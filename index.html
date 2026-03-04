@@ -706,6 +706,39 @@
                                         </div>
                                     </div>
                                 )}
+                                
+                                {/* RESTORED: ATTACHED / RELATED DOCS TILE BLOCK */}
+                                {relatedDocs.length > 0 && (
+                                    <div className={`mt-3 pt-3 border-t text-left w-full flex flex-col gap-1.5 ${isDeceased ? 'border-sepia/20' : 'border-ink/20'}`}>
+                                        <div className={`text-[9px] uppercase tracking-widest mb-0.5 ${isDeceased ? 'text-sepia/60' : 'opacity-60'}`}>Attached Records</div>
+                                        {relatedDocs.map(doc => (
+                                            <div 
+                                                key={doc.id} 
+                                                onClick={(e) => { e.stopPropagation(); openEdit(doc); }}
+                                                className={`flex items-center justify-between p-1.5 border transition-colors cursor-pointer ${
+                                                    isDeceased 
+                                                        ? 'border-sepia/40 bg-teastain hover:bg-sepia/10 text-sepia shadow-[2px_2px_0px_#704214]' 
+                                                        : 'border-ink bg-parchment hover:bg-teastain text-ink shadow-[2px_2px_0px_#1A1A1B]'
+                                                }`}
+                                                title="Click to edit details"
+                                            >
+                                                <div className="flex items-center gap-1.5 overflow-hidden">
+                                                    <Icon name="Paperclip" size={10} className="min-w-[10px] opacity-70" />
+                                                    <span className="font-serif font-bold text-[10px] uppercase tracking-wider truncate">{doc.instrument}</span>
+                                                </div>
+                                                {doc.docData && (
+                                                    <button 
+                                                        onClick={(e) => { e.stopPropagation(); setViewerData(doc.docData); }} 
+                                                        className="p-1 hover:text-stamp transition-colors ml-2"
+                                                        title="View Vault PDF"
+                                                    >
+                                                        <Icon name="Eye" size={12}/>
+                                                    </button>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                             
                             <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 flex gap-1 opacity-0 group-hover:opacity-100 transition-all duration-300 z-20">
