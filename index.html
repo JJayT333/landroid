@@ -472,6 +472,18 @@
                 setShowModal(true);
             };
 
+            const openAddUnlinked = () => {
+                setIsAddingInst(false); setShowGranteeList(false); setModalMode('add_unlinked'); setActiveNode(null);
+                const today = new Date().toISOString().split('T')[0];
+                setForm({
+                    instrument: 'Warranty Deed', vol: '', page: '', docNo: '', fileDate: today, date: today, type: 'conveyance',
+                    grantor: '', grantee: '', landDesc: '', remarks: 'Parked document pending research',
+                    conveyanceMode: 'fraction', splitBasis: 'initial', numerator: 1, denominator: 2, manualAmount: 0, docData: '',
+                    isDeceased: false, obituary: '', graveyardLink: ''
+                });
+                setShowModal(true);
+            };
+
             const openAttach = (node) => {
                 setIsAddingInst(false); setShowGranteeList(false); setModalMode('attach'); setActiveNode(node);
                 setAttachParentId('root'); setAttachType('conveyance');
@@ -505,6 +517,9 @@
                 } else if (modalMode === 'add_related') {
                     const newId = Math.random().toString(36).substr(2, 9);
                     setNodes([...nodes, { ...form, id: newId, type: 'related', fraction: 0, initialFraction: 0, parentId: activeNode.id }]);
+                } else if (modalMode === 'add_unlinked') {
+                    const newId = Math.random().toString(36).substr(2, 9);
+                    setNodes([...nodes, { ...form, id: newId, type: 'conveyance', fraction: 0, initialFraction: 0, parentId: 'unlinked' }]);
                 } else if (modalMode === 'attach') {
                     if (attachType === 'conveyance') {
                         const updatedNodes = nodes.map(n => {
@@ -1086,6 +1101,12 @@
 
                             {/* Data Actions Group */}
                             <div className="inline-flex items-center bg-parchment/50 rounded-md border border-ink/20 p-1 shadow-sm">
+                                <button onClick={openAddUnlinked} className="px-3 py-1.5 text-xs font-bold text-fountain/90 hover:text-fountain hover:bg-fountain/10 rounded transition-all flex items-center gap-2" title="Add a document to the Parking Lot">
+                                    <Icon name="Plus" size={14} /> <span className="hidden sm:block">Add Loose Record</span>
+                                </button>
+                                
+                                <div className="w-px h-4 bg-ink/20 mx-1"></div>
+
                                 <button onClick={() => fileInput.current.click()} className="px-3 py-1.5 text-xs font-bold text-ink/70 hover:text-ink hover:bg-parchment rounded transition-all flex items-center gap-2" title="Upload Data">
                                     <Icon name="Upload" size={14} /> <span className="hidden sm:block">Import CSV</span>
                                 </button>
@@ -1180,7 +1201,14 @@
                                             <Icon name="Clock" size={16} />
                                             <span className="text-xs font-bold uppercase tracking-widest font-serif">Master Runsheet Log</span>
                                         </div>
-                                        <div className="text-[10px] font-mono opacity-60">Sorted by Effective Date</div>
+                                        <div className="text-[10px] font-mono opacity-60">
+                                            {nodes.filter(n => n.parentId === 'unlinked').length > 0 && (
+                                                <span className="text-parchment bg-stamp/80 px-2 py-0.5 rounded-sm mr-3 font-bold inline-flex items-center gap-1">
+                                                    {nodes.filter(n => n.parentId === 'unlinked').length} Loose Record(s) pending link
+                                                </span>
+                                            )}
+                                            Sorted by Effective Date
+                                        </div>
                                     </div>
                                     <div className="overflow-x-auto">
                                         <table className="w-full text-left text-sm whitespace-nowrap">
@@ -1475,6 +1503,7 @@
                                     modalMode === 'add_related' ? 'bg-fountain text-parchment' : 
                                     modalMode === 'attach' ? 'bg-fountain text-parchment' :
                                     modalMode === 'precede' ? 'bg-ink text-parchment' :
+                                    modalMode === 'add_unlinked' ? 'bg-fountain text-parchment' :
                                     'bg-ink text-parchment'
                                 }`}>
                                     <div>
@@ -1483,10 +1512,13 @@
                                              modalMode === 'add_related' ? 'Attach Related Document' : 
                                              modalMode === 'attach' ? 'Link Imported Document to Lineage' :
                                              modalMode === 'precede' ? 'Insert Preceding Record' :
+                                             modalMode === 'add_unlinked' ? 'Add Loose Document' :
                                              'Convey Title Link'}
                                         </h2>
                                         <p className="text-[10px] opacity-80 uppercase font-bold tracking-widest mt-1">
-                                            {modalMode === 'add_related' ? 'Non-Conveying Title Work (e.g., Probates, Affidavits)' : 'Protocol Lineage Analysis & Net-interest Database'}
+                                            {modalMode === 'add_related' ? 'Non-Conveying Title Work (e.g., Probates, Affidavits)' : 
+                                             modalMode === 'add_unlinked' ? 'Parking lot record to be attached to the main lineage later' :
+                                             'Protocol Lineage Analysis & Net-interest Database'}
                                         </p>
                                     </div>
                                     <button onClick={() => setShowModal(false)} className="border border-transparent hover:border-current p-2 rounded-sm transition-all">
@@ -1851,9 +1883,10 @@
                                         modalMode === 'add_related' ? 'bg-fountain' :
                                         modalMode === 'attach' ? 'bg-fountain' :
                                         modalMode === 'precede' ? 'bg-ink' :
+                                        modalMode === 'add_unlinked' ? 'bg-fountain' :
                                         'bg-sepia'
                                     }`}>
-                                        Commit {modalMode === 'add_related' ? 'Document' : modalMode === 'attach' ? 'Linked Record' : modalMode === 'precede' ? 'Predecessor' : 'Transaction'}
+                                        Commit {modalMode === 'add_related' ? 'Document' : modalMode === 'attach' ? 'Linked Record' : modalMode === 'precede' ? 'Predecessor' : modalMode === 'add_unlinked' ? 'Loose Record' : 'Transaction'}
                                     </button>
                                     <button onClick={() => setShowModal(false)} className="px-10 py-4 bg-teastain border border-ink hover:border-stamp hover:text-stamp font-bold uppercase tracking-widest transition-colors hover:-translate-y-0.5">
                                         Cancel
