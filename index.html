@@ -272,6 +272,7 @@
             const [modalMode, setModalMode] = useState('edit'); 
             const [activeNode, setActiveNode] = useState(null);
             const [viewerData, setViewerData] = useState(null);
+            const [showOnlyConveyances, setShowOnlyConveyances] = useState(false);
             
             // -------------------------------------------------------------
             // FLOWCHART PRINT CANVAS ENGINE STATE
@@ -700,7 +701,7 @@
                                 {/* NEW CAUSE OF DEATH TILE BLOCK */}
                                 {isDeceased && n.obituary && (
                                     <div className="mt-3 pt-3 border-t border-sepia/20 text-left w-full">
-                                        <div className="text-[10px] uppercase tracking-widest text-sepia/60 font-mono mb-1">Cause of Death / Notes</div>
+                                        <div className="text-[10px] uppercase tracking-widest text-sepia/60 font-mono mb-1">Death Notes</div>
                                         <div className="text-sm text-fountain whitespace-pre-wrap font-handwriting leading-relaxed">
                                             {n.obituary}
                                         </div>
@@ -1114,9 +1115,6 @@
                             {/* View Navigation Group */}
                             <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
                                 <div className="inline-flex items-center bg-teastain/30 rounded-md border border-ink/20 p-1 shadow-sm">
-                                    <button onClick={() => setView('ledger')} className={`px-4 py-1.5 rounded text-xs font-bold transition-all flex items-center gap-2 ${view === 'ledger' ? 'bg-ink text-parchment shadow-sm' : 'text-ink/60 hover:text-ink hover:bg-parchment/50'}`}>
-                                        <Icon name="List" size={14} /> <span className="hidden md:inline">Title Ledger</span><span className="md:hidden">Ledger</span>
-                                    </button>
                                     <button onClick={() => setView('chart')} className={`px-4 py-1.5 rounded text-xs font-bold transition-all flex items-center gap-2 ${view === 'chart' ? 'bg-ink text-parchment shadow-sm' : 'text-ink/60 hover:text-ink hover:bg-parchment/50'}`}>
                                         <Icon name="Chart" size={14} /> <span className="hidden md:inline">Desk Map</span><span className="md:hidden">Map</span>
                                     </button>
@@ -1162,133 +1160,92 @@
 
                     <main className="flex-1 w-full flex flex-col relative overflow-hidden">
                         
-                        {/* -------------------- LEDGER VIEW -------------------- */}
-                        {view === 'ledger' && (
-                            <div className="flex-1 overflow-auto parchment-grid p-6 animate-fade-in no-print">
-                                <div className="max-w-[1800px] mx-auto bg-parchment border border-ink ink-shadow-lg overflow-hidden flex flex-col">
-                                    <div className="p-4 bg-teastain text-sepia border-b border-ink flex items-center gap-2">
-                                        <Icon name="List" size={16} />
-                                        <span className="text-xs font-bold uppercase tracking-widest font-serif">Active Title Conveyances</span>
-                                    </div>
-                                    <div className="overflow-x-auto">
-                                        <table className="w-full text-left text-sm whitespace-nowrap">
-                                            <thead className="bg-teastain border-b-[2px] border-ink text-[10px] text-ink font-bold uppercase tracking-widest sticky top-0 z-10">
-                                                <tr>
-                                                    <th className="px-6 py-4 border-r border-ink/20">Instrument (B)</th>
-                                                    <th className="px-6 py-4 border-r border-ink/20">Vol/Pg (E/F)</th>
-                                                    <th className="px-6 py-4 border-r border-ink/20">Inst No. (G)</th>
-                                                    <th className="px-6 py-4 border-r border-ink/20">Effective (I)</th>
-                                                    <th className="px-6 py-4 border-r border-ink/20">Grantor / Assignor (J)</th>
-                                                    <th className="px-6 py-4 border-r border-ink/20 text-ink">Grantee / Assignee (K)</th>
-                                                    <th className="px-6 py-4 border-r border-ink/20 text-sepia">Retained Share</th>
-                                                    <th className="px-6 py-4 text-right">Actions</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="divide-y divide-ink/20">
-                                                {nodes.filter(n => n.type !== 'related' && n.parentId !== 'unlinked').map(n => (
-                                                    <tr key={n.id} className={`group cursor-pointer transition-colors ${n.isDeceased ? 'bg-teastain text-sepia' : 'hover:bg-teastain'}`} onClick={() => openEdit(n)}>
-                                                        <td className="px-6 py-4 border-r border-ink/20">
-                                                            <span className={`font-serif font-bold text-xs uppercase ${n.isDeceased ? 'text-sepia/70' : 'text-sepia'}`}>{n.instrument}</span>
-                                                            {n.isDeceased && <Icon name="Tombstone" size={12} className="inline ml-2 opacity-60" />}
-                                                        </td>
-                                                        <td className="px-6 py-4 font-mono text-xs border-r border-ink/20">{n.vol && n.page ? `${n.vol}/${n.page}` : "-"}</td>
-                                                        <td className="px-6 py-4 font-medium border-r border-ink/20 text-xs">{n.docNo || '-'}</td>
-                                                        <td className="px-6 py-4 text-xs border-r border-ink/20">{n.date}</td>
-                                                        <td className="px-6 py-4 text-xs truncate max-w-[200px] border-r border-ink/20 opacity-80">{n.grantor}</td>
-                                                        <td className="px-6 py-4 font-serif font-bold truncate max-w-[250px] border-r border-ink/20">{n.grantee}</td>
-                                                        <td className="px-6 py-4 font-bold font-mono text-sm border-r border-ink/20">{formatFraction(n.fraction)}</td>
-                                                        <td className="px-6 py-4 text-right flex justify-end gap-2">
-                                                            {n.docData && (
-                                                                <button onClick={(e) => { e.stopPropagation(); setViewerData(n.docData); }} className="p-1.5 border border-transparent hover:border-sepia/50 rounded-sm transition-colors text-stamp" title="View PDF">
-                                                                    <Icon name="Eye" size={16}/>
-                                                                </button>
-                                                            )}
-                                                            <button onClick={(e) => { e.stopPropagation(); openPrecede(n); }} className="p-1.5 border border-transparent hover:border-sepia/50 rounded-sm transition-colors" title="Insert Predecessor Record">
-                                                                <Icon name="ArrowUp" size={16}/>
-                                                            </button>
-                                                            <button onClick={(e) => { e.stopPropagation(); openRelated(n); }} className="p-1.5 border border-transparent hover:border-sepia/50 rounded-sm transition-colors" title="Attach Related Doc">
-                                                                <Icon name="Paperclip" size={16}/>
-                                                            </button>
-                                                            <button onClick={(e) => { e.stopPropagation(); openConvey(n); }} className="p-1.5 border border-transparent hover:border-sepia text-sepia rounded-sm transition-colors" title="Convey from this row">
-                                                                <Icon name="Convey" size={16}/>
-                                                            </button>
-                                                            <button onClick={(e) => { e.stopPropagation(); requestDeleteRecord(n); }} disabled={n.parentId === null} className="p-1.5 border border-transparent hover:border-stamp/50 text-stamp rounded-sm disabled:opacity-30 transition-colors">
-                                                                <Icon name="Trash" size={16}/>
-                                                            </button>
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* -------------------- MASTER CHRONOLOGICAL VIEW -------------------- */}
+                        {/* -------------------- RUNSHEET / UNIFIED LEDGER VIEW -------------------- */}
                         {view === 'master' && (
-                            <div className="flex-1 overflow-auto parchment-grid p-6 animate-fade-in no-print">
+                            <div className="flex-1 overflow-auto parchment-grid p-4 sm:p-6 animate-fade-in no-print">
                                 <div className="max-w-[1800px] mx-auto bg-parchment border border-ink ink-shadow-lg overflow-hidden flex flex-col">
-                                    <div className="p-4 bg-ink text-parchment border-b-[2px] border-ink flex items-center justify-between">
+                                    <div className="p-3 bg-ink text-parchment border-b-[2px] border-ink flex items-center justify-between">
                                         <div className="flex items-center gap-2">
                                             <Icon name="Clock" size={16} />
                                             <span className="text-xs font-bold uppercase tracking-widest font-serif">Master Runsheet Log</span>
                                         </div>
-                                        <div className="text-[10px] font-mono opacity-60">
-                                            {nodes.filter(n => n.parentId === 'unlinked').length > 0 && (
-                                                <span className="text-parchment bg-stamp/80 px-2 py-0.5 rounded-sm mr-3 font-bold inline-flex items-center gap-1">
-                                                    {nodes.filter(n => n.parentId === 'unlinked').length} Loose Record(s) pending link
-                                                </span>
-                                            )}
-                                            Sorted by Effective Date
+                                        <div className="flex items-center gap-4">
+                                            <div className="flex bg-ink border border-parchment/30 rounded-sm p-0.5">
+                                                <button onClick={() => setShowOnlyConveyances(false)} className={`px-3 py-1 text-[9px] font-bold uppercase transition-all rounded-sm ${!showOnlyConveyances ? 'bg-parchment text-ink shadow-sm' : 'text-parchment/60 hover:text-parchment'}`}>All Records</button>
+                                                <button onClick={() => setShowOnlyConveyances(true)} className={`px-3 py-1 text-[9px] font-bold uppercase transition-all rounded-sm ${showOnlyConveyances ? 'bg-parchment text-ink shadow-sm' : 'text-parchment/60 hover:text-parchment'}`}>Conveyances Only</button>
+                                            </div>
+                                            <div className="text-[10px] font-mono opacity-60 hidden sm:flex items-center">
+                                                {nodes.filter(n => n.parentId === 'unlinked').length > 0 && !showOnlyConveyances && (
+                                                    <span className="text-parchment bg-stamp/80 px-2 py-0.5 rounded-sm mr-3 font-bold inline-flex items-center gap-1">
+                                                        {nodes.filter(n => n.parentId === 'unlinked').length} Loose Record(s) pending link
+                                                    </span>
+                                                )}
+                                                Sorted by Effective Date
+                                            </div>
                                         </div>
                                     </div>
                                     <div className="overflow-x-auto">
                                         <table className="w-full text-left text-sm whitespace-nowrap">
-                                            <thead className="bg-teastain border-b-[2px] border-ink text-[10px] text-ink font-bold uppercase tracking-widest sticky top-0 z-10">
+                                            <thead className="bg-teastain border-b-[2px] border-ink text-[9px] text-ink font-bold uppercase tracking-widest sticky top-0 z-10">
                                                 <tr>
-                                                    <th className="px-6 py-4 border-r border-ink/20">Instrument</th>
-                                                    <th className="px-6 py-4 border-r border-ink/20">Inst Date</th>
-                                                    <th className="px-6 py-4 border-r border-ink/20">File Date</th>
-                                                    <th className="px-6 py-4 border-r border-ink/20">Vol/Pg</th>
-                                                    <th className="px-6 py-4 border-r border-ink/20">Grantor / Assignor</th>
-                                                    <th className="px-6 py-4 border-r border-ink/20">Grantee / Subject</th>
-                                                    <th className="px-6 py-4 border-r border-ink/20">Land Desc.</th>
-                                                    <th className="px-6 py-4 border-r border-ink/20">Remarks</th>
-                                                    <th className="px-6 py-4 text-right">Actions</th>
+                                                    <th className="px-4 py-2 border-r border-ink/20">Instrument</th>
+                                                    <th className="px-4 py-2 border-r border-ink/20">Inst Date</th>
+                                                    <th className="px-4 py-2 border-r border-ink/20">File Date</th>
+                                                    <th className="px-4 py-2 border-r border-ink/20">Vol/Pg</th>
+                                                    <th className="px-4 py-2 border-r border-ink/20">Grantor / Assignor</th>
+                                                    <th className="px-4 py-2 border-r border-ink/20">Grantee / Subject</th>
+                                                    <th className="px-4 py-2 border-r border-ink/20">Land Desc.</th>
+                                                    {showOnlyConveyances && <th className="px-4 py-2 border-r border-ink/20 text-sepia">Retained Share</th>}
+                                                    <th className="px-4 py-2 border-r border-ink/20">Remarks</th>
+                                                    <th className="px-4 py-2 text-right">Actions</th>
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-ink/20">
-                                                {[...nodes].sort((a,b) => new Date(a.date) - new Date(b.date)).map(n => (
+                                                {[...nodes]
+                                                    .sort((a,b) => new Date(a.date) - new Date(b.date))
+                                                    .filter(n => showOnlyConveyances ? (n.type !== 'related' && n.parentId !== 'unlinked') : true)
+                                                    .map(n => (
                                                     <tr key={n.id} className={`group cursor-pointer transition-colors ${n.parentId === 'unlinked' ? 'bg-[#E6DFCC]/50' : n.type === 'related' ? 'bg-teastain/80' : 'bg-parchment hover:bg-teastain'}`} onClick={() => openEdit(n)}>
-                                                        <td className="px-6 py-4 font-serif font-bold text-xs border-r border-ink/20">
+                                                        <td className="px-4 py-1.5 font-serif font-bold text-[11px] border-r border-ink/20">
                                                             {n.instrument}
                                                             {n.parentId === 'unlinked' && <span className="ml-2 px-1.5 py-0.5 bg-sepia/10 text-sepia text-[8px] uppercase tracking-wider rounded border border-sepia/30 font-mono inline-block">Unlinked</span>}
                                                             {n.type === 'related' && <span className="ml-2 px-1.5 py-0.5 bg-ink/5 text-ink/60 text-[8px] uppercase tracking-wider rounded border border-ink/20 font-mono inline-block">Related</span>}
+                                                            {n.isDeceased && <Icon name="Tombstone" size={10} className="inline ml-2 opacity-60 text-sepia" />}
                                                         </td>
-                                                        <td className="px-6 py-4 text-xs font-mono border-r border-ink/20">{n.date}</td>
-                                                        <td className="px-6 py-4 font-mono text-xs border-r border-ink/20">{n.fileDate || '-'}</td>
-                                                        <td className="px-6 py-4 font-mono text-xs border-r border-ink/20">{n.vol && n.page ? `${n.vol}/${n.page}` : "-"}</td>
-                                                        <td className="px-6 py-4 text-xs truncate max-w-[150px] border-r border-ink/20 opacity-80">{n.grantor || '-'}</td>
-                                                        <td className="px-6 py-4 font-serif font-bold text-xs truncate max-w-[200px] border-r border-ink/20">{n.grantee}</td>
-                                                        <td className="px-6 py-4 text-xs truncate max-w-[200px] border-r border-ink/20">{n.landDesc || '-'}</td>
-                                                        <td className="px-6 py-4 text-xs truncate max-w-[200px] italic border-r border-ink/20 opacity-60">{n.remarks}</td>
-                                                        <td className="px-6 py-4 text-right flex items-center justify-end gap-2">
+                                                        <td className="px-4 py-1.5 text-[11px] font-mono border-r border-ink/20">{n.date}</td>
+                                                        <td className="px-4 py-1.5 font-mono text-[11px] border-r border-ink/20">{n.fileDate || '-'}</td>
+                                                        <td className="px-4 py-1.5 font-mono text-[11px] border-r border-ink/20">{n.vol && n.page ? `${n.vol}/${n.page}` : "-"}</td>
+                                                        <td className="px-4 py-1.5 text-[11px] truncate max-w-[150px] border-r border-ink/20 opacity-80">{n.grantor || '-'}</td>
+                                                        <td className="px-4 py-1.5 font-serif font-bold text-[11px] truncate max-w-[200px] border-r border-ink/20">{n.grantee}</td>
+                                                        <td className="px-4 py-1.5 text-[11px] truncate max-w-[150px] border-r border-ink/20">{n.landDesc || '-'}</td>
+                                                        {showOnlyConveyances && <td className="px-4 py-1.5 font-bold font-mono text-[11px] border-r border-ink/20">{formatFraction(n.fraction)}</td>}
+                                                        <td className="px-4 py-1.5 text-[10px] truncate max-w-[150px] italic border-r border-ink/20 opacity-60">{n.remarks}</td>
+                                                        <td className="px-4 py-1.5 text-right flex items-center justify-end gap-1">
                                                             {n.parentId === 'unlinked' && (
-                                                                <button onClick={(e) => { e.stopPropagation(); openAttach(n); }} className="px-3 py-1 bg-sepia text-parchment border border-sepia hover:bg-sepia/80 rounded-sm transition-colors text-[10px] font-bold uppercase tracking-widest flex items-center gap-1 ink-shadow">
-                                                                    <Icon name="Link" size={12}/> Attach
+                                                                <button onClick={(e) => { e.stopPropagation(); openAttach(n); }} className="px-2 py-1 bg-sepia text-parchment border border-sepia hover:bg-sepia/80 rounded-sm transition-colors text-[9px] font-bold uppercase tracking-widest flex items-center gap-1 ink-shadow">
+                                                                    <Icon name="Link" size={10}/> Attach
                                                                 </button>
                                                             )}
                                                             {n.docData && (
-                                                                <button onClick={(e) => { e.stopPropagation(); setViewerData(n.docData); }} className="p-1.5 border border-transparent hover:border-sepia/50 rounded-sm transition-colors text-stamp" title="View PDF">
-                                                                    <Icon name="Eye" size={16}/>
+                                                                <button onClick={(e) => { e.stopPropagation(); setViewerData(n.docData); }} className="p-1 border border-transparent hover:border-sepia/50 rounded-sm transition-colors text-stamp" title="View PDF">
+                                                                    <Icon name="Eye" size={14}/>
                                                                 </button>
                                                             )}
-                                                            <button onClick={(e) => { e.stopPropagation(); openPrecede(n); }} className="p-1.5 border border-transparent hover:border-sepia/50 rounded-sm transition-colors" title="Insert Predecessor Record">
-                                                                <Icon name="ArrowUp" size={16}/>
-                                                            </button>
-                                                            <button onClick={(e) => { e.stopPropagation(); requestDeleteRecord(n); }} disabled={n.parentId === null} className="p-1.5 border border-transparent hover:border-stamp/50 text-stamp rounded-sm disabled:opacity-30 transition-colors">
-                                                                <Icon name="Trash" size={16}/>
+                                                            {n.parentId !== 'unlinked' && (
+                                                                <>
+                                                                    <button onClick={(e) => { e.stopPropagation(); openPrecede(n); }} className="p-1 border border-transparent hover:border-sepia/50 rounded-sm transition-colors" title="Insert Predecessor Record">
+                                                                        <Icon name="ArrowUp" size={14}/>
+                                                                    </button>
+                                                                    <button onClick={(e) => { e.stopPropagation(); openRelated(n); }} className="p-1 border border-transparent hover:border-sepia/50 rounded-sm transition-colors" title="Attach Related Doc">
+                                                                        <Icon name="Paperclip" size={14}/>
+                                                                    </button>
+                                                                    <button onClick={(e) => { e.stopPropagation(); openConvey(n); }} className="p-1 border border-transparent hover:border-sepia text-sepia rounded-sm transition-colors" title="Convey from this row">
+                                                                        <Icon name="Convey" size={14}/>
+                                                                    </button>
+                                                                </>
+                                                            )}
+                                                            <button onClick={(e) => { e.stopPropagation(); requestDeleteRecord(n); }} disabled={n.parentId === null} className="p-1 border border-transparent hover:border-stamp/50 text-stamp rounded-sm disabled:opacity-30 transition-colors">
+                                                                <Icon name="Trash" size={14}/>
                                                             </button>
                                                         </td>
                                                     </tr>
@@ -1321,54 +1278,75 @@
                             <div className="flex-1 overflow-hidden relative parchment-grid animate-fade-in flex flex-col print-canvas-container">
                                 
                                 {/* UI Toolbar (Hidden on actual print) */}
-                                <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-parchment border border-ink ink-shadow-lg z-50 flex items-center p-2 gap-2 no-print">
-                                    <div className="flex bg-teastain p-1 border border-ink gap-1">
-                                        <button onClick={() => setFlowTool('select')} className={`p-2 transition-colors ${flowTool === 'select' ? 'bg-ink text-parchment' : 'text-ink hover:bg-ink/10'}`} title="Select / Move Single Node"><Icon name="MousePointer" size={16} /></button>
-                                        <button onClick={() => setFlowTool('move-tree')} className={`p-2 transition-colors ${flowTool === 'move-tree' ? 'bg-ink text-parchment' : 'text-ink hover:bg-ink/10'}`} title="Move Entire Tree Inside Paper"><Icon name="Move" size={16} /></button>
-                                        <button onClick={() => setFlowTool('pan')} className={`p-2 transition-colors ${flowTool === 'pan' ? 'bg-ink text-parchment' : 'text-ink hover:bg-ink/10'}`} title="Pan Viewport"><Icon name="Hand" size={16} /></button>
-                                        <button onClick={() => setFlowTool('connect')} className={`p-2 transition-colors ${flowTool === 'connect' ? 'bg-ink text-parchment' : 'text-ink hover:bg-ink/10'}`} title="Draw Link (Drag between boxes)"><Icon name="Link" size={16} /></button>
+                                <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-parchment border border-ink ink-shadow-lg z-50 flex items-stretch p-2 gap-4 no-print max-w-[95vw] overflow-x-auto whitespace-nowrap">
+                                    
+                                    {/* 1. Cursor Tools */}
+                                    <div className="flex flex-col justify-center">
+                                        <div className="text-[8px] font-bold uppercase tracking-widest text-ink/50 mb-1 pl-1">Active Tool</div>
+                                        <div className="flex bg-teastain p-0.5 border border-ink">
+                                            <button onClick={() => setFlowTool('select')} className={`px-3 py-1.5 flex items-center gap-1.5 text-[10px] font-bold uppercase transition-colors ${flowTool === 'select' ? 'bg-ink text-parchment shadow-inner' : 'text-ink hover:bg-ink/10'}`} title="Select, Move, or Double-Click a single Box"><Icon name="MousePointer" size={12} /> Move Box</button>
+                                            <button onClick={() => setFlowTool('move-tree')} className={`px-3 py-1.5 flex items-center gap-1.5 text-[10px] font-bold uppercase transition-colors ${flowTool === 'move-tree' ? 'bg-ink text-parchment shadow-inner' : 'text-ink hover:bg-ink/10'}`} title="Drag the entire tree structure around to fit on the paper"><Icon name="Move" size={12} /> Move Tree</button>
+                                            <button onClick={() => setFlowTool('pan')} className={`px-3 py-1.5 flex items-center gap-1.5 text-[10px] font-bold uppercase transition-colors ${flowTool === 'pan' ? 'bg-ink text-parchment shadow-inner' : 'text-ink hover:bg-ink/10'}`} title="Pan your view around the screen (does not affect print location)"><Icon name="Hand" size={12} /> Pan Canvas</button>
+                                            <button onClick={() => setFlowTool('connect')} className={`px-3 py-1.5 flex items-center gap-1.5 text-[10px] font-bold uppercase transition-colors ${flowTool === 'connect' ? 'bg-ink text-parchment shadow-inner' : 'text-ink hover:bg-ink/10'}`} title="Drag from one box to another to draw a connecting line"><Icon name="Link" size={12} /> Link Boxes</button>
+                                        </div>
                                     </div>
-                                    
-                                    <div className="w-[1.5px] h-6 bg-ink mx-1 opacity-20"></div>
-                                    
-                                    {/* Multi-Page Grid Control */}
-                                    <div className="flex items-center gap-3 px-2 border-r-[1.5px] border-ink/20 pr-3">
-                                        <div className="text-[10px] font-bold uppercase tracking-widest text-ink flex flex-col leading-tight"><span>Pages</span><span className="opacity-50 text-[8px]">[W x H]</span></div>
-                                        <div className="flex flex-col gap-1">
-                                            <div className="flex items-center gap-1">
-                                                <button onClick={() => setGridCols(c => Math.max(1, c-1))} className="w-4 h-4 flex items-center justify-center bg-teastain hover:bg-ink hover:text-parchment border border-ink text-xs transition-colors">-</button>
-                                                <span className="w-3 text-center text-[10px] font-mono font-bold">{gridCols}</span>
-                                                <button onClick={() => setGridCols(c => c+1)} className="w-4 h-4 flex items-center justify-center bg-teastain hover:bg-ink hover:text-parchment border border-ink text-xs transition-colors">+</button>
+
+                                    <div className="w-[1px] bg-ink/20 my-1"></div>
+
+                                    {/* 2. Grid & Scale */}
+                                    <div className="flex flex-col justify-center">
+                                        <div className="text-[8px] font-bold uppercase tracking-widest text-ink/50 mb-1 pl-1">Paper Boundaries</div>
+                                        <div className="flex items-center gap-4 h-full bg-parchment">
+                                            {/* Multi-Page Grid Control */}
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-[10px] font-bold uppercase text-ink flex items-center gap-1" title="Columns x Rows of Pages"><Icon name="FileText" size={10}/> Grid:</span>
+                                                <div className="flex items-center">
+                                                    <button onClick={() => setGridCols(c => Math.max(1, c-1))} className="w-5 h-5 flex items-center justify-center bg-teastain hover:bg-ink hover:text-parchment border border-ink text-xs transition-colors">-</button>
+                                                    <span className="w-4 text-center text-[10px] font-mono font-bold">{gridCols}</span>
+                                                    <button onClick={() => setGridCols(c => c+1)} className="w-5 h-5 flex items-center justify-center bg-teastain hover:bg-ink hover:text-parchment border border-ink text-xs transition-colors">+</button>
+                                                </div>
+                                                <span className="text-[10px] text-ink/50 font-bold">X</span>
+                                                <div className="flex items-center">
+                                                    <button onClick={() => setGridRows(r => Math.max(1, r-1))} className="w-5 h-5 flex items-center justify-center bg-teastain hover:bg-ink hover:text-parchment border border-ink text-xs transition-colors">-</button>
+                                                    <span className="w-4 text-center text-[10px] font-mono font-bold">{gridRows}</span>
+                                                    <button onClick={() => setGridRows(r => r+1)} className="w-5 h-5 flex items-center justify-center bg-teastain hover:bg-ink hover:text-parchment border border-ink text-xs transition-colors">+</button>
+                                                </div>
                                             </div>
-                                            <div className="flex items-center gap-1">
-                                                <button onClick={() => setGridRows(r => Math.max(1, r-1))} className="w-4 h-4 flex items-center justify-center bg-teastain hover:bg-ink hover:text-parchment border border-ink text-xs transition-colors">-</button>
-                                                <span className="w-3 text-center text-[10px] font-mono font-bold">{gridRows}</span>
-                                                <button onClick={() => setGridRows(r => r+1)} className="w-4 h-4 flex items-center justify-center bg-teastain hover:bg-ink hover:text-parchment border border-ink text-xs transition-colors">+</button>
+
+                                            <div className="w-[1px] h-5 bg-ink/20"></div>
+
+                                            {/* Tree Scaling Slider */}
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-[10px] font-bold uppercase tracking-widest text-ink">Scale:</span>
+                                                <input 
+                                                    type="range" min="0.2" max="1.5" step="0.05" 
+                                                    value={treeScale} 
+                                                    onChange={e => setTreeScale(Number(e.target.value))} 
+                                                    className="w-20 accent-sepia cursor-pointer"
+                                                    title="Scale the tree to fit inside the paper bounds"
+                                                />
                                             </div>
                                         </div>
                                     </div>
 
-                                    {/* Tree Scaling Slider to fit boxes in paper */}
-                                    <div className="flex items-center gap-2 px-2">
-                                        <span className="text-[10px] font-bold uppercase tracking-widest text-ink">Scale</span>
-                                        <input 
-                                            type="range" min="0.2" max="1.5" step="0.05" 
-                                            value={treeScale} 
-                                            onChange={e => setTreeScale(Number(e.target.value))} 
-                                            className="w-20 accent-sepia cursor-pointer"
-                                        />
+                                    <div className="w-[1px] bg-ink/20 my-1"></div>
+
+                                    {/* 3. Actions */}
+                                    <div className="flex flex-col justify-center">
+                                        <div className="text-[8px] font-bold uppercase tracking-widest text-ink/50 mb-1 pl-1">Actions</div>
+                                        <div className="flex items-center gap-1.5 h-full">
+                                            <button onClick={() => addFlowNode('template')} className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-ink bg-parchment hover:bg-teastain flex items-center gap-1 shadow-sm transition-all hover:-translate-y-0.5"><Icon name="Plus" size={12}/> Box</button>
+                                            <button onClick={() => addFlowNode('blank')} className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-ink bg-parchment hover:bg-teastain flex items-center gap-1 shadow-sm transition-all hover:-translate-y-0.5"><Icon name="Plus" size={12}/> Note</button>
+                                            
+                                            <div className="w-[1px] h-5 bg-ink/20 mx-1"></div>
+                                            
+                                            <button onClick={() => setPrintOrientation(prev => prev === 'portrait' ? 'landscape' : 'portrait')} className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-ink bg-parchment hover:bg-teastain flex items-center gap-1 shadow-sm transition-all hover:-translate-y-0.5" title="Toggle Portrait/Landscape">
+                                                <Icon name="FileText" size={12}/> {printOrientation === 'portrait' ? 'Portrait' : 'Landscape'}
+                                            </button>
+                                            <button onClick={importToFlowchart} className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-sepia text-sepia hover:bg-sepia hover:text-parchment flex items-center gap-1 shadow-sm transition-all hover:-translate-y-0.5" title="Generate Top-Down layout from Desk Map"><Icon name="Download" size={12}/> Import</button>
+                                            <button onClick={() => window.print()} className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-ink bg-ink text-parchment hover:bg-ink/80 flex items-center gap-1 shadow-sm transition-all hover:-translate-y-0.5"><Icon name="Printer" size={12}/> Print</button>
+                                        </div>
                                     </div>
-                                    
-                                    <div className="w-[1.5px] h-6 bg-ink mx-1 opacity-20"></div>
-                                    <button onClick={() => addFlowNode('template')} className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-ink bg-parchment hover:bg-teastain flex items-center gap-1 shadow-sm transition-all hover:-translate-y-0.5"><Icon name="Plus" size={12}/> Box</button>
-                                    <button onClick={() => addFlowNode('blank')} className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-ink bg-parchment hover:bg-teastain flex items-center gap-1 shadow-sm transition-all hover:-translate-y-0.5"><Icon name="Plus" size={12}/> Note</button>
-                                    <div className="w-[1.5px] h-6 bg-ink mx-1 opacity-20"></div>
-                                    
-                                    <button onClick={() => setPrintOrientation(prev => prev === 'portrait' ? 'landscape' : 'portrait')} className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-ink bg-parchment hover:bg-teastain flex items-center gap-1 shadow-sm transition-all hover:-translate-y-0.5" title="Toggle Canvas Orientation">
-                                        <Icon name="FileText" size={12}/> {printOrientation === 'portrait' ? 'Portrait' : 'Landscape'}
-                                    </button>
-                                    <button onClick={importToFlowchart} className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-sepia text-sepia hover:bg-sepia hover:text-parchment flex items-center gap-1 shadow-sm transition-all hover:-translate-y-0.5" title="Generate Top-Down layout from Desk Map"><Icon name="Download" size={12}/> Import</button>
-                                    <button onClick={() => window.print()} className="px-4 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-ink bg-ink text-parchment hover:bg-ink/80 flex items-center gap-1 shadow-sm transition-all hover:-translate-y-0.5"><Icon name="Printer" size={12}/> Print</button>
                                 </div>
 
                                 {/* Flowchart Property Panel (Hidden on Print) */}
