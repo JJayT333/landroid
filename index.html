@@ -54,18 +54,36 @@
     <style>
         * { box-sizing: border-box; }
 
-        body { 
-            background-color: #F5F1E3; /* Parchment */
-            color: #1A1A1B; /* Ink */
+        :root {
+            --parchment: #F5F1E3;
+            --teastain: #E6DFCC;
+            --ink: #1A1A1B;
+            --sepia: #704214;
+            --fountain: #003366;
+        }
+
+        body {
+            min-height: 100vh;
+            margin: 0;
+            background:
+                radial-gradient(circle at 10% -20%, rgba(0, 51, 102, 0.10), transparent 35%),
+                radial-gradient(circle at 95% 0%, rgba(112, 66, 20, 0.16), transparent 30%),
+                linear-gradient(180deg, #f8f4ea 0%, #f5f1e3 55%, #eee7d5 100%);
+            color: var(--ink);
             font-family: 'Courier Prime', monospace;
+        }
+
+        #root {
+            min-height: 100vh;
+            backdrop-filter: saturate(105%);
         }
 
         /* Engineering Paper Grid Background */
         .parchment-grid {
-            background-color: #F5F1E3;
+            background-color: #f4efdf;
             background-image: 
-                linear-gradient(#E6DFCC 1px, transparent 1px),
-                linear-gradient(90deg, #E6DFCC 1px, transparent 1px);
+                linear-gradient(rgba(112, 66, 20, 0.10) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(112, 66, 20, 0.10) 1px, transparent 1px);
             background-size: 20px 20px, 20px 20px;
         }
 
@@ -87,17 +105,20 @@
         }
 
         /* Hard Edge Vintage Shadows */
-        .ink-shadow { 
-            box-shadow: 4px 4px 0px #1A1A1B; 
-            border: 1px solid #1A1A1B;
+        .ink-shadow {
+            border: 1px solid rgba(26, 26, 27, 0.28);
+            box-shadow: 0 10px 22px rgba(26, 26, 27, 0.14), 0 2px 4px rgba(26, 26, 27, 0.08);
+            border-radius: 10px;
+            transition: box-shadow 0.2s ease, transform 0.2s ease;
         }
-        .ink-shadow-lg { 
-            box-shadow: 8px 8px 0px #1A1A1B; 
-            border: 2px solid #1A1A1B;
+        .ink-shadow-lg {
+            border: 1px solid rgba(26, 26, 27, 0.30);
+            box-shadow: 0 18px 36px rgba(26, 26, 27, 0.16), 0 2px 8px rgba(26, 26, 27, 0.12);
+            border-radius: 14px;
         }
         .ink-shadow-hover:hover {
-            box-shadow: 6px 6px 0px #1A1A1B;
-            transform: translate(-2px, -2px);
+            box-shadow: 0 16px 30px rgba(26, 26, 27, 0.20), 0 3px 9px rgba(26, 26, 27, 0.14);
+            transform: translateY(-2px);
         }
 
         /* Vintage Rubber Stamp */
@@ -105,14 +126,14 @@
             border: 2px solid #8B0000;
             color: #8B0000;
             font-weight: 700;
-            padding: 0.25rem 0.75rem;
+            padding: 0.3rem 0.9rem;
             display: inline-block;
             text-transform: uppercase;
             letter-spacing: 0.1em;
             font-family: 'Courier Prime', monospace;
-            background: transparent;
-            transform: rotate(-2deg);
-            border-radius: 4px;
+            background: rgba(255, 255, 255, 0.45);
+            transform: rotate(-1.25deg);
+            border-radius: 999px;
             opacity: 0.9;
         }
         .rubber-stamp.error {
@@ -132,7 +153,7 @@
         }
         input:focus, select:focus, textarea:focus {
             border-color: #704214 !important;
-            box-shadow: 2px 2px 0px #704214 !important;
+            box-shadow: 0 0 0 3px rgba(112, 66, 20, 0.22) !important;
             outline: none;
         }
         option {
@@ -142,8 +163,10 @@
 
         /* Vintage Header Header */
         .cyber-header-bg {
-            background: #E6DFCC;
-            border-bottom: 2px solid #1A1A1B;
+            background: linear-gradient(180deg, rgba(247, 242, 228, 0.95), rgba(236, 227, 208, 0.95));
+            border-bottom: 1px solid rgba(26, 26, 27, 0.2);
+            box-shadow: 0 10px 20px rgba(26, 26, 27, 0.08);
+            backdrop-filter: blur(8px);
             position: relative;
         }
 
@@ -159,7 +182,7 @@
         .tree-line { background: #1A1A1B !important; }
 
         /* Table rows */
-        tr:hover td { background: rgba(112, 66, 20, 0.05) !important; }
+        tr:hover td { background: rgba(112, 66, 20, 0.08) !important; }
 
         /* Print styles */
         .print-only { display: none; }
@@ -1154,10 +1177,10 @@
                 {/* Dynamically assign the physical print page size based on orientation toggle */}
                 <style dangerouslySetInnerHTML={{ __html: `@media print { @page { size: letter ${printOrientation}; margin: 0; } }` }} />
                 
-                <div className="h-screen w-screen overflow-hidden flex flex-col relative font-mono text-ink">
+                <div className="h-screen w-screen overflow-hidden flex flex-col relative font-mono text-ink px-3 sm:px-5 py-3 sm:py-4 gap-3">
                     
                     {/* The Surveyors Desk Header - HIDDEN ON PRINT */}
-                    <header className="cyber-header-bg z-40 relative px-6 py-4 flex justify-between items-start no-print">
+                    <header className="cyber-header-bg z-40 relative px-4 sm:px-6 py-4 flex justify-between items-start no-print rounded-2xl ink-shadow">
                         <div className="flex flex-col gap-3">
                             <div>
                                 <h1 className="font-serif text-2xl font-black tracking-tight flex items-baseline gap-2">
@@ -1177,7 +1200,7 @@
                         <div className="flex flex-col items-end gap-3 pt-1">
                             {/* View Navigation Group */}
                             <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
-                                <div className="inline-flex items-center bg-teastain/30 rounded-md border border-ink/20 p-1 shadow-sm">
+                                <div className="inline-flex items-center bg-teastain/40 rounded-xl border border-ink/20 p-1.5 shadow-sm">
                                     <button onClick={() => setView('chart')} className={`px-4 py-1.5 rounded text-xs font-bold transition-all flex items-center gap-2 ${view === 'chart' ? 'bg-ink text-parchment shadow-sm' : 'text-ink/60 hover:text-ink hover:bg-parchment/50'}`}>
                                         <Icon name="Chart" size={14} /> <span className="hidden md:inline">Desk Map</span><span className="md:hidden">Map</span>
                                     </button>
@@ -1194,7 +1217,7 @@
                             </div>
 
                             {/* Data Actions Group */}
-                            <div className="inline-flex items-center bg-parchment/50 rounded-md border border-ink/20 p-1 shadow-sm">
+                            <div className="inline-flex items-center bg-parchment/70 rounded-xl border border-ink/20 p-1.5 shadow-sm">
                                 <button onClick={openNewChain} className="px-3 py-1.5 text-xs font-bold text-fountain/90 hover:text-fountain hover:bg-fountain/10 rounded transition-all flex items-center gap-2" title="Start a completely separate independent lineage tree">
                                     <Icon name="Plus" size={14} /> <span className="hidden sm:block">New Tree</span>
                                 </button>
@@ -1227,13 +1250,13 @@
                         </div>
                     </header>
 
-                    <main className="flex-1 w-full flex flex-col relative overflow-hidden">
+                    <main className="flex-1 w-full flex flex-col relative overflow-hidden rounded-2xl border border-ink/20 bg-parchment/30 backdrop-blur-[1px]">
                         
                         {/* -------------------- RUNSHEET / UNIFIED LEDGER VIEW -------------------- */}
                         {view === 'master' && (
-                            <div className="flex-1 overflow-auto parchment-grid p-4 sm:p-6 animate-fade-in no-print">
-                                <div className="max-w-[1800px] mx-auto bg-parchment border border-ink ink-shadow-lg overflow-hidden flex flex-col">
-                                    <div className="p-3 bg-ink text-parchment border-b-[2px] border-ink flex items-center justify-between">
+                            <div className="flex-1 overflow-auto parchment-grid p-4 sm:p-6 animate-fade-in no-print rounded-2xl">
+                                <div className="max-w-[1800px] mx-auto bg-parchment/95 border border-ink/30 ink-shadow-lg overflow-hidden flex flex-col rounded-2xl">
+                                    <div className="p-4 bg-gradient-to-r from-ink via-ink to-sepia text-parchment border-b border-ink/70 flex items-center justify-between">
                                         <div className="flex items-center gap-2">
                                             <Icon name="Clock" size={16} />
                                             <span className="text-xs font-bold uppercase tracking-widest font-serif">Master Runsheet Log</span>
@@ -1255,7 +1278,7 @@
                                     </div>
                                     <div className="overflow-x-auto">
                                         <table className="w-full text-left text-sm whitespace-nowrap">
-                                            <thead className="bg-teastain border-b-[2px] border-ink text-[9px] text-ink font-bold uppercase tracking-widest sticky top-0 z-10">
+                                            <thead className="bg-teastain/90 border-b border-ink/40 text-[9px] text-ink font-bold uppercase tracking-widest sticky top-0 z-10">
                                                 <tr>
                                                     <th className="px-4 py-2 border-r border-ink/20">Instrument</th>
                                                     <th className="px-4 py-2 border-r border-ink/20">Inst Date</th>
@@ -1328,7 +1351,7 @@
                         {/* -------------------- DESK MAP (INTERACTIVE TREE) -------------------- */}
                         {view === 'chart' && (
                             <div 
-                                className={`flex-1 overflow-hidden relative parchment-grid ${isDragging.current ? 'cursor-grabbing select-none' : 'cursor-grab'} animate-fade-in no-print`}
+                                className={`flex-1 overflow-hidden relative parchment-grid ${isDragging.current ? 'cursor-grabbing select-none' : 'cursor-grab'} animate-fade-in no-print rounded-2xl`}
                                 onPointerDown={handlePointerDown}
                                 onPointerMove={handlePointerMove}
                                 onPointerUp={handlePointerUp}
@@ -1343,10 +1366,10 @@
 
                         {/* -------------------- FLOW CHART ENGINE -------------------- */}
                         {view === 'flowchart' && (
-                            <div className="flex-1 overflow-hidden relative parchment-grid animate-fade-in flex flex-col print-canvas-container">
+                            <div className="flex-1 overflow-hidden relative parchment-grid animate-fade-in flex flex-col print-canvas-container rounded-2xl">
                                 
                                 {/* UI Toolbar (Hidden on actual print) */}
-                                <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-parchment border border-ink ink-shadow-lg z-50 flex items-stretch p-2 gap-4 no-print max-w-[95vw] overflow-x-auto whitespace-nowrap">
+                                <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-parchment/95 border border-ink/30 ink-shadow-lg z-50 flex items-stretch p-2.5 gap-4 no-print max-w-[95vw] overflow-x-auto whitespace-nowrap rounded-2xl">
                                     
                                     {/* 1. Cursor Tools */}
                                     <div className="flex flex-col justify-center">
@@ -1467,7 +1490,7 @@
                                                 height: ph * gridRows,
                                             }}
                                         >
-                                            {/* Saftey Margin & Page Break Overlay Guide */}
+                                            {/* Safety Margin & Page Break Overlay Guide */}
                                             <div className="absolute inset-0 pointer-events-none z-30 overflow-hidden">
                                                 {/* Vertical Page Seams */}
                                                 {Array.from({length: gridCols - 1}).map((_, i) => (
