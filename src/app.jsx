@@ -21,77 +21,84 @@ function openDb() {
     });
 }
 
-async function getAllWorkspaces() {
+async function withWorkspaceStore(mode, handler) {
     const db = await openDb();
     return new Promise((resolve, reject) => {
-        const tx = db.transaction(WORKSPACES_STORE, 'readonly');
+        const tx = db.transaction(WORKSPACES_STORE, mode);
         const store = tx.objectStore(WORKSPACES_STORE);
-        const request = store.getAll();
+
+        tx.oncomplete = () => {
+            db.close();
+        };
+        tx.onerror = () => {
+            db.close();
+            reject(tx.error);
+        };
+        tx.onabort = () => {
+            db.close();
+            reject(tx.error || new Error('Workspace transaction aborted'));
+        };
+
+        handler({ store, resolve, reject });
+    });
+}
+
+async function getAllWorkspaces() {
+    return withWorkspaceStore('readonly', ({ store, resolve, reject }) => {
+        const entries = [];
+        const request = store.index('updatedAt').openCursor(null, 'prev');
         request.onsuccess = () => {
-            db.close();
-            resolve((request.result || []).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)));
+            const cursor = request.result;
+            if (!cursor) {
+                resolve(entries);
+                return;
+            }
+            entries.push(cursor.value);
+            cursor.continue();
         };
-        request.onerror = () => {
-            db.close();
-            reject(request.error);
-        };
+        request.onerror = () => reject(request.error);
     });
 }
 
 async function loadWorkspace(id) {
-    const db = await openDb();
-    return new Promise((resolve, reject) => {
-        const tx = db.transaction(WORKSPACES_STORE, 'readonly');
-        const store = tx.objectStore(WORKSPACES_STORE);
+    return withWorkspaceStore('readonly', ({ store, resolve, reject }) => {
         const request = store.get(id);
-        request.onsuccess = () => { db.close(); resolve(request.result || null); };
-        request.onerror = () => { db.close(); reject(request.error); };
+        request.onsuccess = () => resolve(request.result || null);
+        request.onerror = () => reject(request.error);
     });
 }
 
 async function deleteWorkspace(id) {
-    const db = await openDb();
-    await new Promise((resolve, reject) => {
-        const tx = db.transaction(WORKSPACES_STORE, 'readwrite');
-        tx.objectStore(WORKSPACES_STORE).delete(id);
-        tx.oncomplete = resolve;
-        tx.onerror = () => reject(tx.error);
+    await withWorkspaceStore('readwrite', ({ store }) => {
+        store.delete(id);
     });
-    db.close();
     if (localStorage.getItem(LOCAL_META_KEY) === id) {
         localStorage.removeItem(LOCAL_META_KEY);
     }
 }
 
 async function deleteAllWorkspaces() {
-    const db = await openDb();
-    await new Promise((resolve, reject) => {
-        const tx = db.transaction(WORKSPACES_STORE, 'readwrite');
-        tx.objectStore(WORKSPACES_STORE).clear();
-        tx.oncomplete = resolve;
-        tx.onerror = () => reject(tx.error);
+    await withWorkspaceStore('readwrite', ({ store }) => {
+        store.clear();
     });
-    db.close();
     localStorage.removeItem(LOCAL_META_KEY);
 }
 
 async function saveWorkspace(data, workspaceId = null) {
     const payload = { ...data, id: workspaceId || data.id || (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2, 11)), updatedAt: Date.now() };
-    const db = await openDb();
-    await new Promise((resolve, reject) => {
-        const tx = db.transaction(WORKSPACES_STORE, 'readwrite');
-        tx.objectStore(WORKSPACES_STORE).put(payload);
-        tx.oncomplete = resolve;
-        tx.onerror = () => reject(tx.error);
+    await withWorkspaceStore('readwrite', ({ store }) => {
+        store.put(payload);
     });
-    db.close();
     localStorage.setItem(LOCAL_META_KEY, payload.id);
     return payload;
 }
 
 async function getLatestWorkspace() {
-    const all = await getAllWorkspaces();
-    return all[0] || null;
+    return withWorkspaceStore('readonly', ({ store, resolve, reject }) => {
+        const request = store.index('updatedAt').openCursor(null, 'prev');
+        request.onsuccess = () => resolve(request.result ? request.result.value : null);
+        request.onerror = () => reject(request.error);
+    });
 }
 
 
