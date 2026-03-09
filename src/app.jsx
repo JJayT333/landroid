@@ -138,6 +138,7 @@ async function getLatestWorkspace() {
             const [showOnlyConveyances, setShowOnlyConveyances] = useState(false);
             const [runsheetDeskMapFilter, setRunsheetDeskMapFilter] = useState('active');
             const [flowDeskMapFilter, setFlowDeskMapFilter] = useState('active');
+            const [deskMapNameDraft, setDeskMapNameDraft] = useState('');
             
             // PERFORMANCE: Defer massive print grid DOM rendering until exact moment of printing
             const [isPrinting, setIsPrinting] = useState(false);
@@ -280,6 +281,11 @@ async function getLatestWorkspace() {
             }, [activeDeskMapId, deskMaps]);
 
             useEffect(() => {
+                const activeMap = deskMaps.find(map => map.id === activeDeskMapId);
+                setDeskMapNameDraft(activeMap?.name || '');
+            }, [activeDeskMapId, deskMaps]);
+
+            useEffect(() => {
                 if (!activeDeskMapId) return;
                 if (skipDeskMapSyncRef.current) {
                     skipDeskMapSyncRef.current = false;
@@ -296,6 +302,7 @@ async function getLatestWorkspace() {
             };
 
             const renameActiveDeskMap = () => {
+                const trimmed = (deskMapNameDraft || '').trim();
                 const active = deskMaps.find(map => map.id === activeDeskMapId);
                 if (!active) return;
                 const nextName = window.prompt('Rename DeskMap', active.name || active.code || '');
@@ -1110,6 +1117,7 @@ async function getLatestWorkspace() {
 
                 let xCursor = append && flowNodes.length ? (Math.max(...flowNodes.map(n => n.x + 300)) + 200) : 0;
                 const built = selectedMaps.map((map, i) => {
+                    const result = buildFlowLayoutFromNodes(map.nodes || [], `${map.id}-${i}-${makeId()}`, xCursor);
                     const result = buildFlowLayoutFromNodes(map.nodes || [], `${map.id}-${i}`, xCursor);
                     xCursor += result.width + 220;
                     return result;
@@ -1117,6 +1125,25 @@ async function getLatestWorkspace() {
 
                 const importedNodes = built.flatMap(b => b.nodes);
                 const importedEdges = built.flatMap(b => b.edges);
+                const nextNodes = append ? [...flowNodes, ...importedNodes] : importedNodes;
+                const nextEdges = append ? [...flowEdges, ...importedEdges] : importedEdges;
+                setFlowNodes(nextNodes);
+                setFlowEdges(nextEdges);
+
+                if (nextNodes.length) {
+                    const minX = Math.min(...nextNodes.map(n => n.x));
+                    const maxX = Math.max(...nextNodes.map(n => n.x + (n.type === 'template' ? 280 : (n.data.width || 280))));
+                    const minY = Math.min(...nextNodes.map(n => n.y));
+                    const maxY = Math.max(...nextNodes.map(n => n.y + (n.type === 'template' ? 150 : 80)));
+                    const contentW = Math.max(300, maxX - minX);
+                    const contentH = Math.max(200, maxY - minY);
+                    const targetW = Math.max(800, (pw * gridCols) * 0.9);
+                    const targetH = Math.max(600, (ph * gridRows) * 0.9);
+                    const fitScale = Math.min(targetW / contentW, targetH / contentH, 1);
+                    setTreeScale(fitScale);
+                    const centerX = minX + contentW / 2;
+                    const centerY = minY + contentH / 2;
+                    setFlowPz({ x: (window.innerWidth / 2) - (centerX * fitScale), y: (window.innerHeight / 2) - (centerY * fitScale), scale: 1 });
                 if (append) {
                     setFlowNodes(prev => [...prev, ...importedNodes]);
                     setFlowEdges(prev => [...prev, ...importedEdges]);
@@ -1140,6 +1167,7 @@ async function getLatestWorkspace() {
                 await handleSaveWorkspace();
                 const projects = await getAllWorkspaces();
                 setSavedProjects(projects);
+                setView('chart');
                 setShowHome(true);
             };
 
@@ -1497,6 +1525,7 @@ async function getLatestWorkspace() {
                                     <Icon name="Download" size={14} /> <span className="hidden sm:block">Save Workspace</span>
                                 </button>
                                 <button onClick={handleReturnHome} className="px-3 py-1.5 text-xs font-bold text-ink/90 hover:text-ink hover:bg-parchment rounded transition-all flex items-center gap-2" title="Save and return to startup page">
+                                    <Icon name="ArrowUp" size={14} /> <span>Back to Home</span>
                                     <Icon name="ArrowUp" size={14} /> <span className="hidden sm:block">Back to Home</span>
                                 </button>
                             </div>
@@ -1725,6 +1754,8 @@ async function getLatestWorkspace() {
                                         {deskMaps.map(map => <option key={map.id} value={map.id}>{map.code} {map.name ? `- ${map.name}` : ''}</option>)}
                                     </select>
                                     <button onClick={addDeskMap} className="px-2 py-1 text-[10px] font-bold border border-ink hover:bg-ink hover:text-parchment transition-colors">+ DeskMap</button>
+                                    <input value={deskMapNameDraft} onChange={e => setDeskMapNameDraft(e.target.value)} className="border border-ink/40 p-1 text-xs min-w-[140px] bg-parchment" placeholder="DeskMap name" />
+                                    <button onClick={renameActiveDeskMap} className="px-2 py-1 text-[10px] font-bold border border-ink/40 hover:bg-teastain transition-colors">Save Name</button>
                                     <button onClick={renameActiveDeskMap} className="px-2 py-1 text-[10px] font-bold border border-ink/40 hover:bg-teastain transition-colors">Rename</button>
                                 </div>
                                 <div style={{ transform: `translate(${pz.x}px, ${pz.y}px) scale(${pz.scale})`, transformOrigin: '0 0' }} className="w-max h-max min-w-full min-h-full flex justify-center pt-24 pb-48 gap-24">
