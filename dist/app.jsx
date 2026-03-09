@@ -420,10 +420,10 @@ async function getLatestWorkspace() {
                     return true;
                 } catch (e) {
                     console.error(e);
-                    return false;
                 } finally {
                     setIsSaving(false);
                 }
+                return false;
             };
 
             useEffect(() => {
@@ -1217,7 +1217,6 @@ async function getLatestWorkspace() {
                     setSavedProjects(projects);
                 } catch (e) {
                     console.error(e);
-                    return false;
                 } finally {
                     setView('chart');
                     setShowHome(true);
