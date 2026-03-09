@@ -400,7 +400,6 @@
                 return bucket;
             }, [ownershipInterests]);
             const selectedContact = useMemo(() => selectedContactId ? (contactById[selectedContactId] || null) : null, [contactById, selectedContactId]);
-            const selectedContact = useMemo(() => contacts.find(c => c.id === selectedContactId) || null, [contacts, selectedContactId]);
             const selectedContactLogs = useMemo(() => {
                 if (!selectedContactId) return [];
                 return contactLogs
@@ -613,11 +612,11 @@
                 }
                 if (modalMode === 'edit') setNodes(nodes.map(n => n.id === activeNode.id ? { ...n, ...form } : n));
                 else if (modalMode === 'convey') {
-                    const newId = Math.random().toString(36).substr(2, 9);
+                    const newId = makeId();
                     const updatedNodes = nodes.map(n => n.id === activeNode.id ? { ...n, fraction: Math.max(0, n.fraction - calcShare) } : n);
                     setNodes([...updatedNodes, { ...form, id: newId, type: 'conveyance', fraction: calcShare, initialFraction: calcShare, parentId: activeNode.id }]);
                 } else if (modalMode === 'precede') {
-                    const newId = Math.random().toString(36).substr(2, 9);
+                    const newId = makeId();
                     const updatedNodes = nodes.map(n => {
                         if (n.id === activeNode.id) return { ...n, parentId: newId };
                         if (activeNode.parentId && n.id === activeNode.parentId) {
@@ -628,13 +627,13 @@
                     const fractionRetained = form.initialFraction - activeNode.initialFraction;
                     setNodes([...updatedNodes, { ...form, id: newId, type: 'conveyance', parentId: activeNode.parentId, initialFraction: form.initialFraction, fraction: Math.max(0, fractionRetained) }]);
                 } else if (modalMode === 'add_chain') {
-                    const newId = Math.random().toString(36).substr(2, 9);
+                    const newId = makeId();
                     setNodes([...nodes, { ...form, id: newId, type: 'conveyance', parentId: null }]);
                 } else if (modalMode === 'add_related') {
-                    const newId = Math.random().toString(36).substr(2, 9);
+                    const newId = makeId();
                     setNodes([...nodes, { ...form, id: newId, type: 'related', fraction: 0, initialFraction: 0, parentId: activeNode.id }]);
                 } else if (modalMode === 'add_unlinked') {
-                    const newId = Math.random().toString(36).substr(2, 9);
+                    const newId = makeId();
                     setNodes([...nodes, { ...form, id: newId, type: 'conveyance', fraction: 0, initialFraction: 0, parentId: 'unlinked' }]);
                 } else if (modalMode === 'attach') {
                     if (attachType === 'conveyance') {
@@ -733,7 +732,7 @@
                         const newNodes = results.data.map(row => {
                             const isInternal = !!row['INTERNAL_ID'];
                             return {
-                                id: row['INTERNAL_ID'] || Math.random().toString(36).substr(2, 9),
+                                id: row['INTERNAL_ID'] || makeId(),
                                 instrument: findHeader(row, [/^Instrument$/i, /^Instrument \(/i, /Instrument/i]),
                                 vol: findHeader(row, [/^Vol/i]),
                                 page: findHeader(row, [/^Page/i]),
@@ -1098,7 +1097,7 @@
             };
 
             const addFlowNode = (type) => {
-                const id = 'fn_' + Math.random().toString(36).substr(2, 9);
+                const id = `fn_${makeId()}`;
                 const rect = document.getElementById('tree-scaler').getBoundingClientRect();
                 const newNode = {
                     id,
