@@ -171,6 +171,8 @@ async function getLatestWorkspace() {
             const [lastMathProps, setLastMathProps] = useState({ conveyanceMode: 'fraction', splitBasis: 'initial', numerator: 1, denominator: 2, manualAmount: 0 });
             const [savedProjects, setSavedProjects] = useState([]);
             const [showCloudModal, setShowCloudModal] = useState(false);
+            const [showHome, setShowHome] = useState(true);
+            const [workspaceLoaded, setWorkspaceLoaded] = useState(false);
             const [projectName, setProjectName] = useState('My Workspace');
             const [isSaving, setIsSaving] = useState(false);
             const [isOnline, setIsOnline] = useState(navigator.onLine);
@@ -332,7 +334,7 @@ async function getLatestWorkspace() {
                     setSavedProjects(projects);
                     const latestId = localStorage.getItem(LOCAL_META_KEY);
                     const latest = (latestId && await loadWorkspace(latestId)) || projects[0] || await getLatestWorkspace();
-                    if (latest) handleLoadWorkspace(latest, false);
+                    if (latest?.name) setProjectName(latest.name);
                     setBootChecks({
                         offlineModeActive: 'ServiceWorker' in navigator,
                         cloudSyncUnavailable: !navigator.onLine
@@ -363,6 +365,7 @@ async function getLatestWorkspace() {
             };
 
             useEffect(() => {
+                if (!workspaceLoaded) return;
                 const timer = setTimeout(() => {
                     handleSaveWorkspace();
                 }, 400);
@@ -370,7 +373,7 @@ async function getLatestWorkspace() {
             }, [
                 nodes, instrumentList, flowNodes, flowEdges, treeScale, printOrientation,
                 gridCols, gridRows, tracts, contacts, ownershipInterests, contactLogs,
-                deskMaps, activeDeskMapId, projectName
+                deskMaps, activeDeskMapId, projectName, workspaceLoaded
             ]);
 
             const handleLoadWorkspace = (p, closeModal = true) => {
@@ -395,9 +398,17 @@ async function getLatestWorkspace() {
                 const activeDeskMap = loadedDeskMaps.find(map => map.id === nextDeskMapId) || loadedDeskMaps[0];
                 setNodes(activeDeskMap.nodes || p.nodes || [{ ...defaultRoot }]);
                 setPz(activeDeskMap.pz || { ...defaultViewport });
-                setProjectName(p.name); if (closeModal) setShowCloudModal(false);
+                setProjectName(p.name);
+                setWorkspaceLoaded(true);
+                setShowHome(false);
+                if (closeModal) setShowCloudModal(false);
             };
             
+            const handleEnterNewWorkspace = () => {
+                setWorkspaceLoaded(true);
+                setShowHome(false);
+            };
+
             const handleDocSelection = (e) => {
                 const file = e.target.files[0];
                 if (!file) return;
@@ -1330,6 +1341,34 @@ async function getLatestWorkspace() {
                 {/* Dynamically assign the physical print page size based on orientation toggle */}
                 <style dangerouslySetInnerHTML={{ __html: `@media print { @page { size: letter ${printOrientation}; margin: 0; } }` }} />
                 
+                {showHome ? (
+                    <div className="h-screen w-screen p-4 sm:p-8 font-mono text-ink flex items-center justify-center">
+                        <div className="w-full max-w-3xl bg-parchment/95 border border-ink/30 ink-shadow-lg rounded-2xl p-6 sm:p-8">
+                            <h1 className="font-serif text-3xl font-black tracking-tight">LANDroid</h1>
+                            <p className="mt-2 text-sm text-ink/80">Choose a saved workspace or start a new one.</p>
+                            <div className="mt-5 flex flex-wrap gap-2">
+                                <button onClick={handleEnterNewWorkspace} className="px-4 py-2 text-xs font-bold rounded border border-ink bg-ink text-parchment">Start New Workspace</button>
+                                <button onClick={() => fileInput.current.click()} className="px-4 py-2 text-xs font-bold rounded border border-ink/30 bg-teastain">Import CSV</button>
+                            </div>
+                            <input type="file" ref={fileInput} onChange={(e) => { importCSV(e); setWorkspaceLoaded(true); setShowHome(false); }} className="hidden" accept=".csv" />
+                            <div className="mt-6">
+                                <h2 className="text-xs font-bold uppercase tracking-widest text-sepia">Saved Workspaces</h2>
+                                <div className="mt-2 max-h-[45vh] overflow-auto border border-ink/20 rounded-lg bg-parchment">
+                                    {savedProjects.length === 0 ? (
+                                        <div className="p-4 text-sm text-ink/60">No saved workspaces yet.</div>
+                                    ) : (
+                                        savedProjects.map((p) => (
+                                            <button key={p.id} onClick={() => handleLoadWorkspace(p, false)} className="w-full text-left p-3 border-b last:border-b-0 border-ink/10 hover:bg-teastain/50">
+                                                <div className="font-bold text-sm">{p.name || 'Untitled Workspace'}</div>
+                                                <div className="text-[11px] text-ink/60">Updated {new Date(p.updatedAt || Date.now()).toLocaleString()}</div>
+                                            </button>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                ) : (
                 <div className="h-screen w-screen overflow-hidden flex flex-col relative font-mono text-ink px-3 sm:px-5 py-3 sm:py-4 gap-3">
                     
                     {/* The Surveyors Desk Header - HIDDEN ON PRINT */}
@@ -2312,6 +2351,7 @@ async function getLatestWorkspace() {
                         </div>
                     )}
                 </div>
+                )}
                 </>
             );
         };
