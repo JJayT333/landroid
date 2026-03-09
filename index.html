@@ -684,13 +684,6 @@
                     i === 0 ? JSON.stringify(contacts) : '',
                     i === 0 ? JSON.stringify(ownershipInterests) : '',
                     i === 0 ? JSON.stringify(contactLogs) : ''
-                    n.fileDate, n.date, `"${n.grantor}"`, `"${n.grantee}"`, `"${n.landDesc}"`, `"${n.remarks}"`,
-                    n.fraction, n.initialFraction || n.fraction, n.id, n.parentId || "NULL", `"${n.docData || ""}"`, n.type || 'conveyance',
-                    n.isDeceased ? 'true' : 'false', `"${n.obituary || ''}"`, `"${n.graveyardLink || ''}"`,
-                    i === 0 ? `"${JSON.stringify(tracts).replace(/"/g, '""')}"` : '""',
-                    i === 0 ? `"${JSON.stringify(contacts).replace(/"/g, '""')}"` : '""',
-                    i === 0 ? `"${JSON.stringify(ownershipInterests).replace(/"/g, '""')}"` : '""',
-                    i === 0 ? `"${JSON.stringify(contactLogs).replace(/"/g, '""')}"` : '""'
                 ]);
                 const content = "\uFEFF" + headers.join(",") + "\n" + rows.map(r => r.map(escapeCSV).join(",")).join("\n");
                 const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
@@ -770,11 +763,6 @@
                                     } catch {
                                         return [];
                                     }
-                                try {
-                                    if (!firstRow[field]) return [];
-                                    return JSON.parse(String(firstRow[field]).replace(/""/g, '"'));
-                                } catch {
-                                    return [];
                                 }
                             };
                             setTracts(parseJsonField('INTERNAL_TRACTS'));
