@@ -139,6 +139,7 @@ async function getLatestWorkspace() {
             const [runsheetDeskMapFilter, setRunsheetDeskMapFilter] = useState('active');
             const [flowDeskMapFilter, setFlowDeskMapFilter] = useState('active');
             const [deskMapNameDraft, setDeskMapNameDraft] = useState('');
+            const [isEditingDeskMapName, setIsEditingDeskMapName] = useState(false);
             
             // PERFORMANCE: Defer massive print grid DOM rendering until exact moment of printing
             const [isPrinting, setIsPrinting] = useState(false);
@@ -281,9 +282,10 @@ async function getLatestWorkspace() {
             }, [activeDeskMapId, deskMaps]);
 
             useEffect(() => {
+                if (isEditingDeskMapName) return;
                 const activeMap = deskMaps.find(map => map.id === activeDeskMapId);
                 setDeskMapNameDraft(activeMap?.name || '');
-            }, [activeDeskMapId, deskMaps]);
+            }, [activeDeskMapId, deskMaps, isEditingDeskMapName]);
 
             useEffect(() => {
                 if (!activeDeskMapId) return;
@@ -301,10 +303,12 @@ async function getLatestWorkspace() {
                 setActiveDeskMapId(newMap.id);
             };
 
-            const renameActiveDeskMap = () => {
-                const trimmed = (deskMapNameDraft || '').trim();
+            const renameActiveDeskMap = (rawName = deskMapNameDraft) => {
+                const trimmed = (rawName || '').trim();
                 if (!trimmed) return;
                 setDeskMaps(prev => prev.map(map => map.id === activeDeskMapId ? { ...map, name: trimmed } : map));
+                setDeskMapNameDraft(trimmed);
+                setIsEditingDeskMapName(false);
             };
 
             useEffect(() => {
@@ -386,8 +390,13 @@ async function getLatestWorkspace() {
                     await saveWorkspace(data);
                     const projects = await getAllWorkspaces();
                     setSavedProjects(projects);
-                } catch (e) { console.error(e); }
-                setIsSaving(false);
+                    return true;
+                } catch (e) {
+                    console.error(e);
+                } finally {
+                    setIsSaving(false);
+                }
+                return false;
             };
 
             useEffect(() => {
@@ -1137,7 +1146,7 @@ async function getLatestWorkspace() {
                     setTreeScale(fitScale);
                     const centerX = minX + contentW / 2;
                     const centerY = minY + contentH / 2;
-                    setFlowPz({ x: (window.innerWidth / 2) - (centerX * fitScale), y: (window.innerHeight / 2) - (centerY * fitScale), scale: 1 });
+                    setFlowPz({ x: (window.innerWidth / 2) - (centerX * fitScale), y: (window.innerHeight / 2) - (centerY * fitScale), scale: fitScale });
                 }
             };
 
@@ -1150,11 +1159,16 @@ async function getLatestWorkspace() {
             };
 
             const handleReturnHome = async () => {
-                await handleSaveWorkspace();
-                const projects = await getAllWorkspaces();
-                setSavedProjects(projects);
-                setView('chart');
-                setShowHome(true);
+                try {
+                    await handleSaveWorkspace();
+                    const projects = await getAllWorkspaces();
+                    setSavedProjects(projects);
+                } catch (e) {
+                    console.error(e);
+                } finally {
+                    setView('chart');
+                    setShowHome(true);
+                }
             };
 
             const addFlowNode = (type) => {
@@ -1739,8 +1753,13 @@ async function getLatestWorkspace() {
                                         {deskMaps.map(map => <option key={map.id} value={map.id}>{map.code} {map.name ? `- ${map.name}` : ''}</option>)}
                                     </select>
                                     <button onClick={addDeskMap} className="px-2 py-1 text-[10px] font-bold border border-ink hover:bg-ink hover:text-parchment transition-colors">+ DeskMap</button>
-                                    <input value={deskMapNameDraft} onChange={e => setDeskMapNameDraft(e.target.value)} className="border border-ink/40 p-1 text-xs min-w-[140px] bg-parchment" placeholder="DeskMap name" />
-                                    <button onClick={renameActiveDeskMap} className="px-2 py-1 text-[10px] font-bold border border-ink/40 hover:bg-teastain transition-colors">Save Name</button>
+                                    <input value={deskMapNameDraft} onChange={e => { setIsEditingDeskMapName(true); setDeskMapNameDraft(e.target.value); }} onBlur={() => renameActiveDeskMap()} onKeyDown={e => {
+                                        if (e.key === 'Enter') {
+                                            e.preventDefault();
+                                            renameActiveDeskMap(e.currentTarget.value);
+                                        }
+                                    }} className="border border-ink/40 p-1 text-xs min-w-[140px] bg-parchment" placeholder="DeskMap name" />
+                                    <button onClick={() => renameActiveDeskMap()} className="px-2 py-1 text-[10px] font-bold border border-ink/40 hover:bg-teastain transition-colors">Save Name</button>
                                 </div>
                                 <div style={{ transform: `translate(${pz.x}px, ${pz.y}px) scale(${pz.scale})`, transformOrigin: '0 0' }} className="w-max h-max min-w-full min-h-full flex justify-center pt-24 pb-48 gap-24">
                                     {tree.map(n => renderTreeNode(n))}
