@@ -306,6 +306,7 @@
             const [nodes, setNodes] = useState([defaultRoot]);
             const [deskMaps, setDeskMaps] = useState([createDeskMap()]);
             const [activeDeskMapId, setActiveDeskMapId] = useState('');
+            const skipDeskMapSyncRef = useRef(false);
             const [view, setView] = useState('chart'); 
             const [showModal, setShowModal] = useState(false);
             const [modalMode, setModalMode] = useState('edit'); 
@@ -433,12 +434,17 @@
             useEffect(() => {
                 const activeMap = deskMaps.find(map => map.id === activeDeskMapId);
                 if (!activeMap) return;
+                skipDeskMapSyncRef.current = true;
                 setNodes(activeMap.nodes || [{ ...defaultRoot }]);
                 setPz(activeMap.pz || { ...defaultViewport });
-            }, [activeDeskMapId]);
+            }, [activeDeskMapId, deskMaps]);
 
             useEffect(() => {
                 if (!activeDeskMapId) return;
+                if (skipDeskMapSyncRef.current) {
+                    skipDeskMapSyncRef.current = false;
+                    return;
+                }
                 setDeskMaps(prev => prev.map(map => map.id === activeDeskMapId ? { ...map, nodes, pz } : map));
             }, [nodes, pz, activeDeskMapId]);
 
