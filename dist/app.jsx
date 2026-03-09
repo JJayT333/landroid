@@ -1511,7 +1511,7 @@ async function getLatestWorkspace() {
                                     <Icon name="Download" size={14} /> <span className="hidden sm:block">Save Workspace</span>
                                 </button>
                                 <button onClick={handleReturnHome} className="px-3 py-1.5 text-xs font-bold text-ink/90 hover:text-ink hover:bg-parchment rounded transition-all flex items-center gap-2" title="Save and return to startup page">
-                                    <Icon name="ArrowUp" size={14} /> <span>Back to Home</span>
+                                    <Icon name="ArrowUp" size={14} /> <span>Save + Home</span>
                                 </button>
                             </div>
                         </div>
@@ -1823,8 +1823,8 @@ async function getLatestWorkspace() {
                                                 <option value="all">Flow Source: All DeskMaps</option>
                                                 {deskMaps.map(map => <option key={`flow-${map.id}`} value={map.id}>Flow Source: {map.code} {map.name ? `- ${map.name}` : ''}</option>)}
                                             </select>
-                                            <button onClick={() => importToFlowchart(false)} className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-sepia text-sepia hover:bg-sepia hover:text-parchment flex items-center gap-1 shadow-sm transition-all hover:-translate-y-0.5" title="Load selected DeskMap(s) into Flow Chart"><Icon name="Download" size={12}/> Load Selection</button>
-                                            <button onClick={() => importToFlowchart(true)} className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-sepia/50 text-sepia hover:bg-sepia/10 flex items-center gap-1 shadow-sm transition-all hover:-translate-y-0.5" title="Append selected DeskMap(s) to existing Flow Chart"><Icon name="Plus" size={12}/> Add Selection</button>
+                                            <button onClick={() => importToFlowchart(false)} className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-sepia text-sepia hover:bg-sepia hover:text-parchment flex items-center gap-1 shadow-sm transition-all hover:-translate-y-0.5" title="Load selected DeskMap(s) into Flow Chart"><Icon name="Download" size={12}/> Import Selected DeskMap(s)</button>
+                                            <button onClick={() => importToFlowchart(true)} className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-sepia/50 text-sepia hover:bg-sepia/10 flex items-center gap-1 shadow-sm transition-all hover:-translate-y-0.5" title="Append selected DeskMap(s) to existing Flow Chart"><Icon name="Plus" size={12}/> Import + Append</button>
                                             <button onClick={handlePrintFlowchart} className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-ink bg-ink text-parchment hover:bg-ink/80 flex items-center gap-1 shadow-sm transition-all hover:-translate-y-0.5"><Icon name="Printer" size={12}/> Print</button>
                                         </div>
                                     </div>
