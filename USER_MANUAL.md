@@ -1,5 +1,17 @@
 # LANDroid User Manual
 
+
+## 0) Quick launch package (double-click)
+This package includes launchers so you can open a main landing page and choose a saved workspace.
+
+- **macOS/Linux:** double-click `LANDroid.command`
+- **Windows:** double-click `LANDroid.bat`
+
+The launcher starts a local web server, opens LANDroid in your browser, and shows a startup home screen where you can:
+- Start a new workspace
+- Import CSV
+- Open any saved workspace from local storage
+
 ## 1) What LANDroid is for
 LANDroid is a title-chain workspace for landmen and survey/title professionals. It combines:
 

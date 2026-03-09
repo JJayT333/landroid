@@ -136,6 +136,9 @@ async function getLatestWorkspace() {
             const [activeNode, setActiveNode] = useState(null);
             const [viewerData, setViewerData] = useState(null);
             const [showOnlyConveyances, setShowOnlyConveyances] = useState(false);
+            const [runsheetDeskMapFilter, setRunsheetDeskMapFilter] = useState('active');
+            const [flowDeskMapFilter, setFlowDeskMapFilter] = useState('active');
+            const [deskMapNameDraft, setDeskMapNameDraft] = useState('');
             
             // PERFORMANCE: Defer massive print grid DOM rendering until exact moment of printing
             const [isPrinting, setIsPrinting] = useState(false);
@@ -171,6 +174,8 @@ async function getLatestWorkspace() {
             const [lastMathProps, setLastMathProps] = useState({ conveyanceMode: 'fraction', splitBasis: 'initial', numerator: 1, denominator: 2, manualAmount: 0 });
             const [savedProjects, setSavedProjects] = useState([]);
             const [showCloudModal, setShowCloudModal] = useState(false);
+            const [showHome, setShowHome] = useState(true);
+            const [workspaceLoaded, setWorkspaceLoaded] = useState(false);
             const [projectName, setProjectName] = useState('My Workspace');
             const [isSaving, setIsSaving] = useState(false);
             const [isOnline, setIsOnline] = useState(navigator.onLine);
@@ -218,11 +223,23 @@ async function getLatestWorkspace() {
             const uniqueGrantees = useMemo(() => [...new Set(nodes.map(n => n.grantee).filter(Boolean))].sort(), [nodes]);
             
             // PERFORMANCE: Runsheet sorting/filtering memoization
+            const runsheetNodesSource = useMemo(() => {
+                if (runsheetDeskMapFilter === 'all') {
+                    return deskMaps.flatMap(map => (map.nodes || []).map(n => ({ ...n, __deskMapId: map.id, __deskMapLabel: `${map.code} ${map.name ? `- ${map.name}` : ''}` })));
+                }
+                if (runsheetDeskMapFilter === 'active') {
+                    const activeMap = deskMaps.find(map => map.id === activeDeskMapId);
+                    return (activeMap?.nodes || nodes || []).map(n => ({ ...n, __deskMapId: activeMap?.id || activeDeskMapId, __deskMapLabel: activeMap ? `${activeMap.code} ${activeMap.name ? `- ${activeMap.name}` : ''}` : 'Active DeskMap' }));
+                }
+                const chosenMap = deskMaps.find(map => map.id === runsheetDeskMapFilter);
+                return (chosenMap?.nodes || []).map(n => ({ ...n, __deskMapId: chosenMap?.id, __deskMapLabel: chosenMap ? `${chosenMap.code} ${chosenMap.name ? `- ${chosenMap.name}` : ''}` : 'Selected DeskMap' }));
+            }, [runsheetDeskMapFilter, deskMaps, activeDeskMapId, nodes]);
+
             const filteredSortedNodes = useMemo(() => {
-                return [...nodes]
+                return [...runsheetNodesSource]
                     .sort((a,b) => new Date(a.date) - new Date(b.date))
                     .filter(n => showOnlyConveyances ? (n.type !== 'related' && n.parentId !== 'unlinked') : true);
-            }, [nodes, showOnlyConveyances]);
+            }, [runsheetNodesSource, showOnlyConveyances]);
 
             const tractById = useMemo(() => Object.fromEntries(tracts.map(t => [t.id, t])), [tracts]);
             const contactById = useMemo(() => Object.fromEntries(contacts.map(c => [c.id, c])), [contacts]);
@@ -264,6 +281,11 @@ async function getLatestWorkspace() {
             }, [activeDeskMapId, deskMaps]);
 
             useEffect(() => {
+                const activeMap = deskMaps.find(map => map.id === activeDeskMapId);
+                setDeskMapNameDraft(activeMap?.name || '');
+            }, [activeDeskMapId, deskMaps]);
+
+            useEffect(() => {
                 if (!activeDeskMapId) return;
                 if (skipDeskMapSyncRef.current) {
                     skipDeskMapSyncRef.current = false;
@@ -277,6 +299,12 @@ async function getLatestWorkspace() {
                 const newMap = createDeskMap({ name: `Unit Tract ${mapNumber}`, code: `TRACT-${mapNumber}` });
                 setDeskMaps(prev => [...prev, newMap]);
                 setActiveDeskMapId(newMap.id);
+            };
+
+            const renameActiveDeskMap = () => {
+                const trimmed = (deskMapNameDraft || '').trim();
+                if (!trimmed) return;
+                setDeskMaps(prev => prev.map(map => map.id === activeDeskMapId ? { ...map, name: trimmed } : map));
             };
 
             useEffect(() => {
@@ -332,7 +360,7 @@ async function getLatestWorkspace() {
                     setSavedProjects(projects);
                     const latestId = localStorage.getItem(LOCAL_META_KEY);
                     const latest = (latestId && await loadWorkspace(latestId)) || projects[0] || await getLatestWorkspace();
-                    if (latest) handleLoadWorkspace(latest, false);
+                    if (latest?.name) setProjectName(latest.name);
                     setBootChecks({
                         offlineModeActive: 'ServiceWorker' in navigator,
                         cloudSyncUnavailable: !navigator.onLine
@@ -363,6 +391,7 @@ async function getLatestWorkspace() {
             };
 
             useEffect(() => {
+                if (!workspaceLoaded) return;
                 const timer = setTimeout(() => {
                     handleSaveWorkspace();
                 }, 400);
@@ -370,7 +399,7 @@ async function getLatestWorkspace() {
             }, [
                 nodes, instrumentList, flowNodes, flowEdges, treeScale, printOrientation,
                 gridCols, gridRows, tracts, contacts, ownershipInterests, contactLogs,
-                deskMaps, activeDeskMapId, projectName
+                deskMaps, activeDeskMapId, projectName, workspaceLoaded
             ]);
 
             const handleLoadWorkspace = (p, closeModal = true) => {
@@ -395,9 +424,17 @@ async function getLatestWorkspace() {
                 const activeDeskMap = loadedDeskMaps.find(map => map.id === nextDeskMapId) || loadedDeskMaps[0];
                 setNodes(activeDeskMap.nodes || p.nodes || [{ ...defaultRoot }]);
                 setPz(activeDeskMap.pz || { ...defaultViewport });
-                setProjectName(p.name); if (closeModal) setShowCloudModal(false);
+                setProjectName(p.name);
+                setWorkspaceLoaded(true);
+                setShowHome(false);
+                if (closeModal) setShowCloudModal(false);
             };
             
+            const handleEnterNewWorkspace = () => {
+                setWorkspaceLoaded(true);
+                setShowHome(false);
+            };
+
             const handleDocSelection = (e) => {
                 const file = e.target.files[0];
                 if (!file) return;
@@ -1004,69 +1041,46 @@ async function getLatestWorkspace() {
                                      FLOW CHART ENGINE (TOP-DOWN LAYOUT)
             ========================================================================================= */
 
-            const importToFlowchart = () => {
-                if (flowNodes.length > 0 && !window.confirm("This will overwrite your current Flow Chart canvas. Proceed?")) return;
+            const buildFlowLayoutFromNodes = (sourceNodes, idPrefix = '', xShift = 0) => {
+                const safePrefix = idPrefix ? `${idPrefix}-` : '';
+                const normalNodes = sourceNodes.filter(n => n.type !== 'related');
+                if (!normalNodes.length) return { nodes: [], edges: [], width: 0 };
                 const newFlowNodes = [];
                 const newFlowEdges = [];
-                
-                // Advanced Topological Tree Layout (Top to Bottom)
                 const nodePositions = {};
-                let leafX = 0; 
-                const levelYSpacing = 280; // Distance between branches
-                const startY = 60; // Margin from top of paper
+                let leafX = 0;
+                const levelYSpacing = 280;
+                const startY = 60;
 
-                // Recursively assign positions based on child widths
+                const childrenOf = (id) => normalNodes.filter(c => c.parentId === id);
                 const layoutNode = (nId, depth) => {
-                    const children = nodes.filter(c => c.parentId === nId && c.type !== 'related');
+                    const children = childrenOf(nId);
                     if (children.length === 0) {
                         nodePositions[nId] = { x: leafX, y: startY + (depth * levelYSpacing) };
-                        leafX += 340; // Box width (280) + margin (60)
+                        leafX += 340;
                         return nodePositions[nId].x;
-                    } else {
-                        const childXs = children.map(c => {
-                            newFlowEdges.push({ id: `e-${nId}-${c.id}`, source: nId, target: c.id });
-                            return layoutNode(c.id, depth + 1);
-                        });
-                        // Parent x is perfectly centered over its children
-                        const myX = childXs.reduce((a, b) => a + b, 0) / childXs.length;
-                        nodePositions[nId] = { x: myX, y: startY + (depth * levelYSpacing) };
-                        return myX;
                     }
+                    const childXs = children.map(c => {
+                        newFlowEdges.push({ id: `e-${safePrefix}${nId}-${safePrefix}${c.id}`, source: `${safePrefix}${nId}`, target: `${safePrefix}${c.id}` });
+                        return layoutNode(c.id, depth + 1);
+                    });
+                    const myX = childXs.reduce((a, b) => a + b, 0) / childXs.length;
+                    nodePositions[nId] = { x: myX, y: startY + (depth * levelYSpacing) };
+                    return myX;
                 };
 
-                const roots = nodes.filter(n => n.parentId === null && n.type !== 'related');
-                roots.forEach(root => {
-                    layoutNode(root.id, 0);
-                    leafX += 200; // Extra spacing between distinct trees
-                });
+                const roots = normalNodes.filter(n => n.parentId === null);
+                roots.forEach(root => { layoutNode(root.id, 0); leafX += 200; });
 
-                // Build bounds to auto-scale and center inside the chosen paper grid
                 const minX = Math.min(...Object.values(nodePositions).map(p => p.x));
                 const maxX = Math.max(...Object.values(nodePositions).map(p => p.x + 280));
-                const maxY = Math.max(...Object.values(nodePositions).map(p => p.y + 150));
-                
-                const treeWidth = maxX - minX;
-                const treeHeight = maxY;
-                
-                // Use the full multi-page logical width to calculate ideal scale
-                const totalPrintWidth = pw * gridCols;
-                const totalPrintHeight = ph * gridRows;
-                
-                const scaleX = (totalPrintWidth * 0.9) / treeWidth;
-                const scaleY = (totalPrintHeight * 0.9) / treeHeight;
-                let idealScale = Math.min(scaleX, scaleY, 1);
-                
-                setTreeScale(idealScale);
-                
-                // Shift coordinates so the entire tree is physically centered on the multi-page paper
-                const scaledInnerWidth = totalPrintWidth / idealScale; 
-                const offsetX = (scaledInnerWidth - treeWidth) / 2;
+                const width = Math.max(280, maxX - minX);
 
-                nodes.filter(n => n.type !== 'related').forEach(n => {
+                normalNodes.forEach(n => {
                     const pos = nodePositions[n.id] || { x: 0, y: 0 };
                     newFlowNodes.push({
-                        id: n.id,
-                        x: (pos.x - minX) + offsetX, // normalized and centered
+                        id: `${safePrefix}${n.id}`,
+                        x: (pos.x - minX) + xShift,
                         y: pos.y,
                         type: 'template',
                         color: n.isDeceased ? 'bg-teastain text-sepia border-sepia' : 'bg-parchment text-ink border-ink',
@@ -1079,12 +1093,68 @@ async function getLatestWorkspace() {
                         }
                     });
                 });
+                return { nodes: newFlowNodes, edges: newFlowEdges, width };
+            };
 
-                setFlowNodes(newFlowNodes);
-                setFlowEdges(newFlowEdges);
-                
-                // Reset outer pan/zoom to view the page nicely centered
-                setFlowPz({ x: (window.innerWidth / 2) - (totalPrintWidth / 2), y: 50, scale: 1 });
+            const getFlowSelectedDeskMaps = () => {
+                if (flowDeskMapFilter === 'all') return deskMaps;
+                if (flowDeskMapFilter === 'active') return deskMaps.filter(map => map.id === activeDeskMapId);
+                return deskMaps.filter(map => map.id === flowDeskMapFilter);
+            };
+
+            const importToFlowchart = (append = false) => {
+                const selectedMaps = getFlowSelectedDeskMaps();
+                if (!selectedMaps.length) {
+                    window.alert('No DeskMap selected for Flow Chart import.');
+                    return;
+                }
+                if (!append && flowNodes.length > 0 && !window.confirm("This will overwrite your current Flow Chart canvas. Proceed?")) return;
+
+                let xCursor = append && flowNodes.length ? (Math.max(...flowNodes.map(n => n.x + 300)) + 200) : 0;
+                const built = selectedMaps.map((map, i) => {
+                    const result = buildFlowLayoutFromNodes(map.nodes || [], `${map.id}-${i}-${makeId()}`, xCursor);
+                    xCursor += result.width + 220;
+                    return result;
+                });
+
+                const importedNodes = built.flatMap(b => b.nodes);
+                const importedEdges = built.flatMap(b => b.edges);
+                const nextNodes = append ? [...flowNodes, ...importedNodes] : importedNodes;
+                const nextEdges = append ? [...flowEdges, ...importedEdges] : importedEdges;
+                setFlowNodes(nextNodes);
+                setFlowEdges(nextEdges);
+
+                if (nextNodes.length) {
+                    const minX = Math.min(...nextNodes.map(n => n.x));
+                    const maxX = Math.max(...nextNodes.map(n => n.x + (n.type === 'template' ? 280 : (n.data.width || 280))));
+                    const minY = Math.min(...nextNodes.map(n => n.y));
+                    const maxY = Math.max(...nextNodes.map(n => n.y + (n.type === 'template' ? 150 : 80)));
+                    const contentW = Math.max(300, maxX - minX);
+                    const contentH = Math.max(200, maxY - minY);
+                    const targetW = Math.max(800, (pw * gridCols) * 0.9);
+                    const targetH = Math.max(600, (ph * gridRows) * 0.9);
+                    const fitScale = Math.min(targetW / contentW, targetH / contentH, 1);
+                    setTreeScale(fitScale);
+                    const centerX = minX + contentW / 2;
+                    const centerY = minY + contentH / 2;
+                    setFlowPz({ x: (window.innerWidth / 2) - (centerX * fitScale), y: (window.innerHeight / 2) - (centerY * fitScale), scale: 1 });
+                }
+            };
+
+            const handlePrintFlowchart = () => {
+                flushSync(() => setIsPrinting(true));
+                setTimeout(() => {
+                    window.print();
+                    setTimeout(() => setIsPrinting(false), 150);
+                }, 50);
+            };
+
+            const handleReturnHome = async () => {
+                await handleSaveWorkspace();
+                const projects = await getAllWorkspaces();
+                setSavedProjects(projects);
+                setView('chart');
+                setShowHome(true);
             };
 
             const addFlowNode = (type) => {
@@ -1330,6 +1400,34 @@ async function getLatestWorkspace() {
                 {/* Dynamically assign the physical print page size based on orientation toggle */}
                 <style dangerouslySetInnerHTML={{ __html: `@media print { @page { size: letter ${printOrientation}; margin: 0; } }` }} />
                 
+                {showHome ? (
+                    <div className="h-screen w-screen p-4 sm:p-8 font-mono text-ink flex items-center justify-center">
+                        <div className="w-full max-w-3xl bg-parchment/95 border border-ink/30 ink-shadow-lg rounded-2xl p-6 sm:p-8">
+                            <h1 className="font-serif text-3xl font-black tracking-tight">LANDroid</h1>
+                            <p className="mt-2 text-sm text-ink/80">Choose a saved workspace or start a new one.</p>
+                            <div className="mt-5 flex flex-wrap gap-2">
+                                <button onClick={handleEnterNewWorkspace} className="px-4 py-2 text-xs font-bold rounded border border-ink bg-ink text-parchment">Start New Workspace</button>
+                                <button onClick={() => fileInput.current.click()} className="px-4 py-2 text-xs font-bold rounded border border-ink/30 bg-teastain">Import CSV</button>
+                            </div>
+                            <input type="file" ref={fileInput} onChange={(e) => { importCSV(e); setWorkspaceLoaded(true); setShowHome(false); }} className="hidden" accept=".csv" />
+                            <div className="mt-6">
+                                <h2 className="text-xs font-bold uppercase tracking-widest text-sepia">Saved Workspaces</h2>
+                                <div className="mt-2 max-h-[45vh] overflow-auto border border-ink/20 rounded-lg bg-parchment">
+                                    {savedProjects.length === 0 ? (
+                                        <div className="p-4 text-sm text-ink/60">No saved workspaces yet.</div>
+                                    ) : (
+                                        savedProjects.map((p) => (
+                                            <button key={p.id} onClick={() => handleLoadWorkspace(p, false)} className="w-full text-left p-3 border-b last:border-b-0 border-ink/10 hover:bg-teastain/50">
+                                                <div className="font-bold text-sm">{p.name || 'Untitled Workspace'}</div>
+                                                <div className="text-[11px] text-ink/60">Updated {new Date(p.updatedAt || Date.now()).toLocaleString()}</div>
+                                            </button>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                ) : (
                 <div className="h-screen w-screen overflow-hidden flex flex-col relative font-mono text-ink px-3 sm:px-5 py-3 sm:py-4 gap-3">
                     
                     {/* The Surveyors Desk Header - HIDDEN ON PRINT */}
@@ -1406,6 +1504,15 @@ async function getLatestWorkspace() {
                                 <button onClick={exportToRunsheet} className="px-3 py-1.5 text-xs font-bold text-sepia/90 hover:text-sepia hover:bg-sepia/10 rounded transition-all flex items-center gap-2" title="Generate Chronological Runsheet">
                                     <Icon name="FileText" size={14} /> <span className="hidden sm:block">Export Runsheet</span>
                                 </button>
+
+                                <div className="w-px h-4 bg-ink/20 mx-1"></div>
+
+                                <button onClick={handleSaveWorkspace} className="px-3 py-1.5 text-xs font-bold text-ink/90 hover:text-ink hover:bg-parchment rounded transition-all flex items-center gap-2" title="Save workspace locally">
+                                    <Icon name="Download" size={14} /> <span className="hidden sm:block">Save Workspace</span>
+                                </button>
+                                <button onClick={handleReturnHome} className="px-3 py-1.5 text-xs font-bold text-ink/90 hover:text-ink hover:bg-parchment rounded transition-all flex items-center gap-2" title="Save and return to startup page">
+                                    <Icon name="ArrowUp" size={14} /> <span>Back to Home</span>
+                                </button>
                             </div>
                         </div>
                     </header>
@@ -1422,14 +1529,22 @@ async function getLatestWorkspace() {
                                             <span className="text-xs font-bold uppercase tracking-widest font-serif">Master Runsheet Log</span>
                                         </div>
                                         <div className="flex items-center gap-4">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-[9px] uppercase tracking-widest text-parchment/80 font-bold">DeskMap:</span>
+                                                <select value={runsheetDeskMapFilter} onChange={e => setRunsheetDeskMapFilter(e.target.value)} className="bg-parchment text-ink border border-parchment/30 text-[10px] px-2 py-1 rounded">
+                                                    <option value="active">Active DeskMap</option>
+                                                    <option value="all">All DeskMaps</option>
+                                                    {deskMaps.map(map => <option key={`rs-${map.id}`} value={map.id}>{map.code} {map.name ? `- ${map.name}` : ''}</option>)}
+                                                </select>
+                                            </div>
                                             <div className="flex bg-ink border border-parchment/30 rounded-sm p-0.5">
                                                 <button onClick={() => setShowOnlyConveyances(false)} className={`px-3 py-1 text-[9px] font-bold uppercase transition-all rounded-sm ${!showOnlyConveyances ? 'bg-parchment text-ink shadow-sm' : 'text-parchment/60 hover:text-parchment'}`}>All Records</button>
                                                 <button onClick={() => setShowOnlyConveyances(true)} className={`px-3 py-1 text-[9px] font-bold uppercase transition-all rounded-sm ${showOnlyConveyances ? 'bg-parchment text-ink shadow-sm' : 'text-parchment/60 hover:text-parchment'}`}>Conveyances Only</button>
                                             </div>
                                             <div className="text-[10px] font-mono opacity-60 hidden sm:flex items-center">
-                                                {nodes.filter(n => n.parentId === 'unlinked').length > 0 && !showOnlyConveyances && (
+                                                {filteredSortedNodes.filter(n => n.parentId === 'unlinked').length > 0 && !showOnlyConveyances && (
                                                     <span className="text-parchment bg-stamp/80 px-2 py-0.5 rounded-sm mr-3 font-bold inline-flex items-center gap-1">
-                                                        {nodes.filter(n => n.parentId === 'unlinked').length} Loose Record(s) pending link
+                                                        {filteredSortedNodes.filter(n => n.parentId === 'unlinked').length} Loose Record(s) pending link
                                                     </span>
                                                 )}
                                                 Sorted by Effective Date
@@ -1624,6 +1739,8 @@ async function getLatestWorkspace() {
                                         {deskMaps.map(map => <option key={map.id} value={map.id}>{map.code} {map.name ? `- ${map.name}` : ''}</option>)}
                                     </select>
                                     <button onClick={addDeskMap} className="px-2 py-1 text-[10px] font-bold border border-ink hover:bg-ink hover:text-parchment transition-colors">+ DeskMap</button>
+                                    <input value={deskMapNameDraft} onChange={e => setDeskMapNameDraft(e.target.value)} className="border border-ink/40 p-1 text-xs min-w-[140px] bg-parchment" placeholder="DeskMap name" />
+                                    <button onClick={renameActiveDeskMap} className="px-2 py-1 text-[10px] font-bold border border-ink/40 hover:bg-teastain transition-colors">Save Name</button>
                                 </div>
                                 <div style={{ transform: `translate(${pz.x}px, ${pz.y}px) scale(${pz.scale})`, transformOrigin: '0 0' }} className="w-max h-max min-w-full min-h-full flex justify-center pt-24 pb-48 gap-24">
                                     {tree.map(n => renderTreeNode(n))}
@@ -1701,8 +1818,14 @@ async function getLatestWorkspace() {
                                             <button onClick={() => setPrintOrientation(prev => prev === 'portrait' ? 'landscape' : 'portrait')} className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-ink bg-parchment hover:bg-teastain flex items-center gap-1 shadow-sm transition-all hover:-translate-y-0.5" title="Toggle Portrait/Landscape">
                                                 <Icon name="FileText" size={12}/> {printOrientation === 'portrait' ? 'Portrait' : 'Landscape'}
                                             </button>
-                                            <button onClick={importToFlowchart} className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-sepia text-sepia hover:bg-sepia hover:text-parchment flex items-center gap-1 shadow-sm transition-all hover:-translate-y-0.5" title="Generate Top-Down layout from Desk Map"><Icon name="Download" size={12}/> Import</button>
-                                            <button onClick={() => window.print()} className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-ink bg-ink text-parchment hover:bg-ink/80 flex items-center gap-1 shadow-sm transition-all hover:-translate-y-0.5"><Icon name="Printer" size={12}/> Print</button>
+                                            <select value={flowDeskMapFilter} onChange={e => setFlowDeskMapFilter(e.target.value)} className="px-2 py-1.5 text-[10px] font-bold border border-ink/30 bg-parchment">
+                                                <option value="active">Flow Source: Active DeskMap</option>
+                                                <option value="all">Flow Source: All DeskMaps</option>
+                                                {deskMaps.map(map => <option key={`flow-${map.id}`} value={map.id}>Flow Source: {map.code} {map.name ? `- ${map.name}` : ''}</option>)}
+                                            </select>
+                                            <button onClick={() => importToFlowchart(false)} className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-sepia text-sepia hover:bg-sepia hover:text-parchment flex items-center gap-1 shadow-sm transition-all hover:-translate-y-0.5" title="Load selected DeskMap(s) into Flow Chart"><Icon name="Download" size={12}/> Load Selection</button>
+                                            <button onClick={() => importToFlowchart(true)} className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-sepia/50 text-sepia hover:bg-sepia/10 flex items-center gap-1 shadow-sm transition-all hover:-translate-y-0.5" title="Append selected DeskMap(s) to existing Flow Chart"><Icon name="Plus" size={12}/> Add Selection</button>
+                                            <button onClick={handlePrintFlowchart} className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-ink bg-ink text-parchment hover:bg-ink/80 flex items-center gap-1 shadow-sm transition-all hover:-translate-y-0.5"><Icon name="Printer" size={12}/> Print</button>
                                         </div>
                                     </div>
                                 </div>
@@ -2312,6 +2435,7 @@ async function getLatestWorkspace() {
                         </div>
                     )}
                 </div>
+                )}
                 </>
             );
         };
