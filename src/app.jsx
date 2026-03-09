@@ -49,10 +49,34 @@ async function loadWorkspace(id) {
     });
 }
 
-async function saveWorkspace(data) {
-    const existing = await getAllWorkspaces();
-    const match = existing.find(p => p.name?.toLowerCase() === data.name?.toLowerCase());
-    const payload = { ...data, id: match?.id || (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2, 11)), updatedAt: Date.now() };
+async function deleteWorkspace(id) {
+    const db = await openDb();
+    await new Promise((resolve, reject) => {
+        const tx = db.transaction(WORKSPACES_STORE, 'readwrite');
+        tx.objectStore(WORKSPACES_STORE).delete(id);
+        tx.oncomplete = resolve;
+        tx.onerror = () => reject(tx.error);
+    });
+    db.close();
+    if (localStorage.getItem(LOCAL_META_KEY) === id) {
+        localStorage.removeItem(LOCAL_META_KEY);
+    }
+}
+
+async function deleteAllWorkspaces() {
+    const db = await openDb();
+    await new Promise((resolve, reject) => {
+        const tx = db.transaction(WORKSPACES_STORE, 'readwrite');
+        tx.objectStore(WORKSPACES_STORE).clear();
+        tx.oncomplete = resolve;
+        tx.onerror = () => reject(tx.error);
+    });
+    db.close();
+    localStorage.removeItem(LOCAL_META_KEY);
+}
+
+async function saveWorkspace(data, workspaceId = null) {
+    const payload = { ...data, id: workspaceId || data.id || (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2, 11)), updatedAt: Date.now() };
     const db = await openDb();
     await new Promise((resolve, reject) => {
         const tx = db.transaction(WORKSPACES_STORE, 'readwrite');
@@ -178,6 +202,7 @@ async function getLatestWorkspace() {
             const [showHome, setShowHome] = useState(true);
             const [workspaceLoaded, setWorkspaceLoaded] = useState(false);
             const [projectName, setProjectName] = useState('My Workspace');
+            const [currentWorkspaceId, setCurrentWorkspaceId] = useState(null);
             const [isSaving, setIsSaving] = useState(false);
             const [isOnline, setIsOnline] = useState(navigator.onLine);
             const [bootChecks, setBootChecks] = useState({ offlineModeActive: false, cloudSyncUnavailable: !navigator.onLine });
@@ -365,6 +390,7 @@ async function getLatestWorkspace() {
                     const latestId = localStorage.getItem(LOCAL_META_KEY);
                     const latest = (latestId && await loadWorkspace(latestId)) || projects[0] || await getLatestWorkspace();
                     if (latest?.name) setProjectName(latest.name);
+                    if (latest?.id) setCurrentWorkspaceId(latest.id);
                     setBootChecks({
                         offlineModeActive: 'ServiceWorker' in navigator,
                         cloudSyncUnavailable: !navigator.onLine
@@ -374,7 +400,7 @@ async function getLatestWorkspace() {
             }, []);
 
             const handleSaveWorkspace = async () => {
-                if (!projectName.trim()) return;
+                if (!projectName.trim()) return false;
                 setIsSaving(true);
                 try {
                     const nodesToSave = nodes.map(n => {
@@ -387,7 +413,8 @@ async function getLatestWorkspace() {
                         tracts, contacts, ownershipInterests, contactLogs, deskMaps, activeDeskMapId,
                         updatedAt: Date.now(), appId
                     };
-                    await saveWorkspace(data);
+                    const savedWorkspace = await saveWorkspace(data, currentWorkspaceId);
+                    setCurrentWorkspaceId(savedWorkspace.id);
                     const projects = await getAllWorkspaces();
                     setSavedProjects(projects);
                     return true;
@@ -400,7 +427,7 @@ async function getLatestWorkspace() {
             };
 
             useEffect(() => {
-                if (!workspaceLoaded) return;
+                if (!workspaceLoaded || showHome) return;
                 const timer = setTimeout(() => {
                     handleSaveWorkspace();
                 }, 400);
@@ -408,7 +435,7 @@ async function getLatestWorkspace() {
             }, [
                 nodes, instrumentList, flowNodes, flowEdges, treeScale, printOrientation,
                 gridCols, gridRows, tracts, contacts, ownershipInterests, contactLogs,
-                deskMaps, activeDeskMapId, projectName, workspaceLoaded
+                deskMaps, activeDeskMapId, projectName, workspaceLoaded, currentWorkspaceId, showHome
             ]);
 
             const handleLoadWorkspace = (p, closeModal = true) => {
@@ -434,12 +461,16 @@ async function getLatestWorkspace() {
                 setNodes(activeDeskMap.nodes || p.nodes || [{ ...defaultRoot }]);
                 setPz(activeDeskMap.pz || { ...defaultViewport });
                 setProjectName(p.name);
+                setCurrentWorkspaceId(p.id || null);
                 setWorkspaceLoaded(true);
                 setShowHome(false);
                 if (closeModal) setShowCloudModal(false);
             };
             
             const handleEnterNewWorkspace = () => {
+                const freshWorkspaceId = crypto.randomUUID ? crypto.randomUUID() : makeId();
+                setCurrentWorkspaceId(freshWorkspaceId);
+                setProjectName('My Workspace');
                 setWorkspaceLoaded(true);
                 setShowHome(false);
             };
@@ -1158,6 +1189,27 @@ async function getLatestWorkspace() {
                 }, 50);
             };
 
+            const handleDeleteWorkspace = async (workspaceId) => {
+                if (!workspaceId) return;
+                if (!window.confirm('Delete this saved workspace permanently?')) return;
+                await deleteWorkspace(workspaceId);
+                const projects = await getAllWorkspaces();
+                setSavedProjects(projects);
+                if (currentWorkspaceId === workspaceId) {
+                    setCurrentWorkspaceId(null);
+                    setProjectName('My Workspace');
+                }
+            };
+
+            const handleDeleteAllWorkspaces = async () => {
+                if (!savedProjects.length) return;
+                if (!window.confirm('Delete ALL saved workspaces? This cannot be undone.')) return;
+                await deleteAllWorkspaces();
+                setSavedProjects([]);
+                setCurrentWorkspaceId(null);
+                setProjectName('My Workspace');
+            };
+
             const handleReturnHome = async () => {
                 try {
                     await handleSaveWorkspace();
@@ -1425,16 +1477,24 @@ async function getLatestWorkspace() {
                             </div>
                             <input type="file" ref={fileInput} onChange={(e) => { importCSV(e); setWorkspaceLoaded(true); setShowHome(false); }} className="hidden" accept=".csv" />
                             <div className="mt-6">
-                                <h2 className="text-xs font-bold uppercase tracking-widest text-sepia">Saved Workspaces</h2>
+                                <div className="flex items-center justify-between gap-2">
+                                    <h2 className="text-xs font-bold uppercase tracking-widest text-sepia">Saved Workspaces</h2>
+                                    <button aria-label="Delete All Workspaces" onClick={handleDeleteAllWorkspaces} className="px-2 py-1 text-[10px] font-bold border border-stamp/60 text-stamp hover:bg-stamp hover:text-parchment rounded transition-colors">Delete All</button>
+                                </div>
                                 <div className="mt-2 max-h-[45vh] overflow-auto border border-ink/20 rounded-lg bg-parchment">
                                     {savedProjects.length === 0 ? (
                                         <div className="p-4 text-sm text-ink/60">No saved workspaces yet.</div>
                                     ) : (
                                         savedProjects.map((p) => (
-                                            <button key={p.id} onClick={() => handleLoadWorkspace(p, false)} className="w-full text-left p-3 border-b last:border-b-0 border-ink/10 hover:bg-teastain/50">
-                                                <div className="font-bold text-sm">{p.name || 'Untitled Workspace'}</div>
-                                                <div className="text-[11px] text-ink/60">Updated {new Date(p.updatedAt || Date.now()).toLocaleString()}</div>
-                                            </button>
+                                            <div key={p.id} className="w-full border-b last:border-b-0 border-ink/10 flex items-center gap-2 p-2 hover:bg-teastain/40">
+                                                <button onClick={() => handleLoadWorkspace(p, false)} className="flex-1 text-left p-1">
+                                                    <div className="font-bold text-sm">{p.name || 'Untitled Workspace'}</div>
+                                                    <div className="text-[11px] text-ink/60">Updated {new Date(p.updatedAt || Date.now()).toLocaleString()}</div>
+                                                </button>
+                                                <button aria-label={`Delete Workspace ${p.name || p.id}`} onClick={() => handleDeleteWorkspace(p.id)} className="px-2 py-1 text-[10px] font-bold border border-stamp/60 text-stamp hover:bg-stamp hover:text-parchment transition-colors rounded" title="Delete workspace">
+                                                    Delete
+                                                </button>
+                                            </div>
                                         ))
                                     )}
                                 </div>
