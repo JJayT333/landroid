@@ -400,6 +400,7 @@
                 return bucket;
             }, [ownershipInterests]);
             const selectedContact = useMemo(() => selectedContactId ? (contactById[selectedContactId] || null) : null, [contactById, selectedContactId]);
+            const selectedContact = useMemo(() => contacts.find(c => c.id === selectedContactId) || null, [contacts, selectedContactId]);
             const selectedContactLogs = useMemo(() => {
                 if (!selectedContactId) return [];
                 return contactLogs
@@ -684,6 +685,13 @@
                     i === 0 ? JSON.stringify(contacts) : '',
                     i === 0 ? JSON.stringify(ownershipInterests) : '',
                     i === 0 ? JSON.stringify(contactLogs) : ''
+                    n.fileDate, n.date, `"${n.grantor}"`, `"${n.grantee}"`, `"${n.landDesc}"`, `"${n.remarks}"`,
+                    n.fraction, n.initialFraction || n.fraction, n.id, n.parentId || "NULL", `"${n.docData || ""}"`, n.type || 'conveyance',
+                    n.isDeceased ? 'true' : 'false', `"${n.obituary || ''}"`, `"${n.graveyardLink || ''}"`,
+                    i === 0 ? `"${JSON.stringify(tracts).replace(/"/g, '""')}"` : '""',
+                    i === 0 ? `"${JSON.stringify(contacts).replace(/"/g, '""')}"` : '""',
+                    i === 0 ? `"${JSON.stringify(ownershipInterests).replace(/"/g, '""')}"` : '""',
+                    i === 0 ? `"${JSON.stringify(contactLogs).replace(/"/g, '""')}"` : '""'
                 ]);
                 const content = "\uFEFF" + headers.join(",") + "\n" + rows.map(r => r.map(escapeCSV).join(",")).join("\n");
                 const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
@@ -763,6 +771,11 @@
                                     } catch {
                                         return [];
                                     }
+                                try {
+                                    if (!firstRow[field]) return [];
+                                    return JSON.parse(String(firstRow[field]).replace(/""/g, '"'));
+                                } catch {
+                                    return [];
                                 }
                             };
                             setTracts(parseJsonField('INTERNAL_TRACTS'));
@@ -1603,6 +1616,7 @@
                                                     <thead><tr className="border-b border-ink/20"><th className="text-left py-1">When</th><th className="text-left py-1">Method</th><th className="text-left py-1">Tract</th><th className="text-left py-1">Outcome</th><th className="text-left py-1">Follow-up</th><th className="text-right py-1">Actions</th></tr></thead>
                                                     <tbody>
                                                         {selectedContactLogs.map(l => <tr key={l.id} className="border-b border-ink/10"><td className="py-1">{new Date(l.contactAt).toLocaleString()}</td><td>{l.method}</td><td>{tractById[l.tractId]?.code || '-'}</td><td>{l.outcome}</td><td>{l.nextFollowupAt || '-'}</td><td className="text-right"><button onClick={() => removeContactLog(l.id)} className="text-stamp hover:underline">Remove</button></td></tr>)}
+                                                        {selectedContactLogs.map(l => <tr key={l.id} className="border-b border-ink/10"><td className="py-1">{new Date(l.contactAt).toLocaleString()}</td><td>{l.method}</td><td>{tracts.find(t => t.id === l.tractId)?.code || '-'}</td><td>{l.outcome}</td><td>{l.nextFollowupAt || '-'}</td><td className="text-right"><button onClick={() => removeContactLog(l.id)} className="text-stamp hover:underline">Remove</button></td></tr>)}
                                                     </tbody>
                                                 </table>
                                             </div>
