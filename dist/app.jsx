@@ -303,11 +303,6 @@ async function getLatestWorkspace() {
 
             const renameActiveDeskMap = () => {
                 const trimmed = (deskMapNameDraft || '').trim();
-                const active = deskMaps.find(map => map.id === activeDeskMapId);
-                if (!active) return;
-                const nextName = window.prompt('Rename DeskMap', active.name || active.code || '');
-                if (nextName === null) return;
-                const trimmed = nextName.trim();
                 if (!trimmed) return;
                 setDeskMaps(prev => prev.map(map => map.id === activeDeskMapId ? { ...map, name: trimmed } : map));
             };
@@ -1118,7 +1113,6 @@ async function getLatestWorkspace() {
                 let xCursor = append && flowNodes.length ? (Math.max(...flowNodes.map(n => n.x + 300)) + 200) : 0;
                 const built = selectedMaps.map((map, i) => {
                     const result = buildFlowLayoutFromNodes(map.nodes || [], `${map.id}-${i}-${makeId()}`, xCursor);
-                    const result = buildFlowLayoutFromNodes(map.nodes || [], `${map.id}-${i}`, xCursor);
                     xCursor += result.width + 220;
                     return result;
                 });
@@ -1144,14 +1138,6 @@ async function getLatestWorkspace() {
                     const centerX = minX + contentW / 2;
                     const centerY = minY + contentH / 2;
                     setFlowPz({ x: (window.innerWidth / 2) - (centerX * fitScale), y: (window.innerHeight / 2) - (centerY * fitScale), scale: 1 });
-                if (append) {
-                    setFlowNodes(prev => [...prev, ...importedNodes]);
-                    setFlowEdges(prev => [...prev, ...importedEdges]);
-                } else {
-                    setFlowNodes(importedNodes);
-                    setFlowEdges(importedEdges);
-                    const totalPrintWidth = pw * gridCols;
-                    setFlowPz({ x: (window.innerWidth / 2) - (totalPrintWidth / 2), y: 50, scale: 1 });
                 }
             };
 
@@ -1525,8 +1511,7 @@ async function getLatestWorkspace() {
                                     <Icon name="Download" size={14} /> <span className="hidden sm:block">Save Workspace</span>
                                 </button>
                                 <button onClick={handleReturnHome} className="px-3 py-1.5 text-xs font-bold text-ink/90 hover:text-ink hover:bg-parchment rounded transition-all flex items-center gap-2" title="Save and return to startup page">
-                                    <Icon name="ArrowUp" size={14} /> <span>Back to Home</span>
-                                    <Icon name="ArrowUp" size={14} /> <span className="hidden sm:block">Back to Home</span>
+                                    <Icon name="ArrowUp" size={14} /> <span>Save + Home</span>
                                 </button>
                             </div>
                         </div>
@@ -1756,7 +1741,6 @@ async function getLatestWorkspace() {
                                     <button onClick={addDeskMap} className="px-2 py-1 text-[10px] font-bold border border-ink hover:bg-ink hover:text-parchment transition-colors">+ DeskMap</button>
                                     <input value={deskMapNameDraft} onChange={e => setDeskMapNameDraft(e.target.value)} className="border border-ink/40 p-1 text-xs min-w-[140px] bg-parchment" placeholder="DeskMap name" />
                                     <button onClick={renameActiveDeskMap} className="px-2 py-1 text-[10px] font-bold border border-ink/40 hover:bg-teastain transition-colors">Save Name</button>
-                                    <button onClick={renameActiveDeskMap} className="px-2 py-1 text-[10px] font-bold border border-ink/40 hover:bg-teastain transition-colors">Rename</button>
                                 </div>
                                 <div style={{ transform: `translate(${pz.x}px, ${pz.y}px) scale(${pz.scale})`, transformOrigin: '0 0' }} className="w-max h-max min-w-full min-h-full flex justify-center pt-24 pb-48 gap-24">
                                     {tree.map(n => renderTreeNode(n))}
@@ -1839,8 +1823,8 @@ async function getLatestWorkspace() {
                                                 <option value="all">Flow Source: All DeskMaps</option>
                                                 {deskMaps.map(map => <option key={`flow-${map.id}`} value={map.id}>Flow Source: {map.code} {map.name ? `- ${map.name}` : ''}</option>)}
                                             </select>
-                                            <button onClick={() => importToFlowchart(false)} className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-sepia text-sepia hover:bg-sepia hover:text-parchment flex items-center gap-1 shadow-sm transition-all hover:-translate-y-0.5" title="Load selected DeskMap(s) into Flow Chart"><Icon name="Download" size={12}/> Load Selection</button>
-                                            <button onClick={() => importToFlowchart(true)} className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-sepia/50 text-sepia hover:bg-sepia/10 flex items-center gap-1 shadow-sm transition-all hover:-translate-y-0.5" title="Append selected DeskMap(s) to existing Flow Chart"><Icon name="Plus" size={12}/> Add Selection</button>
+                                            <button onClick={() => importToFlowchart(false)} className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-sepia text-sepia hover:bg-sepia hover:text-parchment flex items-center gap-1 shadow-sm transition-all hover:-translate-y-0.5" title="Load selected DeskMap(s) into Flow Chart"><Icon name="Download" size={12}/> Import Selected DeskMap(s)</button>
+                                            <button onClick={() => importToFlowchart(true)} className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-sepia/50 text-sepia hover:bg-sepia/10 flex items-center gap-1 shadow-sm transition-all hover:-translate-y-0.5" title="Append selected DeskMap(s) to existing Flow Chart"><Icon name="Plus" size={12}/> Import + Append</button>
                                             <button onClick={handlePrintFlowchart} className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-ink bg-ink text-parchment hover:bg-ink/80 flex items-center gap-1 shadow-sm transition-all hover:-translate-y-0.5"><Icon name="Printer" size={12}/> Print</button>
                                         </div>
                                     </div>
