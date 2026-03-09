@@ -24,22 +24,34 @@ function openDb() {
 async function withWorkspaceStore(mode, handler) {
     const db = await openDb();
     return new Promise((resolve, reject) => {
+        let settled = false;
+        const safeResolve = (value) => {
+            if (settled) return;
+            settled = true;
+            resolve(value);
+        };
+        const safeReject = (error) => {
+            if (settled) return;
+            settled = true;
+            reject(error);
+        };
         const tx = db.transaction(WORKSPACES_STORE, mode);
         const store = tx.objectStore(WORKSPACES_STORE);
 
         tx.oncomplete = () => {
             db.close();
+            safeResolve();
         };
         tx.onerror = () => {
             db.close();
-            reject(tx.error);
+            safeReject(tx.error);
         };
         tx.onabort = () => {
             db.close();
-            reject(tx.error || new Error('Workspace transaction aborted'));
+            safeReject(tx.error || new Error('Workspace transaction aborted'));
         };
 
-        handler({ store, resolve, reject });
+        handler({ store, resolve: safeResolve, reject: safeReject });
     });
 }
 
