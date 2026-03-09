@@ -1,221 +1,223 @@
 # LANDroid User Manual
 
-
-## 0) Quick launch package (double-click)
-This package includes launchers so you can open a main landing page and choose a saved workspace.
-
-- **macOS/Linux:** double-click `LANDroid.command`
-- **Windows:** double-click `LANDroid.bat`
-
-The launcher starts a local web server, opens LANDroid in your browser, and shows a startup home screen where you can:
-- Start a new workspace
-- Import CSV
-- Open any saved workspace from local storage
-
-## 1) What LANDroid is for
-LANDroid is a title-chain workspace for landmen and survey/title professionals. It combines:
-
-- **Desk Map**: interactive title lineage tree.
-- **Runsheet**: chronological, ledger-style document view.
-- **Flow Chart**: print-focused diagram builder for clean exhibit output.
-
-The app keeps a surveyor/landman visual style (parchment, ink, sepia) while supporting day-to-day chain construction, conveyance math, and print prep.
+This manual explains the current LANDroid workflow, including the startup workspace system, DeskMap management enhancements, Runsheet/Flow source filters, offline behavior, and print/export operations.
 
 ---
 
-## 2) Main navigation and layout
-At the top of the app, use the view switcher:
+## 1) Quick start and launch
 
-- **Desk Map** → interactive lineage/tree view.
-- **Runsheet** → tabular master log.
-- **Flow Chart** → presentation/print canvas.
+### Desktop launchers
+LANDroid ships with local launchers:
+- **macOS/Linux:** `LANDroid.command`
+- **Windows:** `LANDroid.bat`
 
-Also in the header:
+Each launcher opens the app in your browser and presents the **Home / Workspace Picker**.
 
-- **Master Total** stamp: shows the current total remaining interest.
-- **New Tree**: start a separate root chain.
-- **Add Loose Record**: add a parking-lot record not yet linked.
-- **Upload Data**: import CSV.
-- **Save Data**: export CSV backup.
-- **Export Runsheet**: export runsheet file.
+### Browser-only launch
+If needed, you can also run a local static server from the app folder and open `index.html` through that server.
 
 ---
 
-## 3) Core record concepts
-A title record can exist in one of these practical states:
+## 2) Home screen (workspace picker)
 
-1. **Chain-linked conveyance** (part of the main title math lineage).
-2. **Related document** (non-conveying support docs; e.g., probate/affidavit).
-3. **Loose record** (parking lot item waiting to be linked).
-4. **Independent chain root** (new tree, separate branch set).
+When LANDroid opens, you land on Home. This is your control center.
 
-Each record can include key metadata such as:
+### Primary actions
+- **Start New Workspace**
+  - Creates a new workspace with default starter data.
+- **Import CSV**
+  - Imports a CSV backup into a workspace.
+- **Open Existing Workspace**
+  - Loads a previously saved local workspace.
 
+### What Home stores
+Workspace data is saved in your browser’s local IndexedDB storage. Workspace metadata (last-opened workspace id) is stored locally as well.
+
+### Save and return behavior
+Inside a workspace, use:
+- **Save Workspace**: saves changes in place.
+- **Save + Home** (or equivalent home-return action): saves current work, then returns to Home for workspace switching.
+
+---
+
+## 3) Core app views and what each is for
+
+LANDroid has three main views:
+
+1. **Desk Map**
+   - Tree-based title lineage editor.
+   - Best for branch logic and parent/child relationships.
+
+2. **Runsheet**
+   - Chronological and audit-friendly table.
+   - Best for QA review, chain integrity, and chronology checks.
+
+3. **Flow Chart**
+   - Presentation/print layout canvas.
+   - Best for page-formatted exhibits and handoff diagrams.
+
+---
+
+## 4) Record types and chain behavior
+
+LANDroid records generally fall into these categories:
+
+- **Conveyance**: participates in ownership math.
+- **Related Document**: attached for context/reference; does not move title fraction.
+- **Loose Record**: parked document not yet linked to lineage.
+- **Root / independent chain starter**: beginning of a tree.
+
+Typical fields include:
 - Instrument type
-- Effective/file dates
-- Volume/page/instrument number
-- Grantor / grantee
+- File/effective date
+- Volume/page/document no.
+- Grantor/grantee
 - Land description
 - Remarks
-- Optional PDF attachment (Vault PDF Link)
+- Optional document attachment/link
 
 ---
 
-## 4) Typical workflow (recommended)
+## 5) Desk Map guide (including new multi-DeskMap controls)
 
-### Step 1: Start your base chain
-- Click **New Tree** to create a new chain root record.
-- Fill in base instrument and party details.
+Desk Map is your primary editing surface.
 
-### Step 2: Add conveyances
-- From Desk Map or Runsheet, use **Convey** on the parent record.
-- Choose conveyance math mode and basis (fraction/decimal behavior depends on your selected options).
-- Commit the transaction.
+### Canvas interaction
+- Pan by drag.
+- Zoom with mouse wheel/trackpad.
+- Use node-level actions to edit, convey, attach docs, or delete (where allowed).
 
-### Step 3: Add non-conveying support docs
-- Use **+ DOC** / **Attach Related Document** for docs that should display with a branch but not change math totals.
+### DeskMap management (new additions)
+LANDroid supports multiple DeskMaps in one workspace.
 
-### Step 4: Manage unlinked documents
-- Add to **Loose Record** when details are known but parent linkage is pending.
-- Later use **Link Imported Document to Lineage** to attach to a parent and choose attachment type.
+- **Add DeskMap (`+ DeskMap`)**
+  - Creates a new DeskMap segment (useful for tracts, phases, or organizational splits).
+- **Rename active DeskMap (`Save Name`)**
+  - Edit DeskMap title/code and save updates.
+- **Active DeskMap switching**
+  - Choose which DeskMap is currently being edited in Desk Map view.
 
-### Step 5: QA in Runsheet
-- Review chronology in **Runsheet**.
-- Toggle **All Records** / **Conveyances Only** for focused math review.
-
-### Step 6: Build print output in Flow Chart
-- Switch to **Flow Chart**.
-- Use **Import** to generate a top-down layout from Desk Map.
-- Clean up placement and connector routing.
-- Set orientation/grid and print.
+### Suggested usage
+- Keep one DeskMap per logical tract/unit when practical.
+- Use consistent naming conventions for easier Runsheet/Flow filtering.
 
 ---
 
-## 5) Desk Map guide
-Desk Map is for visual chain development.
+## 6) Runsheet guide (with DeskMap filter controls)
 
-### Interactions
-- **Pan**: click-drag canvas (grab cursor behavior).
-- **Zoom**: mouse wheel.
-- **Node actions** (depending on context):
-  - Edit
-  - Precede (insert prior doc)
-  - Related doc
-  - Convey
-  - Delete (when allowed)
+Runsheet is the QA/audit surface.
 
-### Tips
-- Use Desk Map for branch logic and quick spatial review.
-- Keep related docs attached at the right branch point for clarity.
+### Core uses
+- Validate chronology.
+- Confirm grantor/grantee transitions.
+- Review title-moving entries quickly.
 
----
+### Filters (new additions)
+Runsheet DeskMap scope selector supports:
+- **Active DeskMap**
+- **All DeskMaps**
+- **Specific DeskMap**
 
-## 6) Runsheet guide
-Runsheet is the auditing/verification surface.
-
-### What it gives you
-- Chronological table with instrument details and parties.
-- Optional **Conveyances Only** mode for quick retained-share checks.
-- Visibility of loose-record backlog.
-
-### Row actions
-- Edit a record
-- Add predecessor
-- Attach related doc
-- Convey from row
-- Delete (when allowed)
-
-Use this view to verify:
-- Dates are in expected order
-- Correct grantor/grantee transitions
-- Conveyance-only math looks right
+Use these modes to inspect a single tract or full-workspace activity without changing your underlying Desk Map context.
 
 ---
 
-## 7) Record modal (add/edit) explained
-When adding or editing, modal title changes by task (e.g., Convey Title Link, Add Loose Document, Attach Related Document).
+## 7) Flow Chart guide (source selection, import, and append)
 
-Common sections include:
-- Parent selection (when linking/attaching)
-- Instrument controls (select existing or create custom instrument)
-- Book/page/instrument number
-- Party names
-- Dates
-- Land description and remarks
-- Conveyance math controls (for conveyance entries)
-- PDF upload/view
+Flow Chart is optimized for print-ready diagrams.
 
-### PDF behavior
-- Uploading a PDF can auto-populate instrument number.
-- You can view the attached PDF from the modal when present.
+### Tooling
+- Move box
+- Move tree/group
+- Pan canvas
+- Link boxes/connectors
 
----
+### Source filter and import actions (new additions)
+Flow Chart source selector supports:
+- **Active DeskMap**
+- **All DeskMaps**
+- **Specific DeskMap**
 
-## 8) Flow Chart guide (for exhibits/print)
-Flow Chart is optimized for page-aware output.
+Import actions:
+- **Import Selected DeskMap(s)**
+  - Rebuilds/loads selected source nodes into Flow Chart.
+- **Import + Append**
+  - Adds selected source content to existing Flow Chart instead of replacing it.
 
-### Toolbar tools
-- **Move Box**: reposition individual elements.
-- **Move Tree**: reposition whole structure on paper area.
-- **Pan Canvas**: move viewport only.
-- **Link Boxes**: draw connectors.
+### Print setup
+- Orientation (portrait/landscape)
+- Grid/page configuration
+- Scale and placement adjustments
 
-### Layout controls
-- Grid/page dimensions and tree scale.
-- Orientation toggle (portrait/landscape).
-- Import from Desk Map.
-
-### Print behavior
-- Uses page slicing under the hood for multi-page output.
-- Print boundary and seam guides help avoid accidental clipping.
+Before printing, verify boundary/seam alignment and page count.
 
 ---
 
-## 9) Import, export, and backups
-
-### Export
-- **Save Data** exports internal data (CSV) for backup/transfer.
-- **Export Runsheet** exports a runsheet-oriented output.
+## 8) Import/export and backups
 
 ### Import
-- **Upload Data** loads CSV into the app.
-- Verify key fields after import (especially dates, parties, and fraction values).
+- Use **Import CSV** at Home or **Upload Data** in-workspace (if shown in your toolbar) to load data.
 
-**Best practice:** export before major edits, then export again after completing review.
+### Export
+- Use **Save Data** / export action for CSV backup.
+- Use **Export Runsheet** when you need reporting output.
+
+### Backup best practice
+- Export before major edits.
+- Export after milestone checkpoints.
+- Keep timestamped backups when collaborating across teams.
 
 ---
 
-## 10) Quality-control checklist
-Before finalizing work:
+## 9) Offline mode and sync expectations
 
-- [ ] Master Total is as expected.
-- [ ] All conveyances are connected to intended parent.
-- [ ] Related docs are marked correctly (not accidentally math-bearing).
-- [ ] Runsheet chronology is correct.
-- [ ] Loose records are resolved or intentionally parked.
-- [ ] Flow Chart print boundary/orientation verified.
-- [ ] Final CSV backup exported.
+LANDroid includes offline-friendly behavior:
+- App shell is service-worker cached for repeat loads.
+- Workspaces are stored in local browser storage.
+
+### Important notes
+- Data is local to the browser profile/device unless you export/import manually.
+- “Cloud sync unavailable” indicators generally reflect network status; local editing still works.
+
+---
+
+## 10) Standard operating workflow (recommended)
+
+1. Open Home and pick/create workspace.
+2. Build chain structure in **Desk Map**.
+3. Add related docs and loose records as needed.
+4. Audit in **Runsheet** (Active vs All DeskMaps as needed).
+5. Build final exhibit in **Flow Chart** using source filters and import/append tools.
+6. Save workspace and export backups.
+7. Return to Home for workspace switching or archival actions.
 
 ---
 
 ## 11) Troubleshooting
 
-### I imported records but they are not in the right branch
-Use **Link Imported Document to Lineage** and pick the correct parent + attachment type.
+### “I don’t see a record where expected”
+- Confirm current DeskMap/view filters.
+- In Runsheet/Flow, switch from Active DeskMap to All DeskMaps.
 
-### My totals look wrong
-Check whether a record was entered as conveyance vs related document and verify conveyance basis/mode values.
+### “Totals look off”
+- Verify entries are correctly marked as conveyance vs related doc.
+- Recheck conveyance mode/basis for the affected transaction.
 
-### Printing is clipped or awkward
-Open **Flow Chart**, adjust tree position/scale, verify page seams and orientation, then reprint.
+### “Print output is clipped”
+- Reposition content in Flow Chart.
+- Adjust orientation and tree scale.
+- Re-run print preview before final output.
 
-### I need to start over safely
-Export current data first, then import your known-good CSV backup.
+### “I need to change workspaces safely”
+- Save current workspace.
+- Export CSV backup.
+- Use Save + Home, then open target workspace.
 
 ---
 
-## 12) Operating tips for land/title teams
-- Build conveyance chain first, then attach related docs.
-- Keep instrument naming consistent (or define custom types intentionally).
-- Use Runsheet for audit; use Desk Map for relationship comprehension; use Flow Chart for deliverables.
-- Export frequent backups during complex chain reconstruction.
+## 12) Team conventions (recommended)
+
+- Keep instrument naming consistent.
+- Use DeskMap naming standards (`TRACT-1`, `TRACT-2`, etc.).
+- Resolve loose records before final issue, or annotate intentional exceptions.
+- Perform final QA pass in Runsheet before generating Flow exhibit.
