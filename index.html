@@ -273,6 +273,9 @@
                 MousePointer: <><path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z" /><path d="M13 13l6 6" /></>,
                 Move: <><polyline points="5 9 2 12 5 15" /><polyline points="9 5 12 2 15 5" /><polyline points="19 9 22 12 19 15" /><polyline points="9 19 12 22 15 19" /><line x1="2" y1="12" x2="22" y2="12" /><line x1="12" y1="2" x2="12" y2="22" /></>,
                 Hand: <><path d="M18 11V6a2 2 0 0 0-4 0v4"/><path d="M14 10V4a2 2 0 0 0-4 0v6"/><path d="M10 10.5V3a2 2 0 0 0-4 0v9"/><path d="M6 12v-1a2 2 0 0 0-4 0v5a10 10 0 0 0 20 0v-5a2 2 0 0 0-4 0v-4.5"/></>,
+                Users: <><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><path d="M20 8v6"/><path d="M23 11h-6"/></>,
+                Table: <><rect x="3" y="4" width="18" height="16" rx="1"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="9" y1="4" x2="9" y2="20"/><line x1="15" y1="4" x2="15" y2="20"/></>,
+                MapPin: <><path d="M12 21s-6-5.33-6-10a6 6 0 1 1 12 0c0 4.67-6 10-6 10Z"/><circle cx="12" cy="11" r="2.5"/></>,
             };
             return (
                 <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
@@ -360,6 +363,18 @@
             const [newInst, setNewInst] = useState('');
             const [showGranteeList, setShowGranteeList] = useState(false);
 
+            // Research Hub (contacts + tracts + matrix + contact logs)
+            const [tracts, setTracts] = useState([]);
+            const [contacts, setContacts] = useState([]);
+            const [ownershipInterests, setOwnershipInterests] = useState([]);
+            const [contactLogs, setContactLogs] = useState([]);
+            const [selectedContactId, setSelectedContactId] = useState(null);
+            const [researchTab, setResearchTab] = useState('contacts');
+            const [tractForm, setTractForm] = useState({ code: '', name: '', acres: '', mapId: '' });
+            const [contactForm, setContactForm] = useState({ name: '', role: '', phone: '', email: '' });
+            const [interestForm, setInterestForm] = useState({ contactId: '', tractId: '', interestType: 'MI', interestValue: '', status: 'confirmed' });
+            const [logForm, setLogForm] = useState({ contactId: '', tractId: '', method: 'call', outcome: '', nextFollowupAt: '', notes: '' });
+
             // PERFORMANCE: Memoized calculated arrays
             const activeOwners = useMemo(() => nodes.filter(n => n.type !== 'related' && n.fraction > 0.00000001), [nodes]);
             const totalRemaining = useMemo(() => activeOwners.reduce((sum, n) => sum + parseFloat(n.fraction), 0), [activeOwners]);
@@ -371,6 +386,24 @@
                     .sort((a,b) => new Date(a.date) - new Date(b.date))
                     .filter(n => showOnlyConveyances ? (n.type !== 'related' && n.parentId !== 'unlinked') : true);
             }, [nodes, showOnlyConveyances]);
+
+            const makeId = () => Math.random().toString(36).slice(2, 11);
+            const interestsByContactAndTract = useMemo(() => {
+                const bucket = {};
+                ownershipInterests.forEach(item => {
+                    const key = `${item.contactId}::${item.tractId}`;
+                    if (!bucket[key]) bucket[key] = [];
+                    bucket[key].push(item);
+                });
+                return bucket;
+            }, [ownershipInterests]);
+            const selectedContact = useMemo(() => contacts.find(c => c.id === selectedContactId) || null, [contacts, selectedContactId]);
+            const selectedContactLogs = useMemo(() => {
+                if (!selectedContactId) return [];
+                return contactLogs
+                    .filter(l => l.contactId === selectedContactId)
+                    .sort((a, b) => new Date(b.contactAt) - new Date(a.contactAt));
+            }, [contactLogs, selectedContactId]);
 
             // Print interceptor hook
             useEffect(() => {
@@ -431,8 +464,10 @@
                         if (copy.docData) copy.hasDoc = true; delete copy.docData; return copy;
                     });
                     const data = { 
-                        name: projectName.trim(), nodes: nodesToSave, instrumentList, 
-                        flowNodes, flowEdges, treeScale, printOrientation, gridCols, gridRows, updatedAt: Date.now() 
+                        name: projectName.trim(), nodes: nodesToSave, instrumentList,
+                        flowNodes, flowEdges, treeScale, printOrientation, gridCols, gridRows,
+                        tracts, contacts, ownershipInterests, contactLogs,
+                        updatedAt: Date.now()
                     };
                     if (existing) await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'workspaces', existing.id), data);
                     else await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'workspaces'), data);
@@ -450,6 +485,11 @@
                 if (p.printOrientation) setPrintOrientation(p.printOrientation);
                 if (p.gridCols) setGridCols(p.gridCols);
                 if (p.gridRows) setGridRows(p.gridRows);
+                setTracts(p.tracts || []);
+                setContacts(p.contacts || []);
+                setOwnershipInterests(p.ownershipInterests || []);
+                setContactLogs(p.contactLogs || []);
+                setSelectedContactId((p.contacts && p.contacts[0] && p.contacts[0].id) || null);
                 setProjectName(p.name); setShowCloudModal(false); setPz({ x: 0, y: 0, scale: 1 });
             };
             
@@ -706,6 +746,60 @@
                     error: (error) => console.error("Error parsing CSV:", error)
                 });
                 e.target.value = ''; 
+            };
+
+            const addTract = () => {
+                if (!tractForm.code.trim()) return;
+                setTracts(prev => [...prev, {
+                    id: makeId(),
+                    code: tractForm.code.trim(),
+                    name: tractForm.name.trim(),
+                    acres: parseFloat(tractForm.acres) || 0,
+                    mapId: tractForm.mapId.trim()
+                }]);
+                setTractForm({ code: '', name: '', acres: '', mapId: '' });
+            };
+
+            const addContact = () => {
+                if (!contactForm.name.trim()) return;
+                const newContact = {
+                    id: makeId(),
+                    name: contactForm.name.trim(),
+                    role: contactForm.role.trim(),
+                    phone: contactForm.phone.trim(),
+                    email: contactForm.email.trim()
+                };
+                setContacts(prev => [...prev, newContact]);
+                setSelectedContactId(newContact.id);
+                setContactForm({ name: '', role: '', phone: '', email: '' });
+            };
+
+            const addInterest = () => {
+                if (!interestForm.contactId || !interestForm.tractId || !interestForm.interestValue) return;
+                setOwnershipInterests(prev => [...prev, {
+                    id: makeId(),
+                    contactId: interestForm.contactId,
+                    tractId: interestForm.tractId,
+                    interestType: interestForm.interestType,
+                    interestValue: parseFloat(interestForm.interestValue) || 0,
+                    status: interestForm.status
+                }]);
+                setInterestForm(prev => ({ ...prev, interestValue: '' }));
+            };
+
+            const addContactLog = () => {
+                if (!logForm.contactId || !logForm.outcome.trim()) return;
+                setContactLogs(prev => [...prev, {
+                    id: makeId(),
+                    contactId: logForm.contactId,
+                    tractId: logForm.tractId || null,
+                    method: logForm.method,
+                    outcome: logForm.outcome.trim(),
+                    nextFollowupAt: logForm.nextFollowupAt || '',
+                    notes: logForm.notes.trim(),
+                    contactAt: new Date().toISOString()
+                }]);
+                setLogForm(prev => ({ ...prev, outcome: '', notes: '', nextFollowupAt: '' }));
             };
 
             // Regular Desk Map Build/Render
@@ -1213,6 +1307,9 @@
                                     <button onClick={() => setView('flowchart')} className={`px-4 py-1.5 rounded text-xs font-bold transition-all flex items-center gap-2 ${view === 'flowchart' ? 'bg-sepia text-parchment shadow-sm' : 'text-sepia/80 hover:text-sepia hover:bg-parchment/50'}`}>
                                         <Icon name="Flowchart" size={14} /> <span className="hidden md:inline">Flow Chart</span><span className="md:hidden">Flow</span>
                                     </button>
+                                    <button onClick={() => setView('research')} className={`px-4 py-1.5 rounded text-xs font-bold transition-all flex items-center gap-2 ${view === 'research' ? 'bg-fountain text-parchment shadow-sm' : 'text-fountain/80 hover:text-fountain hover:bg-parchment/50'}`}>
+                                        <Icon name="Users" size={14} /> <span className="hidden md:inline">Research Hub</span><span className="md:hidden">Hub</span>
+                                    </button>
                                 </div>
                             </div>
 
@@ -1347,6 +1444,156 @@
                                 </div>
                             </div>
                         )}
+
+                        {view === 'research' && (
+                            <div className="flex-1 overflow-auto parchment-grid p-4 sm:p-6 animate-fade-in no-print rounded-2xl">
+                                <div className="max-w-[1800px] mx-auto bg-parchment/95 border border-ink/30 ink-shadow-lg overflow-hidden flex flex-col rounded-2xl">
+                                    <div className="p-4 bg-gradient-to-r from-fountain via-ink to-sepia text-parchment border-b border-ink/70 flex items-center justify-between gap-3 flex-wrap">
+                                        <div className="flex items-center gap-2">
+                                            <Icon name="Users" size={16} />
+                                            <span className="text-xs font-bold uppercase tracking-widest font-serif">Research Hub</span>
+                                        </div>
+                                        <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest">
+                                            <span>{tracts.length} Tracts</span>
+                                            <span>•</span>
+                                            <span>{contacts.length} Contacts</span>
+                                            <span>•</span>
+                                            <span>{ownershipInterests.length} Interests</span>
+                                        </div>
+                                    </div>
+
+                                    <div className="p-3 border-b border-ink/20 bg-teastain/60 flex gap-2 flex-wrap">
+                                        {[
+                                            { key: 'contacts', label: 'Contacts', icon: 'Users' },
+                                            { key: 'matrix', label: 'Interest Matrix', icon: 'Table' },
+                                            { key: 'tracts', label: 'Tracts', icon: 'MapPin' }
+                                        ].map(tab => (
+                                            <button key={tab.key} onClick={() => setResearchTab(tab.key)} className={`px-3 py-1.5 rounded text-xs font-bold transition-all flex items-center gap-2 ${researchTab === tab.key ? 'bg-ink text-parchment shadow-sm' : 'text-ink/70 hover:text-ink hover:bg-parchment/50'}`}>
+                                                <Icon name={tab.icon} size={13} /> {tab.label}
+                                            </button>
+                                        ))}
+                                    </div>
+
+                                    {researchTab === 'tracts' && (
+                                        <div className="p-4 grid md:grid-cols-2 gap-4">
+                                            <div className="border border-ink/20 rounded-xl p-3 bg-parchment">
+                                                <h3 className="text-xs font-bold uppercase tracking-widest mb-3">Add Tract</h3>
+                                                <div className="grid grid-cols-2 gap-2 text-xs">
+                                                    <input className="border border-ink p-2" placeholder="Tract Code" value={tractForm.code} onChange={e => setTractForm({ ...tractForm, code: e.target.value })} />
+                                                    <input className="border border-ink p-2" placeholder="Display Name" value={tractForm.name} onChange={e => setTractForm({ ...tractForm, name: e.target.value })} />
+                                                    <input className="border border-ink p-2" placeholder="Gross Acres" type="number" value={tractForm.acres} onChange={e => setTractForm({ ...tractForm, acres: e.target.value })} />
+                                                    <input className="border border-ink p-2" placeholder="ArcGIS Feature ID" value={tractForm.mapId} onChange={e => setTractForm({ ...tractForm, mapId: e.target.value })} />
+                                                </div>
+                                                <button onClick={addTract} className="mt-3 px-3 py-1.5 text-xs font-bold border border-ink hover:bg-ink hover:text-parchment transition-colors">Add Tract</button>
+                                            </div>
+                                            <div className="border border-ink/20 rounded-xl p-3 bg-parchment overflow-auto">
+                                                <h3 className="text-xs font-bold uppercase tracking-widest mb-3">Tract Registry</h3>
+                                                <table className="w-full text-xs">
+                                                    <thead><tr className="border-b border-ink/20"><th className="text-left py-1">Code</th><th className="text-left py-1">Name</th><th className="text-left py-1">Acres</th><th className="text-left py-1">Map ID</th></tr></thead>
+                                                    <tbody>
+                                                        {tracts.map(t => <tr key={t.id} className="border-b border-ink/10"><td className="py-1">{t.code}</td><td>{t.name || '-'}</td><td>{t.acres || '-'}</td><td>{t.mapId || '-'}</td></tr>)}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {researchTab === 'contacts' && (
+                                        <div className="p-4 grid lg:grid-cols-3 gap-4">
+                                            <div className="border border-ink/20 rounded-xl p-3 bg-parchment">
+                                                <h3 className="text-xs font-bold uppercase tracking-widest mb-3">Add Contact</h3>
+                                                <div className="space-y-2 text-xs">
+                                                    <input className="w-full border border-ink p-2" placeholder="Name / Entity" value={contactForm.name} onChange={e => setContactForm({ ...contactForm, name: e.target.value })} />
+                                                    <input className="w-full border border-ink p-2" placeholder="Role" value={contactForm.role} onChange={e => setContactForm({ ...contactForm, role: e.target.value })} />
+                                                    <input className="w-full border border-ink p-2" placeholder="Phone" value={contactForm.phone} onChange={e => setContactForm({ ...contactForm, phone: e.target.value })} />
+                                                    <input className="w-full border border-ink p-2" placeholder="Email" value={contactForm.email} onChange={e => setContactForm({ ...contactForm, email: e.target.value })} />
+                                                </div>
+                                                <button onClick={addContact} className="mt-3 px-3 py-1.5 text-xs font-bold border border-ink hover:bg-ink hover:text-parchment transition-colors">Add Contact</button>
+                                            </div>
+                                            <div className="border border-ink/20 rounded-xl p-3 bg-parchment lg:col-span-2">
+                                                <h3 className="text-xs font-bold uppercase tracking-widest mb-3">Rolodex</h3>
+                                                <div className="grid md:grid-cols-2 gap-3 max-h-[240px] overflow-auto pr-1">
+                                                    {contacts.map(c => (
+                                                        <button key={c.id} onClick={() => { setSelectedContactId(c.id); setLogForm(prev => ({ ...prev, contactId: c.id })); setInterestForm(prev => ({ ...prev, contactId: c.id })); }} className={`text-left border p-2 rounded-lg transition-colors ${selectedContactId === c.id ? 'border-fountain bg-fountain/10' : 'border-ink/20 hover:bg-teastain/50'}`}>
+                                                            <div className="font-bold text-sm">{c.name}</div>
+                                                            <div className="text-xs opacity-70">{c.role || 'No role set'}</div>
+                                                            <div className="text-xs mt-1">{c.phone || '—'} · {c.email || '—'}</div>
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                            <div className="border border-ink/20 rounded-xl p-3 bg-parchment lg:col-span-3">
+                                                <div className="flex items-center justify-between mb-3">
+                                                    <h3 className="text-xs font-bold uppercase tracking-widest">Contact Log {selectedContact ? `• ${selectedContact.name}` : ''}</h3>
+                                                </div>
+                                                <div className="grid md:grid-cols-5 gap-2 text-xs mb-3">
+                                                    <select className="border border-ink p-2" value={logForm.contactId} onChange={e => setLogForm({ ...logForm, contactId: e.target.value })}>
+                                                        <option value="">Contact</option>
+                                                        {contacts.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                                    </select>
+                                                    <select className="border border-ink p-2" value={logForm.tractId} onChange={e => setLogForm({ ...logForm, tractId: e.target.value })}>
+                                                        <option value="">Any Tract</option>
+                                                        {tracts.map(t => <option key={t.id} value={t.id}>{t.code}</option>)}
+                                                    </select>
+                                                    <select className="border border-ink p-2" value={logForm.method} onChange={e => setLogForm({ ...logForm, method: e.target.value })}>
+                                                        <option value="call">Call</option><option value="email">Email</option><option value="text">Text</option><option value="mail">Mail</option>
+                                                    </select>
+                                                    <input className="border border-ink p-2" placeholder="Outcome" value={logForm.outcome} onChange={e => setLogForm({ ...logForm, outcome: e.target.value })} />
+                                                    <input className="border border-ink p-2" type="date" value={logForm.nextFollowupAt} onChange={e => setLogForm({ ...logForm, nextFollowupAt: e.target.value })} />
+                                                    <input className="border border-ink p-2 md:col-span-4" placeholder="Notes" value={logForm.notes} onChange={e => setLogForm({ ...logForm, notes: e.target.value })} />
+                                                    <button onClick={addContactLog} className="border border-ink p-2 font-bold hover:bg-ink hover:text-parchment transition-colors">Add Log</button>
+                                                </div>
+                                                <table className="w-full text-xs">
+                                                    <thead><tr className="border-b border-ink/20"><th className="text-left py-1">When</th><th className="text-left py-1">Method</th><th className="text-left py-1">Tract</th><th className="text-left py-1">Outcome</th><th className="text-left py-1">Follow-up</th></tr></thead>
+                                                    <tbody>
+                                                        {selectedContactLogs.map(l => <tr key={l.id} className="border-b border-ink/10"><td className="py-1">{new Date(l.contactAt).toLocaleString()}</td><td>{l.method}</td><td>{tracts.find(t => t.id === l.tractId)?.code || '-'}</td><td>{l.outcome}</td><td>{l.nextFollowupAt || '-'}</td></tr>)}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {researchTab === 'matrix' && (
+                                        <div className="p-4 grid lg:grid-cols-3 gap-4">
+                                            <div className="border border-ink/20 rounded-xl p-3 bg-parchment lg:col-span-1">
+                                                <h3 className="text-xs font-bold uppercase tracking-widest mb-3">Add Interest</h3>
+                                                <div className="space-y-2 text-xs">
+                                                    <select className="w-full border border-ink p-2" value={interestForm.contactId} onChange={e => setInterestForm({ ...interestForm, contactId: e.target.value })}><option value="">Contact</option>{contacts.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
+                                                    <select className="w-full border border-ink p-2" value={interestForm.tractId} onChange={e => setInterestForm({ ...interestForm, tractId: e.target.value })}><option value="">Tract</option>{tracts.map(t => <option key={t.id} value={t.id}>{t.code} {t.name ? `- ${t.name}` : ''}</option>)}</select>
+                                                    <select className="w-full border border-ink p-2" value={interestForm.interestType} onChange={e => setInterestForm({ ...interestForm, interestType: e.target.value })}><option value="MI">MI</option><option value="RI">RI</option><option value="NRI">NRI</option><option value="ORRI">ORRI</option></select>
+                                                    <input className="w-full border border-ink p-2" type="number" step="0.00000001" placeholder="Interest (decimal)" value={interestForm.interestValue} onChange={e => setInterestForm({ ...interestForm, interestValue: e.target.value })} />
+                                                    <select className="w-full border border-ink p-2" value={interestForm.status} onChange={e => setInterestForm({ ...interestForm, status: e.target.value })}><option value="confirmed">Confirmed</option><option value="proposed">Proposed</option><option value="disputed">Disputed</option></select>
+                                                </div>
+                                                <button onClick={addInterest} className="mt-3 px-3 py-1.5 text-xs font-bold border border-ink hover:bg-ink hover:text-parchment transition-colors">Add Interest</button>
+                                            </div>
+                                            <div className="border border-ink/20 rounded-xl p-3 bg-parchment overflow-auto lg:col-span-2">
+                                                <h3 className="text-xs font-bold uppercase tracking-widest mb-3">Owner × Tract Matrix</h3>
+                                                <table className="w-full text-xs whitespace-nowrap">
+                                                    <thead>
+                                                        <tr className="border-b border-ink/20">
+                                                            <th className="text-left py-1 pr-2">Owner</th>
+                                                            {tracts.map(t => <th key={t.id} className="text-left py-1 px-2">{t.code}</th>)}
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {contacts.map(c => (
+                                                            <tr key={c.id} className="border-b border-ink/10">
+                                                                <td className="py-1 pr-2 font-bold">{c.name}</td>
+                                                                {tracts.map(t => {
+                                                                    const records = interestsByContactAndTract[`${c.id}::${t.id}`] || [];
+                                                                    return <td key={t.id} className="px-2 py-1">{records.length ? records.map(r => `${r.interestType}:${r.interestValue}`).join(', ') : '-'}</td>;
+                                                                })}
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
 
                         {/* -------------------- DESK MAP (INTERACTIVE TREE) -------------------- */}
                         {view === 'chart' && (
