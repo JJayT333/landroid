@@ -1056,11 +1056,25 @@ async function getLatestWorkspace() {
                 setPz(prev => ({ ...prev, scale: Math.min(Math.max(0.1, prev.scale + scaleAdjust), 5) }));
             };
 
+            const countTreeDescendants = (node) => {
+                if (!node?.children?.length) return 0;
+                return node.children.reduce((sum, child) => sum + 1 + countTreeDescendants(child), 0);
+            };
+
+            const toggleTreeBranchCollapse = (nodeId) => {
+                updateActiveDeskMapNodes(prevNodes => prevNodes.map(node => (
+                    node.id === nodeId ? { ...node, isCollapsed: !node.isCollapsed } : node
+                )));
+            };
+
             // PERFORMANCE: Extracted to a standard render function to prevent destructive unmounting/remounting on every frame
             const renderTreeNode = (n) => {
                 const relatedDocs = nodes.filter(x => x.parentId === n.id && x.type === 'related');
                 const isDeceased = n.isDeceased;
                 const conveyanceFractionLabel = formatConveyanceFraction(n);
+                const hasChildren = n.children.length > 0;
+                const isCollapsed = Boolean(n.isCollapsed);
+                const hiddenDescendantCount = isCollapsed ? countTreeDescendants(n) : 0;
                 return (
                     <div key={n.id} className="flex flex-col items-center relative animate-fade-in treenode">
                         <div className="z-10 group relative treenode-body">
@@ -1073,6 +1087,20 @@ async function getLatestWorkspace() {
                                 <div className={`flex justify-between items-start mb-2 border-b pb-2 ${isDeceased ? 'border-sepia/20' : 'border-ink/20'}`}>
                                     <span className="font-serif text-xs font-bold uppercase tracking-widest text-sepia">{n.instrument}</span>
                                     <div className="flex gap-1 items-center">
+                                        {hasChildren && (
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    toggleTreeBranchCollapse(n.id);
+                                                }}
+                                                title={isCollapsed ? 'Expand branch' : 'Collapse branch'}
+                                                className={`px-1.5 py-0.5 text-xs font-bold border rounded-sm transition-colors ${
+                                                    isDeceased ? 'border-sepia/50 hover:bg-sepia/20' : 'border-ink/40 hover:bg-ink/10'
+                                                }`}
+                                            >
+                                                {isCollapsed ? '+' : '−'}
+                                            </button>
+                                        )}
                                         {n.docData && (
                                             <button onClick={(e) => { e.stopPropagation(); setViewerData(n.docData); }} title="View Vault Document" className={`p-1 border border-transparent hover:border-current rounded-sm transition-colors text-stamp`}>
                                                 <Icon name="Eye" size={16} />
@@ -1151,6 +1179,14 @@ async function getLatestWorkspace() {
                                         ))}
                                     </div>
                                 )}
+
+                                {isCollapsed && hiddenDescendantCount > 0 && (
+                                    <div className={`mt-3 inline-flex items-center px-2 py-1 border rounded-sm text-[10px] font-mono uppercase tracking-wider ${
+                                        isDeceased ? 'border-sepia/40 bg-sepia/10 text-sepia' : 'border-ink/40 bg-ink/5 text-ink/80'
+                                    }`}>
+                                        +{hiddenDescendantCount} descendants
+                                    </div>
+                                )}
                             </div>
                             
                             <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 flex gap-1 opacity-0 group-hover:opacity-100 transition-all duration-300 z-20">
@@ -1163,7 +1199,7 @@ async function getLatestWorkspace() {
                                 {nodes.length > 1 && <button onClick={(e) => { e.stopPropagation(); requestDeleteRecord(n); }} className="bg-parchment text-stamp border border-stamp/60 rounded-sm p-1.5 text-[10px] font-bold hover:bg-teastain hover:border-stamp shadow-lg flex items-center justify-center hover:-translate-y-0.5 transition-all"><Icon name="Trash" size={14} /></button>}
                             </div>
                         </div>
-                        {n.children.length > 0 && (
+                        {hasChildren && !isCollapsed && (
                             <div className="flex relative justify-center pt-8">
                                 {n.children.map((c, i) => (
                                     <div key={c.id} className="relative flex flex-col items-center px-4">
@@ -1308,6 +1344,9 @@ async function getLatestWorkspace() {
                 if (currentWorkspaceId === workspaceId) {
                     setCurrentWorkspaceId(null);
                     setProjectName('My Workspace');
+                    setWorkspaceLoaded(false);
+                    setShowCloudModal(false);
+                    setShowHome(true);
                 }
             };
 
@@ -1318,6 +1357,9 @@ async function getLatestWorkspace() {
                 setSavedProjects([]);
                 setCurrentWorkspaceId(null);
                 setProjectName('My Workspace');
+                setWorkspaceLoaded(false);
+                setShowCloudModal(false);
+                setShowHome(true);
             };
 
             const handleReturnHome = async () => {
@@ -1954,7 +1996,7 @@ async function getLatestWorkspace() {
                                     }} className="border border-ink/40 p-1 text-xs min-w-[140px] bg-parchment" placeholder="DeskMap name" />
                                     <button onClick={() => renameActiveDeskMap()} className="px-2 py-1 text-[10px] font-bold border border-ink/40 hover:bg-teastain transition-colors">Save Name</button>
                                 </div>
-                                <div style={{ transform: `translate(${pz.x}px, ${pz.y}px) scale(${pz.scale})`, transformOrigin: '0 0' }} className="w-max h-max min-w-full min-h-full flex justify-center pt-24 pb-48 gap-24">
+                                <div style={{ transform: `translate(${pz.x}px, ${pz.y}px) scale(${pz.scale})`, transformOrigin: '0 0' }} className="w-max h-max min-w-full min-h-full flex justify-start pt-24 pb-48 gap-24">
                                     {tree.map(n => renderTreeNode(n))}
                                 </div>
                             </div>
