@@ -1,0 +1,11 @@
+{
+  "name": "landroid",
+  "private": true,
+  "version": "1.0.0",
+  "type": "commonjs",
+  "scripts": {
+    "test": "npm run test:smoke && npm run test:storage",
+    "test:smoke": "node scripts/smoke-checks.js",
+    "test:storage": "node scripts/workspace-storage-checks.js"
+  }
+}
