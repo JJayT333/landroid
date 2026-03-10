@@ -653,6 +653,21 @@ async function getLatestWorkspace() {
             };
 
             const formatFraction = (num) => (isNaN(num) || num === null || num === undefined ? "0.00000000" : Number(num).toFixed(8));
+            const formatConveyanceFraction = (node) => {
+                if (!node || node.type !== 'conveyance' || node.conveyanceMode !== 'fraction') return '';
+                const numerator = Number(node.numerator || 0);
+                const denominator = Number(node.denominator || 0);
+                if (!Number.isFinite(numerator) || !Number.isFinite(denominator) || denominator <= 0) return '';
+
+                const basisLabel =
+                    node.splitBasis === 'initial'
+                        ? 'of predecessor grant'
+                        : node.splitBasis === 'remaining'
+                            ? 'of predecessor remaining'
+                            : 'of whole tract';
+
+                return `${numerator}/${denominator} ${basisLabel}`;
+            };
 
             const calcShare = useMemo(() => {
                 if (modalMode !== 'convey' && modalMode !== 'attach') return 0;
@@ -1131,6 +1146,7 @@ async function getLatestWorkspace() {
             const renderTreeNode = (n) => {
                 const relatedDocs = nodes.filter(x => x.parentId === n.id && x.type === 'related');
                 const isDeceased = n.isDeceased;
+                const conveyanceFractionLabel = formatConveyanceFraction(n);
                 return (
                     <div key={n.id} className="flex flex-col items-center relative animate-fade-in treenode">
                         <div className="z-10 group relative treenode-body">
@@ -1162,6 +1178,12 @@ async function getLatestWorkspace() {
                                     <div className="text-[10px] uppercase tracking-widest text-sepia/60 font-mono mb-0.5">Grantor / Assignor</div>
                                     <div className="font-mono text-xs truncate opacity-80">{n.grantor}</div>
                                 </div>
+                                {conveyanceFractionLabel && (
+                                    <div className="mb-3">
+                                        <div className="text-[10px] uppercase tracking-widest text-sepia/60 font-mono mb-0.5">Conveyance</div>
+                                        <div className="font-mono text-xs">{conveyanceFractionLabel}</div>
+                                    </div>
+                                )}
                                 <div className={`flex flex-col border-t pt-2 font-mono ${isDeceased ? 'border-sepia/20' : 'border-ink/20'}`}>
                                     <div className="flex justify-between items-end mb-1 ">
                                         <span className="text-[10px] uppercase tracking-widest opacity-60">Grant</span>
