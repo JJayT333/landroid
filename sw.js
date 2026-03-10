@@ -1,10 +1,16 @@
-const CACHE_NAME = 'landroid-shell-v2';
+const CACHE_NAME = 'landroid-shell-v3';
 const APP_SHELL = [
   './',
   './index.html',
   './manifest.webmanifest',
   './dist/app.jsx',
-  './dist/app.css'
+  './dist/app.css',
+  './dist/workspaceStorage.js',
+  './dist/storageProvider.js',
+  './dist/workspaceDomain.js',
+  './dist/auditLog.js',
+  './dist/syncEngine.js',
+  './dist/dropboxIntegration.js'
 ];
 
 self.addEventListener('install', (event) => {

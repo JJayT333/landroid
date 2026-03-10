@@ -28,6 +28,15 @@ const workspaceDomainApi = globalThis.LANDroidWorkspaceDomain || {};
 const toWorkspaceSavePayload = workspaceDomainApi.toWorkspaceSavePayload || ((state) => state);
 const fromStoredWorkspace = workspaceDomainApi.fromStoredWorkspace || ((payload) => payload);
 
+const auditLogApi = globalThis.LANDroidAuditLog || {};
+const recordAuditEvent = auditLogApi.recordAuditEvent || (() => null);
+
+const syncEngineApi = globalThis.LANDroidSyncEngine || {};
+const getSyncSummary = syncEngineApi.getSyncSummary || (() => ({ pendingCount: 0, status: 'synced', lastOperationAt: null }));
+
+const dropboxIntegrationApi = globalThis.LANDroidDropboxIntegration || {};
+const normalizeAttachmentMetadata = dropboxIntegrationApi.normalizeAttachmentMetadata || (() => null);
+
 const Icon = ({ name, size = 18, className = "" }) => {
             const icons = {
                 Plus: <path d="M12 5v14M5 12h14" />,
@@ -537,10 +546,10 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 };
 
                 try {
-                    await saveWorkspace(initialPayload, freshWorkspaceId);
+                    const savedWorkspace = await saveWorkspace(initialPayload, freshWorkspaceId);
                     const projects = await listWorkspaces();
                     setSavedProjects(projects);
-                    recordAuditEvent('workspace_created', { workspaceId: saved.id, workspaceName: saved.name || 'My Workspace' });
+                    recordAuditEvent('workspace_created', { workspaceId: savedWorkspace.id, workspaceName: savedWorkspace.name || 'My Workspace' });
                 } catch (e) {
                     console.error(e);
                     window.alert('Unable to create a new workspace in local storage. Please try again.');
