@@ -28,9 +28,6 @@ const workspaceDomainApi = globalThis.LANDroidWorkspaceDomain || {};
 const toWorkspaceSavePayload = workspaceDomainApi.toWorkspaceSavePayload || ((state) => state);
 const fromStoredWorkspace = workspaceDomainApi.fromStoredWorkspace || ((payload) => payload);
 
-const auditLogApi = globalThis.LANDroidAuditLog || {};
-const recordAuditEvent = auditLogApi.recordAuditEvent || (() => null);
-
 const Icon = ({ name, size = 18, className = "" }) => {
             const icons = {
                 Plus: <path d="M12 5v14M5 12h14" />,
@@ -536,7 +533,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 };
 
                 try {
-                    const saved = await saveWorkspace(initialPayload, freshWorkspaceId);
+                    await saveWorkspace(initialPayload, freshWorkspaceId);
                     const projects = await listWorkspaces();
                     setSavedProjects(projects);
                     recordAuditEvent('workspace_created', { workspaceId: saved.id, workspaceName: saved.name || 'My Workspace' });
@@ -1446,7 +1443,6 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 if (!workspaceId) return;
                 if (!window.confirm('Delete this saved workspace permanently?')) return;
                 await deleteWorkspace(workspaceId);
-                recordAuditEvent('workspace_deleted', { workspaceId });
                 const projects = await listWorkspaces();
                 setSavedProjects(projects);
                 if (currentWorkspaceId === workspaceId) {

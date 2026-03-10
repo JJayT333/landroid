@@ -28,9 +28,6 @@ const workspaceDomainApi = globalThis.LANDroidWorkspaceDomain || {};
 const toWorkspaceSavePayload = workspaceDomainApi.toWorkspaceSavePayload || ((state) => state);
 const fromStoredWorkspace = workspaceDomainApi.fromStoredWorkspace || ((payload) => payload);
 
-const auditLogApi = globalThis.LANDroidAuditLog || {};
-const recordAuditEvent = auditLogApi.recordAuditEvent || (() => null);
-
 const Icon = ({ name, size = 18, className = "" }) => {
             const icons = {
                 Plus: <path d="M12 5v14M5 12h14" />,
@@ -536,10 +533,9 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 };
 
                 try {
-                    const saved = await saveWorkspace(initialPayload, freshWorkspaceId);
-                    const projects = await listWorkspaces();
+                    await saveWorkspace(initialPayload, freshWorkspaceId);
+                    const projects = await getAllWorkspaces();
                     setSavedProjects(projects);
-                    recordAuditEvent('workspace_created', { workspaceId: saved.id, workspaceName: saved.name || 'My Workspace' });
                 } catch (e) {
                     console.error(e);
                     window.alert('Unable to create a new workspace in local storage. Please try again.');
@@ -562,7 +558,6 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 setGridCols(defaultFlowGrid.cols);
                 setGridRows(defaultFlowGrid.rows);
                 setShowActionsMenu(false);
-                recordAuditEvent('flowchart_cleared', { previousNodeCount: flowNodes.length, previousEdgeCount: flowEdges.length });
             };
 
             const handleDocSelection = (e) => {
@@ -1446,7 +1441,6 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 if (!workspaceId) return;
                 if (!window.confirm('Delete this saved workspace permanently?')) return;
                 await deleteWorkspace(workspaceId);
-                recordAuditEvent('workspace_deleted', { workspaceId });
                 const projects = await listWorkspaces();
                 setSavedProjects(projects);
                 if (currentWorkspaceId === workspaceId) {
