@@ -7,16 +7,33 @@ if (!workspaceStorageApi) {
     throw new Error('LANDroidWorkspaceStorage API is unavailable. Ensure dist/workspaceStorage.js is loaded before app.jsx.');
 }
 
+const storageProviderApi = globalThis.LANDroidStorageProvider || {};
+const createLocalStorageProvider = storageProviderApi.createLocalStorageProvider;
+if (!createLocalStorageProvider) {
+    throw new Error('LANDroidStorageProvider API is unavailable. Ensure dist/storageProvider.js is loaded before app.jsx.');
+}
+
+const workspaceProvider = createLocalStorageProvider(workspaceStorageApi);
 const {
-    LOCAL_META_KEY,
-    getAllWorkspaces,
+    getLastWorkspaceId,
+    listWorkspaces,
     loadWorkspace,
+    saveWorkspace,
     deleteWorkspace,
     deleteAllWorkspaces,
-    saveWorkspace,
-    getLatestWorkspace
-} = workspaceStorageApi;
+    getLatestWorkspace,
+} = workspaceProvider;
 
+const workspaceDomainApi = globalThis.LANDroidWorkspaceDomain || {};
+const toWorkspaceSavePayload = workspaceDomainApi.toWorkspaceSavePayload || ((state) => state);
+const fromStoredWorkspace = workspaceDomainApi.fromStoredWorkspace || ((payload) => payload);
+
+const auditLogApi = globalThis.LANDroidAuditLog || {};
+const recordAuditEvent = auditLogApi.recordAuditEvent || (() => null);
+
+const syncEngineApi = globalThis.LANDroidSyncEngine || {};
+const recordSyncOperation = syncEngineApi.recordSyncOperation || (() => null);
+const getSyncSummary = syncEngineApi.getSyncSummary || (() => ({ pendingCount: 0, status: 'synced', lastOperationAt: null }));
 
 const Icon = ({ name, size = 18, className = "" }) => {
             const icons = {
@@ -138,6 +155,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
             const [isSaving, setIsSaving] = useState(false);
             const [isOnline, setIsOnline] = useState(navigator.onLine);
             const [bootChecks, setBootChecks] = useState({ offlineModeActive: false, cloudSyncUnavailable: !navigator.onLine });
+            const [syncSummary, setSyncSummary] = useState(() => getSyncSummary());
             const [confirmAction, setConfirmAction] = useState(null); 
             const [attachParentId, setAttachParentId] = useState('root');
             const [attachType, setAttachType] = useState('conveyance');
@@ -362,7 +380,10 @@ const Icon = ({ name, size = 18, className = "" }) => {
 
             // Persistence + health status
             useEffect(() => {
-                const syncOnline = () => setIsOnline(navigator.onLine);
+                const syncOnline = () => {
+                    setIsOnline(navigator.onLine);
+                    setSyncSummary(getSyncSummary());
+                };
                 window.addEventListener('online', syncOnline);
                 window.addEventListener('offline', syncOnline);
                 return () => {
@@ -373,12 +394,14 @@ const Icon = ({ name, size = 18, className = "" }) => {
 
             useEffect(() => {
                 const initLocal = async () => {
-                    const projects = await getAllWorkspaces();
+                    const projects = await listWorkspaces();
                     setSavedProjects(projects);
-                    const latestId = localStorage.getItem(LOCAL_META_KEY);
+                    const latestId = getLastWorkspaceId();
                     const latest = (latestId && await loadWorkspace(latestId)) || projects[0] || await getLatestWorkspace();
                     if (latest?.name) setProjectName(latest.name);
                     if (latest?.id) setCurrentWorkspaceId(latest.id);
+                    recordAuditEvent('workspace_bootstrap', { hasLatestWorkspace: Boolean(latest?.id), savedWorkspaceCount: projects.length });
+                    setSyncSummary(getSyncSummary());
                     setBootChecks({
                         offlineModeActive: 'ServiceWorker' in navigator,
                         cloudSyncUnavailable: !navigator.onLine
@@ -391,24 +414,32 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 if (!projectName.trim()) return false;
                 setIsSaving(true);
                 try {
-                    const serializeNodesForSave = (sourceNodes) => sourceNodes.map(n => {
-                        const copy = { ...n };
-                        if (copy.docData) copy.hasDoc = true;
-                        delete copy.docData;
-                        return copy;
-                    });
-                    const data = {
-                        name: projectName.trim(), nodes: serializeNodesForSave(nodes), instrumentList,
-                        flowNodes, flowEdges, flowPz, treeScale, printOrientation, gridCols, gridRows,
-                        tracts, contacts, ownershipInterests, contactLogs,
-                        deskMaps: deskMaps.map(map => ({ ...map, nodes: serializeNodesForSave(map.nodes || []) })),
+                    const data = toWorkspaceSavePayload({
+                        projectName,
+                        nodes,
+                        instrumentList,
+                        flowNodes,
+                        flowEdges,
+                        flowPz,
+                        treeScale,
+                        printOrientation,
+                        gridCols,
+                        gridRows,
+                        tracts,
+                        contacts,
+                        ownershipInterests,
+                        contactLogs,
+                        deskMaps,
                         activeDeskMapId,
-                        updatedAt: Date.now(), appId
-                    };
+                        appId,
+                    });
                     const savedWorkspace = await saveWorkspace(data, currentWorkspaceId);
                     setCurrentWorkspaceId(savedWorkspace.id);
-                    const projects = await getAllWorkspaces();
+                    const projects = await listWorkspaces();
                     setSavedProjects(projects);
+                    recordAuditEvent('workspace_saved', { workspaceId: savedWorkspace.id, workspaceName: data.name });
+                    recordSyncOperation('upsert', 'workspace', savedWorkspace.id, { workspaceName: data.name });
+                    setSyncSummary(getSyncSummary());
                     return true;
                 } catch (e) {
                     console.error(e);
@@ -431,34 +462,38 @@ const Icon = ({ name, size = 18, className = "" }) => {
             ]);
 
             const handleLoadWorkspace = (p, closeModal = true) => {
+                const hydrated = fromStoredWorkspace(p, {
+                    makeId,
+                    defaultRoot,
+                    defaultViewport,
+                    defaultFlowViewport,
+                    normalizeFlowNodeGroups,
+                });
 
-                setNodes(p.nodes);
-                if (p.instrumentList) setInstrumentList(p.instrumentList);
-                if (p.flowNodes) setFlowNodes(normalizeFlowNodeGroups(p.flowNodes));
-                if (p.flowEdges) setFlowEdges(p.flowEdges);
-                if (p.flowPz) setFlowPz(p.flowPz);
-                else setFlowPz({ ...defaultFlowViewport });
-                if (p.treeScale) setTreeScale(p.treeScale);
-                if (p.printOrientation) setPrintOrientation(p.printOrientation);
-                if (p.gridCols) setGridCols(p.gridCols);
-                if (p.gridRows) setGridRows(p.gridRows);
-                setTracts(p.tracts || []);
-                setContacts(p.contacts || []);
-                setOwnershipInterests(p.ownershipInterests || []);
-                setContactLogs(p.contactLogs || []);
-                setSelectedContactId((p.contacts && p.contacts[0] && p.contacts[0].id) || null);
-                const loadedDeskMaps = p.deskMaps && p.deskMaps.length ? p.deskMaps : [{ id: makeId(), name: p.tracts?.[0]?.name || 'Unit Tract 1', code: p.tracts?.[0]?.code || 'TRACT-1', tractId: p.tracts?.[0]?.id || null, nodes: p.nodes || [{ ...defaultRoot }], pz: { ...defaultViewport } }];
-                setDeskMaps(loadedDeskMaps);
-                const nextDeskMapId = (p.activeDeskMapId && loadedDeskMaps.some(map => map.id === p.activeDeskMapId)) ? p.activeDeskMapId : loadedDeskMaps[0].id;
-                setActiveDeskMapId(nextDeskMapId);
-                const activeDeskMap = loadedDeskMaps.find(map => map.id === nextDeskMapId) || loadedDeskMaps[0];
-                setNodes(activeDeskMap.nodes || p.nodes || [{ ...defaultRoot }]);
-                setPz(activeDeskMap.pz || { ...defaultViewport });
-                setProjectName(p.name);
-                setCurrentWorkspaceId(p.id || null);
+                setNodes(hydrated.nodes);
+                if (hydrated.instrumentList) setInstrumentList(hydrated.instrumentList);
+                if (hydrated.flowNodes) setFlowNodes(hydrated.flowNodes);
+                if (hydrated.flowEdges) setFlowEdges(hydrated.flowEdges);
+                if (hydrated.flowPz) setFlowPz(hydrated.flowPz);
+                if (hydrated.treeScale) setTreeScale(hydrated.treeScale);
+                if (hydrated.printOrientation) setPrintOrientation(hydrated.printOrientation);
+                if (hydrated.gridCols) setGridCols(hydrated.gridCols);
+                if (hydrated.gridRows) setGridRows(hydrated.gridRows);
+                setTracts(hydrated.tracts);
+                setContacts(hydrated.contacts);
+                setOwnershipInterests(hydrated.ownershipInterests);
+                setContactLogs(hydrated.contactLogs);
+                setSelectedContactId(hydrated.selectedContactId);
+                setDeskMaps(hydrated.deskMaps);
+                setActiveDeskMapId(hydrated.activeDeskMapId);
+                setNodes(hydrated.nodes);
+                setPz(hydrated.pz);
+                setProjectName(hydrated.projectName);
+                setCurrentWorkspaceId(hydrated.workspaceId);
                 setWorkspaceLoaded(true);
                 setShowHome(false);
                 if (closeModal) setShowCloudModal(false);
+                recordAuditEvent('workspace_loaded', { workspaceId: hydrated.workspaceId, workspaceName: hydrated.projectName });
             };
             
             const handleEnterNewWorkspace = async () => {
@@ -512,9 +547,12 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 };
 
                 try {
-                    await saveWorkspace(initialPayload, freshWorkspaceId);
-                    const projects = await getAllWorkspaces();
+                    const saved = await saveWorkspace(initialPayload, freshWorkspaceId);
+                    const projects = await listWorkspaces();
                     setSavedProjects(projects);
+                    recordAuditEvent('workspace_created', { workspaceId: saved.id, workspaceName: saved.name || 'My Workspace' });
+                    recordSyncOperation('insert', 'workspace', saved.id, { workspaceName: saved.name || 'My Workspace' });
+                    setSyncSummary(getSyncSummary());
                 } catch (e) {
                     console.error(e);
                     window.alert('Unable to create a new workspace in local storage. Please try again.');
@@ -537,6 +575,9 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 setGridCols(defaultFlowGrid.cols);
                 setGridRows(defaultFlowGrid.rows);
                 setShowActionsMenu(false);
+                recordAuditEvent('flowchart_cleared', { previousNodeCount: flowNodes.length, previousEdgeCount: flowEdges.length });
+                recordSyncOperation('update', 'flowchart', currentWorkspaceId, { action: 'clear', previousNodeCount: flowNodes.length, previousEdgeCount: flowEdges.length });
+                setSyncSummary(getSyncSummary());
             };
 
             const handleDocSelection = (e) => {
@@ -1403,6 +1444,9 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 const nextEdges = append ? [...flowEdges, ...importedEdges] : importedEdges;
                 setFlowNodes(nextNodes);
                 setFlowEdges(nextEdges);
+                recordAuditEvent('flowchart_imported', { append, deskMapCount: selectedMaps.length, nodeCount: nextNodes.length, edgeCount: nextEdges.length });
+                recordSyncOperation('update', 'flowchart', currentWorkspaceId, { action: 'import', append, nodeCount: nextNodes.length, edgeCount: nextEdges.length });
+                setSyncSummary(getSyncSummary());
 
                 if (nextNodes.length) fitFlowToView(nextNodes);
             };
@@ -1419,7 +1463,10 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 if (!workspaceId) return;
                 if (!window.confirm('Delete this saved workspace permanently?')) return;
                 await deleteWorkspace(workspaceId);
-                const projects = await getAllWorkspaces();
+                recordAuditEvent('workspace_deleted', { workspaceId });
+                recordSyncOperation('delete', 'workspace', workspaceId);
+                setSyncSummary(getSyncSummary());
+                const projects = await listWorkspaces();
                 setSavedProjects(projects);
                 if (currentWorkspaceId === workspaceId) {
                     setCurrentWorkspaceId(null);
@@ -1434,6 +1481,9 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 if (!savedProjects.length) return;
                 if (!window.confirm('Delete ALL saved workspaces? This cannot be undone.')) return;
                 await deleteAllWorkspaces();
+                recordAuditEvent('workspace_deleted_all', { deletedCount: savedProjects.length });
+                recordSyncOperation('delete_all', 'workspace', null, { deletedCount: savedProjects.length });
+                setSyncSummary(getSyncSummary());
                 setSavedProjects([]);
                 setCurrentWorkspaceId(null);
                 setProjectName('My Workspace');
@@ -1445,7 +1495,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
             const handleReturnHome = async () => {
                 try {
                     await handleSaveWorkspace();
-                    const projects = await getAllWorkspaces();
+                    const projects = await listWorkspaces();
                     setSavedProjects(projects);
                 } catch (e) {
                     console.error(e);
@@ -1826,6 +1876,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
                             <div className="flex flex-col items-end gap-1 text-[11px] font-bold">
                                 <span className="px-2 py-1 rounded border border-ink/30 bg-teastain/60">Offline mode active: {bootChecks.offlineModeActive ? 'Yes' : 'No'}</span>
                                 <span className="px-2 py-1 rounded border border-ink/30 bg-teastain/60">Cloud sync unavailable: {(!isOnline || bootChecks.cloudSyncUnavailable) ? 'Yes' : 'No'}</span>
+                                <span className="px-2 py-1 rounded border border-ink/30 bg-teastain/60">Sync status: {syncSummary.status === 'pending' ? `Pending (${syncSummary.pendingCount})` : 'Synced'}</span>
                             </div>
                             {/* View Navigation Group */}
                             <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">

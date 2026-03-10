@@ -7,16 +7,33 @@ if (!workspaceStorageApi) {
     throw new Error('LANDroidWorkspaceStorage API is unavailable. Ensure dist/workspaceStorage.js is loaded before app.jsx.');
 }
 
+const storageProviderApi = globalThis.LANDroidStorageProvider || {};
+const createLocalStorageProvider = storageProviderApi.createLocalStorageProvider;
+if (!createLocalStorageProvider) {
+    throw new Error('LANDroidStorageProvider API is unavailable. Ensure dist/storageProvider.js is loaded before app.jsx.');
+}
+
+const workspaceProvider = createLocalStorageProvider(workspaceStorageApi);
 const {
-    LOCAL_META_KEY,
-    getAllWorkspaces,
+    getLastWorkspaceId,
+    listWorkspaces,
     loadWorkspace,
+    saveWorkspace,
     deleteWorkspace,
     deleteAllWorkspaces,
-    saveWorkspace,
-    getLatestWorkspace
-} = workspaceStorageApi;
+    getLatestWorkspace,
+} = workspaceProvider;
 
+const workspaceDomainApi = globalThis.LANDroidWorkspaceDomain || {};
+const toWorkspaceSavePayload = workspaceDomainApi.toWorkspaceSavePayload || ((state) => state);
+const fromStoredWorkspace = workspaceDomainApi.fromStoredWorkspace || ((payload) => payload);
+
+const auditLogApi = globalThis.LANDroidAuditLog || {};
+const recordAuditEvent = auditLogApi.recordAuditEvent || (() => null);
+
+const syncEngineApi = globalThis.LANDroidSyncEngine || {};
+const recordSyncOperation = syncEngineApi.recordSyncOperation || (() => null);
+const getSyncSummary = syncEngineApi.getSyncSummary || (() => ({ pendingCount: 0, status: 'synced', lastOperationAt: null }));
 
 const Icon = ({ name, size = 18, className = "" }) => {
             const icons = {
@@ -64,6 +81,8 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 isDeceased: false, obituary: '', graveyardLink: ''
             };
             const defaultViewport = { x: 0, y: 0, scale: 1 };
+            const defaultFlowViewport = { x: 0, y: 0, scale: 1 };
+            const defaultFlowGrid = { cols: 1, rows: 1 };
             const createDeskMap = ({ name = 'Unit Tract 1', code = 'TRACT-1', tractId = null } = {}) => ({
                 id: makeId(),
                 name,
@@ -98,10 +117,10 @@ const Icon = ({ name, size = 18, className = "" }) => {
             const [flowNodes, setFlowNodes] = useState([]);
             const [flowEdges, setFlowEdges] = useState([]);
             const [flowTool, setFlowTool] = useState('select'); 
-            const [flowPz, setFlowPz] = useState({ x: 0, y: 0, scale: 1 }); 
+            const [flowPz, setFlowPz] = useState({ ...defaultFlowViewport });
             const [treeScale, setTreeScale] = useState(1); 
-            const [gridCols, setGridCols] = useState(1);
-            const [gridRows, setGridRows] = useState(1);
+            const [gridCols, setGridCols] = useState(defaultFlowGrid.cols);
+            const [gridRows, setGridRows] = useState(defaultFlowGrid.rows);
             const [connectingStart, setConnectingStart] = useState(null);
             const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
             const [selectedFlowNode, setSelectedFlowNode] = useState(null);
@@ -109,11 +128,13 @@ const Icon = ({ name, size = 18, className = "" }) => {
             const [flowForm, setFlowForm] = useState(null);
             const [printOrientation, setPrintOrientation] = useState('landscape');
             const [showFlowLayoutMenu, setShowFlowLayoutMenu] = useState(false);
+            const [showActionsMenu, setShowActionsMenu] = useState(false);
             
             const flowDraggingNode = useRef(null);
             const flowDragStart = useRef({ x: 0, y: 0 });
             const flowCanvasRef = useRef(null);
             const flowLayoutMenuRef = useRef(null);
+            const actionsMenuRef = useRef(null);
             
             const moveTreeStartPos = useRef(null);
             const initialTreeNodes = useRef(null);
@@ -134,6 +155,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
             const [isSaving, setIsSaving] = useState(false);
             const [isOnline, setIsOnline] = useState(navigator.onLine);
             const [bootChecks, setBootChecks] = useState({ offlineModeActive: false, cloudSyncUnavailable: !navigator.onLine });
+            const [syncSummary, setSyncSummary] = useState(() => getSyncSummary());
             const [confirmAction, setConfirmAction] = useState(null); 
             const [attachParentId, setAttachParentId] = useState('root');
             const [attachType, setAttachType] = useState('conveyance');
@@ -305,14 +327,19 @@ const Icon = ({ name, size = 18, className = "" }) => {
             }, [tracts]);
 
             useEffect(() => {
-                if (!showFlowLayoutMenu) return;
+                if (!showFlowLayoutMenu && !showActionsMenu) return;
                 const handleMenuDismiss = (event) => {
-                    if (flowLayoutMenuRef.current && !flowLayoutMenuRef.current.contains(event.target)) {
+                    if (showFlowLayoutMenu && flowLayoutMenuRef.current && !flowLayoutMenuRef.current.contains(event.target)) {
                         setShowFlowLayoutMenu(false);
+                    }
+                    if (showActionsMenu && actionsMenuRef.current && !actionsMenuRef.current.contains(event.target)) {
+                        setShowActionsMenu(false);
                     }
                 };
                 const handleEsc = (event) => {
-                    if (event.key === 'Escape') setShowFlowLayoutMenu(false);
+                    if (event.key !== 'Escape') return;
+                    if (showFlowLayoutMenu) setShowFlowLayoutMenu(false);
+                    if (showActionsMenu) setShowActionsMenu(false);
                 };
                 document.addEventListener('mousedown', handleMenuDismiss);
                 document.addEventListener('keydown', handleEsc);
@@ -320,12 +347,13 @@ const Icon = ({ name, size = 18, className = "" }) => {
                     document.removeEventListener('mousedown', handleMenuDismiss);
                     document.removeEventListener('keydown', handleEsc);
                 };
-            }, [showFlowLayoutMenu]);
+            }, [showFlowLayoutMenu, showActionsMenu]);
 
             useEffect(() => {
                 if (view !== 'flowchart' && showFlowLayoutMenu) {
                     setShowFlowLayoutMenu(false);
                 }
+                setShowActionsMenu(false);
             }, [view, showFlowLayoutMenu]);
 
             // Print interceptor hook
@@ -352,7 +380,10 @@ const Icon = ({ name, size = 18, className = "" }) => {
 
             // Persistence + health status
             useEffect(() => {
-                const syncOnline = () => setIsOnline(navigator.onLine);
+                const syncOnline = () => {
+                    setIsOnline(navigator.onLine);
+                    setSyncSummary(getSyncSummary());
+                };
                 window.addEventListener('online', syncOnline);
                 window.addEventListener('offline', syncOnline);
                 return () => {
@@ -363,12 +394,14 @@ const Icon = ({ name, size = 18, className = "" }) => {
 
             useEffect(() => {
                 const initLocal = async () => {
-                    const projects = await getAllWorkspaces();
+                    const projects = await listWorkspaces();
                     setSavedProjects(projects);
-                    const latestId = localStorage.getItem(LOCAL_META_KEY);
+                    const latestId = getLastWorkspaceId();
                     const latest = (latestId && await loadWorkspace(latestId)) || projects[0] || await getLatestWorkspace();
                     if (latest?.name) setProjectName(latest.name);
                     if (latest?.id) setCurrentWorkspaceId(latest.id);
+                    recordAuditEvent('workspace_bootstrap', { hasLatestWorkspace: Boolean(latest?.id), savedWorkspaceCount: projects.length });
+                    setSyncSummary(getSyncSummary());
                     setBootChecks({
                         offlineModeActive: 'ServiceWorker' in navigator,
                         cloudSyncUnavailable: !navigator.onLine
@@ -381,20 +414,32 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 if (!projectName.trim()) return false;
                 setIsSaving(true);
                 try {
-                    const nodesToSave = nodes.map(n => {
-                        const copy = { ...n };
-                        if (copy.docData) copy.hasDoc = true; delete copy.docData; return copy;
+                    const data = toWorkspaceSavePayload({
+                        projectName,
+                        nodes,
+                        instrumentList,
+                        flowNodes,
+                        flowEdges,
+                        flowPz,
+                        treeScale,
+                        printOrientation,
+                        gridCols,
+                        gridRows,
+                        tracts,
+                        contacts,
+                        ownershipInterests,
+                        contactLogs,
+                        deskMaps,
+                        activeDeskMapId,
+                        appId,
                     });
-                    const data = {
-                        name: projectName.trim(), nodes: nodesToSave, instrumentList,
-                        flowNodes, flowEdges, treeScale, printOrientation, gridCols, gridRows,
-                        tracts, contacts, ownershipInterests, contactLogs, deskMaps, activeDeskMapId,
-                        updatedAt: Date.now(), appId
-                    };
                     const savedWorkspace = await saveWorkspace(data, currentWorkspaceId);
                     setCurrentWorkspaceId(savedWorkspace.id);
-                    const projects = await getAllWorkspaces();
+                    const projects = await listWorkspaces();
                     setSavedProjects(projects);
+                    recordAuditEvent('workspace_saved', { workspaceId: savedWorkspace.id, workspaceName: data.name });
+                    recordSyncOperation('upsert', 'workspace', savedWorkspace.id, { workspaceName: data.name });
+                    setSyncSummary(getSyncSummary());
                     return true;
                 } catch (e) {
                     console.error(e);
@@ -411,46 +456,128 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 }, 400);
                 return () => clearTimeout(timer);
             }, [
-                nodes, instrumentList, flowNodes, flowEdges, treeScale, printOrientation,
+                nodes, instrumentList, flowNodes, flowEdges, flowPz, treeScale, printOrientation,
                 gridCols, gridRows, tracts, contacts, ownershipInterests, contactLogs,
                 deskMaps, activeDeskMapId, projectName, workspaceLoaded, currentWorkspaceId, showHome
             ]);
 
             const handleLoadWorkspace = (p, closeModal = true) => {
+                const hydrated = fromStoredWorkspace(p, {
+                    makeId,
+                    defaultRoot,
+                    defaultViewport,
+                    defaultFlowViewport,
+                    normalizeFlowNodeGroups,
+                });
 
-                setNodes(p.nodes);
-                if (p.instrumentList) setInstrumentList(p.instrumentList);
-                if (p.flowNodes) setFlowNodes(p.flowNodes);
-                if (p.flowEdges) setFlowEdges(p.flowEdges);
-                if (p.treeScale) setTreeScale(p.treeScale);
-                if (p.printOrientation) setPrintOrientation(p.printOrientation);
-                if (p.gridCols) setGridCols(p.gridCols);
-                if (p.gridRows) setGridRows(p.gridRows);
-                setTracts(p.tracts || []);
-                setContacts(p.contacts || []);
-                setOwnershipInterests(p.ownershipInterests || []);
-                setContactLogs(p.contactLogs || []);
-                setSelectedContactId((p.contacts && p.contacts[0] && p.contacts[0].id) || null);
-                const loadedDeskMaps = p.deskMaps && p.deskMaps.length ? p.deskMaps : [{ id: makeId(), name: p.tracts?.[0]?.name || 'Unit Tract 1', code: p.tracts?.[0]?.code || 'TRACT-1', tractId: p.tracts?.[0]?.id || null, nodes: p.nodes || [{ ...defaultRoot }], pz: { ...defaultViewport } }];
-                setDeskMaps(loadedDeskMaps);
-                const nextDeskMapId = (p.activeDeskMapId && loadedDeskMaps.some(map => map.id === p.activeDeskMapId)) ? p.activeDeskMapId : loadedDeskMaps[0].id;
-                setActiveDeskMapId(nextDeskMapId);
-                const activeDeskMap = loadedDeskMaps.find(map => map.id === nextDeskMapId) || loadedDeskMaps[0];
-                setNodes(activeDeskMap.nodes || p.nodes || [{ ...defaultRoot }]);
-                setPz(activeDeskMap.pz || { ...defaultViewport });
-                setProjectName(p.name);
-                setCurrentWorkspaceId(p.id || null);
+                setNodes(hydrated.nodes);
+                if (hydrated.instrumentList) setInstrumentList(hydrated.instrumentList);
+                if (hydrated.flowNodes) setFlowNodes(hydrated.flowNodes);
+                if (hydrated.flowEdges) setFlowEdges(hydrated.flowEdges);
+                if (hydrated.flowPz) setFlowPz(hydrated.flowPz);
+                if (hydrated.treeScale) setTreeScale(hydrated.treeScale);
+                if (hydrated.printOrientation) setPrintOrientation(hydrated.printOrientation);
+                if (hydrated.gridCols) setGridCols(hydrated.gridCols);
+                if (hydrated.gridRows) setGridRows(hydrated.gridRows);
+                setTracts(hydrated.tracts);
+                setContacts(hydrated.contacts);
+                setOwnershipInterests(hydrated.ownershipInterests);
+                setContactLogs(hydrated.contactLogs);
+                setSelectedContactId(hydrated.selectedContactId);
+                setDeskMaps(hydrated.deskMaps);
+                setActiveDeskMapId(hydrated.activeDeskMapId);
+                setNodes(hydrated.nodes);
+                setPz(hydrated.pz);
+                setProjectName(hydrated.projectName);
+                setCurrentWorkspaceId(hydrated.workspaceId);
                 setWorkspaceLoaded(true);
                 setShowHome(false);
                 if (closeModal) setShowCloudModal(false);
+                recordAuditEvent('workspace_loaded', { workspaceId: hydrated.workspaceId, workspaceName: hydrated.projectName });
             };
             
-            const handleEnterNewWorkspace = () => {
+            const handleEnterNewWorkspace = async () => {
                 const freshWorkspaceId = crypto.randomUUID ? crypto.randomUUID() : makeId();
+                const freshNode = { ...defaultRoot };
+                const freshDeskMap = {
+                    id: makeId(),
+                    name: 'Unit Tract 1',
+                    code: 'TRACT-1',
+                    tractId: null,
+                    nodes: [{ ...freshNode }],
+                    pz: { ...defaultViewport }
+                };
+
+                setNodes([{ ...freshNode }]);
+                setDeskMaps([freshDeskMap]);
+                setActiveDeskMapId(freshDeskMap.id);
+                setPz({ ...defaultViewport });
+                setFlowNodes([]);
+                setFlowEdges([]);
+                setFlowPz({ ...defaultFlowViewport });
+                setTreeScale(1);
+                setPrintOrientation('landscape');
+                setGridCols(defaultFlowGrid.cols);
+                setGridRows(defaultFlowGrid.rows);
+                setTracts([]);
+                setContacts([]);
+                setOwnershipInterests([]);
+                setContactLogs([]);
+                setSelectedContactId(null);
+
+                const initialPayload = {
+                    name: 'My Workspace',
+                    nodes: [{ ...freshNode }],
+                    instrumentList,
+                    flowNodes: [],
+                    flowEdges: [],
+                    flowPz: { ...defaultFlowViewport },
+                    treeScale: 1,
+                    printOrientation: 'landscape',
+                    gridCols: 1,
+                    gridRows: 1,
+                    tracts: [],
+                    contacts: [],
+                    ownershipInterests: [],
+                    contactLogs: [],
+                    deskMaps: [{ ...freshDeskMap }],
+                    activeDeskMapId: freshDeskMap.id,
+                    updatedAt: Date.now(),
+                    appId
+                };
+
+                try {
+                    const saved = await saveWorkspace(initialPayload, freshWorkspaceId);
+                    const projects = await listWorkspaces();
+                    setSavedProjects(projects);
+                    recordAuditEvent('workspace_created', { workspaceId: saved.id, workspaceName: saved.name || 'My Workspace' });
+                    recordSyncOperation('insert', 'workspace', saved.id, { workspaceName: saved.name || 'My Workspace' });
+                    setSyncSummary(getSyncSummary());
+                } catch (e) {
+                    console.error(e);
+                    window.alert('Unable to create a new workspace in local storage. Please try again.');
+                }
+
                 setCurrentWorkspaceId(freshWorkspaceId);
                 setProjectName('My Workspace');
                 setWorkspaceLoaded(true);
                 setShowHome(false);
+            };
+
+            const handleClearFlowchart = () => {
+                if (!window.confirm('Clear all flowchart nodes, edges, and layout settings? This cannot be undone.')) return;
+                setFlowNodes([]);
+                setFlowEdges([]);
+                setSelectedFlowNode(null);
+                setConnectingStart(null);
+                setFlowPz({ ...defaultFlowViewport });
+                setTreeScale(1);
+                setGridCols(defaultFlowGrid.cols);
+                setGridRows(defaultFlowGrid.rows);
+                setShowActionsMenu(false);
+                recordAuditEvent('flowchart_cleared', { previousNodeCount: flowNodes.length, previousEdgeCount: flowEdges.length });
+                recordSyncOperation('update', 'flowchart', currentWorkspaceId, { action: 'clear', previousNodeCount: flowNodes.length, previousEdgeCount: flowEdges.length });
+                setSyncSummary(getSyncSummary());
             };
 
             const handleDocSelection = (e) => {
@@ -479,6 +606,64 @@ const Icon = ({ name, size = 18, className = "" }) => {
                             : 'of whole tract';
 
                 return `${numerator}/${denominator} ${basisLabel}`;
+            };
+
+            const FRACTION_EPSILON = 0.00000001;
+            const clampFraction = (value) => {
+                const numeric = Number(value || 0);
+                if (!Number.isFinite(numeric)) return 0;
+                if (numeric < 0 && numeric > -FRACTION_EPSILON) return 0;
+                return Math.max(0, numeric);
+            };
+
+            const collectDescendantIds = (allNodes, rootId) => {
+                const descendants = new Set();
+                const queue = [rootId];
+                while (queue.length) {
+                    const currentId = queue.shift();
+                    allNodes.forEach(node => {
+                        if (node.parentId !== currentId || descendants.has(node.id)) return;
+                        descendants.add(node.id);
+                        queue.push(node.id);
+                    });
+                }
+                return descendants;
+            };
+
+            const applyAttachConveyanceUpdate = (allNodes) => {
+                const descendants = collectDescendantIds(allNodes, activeNode.id);
+                if (attachParentId === activeNode.id || descendants.has(attachParentId)) return allNodes;
+
+                const sourceRoot = allNodes.find(n => n.id === activeNode.id);
+                if (!sourceRoot) return allNodes;
+
+                const oldRootFraction = Math.max(sourceRoot.fraction || 0, FRACTION_EPSILON);
+                const newRootFraction = clampFraction(calcShare);
+                const scaleFactor = newRootFraction / oldRootFraction;
+
+                return allNodes.map(n => {
+                    if (n.id === attachParentId) {
+                        return { ...n, fraction: clampFraction((n.fraction || 0) - newRootFraction) };
+                    }
+                    if (n.id === activeNode.id) {
+                        return {
+                            ...n,
+                            ...form,
+                            parentId: attachParentId,
+                            type: 'conveyance',
+                            fraction: newRootFraction,
+                            initialFraction: newRootFraction
+                        };
+                    }
+                    if (descendants.has(n.id)) {
+                        return {
+                            ...n,
+                            fraction: clampFraction((n.fraction || 0) * scaleFactor),
+                            initialFraction: clampFraction((n.initialFraction || 0) * scaleFactor)
+                        };
+                    }
+                    return n;
+                });
             };
 
             const calcShare = useMemo(() => {
@@ -610,12 +795,12 @@ const Icon = ({ name, size = 18, className = "" }) => {
                     updateActiveDeskMapNodes(prev => [...prev, { ...form, id: newId, type: 'conveyance', fraction: 0, initialFraction: 0, parentId: 'unlinked' }]);
                 } else if (modalMode === 'attach') {
                     if (attachType === 'conveyance') {
-                        const updatedNodes = nodes.map(n => {
-                            if (n.id === attachParentId) return { ...n, fraction: Math.max(0, n.fraction - calcShare) };
-                            if (n.id === activeNode.id) return { ...form, parentId: attachParentId, type: 'conveyance', fraction: calcShare, initialFraction: calcShare };
-                            return n;
-                        });
-                        updateActiveDeskMapNodes(updatedNodes);
+                        const descendants = collectDescendantIds(nodes, activeNode.id);
+                        if (attachParentId === activeNode.id || descendants.has(attachParentId)) {
+                            window.alert('Cannot attach a record to itself or one of its descendants.');
+                            return;
+                        }
+                        updateActiveDeskMapNodes(prev => applyAttachConveyanceUpdate(prev));
                     } else {
                         updateActiveDeskMapNodes(prev => prev.map(n => n.id === activeNode.id ? { ...form, parentId: attachParentId, type: 'related', fraction: 0, initialFraction: 0 } : n));
                     }
@@ -950,8 +1135,26 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 isDragging.current = false; e.currentTarget.releasePointerCapture(e.pointerId);
             };
             const handleWheel = (e) => {
-                e.preventDefault(); const scaleAdjust = e.deltaY * -0.001;
-                setPz(prev => ({ ...prev, scale: Math.min(Math.max(0.1, prev.scale + scaleAdjust), 5) }));
+                e.preventDefault();
+                const scaleAdjust = e.deltaY * -0.001;
+                const rect = e.currentTarget.getBoundingClientRect();
+                const pointerX = e.clientX - rect.left;
+                const pointerY = e.clientY - rect.top;
+
+                setPz(prev => {
+                    const nextScale = Math.min(Math.max(0.1, prev.scale + scaleAdjust), 5);
+                    if (nextScale === prev.scale) return prev;
+
+                    const worldX = (pointerX - prev.x) / prev.scale;
+                    const worldY = (pointerY - prev.y) / prev.scale;
+
+                    return {
+                        ...prev,
+                        scale: nextScale,
+                        x: pointerX - worldX * nextScale,
+                        y: pointerY - worldY * nextScale
+                    };
+                });
             };
 
             const countTreeDescendants = (node) => {
@@ -1117,6 +1320,26 @@ const Icon = ({ name, size = 18, className = "" }) => {
                                      FLOW CHART ENGINE (TOP-DOWN LAYOUT)
             ========================================================================================= */
 
+            const createTreeGroupId = () => `tg_${makeId()}`;
+            const resolveTreeGroupId = (node) => node?.treeGroupId || (node?.id ? `tg_${node.id}` : createTreeGroupId());
+            const normalizeFlowNodeGroups = (inputNodes = []) => inputNodes.map(node => ({ ...node, treeGroupId: resolveTreeGroupId(node) }));
+            const mergeFlowNodeGroups = (inputNodes, firstNodeId, secondNodeId) => {
+                const firstNode = inputNodes.find(n => n.id === firstNodeId);
+                const secondNode = inputNodes.find(n => n.id === secondNodeId);
+                if (!firstNode || !secondNode) return inputNodes;
+
+                const firstGroup = resolveTreeGroupId(firstNode);
+                const secondGroup = resolveTreeGroupId(secondNode);
+                if (firstGroup === secondGroup) return inputNodes;
+
+                const unifiedGroup = [firstGroup, secondGroup].sort()[0];
+                return inputNodes.map(node => {
+                    const nodeGroup = resolveTreeGroupId(node);
+                    if (nodeGroup !== firstGroup && nodeGroup !== secondGroup) return { ...node, treeGroupId: nodeGroup };
+                    return { ...node, treeGroupId: unifiedGroup };
+                });
+            };
+
             const buildFlowLayoutFromNodes = (sourceNodes, idPrefix = '', xShift = 0, treeGroupId = '') => {
                 const safePrefix = idPrefix ? `${idPrefix}-` : '';
                 const normalNodes = sourceNodes.filter(n => n.type !== 'related');
@@ -1221,6 +1444,9 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 const nextEdges = append ? [...flowEdges, ...importedEdges] : importedEdges;
                 setFlowNodes(nextNodes);
                 setFlowEdges(nextEdges);
+                recordAuditEvent('flowchart_imported', { append, deskMapCount: selectedMaps.length, nodeCount: nextNodes.length, edgeCount: nextEdges.length });
+                recordSyncOperation('update', 'flowchart', currentWorkspaceId, { action: 'import', append, nodeCount: nextNodes.length, edgeCount: nextEdges.length });
+                setSyncSummary(getSyncSummary());
 
                 if (nextNodes.length) fitFlowToView(nextNodes);
             };
@@ -1237,7 +1463,10 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 if (!workspaceId) return;
                 if (!window.confirm('Delete this saved workspace permanently?')) return;
                 await deleteWorkspace(workspaceId);
-                const projects = await getAllWorkspaces();
+                recordAuditEvent('workspace_deleted', { workspaceId });
+                recordSyncOperation('delete', 'workspace', workspaceId);
+                setSyncSummary(getSyncSummary());
+                const projects = await listWorkspaces();
                 setSavedProjects(projects);
                 if (currentWorkspaceId === workspaceId) {
                     setCurrentWorkspaceId(null);
@@ -1252,6 +1481,9 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 if (!savedProjects.length) return;
                 if (!window.confirm('Delete ALL saved workspaces? This cannot be undone.')) return;
                 await deleteAllWorkspaces();
+                recordAuditEvent('workspace_deleted_all', { deletedCount: savedProjects.length });
+                recordSyncOperation('delete_all', 'workspace', null, { deletedCount: savedProjects.length });
+                setSyncSummary(getSyncSummary());
                 setSavedProjects([]);
                 setCurrentWorkspaceId(null);
                 setProjectName('My Workspace');
@@ -1263,7 +1495,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
             const handleReturnHome = async () => {
                 try {
                     await handleSaveWorkspace();
-                    const projects = await getAllWorkspaces();
+                    const projects = await listWorkspaces();
                     setSavedProjects(projects);
                 } catch (e) {
                     console.error(e);
@@ -1284,6 +1516,9 @@ const Icon = ({ name, size = 18, className = "" }) => {
                     x: ((anchorX - (scalerRect?.left || 0)) / (flowPz.scale * treeScale)) - 140,
                     y: ((anchorY - (scalerRect?.top || 0)) / (flowPz.scale * treeScale)) - 100,
                     type,
+                    treeGroupId: selectedFlowNode
+                        ? resolveTreeGroupId(flowNodes.find(n => n.id === selectedFlowNode))
+                        : createTreeGroupId(),
                     color: 'bg-parchment text-ink border-ink',
                     data: type === 'template' ? {
                         title: 'Instrument', grantee: 'Grantee Name', grantor: 'Grantor Name', fraction: '1.00000000', details: 'Date • Vol/Page'
@@ -1325,7 +1560,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
                     const initialNodes = initialTreeNodes.current; // Capture ref to prevent null error in async state updater
                     const targetGroup = moveTreeGroupId.current;
                     setFlowNodes(prev => prev.map(n => {
-                        if (targetGroup && (n.treeGroupId || n.id) !== targetGroup) return n;
+                        if (targetGroup && resolveTreeGroupId(n) !== targetGroup) return n;
                         const orig = initialNodes.find(o => o.id === n.id);
                         return orig ? { ...n, x: orig.x + dx, y: orig.y + dy } : n;
                     }));
@@ -1343,8 +1578,26 @@ const Icon = ({ name, size = 18, className = "" }) => {
             
             const handleFlowWheel = (e) => {
                 if (e.ctrlKey || e.metaKey || flowTool === 'pan') { 
-                    e.preventDefault(); const scaleAdjust = e.deltaY * -0.002;
-                    setFlowPz(prev => ({ ...prev, scale: Math.min(Math.max(0.1, prev.scale + scaleAdjust), 3) }));
+                    e.preventDefault();
+                    const scaleAdjust = e.deltaY * -0.002;
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const pointerX = e.clientX - rect.left;
+                    const pointerY = e.clientY - rect.top;
+
+                    setFlowPz(prev => {
+                        const nextScale = Math.min(Math.max(0.1, prev.scale + scaleAdjust), 3);
+                        if (nextScale === prev.scale) return prev;
+
+                        const worldX = (pointerX - prev.x) / prev.scale;
+                        const worldY = (pointerY - prev.y) / prev.scale;
+
+                        return {
+                            ...prev,
+                            scale: nextScale,
+                            x: pointerX - worldX * nextScale,
+                            y: pointerY - worldY * nextScale
+                        };
+                    });
                 }
             };
 
@@ -1364,7 +1617,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
                     isDragging.current = true;
                     moveTreeStartPos.current = { x: e.clientX, y: e.clientY };
                     initialTreeNodes.current = flowNodes.map(n => ({ id: n.id, x: n.x, y: n.y }));
-                    moveTreeGroupId.current = node.treeGroupId || node.id;
+                    moveTreeGroupId.current = resolveTreeGroupId(node);
                     e.currentTarget.setPointerCapture(e.pointerId);
                     setSelectedFlowNode(null);
                 }
@@ -1388,7 +1641,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
                     const targetGroup = moveTreeGroupId.current;
                     
                     setFlowNodes(prev => prev.map(n => {
-                        if (targetGroup && (n.treeGroupId || n.id) !== targetGroup) return n;
+                        if (targetGroup && resolveTreeGroupId(n) !== targetGroup) return n;
                         const orig = initialNodes.find(o => o.id === n.id);
                         return orig ? { ...n, x: orig.x + dx, y: orig.y + dy } : n;
                     }));
@@ -1403,7 +1656,10 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 }
                 if (flowTool === 'connect' && connectingStart && connectingStart !== targetNode.id) {
                     const edgeExists = flowEdges.find(ed => ed.source === connectingStart && ed.target === targetNode.id);
-                    if (!edgeExists) setFlowEdges([...flowEdges, { id: `e-${connectingStart}-${targetNode.id}`, source: connectingStart, target: targetNode.id }]);
+                    if (!edgeExists) {
+                        setFlowEdges([...flowEdges, { id: `e-${connectingStart}-${targetNode.id}`, source: connectingStart, target: targetNode.id }]);
+                        setFlowNodes(prev => mergeFlowNodeGroups(prev, connectingStart, targetNode.id));
+                    }
                     setConnectingStart(null);
                 }
                 if (flowTool === 'move-tree') {
@@ -1525,6 +1781,36 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 </>
             );
 
+            const viewActions = {
+                chart: [
+                    { key: 'new-tree', label: 'New Tree', icon: 'Plus', onClick: openNewChain, title: 'Start a completely separate independent lineage tree' },
+                    { key: 'add-loose-record', label: 'Add Loose Record', icon: 'Plus', onClick: openAddUnlinked, title: 'Add a document to the Parking Lot' },
+                    { key: 'import-csv', label: 'Import CSV', icon: 'Upload', onClick: () => fileInput.current?.click(), title: 'Upload Data' },
+                    { key: 'save-data', label: 'Save Data', icon: 'Download', onClick: exportCSV, title: 'Save Internal Data' }
+                ],
+                master: [
+                    { key: 'export-runsheet', label: 'Export Runsheet', icon: 'FileText', onClick: exportToRunsheet, title: 'Generate Chronological Runsheet' },
+                    { key: 'toggle-conveyance-filter', label: showOnlyConveyances ? 'Show All Records' : 'Show Conveyances Only', icon: 'List', onClick: () => setShowOnlyConveyances(prev => !prev), title: 'Toggle runsheet filter' },
+                    { key: 'save-data', label: 'Save Data', icon: 'Download', onClick: exportCSV, title: 'Save Internal Data' },
+                    { key: 'import-csv', label: 'Import CSV', icon: 'Upload', onClick: () => fileInput.current?.click(), title: 'Upload Data' }
+                ],
+                flowchart: [
+                    { key: 'import-flowchart', label: 'Import Tree → Flowchart', icon: 'Upload', onClick: () => importToFlowchart(false), title: 'Replace flowchart with transformed tree' },
+                    { key: 'append-flowchart', label: 'Append Tree → Flowchart', icon: 'Plus', onClick: () => importToFlowchart(true), title: 'Append transformed tree to flowchart' },
+                    { key: 'print-flowchart', label: 'Print Flowchart', icon: 'Printer', onClick: handlePrintFlowchart, title: 'Print flowchart layout' },
+                    { key: 'clear-flowchart', label: 'Clear Flowchart', icon: 'Trash', onClick: handleClearFlowchart, title: 'Remove all flowchart nodes/edges and reset layout defaults', destructive: true }
+                ],
+                research: [
+                    { key: 'save-data', label: 'Save Data', icon: 'Download', onClick: exportCSV, title: 'Save Internal Data' },
+                    { key: 'import-csv', label: 'Import CSV', icon: 'Upload', onClick: () => fileInput.current?.click(), title: 'Upload Data' }
+                ]
+            };
+            const currentActions = viewActions[view] || [];
+            const quickActions = [
+                { key: 'save-workspace', label: 'Save', icon: 'Download', onClick: handleSaveWorkspace, title: 'Save workspace locally' },
+                { key: 'save-home', label: 'Home', icon: 'ArrowUp', onClick: handleReturnHome, title: 'Save and return to startup page' }
+            ];
+
             return (
                 <>
                 {/* Dynamically assign the physical print page size based on orientation toggle */}
@@ -1590,6 +1876,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
                             <div className="flex flex-col items-end gap-1 text-[11px] font-bold">
                                 <span className="px-2 py-1 rounded border border-ink/30 bg-teastain/60">Offline mode active: {bootChecks.offlineModeActive ? 'Yes' : 'No'}</span>
                                 <span className="px-2 py-1 rounded border border-ink/30 bg-teastain/60">Cloud sync unavailable: {(!isOnline || bootChecks.cloudSyncUnavailable) ? 'Yes' : 'No'}</span>
+                                <span className="px-2 py-1 rounded border border-ink/30 bg-teastain/60">Sync status: {syncSummary.status === 'pending' ? `Pending (${syncSummary.pendingCount})` : 'Synced'}</span>
                             </div>
                             {/* View Navigation Group */}
                             <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
@@ -1613,47 +1900,51 @@ const Icon = ({ name, size = 18, className = "" }) => {
                             </div>
 
                             {/* Data Actions Group */}
-                            <div className="inline-flex items-center bg-parchment/70 rounded-xl border border-ink/20 p-1.5 shadow-sm">
-                                <button onClick={openNewChain} className="px-3 py-1.5 text-xs font-bold text-fountain/90 hover:text-fountain hover:bg-fountain/10 rounded transition-all flex items-center gap-2" title="Start a completely separate independent lineage tree">
-                                    <Icon name="Plus" size={14} /> <span className="hidden sm:block">New Tree</span>
-                                </button>
+                            <div className="inline-flex flex-wrap items-center justify-end gap-1.5 sm:gap-2 bg-parchment/70 rounded-xl border border-ink/20 p-1.5 shadow-sm">
+                                {quickActions.map((action) => (
+                                    <button key={action.key} onClick={action.onClick} className="px-3 py-1.5 text-xs font-bold text-ink/85 hover:text-ink hover:bg-parchment rounded transition-all flex items-center gap-2" title={action.title}>
+                                        <Icon name={action.icon} size={14} /> <span>{action.label}</span>
+                                    </button>
+                                ))}
 
-                                <div className="w-px h-4 bg-ink/20 mx-1"></div>
-
-                                <button onClick={openAddUnlinked} className="px-3 py-1.5 text-xs font-bold text-fountain/90 hover:text-fountain hover:bg-fountain/10 rounded transition-all flex items-center gap-2" title="Add a document to the Parking Lot">
-                                    <Icon name="Plus" size={14} /> <span className="hidden sm:block">Add Loose Record</span>
-                                </button>
-                                
-                                <div className="w-px h-4 bg-ink/20 mx-1"></div>
-
-                                <button onClick={() => fileInput.current.click()} className="px-3 py-1.5 text-xs font-bold text-ink/70 hover:text-ink hover:bg-parchment rounded transition-all flex items-center gap-2" title="Upload Data">
-                                    <Icon name="Upload" size={14} /> <span className="hidden sm:block">Import CSV</span>
-                                </button>
-                                <input type="file" ref={fileInput} onChange={importCSV} className="hidden" accept=".csv" />
-                                
-                                <div className="w-px h-4 bg-ink/20 mx-1"></div>
-                                
-                                <button onClick={exportCSV} className="px-3 py-1.5 text-xs font-bold text-ink/80 hover:text-ink hover:bg-parchment rounded transition-all flex items-center gap-2" title="Save Internal Data">
-                                    <Icon name="Download" size={14} /> <span className="hidden sm:block">Save Data</span>
-                                </button>
-
-                                <div className="w-px h-4 bg-ink/20 mx-1"></div>
-
-                                <button onClick={exportToRunsheet} className="px-3 py-1.5 text-xs font-bold text-sepia/90 hover:text-sepia hover:bg-sepia/10 rounded transition-all flex items-center gap-2" title="Generate Chronological Runsheet">
-                                    <Icon name="FileText" size={14} /> <span className="hidden sm:block">Export Runsheet</span>
-                                </button>
-
-                                <div className="w-px h-4 bg-ink/20 mx-1"></div>
-
-                                <button onClick={handleSaveWorkspace} className="px-3 py-1.5 text-xs font-bold text-ink/90 hover:text-ink hover:bg-parchment rounded transition-all flex items-center gap-2" title="Save workspace locally">
-                                    <Icon name="Download" size={14} /> <span className="hidden sm:block">Save Workspace</span>
-                                </button>
-                                <span className="px-2 py-1 text-[10px] uppercase tracking-widest rounded border border-ink/20 bg-parchment/60 text-ink/70">
+                                <span className="px-2 py-1 text-[10px] uppercase tracking-widest rounded border border-ink/20 bg-parchment/60 text-ink/60">
                                     {isSaving ? 'Saving…' : 'AutoSave On'}
                                 </span>
-                                <button onClick={handleReturnHome} className="px-3 py-1.5 text-xs font-bold text-ink/90 hover:text-ink hover:bg-parchment rounded transition-all flex items-center gap-2" title="Save and return to startup page">
-                                    <Icon name="ArrowUp" size={14} /> <span>Save + Home</span>
-                                </button>
+
+                                <div className="relative" ref={actionsMenuRef}>
+                                    <button
+                                        onClick={() => setShowActionsMenu(prev => !prev)}
+                                        className="px-3 py-1.5 text-xs font-bold text-fountain/90 hover:text-fountain hover:bg-fountain/10 rounded transition-all flex items-center gap-2"
+                                        aria-haspopup="menu"
+                                        aria-expanded={showActionsMenu}
+                                        title="Open view-specific actions"
+                                    >
+                                        <Icon name="List" size={14} /> <span>Actions ▾</span>
+                                    </button>
+
+                                    {showActionsMenu && (
+                                        <div className="absolute right-0 mt-1 min-w-[220px] z-50 rounded-lg border border-ink/20 bg-parchment shadow-lg p-1">
+                                            {currentActions.length > 0 ? currentActions.map((action) => (
+                                                <button
+                                                    key={action.key}
+                                                    onClick={() => {
+                                                        action.onClick();
+                                                        setShowActionsMenu(false);
+                                                    }}
+                                                    className={`w-full px-3 py-2 text-left text-xs font-bold rounded transition-all flex items-center gap-2 ${action.destructive ? 'text-stamp hover:text-stamp hover:bg-stamp/10' : 'text-ink/80 hover:text-ink hover:bg-teastain/50'}`}
+                                                    title={action.title}
+                                                    role="menuitem"
+                                                >
+                                                    <Icon name={action.icon} size={13} />
+                                                    <span>{action.label}</span>
+                                                </button>
+                                            )) : (
+                                                <div className="px-3 py-2 text-xs text-ink/60">No actions available for this view.</div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                                <input type="file" ref={fileInput} onChange={importCSV} className="hidden" accept=".csv" />
                             </div>
                         </div>
                     </header>
@@ -2009,6 +2300,16 @@ const Icon = ({ name, size = 18, className = "" }) => {
                                             const node = flowNodes.find(n => n.id === selectedFlowNode);
                                             setFlowForm(node.data); setShowFlowEditModal(true);
                                         }} className="w-full py-2 border border-ink mb-2 text-xs font-bold uppercase hover:bg-ink hover:text-parchment transition-colors">Edit Content</button>
+                                        <div className="mb-2 border border-ink/20 bg-teastain/20 px-2 py-1.5 text-[10px]">
+                                            <div className="font-bold uppercase tracking-widest text-ink/70 mb-1">Tree Group</div>
+                                            <label className="flex items-center justify-between gap-2 text-[10px] text-ink">
+                                                <span>Move as tree group</span>
+                                                <input type="checkbox" checked readOnly aria-label="Move as tree group" />
+                                            </label>
+                                            <div className="mt-1 font-mono text-[9px] break-all text-ink/70">
+                                                {resolveTreeGroupId(flowNodes.find(n => n.id === selectedFlowNode))}
+                                            </div>
+                                        </div>
                                         <button onClick={deleteSelectedFlowElement} className="w-full py-2 border border-transparent text-stamp hover:border-stamp/50 text-xs font-bold uppercase transition-colors flex items-center justify-center gap-2"><Icon name="Trash" size={14}/> Delete Node</button>
                                     </div>
                                 )}
