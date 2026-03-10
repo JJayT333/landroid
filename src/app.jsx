@@ -1508,6 +1508,9 @@ async function getLatestWorkspace() {
                 if (currentWorkspaceId === workspaceId) {
                     setCurrentWorkspaceId(null);
                     setProjectName('My Workspace');
+                    setWorkspaceLoaded(false);
+                    setShowCloudModal(false);
+                    setShowHome(true);
                 }
             };
 
@@ -1518,6 +1521,9 @@ async function getLatestWorkspace() {
                 setSavedProjects([]);
                 setCurrentWorkspaceId(null);
                 setProjectName('My Workspace');
+                setWorkspaceLoaded(false);
+                setShowCloudModal(false);
+                setShowHome(true);
             };
 
             const handleReturnHome = async () => {
@@ -2194,7 +2200,7 @@ async function getLatestWorkspace() {
                                     }} className="border border-ink/40 p-1 text-xs min-w-[140px] bg-parchment" placeholder="DeskMap name" />
                                     <button onClick={() => renameActiveDeskMap()} className="px-2 py-1 text-[10px] font-bold border border-ink/40 hover:bg-teastain transition-colors">Save Name</button>
                                 </div>
-                                <div style={{ transform: `translate(${pz.x}px, ${pz.y}px) scale(${pz.scale})`, transformOrigin: '0 0' }} className="w-max h-max min-w-full min-h-full flex justify-center pt-24 pb-48 gap-24">
+                                <div style={{ transform: `translate(${pz.x}px, ${pz.y}px) scale(${pz.scale})`, transformOrigin: '0 0' }} className="w-max h-max min-w-full min-h-full flex justify-start pt-24 pb-48 gap-24">
                                     {tree.map(n => renderTreeNode(n))}
                                 </div>
                             </div>
