@@ -4,7 +4,8 @@
   "version": "1.0.0",
   "type": "commonjs",
   "scripts": {
-    "test": "jest --runInBand"
+    "test": "jest --runInBand",
+    "test:smoke": "node scripts/smoke-checks.js"
   },
   "devDependencies": {
     "jest": "^29.7.0"

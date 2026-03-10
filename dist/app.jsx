@@ -394,7 +394,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
                     if (latest?.name) setProjectName(latest.name);
                     if (latest?.id) setCurrentWorkspaceId(latest.id);
                     recordAuditEvent('workspace_bootstrap', { hasLatestWorkspace: Boolean(latest?.id), savedWorkspaceCount: projects.length });
-                    setBootChecks({
+                       setBootChecks({
                         offlineModeActive: 'ServiceWorker' in navigator,
                         cloudSyncUnavailable: !navigator.onLine
                     });
