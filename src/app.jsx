@@ -491,14 +491,18 @@ async function getLatestWorkspace() {
                 if (!projectName.trim()) return false;
                 setIsSaving(true);
                 try {
-                    const nodesToSave = nodes.map(n => {
+                    const serializeNodesForSave = (sourceNodes) => sourceNodes.map(n => {
                         const copy = { ...n };
-                        if (copy.docData) copy.hasDoc = true; delete copy.docData; return copy;
+                        if (copy.docData) copy.hasDoc = true;
+                        delete copy.docData;
+                        return copy;
                     });
                     const data = {
-                        name: projectName.trim(), nodes: nodesToSave, instrumentList,
+                        name: projectName.trim(), nodes: serializeNodesForSave(nodes), instrumentList,
                         flowNodes, flowEdges, treeScale, printOrientation, gridCols, gridRows,
-                        tracts, contacts, ownershipInterests, contactLogs, deskMaps, activeDeskMapId,
+                        tracts, contacts, ownershipInterests, contactLogs,
+                        deskMaps: deskMaps.map(map => ({ ...map, nodes: serializeNodesForSave(map.nodes || []) })),
+                        activeDeskMapId,
                         updatedAt: Date.now(), appId
                     };
                     const savedWorkspace = await saveWorkspace(data, currentWorkspaceId);
@@ -555,8 +559,63 @@ async function getLatestWorkspace() {
                 if (closeModal) setShowCloudModal(false);
             };
             
-            const handleEnterNewWorkspace = () => {
+            const handleEnterNewWorkspace = async () => {
                 const freshWorkspaceId = crypto.randomUUID ? crypto.randomUUID() : makeId();
+                const freshNode = { ...defaultRoot };
+                const freshDeskMap = {
+                    id: makeId(),
+                    name: 'Unit Tract 1',
+                    code: 'TRACT-1',
+                    tractId: null,
+                    nodes: [{ ...freshNode }],
+                    pz: { ...defaultViewport }
+                };
+
+                setNodes([{ ...freshNode }]);
+                setDeskMaps([freshDeskMap]);
+                setActiveDeskMapId(freshDeskMap.id);
+                setPz({ ...defaultViewport });
+                setFlowNodes([]);
+                setFlowEdges([]);
+                setTreeScale(1);
+                setPrintOrientation('landscape');
+                setGridCols(1);
+                setGridRows(1);
+                setTracts([]);
+                setContacts([]);
+                setOwnershipInterests([]);
+                setContactLogs([]);
+                setSelectedContactId(null);
+
+                const initialPayload = {
+                    name: 'My Workspace',
+                    nodes: [{ ...freshNode }],
+                    instrumentList,
+                    flowNodes: [],
+                    flowEdges: [],
+                    treeScale: 1,
+                    printOrientation: 'landscape',
+                    gridCols: 1,
+                    gridRows: 1,
+                    tracts: [],
+                    contacts: [],
+                    ownershipInterests: [],
+                    contactLogs: [],
+                    deskMaps: [{ ...freshDeskMap }],
+                    activeDeskMapId: freshDeskMap.id,
+                    updatedAt: Date.now(),
+                    appId
+                };
+
+                try {
+                    await saveWorkspace(initialPayload, freshWorkspaceId);
+                    const projects = await getAllWorkspaces();
+                    setSavedProjects(projects);
+                } catch (e) {
+                    console.error(e);
+                    window.alert('Unable to create a new workspace in local storage. Please try again.');
+                }
+
                 setCurrentWorkspaceId(freshWorkspaceId);
                 setProjectName('My Workspace');
                 setWorkspaceLoaded(true);
