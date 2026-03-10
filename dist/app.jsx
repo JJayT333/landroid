@@ -1313,11 +1313,14 @@ async function getLatestWorkspace() {
 
             const addFlowNode = (type) => {
                 const id = `fn_${makeId()}`;
-                const rect = document.getElementById('tree-scaler').getBoundingClientRect();
+                const scalerRect = document.getElementById('tree-scaler')?.getBoundingClientRect();
+                const canvasRect = flowCanvasRef.current?.getBoundingClientRect();
+                const anchorX = canvasRect ? canvasRect.left + (canvasRect.width / 2) : (window.innerWidth / 2);
+                const anchorY = canvasRect ? canvasRect.top + (canvasRect.height / 2) : (window.innerHeight / 2);
                 const newNode = {
                     id,
-                    x: (-rect.left + window.innerWidth / 2) / (flowPz.scale * treeScale) - 140,
-                    y: (-rect.top + window.innerHeight / 2) / (flowPz.scale * treeScale) - 100,
+                    x: ((anchorX - (scalerRect?.left || 0)) / (flowPz.scale * treeScale)) - 140,
+                    y: ((anchorY - (scalerRect?.top || 0)) / (flowPz.scale * treeScale)) - 100,
                     type,
                     color: 'bg-parchment text-ink border-ink',
                     data: type === 'template' ? {
@@ -1325,6 +1328,10 @@ async function getLatestWorkspace() {
                     } : { text: 'Double click to edit text...', width: 280 }
                 };
                 setFlowNodes([...flowNodes, newNode]);
+                setSelectedFlowNode(id);
+                setFlowForm(newNode.data);
+                setFlowTool('select');
+                setShowFlowEditModal(true);
             };
 
             const handleFlowPointerDown = (e) => {
@@ -1373,7 +1380,7 @@ async function getLatestWorkspace() {
             };
             
             const handleFlowWheel = (e) => {
-                if (e.ctrlKey || e.metaKey) { 
+                if (e.ctrlKey || e.metaKey || flowTool === 'pan') { 
                     e.preventDefault(); const scaleAdjust = e.deltaY * -0.002;
                     setFlowPz(prev => ({ ...prev, scale: Math.min(Math.max(0.1, prev.scale + scaleAdjust), 3) }));
                 }
