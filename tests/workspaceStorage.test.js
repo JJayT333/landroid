@@ -1,6 +1,3 @@
-const fs = require('fs');
-const path = require('path');
-
 function createLocalStorageMock() {
   const state = new Map();
   return {
@@ -136,25 +133,6 @@ function createIndexedDbMock() {
   };
 }
 
-function loadWorkspaceFns({ indexedDB, localStorage, crypto }) {
-  const appSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'app.jsx'), 'utf8');
-  const start = appSource.indexOf("const LOCAL_META_KEY = 'landroid:lastWorkspaceId';");
-  const end = appSource.indexOf('const Icon = ({ name, size = 18, className = "" }) => {');
-
-  if (start === -1 || end === -1 || end <= start) {
-    throw new Error('Unable to find workspace storage function block in src/app.jsx');
-  }
-
-  const block = appSource.slice(start, end);
-
-  return new Function(
-    'indexedDB',
-    'localStorage',
-    'crypto',
-    `${block}\nreturn { LOCAL_META_KEY, saveWorkspace, getAllWorkspaces, loadWorkspace, deleteWorkspace, deleteAllWorkspaces, getLatestWorkspace };`
-  )(indexedDB, localStorage, crypto);
-}
-
 describe('workspace storage unit tests', () => {
   let localStorage;
   let indexedDB;
@@ -163,11 +141,11 @@ describe('workspace storage unit tests', () => {
   beforeEach(() => {
     localStorage = createLocalStorageMock();
     indexedDB = createIndexedDbMock();
-    api = loadWorkspaceFns({
-      indexedDB,
-      localStorage,
-      crypto: { randomUUID: () => 'uuid-fixed-123' },
-    });
+    global.indexedDB = indexedDB;
+    global.localStorage = localStorage;
+    global.crypto = { randomUUID: () => 'uuid-fixed-123' };
+    jest.resetModules();
+    api = require('../src/workspaceStorage');
   });
 
   test('returns an empty list when there are no saved workspaces', async () => {
