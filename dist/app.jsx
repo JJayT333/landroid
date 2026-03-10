@@ -25,10 +25,16 @@ async function withWorkspaceStore(mode, handler) {
     const db = await openDb();
     return new Promise((resolve, reject) => {
         let settled = false;
+        let result;
+        let hasResult = false;
         const safeResolve = (value) => {
             if (settled) return;
             settled = true;
             resolve(value);
+        };
+        const setResult = (value) => {
+            result = value;
+            hasResult = true;
         };
         const safeReject = (error) => {
             if (settled) return;
@@ -40,7 +46,7 @@ async function withWorkspaceStore(mode, handler) {
 
         tx.oncomplete = () => {
             db.close();
-            safeResolve();
+            safeResolve(hasResult ? result : undefined);
         };
         tx.onerror = () => {
             db.close();
@@ -51,18 +57,18 @@ async function withWorkspaceStore(mode, handler) {
             safeReject(tx.error || new Error('Workspace transaction aborted'));
         };
 
-        handler({ store, resolve: safeResolve, reject: safeReject });
+        handler({ store, setResult, reject: safeReject });
     });
 }
 
 async function getAllWorkspaces() {
-    return withWorkspaceStore('readonly', ({ store, resolve, reject }) => {
+    return withWorkspaceStore('readonly', ({ store, setResult, reject }) => {
         const entries = [];
         const request = store.index('updatedAt').openCursor(null, 'prev');
         request.onsuccess = () => {
             const cursor = request.result;
             if (!cursor) {
-                resolve(entries);
+                setResult(entries);
                 return;
             }
             entries.push(cursor.value);
@@ -73,9 +79,9 @@ async function getAllWorkspaces() {
 }
 
 async function loadWorkspace(id) {
-    return withWorkspaceStore('readonly', ({ store, resolve, reject }) => {
+    return withWorkspaceStore('readonly', ({ store, setResult, reject }) => {
         const request = store.get(id);
-        request.onsuccess = () => resolve(request.result || null);
+        request.onsuccess = () => setResult(request.result || null);
         request.onerror = () => reject(request.error);
     });
 }
@@ -106,9 +112,9 @@ async function saveWorkspace(data, workspaceId = null) {
 }
 
 async function getLatestWorkspace() {
-    return withWorkspaceStore('readonly', ({ store, resolve, reject }) => {
+    return withWorkspaceStore('readonly', ({ store, setResult, reject }) => {
         const request = store.index('updatedAt').openCursor(null, 'prev');
-        request.onsuccess = () => resolve(request.result ? request.result.value : null);
+        request.onsuccess = () => setResult(request.result ? request.result.value : null);
         request.onerror = () => reject(request.error);
     });
 }
@@ -182,6 +188,7 @@ async function getLatestWorkspace() {
             const [runsheetDeskMapFilter, setRunsheetDeskMapFilter] = useState('active');
             const [flowDeskMapFilter, setFlowDeskMapFilter] = useState('active');
             const [deskMapNameDraft, setDeskMapNameDraft] = useState('');
+            const [deskMapCodeDraft, setDeskMapCodeDraft] = useState('');
             const [isEditingDeskMapName, setIsEditingDeskMapName] = useState(false);
             
             // PERFORMANCE: Defer massive print grid DOM rendering until exact moment of printing
@@ -206,9 +213,11 @@ async function getLatestWorkspace() {
             
             const flowDraggingNode = useRef(null);
             const flowDragStart = useRef({ x: 0, y: 0 });
+            const flowCanvasRef = useRef(null);
             
             const moveTreeStartPos = useRef(null);
             const initialTreeNodes = useRef(null);
+            const moveTreeGroupId = useRef(null);
 
             // Dynamic Paper Size Calculation (96 DPI)
             const pw = printOrientation === 'landscape' ? 1056 : 816; // 11" vs 8.5"
@@ -262,6 +271,15 @@ async function getLatestWorkspace() {
             const [interestForm, setInterestForm] = useState({ contactId: '', tractId: '', interestType: 'MI', interestValue: '', status: 'confirmed' });
             const [logForm, setLogForm] = useState({ contactId: '', tractId: '', method: 'call', outcome: '', nextFollowupAt: '', notes: '' });
 
+
+            const formatDeskMapLabel = (map) => {
+                if (!map) return 'DeskMap';
+                const code = (map.code || '').trim();
+                const name = (map.name || '').trim();
+                if (code && name) return `${code} - ${name}`;
+                return code || name || 'DeskMap';
+            };
+
             // PERFORMANCE: Memoized calculated arrays
             const activeOwners = useMemo(() => nodes.filter(n => n.type !== 'related' && n.fraction > 0.00000001), [nodes]);
             const totalRemaining = useMemo(() => activeOwners.reduce((sum, n) => sum + parseFloat(n.fraction), 0), [activeOwners]);
@@ -270,14 +288,14 @@ async function getLatestWorkspace() {
             // PERFORMANCE: Runsheet sorting/filtering memoization
             const runsheetNodesSource = useMemo(() => {
                 if (runsheetDeskMapFilter === 'all') {
-                    return deskMaps.flatMap(map => (map.nodes || []).map(n => ({ ...n, __deskMapId: map.id, __deskMapLabel: `${map.code} ${map.name ? `- ${map.name}` : ''}` })));
+                    return deskMaps.flatMap(map => (map.nodes || []).map(n => ({ ...n, __deskMapId: map.id, __deskMapLabel: formatDeskMapLabel(map) })));
                 }
                 if (runsheetDeskMapFilter === 'active') {
                     const activeMap = deskMaps.find(map => map.id === activeDeskMapId);
-                    return (activeMap?.nodes || nodes || []).map(n => ({ ...n, __deskMapId: activeMap?.id || activeDeskMapId, __deskMapLabel: activeMap ? `${activeMap.code} ${activeMap.name ? `- ${activeMap.name}` : ''}` : 'Active DeskMap' }));
+                    return (activeMap?.nodes || nodes || []).map(n => ({ ...n, __deskMapId: activeMap?.id || activeDeskMapId, __deskMapLabel: activeMap ? formatDeskMapLabel(activeMap) : 'Active DeskMap' }));
                 }
                 const chosenMap = deskMaps.find(map => map.id === runsheetDeskMapFilter);
-                return (chosenMap?.nodes || []).map(n => ({ ...n, __deskMapId: chosenMap?.id, __deskMapLabel: chosenMap ? `${chosenMap.code} ${chosenMap.name ? `- ${chosenMap.name}` : ''}` : 'Selected DeskMap' }));
+                return (chosenMap?.nodes || []).map(n => ({ ...n, __deskMapId: chosenMap?.id, __deskMapLabel: chosenMap ? formatDeskMapLabel(chosenMap) : 'Selected DeskMap' }));
             }, [runsheetDeskMapFilter, deskMaps, activeDeskMapId, nodes]);
 
             const filteredSortedNodes = useMemo(() => {
@@ -329,7 +347,18 @@ async function getLatestWorkspace() {
                 if (isEditingDeskMapName) return;
                 const activeMap = deskMaps.find(map => map.id === activeDeskMapId);
                 setDeskMapNameDraft(activeMap?.name || '');
+                setDeskMapCodeDraft(activeMap?.code || '');
             }, [activeDeskMapId, deskMaps, isEditingDeskMapName]);
+
+            const updateActiveDeskMapNodes = (updater) => {
+                const mapId = activeDeskMapId;
+                if (!mapId) return;
+                setNodes(prevNodes => {
+                    const nextNodes = typeof updater === 'function' ? updater(prevNodes) : updater;
+                    setDeskMaps(prevMaps => prevMaps.map(map => map.id === mapId ? { ...map, nodes: nextNodes } : map));
+                    return nextNodes;
+                });
+            };
 
             useEffect(() => {
                 if (!activeDeskMapId) return;
@@ -347,11 +376,17 @@ async function getLatestWorkspace() {
                 setActiveDeskMapId(newMap.id);
             };
 
-            const renameActiveDeskMap = (rawName = deskMapNameDraft) => {
-                const trimmed = (rawName || '').trim();
-                if (!trimmed) return;
-                setDeskMaps(prev => prev.map(map => map.id === activeDeskMapId ? { ...map, name: trimmed } : map));
-                setDeskMapNameDraft(trimmed);
+            const renameActiveDeskMap = (rawName = deskMapNameDraft, rawCode = deskMapCodeDraft) => {
+                const trimmedName = (rawName || '').trim();
+                const trimmedCode = (rawCode || '').trim();
+                if (!trimmedName && !trimmedCode) return;
+                setDeskMaps(prev => prev.map(map => map.id === activeDeskMapId ? {
+                    ...map,
+                    name: trimmedName || map.name,
+                    code: trimmedCode || map.code
+                } : map));
+                setDeskMapNameDraft(trimmedName);
+                setDeskMapCodeDraft(trimmedCode);
                 setIsEditingDeskMapName(false);
             };
 
@@ -603,17 +638,17 @@ async function getLatestWorkspace() {
                 setShowModal(true);
             };
 
-            const toggleDeceased = (node) => setNodes(nodes.map(n => n.id === node.id ? { ...n, isDeceased: !n.isDeceased } : n));
+            const toggleDeceased = (node) => updateActiveDeskMapNodes(prev => prev.map(n => n.id === node.id ? { ...n, isDeceased: !n.isDeceased } : n));
 
             const handleCommit = () => {
                 if (modalMode === 'convey' || modalMode === 'attach') {
                     setLastMathProps({ conveyanceMode: form.conveyanceMode, splitBasis: form.splitBasis, numerator: form.numerator, denominator: form.denominator, manualAmount: form.manualAmount });
                 }
-                if (modalMode === 'edit') setNodes(nodes.map(n => n.id === activeNode.id ? { ...n, ...form } : n));
+                if (modalMode === 'edit') updateActiveDeskMapNodes(prev => prev.map(n => n.id === activeNode.id ? { ...n, ...form } : n));
                 else if (modalMode === 'convey') {
                     const newId = makeId();
                     const updatedNodes = nodes.map(n => n.id === activeNode.id ? { ...n, fraction: Math.max(0, n.fraction - calcShare) } : n);
-                    setNodes([...updatedNodes, { ...form, id: newId, type: 'conveyance', fraction: calcShare, initialFraction: calcShare, parentId: activeNode.id }]);
+                    updateActiveDeskMapNodes([...updatedNodes, { ...form, id: newId, type: 'conveyance', fraction: calcShare, initialFraction: calcShare, parentId: activeNode.id }]);
                 } else if (modalMode === 'precede') {
                     const newId = makeId();
                     const updatedNodes = nodes.map(n => {
@@ -624,16 +659,16 @@ async function getLatestWorkspace() {
                         return n;
                     });
                     const fractionRetained = form.initialFraction - activeNode.initialFraction;
-                    setNodes([...updatedNodes, { ...form, id: newId, type: 'conveyance', parentId: activeNode.parentId, initialFraction: form.initialFraction, fraction: Math.max(0, fractionRetained) }]);
+                    updateActiveDeskMapNodes([...updatedNodes, { ...form, id: newId, type: 'conveyance', parentId: activeNode.parentId, initialFraction: form.initialFraction, fraction: Math.max(0, fractionRetained) }]);
                 } else if (modalMode === 'add_chain') {
                     const newId = makeId();
-                    setNodes([...nodes, { ...form, id: newId, type: 'conveyance', parentId: null }]);
+                    updateActiveDeskMapNodes(prev => [...prev, { ...form, id: newId, type: 'conveyance', parentId: null }]);
                 } else if (modalMode === 'add_related') {
                     const newId = makeId();
-                    setNodes([...nodes, { ...form, id: newId, type: 'related', fraction: 0, initialFraction: 0, parentId: activeNode.id }]);
+                    updateActiveDeskMapNodes(prev => [...prev, { ...form, id: newId, type: 'related', fraction: 0, initialFraction: 0, parentId: activeNode.id }]);
                 } else if (modalMode === 'add_unlinked') {
                     const newId = makeId();
-                    setNodes([...nodes, { ...form, id: newId, type: 'conveyance', fraction: 0, initialFraction: 0, parentId: 'unlinked' }]);
+                    updateActiveDeskMapNodes(prev => [...prev, { ...form, id: newId, type: 'conveyance', fraction: 0, initialFraction: 0, parentId: 'unlinked' }]);
                 } else if (modalMode === 'attach') {
                     if (attachType === 'conveyance') {
                         const updatedNodes = nodes.map(n => {
@@ -641,9 +676,9 @@ async function getLatestWorkspace() {
                             if (n.id === activeNode.id) return { ...form, parentId: attachParentId, type: 'conveyance', fraction: calcShare, initialFraction: calcShare };
                             return n;
                         });
-                        setNodes(updatedNodes);
+                        updateActiveDeskMapNodes(updatedNodes);
                     } else {
-                        setNodes(nodes.map(n => n.id === activeNode.id ? { ...form, parentId: attachParentId, type: 'related', fraction: 0, initialFraction: 0 } : n));
+                        updateActiveDeskMapNodes(prev => prev.map(n => n.id === activeNode.id ? { ...form, parentId: attachParentId, type: 'related', fraction: 0, initialFraction: 0 } : n));
                     }
                 }
                 setShowModal(false);
@@ -655,7 +690,7 @@ async function getLatestWorkspace() {
                     message: `Are you sure you want to permanently delete "${node.instrument}" to ${node.grantee}? Any attached child branches will be safely moved to the Runsheet Parking Lot.`,
                     actionText: 'Delete Record',
                     onConfirm: () => {
-                        setNodes(prev => prev.map(x => {
+                        updateActiveDeskMapNodes(prev => prev.map(x => {
                             if (x.id === node.id) return null;
                             if (x.parentId === node.id) return { ...x, parentId: 'unlinked', remarks: (x.remarks ? x.remarks + ' ' : '') + '[Orphaned from deleted parent]' };
                             return x;
@@ -1100,7 +1135,7 @@ async function getLatestWorkspace() {
                                      FLOW CHART ENGINE (TOP-DOWN LAYOUT)
             ========================================================================================= */
 
-            const buildFlowLayoutFromNodes = (sourceNodes, idPrefix = '', xShift = 0) => {
+            const buildFlowLayoutFromNodes = (sourceNodes, idPrefix = '', xShift = 0, treeGroupId = '') => {
                 const safePrefix = idPrefix ? `${idPrefix}-` : '';
                 const normalNodes = sourceNodes.filter(n => n.type !== 'related');
                 if (!normalNodes.length) return { nodes: [], edges: [], width: 0 };
@@ -1139,6 +1174,7 @@ async function getLatestWorkspace() {
                     const pos = nodePositions[n.id] || { x: 0, y: 0 };
                     newFlowNodes.push({
                         id: `${safePrefix}${n.id}`,
+                        treeGroupId: treeGroupId || safePrefix || 'default-tree',
                         x: (pos.x - minX) + xShift,
                         y: pos.y,
                         type: 'template',
@@ -1161,6 +1197,27 @@ async function getLatestWorkspace() {
                 return deskMaps.filter(map => map.id === flowDeskMapFilter);
             };
 
+            const fitFlowToView = (targetNodes) => {
+                const scopeNodes = targetNodes || flowNodes;
+                if (!scopeNodes.length) return;
+                const containerRect = flowCanvasRef.current?.getBoundingClientRect();
+                const viewportW = Math.max(700, (containerRect?.width || window.innerWidth) - 80);
+                const viewportH = Math.max(500, (containerRect?.height || window.innerHeight) - 110);
+                const minX = Math.min(...scopeNodes.map(n => n.x));
+                const maxX = Math.max(...scopeNodes.map(n => n.x + (n.type === 'template' ? 280 : (n.data.width || 280))));
+                const minY = Math.min(...scopeNodes.map(n => n.y));
+                const maxY = Math.max(...scopeNodes.map(n => n.y + (n.type === 'template' ? 150 : 80)));
+                const contentW = Math.max(300, maxX - minX);
+                const contentH = Math.max(200, maxY - minY);
+                const fitScale = Math.min(viewportW / contentW, viewportH / contentH, 1);
+                setTreeScale(fitScale);
+                const centerX = minX + contentW / 2;
+                const centerY = minY + contentH / 2;
+                const targetX = (viewportW / 2) - (centerX * fitScale);
+                const targetY = (viewportH / 2) - (centerY * fitScale);
+                setFlowPz({ x: Math.min(600, Math.max(-6000, targetX)), y: Math.min(400, Math.max(-6000, targetY)), scale: fitScale });
+            };
+
             const importToFlowchart = (append = false) => {
                 const selectedMaps = getFlowSelectedDeskMaps();
                 if (!selectedMaps.length) {
@@ -1171,7 +1228,7 @@ async function getLatestWorkspace() {
 
                 let xCursor = append && flowNodes.length ? (Math.max(...flowNodes.map(n => n.x + 300)) + 200) : 0;
                 const built = selectedMaps.map((map, i) => {
-                    const result = buildFlowLayoutFromNodes(map.nodes || [], `${map.id}-${i}-${makeId()}`, xCursor);
+                    const result = buildFlowLayoutFromNodes(map.nodes || [], `${map.id}-${i}-${makeId()}`, xCursor, map.id);
                     xCursor += result.width + 220;
                     return result;
                 });
@@ -1183,21 +1240,7 @@ async function getLatestWorkspace() {
                 setFlowNodes(nextNodes);
                 setFlowEdges(nextEdges);
 
-                if (nextNodes.length) {
-                    const minX = Math.min(...nextNodes.map(n => n.x));
-                    const maxX = Math.max(...nextNodes.map(n => n.x + (n.type === 'template' ? 280 : (n.data.width || 280))));
-                    const minY = Math.min(...nextNodes.map(n => n.y));
-                    const maxY = Math.max(...nextNodes.map(n => n.y + (n.type === 'template' ? 150 : 80)));
-                    const contentW = Math.max(300, maxX - minX);
-                    const contentH = Math.max(200, maxY - minY);
-                    const targetW = Math.max(800, (pw * gridCols) * 0.9);
-                    const targetH = Math.max(600, (ph * gridRows) * 0.9);
-                    const fitScale = Math.min(targetW / contentW, targetH / contentH, 1);
-                    setTreeScale(fitScale);
-                    const centerX = minX + contentW / 2;
-                    const centerY = minY + contentH / 2;
-                    setFlowPz({ x: (window.innerWidth / 2) - (centerX * fitScale), y: (window.innerHeight / 2) - (centerY * fitScale), scale: fitScale });
-                }
+                if (nextNodes.length) fitFlowToView(nextNodes);
             };
 
             const handlePrintFlowchart = () => {
@@ -1267,6 +1310,7 @@ async function getLatestWorkspace() {
                     isDragging.current = true;
                     moveTreeStartPos.current = { x: e.clientX, y: e.clientY };
                     initialTreeNodes.current = flowNodes.map(n => ({ id: n.id, x: n.x, y: n.y }));
+                    moveTreeGroupId.current = null;
                     e.currentTarget.setPointerCapture(e.pointerId); setSelectedFlowNode(null);
                 }
             };
@@ -1284,7 +1328,9 @@ async function getLatestWorkspace() {
                     const dx = (e.clientX - moveTreeStartPos.current.x) / (flowPz.scale * treeScale);
                     const dy = (e.clientY - moveTreeStartPos.current.y) / (flowPz.scale * treeScale);
                     const initialNodes = initialTreeNodes.current; // Capture ref to prevent null error in async state updater
+                    const targetGroup = moveTreeGroupId.current;
                     setFlowNodes(prev => prev.map(n => {
+                        if (targetGroup && (n.treeGroupId || n.id) !== targetGroup) return n;
                         const orig = initialNodes.find(o => o.id === n.id);
                         return orig ? { ...n, x: orig.x + dx, y: orig.y + dy } : n;
                     }));
@@ -1297,6 +1343,7 @@ async function getLatestWorkspace() {
                 if (connectingStart) setConnectingStart(null); 
                 moveTreeStartPos.current = null;
                 initialTreeNodes.current = null;
+                moveTreeGroupId.current = null;
             };
             
             const handleFlowWheel = (e) => {
@@ -1322,6 +1369,7 @@ async function getLatestWorkspace() {
                     isDragging.current = true;
                     moveTreeStartPos.current = { x: e.clientX, y: e.clientY };
                     initialTreeNodes.current = flowNodes.map(n => ({ id: n.id, x: n.x, y: n.y }));
+                    moveTreeGroupId.current = node.treeGroupId || node.id;
                     e.currentTarget.setPointerCapture(e.pointerId);
                     setSelectedFlowNode(null);
                 }
@@ -1342,8 +1390,10 @@ async function getLatestWorkspace() {
                     const dx = (e.clientX - moveTreeStartPos.current.x) / (flowPz.scale * treeScale);
                     const dy = (e.clientY - moveTreeStartPos.current.y) / (flowPz.scale * treeScale);
                     const initialNodes = initialTreeNodes.current; // Capture ref to prevent null error in async state updater
+                    const targetGroup = moveTreeGroupId.current;
                     
                     setFlowNodes(prev => prev.map(n => {
+                        if (targetGroup && (n.treeGroupId || n.id) !== targetGroup) return n;
                         const orig = initialNodes.find(o => o.id === n.id);
                         return orig ? { ...n, x: orig.x + dx, y: orig.y + dy } : n;
                     }));
@@ -1603,6 +1653,9 @@ async function getLatestWorkspace() {
                                 <button onClick={handleSaveWorkspace} className="px-3 py-1.5 text-xs font-bold text-ink/90 hover:text-ink hover:bg-parchment rounded transition-all flex items-center gap-2" title="Save workspace locally">
                                     <Icon name="Download" size={14} /> <span className="hidden sm:block">Save Workspace</span>
                                 </button>
+                                <span className="px-2 py-1 text-[10px] uppercase tracking-widest rounded border border-ink/20 bg-parchment/60 text-ink/70">
+                                    {isSaving ? 'Saving…' : 'AutoSave On'}
+                                </span>
                                 <button onClick={handleReturnHome} className="px-3 py-1.5 text-xs font-bold text-ink/90 hover:text-ink hover:bg-parchment rounded transition-all flex items-center gap-2" title="Save and return to startup page">
                                     <Icon name="ArrowUp" size={14} /> <span>Save + Home</span>
                                 </button>
@@ -1829,13 +1882,19 @@ async function getLatestWorkspace() {
                                 <div className="absolute top-3 left-3 z-30 flex items-center gap-2 bg-parchment/95 border border-ink/30 rounded-lg px-2 py-2 ink-shadow">
                                     <span className="text-[10px] uppercase tracking-widest font-bold text-sepia">DeskMap</span>
                                     <select className="border border-ink p-1 text-xs min-w-[180px]" value={activeDeskMapId} onChange={e => setActiveDeskMapId(e.target.value)}>
-                                        {deskMaps.map(map => <option key={map.id} value={map.id}>{map.code} {map.name ? `- ${map.name}` : ''}</option>)}
+                                        {deskMaps.map(map => <option key={map.id} value={map.id}>{formatDeskMapLabel(map)}</option>)}
                                     </select>
                                     <button onClick={addDeskMap} className="px-2 py-1 text-[10px] font-bold border border-ink hover:bg-ink hover:text-parchment transition-colors">+ DeskMap</button>
+                                    <input value={deskMapCodeDraft} onChange={e => { setIsEditingDeskMapName(true); setDeskMapCodeDraft(e.target.value); }} onBlur={() => renameActiveDeskMap()} onKeyDown={e => {
+                                        if (e.key === 'Enter') {
+                                            e.preventDefault();
+                                            renameActiveDeskMap(deskMapNameDraft, e.currentTarget.value);
+                                        }
+                                    }} className="border border-ink/40 p-1 text-xs w-[110px] bg-parchment" placeholder="Tract code" />
                                     <input value={deskMapNameDraft} onChange={e => { setIsEditingDeskMapName(true); setDeskMapNameDraft(e.target.value); }} onBlur={() => renameActiveDeskMap()} onKeyDown={e => {
                                         if (e.key === 'Enter') {
                                             e.preventDefault();
-                                            renameActiveDeskMap(e.currentTarget.value);
+                                            renameActiveDeskMap(e.currentTarget.value, deskMapCodeDraft);
                                         }
                                     }} className="border border-ink/40 p-1 text-xs min-w-[140px] bg-parchment" placeholder="DeskMap name" />
                                     <button onClick={() => renameActiveDeskMap()} className="px-2 py-1 text-[10px] font-bold border border-ink/40 hover:bg-teastain transition-colors">Save Name</button>
@@ -1858,7 +1917,7 @@ async function getLatestWorkspace() {
                                         <div className="text-[8px] font-bold uppercase tracking-widest text-ink/50 mb-1 pl-1">Active Tool</div>
                                         <div className="flex bg-teastain p-0.5 border border-ink">
                                             <button onClick={() => setFlowTool('select')} className={`px-3 py-1.5 flex items-center gap-1.5 text-[10px] font-bold uppercase transition-colors ${flowTool === 'select' ? 'bg-ink text-parchment shadow-inner' : 'text-ink hover:bg-ink/10'}`} title="Select, Move, or Double-Click a single Box"><Icon name="MousePointer" size={12} /> Move Box</button>
-                                            <button onClick={() => setFlowTool('move-tree')} className={`px-3 py-1.5 flex items-center gap-1.5 text-[10px] font-bold uppercase transition-colors ${flowTool === 'move-tree' ? 'bg-ink text-parchment shadow-inner' : 'text-ink hover:bg-ink/10'}`} title="Drag the entire tree structure around to fit on the paper"><Icon name="Move" size={12} /> Move Tree</button>
+                                            <button onClick={() => setFlowTool('move-tree')} className={`px-3 py-1.5 flex items-center gap-1.5 text-[10px] font-bold uppercase transition-colors ${flowTool === 'move-tree' ? 'bg-ink text-parchment shadow-inner' : 'text-ink hover:bg-ink/10'}`} title="Drag a tree to move that tree only; drag canvas to move all trees"><Icon name="Move" size={12} /> Move Tree</button>
                                             <button onClick={() => setFlowTool('pan')} className={`px-3 py-1.5 flex items-center gap-1.5 text-[10px] font-bold uppercase transition-colors ${flowTool === 'pan' ? 'bg-ink text-parchment shadow-inner' : 'text-ink hover:bg-ink/10'}`} title="Pan your view around the screen (does not affect print location)"><Icon name="Hand" size={12} /> Pan Canvas</button>
                                             <button onClick={() => setFlowTool('connect')} className={`px-3 py-1.5 flex items-center gap-1.5 text-[10px] font-bold uppercase transition-colors ${flowTool === 'connect' ? 'bg-ink text-parchment shadow-inner' : 'text-ink hover:bg-ink/10'}`} title="Drag from one box to another to draw a connecting line"><Icon name="Link" size={12} /> Link Boxes</button>
                                         </div>
@@ -1923,6 +1982,7 @@ async function getLatestWorkspace() {
                                             </select>
                                             <button onClick={() => importToFlowchart(false)} className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-sepia text-sepia hover:bg-sepia hover:text-parchment flex items-center gap-1 shadow-sm transition-all hover:-translate-y-0.5" title="Load selected DeskMap(s) into Flow Chart"><Icon name="Download" size={12}/> Import Selected DeskMap(s)</button>
                                             <button onClick={() => importToFlowchart(true)} className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-sepia/50 text-sepia hover:bg-sepia/10 flex items-center gap-1 shadow-sm transition-all hover:-translate-y-0.5" title="Append selected DeskMap(s) to existing Flow Chart"><Icon name="Plus" size={12}/> Import + Append</button>
+                                            <button onClick={() => fitFlowToView()} className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-ink/40 text-ink hover:bg-ink hover:text-parchment flex items-center gap-1 shadow-sm transition-all hover:-translate-y-0.5" title="Recenter and fit all flow nodes to the current canvas"><Icon name="Move" size={12}/> Fit View</button>
                                             <button onClick={handlePrintFlowchart} className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-ink bg-ink text-parchment hover:bg-ink/80 flex items-center gap-1 shadow-sm transition-all hover:-translate-y-0.5"><Icon name="Printer" size={12}/> Print</button>
                                         </div>
                                     </div>
@@ -1951,6 +2011,7 @@ async function getLatestWorkspace() {
 
                                 {/* Outer Zoom Viewport (Interactive Screen View) */}
                                 <div 
+                                    ref={flowCanvasRef}
                                     className={`flex-1 relative overflow-hidden no-print ${
                                         flowTool === 'pan' ? 'cursor-grab active:cursor-grabbing' 
                                         : flowTool === 'move-tree' ? 'cursor-move' 

@@ -25,10 +25,16 @@ async function withWorkspaceStore(mode, handler) {
     const db = await openDb();
     return new Promise((resolve, reject) => {
         let settled = false;
+        let result;
+        let hasResult = false;
         const safeResolve = (value) => {
             if (settled) return;
             settled = true;
             resolve(value);
+        };
+        const setResult = (value) => {
+            result = value;
+            hasResult = true;
         };
         const safeReject = (error) => {
             if (settled) return;
@@ -40,7 +46,7 @@ async function withWorkspaceStore(mode, handler) {
 
         tx.oncomplete = () => {
             db.close();
-            safeResolve();
+            safeResolve(hasResult ? result : undefined);
         };
         tx.onerror = () => {
             db.close();
@@ -51,18 +57,18 @@ async function withWorkspaceStore(mode, handler) {
             safeReject(tx.error || new Error('Workspace transaction aborted'));
         };
 
-        handler({ store, resolve: safeResolve, reject: safeReject });
+        handler({ store, setResult, reject: safeReject });
     });
 }
 
 async function getAllWorkspaces() {
-    return withWorkspaceStore('readonly', ({ store, resolve, reject }) => {
+    return withWorkspaceStore('readonly', ({ store, setResult, reject }) => {
         const entries = [];
         const request = store.index('updatedAt').openCursor(null, 'prev');
         request.onsuccess = () => {
             const cursor = request.result;
             if (!cursor) {
-                resolve(entries);
+                setResult(entries);
                 return;
             }
             entries.push(cursor.value);
@@ -73,9 +79,9 @@ async function getAllWorkspaces() {
 }
 
 async function loadWorkspace(id) {
-    return withWorkspaceStore('readonly', ({ store, resolve, reject }) => {
+    return withWorkspaceStore('readonly', ({ store, setResult, reject }) => {
         const request = store.get(id);
-        request.onsuccess = () => resolve(request.result || null);
+        request.onsuccess = () => setResult(request.result || null);
         request.onerror = () => reject(request.error);
     });
 }
@@ -106,9 +112,9 @@ async function saveWorkspace(data, workspaceId = null) {
 }
 
 async function getLatestWorkspace() {
-    return withWorkspaceStore('readonly', ({ store, resolve, reject }) => {
+    return withWorkspaceStore('readonly', ({ store, setResult, reject }) => {
         const request = store.index('updatedAt').openCursor(null, 'prev');
-        request.onsuccess = () => resolve(request.result ? request.result.value : null);
+        request.onsuccess = () => setResult(request.result ? request.result.value : null);
         request.onerror = () => reject(request.error);
     });
 }
