@@ -669,6 +669,64 @@ async function getLatestWorkspace() {
                 return `${numerator}/${denominator} ${basisLabel}`;
             };
 
+            const FRACTION_EPSILON = 0.00000001;
+            const clampFraction = (value) => {
+                const numeric = Number(value || 0);
+                if (!Number.isFinite(numeric)) return 0;
+                if (numeric < 0 && numeric > -FRACTION_EPSILON) return 0;
+                return Math.max(0, numeric);
+            };
+
+            const collectDescendantIds = (allNodes, rootId) => {
+                const descendants = new Set();
+                const queue = [rootId];
+                while (queue.length) {
+                    const currentId = queue.shift();
+                    allNodes.forEach(node => {
+                        if (node.parentId !== currentId || descendants.has(node.id)) return;
+                        descendants.add(node.id);
+                        queue.push(node.id);
+                    });
+                }
+                return descendants;
+            };
+
+            const applyAttachConveyanceUpdate = (allNodes) => {
+                const descendants = collectDescendantIds(allNodes, activeNode.id);
+                if (attachParentId === activeNode.id || descendants.has(attachParentId)) return allNodes;
+
+                const sourceRoot = allNodes.find(n => n.id === activeNode.id);
+                if (!sourceRoot) return allNodes;
+
+                const oldRootFraction = Math.max(sourceRoot.fraction || 0, FRACTION_EPSILON);
+                const newRootFraction = clampFraction(calcShare);
+                const scaleFactor = newRootFraction / oldRootFraction;
+
+                return allNodes.map(n => {
+                    if (n.id === attachParentId) {
+                        return { ...n, fraction: clampFraction((n.fraction || 0) - newRootFraction) };
+                    }
+                    if (n.id === activeNode.id) {
+                        return {
+                            ...n,
+                            ...form,
+                            parentId: attachParentId,
+                            type: 'conveyance',
+                            fraction: newRootFraction,
+                            initialFraction: newRootFraction
+                        };
+                    }
+                    if (descendants.has(n.id)) {
+                        return {
+                            ...n,
+                            fraction: clampFraction((n.fraction || 0) * scaleFactor),
+                            initialFraction: clampFraction((n.initialFraction || 0) * scaleFactor)
+                        };
+                    }
+                    return n;
+                });
+            };
+
             const calcShare = useMemo(() => {
                 if (modalMode !== 'convey' && modalMode !== 'attach') return 0;
                 const parentIdToUse = modalMode === 'attach' ? attachParentId : activeNode?.id;
@@ -798,12 +856,12 @@ async function getLatestWorkspace() {
                     updateActiveDeskMapNodes(prev => [...prev, { ...form, id: newId, type: 'conveyance', fraction: 0, initialFraction: 0, parentId: 'unlinked' }]);
                 } else if (modalMode === 'attach') {
                     if (attachType === 'conveyance') {
-                        const updatedNodes = nodes.map(n => {
-                            if (n.id === attachParentId) return { ...n, fraction: Math.max(0, n.fraction - calcShare) };
-                            if (n.id === activeNode.id) return { ...form, parentId: attachParentId, type: 'conveyance', fraction: calcShare, initialFraction: calcShare };
-                            return n;
-                        });
-                        updateActiveDeskMapNodes(updatedNodes);
+                        const descendants = collectDescendantIds(nodes, activeNode.id);
+                        if (attachParentId === activeNode.id || descendants.has(attachParentId)) {
+                            window.alert('Cannot attach a record to itself or one of its descendants.');
+                            return;
+                        }
+                        updateActiveDeskMapNodes(prev => applyAttachConveyanceUpdate(prev));
                     } else {
                         updateActiveDeskMapNodes(prev => prev.map(n => n.id === activeNode.id ? { ...form, parentId: attachParentId, type: 'related', fraction: 0, initialFraction: 0 } : n));
                     }
