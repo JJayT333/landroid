@@ -9,6 +9,19 @@
   const DB_NAME = 'landroid-offline-db';
   const DB_VERSION = 1;
   const WORKSPACES_STORE = 'workspaces';
+  const CURRENT_SCHEMA_VERSION = 1;
+
+
+  function migrateWorkspaceRecord(record) {
+    if (!record) return null;
+    if (typeof record.schemaVersion === 'number' && record.schemaVersion >= CURRENT_SCHEMA_VERSION) {
+      return record;
+    }
+    return {
+      ...record,
+      schemaVersion: CURRENT_SCHEMA_VERSION,
+    };
+  }
 
   function createWorkspaceId() {
     return crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2, 11);
@@ -83,7 +96,7 @@
           setResult(entries);
           return;
         }
-        entries.push(cursor.value);
+        entries.push(migrateWorkspaceRecord(cursor.value));
         cursor.continue();
       };
       request.onerror = () => reject(request.error);
@@ -93,7 +106,7 @@
   async function loadWorkspace(id) {
     return withWorkspaceStore('readonly', ({ store, setResult, reject }) => {
       const request = store.get(id);
-      request.onsuccess = () => setResult(request.result || null);
+      request.onsuccess = () => setResult(migrateWorkspaceRecord(request.result) || null);
       request.onerror = () => reject(request.error);
     });
   }
@@ -115,7 +128,7 @@
   }
 
   async function saveWorkspace(data, workspaceId = null) {
-    const payload = { ...data, id: workspaceId || data.id || createWorkspaceId(), updatedAt: Date.now() };
+    const payload = migrateWorkspaceRecord({ ...data, id: workspaceId || data.id || createWorkspaceId(), updatedAt: Date.now() });
     await withWorkspaceStore('readwrite', ({ store }) => {
       store.put(payload);
     });
@@ -126,7 +139,7 @@
   async function getLatestWorkspace() {
     return withWorkspaceStore('readonly', ({ store, setResult, reject }) => {
       const request = store.index('updatedAt').openCursor(null, 'prev');
-      request.onsuccess = () => setResult(request.result ? request.result.value : null);
+      request.onsuccess = () => setResult(request.result ? migrateWorkspaceRecord(request.result.value) : null);
       request.onerror = () => reject(request.error);
     });
   }
@@ -139,5 +152,6 @@
     deleteAllWorkspaces,
     saveWorkspace,
     getLatestWorkspace,
+    CURRENT_SCHEMA_VERSION,
   };
 });

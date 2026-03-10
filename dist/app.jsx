@@ -389,6 +389,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
                     const latest = (latestId && await loadWorkspace(latestId)) || projects[0] || await getLatestWorkspace();
                     if (latest?.name) setProjectName(latest.name);
                     if (latest?.id) setCurrentWorkspaceId(latest.id);
+                    recordAuditEvent('workspace_bootstrap', { hasLatestWorkspace: Boolean(latest?.id), savedWorkspaceCount: projects.length });
                     setBootChecks({
                         offlineModeActive: 'ServiceWorker' in navigator,
                         cloudSyncUnavailable: !navigator.onLine
@@ -424,6 +425,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
                     setCurrentWorkspaceId(savedWorkspace.id);
                     const projects = await listWorkspaces();
                     setSavedProjects(projects);
+                    recordAuditEvent('workspace_saved', { workspaceId: savedWorkspace.id, workspaceName: data.name });
                     return true;
                 } catch (e) {
                     console.error(e);
@@ -477,6 +479,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 setWorkspaceLoaded(true);
                 setShowHome(false);
                 if (closeModal) setShowCloudModal(false);
+                recordAuditEvent('workspace_loaded', { workspaceId: hydrated.workspaceId, workspaceName: hydrated.projectName });
             };
             
             const handleEnterNewWorkspace = async () => {
@@ -1421,6 +1424,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 const nextEdges = append ? [...flowEdges, ...importedEdges] : importedEdges;
                 setFlowNodes(nextNodes);
                 setFlowEdges(nextEdges);
+                recordAuditEvent('flowchart_imported', { append, deskMapCount: selectedMaps.length, nodeCount: nextNodes.length, edgeCount: nextEdges.length });
 
                 if (nextNodes.length) fitFlowToView(nextNodes);
             };
@@ -1452,6 +1456,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 if (!savedProjects.length) return;
                 if (!window.confirm('Delete ALL saved workspaces? This cannot be undone.')) return;
                 await deleteAllWorkspaces();
+                recordAuditEvent('workspace_deleted_all', { deletedCount: savedProjects.length });
                 setSavedProjects([]);
                 setCurrentWorkspaceId(null);
                 setProjectName('My Workspace');
