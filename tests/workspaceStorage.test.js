@@ -169,6 +169,8 @@ describe('workspace storage unit tests', () => {
 
     const loaded = await api.loadWorkspace(saved.id);
     expect(loaded.name).toBe('A');
+    expect(saved.schemaVersion).toBe(api.CURRENT_SCHEMA_VERSION);
+    expect(loaded.schemaVersion).toBe(api.CURRENT_SCHEMA_VERSION);
   });
 
   test('honors explicit workspace id at boundary length values', async () => {
@@ -189,6 +191,16 @@ describe('workspace storage unit tests', () => {
 
     const latest = await api.getLatestWorkspace();
     expect(latest.id).toBe('newer');
+  });
+
+
+  test('migrates legacy records without schemaVersion when loading', async () => {
+    await api.saveWorkspace({ id: 'legacy', name: 'legacy workspace', schemaVersion: undefined }, 'legacy');
+
+    const loaded = await api.loadWorkspace('legacy');
+
+    expect(loaded.id).toBe('legacy');
+    expect(loaded.schemaVersion).toBe(api.CURRENT_SCHEMA_VERSION);
   });
 
   test('deleteWorkspace removes workspace and clears local storage key when it matches', async () => {
