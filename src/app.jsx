@@ -28,13 +28,6 @@ const workspaceDomainApi = globalThis.LANDroidWorkspaceDomain || {};
 const toWorkspaceSavePayload = workspaceDomainApi.toWorkspaceSavePayload || ((state) => state);
 const fromStoredWorkspace = workspaceDomainApi.fromStoredWorkspace || ((payload) => payload);
 
-const auditLogApi = globalThis.LANDroidAuditLog || {};
-const recordAuditEvent = auditLogApi.recordAuditEvent || (() => null);
-
-const syncEngineApi = globalThis.LANDroidSyncEngine || {};
-const recordSyncOperation = syncEngineApi.recordSyncOperation || (() => null);
-const getSyncSummary = syncEngineApi.getSyncSummary || (() => ({ pendingCount: 0, status: 'synced', lastOperationAt: null }));
-
 const Icon = ({ name, size = 18, className = "" }) => {
             const icons = {
                 Plus: <path d="M12 5v14M5 12h14" />,
@@ -401,7 +394,6 @@ const Icon = ({ name, size = 18, className = "" }) => {
                     if (latest?.name) setProjectName(latest.name);
                     if (latest?.id) setCurrentWorkspaceId(latest.id);
                     recordAuditEvent('workspace_bootstrap', { hasLatestWorkspace: Boolean(latest?.id), savedWorkspaceCount: projects.length });
-                    setSyncSummary(getSyncSummary());
                     setBootChecks({
                         offlineModeActive: 'ServiceWorker' in navigator,
                         cloudSyncUnavailable: !navigator.onLine
@@ -438,8 +430,6 @@ const Icon = ({ name, size = 18, className = "" }) => {
                     const projects = await listWorkspaces();
                     setSavedProjects(projects);
                     recordAuditEvent('workspace_saved', { workspaceId: savedWorkspace.id, workspaceName: data.name });
-                    recordSyncOperation('upsert', 'workspace', savedWorkspace.id, { workspaceName: data.name });
-                    setSyncSummary(getSyncSummary());
                     return true;
                 } catch (e) {
                     console.error(e);
@@ -547,12 +537,10 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 };
 
                 try {
-                    const saved = await saveWorkspace(initialPayload, freshWorkspaceId);
+                    await saveWorkspace(initialPayload, freshWorkspaceId);
                     const projects = await listWorkspaces();
                     setSavedProjects(projects);
                     recordAuditEvent('workspace_created', { workspaceId: saved.id, workspaceName: saved.name || 'My Workspace' });
-                    recordSyncOperation('insert', 'workspace', saved.id, { workspaceName: saved.name || 'My Workspace' });
-                    setSyncSummary(getSyncSummary());
                 } catch (e) {
                     console.error(e);
                     window.alert('Unable to create a new workspace in local storage. Please try again.');
@@ -576,8 +564,6 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 setGridRows(defaultFlowGrid.rows);
                 setShowActionsMenu(false);
                 recordAuditEvent('flowchart_cleared', { previousNodeCount: flowNodes.length, previousEdgeCount: flowEdges.length });
-                recordSyncOperation('update', 'flowchart', currentWorkspaceId, { action: 'clear', previousNodeCount: flowNodes.length, previousEdgeCount: flowEdges.length });
-                setSyncSummary(getSyncSummary());
             };
 
             const handleDocSelection = (e) => {
@@ -1445,8 +1431,6 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 setFlowNodes(nextNodes);
                 setFlowEdges(nextEdges);
                 recordAuditEvent('flowchart_imported', { append, deskMapCount: selectedMaps.length, nodeCount: nextNodes.length, edgeCount: nextEdges.length });
-                recordSyncOperation('update', 'flowchart', currentWorkspaceId, { action: 'import', append, nodeCount: nextNodes.length, edgeCount: nextEdges.length });
-                setSyncSummary(getSyncSummary());
 
                 if (nextNodes.length) fitFlowToView(nextNodes);
             };
@@ -1463,9 +1447,6 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 if (!workspaceId) return;
                 if (!window.confirm('Delete this saved workspace permanently?')) return;
                 await deleteWorkspace(workspaceId);
-                recordAuditEvent('workspace_deleted', { workspaceId });
-                recordSyncOperation('delete', 'workspace', workspaceId);
-                setSyncSummary(getSyncSummary());
                 const projects = await listWorkspaces();
                 setSavedProjects(projects);
                 if (currentWorkspaceId === workspaceId) {
@@ -1482,8 +1463,6 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 if (!window.confirm('Delete ALL saved workspaces? This cannot be undone.')) return;
                 await deleteAllWorkspaces();
                 recordAuditEvent('workspace_deleted_all', { deletedCount: savedProjects.length });
-                recordSyncOperation('delete_all', 'workspace', null, { deletedCount: savedProjects.length });
-                setSyncSummary(getSyncSummary());
                 setSavedProjects([]);
                 setCurrentWorkspaceId(null);
                 setProjectName('My Workspace');
