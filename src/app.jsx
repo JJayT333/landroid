@@ -7,15 +7,22 @@ if (!workspaceStorageApi) {
     throw new Error('LANDroidWorkspaceStorage API is unavailable. Ensure dist/workspaceStorage.js is loaded before app.jsx.');
 }
 
+const storageProviderApi = globalThis.LANDroidStorageProvider || {};
+const createLocalStorageProvider = storageProviderApi.createLocalStorageProvider;
+if (!createLocalStorageProvider) {
+    throw new Error('LANDroidStorageProvider API is unavailable. Ensure dist/storageProvider.js is loaded before app.jsx.');
+}
+
+const workspaceProvider = createLocalStorageProvider(workspaceStorageApi);
 const {
-    LOCAL_META_KEY,
-    getAllWorkspaces,
+    getLastWorkspaceId,
+    listWorkspaces,
     loadWorkspace,
+    saveWorkspace,
     deleteWorkspace,
     deleteAllWorkspaces,
-    saveWorkspace,
-    getLatestWorkspace
-} = workspaceStorageApi;
+    getLatestWorkspace,
+} = workspaceProvider;
 
 const workspaceDomainApi = globalThis.LANDroidWorkspaceDomain || {};
 const toWorkspaceSavePayload = workspaceDomainApi.toWorkspaceSavePayload || ((state) => state);
@@ -376,9 +383,9 @@ const Icon = ({ name, size = 18, className = "" }) => {
 
             useEffect(() => {
                 const initLocal = async () => {
-                    const projects = await getAllWorkspaces();
+                    const projects = await listWorkspaces();
                     setSavedProjects(projects);
-                    const latestId = localStorage.getItem(LOCAL_META_KEY);
+                    const latestId = getLastWorkspaceId();
                     const latest = (latestId && await loadWorkspace(latestId)) || projects[0] || await getLatestWorkspace();
                     if (latest?.name) setProjectName(latest.name);
                     if (latest?.id) setCurrentWorkspaceId(latest.id);
@@ -415,7 +422,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
                     });
                     const savedWorkspace = await saveWorkspace(data, currentWorkspaceId);
                     setCurrentWorkspaceId(savedWorkspace.id);
-                    const projects = await getAllWorkspaces();
+                    const projects = await listWorkspaces();
                     setSavedProjects(projects);
                     return true;
                 } catch (e) {
@@ -524,7 +531,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 
                 try {
                     await saveWorkspace(initialPayload, freshWorkspaceId);
-                    const projects = await getAllWorkspaces();
+                    const projects = await listWorkspaces();
                     setSavedProjects(projects);
                 } catch (e) {
                     console.error(e);
@@ -1430,7 +1437,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 if (!workspaceId) return;
                 if (!window.confirm('Delete this saved workspace permanently?')) return;
                 await deleteWorkspace(workspaceId);
-                const projects = await getAllWorkspaces();
+                const projects = await listWorkspaces();
                 setSavedProjects(projects);
                 if (currentWorkspaceId === workspaceId) {
                     setCurrentWorkspaceId(null);
@@ -1456,7 +1463,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
             const handleReturnHome = async () => {
                 try {
                     await handleSaveWorkspace();
-                    const projects = await getAllWorkspaces();
+                    const projects = await listWorkspaces();
                     setSavedProjects(projects);
                 } catch (e) {
                     console.error(e);
