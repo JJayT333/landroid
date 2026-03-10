@@ -5,7 +5,8 @@
   "type": "commonjs",
   "scripts": {
     "test": "jest --runInBand",
-    "test:smoke": "node scripts/smoke-checks.js"
+    "test:smoke": "node scripts/smoke-checks.js",
+    "test:storage": "node scripts/workspace-storage-checks.js"
   },
   "devDependencies": {
     "jest": "^29.7.0"
