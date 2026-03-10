@@ -166,6 +166,8 @@ async function getLatestWorkspace() {
                 isDeceased: false, obituary: '', graveyardLink: ''
             };
             const defaultViewport = { x: 0, y: 0, scale: 1 };
+            const defaultFlowViewport = { x: 0, y: 0, scale: 1 };
+            const defaultFlowGrid = { cols: 1, rows: 1 };
             const createDeskMap = ({ name = 'Unit Tract 1', code = 'TRACT-1', tractId = null } = {}) => ({
                 id: makeId(),
                 name,
@@ -200,10 +202,10 @@ async function getLatestWorkspace() {
             const [flowNodes, setFlowNodes] = useState([]);
             const [flowEdges, setFlowEdges] = useState([]);
             const [flowTool, setFlowTool] = useState('select'); 
-            const [flowPz, setFlowPz] = useState({ x: 0, y: 0, scale: 1 }); 
+            const [flowPz, setFlowPz] = useState({ ...defaultFlowViewport });
             const [treeScale, setTreeScale] = useState(1); 
-            const [gridCols, setGridCols] = useState(1);
-            const [gridRows, setGridRows] = useState(1);
+            const [gridCols, setGridCols] = useState(defaultFlowGrid.cols);
+            const [gridRows, setGridRows] = useState(defaultFlowGrid.rows);
             const [connectingStart, setConnectingStart] = useState(null);
             const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
             const [selectedFlowNode, setSelectedFlowNode] = useState(null);
@@ -499,7 +501,7 @@ async function getLatestWorkspace() {
                     });
                     const data = {
                         name: projectName.trim(), nodes: serializeNodesForSave(nodes), instrumentList,
-                        flowNodes, flowEdges, treeScale, printOrientation, gridCols, gridRows,
+                        flowNodes, flowEdges, flowPz, treeScale, printOrientation, gridCols, gridRows,
                         tracts, contacts, ownershipInterests, contactLogs,
                         deskMaps: deskMaps.map(map => ({ ...map, nodes: serializeNodesForSave(map.nodes || []) })),
                         activeDeskMapId,
@@ -525,7 +527,7 @@ async function getLatestWorkspace() {
                 }, 400);
                 return () => clearTimeout(timer);
             }, [
-                nodes, instrumentList, flowNodes, flowEdges, treeScale, printOrientation,
+                nodes, instrumentList, flowNodes, flowEdges, flowPz, treeScale, printOrientation,
                 gridCols, gridRows, tracts, contacts, ownershipInterests, contactLogs,
                 deskMaps, activeDeskMapId, projectName, workspaceLoaded, currentWorkspaceId, showHome
             ]);
@@ -536,6 +538,8 @@ async function getLatestWorkspace() {
                 if (p.instrumentList) setInstrumentList(p.instrumentList);
                 if (p.flowNodes) setFlowNodes(normalizeFlowNodeGroups(p.flowNodes));
                 if (p.flowEdges) setFlowEdges(p.flowEdges);
+                if (p.flowPz) setFlowPz(p.flowPz);
+                else setFlowPz({ ...defaultFlowViewport });
                 if (p.treeScale) setTreeScale(p.treeScale);
                 if (p.printOrientation) setPrintOrientation(p.printOrientation);
                 if (p.gridCols) setGridCols(p.gridCols);
@@ -577,10 +581,11 @@ async function getLatestWorkspace() {
                 setPz({ ...defaultViewport });
                 setFlowNodes([]);
                 setFlowEdges([]);
+                setFlowPz({ ...defaultFlowViewport });
                 setTreeScale(1);
                 setPrintOrientation('landscape');
-                setGridCols(1);
-                setGridRows(1);
+                setGridCols(defaultFlowGrid.cols);
+                setGridRows(defaultFlowGrid.rows);
                 setTracts([]);
                 setContacts([]);
                 setOwnershipInterests([]);
@@ -593,6 +598,7 @@ async function getLatestWorkspace() {
                     instrumentList,
                     flowNodes: [],
                     flowEdges: [],
+                    flowPz: { ...defaultFlowViewport },
                     treeScale: 1,
                     printOrientation: 'landscape',
                     gridCols: 1,
@@ -620,6 +626,19 @@ async function getLatestWorkspace() {
                 setProjectName('My Workspace');
                 setWorkspaceLoaded(true);
                 setShowHome(false);
+            };
+
+            const handleClearFlowchart = () => {
+                if (!window.confirm('Clear all flowchart nodes, edges, and layout settings? This cannot be undone.')) return;
+                setFlowNodes([]);
+                setFlowEdges([]);
+                setSelectedFlowNode(null);
+                setConnectingStart(null);
+                setFlowPz({ ...defaultFlowViewport });
+                setTreeScale(1);
+                setGridCols(defaultFlowGrid.cols);
+                setGridRows(defaultFlowGrid.rows);
+                setShowActionsMenu(false);
             };
 
             const handleDocSelection = (e) => {
@@ -1665,7 +1684,8 @@ async function getLatestWorkspace() {
                 flowchart: [
                     { key: 'import-flowchart', label: 'Import Tree → Flowchart', icon: 'Upload', onClick: () => importToFlowchart(false), title: 'Replace flowchart with transformed tree' },
                     { key: 'append-flowchart', label: 'Append Tree → Flowchart', icon: 'Plus', onClick: () => importToFlowchart(true), title: 'Append transformed tree to flowchart' },
-                    { key: 'print-flowchart', label: 'Print Flowchart', icon: 'Printer', onClick: handlePrintFlowchart, title: 'Print flowchart layout' }
+                    { key: 'print-flowchart', label: 'Print Flowchart', icon: 'Printer', onClick: handlePrintFlowchart, title: 'Print flowchart layout' },
+                    { key: 'clear-flowchart', label: 'Clear Flowchart', icon: 'Trash', onClick: handleClearFlowchart, title: 'Remove all flowchart nodes/edges and reset layout defaults', destructive: true }
                 ],
                 research: [
                     { key: 'save-data', label: 'Save Data', icon: 'Download', onClick: exportCSV, title: 'Save Internal Data' },
@@ -1797,7 +1817,7 @@ async function getLatestWorkspace() {
                                                         action.onClick();
                                                         setShowActionsMenu(false);
                                                     }}
-                                                    className="w-full px-3 py-2 text-left text-xs font-bold text-ink/80 hover:text-ink hover:bg-teastain/50 rounded transition-all flex items-center gap-2"
+                                                    className={`w-full px-3 py-2 text-left text-xs font-bold rounded transition-all flex items-center gap-2 ${action.destructive ? 'text-stamp hover:text-stamp hover:bg-stamp/10' : 'text-ink/80 hover:text-ink hover:bg-teastain/50'}`}
                                                     title={action.title}
                                                     role="menuitem"
                                                 >
