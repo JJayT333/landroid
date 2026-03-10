@@ -546,10 +546,10 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 };
 
                 try {
-                    await saveWorkspace(initialPayload, freshWorkspaceId);
+                    const savedWorkspace = await saveWorkspace(initialPayload, freshWorkspaceId);
                     const projects = await listWorkspaces();
                     setSavedProjects(projects);
-                    recordAuditEvent('workspace_created', { workspaceId: saved.id, workspaceName: saved.name || 'My Workspace' });
+                    recordAuditEvent('workspace_created', { workspaceId: savedWorkspace.id, workspaceName: savedWorkspace.name || 'My Workspace' });
                 } catch (e) {
                     console.error(e);
                     window.alert('Unable to create a new workspace in local storage. Please try again.');
