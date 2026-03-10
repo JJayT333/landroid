@@ -5,29 +5,11 @@
     root.LANDroidWorkspaceDomain = factory();
   }
 })(typeof self !== 'undefined' ? self : globalThis, function () {
-  function getDropboxIntegrationApi() {
-    const api = (typeof globalThis !== 'undefined' && globalThis.LANDroidDropboxIntegration) || {};
-    return {
-      isDropboxFeatureEnabled: api.isDropboxFeatureEnabled || (() => false),
-      normalizeAttachmentMetadata: api.normalizeAttachmentMetadata || (() => null),
-    };
-  }
-
   function serializeNodesForSave(sourceNodes) {
-    const { isDropboxFeatureEnabled, normalizeAttachmentMetadata } = getDropboxIntegrationApi();
-
     return (sourceNodes || []).map((node) => {
       const copy = { ...node };
       if (copy.docData) copy.hasDoc = true;
       delete copy.docData;
-
-      if (isDropboxFeatureEnabled()) {
-        const attachmentMetadata = normalizeAttachmentMetadata(copy.attachmentMetadata || copy.attachment);
-        if (attachmentMetadata) {
-          copy.attachmentMetadata = attachmentMetadata;
-        }
-      }
-
       return copy;
     });
   }
@@ -57,7 +39,7 @@
       name: (projectName || '').trim(),
       nodes: serializeNodesForSave(nodes),
       instrumentList,
-      flowNodes: flowNodes || [],
+      flowNodes,
       flowEdges,
       flowPz,
       treeScale,
@@ -84,8 +66,6 @@
       normalizeFlowNodeGroups,
     } = deps;
 
-    const { isDropboxFeatureEnabled, normalizeAttachmentMetadata } = getDropboxIntegrationApi();
-
     const workspace = payload || {};
     const flowNodes = workspace.flowNodes ? normalizeFlowNodeGroups(workspace.flowNodes) : undefined;
     const flowPz = workspace.flowPz || { ...defaultFlowViewport };
@@ -101,14 +81,7 @@
       pz: { ...defaultViewport },
     };
 
-    const applyAttachmentNormalization = (nodes) => (nodes || []).map((node) => {
-      if (!isDropboxFeatureEnabled()) return node;
-      const attachmentMetadata = normalizeAttachmentMetadata(node.attachmentMetadata || node.attachment);
-      return attachmentMetadata ? { ...node, attachmentMetadata } : node;
-    });
-
-    const deskMaps = (workspace.deskMaps && workspace.deskMaps.length ? workspace.deskMaps : [fallbackDeskMap])
-      .map((map) => ({ ...map, nodes: applyAttachmentNormalization(map.nodes || []) }));
+    const deskMaps = workspace.deskMaps && workspace.deskMaps.length ? workspace.deskMaps : [fallbackDeskMap];
     const activeDeskMapId =
       workspace.activeDeskMapId && deskMaps.some((map) => map.id === workspace.activeDeskMapId)
         ? workspace.activeDeskMapId
@@ -116,17 +89,15 @@
     const activeDeskMap = deskMaps.find((map) => map.id === activeDeskMapId) || deskMaps[0];
 
     return {
-      nodes: (activeDeskMap.nodes && activeDeskMap.nodes.length)
-        ? activeDeskMap.nodes
-        : applyAttachmentNormalization(workspace.nodes || [{ ...defaultRoot }]),
-      instrumentList: workspace.instrumentList || [],
-      flowNodes: flowNodes || [],
-      flowEdges: workspace.flowEdges || [],
+      nodes: activeDeskMap.nodes || workspace.nodes || [{ ...defaultRoot }],
+      instrumentList: workspace.instrumentList,
+      flowNodes,
+      flowEdges: workspace.flowEdges,
       flowPz,
-      treeScale: workspace.treeScale || 1,
-      printOrientation: workspace.printOrientation || 'landscape',
-      gridCols: workspace.gridCols || 1,
-      gridRows: workspace.gridRows || 1,
+      treeScale: workspace.treeScale,
+      printOrientation: workspace.printOrientation,
+      gridCols: workspace.gridCols,
+      gridRows: workspace.gridRows,
       tracts,
       contacts,
       ownershipInterests: workspace.ownershipInterests || [],

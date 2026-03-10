@@ -2,14 +2,14 @@
 
 ## Primary test path
 - `npm test`
-- Runs Node-based smoke + storage checks (`test:smoke` and `test:storage`).
+- Runs Jest test suite (`jest --runInBand`).
 
 ## Environment fallback path
-`npm run test:smoke` validates general module and integration seams.
+Some environments do not permit installing dependencies from npm registry. When Jest cannot run, use:
 
-`npm run test:storage` validates workspace-storage behavior using an IndexedDB/localStorage mock.
+- `npm run test:smoke`
 
-Smoke check validates:
+This smoke check validates:
 - critical module exports
 - audit log basic persistence behavior
 - sync op-log pending/synced summary behavior
@@ -18,5 +18,5 @@ Smoke check validates:
 
 ## Recommended CI behavior
 1. Run `npm test`.
-2. Keep both `test:smoke` and `test:storage` green during iterative refactors.
-3. Optionally run browser smoke checks for UI regressions.
+2. If dependency install is blocked by environment policy, run `npm run test:smoke` and mark build with warning.
+3. Keep both checks green during iterative refactors.
