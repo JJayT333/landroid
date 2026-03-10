@@ -211,11 +211,13 @@ async function getLatestWorkspace() {
             const [flowForm, setFlowForm] = useState(null);
             const [printOrientation, setPrintOrientation] = useState('landscape');
             const [showFlowLayoutMenu, setShowFlowLayoutMenu] = useState(false);
+            const [showActionsMenu, setShowActionsMenu] = useState(false);
             
             const flowDraggingNode = useRef(null);
             const flowDragStart = useRef({ x: 0, y: 0 });
             const flowCanvasRef = useRef(null);
             const flowLayoutMenuRef = useRef(null);
+            const actionsMenuRef = useRef(null);
             
             const moveTreeStartPos = useRef(null);
             const initialTreeNodes = useRef(null);
@@ -407,14 +409,19 @@ async function getLatestWorkspace() {
             }, [tracts]);
 
             useEffect(() => {
-                if (!showFlowLayoutMenu) return;
+                if (!showFlowLayoutMenu && !showActionsMenu) return;
                 const handleMenuDismiss = (event) => {
-                    if (flowLayoutMenuRef.current && !flowLayoutMenuRef.current.contains(event.target)) {
+                    if (showFlowLayoutMenu && flowLayoutMenuRef.current && !flowLayoutMenuRef.current.contains(event.target)) {
                         setShowFlowLayoutMenu(false);
+                    }
+                    if (showActionsMenu && actionsMenuRef.current && !actionsMenuRef.current.contains(event.target)) {
+                        setShowActionsMenu(false);
                     }
                 };
                 const handleEsc = (event) => {
-                    if (event.key === 'Escape') setShowFlowLayoutMenu(false);
+                    if (event.key !== 'Escape') return;
+                    if (showFlowLayoutMenu) setShowFlowLayoutMenu(false);
+                    if (showActionsMenu) setShowActionsMenu(false);
                 };
                 document.addEventListener('mousedown', handleMenuDismiss);
                 document.addEventListener('keydown', handleEsc);
@@ -422,12 +429,13 @@ async function getLatestWorkspace() {
                     document.removeEventListener('mousedown', handleMenuDismiss);
                     document.removeEventListener('keydown', handleEsc);
                 };
-            }, [showFlowLayoutMenu]);
+            }, [showFlowLayoutMenu, showActionsMenu]);
 
             useEffect(() => {
                 if (view !== 'flowchart' && showFlowLayoutMenu) {
                     setShowFlowLayoutMenu(false);
                 }
+                setShowActionsMenu(false);
             }, [view, showFlowLayoutMenu]);
 
             // Print interceptor hook
@@ -1582,6 +1590,35 @@ async function getLatestWorkspace() {
                 </>
             );
 
+            const viewActions = {
+                chart: [
+                    { key: 'new-tree', label: 'New Tree', icon: 'Plus', onClick: openNewChain, title: 'Start a completely separate independent lineage tree' },
+                    { key: 'add-loose-record', label: 'Add Loose Record', icon: 'Plus', onClick: openAddUnlinked, title: 'Add a document to the Parking Lot' },
+                    { key: 'import-csv', label: 'Import CSV', icon: 'Upload', onClick: () => fileInput.current?.click(), title: 'Upload Data' },
+                    { key: 'save-data', label: 'Save Data', icon: 'Download', onClick: exportCSV, title: 'Save Internal Data' }
+                ],
+                master: [
+                    { key: 'export-runsheet', label: 'Export Runsheet', icon: 'FileText', onClick: exportToRunsheet, title: 'Generate Chronological Runsheet' },
+                    { key: 'toggle-conveyance-filter', label: showOnlyConveyances ? 'Show All Records' : 'Show Conveyances Only', icon: 'List', onClick: () => setShowOnlyConveyances(prev => !prev), title: 'Toggle runsheet filter' },
+                    { key: 'save-data', label: 'Save Data', icon: 'Download', onClick: exportCSV, title: 'Save Internal Data' },
+                    { key: 'import-csv', label: 'Import CSV', icon: 'Upload', onClick: () => fileInput.current?.click(), title: 'Upload Data' }
+                ],
+                flowchart: [
+                    { key: 'import-flowchart', label: 'Import Tree → Flowchart', icon: 'Upload', onClick: () => importToFlowchart(false), title: 'Replace flowchart with transformed tree' },
+                    { key: 'append-flowchart', label: 'Append Tree → Flowchart', icon: 'Plus', onClick: () => importToFlowchart(true), title: 'Append transformed tree to flowchart' },
+                    { key: 'print-flowchart', label: 'Print Flowchart', icon: 'Printer', onClick: handlePrintFlowchart, title: 'Print flowchart layout' }
+                ],
+                research: [
+                    { key: 'save-data', label: 'Save Data', icon: 'Download', onClick: exportCSV, title: 'Save Internal Data' },
+                    { key: 'import-csv', label: 'Import CSV', icon: 'Upload', onClick: () => fileInput.current?.click(), title: 'Upload Data' }
+                ]
+            };
+            const currentActions = viewActions[view] || [];
+            const quickActions = [
+                { key: 'save-workspace', label: 'Save', icon: 'Download', onClick: handleSaveWorkspace, title: 'Save workspace locally' },
+                { key: 'save-home', label: 'Home', icon: 'ArrowUp', onClick: handleReturnHome, title: 'Save and return to startup page' }
+            ];
+
             return (
                 <>
                 {/* Dynamically assign the physical print page size based on orientation toggle */}
@@ -1670,47 +1707,51 @@ async function getLatestWorkspace() {
                             </div>
 
                             {/* Data Actions Group */}
-                            <div className="inline-flex items-center bg-parchment/70 rounded-xl border border-ink/20 p-1.5 shadow-sm">
-                                <button onClick={openNewChain} className="px-3 py-1.5 text-xs font-bold text-fountain/90 hover:text-fountain hover:bg-fountain/10 rounded transition-all flex items-center gap-2" title="Start a completely separate independent lineage tree">
-                                    <Icon name="Plus" size={14} /> <span className="hidden sm:block">New Tree</span>
-                                </button>
+                            <div className="inline-flex flex-wrap items-center justify-end gap-1.5 sm:gap-2 bg-parchment/70 rounded-xl border border-ink/20 p-1.5 shadow-sm">
+                                {quickActions.map((action) => (
+                                    <button key={action.key} onClick={action.onClick} className="px-3 py-1.5 text-xs font-bold text-ink/85 hover:text-ink hover:bg-parchment rounded transition-all flex items-center gap-2" title={action.title}>
+                                        <Icon name={action.icon} size={14} /> <span>{action.label}</span>
+                                    </button>
+                                ))}
 
-                                <div className="w-px h-4 bg-ink/20 mx-1"></div>
-
-                                <button onClick={openAddUnlinked} className="px-3 py-1.5 text-xs font-bold text-fountain/90 hover:text-fountain hover:bg-fountain/10 rounded transition-all flex items-center gap-2" title="Add a document to the Parking Lot">
-                                    <Icon name="Plus" size={14} /> <span className="hidden sm:block">Add Loose Record</span>
-                                </button>
-                                
-                                <div className="w-px h-4 bg-ink/20 mx-1"></div>
-
-                                <button onClick={() => fileInput.current.click()} className="px-3 py-1.5 text-xs font-bold text-ink/70 hover:text-ink hover:bg-parchment rounded transition-all flex items-center gap-2" title="Upload Data">
-                                    <Icon name="Upload" size={14} /> <span className="hidden sm:block">Import CSV</span>
-                                </button>
-                                <input type="file" ref={fileInput} onChange={importCSV} className="hidden" accept=".csv" />
-                                
-                                <div className="w-px h-4 bg-ink/20 mx-1"></div>
-                                
-                                <button onClick={exportCSV} className="px-3 py-1.5 text-xs font-bold text-ink/80 hover:text-ink hover:bg-parchment rounded transition-all flex items-center gap-2" title="Save Internal Data">
-                                    <Icon name="Download" size={14} /> <span className="hidden sm:block">Save Data</span>
-                                </button>
-
-                                <div className="w-px h-4 bg-ink/20 mx-1"></div>
-
-                                <button onClick={exportToRunsheet} className="px-3 py-1.5 text-xs font-bold text-sepia/90 hover:text-sepia hover:bg-sepia/10 rounded transition-all flex items-center gap-2" title="Generate Chronological Runsheet">
-                                    <Icon name="FileText" size={14} /> <span className="hidden sm:block">Export Runsheet</span>
-                                </button>
-
-                                <div className="w-px h-4 bg-ink/20 mx-1"></div>
-
-                                <button onClick={handleSaveWorkspace} className="px-3 py-1.5 text-xs font-bold text-ink/90 hover:text-ink hover:bg-parchment rounded transition-all flex items-center gap-2" title="Save workspace locally">
-                                    <Icon name="Download" size={14} /> <span className="hidden sm:block">Save Workspace</span>
-                                </button>
-                                <span className="px-2 py-1 text-[10px] uppercase tracking-widest rounded border border-ink/20 bg-parchment/60 text-ink/70">
+                                <span className="px-2 py-1 text-[10px] uppercase tracking-widest rounded border border-ink/20 bg-parchment/60 text-ink/60">
                                     {isSaving ? 'Saving…' : 'AutoSave On'}
                                 </span>
-                                <button onClick={handleReturnHome} className="px-3 py-1.5 text-xs font-bold text-ink/90 hover:text-ink hover:bg-parchment rounded transition-all flex items-center gap-2" title="Save and return to startup page">
-                                    <Icon name="ArrowUp" size={14} /> <span>Save + Home</span>
-                                </button>
+
+                                <div className="relative" ref={actionsMenuRef}>
+                                    <button
+                                        onClick={() => setShowActionsMenu(prev => !prev)}
+                                        className="px-3 py-1.5 text-xs font-bold text-fountain/90 hover:text-fountain hover:bg-fountain/10 rounded transition-all flex items-center gap-2"
+                                        aria-haspopup="menu"
+                                        aria-expanded={showActionsMenu}
+                                        title="Open view-specific actions"
+                                    >
+                                        <Icon name="List" size={14} /> <span>Actions ▾</span>
+                                    </button>
+
+                                    {showActionsMenu && (
+                                        <div className="absolute right-0 mt-1 min-w-[220px] z-50 rounded-lg border border-ink/20 bg-parchment shadow-lg p-1">
+                                            {currentActions.length > 0 ? currentActions.map((action) => (
+                                                <button
+                                                    key={action.key}
+                                                    onClick={() => {
+                                                        action.onClick();
+                                                        setShowActionsMenu(false);
+                                                    }}
+                                                    className="w-full px-3 py-2 text-left text-xs font-bold text-ink/80 hover:text-ink hover:bg-teastain/50 rounded transition-all flex items-center gap-2"
+                                                    title={action.title}
+                                                    role="menuitem"
+                                                >
+                                                    <Icon name={action.icon} size={13} />
+                                                    <span>{action.label}</span>
+                                                </button>
+                                            )) : (
+                                                <div className="px-3 py-2 text-xs text-ink/60">No actions available for this view.</div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                                <input type="file" ref={fileInput} onChange={importCSV} className="hidden" accept=".csv" />
                             </div>
                         </div>
                     </header>
