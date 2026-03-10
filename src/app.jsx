@@ -522,7 +522,7 @@ async function getLatestWorkspace() {
 
                 setNodes(p.nodes);
                 if (p.instrumentList) setInstrumentList(p.instrumentList);
-                if (p.flowNodes) setFlowNodes(p.flowNodes);
+                if (p.flowNodes) setFlowNodes(normalizeFlowNodeGroups(p.flowNodes));
                 if (p.flowEdges) setFlowEdges(p.flowEdges);
                 if (p.treeScale) setTreeScale(p.treeScale);
                 if (p.printOrientation) setPrintOrientation(p.printOrientation);
@@ -1161,6 +1161,26 @@ async function getLatestWorkspace() {
                                      FLOW CHART ENGINE (TOP-DOWN LAYOUT)
             ========================================================================================= */
 
+            const createTreeGroupId = () => `tg_${makeId()}`;
+            const resolveTreeGroupId = (node) => node?.treeGroupId || (node?.id ? `tg_${node.id}` : createTreeGroupId());
+            const normalizeFlowNodeGroups = (inputNodes = []) => inputNodes.map(node => ({ ...node, treeGroupId: resolveTreeGroupId(node) }));
+            const mergeFlowNodeGroups = (inputNodes, firstNodeId, secondNodeId) => {
+                const firstNode = inputNodes.find(n => n.id === firstNodeId);
+                const secondNode = inputNodes.find(n => n.id === secondNodeId);
+                if (!firstNode || !secondNode) return inputNodes;
+
+                const firstGroup = resolveTreeGroupId(firstNode);
+                const secondGroup = resolveTreeGroupId(secondNode);
+                if (firstGroup === secondGroup) return inputNodes;
+
+                const unifiedGroup = [firstGroup, secondGroup].sort()[0];
+                return inputNodes.map(node => {
+                    const nodeGroup = resolveTreeGroupId(node);
+                    if (nodeGroup !== firstGroup && nodeGroup !== secondGroup) return { ...node, treeGroupId: nodeGroup };
+                    return { ...node, treeGroupId: unifiedGroup };
+                });
+            };
+
             const buildFlowLayoutFromNodes = (sourceNodes, idPrefix = '', xShift = 0, treeGroupId = '') => {
                 const safePrefix = idPrefix ? `${idPrefix}-` : '';
                 const normalNodes = sourceNodes.filter(n => n.type !== 'related');
@@ -1319,6 +1339,9 @@ async function getLatestWorkspace() {
                     x: (-rect.left + window.innerWidth / 2) / (flowPz.scale * treeScale) - 140,
                     y: (-rect.top + window.innerHeight / 2) / (flowPz.scale * treeScale) - 100,
                     type,
+                    treeGroupId: selectedFlowNode
+                        ? resolveTreeGroupId(flowNodes.find(n => n.id === selectedFlowNode))
+                        : createTreeGroupId(),
                     color: 'bg-parchment text-ink border-ink',
                     data: type === 'template' ? {
                         title: 'Instrument', grantee: 'Grantee Name', grantor: 'Grantor Name', fraction: '1.00000000', details: 'Date • Vol/Page'
@@ -1356,7 +1379,7 @@ async function getLatestWorkspace() {
                     const initialNodes = initialTreeNodes.current; // Capture ref to prevent null error in async state updater
                     const targetGroup = moveTreeGroupId.current;
                     setFlowNodes(prev => prev.map(n => {
-                        if (targetGroup && (n.treeGroupId || n.id) !== targetGroup) return n;
+                        if (targetGroup && resolveTreeGroupId(n) !== targetGroup) return n;
                         const orig = initialNodes.find(o => o.id === n.id);
                         return orig ? { ...n, x: orig.x + dx, y: orig.y + dy } : n;
                     }));
@@ -1395,7 +1418,7 @@ async function getLatestWorkspace() {
                     isDragging.current = true;
                     moveTreeStartPos.current = { x: e.clientX, y: e.clientY };
                     initialTreeNodes.current = flowNodes.map(n => ({ id: n.id, x: n.x, y: n.y }));
-                    moveTreeGroupId.current = node.treeGroupId || node.id;
+                    moveTreeGroupId.current = resolveTreeGroupId(node);
                     e.currentTarget.setPointerCapture(e.pointerId);
                     setSelectedFlowNode(null);
                 }
@@ -1419,7 +1442,7 @@ async function getLatestWorkspace() {
                     const targetGroup = moveTreeGroupId.current;
                     
                     setFlowNodes(prev => prev.map(n => {
-                        if (targetGroup && (n.treeGroupId || n.id) !== targetGroup) return n;
+                        if (targetGroup && resolveTreeGroupId(n) !== targetGroup) return n;
                         const orig = initialNodes.find(o => o.id === n.id);
                         return orig ? { ...n, x: orig.x + dx, y: orig.y + dy } : n;
                     }));
@@ -1434,7 +1457,10 @@ async function getLatestWorkspace() {
                 }
                 if (flowTool === 'connect' && connectingStart && connectingStart !== targetNode.id) {
                     const edgeExists = flowEdges.find(ed => ed.source === connectingStart && ed.target === targetNode.id);
-                    if (!edgeExists) setFlowEdges([...flowEdges, { id: `e-${connectingStart}-${targetNode.id}`, source: connectingStart, target: targetNode.id }]);
+                    if (!edgeExists) {
+                        setFlowEdges([...flowEdges, { id: `e-${connectingStart}-${targetNode.id}`, source: connectingStart, target: targetNode.id }]);
+                        setFlowNodes(prev => mergeFlowNodeGroups(prev, connectingStart, targetNode.id));
+                    }
                     setConnectingStart(null);
                 }
                 if (flowTool === 'move-tree') {
@@ -2040,6 +2066,16 @@ async function getLatestWorkspace() {
                                             const node = flowNodes.find(n => n.id === selectedFlowNode);
                                             setFlowForm(node.data); setShowFlowEditModal(true);
                                         }} className="w-full py-2 border border-ink mb-2 text-xs font-bold uppercase hover:bg-ink hover:text-parchment transition-colors">Edit Content</button>
+                                        <div className="mb-2 border border-ink/20 bg-teastain/20 px-2 py-1.5 text-[10px]">
+                                            <div className="font-bold uppercase tracking-widest text-ink/70 mb-1">Tree Group</div>
+                                            <label className="flex items-center justify-between gap-2 text-[10px] text-ink">
+                                                <span>Move as tree group</span>
+                                                <input type="checkbox" checked readOnly aria-label="Move as tree group" />
+                                            </label>
+                                            <div className="mt-1 font-mono text-[9px] break-all text-ink/70">
+                                                {resolveTreeGroupId(flowNodes.find(n => n.id === selectedFlowNode))}
+                                            </div>
+                                        </div>
                                         <button onClick={deleteSelectedFlowElement} className="w-full py-2 border border-transparent text-stamp hover:border-stamp/50 text-xs font-bold uppercase transition-colors flex items-center justify-center gap-2"><Icon name="Trash" size={14}/> Delete Node</button>
                                     </div>
                                 )}
