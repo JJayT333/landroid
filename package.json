@@ -4,10 +4,8 @@
   "version": "1.0.0",
   "type": "commonjs",
   "scripts": {
-    "test": "jest --runInBand",
-    "test:smoke": "node scripts/smoke-checks.js"
-  },
-  "devDependencies": {
-    "jest": "^29.7.0"
+    "test": "npm run test:smoke && npm run test:storage",
+    "test:smoke": "node scripts/smoke-checks.js",
+    "test:storage": "node scripts/workspace-storage-checks.js"
   }
 }

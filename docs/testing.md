@@ -2,21 +2,27 @@
 
 ## Primary test path
 - `npm test`
-- Runs Jest test suite (`jest --runInBand`).
+- Runs local Node-based validation chain:
+  1. `npm run test:smoke`
+  2. `npm run test:storage`
 
-## Environment fallback path
-Some environments do not permit installing dependencies from npm registry. When Jest cannot run, use:
+## Why this path
+- LANDroid currently uses local Node scripts for regression checks in constrained environments.
+- This keeps test execution reliable without external dependency installs.
 
+## Individual checks
 - `npm run test:smoke`
+  - critical module export checks
+  - audit log basic persistence behavior
+  - sync op-log pending/synced summary behavior
+  - dropbox metadata normalization seam
+  - workspace domain save payload hygiene (name trim + docData stripping)
 
-This smoke check validates:
-- critical module exports
-- audit log basic persistence behavior
-- sync op-log pending/synced summary behavior
-- dropbox metadata normalization seam
-- workspace domain save payload hygiene (name trim + docData stripping)
+- `npm run test:storage`
+  - workspace IndexedDB/localStorage persistence flow
+  - save/load/sort/delete/deleteAll workflows
 
 ## Recommended CI behavior
 1. Run `npm test`.
-2. If dependency install is blocked by environment policy, run `npm run test:smoke` and mark build with warning.
+2. Treat any failure as blocking for local-first runtime changes.
 3. Keep both checks green during iterative refactors.
