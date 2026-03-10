@@ -210,10 +210,12 @@ async function getLatestWorkspace() {
             const [showFlowEditModal, setShowFlowEditModal] = useState(false);
             const [flowForm, setFlowForm] = useState(null);
             const [printOrientation, setPrintOrientation] = useState('landscape');
+            const [showFlowLayoutMenu, setShowFlowLayoutMenu] = useState(false);
             
             const flowDraggingNode = useRef(null);
             const flowDragStart = useRef({ x: 0, y: 0 });
             const flowCanvasRef = useRef(null);
+            const flowLayoutMenuRef = useRef(null);
             
             const moveTreeStartPos = useRef(null);
             const initialTreeNodes = useRef(null);
@@ -403,6 +405,30 @@ async function getLatestWorkspace() {
                     return updated;
                 });
             }, [tracts]);
+
+            useEffect(() => {
+                if (!showFlowLayoutMenu) return;
+                const handleMenuDismiss = (event) => {
+                    if (flowLayoutMenuRef.current && !flowLayoutMenuRef.current.contains(event.target)) {
+                        setShowFlowLayoutMenu(false);
+                    }
+                };
+                const handleEsc = (event) => {
+                    if (event.key === 'Escape') setShowFlowLayoutMenu(false);
+                };
+                document.addEventListener('mousedown', handleMenuDismiss);
+                document.addEventListener('keydown', handleEsc);
+                return () => {
+                    document.removeEventListener('mousedown', handleMenuDismiss);
+                    document.removeEventListener('keydown', handleEsc);
+                };
+            }, [showFlowLayoutMenu]);
+
+            useEffect(() => {
+                if (view !== 'flowchart' && showFlowLayoutMenu) {
+                    setShowFlowLayoutMenu(false);
+                }
+            }, [view, showFlowLayoutMenu]);
 
             // Print interceptor hook
             useEffect(() => {
@@ -1910,81 +1936,90 @@ async function getLatestWorkspace() {
                             <div className="flex-1 overflow-hidden relative parchment-grid animate-fade-in flex flex-col print-canvas-container rounded-2xl">
                                 
                                 {/* UI Toolbar (Hidden on actual print) */}
-                                <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-parchment/95 border border-ink/30 ink-shadow-lg z-50 flex items-stretch p-2.5 gap-4 no-print max-w-[95vw] overflow-x-auto whitespace-nowrap rounded-2xl">
-                                    
-                                    {/* 1. Cursor Tools */}
-                                    <div className="flex flex-col justify-center">
-                                        <div className="text-[8px] font-bold uppercase tracking-widest text-ink/50 mb-1 pl-1">Active Tool</div>
-                                        <div className="flex bg-teastain p-0.5 border border-ink">
-                                            <button onClick={() => setFlowTool('select')} className={`px-3 py-1.5 flex items-center gap-1.5 text-[10px] font-bold uppercase transition-colors ${flowTool === 'select' ? 'bg-ink text-parchment shadow-inner' : 'text-ink hover:bg-ink/10'}`} title="Select, Move, or Double-Click a single Box"><Icon name="MousePointer" size={12} /> Move Box</button>
-                                            <button onClick={() => setFlowTool('move-tree')} className={`px-3 py-1.5 flex items-center gap-1.5 text-[10px] font-bold uppercase transition-colors ${flowTool === 'move-tree' ? 'bg-ink text-parchment shadow-inner' : 'text-ink hover:bg-ink/10'}`} title="Drag a tree to move that tree only; drag canvas to move all trees"><Icon name="Move" size={12} /> Move Tree</button>
-                                            <button onClick={() => setFlowTool('pan')} className={`px-3 py-1.5 flex items-center gap-1.5 text-[10px] font-bold uppercase transition-colors ${flowTool === 'pan' ? 'bg-ink text-parchment shadow-inner' : 'text-ink hover:bg-ink/10'}`} title="Pan your view around the screen (does not affect print location)"><Icon name="Hand" size={12} /> Pan Canvas</button>
-                                            <button onClick={() => setFlowTool('connect')} className={`px-3 py-1.5 flex items-center gap-1.5 text-[10px] font-bold uppercase transition-colors ${flowTool === 'connect' ? 'bg-ink text-parchment shadow-inner' : 'text-ink hover:bg-ink/10'}`} title="Drag from one box to another to draw a connecting line"><Icon name="Link" size={12} /> Link Boxes</button>
-                                        </div>
+                                <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-parchment/95 border border-ink/30 ink-shadow-lg z-50 flex items-center p-2 gap-2 no-print rounded-2xl max-w-[94vw]">
+                                    <div className="flex items-center gap-2 bg-teastain border border-ink px-2 py-1 rounded-md">
+                                        <label className="text-[9px] font-bold uppercase tracking-widest text-ink" htmlFor="flow-tool-select">Tool</label>
+                                        <select
+                                            id="flow-tool-select"
+                                            value={flowTool}
+                                            onChange={e => setFlowTool(e.target.value)}
+                                            aria-label="Flowchart active tool"
+                                            className="px-2 py-1 text-[10px] font-bold uppercase border border-ink/30 bg-parchment focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sepia"
+                                        >
+                                            <option value="select">Move Box</option>
+                                            <option value="move-tree">Move Tree</option>
+                                            <option value="pan">Pan Canvas</option>
+                                            <option value="connect">Link Boxes</option>
+                                        </select>
                                     </div>
 
-                                    <div className="w-[1px] bg-ink/20 my-1"></div>
+                                    <button onClick={() => addFlowNode('template')} aria-label="Add templated flowchart box" className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-ink bg-parchment hover:bg-teastain flex items-center gap-1 shadow-sm transition-all hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sepia"><Icon name="Plus" size={12}/> Box</button>
+                                    <button onClick={() => addFlowNode('blank')} aria-label="Add blank note box" className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-ink bg-parchment hover:bg-teastain flex items-center gap-1 shadow-sm transition-all hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sepia"><Icon name="Plus" size={12}/> Note</button>
+                                    <button onClick={() => fitFlowToView()} aria-label="Fit all flow nodes to view" className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-ink/40 text-ink hover:bg-ink hover:text-parchment flex items-center gap-1 shadow-sm transition-all hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sepia" title="Recenter and fit all flow nodes to the current canvas"><Icon name="Move" size={12}/> Fit View</button>
+                                    <button onClick={handlePrintFlowchart} aria-label="Print flowchart" className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-ink bg-ink text-parchment hover:bg-ink/80 flex items-center gap-1 shadow-sm transition-all hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sepia"><Icon name="Printer" size={12}/> Print</button>
 
-                                    {/* 2. Grid & Scale */}
-                                    <div className="flex flex-col justify-center">
-                                        <div className="text-[8px] font-bold uppercase tracking-widest text-ink/50 mb-1 pl-1">Paper Boundaries</div>
-                                        <div className="flex items-center gap-4 h-full bg-parchment">
-                                            {/* Multi-Page Grid Control */}
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-[10px] font-bold uppercase text-ink flex items-center gap-1" title="Columns x Rows of Pages"><Icon name="FileText" size={10}/> Grid:</span>
-                                                <div className="flex items-center">
-                                                    <button onClick={() => setGridCols(c => Math.max(1, c-1))} className="w-5 h-5 flex items-center justify-center bg-teastain hover:bg-ink hover:text-parchment border border-ink text-xs transition-colors">-</button>
-                                                    <span className="w-4 text-center text-[10px] font-mono font-bold">{gridCols}</span>
-                                                    <button onClick={() => setGridCols(c => c+1)} className="w-5 h-5 flex items-center justify-center bg-teastain hover:bg-ink hover:text-parchment border border-ink text-xs transition-colors">+</button>
+                                    <div className="relative" ref={flowLayoutMenuRef}>
+                                        <button
+                                            onClick={() => setShowFlowLayoutMenu(v => !v)}
+                                            aria-label="Toggle layout and import controls"
+                                            aria-haspopup="menu"
+                                            aria-expanded={showFlowLayoutMenu}
+                                            className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-sepia text-sepia hover:bg-sepia hover:text-parchment flex items-center gap-1 shadow-sm transition-all hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sepia"
+                                        >
+                                            <Icon name="List" size={12}/> Layout & Import
+                                        </button>
+
+                                        {showFlowLayoutMenu && (
+                                            <div className="absolute right-0 mt-2 w-[320px] bg-parchment border border-ink/40 ink-shadow-lg rounded-lg p-3 space-y-3" role="menu" aria-label="Layout and import controls">
+                                                <div>
+                                                    <div className="text-[9px] font-bold uppercase tracking-widest text-ink/60 mb-1 flex items-center gap-1"><Icon name="Chart" size={11}/> Paper Boundaries</div>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-[10px] font-bold uppercase text-ink">Grid</span>
+                                                        <div className="flex items-center">
+                                                            <button onClick={() => setGridCols(c => Math.max(1, c-1))} aria-label="Decrease grid columns" className="w-5 h-5 flex items-center justify-center bg-teastain hover:bg-ink hover:text-parchment border border-ink text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sepia">-</button>
+                                                            <span className="w-5 text-center text-[10px] font-mono font-bold" aria-label={`Grid columns ${gridCols}`}>{gridCols}</span>
+                                                            <button onClick={() => setGridCols(c => c+1)} aria-label="Increase grid columns" className="w-5 h-5 flex items-center justify-center bg-teastain hover:bg-ink hover:text-parchment border border-ink text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sepia">+</button>
+                                                        </div>
+                                                        <span className="text-[10px] font-bold text-ink/50">x</span>
+                                                        <div className="flex items-center">
+                                                            <button onClick={() => setGridRows(r => Math.max(1, r-1))} aria-label="Decrease grid rows" className="w-5 h-5 flex items-center justify-center bg-teastain hover:bg-ink hover:text-parchment border border-ink text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sepia">-</button>
+                                                            <span className="w-5 text-center text-[10px] font-mono font-bold" aria-label={`Grid rows ${gridRows}`}>{gridRows}</span>
+                                                            <button onClick={() => setGridRows(r => r+1)} aria-label="Increase grid rows" className="w-5 h-5 flex items-center justify-center bg-teastain hover:bg-ink hover:text-parchment border border-ink text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sepia">+</button>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center gap-2 mt-2">
+                                                        <span className="text-[10px] font-bold uppercase tracking-widest text-ink">Scale</span>
+                                                        <input
+                                                            type="range"
+                                                            min="0.2"
+                                                            max="1.5"
+                                                            step="0.05"
+                                                            value={treeScale}
+                                                            onChange={e => setTreeScale(Number(e.target.value))}
+                                                            aria-label="Adjust tree scale"
+                                                            className="w-full accent-sepia cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sepia"
+                                                            title="Scale the tree to fit inside the paper bounds"
+                                                        />
+                                                    </div>
+                                                    <button onClick={() => setPrintOrientation(prev => prev === 'portrait' ? 'landscape' : 'portrait')} aria-label="Toggle print orientation" className="mt-2 px-2 py-1.5 w-full text-[10px] font-bold uppercase tracking-widest border border-ink bg-parchment hover:bg-teastain flex items-center justify-center gap-1 shadow-sm transition-all hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sepia">
+                                                        <Icon name="FileText" size={12}/> {printOrientation === 'portrait' ? 'Portrait' : 'Landscape'}
+                                                    </button>
                                                 </div>
-                                                <span className="text-[10px] text-ink/50 font-bold">X</span>
-                                                <div className="flex items-center">
-                                                    <button onClick={() => setGridRows(r => Math.max(1, r-1))} className="w-5 h-5 flex items-center justify-center bg-teastain hover:bg-ink hover:text-parchment border border-ink text-xs transition-colors">-</button>
-                                                    <span className="w-4 text-center text-[10px] font-mono font-bold">{gridRows}</span>
-                                                    <button onClick={() => setGridRows(r => r+1)} className="w-5 h-5 flex items-center justify-center bg-teastain hover:bg-ink hover:text-parchment border border-ink text-xs transition-colors">+</button>
+
+                                                <div>
+                                                    <div className="text-[9px] font-bold uppercase tracking-widest text-ink/60 mb-1 flex items-center gap-1"><Icon name="Download" size={11}/> Import Source</div>
+                                                    <select value={flowDeskMapFilter} onChange={e => setFlowDeskMapFilter(e.target.value)} aria-label="Flow source selector" className="w-full px-2 py-1.5 text-[10px] font-bold border border-ink/30 bg-parchment focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sepia">
+                                                        <option value="active">Flow Source: Active DeskMap</option>
+                                                        <option value="all">Flow Source: All DeskMaps</option>
+                                                        {deskMaps.map(map => <option key={`flow-${map.id}`} value={map.id}>Flow Source: {map.code} {map.name ? `- ${map.name}` : ''}</option>)}
+                                                    </select>
+                                                    <div className="grid grid-cols-2 gap-2 mt-2">
+                                                        <button onClick={() => importToFlowchart(false)} aria-label="Import selected deskmaps into flowchart" className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-sepia text-sepia hover:bg-sepia hover:text-parchment flex items-center justify-center gap-1 shadow-sm transition-all hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sepia" title="Load selected DeskMap(s) into Flow Chart"><Icon name="Download" size={12}/> Import</button>
+                                                        <button onClick={() => importToFlowchart(true)} aria-label="Import and append selected deskmaps into flowchart" className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-sepia/50 text-sepia hover:bg-sepia/10 flex items-center justify-center gap-1 shadow-sm transition-all hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sepia" title="Append selected DeskMap(s) to existing Flow Chart"><Icon name="Plus" size={12}/> Append</button>
+                                                    </div>
                                                 </div>
                                             </div>
-
-                                            <div className="w-[1px] h-5 bg-ink/20"></div>
-
-                                            {/* Tree Scaling Slider */}
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-[10px] font-bold uppercase tracking-widest text-ink">Scale:</span>
-                                                <input 
-                                                    type="range" min="0.2" max="1.5" step="0.05" 
-                                                    value={treeScale} 
-                                                    onChange={e => setTreeScale(Number(e.target.value))} 
-                                                    className="w-20 accent-sepia cursor-pointer"
-                                                    title="Scale the tree to fit inside the paper bounds"
-                                                />
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div className="w-[1px] bg-ink/20 my-1"></div>
-
-                                    {/* 3. Actions */}
-                                    <div className="flex flex-col justify-center">
-                                        <div className="text-[8px] font-bold uppercase tracking-widest text-ink/50 mb-1 pl-1">Actions</div>
-                                        <div className="flex items-center gap-1.5 h-full">
-                                            <button onClick={() => addFlowNode('template')} className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-ink bg-parchment hover:bg-teastain flex items-center gap-1 shadow-sm transition-all hover:-translate-y-0.5"><Icon name="Plus" size={12}/> Box</button>
-                                            <button onClick={() => addFlowNode('blank')} className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-ink bg-parchment hover:bg-teastain flex items-center gap-1 shadow-sm transition-all hover:-translate-y-0.5"><Icon name="Plus" size={12}/> Note</button>
-                                            
-                                            <div className="w-[1px] h-5 bg-ink/20 mx-1"></div>
-                                            
-                                            <button onClick={() => setPrintOrientation(prev => prev === 'portrait' ? 'landscape' : 'portrait')} className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-ink bg-parchment hover:bg-teastain flex items-center gap-1 shadow-sm transition-all hover:-translate-y-0.5" title="Toggle Portrait/Landscape">
-                                                <Icon name="FileText" size={12}/> {printOrientation === 'portrait' ? 'Portrait' : 'Landscape'}
-                                            </button>
-                                            <select value={flowDeskMapFilter} onChange={e => setFlowDeskMapFilter(e.target.value)} className="px-2 py-1.5 text-[10px] font-bold border border-ink/30 bg-parchment">
-                                                <option value="active">Flow Source: Active DeskMap</option>
-                                                <option value="all">Flow Source: All DeskMaps</option>
-                                                {deskMaps.map(map => <option key={`flow-${map.id}`} value={map.id}>Flow Source: {map.code} {map.name ? `- ${map.name}` : ''}</option>)}
-                                            </select>
-                                            <button onClick={() => importToFlowchart(false)} className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-sepia text-sepia hover:bg-sepia hover:text-parchment flex items-center gap-1 shadow-sm transition-all hover:-translate-y-0.5" title="Load selected DeskMap(s) into Flow Chart"><Icon name="Download" size={12}/> Import Selected DeskMap(s)</button>
-                                            <button onClick={() => importToFlowchart(true)} className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-sepia/50 text-sepia hover:bg-sepia/10 flex items-center gap-1 shadow-sm transition-all hover:-translate-y-0.5" title="Append selected DeskMap(s) to existing Flow Chart"><Icon name="Plus" size={12}/> Import + Append</button>
-                                            <button onClick={() => fitFlowToView()} className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-ink/40 text-ink hover:bg-ink hover:text-parchment flex items-center gap-1 shadow-sm transition-all hover:-translate-y-0.5" title="Recenter and fit all flow nodes to the current canvas"><Icon name="Move" size={12}/> Fit View</button>
-                                            <button onClick={handlePrintFlowchart} className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-ink bg-ink text-parchment hover:bg-ink/80 flex items-center gap-1 shadow-sm transition-all hover:-translate-y-0.5"><Icon name="Printer" size={12}/> Print</button>
-                                        </div>
+                                        )}
                                     </div>
                                 </div>
 
