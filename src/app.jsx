@@ -1196,8 +1196,26 @@ async function getLatestWorkspace() {
                 isDragging.current = false; e.currentTarget.releasePointerCapture(e.pointerId);
             };
             const handleWheel = (e) => {
-                e.preventDefault(); const scaleAdjust = e.deltaY * -0.001;
-                setPz(prev => ({ ...prev, scale: Math.min(Math.max(0.1, prev.scale + scaleAdjust), 5) }));
+                e.preventDefault();
+                const scaleAdjust = e.deltaY * -0.001;
+                const rect = e.currentTarget.getBoundingClientRect();
+                const pointerX = e.clientX - rect.left;
+                const pointerY = e.clientY - rect.top;
+
+                setPz(prev => {
+                    const nextScale = Math.min(Math.max(0.1, prev.scale + scaleAdjust), 5);
+                    if (nextScale === prev.scale) return prev;
+
+                    const worldX = (pointerX - prev.x) / prev.scale;
+                    const worldY = (pointerY - prev.y) / prev.scale;
+
+                    return {
+                        ...prev,
+                        scale: nextScale,
+                        x: pointerX - worldX * nextScale,
+                        y: pointerY - worldY * nextScale
+                    };
+                });
             };
 
             const countTreeDescendants = (node) => {
@@ -1612,8 +1630,26 @@ async function getLatestWorkspace() {
             
             const handleFlowWheel = (e) => {
                 if (e.ctrlKey || e.metaKey || flowTool === 'pan') { 
-                    e.preventDefault(); const scaleAdjust = e.deltaY * -0.002;
-                    setFlowPz(prev => ({ ...prev, scale: Math.min(Math.max(0.1, prev.scale + scaleAdjust), 3) }));
+                    e.preventDefault();
+                    const scaleAdjust = e.deltaY * -0.002;
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const pointerX = e.clientX - rect.left;
+                    const pointerY = e.clientY - rect.top;
+
+                    setFlowPz(prev => {
+                        const nextScale = Math.min(Math.max(0.1, prev.scale + scaleAdjust), 3);
+                        if (nextScale === prev.scale) return prev;
+
+                        const worldX = (pointerX - prev.x) / prev.scale;
+                        const worldY = (pointerY - prev.y) / prev.scale;
+
+                        return {
+                            ...prev,
+                            scale: nextScale,
+                            x: pointerX - worldX * nextScale,
+                            y: pointerY - worldY * nextScale
+                        };
+                    });
                 }
             };
 
