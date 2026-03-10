@@ -531,7 +531,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 
                 try {
                     await saveWorkspace(initialPayload, freshWorkspaceId);
-                    const projects = await listWorkspaces();
+                    const projects = await getAllWorkspaces();
                     setSavedProjects(projects);
                 } catch (e) {
                     console.error(e);
