@@ -148,6 +148,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
             const [isSaving, setIsSaving] = useState(false);
             const [isOnline, setIsOnline] = useState(navigator.onLine);
             const [bootChecks, setBootChecks] = useState({ offlineModeActive: false, cloudSyncUnavailable: !navigator.onLine });
+            const [syncSummary, setSyncSummary] = useState(() => getSyncSummary());
             const [confirmAction, setConfirmAction] = useState(null); 
             const [attachParentId, setAttachParentId] = useState('root');
             const [attachType, setAttachType] = useState('conveyance');
@@ -372,7 +373,10 @@ const Icon = ({ name, size = 18, className = "" }) => {
 
             // Persistence + health status
             useEffect(() => {
-                const syncOnline = () => setIsOnline(navigator.onLine);
+                const syncOnline = () => {
+                    setIsOnline(navigator.onLine);
+                    setSyncSummary(getSyncSummary());
+                };
                 window.addEventListener('online', syncOnline);
                 window.addEventListener('offline', syncOnline);
                 return () => {
@@ -1849,6 +1853,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
                             <div className="flex flex-col items-end gap-1 text-[11px] font-bold">
                                 <span className="px-2 py-1 rounded border border-ink/30 bg-teastain/60">Offline mode active: {bootChecks.offlineModeActive ? 'Yes' : 'No'}</span>
                                 <span className="px-2 py-1 rounded border border-ink/30 bg-teastain/60">Cloud sync unavailable: {(!isOnline || bootChecks.cloudSyncUnavailable) ? 'Yes' : 'No'}</span>
+                                <span className="px-2 py-1 rounded border border-ink/30 bg-teastain/60">Sync status: {syncSummary.status === 'pending' ? `Pending (${syncSummary.pendingCount})` : 'Synced'}</span>
                             </div>
                             {/* View Navigation Group */}
                             <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
