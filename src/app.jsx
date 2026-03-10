@@ -17,6 +17,9 @@ const {
     getLatestWorkspace
 } = workspaceStorageApi;
 
+const workspaceDomainApi = globalThis.LANDroidWorkspaceDomain || {};
+const toWorkspaceSavePayload = workspaceDomainApi.toWorkspaceSavePayload || ((state) => state);
+const fromStoredWorkspace = workspaceDomainApi.fromStoredWorkspace || ((payload) => payload);
 
 const Icon = ({ name, size = 18, className = "" }) => {
             const icons = {
@@ -391,20 +394,25 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 if (!projectName.trim()) return false;
                 setIsSaving(true);
                 try {
-                    const serializeNodesForSave = (sourceNodes) => sourceNodes.map(n => {
-                        const copy = { ...n };
-                        if (copy.docData) copy.hasDoc = true;
-                        delete copy.docData;
-                        return copy;
-                    });
-                    const data = {
-                        name: projectName.trim(), nodes: serializeNodesForSave(nodes), instrumentList,
-                        flowNodes, flowEdges, flowPz, treeScale, printOrientation, gridCols, gridRows,
-                        tracts, contacts, ownershipInterests, contactLogs,
-                        deskMaps: deskMaps.map(map => ({ ...map, nodes: serializeNodesForSave(map.nodes || []) })),
+                    const data = toWorkspaceSavePayload({
+                        projectName,
+                        nodes,
+                        instrumentList,
+                        flowNodes,
+                        flowEdges,
+                        flowPz,
+                        treeScale,
+                        printOrientation,
+                        gridCols,
+                        gridRows,
+                        tracts,
+                        contacts,
+                        ownershipInterests,
+                        contactLogs,
+                        deskMaps,
                         activeDeskMapId,
-                        updatedAt: Date.now(), appId
-                    };
+                        appId,
+                    });
                     const savedWorkspace = await saveWorkspace(data, currentWorkspaceId);
                     setCurrentWorkspaceId(savedWorkspace.id);
                     const projects = await getAllWorkspaces();
@@ -431,31 +439,34 @@ const Icon = ({ name, size = 18, className = "" }) => {
             ]);
 
             const handleLoadWorkspace = (p, closeModal = true) => {
+                const hydrated = fromStoredWorkspace(p, {
+                    makeId,
+                    defaultRoot,
+                    defaultViewport,
+                    defaultFlowViewport,
+                    normalizeFlowNodeGroups,
+                });
 
-                setNodes(p.nodes);
-                if (p.instrumentList) setInstrumentList(p.instrumentList);
-                if (p.flowNodes) setFlowNodes(normalizeFlowNodeGroups(p.flowNodes));
-                if (p.flowEdges) setFlowEdges(p.flowEdges);
-                if (p.flowPz) setFlowPz(p.flowPz);
-                else setFlowPz({ ...defaultFlowViewport });
-                if (p.treeScale) setTreeScale(p.treeScale);
-                if (p.printOrientation) setPrintOrientation(p.printOrientation);
-                if (p.gridCols) setGridCols(p.gridCols);
-                if (p.gridRows) setGridRows(p.gridRows);
-                setTracts(p.tracts || []);
-                setContacts(p.contacts || []);
-                setOwnershipInterests(p.ownershipInterests || []);
-                setContactLogs(p.contactLogs || []);
-                setSelectedContactId((p.contacts && p.contacts[0] && p.contacts[0].id) || null);
-                const loadedDeskMaps = p.deskMaps && p.deskMaps.length ? p.deskMaps : [{ id: makeId(), name: p.tracts?.[0]?.name || 'Unit Tract 1', code: p.tracts?.[0]?.code || 'TRACT-1', tractId: p.tracts?.[0]?.id || null, nodes: p.nodes || [{ ...defaultRoot }], pz: { ...defaultViewport } }];
-                setDeskMaps(loadedDeskMaps);
-                const nextDeskMapId = (p.activeDeskMapId && loadedDeskMaps.some(map => map.id === p.activeDeskMapId)) ? p.activeDeskMapId : loadedDeskMaps[0].id;
-                setActiveDeskMapId(nextDeskMapId);
-                const activeDeskMap = loadedDeskMaps.find(map => map.id === nextDeskMapId) || loadedDeskMaps[0];
-                setNodes(activeDeskMap.nodes || p.nodes || [{ ...defaultRoot }]);
-                setPz(activeDeskMap.pz || { ...defaultViewport });
-                setProjectName(p.name);
-                setCurrentWorkspaceId(p.id || null);
+                setNodes(hydrated.nodes);
+                if (hydrated.instrumentList) setInstrumentList(hydrated.instrumentList);
+                if (hydrated.flowNodes) setFlowNodes(hydrated.flowNodes);
+                if (hydrated.flowEdges) setFlowEdges(hydrated.flowEdges);
+                if (hydrated.flowPz) setFlowPz(hydrated.flowPz);
+                if (hydrated.treeScale) setTreeScale(hydrated.treeScale);
+                if (hydrated.printOrientation) setPrintOrientation(hydrated.printOrientation);
+                if (hydrated.gridCols) setGridCols(hydrated.gridCols);
+                if (hydrated.gridRows) setGridRows(hydrated.gridRows);
+                setTracts(hydrated.tracts);
+                setContacts(hydrated.contacts);
+                setOwnershipInterests(hydrated.ownershipInterests);
+                setContactLogs(hydrated.contactLogs);
+                setSelectedContactId(hydrated.selectedContactId);
+                setDeskMaps(hydrated.deskMaps);
+                setActiveDeskMapId(hydrated.activeDeskMapId);
+                setNodes(hydrated.nodes);
+                setPz(hydrated.pz);
+                setProjectName(hydrated.projectName);
+                setCurrentWorkspaceId(hydrated.workspaceId);
                 setWorkspaceLoaded(true);
                 setShowHome(false);
                 if (closeModal) setShowCloudModal(false);
