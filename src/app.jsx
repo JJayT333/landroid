@@ -176,6 +176,9 @@ const Icon = ({ name, size = 18, className = "" }) => {
             const [pz, setPz] = useState({ ...defaultViewport });
             const isDragging = useRef(false);
             const dragStart = useRef({ x: 0, y: 0 });
+            const wheelFrameRef = useRef(null);
+            const wheelAccumulatedDeltaRef = useRef(0);
+            const wheelPointerRef = useRef({ x: 0, y: 0 });
 
             const [form, setForm] = useState({
                 instrument: '', vol: '', page: '', docNo: '', fileDate: '', date: '', grantor: '', grantee: '', 
@@ -1367,6 +1370,22 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 return children.map(n => ({ ...n, children: buildTree(n.id) }));
             };
             const tree = useMemo(() => buildTree(), [nodes]);
+            const relatedByParentId = useMemo(() => {
+                const grouped = {};
+                nodes.forEach(node => {
+                    if (node.type !== 'related' || node.parentId == null) return;
+                    if (!grouped[node.parentId]) grouped[node.parentId] = [];
+                    grouped[node.parentId].push(node);
+                });
+                return grouped;
+            }, [nodes]);
+
+            useEffect(() => () => {
+                if (wheelFrameRef.current !== null) {
+                    cancelAnimationFrame(wheelFrameRef.current);
+                    wheelFrameRef.current = null;
+                }
+            }, []);
 
             const handlePointerDown = (e) => {
                 if (e.button !== 0 || e.target.closest('button') || e.target.closest('.treenode-body')) return;
@@ -1381,24 +1400,38 @@ const Icon = ({ name, size = 18, className = "" }) => {
             };
             const handleWheel = (e) => {
                 e.preventDefault();
-                const scaleAdjust = e.deltaY * -0.001;
                 const rect = e.currentTarget.getBoundingClientRect();
-                const pointerX = e.clientX - rect.left;
-                const pointerY = e.clientY - rect.top;
+                wheelPointerRef.current = {
+                    x: e.clientX - rect.left,
+                    y: e.clientY - rect.top
+                };
+                wheelAccumulatedDeltaRef.current += e.deltaY;
 
-                setPz(prev => {
-                    const nextScale = Math.min(Math.max(0.1, prev.scale + scaleAdjust), 5);
-                    if (nextScale === prev.scale) return prev;
+                if (wheelFrameRef.current !== null) return;
 
-                    const worldX = (pointerX - prev.x) / prev.scale;
-                    const worldY = (pointerY - prev.y) / prev.scale;
+                wheelFrameRef.current = requestAnimationFrame(() => {
+                    const totalDelta = wheelAccumulatedDeltaRef.current;
+                    wheelAccumulatedDeltaRef.current = 0;
+                    wheelFrameRef.current = null;
 
-                    return {
-                        ...prev,
-                        scale: nextScale,
-                        x: pointerX - worldX * nextScale,
-                        y: pointerY - worldY * nextScale
-                    };
+                    const scaleAdjust = totalDelta * -0.001;
+                    const pointerX = wheelPointerRef.current.x;
+                    const pointerY = wheelPointerRef.current.y;
+
+                    setPz(prev => {
+                        const nextScale = Math.min(Math.max(0.1, prev.scale + scaleAdjust), 5);
+                        if (nextScale === prev.scale) return prev;
+
+                        const worldX = (pointerX - prev.x) / prev.scale;
+                        const worldY = (pointerY - prev.y) / prev.scale;
+
+                        return {
+                            ...prev,
+                            scale: nextScale,
+                            x: pointerX - worldX * nextScale,
+                            y: pointerY - worldY * nextScale
+                        };
+                    });
                 });
             };
 
@@ -1415,7 +1448,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 
             // PERFORMANCE: Extracted to a standard render function to prevent destructive unmounting/remounting on every frame
             const renderTreeNode = (n) => {
-                const relatedDocs = nodes.filter(x => x.parentId === n.id && x.type === 'related');
+                const relatedDocs = relatedByParentId[n.id] || [];
                 const isDeceased = n.isDeceased;
                 const conveyanceFractionLabel = formatConveyanceFraction(n);
                 const hasChildren = n.children.length > 0;
