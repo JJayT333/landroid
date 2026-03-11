@@ -207,6 +207,12 @@ const Icon = ({ name, size = 18, className = "" }) => {
             // PERFORMANCE: Memoized calculated arrays
             const activeOwners = useMemo(() => nodes.filter(n => n.type !== 'related' && n.fraction > 0.00000001), [nodes]);
             const totalRemaining = useMemo(() => activeOwners.reduce((sum, n) => sum + parseFloat(n.fraction), 0), [activeOwners]);
+            const ownershipHealth = useMemo(() => {
+                const delta = totalRemaining - 1;
+                if (Math.abs(delta) <= 0.00000001) return { status: 'balanced', label: 'Balanced', delta };
+                if (delta > 0) return { status: 'over', label: 'Over', delta };
+                return { status: 'under', label: 'Under', delta };
+            }, [totalRemaining]);
             const uniqueGrantees = useMemo(() => [...new Set(nodes.map(n => n.grantee).filter(Boolean))].sort(), [nodes]);
             
             // PERFORMANCE: Runsheet sorting/filtering memoization
@@ -661,6 +667,19 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 });
             };
 
+            const applyBranchScale = (allNodes, rootId, scaleFactor) => {
+                if (!Number.isFinite(scaleFactor)) return allNodes;
+                const descendants = collectDescendantIds(allNodes, rootId);
+                return allNodes.map(n => {
+                    if (n.id !== rootId && !descendants.has(n.id)) return n;
+                    return {
+                        ...n,
+                        fraction: clampFraction((n.fraction || 0) * scaleFactor),
+                        initialFraction: clampFraction((n.initialFraction || 0) * scaleFactor)
+                    };
+                });
+            };
+
             const calcShare = useMemo(() => {
                 if (modalMode !== 'convey' && modalMode !== 'attach') return 0;
                 const parentIdToUse = modalMode === 'attach' ? attachParentId : activeNode?.id;
@@ -770,15 +789,22 @@ const Icon = ({ name, size = 18, className = "" }) => {
                     updateActiveDeskMapNodes([...updatedNodes, { ...form, id: newId, type: 'conveyance', fraction: calcShare, initialFraction: calcShare, parentId: activeNode.id }]);
                 } else if (modalMode === 'precede') {
                     const newId = makeId();
-                    const updatedNodes = nodes.map(n => {
+                    const oldInitialFraction = Math.max(activeNode.initialFraction || 0, FRACTION_EPSILON);
+                    const newInitialFraction = clampFraction(form.initialFraction);
+                    if (Math.abs(newInitialFraction - oldInitialFraction) > FRACTION_EPSILON) {
+                        const shouldContinue = window.confirm('This predecessor change will recalculate every descendant in this branch. Continue?');
+                        if (!shouldContinue) return;
+                    }
+                    const scaleFactor = newInitialFraction / oldInitialFraction;
+                    const scaledNodes = applyBranchScale(nodes, activeNode.id, scaleFactor);
+                    const updatedNodes = scaledNodes.map(n => {
                         if (n.id === activeNode.id) return { ...n, parentId: newId };
                         if (activeNode.parentId && n.id === activeNode.parentId) {
-                            return { ...n, fraction: n.fraction + activeNode.initialFraction - form.initialFraction };
+                            return { ...n, fraction: clampFraction((n.fraction || 0) + oldInitialFraction - newInitialFraction) };
                         }
                         return n;
                     });
-                    const fractionRetained = form.initialFraction - activeNode.initialFraction;
-                    updateActiveDeskMapNodes([...updatedNodes, { ...form, id: newId, type: 'conveyance', parentId: activeNode.parentId, initialFraction: form.initialFraction, fraction: Math.max(0, fractionRetained) }]);
+                    updateActiveDeskMapNodes([...updatedNodes, { ...form, id: newId, type: 'conveyance', parentId: activeNode.parentId, initialFraction: newInitialFraction, fraction: 0 }]);
                 } else if (modalMode === 'add_chain') {
                     const newId = makeId();
                     updateActiveDeskMapNodes(prev => [...prev, { ...form, id: newId, type: 'conveyance', parentId: null }]);
@@ -795,6 +821,8 @@ const Icon = ({ name, size = 18, className = "" }) => {
                             window.alert('Cannot attach a record to itself or one of its descendants.');
                             return;
                         }
+                        const shouldContinue = window.confirm('Attaching this conveyance will recalculate ownership for this branch. Continue?');
+                        if (!shouldContinue) return;
                         updateActiveDeskMapNodes(prev => applyAttachConveyanceUpdate(prev));
                     } else {
                         updateActiveDeskMapNodes(prev => prev.map(n => n.id === activeNode.id ? { ...form, parentId: attachParentId, type: 'related', fraction: 0, initialFraction: 0 } : n));
@@ -1852,11 +1880,20 @@ const Icon = ({ name, size = 18, className = "" }) => {
                                 </h1>
                             </div>
                             
-                            <div className="group">
-                                <div className={`rubber-stamp bg-parchment shadow-sm ${totalRemaining > 1.00000001 ? 'error animate-vibrate' : ''}`}>
+                            <div className="group flex items-center gap-2 flex-wrap">
+                                <div className={`rubber-stamp bg-parchment shadow-sm ${ownershipHealth.status === 'over' ? 'error animate-vibrate' : ''}`}>
                                     <span className="opacity-80 text-xs mr-2">Master Total:</span>
                                     <span className="text-lg">{formatFraction(totalRemaining)}</span>
                                 </div>
+                                <span className={`px-2 py-1 text-[10px] border rounded font-bold uppercase tracking-widest ${
+                                    ownershipHealth.status === 'balanced'
+                                        ? 'border-green-700/40 text-green-800 bg-green-100/60'
+                                        : ownershipHealth.status === 'over'
+                                            ? 'border-stamp/60 text-stamp bg-stamp/10'
+                                            : 'border-amber-700/50 text-amber-900 bg-amber-100/70'
+                                }`}>
+                                    {ownershipHealth.label} {formatFraction(Math.abs(ownershipHealth.delta))}
+                                </span>
                             </div>
                         </div>
 
