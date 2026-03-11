@@ -137,6 +137,25 @@ function validateMap(map) {
   }
 }
 
+function normalizeLinkedConveyanceTotal(map) {
+  const nodes = map.nodes || [];
+  const scoped = nodes.filter(
+    (node) => node.type === 'conveyance' && node.parentId !== 'unlinked' && Number(node.fraction || 0) > FRACTION_EPSILON
+  );
+  const total = scoped.reduce((sum, node) => sum + Number(node.fraction || 0), 0);
+  if (!Number.isFinite(total) || total <= FRACTION_EPSILON) return;
+
+  const scale = 1 / total;
+  map.nodes = nodes.map((node) => {
+    if (node.type !== 'conveyance' || node.parentId === 'unlinked') return node;
+    return {
+      ...node,
+      fraction: clampFraction((node.fraction || 0) * scale),
+      initialFraction: clampFraction((node.initialFraction || 0) * scale),
+    };
+  });
+}
+
 function buildDeskMap(mapIndex) {
   const seed = 1000 + mapIndex * 97;
   const rng = createRng(seed);
@@ -150,6 +169,7 @@ function buildDeskMap(mapIndex) {
     id: `deskmap-stress-${mapIndex}`,
     code,
     name,
+    tractId: `tract-stress-${mapIndex}`,
     pz: { x: 0, y: 0, z: 1 },
     nodes,
   };
@@ -354,6 +374,7 @@ function buildDeskMap(mapIndex) {
     throw new Error(`${code}: unable to finalize exactly ${NODES_PER_MAP} nodes; got ${nodes.length}`);
   }
 
+  normalizeLinkedConveyanceTotal(map);
   validateMap(map);
   return map;
 }
@@ -363,6 +384,15 @@ function buildWorkspace() {
   for (let i = 1; i <= MAP_COUNT; i += 1) {
     deskMaps.push(buildDeskMap(i));
   }
+
+  const tracts = deskMaps.map((map, index) => ({
+    id: map.tractId,
+    code: `TRACT-${index + 1}`,
+    name: `Stress Tract ${index + 1}`,
+    acres: 40 + (index * 7),
+    mapId: map.code,
+  }));
+
   return {
     generatedAt: new Date().toISOString(),
     profile: {
@@ -372,6 +402,7 @@ function buildWorkspace() {
       description: 'Deterministic stress dataset with mixed conveyance/precede/attach/related/unlinked patterns',
     },
     activeDeskMapId: deskMaps[0].id,
+    tracts,
     deskMaps,
   };
 }
@@ -417,7 +448,7 @@ function workspaceToImportCsv(workspace) {
       n.isDeceased ? 'true' : 'false',
       n.obituary || '',
       n.graveyardLink || '',
-      index === 0 ? '[]' : '',
+      index === 0 ? JSON.stringify(workspace.tracts || []) : '',
       index === 0 ? '[]' : '',
       index === 0 ? '[]' : '',
       index === 0 ? '[]' : '',
@@ -428,6 +459,78 @@ function workspaceToImportCsv(workspace) {
 
   const body = rows.map((row) => row.map(escapeCsv).join(',')).join('\n');
   return `\uFEFF${headers.join(',')}\n${body}\n`;
+}
+
+
+function mapToImportCsv(map, tract) {
+  const headers = [
+    'Documents Hyperlinked', 'Instrument', 'Order by Date', 'Image Path', 'Vol', 'Page', 'Inst No.',
+    'File Date', 'Inst Date', 'Grantor / Assignor', 'Grantee / Assignee', 'Land Desc.', 'Remarks',
+    'INTERNAL_REMAINING_FRACTION', 'INTERNAL_INITIAL_FRACTION', 'INTERNAL_ID', 'INTERNAL_PID',
+    'INTERNAL_DOC', 'INTERNAL_TYPE', 'INTERNAL_DECEASED', 'INTERNAL_OBITUARY', 'INTERNAL_GRAVEYARD_LINK',
+    'INTERNAL_TRACTS', 'INTERNAL_CONTACTS', 'INTERNAL_INTERESTS', 'INTERNAL_CONTACT_LOGS', 'INTERNAL_DESKMAPS',
+    'INTERNAL_ACTIVE_DESKMAP_ID'
+  ];
+
+  const rows = (map.nodes || []).map((n, index) => [
+    index + 1,
+    n.instrument,
+    index + 1,
+    `TORS_Documents\\${n.docNo}.pdf`,
+    n.vol,
+    n.page,
+    n.docNo,
+    n.fileDate,
+    n.date,
+    n.grantor,
+    n.grantee,
+    n.landDesc,
+    n.remarks,
+    n.fraction,
+    n.initialFraction,
+    n.id,
+    n.parentId === null ? 'NULL' : n.parentId,
+    '',
+    n.type,
+    n.isDeceased ? 'true' : 'false',
+    n.obituary || '',
+    n.graveyardLink || '',
+    index === 0 ? JSON.stringify([tract]) : '',
+    index === 0 ? '[]' : '',
+    index === 0 ? '[]' : '',
+    index === 0 ? '[]' : '',
+    index === 0 ? JSON.stringify([{ ...map, nodes: map.nodes || [] }]) : '',
+    index === 0 ? map.id : '',
+  ]);
+
+  const body = rows.map((row) => row.map(escapeCsv).join(',')).join('\n');
+  return `\uFEFF${headers.join(',')}\n${body}\n`;
+}
+
+function writeSplitImportCsvs(workspace, outDir) {
+  const splitDir = path.join(outDir, 'split-tract-imports-5x200');
+  if (!fs.existsSync(splitDir)) fs.mkdirSync(splitDir, { recursive: true });
+
+  workspace.deskMaps.forEach((map, idx) => {
+    const tract = (workspace.tracts || [])[idx] || { id: map.tractId, code: `TRACT-${idx + 1}`, name: `Stress Tract ${idx + 1}` };
+    const csv = mapToImportCsv(map, tract);
+    const file = path.join(splitDir, `deskmap-stress-tract-${idx + 1}-200.import.csv`);
+    fs.writeFileSync(file, csv, 'utf8');
+  });
+
+  const readme = [
+    '# Split tract import files (5 x 200)',
+    '',
+    'These files allow importing one 200-record tract at a time.',
+    'Each file includes full internal columns and mixed feature combinations',
+    '(conveyance modes, related docs, unlinked records, predecessor inserts, attach/rebalance patterns, deceased metadata fields).',
+    '',
+    'Files:',
+    ...workspace.deskMaps.map((_, idx) => `- deskmap-stress-tract-${idx + 1}-200.import.csv`),
+  ].join('\n');
+  fs.writeFileSync(path.join(splitDir, 'README.md'), readme, 'utf8');
+
+  return splitDir;
 }
 
 function summarize(workspace) {
@@ -475,6 +578,7 @@ function run() {
   fs.writeFileSync(jsonPath, jsonOutput, 'utf8');
   fs.writeFileSync(csvPath, csvOutput, 'utf8');
   fs.writeFileSync(summaryPath, JSON.stringify({ generatedAt: workspace.generatedAt, summary: summarize(workspace) }, null, 2));
+  const splitDir = writeSplitImportCsvs(workspace, outDir);
 
   const toMs = (start, end) => Number(end - start) / 1_000_000;
   const buildMs = toMs(t0, t1);
@@ -489,6 +593,7 @@ function run() {
   console.log(`Workspace file: ${path.relative(process.cwd(), jsonPath)}`);
   console.log(`Import CSV file: ${path.relative(process.cwd(), csvPath)}`);
   console.log(`Summary file: ${path.relative(process.cwd(), summaryPath)}`);
+  console.log(`Split import directory: ${path.relative(process.cwd(), splitDir)}`);
 }
 
 run();

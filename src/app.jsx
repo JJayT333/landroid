@@ -230,7 +230,10 @@ const Icon = ({ name, size = 18, className = "" }) => {
             };
 
             // PERFORMANCE: Memoized calculated arrays
-            const activeOwners = useMemo(() => nodes.filter(n => n.type !== 'related' && n.fraction > 0.00000001), [nodes]);
+            const activeOwners = useMemo(
+                () => nodes.filter(n => n.type !== 'related' && n.parentId !== 'unlinked' && n.fraction > 0.00000001),
+                [nodes]
+            );
             const totalRemaining = useMemo(() => activeOwners.reduce((sum, n) => sum + parseFloat(n.fraction), 0), [activeOwners]);
             const ownershipHealth = useMemo(() => {
                 const delta = totalRemaining - 1;
@@ -1220,15 +1223,22 @@ const Icon = ({ name, size = 18, className = "" }) => {
                             setInstrumentList(prev => [...new Set([...prev, ...newInsts])]);
 
                             const firstRow = results.data[0] || {};
-                            if (importMode === 'replace') {
+                            const importedDeskMaps = parseJsonField(firstRow, 'INTERNAL_DESKMAPS');
+                            const importedActiveDeskMapId = firstRow['INTERNAL_ACTIVE_DESKMAP_ID'] || '';
+                            const hasEmbeddedWorkspace = importedDeskMaps.length > 0;
+                            const normalizedImportMode = hasEmbeddedWorkspace && importMode !== 'replace' ? 'replace' : importMode;
+
+                            if (hasEmbeddedWorkspace && importMode !== 'replace') {
+                                window.alert('This CSV contains a full multi-map workspace payload. Import mode was switched to Replace so Desk Maps stay separated and performant.');
+                            }
+
+                            if (normalizedImportMode === 'replace') {
                                 setNodes(newNodes);
                                 setTracts(parseJsonField(firstRow, 'INTERNAL_TRACTS'));
                                 const importedContacts = parseJsonField(firstRow, 'INTERNAL_CONTACTS');
                                 setContacts(importedContacts);
                                 setOwnershipInterests(parseJsonField(firstRow, 'INTERNAL_INTERESTS'));
                                 setContactLogs(parseJsonField(firstRow, 'INTERNAL_CONTACT_LOGS'));
-                                const importedDeskMaps = parseJsonField(firstRow, 'INTERNAL_DESKMAPS');
-                                const importedActiveDeskMapId = firstRow['INTERNAL_ACTIVE_DESKMAP_ID'] || '';
                                 if (importedDeskMaps.length) {
                                     setDeskMaps(importedDeskMaps);
                                     const nextDeskMapId = importedDeskMaps.some(map => map.id === importedActiveDeskMapId) ? importedActiveDeskMapId : importedDeskMaps[0].id;
@@ -1244,7 +1254,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
                                     setPz({ ...defaultViewport });
                                 }
                                 setSelectedContactId((importedContacts[0] && importedContacts[0].id) || null);
-                            } else if (importMode === 'merge') {
+                            } else if (normalizedImportMode === 'merge') {
                                 setDeskMaps(prev => prev.map(map => {
                                     if (map.id !== activeDeskMapId) return map;
                                     return { ...map, nodes: [...(map.nodes || []), ...newNodes] };
@@ -1259,10 +1269,10 @@ const Icon = ({ name, size = 18, className = "" }) => {
                                 setPz({ ...defaultViewport });
                             }
 
-                            const modeLabel = importMode === 'replace' ? 'replace' : importMode === 'merge' ? 'merge' : 'new map';
-                            const mapSummary = importMode === 'replace'
+                            const modeLabel = normalizedImportMode === 'replace' ? 'replace' : normalizedImportMode === 'merge' ? 'merge' : 'new map';
+                            const mapSummary = normalizedImportMode === 'replace'
                                 ? 'Maps updated: project desk maps replaced from import (or rebuilt fallback map).'
-                                : importMode === 'merge'
+                                : normalizedImportMode === 'merge'
                                     ? 'Maps updated: active desk map merged; other maps preserved.'
                                     : 'Maps created: 1 new desk map from CSV; existing maps preserved.';
                             window.alert(`Import complete.\nRecords imported: ${newNodes.length}\nMode: ${modeLabel}\n${mapSummary}`);
