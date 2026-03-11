@@ -271,6 +271,15 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 () => filteredSortedNodes.reduce((count, node) => count + (node.parentId === 'unlinked' ? 1 : 0), 0),
                 [filteredSortedNodes]
             );
+            const nodeById = useMemo(() => Object.fromEntries(nodes.map(node => [node.id, node])), [nodes]);
+            const deskMapById = useMemo(() => Object.fromEntries(deskMaps.map(map => [map.id, map])), [deskMaps]);
+            const runsheetAllDecoratedNodes = useMemo(
+                () => deskMaps.flatMap(map => {
+                    const label = formatDeskMapLabel(map);
+                    return (map.nodes || []).map(node => decorateRunsheetNode(node, map.id, label));
+                }),
+                [deskMaps]
+            );
 
             const tractById = useMemo(() => Object.fromEntries(tracts.map(t => [t.id, t])), [tracts]);
             const contactById = useMemo(() => Object.fromEntries(contacts.map(c => [c.id, c])), [contacts]);
