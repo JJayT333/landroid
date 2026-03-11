@@ -893,11 +893,64 @@ const Icon = ({ name, size = 18, className = "" }) => {
 
             const toggleDeceased = (node) => updateActiveDeskMapNodes(prev => prev.map(n => n.id === node.id ? { ...n, isDeceased: !n.isDeceased } : n));
 
+            const commitBranchRebalance = (baseNodes, options) => {
+                const { node, newInitialFraction, includeFormFields = false } = options;
+                const oldInitialFraction = Math.max(node.initialFraction || 0, FRACTION_EPSILON);
+                const normalizedNewInitialFraction = clampFraction(newInitialFraction);
+                const scaleFactor = normalizedNewInitialFraction / oldInitialFraction;
+                const scaledNodes = applyBranchScale(baseNodes, node.id, scaleFactor);
+                const affectedCount = collectDescendantIds(baseNodes, node.id).size + 1;
+                const updatedNodes = scaledNodes.map(n => {
+                    if (n.id === node.id) {
+                        const mergedNode = includeFormFields ? { ...n, ...form } : n;
+                        return { ...mergedNode, initialFraction: normalizedNewInitialFraction };
+                    }
+                    if (node.parentId && n.id === node.parentId) {
+                        return { ...n, fraction: clampFraction((n.fraction || 0) + oldInitialFraction - normalizedNewInitialFraction) };
+                    }
+                    return n;
+                });
+                return {
+                    updatedNodes,
+                    oldInitialFraction,
+                    newInitialFraction: normalizedNewInitialFraction,
+                    scaleFactor,
+                    affectedCount
+                };
+            };
+
             const handleCommit = () => {
                 if (modalMode === 'convey' || modalMode === 'attach') {
                     setLastMathProps({ conveyanceMode: form.conveyanceMode, splitBasis: form.splitBasis, numerator: form.numerator, denominator: form.denominator, manualAmount: form.manualAmount });
                 }
-                if (modalMode === 'edit') updateActiveDeskMapNodes(prev => prev.map(n => n.id === activeNode.id ? { ...n, ...form } : n));
+                if (modalMode === 'edit') {
+                    const isRebalanceEdit = activeNode
+                        && activeNode.type === 'conveyance'
+                        && activeNode.parentId !== 'unlinked'
+                        && Number.isFinite(form.initialFraction)
+                        && Math.abs(clampFraction(form.initialFraction) - (activeNode.initialFraction || 0)) > FRACTION_EPSILON;
+
+                    if (!isRebalanceEdit) {
+                        updateActiveDeskMapNodes(prev => prev.map(n => n.id === activeNode.id ? { ...n, ...form } : n));
+                    } else {
+                        const shouldContinue = window.confirm('Changing initial fraction will recalculate this branch and descendants. Continue?');
+                        if (!shouldContinue) return;
+                        const result = commitBranchRebalance(nodes, {
+                            node: activeNode,
+                            newInitialFraction: form.initialFraction,
+                            includeFormFields: true
+                        });
+                        updateActiveDeskMapNodes(result.updatedNodes);
+                        recordBranchRecalculationAudit({
+                            action: 'edit_rebalance',
+                            nodeId: activeNode.id,
+                            oldInitialFraction: result.oldInitialFraction,
+                            newInitialFraction: result.newInitialFraction,
+                            scaleFactor: result.scaleFactor,
+                            affectedCount: result.affectedCount
+                        });
+                    }
+                }
                 else if (modalMode === 'convey') {
                     const newId = makeId();
                     const updatedNodes = nodes.map(n => n.id === activeNode.id ? { ...n, fraction: Math.max(0, n.fraction - calcShare) } : n);
@@ -937,23 +990,19 @@ const Icon = ({ name, size = 18, className = "" }) => {
                         const shouldContinue = window.confirm('This rebalance will recalculate every descendant in this branch. Continue?');
                         if (!shouldContinue) return;
                     }
-                    const scaleFactor = newInitialFraction / oldInitialFraction;
-                    const scaledNodes = applyBranchScale(nodes, activeNode.id, scaleFactor);
-                    const affectedCount = collectDescendantIds(nodes, activeNode.id).size + 1;
-                    const updatedNodes = scaledNodes.map(n => {
-                        if (activeNode.parentId && n.id === activeNode.parentId) {
-                            return { ...n, fraction: clampFraction((n.fraction || 0) + oldInitialFraction - newInitialFraction) };
-                        }
-                        return n;
+                    const result = commitBranchRebalance(nodes, {
+                        node: activeNode,
+                        newInitialFraction: form.initialFraction,
+                        includeFormFields: false
                     });
-                    updateActiveDeskMapNodes(updatedNodes);
+                    updateActiveDeskMapNodes(result.updatedNodes);
                     recordBranchRecalculationAudit({
                         action: 'rebalance',
                         nodeId: activeNode.id,
-                        oldInitialFraction,
-                        newInitialFraction,
-                        scaleFactor,
-                        affectedCount
+                        oldInitialFraction: result.oldInitialFraction,
+                        newInitialFraction: result.newInitialFraction,
+                        scaleFactor: result.scaleFactor,
+                        affectedCount: result.affectedCount
                     });
                 } else if (modalMode === 'add_chain') {
                     const newId = makeId();
@@ -1649,29 +1698,32 @@ const Icon = ({ name, size = 18, className = "" }) => {
             const handleDeleteWorkspace = async (workspaceId) => {
                 if (!workspaceId) return;
                 if (!window.confirm('Delete this saved workspace permanently?')) return;
+                const deletingActiveWorkspace = currentWorkspaceId === workspaceId;
+                if (deletingActiveWorkspace) {
+                    setWorkspaceLoaded(false);
+                    setCurrentWorkspaceId(null);
+                    setShowHome(true);
+                }
                 await deleteWorkspace(workspaceId);
                 const projects = await listWorkspaces();
                 setSavedProjects(projects);
-                if (currentWorkspaceId === workspaceId) {
-                    setCurrentWorkspaceId(null);
+                if (deletingActiveWorkspace) {
                     setProjectName('My Workspace');
-                    setWorkspaceLoaded(false);
                     setShowCloudModal(false);
-                    setShowHome(true);
                 }
             };
 
             const handleDeleteAllWorkspaces = async () => {
                 if (!savedProjects.length) return;
                 if (!window.confirm('Delete ALL saved workspaces? This cannot be undone.')) return;
+                setWorkspaceLoaded(false);
+                setCurrentWorkspaceId(null);
+                setShowHome(true);
                 await deleteAllWorkspaces();
                 recordAuditEvent('workspace_deleted_all', { deletedCount: savedProjects.length });
                 setSavedProjects([]);
-                setCurrentWorkspaceId(null);
                 setProjectName('My Workspace');
-                setWorkspaceLoaded(false);
                 setShowCloudModal(false);
-                setShowHome(true);
             };
 
             const handleReturnHome = async () => {
