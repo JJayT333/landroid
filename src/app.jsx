@@ -1,4 +1,4 @@
-const { useState, useMemo, useRef, useEffect } = React;
+const { useState, useMemo, useRef, useEffect, useCallback } = React;
 const { flushSync } = ReactDOM;
 const appId = 'default-app-id';
 
@@ -31,6 +31,15 @@ const fromStoredWorkspace = workspaceDomainApi.fromStoredWorkspace || ((payload)
 const auditLogApi = globalThis.LANDroidAuditLog || {};
 const recordAuditEvent = auditLogApi.recordAuditEvent || (() => null);
 const listAuditEvents = auditLogApi.listAuditEvents || (() => []);
+const getRecentBranchAuditEvents = () => {
+    try {
+        return listAuditEvents()
+            .filter(event => event?.type === 'branch_recalculated')
+            .slice(0, 8);
+    } catch (_error) {
+        return [];
+    }
+};
 
 const syncEngineApi = globalThis.LANDroidSyncEngine || {};
 const getSyncSummary = syncEngineApi.getSyncSummary || (() => ({ pendingCount: 0, status: 'synced', lastOperationAt: null }));
@@ -196,6 +205,18 @@ const Icon = ({ name, size = 18, className = "" }) => {
             const [interestForm, setInterestForm] = useState({ contactId: '', tractId: '', interestType: 'MI', interestValue: '', status: 'confirmed' });
             const [logForm, setLogForm] = useState({ contactId: '', tractId: '', method: 'call', outcome: '', nextFollowupAt: '', notes: '' });
 
+            const toSortTimestamp = (value) => {
+                const ts = Date.parse(value || '');
+                return Number.isFinite(ts) ? ts : 0;
+            };
+
+            const decorateRunsheetNode = (node, deskMapId, deskMapLabel) => ({
+                ...node,
+                __deskMapId: deskMapId,
+                __deskMapLabel: deskMapLabel,
+                __sortTs: toSortTimestamp(node?.date)
+            });
+
 
             const formatDeskMapLabel = (map) => {
                 if (!map) return 'DeskMap';
@@ -215,34 +236,41 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 return { status: 'under', label: 'Under', delta };
             }, [totalRemaining]);
             const uniqueGrantees = useMemo(() => [...new Set(nodes.map(n => n.grantee).filter(Boolean))].sort(), [nodes]);
-            const recentMathAuditEvents = useMemo(() => {
-                try {
-                    return listAuditEvents()
-                        .filter(event => event?.type === 'branch_recalculated')
-                        .slice(0, 8);
-                } catch (_error) {
-                    return [];
-                }
-            }, [nodes, deskMaps]);
+            const [recentMathAuditEvents, setRecentMathAuditEvents] = useState(() => getRecentBranchAuditEvents());
             
             // PERFORMANCE: Runsheet sorting/filtering memoization
             const runsheetNodesSource = useMemo(() => {
                 if (runsheetDeskMapFilter === 'all') {
-                    return deskMaps.flatMap(map => (map.nodes || []).map(n => ({ ...n, __deskMapId: map.id, __deskMapLabel: formatDeskMapLabel(map) })));
+                    return runsheetAllDecoratedNodes;
                 }
                 if (runsheetDeskMapFilter === 'active') {
-                    const activeMap = deskMaps.find(map => map.id === activeDeskMapId);
-                    return (activeMap?.nodes || nodes || []).map(n => ({ ...n, __deskMapId: activeMap?.id || activeDeskMapId, __deskMapLabel: activeMap ? formatDeskMapLabel(activeMap) : 'Active DeskMap' }));
+                    const activeMap = deskMapById[activeDeskMapId];
+                    const activeMapLabel = activeMap ? formatDeskMapLabel(activeMap) : 'Active DeskMap';
+                    return (activeMap?.nodes || nodes || []).map(n => decorateRunsheetNode(n, activeMap?.id || activeDeskMapId, activeMapLabel));
                 }
-                const chosenMap = deskMaps.find(map => map.id === runsheetDeskMapFilter);
-                return (chosenMap?.nodes || []).map(n => ({ ...n, __deskMapId: chosenMap?.id, __deskMapLabel: chosenMap ? formatDeskMapLabel(chosenMap) : 'Selected DeskMap' }));
-            }, [runsheetDeskMapFilter, deskMaps, activeDeskMapId, nodes]);
+                const chosenMap = deskMapById[runsheetDeskMapFilter];
+                return (chosenMap?.nodes || []).map(n => decorateRunsheetNode(n, chosenMap?.id, chosenMap ? formatDeskMapLabel(chosenMap) : 'Selected DeskMap'));
+            }, [runsheetDeskMapFilter, runsheetAllDecoratedNodes, activeDeskMapId, nodes, deskMapById]);
 
             const filteredSortedNodes = useMemo(() => {
-                return [...runsheetNodesSource]
-                    .sort((a,b) => new Date(a.date) - new Date(b.date))
-                    .filter(n => showOnlyConveyances ? (n.type !== 'related' && n.parentId !== 'unlinked') : true);
+                const scopedNodes = showOnlyConveyances
+                    ? runsheetNodesSource.filter(n => n.type !== 'related' && n.parentId !== 'unlinked')
+                    : runsheetNodesSource;
+                return [...scopedNodes].sort((a,b) => a.__sortTs - b.__sortTs);
             }, [runsheetNodesSource, showOnlyConveyances]);
+            const looseRecordCount = useMemo(
+                () => filteredSortedNodes.reduce((count, node) => count + (node.parentId === 'unlinked' ? 1 : 0), 0),
+                [filteredSortedNodes]
+            );
+            const nodeById = useMemo(() => Object.fromEntries(nodes.map(node => [node.id, node])), [nodes]);
+            const deskMapById = useMemo(() => Object.fromEntries(deskMaps.map(map => [map.id, map])), [deskMaps]);
+            const runsheetAllDecoratedNodes = useMemo(
+                () => deskMaps.flatMap(map => {
+                    const label = formatDeskMapLabel(map);
+                    return (map.nodes || []).map(node => decorateRunsheetNode(node, map.id, label));
+                }),
+                [deskMaps]
+            );
 
             const tractById = useMemo(() => Object.fromEntries(tracts.map(t => [t.id, t])), [tracts]);
             const contactById = useMemo(() => Object.fromEntries(contacts.map(c => [c.id, c])), [contacts]);
@@ -289,6 +317,15 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 setDeskMapNameDraft(activeMap?.name || '');
                 setDeskMapCodeDraft(activeMap?.code || '');
             }, [activeDeskMapId, deskMaps, isEditingDeskMapName]);
+
+            const refreshRecentMathAuditEvents = useCallback(() => {
+                setRecentMathAuditEvents(getRecentBranchAuditEvents());
+            }, []);
+
+            const recordBranchRecalculationAudit = useCallback((detail) => {
+                recordAuditEvent('branch_recalculated', detail);
+                refreshRecentMathAuditEvents();
+            }, [refreshRecentMathAuditEvents]);
 
             const updateActiveDeskMapNodes = (updater) => {
                 const mapId = activeDeskMapId;
@@ -693,7 +730,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
             const calcShare = useMemo(() => {
                 if (modalMode !== 'convey' && modalMode !== 'attach') return 0;
                 const parentIdToUse = modalMode === 'attach' ? attachParentId : activeNode?.id;
-                const parent = nodes.find(n => n.id === parentIdToUse);
+                const parent = nodeById[parentIdToUse];
                 if (!parent) return 0;
                 const ratio = (parseFloat(form.numerator || 0) / parseFloat(form.denominator || 1));
                 if (form.conveyanceMode === 'all') return parent.fraction;
@@ -706,11 +743,11 @@ const Icon = ({ name, size = 18, className = "" }) => {
                     return base * ratio;
                 }
                 return 0;
-            }, [form, nodes, modalMode, activeNode, attachParentId]);
+            }, [form, nodeById, modalMode, activeNode, attachParentId]);
 
             const attachImpact = useMemo(() => {
                 if (modalMode !== 'attach' || attachType !== 'conveyance' || !activeNode) return null;
-                const destination = nodes.find(n => n.id === attachParentId);
+                const destination = nodeById[attachParentId];
                 if (!destination) return { valid: false, reason: 'Select a valid destination record.' };
                 const descendants = collectDescendantIds(nodes, activeNode.id);
                 if (attachParentId === activeNode.id || descendants.has(attachParentId)) {
@@ -729,11 +766,11 @@ const Icon = ({ name, size = 18, className = "" }) => {
                     scaleFactor,
                     descendantCount: descendants.size
                 };
-            }, [modalMode, attachType, activeNode, nodes, attachParentId, calcShare]);
+            }, [modalMode, attachType, activeNode, nodes, attachParentId, calcShare, nodeById]);
 
             const rebalanceImpact = useMemo(() => {
                 if (modalMode !== 'rebalance' || !activeNode) return null;
-                const parent = nodes.find(n => n.id === activeNode.parentId);
+                const parent = nodeById[activeNode.parentId];
                 const oldInitialFraction = Math.max(activeNode.initialFraction || 0, FRACTION_EPSILON);
                 const newInitialFraction = clampFraction(form.initialFraction);
                 const scaleFactor = newInitialFraction / oldInitialFraction;
@@ -746,11 +783,11 @@ const Icon = ({ name, size = 18, className = "" }) => {
                     parentBefore: parent?.fraction || 0,
                     parentAfter: parent ? clampFraction((parent.fraction || 0) + oldInitialFraction - newInitialFraction) : null
                 };
-            }, [modalMode, activeNode, nodes, form.initialFraction]);
+            }, [modalMode, activeNode, nodes, form.initialFraction, nodeById]);
 
             const precedeImpact = useMemo(() => {
                 if (modalMode !== 'precede' || !activeNode) return null;
-                const parent = nodes.find(n => n.id === activeNode.parentId);
+                const parent = nodeById[activeNode.parentId];
                 const oldInitialFraction = Math.max(activeNode.initialFraction || 0, FRACTION_EPSILON);
                 const newInitialFraction = clampFraction(form.initialFraction);
                 const scaleFactor = newInitialFraction / oldInitialFraction;
@@ -764,7 +801,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
                     parentAfter: parent ? clampFraction((parent.fraction || 0) + oldInitialFraction - newInitialFraction) : null,
                     predecessorRetained: clampFraction(newInitialFraction - (activeNode.initialFraction || 0))
                 };
-            }, [modalMode, activeNode, nodes, form.initialFraction]);
+            }, [modalMode, activeNode, nodes, form.initialFraction, nodeById]);
 
             // CRUD Actions
             const openEdit = (node) => {
@@ -884,7 +921,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
                         return n;
                     });
                     updateActiveDeskMapNodes([...updatedNodes, { ...form, id: newId, type: 'conveyance', parentId: activeNode.parentId, initialFraction: newInitialFraction, fraction: 0 }]);
-                    recordAuditEvent('branch_recalculated', {
+                    recordBranchRecalculationAudit({
                         action: 'precede',
                         nodeId: activeNode.id,
                         predecessorId: newId,
@@ -910,7 +947,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
                         return n;
                     });
                     updateActiveDeskMapNodes(updatedNodes);
-                    recordAuditEvent('branch_recalculated', {
+                    recordBranchRecalculationAudit({
                         action: 'rebalance',
                         nodeId: activeNode.id,
                         oldInitialFraction,
@@ -936,13 +973,13 @@ const Icon = ({ name, size = 18, className = "" }) => {
                         }
                         const shouldContinue = window.confirm('Attaching this conveyance will recalculate ownership for this branch. Continue?');
                         if (!shouldContinue) return;
-                        const destinationNode = nodes.find(n => n.id === attachParentId);
+                        const destinationNode = nodeById[attachParentId];
                         const oldRootFraction = Math.max(activeNode.fraction || 0, FRACTION_EPSILON);
                         const newRootFraction = clampFraction(calcShare);
                         const scaleFactor = newRootFraction / oldRootFraction;
                         const affectedCount = collectDescendantIds(nodes, activeNode.id).size + 1;
                         updateActiveDeskMapNodes(prev => applyAttachConveyanceUpdate(prev));
-                        recordAuditEvent('branch_recalculated', {
+                        recordBranchRecalculationAudit({
                             action: 'attach_conveyance',
                             nodeId: activeNode.id,
                             destinationId: attachParentId,
@@ -2128,9 +2165,9 @@ const Icon = ({ name, size = 18, className = "" }) => {
                                                 <button onClick={() => setShowOnlyConveyances(true)} className={`px-3 py-1 text-[9px] font-bold uppercase transition-all rounded-sm ${showOnlyConveyances ? 'bg-parchment text-ink shadow-sm' : 'text-parchment/60 hover:text-parchment'}`}>Conveyances Only</button>
                                             </div>
                                             <div className="text-[10px] font-mono opacity-60 hidden sm:flex items-center">
-                                                {filteredSortedNodes.filter(n => n.parentId === 'unlinked').length > 0 && !showOnlyConveyances && (
+                                                {looseRecordCount > 0 && !showOnlyConveyances && (
                                                     <span className="text-parchment bg-stamp/80 px-2 py-0.5 rounded-sm mr-3 font-bold inline-flex items-center gap-1">
-                                                        {filteredSortedNodes.filter(n => n.parentId === 'unlinked').length} Loose Record(s) pending link
+                                                        {looseRecordCount} Loose Record(s) pending link
                                                     </span>
                                                 )}
                                                 Sorted by Effective Date
