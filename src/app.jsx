@@ -205,6 +205,18 @@ const Icon = ({ name, size = 18, className = "" }) => {
             const [interestForm, setInterestForm] = useState({ contactId: '', tractId: '', interestType: 'MI', interestValue: '', status: 'confirmed' });
             const [logForm, setLogForm] = useState({ contactId: '', tractId: '', method: 'call', outcome: '', nextFollowupAt: '', notes: '' });
 
+            const toSortTimestamp = (value) => {
+                const ts = Date.parse(value || '');
+                return Number.isFinite(ts) ? ts : 0;
+            };
+
+            const decorateRunsheetNode = (node, deskMapId, deskMapLabel) => ({
+                ...node,
+                __deskMapId: deskMapId,
+                __deskMapLabel: deskMapLabel,
+                __sortTs: toSortTimestamp(node?.date)
+            });
+
 
             const formatDeskMapLabel = (map) => {
                 if (!map) return 'DeskMap';
@@ -229,26 +241,36 @@ const Icon = ({ name, size = 18, className = "" }) => {
             // PERFORMANCE: Runsheet sorting/filtering memoization
             const runsheetNodesSource = useMemo(() => {
                 if (runsheetDeskMapFilter === 'all') {
-                    return deskMaps.flatMap(map => (map.nodes || []).map(n => ({ ...n, __deskMapId: map.id, __deskMapLabel: formatDeskMapLabel(map) })));
+                    return runsheetAllDecoratedNodes;
                 }
                 if (runsheetDeskMapFilter === 'active') {
-                    const activeMap = deskMaps.find(map => map.id === activeDeskMapId);
-                    return (activeMap?.nodes || nodes || []).map(n => ({ ...n, __deskMapId: activeMap?.id || activeDeskMapId, __deskMapLabel: activeMap ? formatDeskMapLabel(activeMap) : 'Active DeskMap' }));
+                    const activeMap = deskMapById[activeDeskMapId];
+                    const activeMapLabel = activeMap ? formatDeskMapLabel(activeMap) : 'Active DeskMap';
+                    return (activeMap?.nodes || nodes || []).map(n => decorateRunsheetNode(n, activeMap?.id || activeDeskMapId, activeMapLabel));
                 }
-                const chosenMap = deskMaps.find(map => map.id === runsheetDeskMapFilter);
-                return (chosenMap?.nodes || []).map(n => ({ ...n, __deskMapId: chosenMap?.id, __deskMapLabel: chosenMap ? formatDeskMapLabel(chosenMap) : 'Selected DeskMap' }));
-            }, [runsheetDeskMapFilter, deskMaps, activeDeskMapId, nodes]);
+                const chosenMap = deskMapById[runsheetDeskMapFilter];
+                return (chosenMap?.nodes || []).map(n => decorateRunsheetNode(n, chosenMap?.id, chosenMap ? formatDeskMapLabel(chosenMap) : 'Selected DeskMap'));
+            }, [runsheetDeskMapFilter, runsheetAllDecoratedNodes, activeDeskMapId, nodes, deskMapById]);
 
             const filteredSortedNodes = useMemo(() => {
-                return [...runsheetNodesSource]
-                    .sort((a,b) => new Date(a.date) - new Date(b.date))
-                    .filter(n => showOnlyConveyances ? (n.type !== 'related' && n.parentId !== 'unlinked') : true);
+                const scopedNodes = showOnlyConveyances
+                    ? runsheetNodesSource.filter(n => n.type !== 'related' && n.parentId !== 'unlinked')
+                    : runsheetNodesSource;
+                return [...scopedNodes].sort((a,b) => a.__sortTs - b.__sortTs);
             }, [runsheetNodesSource, showOnlyConveyances]);
             const looseRecordCount = useMemo(
                 () => filteredSortedNodes.reduce((count, node) => count + (node.parentId === 'unlinked' ? 1 : 0), 0),
                 [filteredSortedNodes]
             );
             const nodeById = useMemo(() => Object.fromEntries(nodes.map(node => [node.id, node])), [nodes]);
+            const deskMapById = useMemo(() => Object.fromEntries(deskMaps.map(map => [map.id, map])), [deskMaps]);
+            const runsheetAllDecoratedNodes = useMemo(
+                () => deskMaps.flatMap(map => {
+                    const label = formatDeskMapLabel(map);
+                    return (map.nodes || []).map(node => decorateRunsheetNode(node, map.id, label));
+                }),
+                [deskMaps]
+            );
 
             const tractById = useMemo(() => Object.fromEntries(tracts.map(t => [t.id, t])), [tracts]);
             const contactById = useMemo(() => Object.fromEntries(contacts.map(c => [c.id, c])), [contacts]);

@@ -11,6 +11,7 @@ Use this checklist before starting each new hardening/feature phase.
 - [ ] `npm run test:cross-surface` passes against `testdata/deskmap-stress-5x200.workspace.json`.
 
 ## 3) Performance Gate (Go / No-Go)
+- [ ] `npm run test:perf` runs against `testdata/deskmap-stress-5x200.workspace.json` and reports no unexpected regressions.
 - [ ] No widened dependencies in hot memo paths (runsheet derivation, audit log derivation, flow source selection).
 - [ ] No duplicate O(n) render work for unchanged values in core views.
 - [ ] Any perf-sensitive refactor includes before/after timing notes when practical.

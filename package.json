@@ -4,11 +4,12 @@
   "version": "1.0.0",
   "type": "commonjs",
   "scripts": {
-    "test": "npm run test:smoke && npm run test:storage && npm run test:math-regression && npm run test:title-scenarios && npm run test:cross-surface",
+    "test": "npm run test:smoke && npm run test:storage && npm run test:math-regression && npm run test:title-scenarios && npm run test:cross-surface && npm run test:perf",
     "test:smoke": "node scripts/smoke-checks.js",
     "test:storage": "node scripts/workspace-storage-checks.js",
     "test:math-regression": "node scripts/math-regression-checks.js",
     "test:title-scenarios": "node scripts/title-scenario-checks.js",
-    "test:cross-surface": "node scripts/cross-surface-parity-checks.js"
+    "test:cross-surface": "node scripts/cross-surface-parity-checks.js",
+    "test:perf": "node scripts/perf-benchmark-5x200.js"
   }
 }
