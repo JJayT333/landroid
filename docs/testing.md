@@ -41,6 +41,7 @@
   - reports timing regressions via warnings
 
 ## Recommended CI behavior
-1. Run `npm test`.
+1. Run `npm test` once per change set that affects runtime behavior.
 2. Treat any failure as blocking for correctness and hardening changes.
 3. Track `test:perf` warnings over time and investigate sustained regressions.
+4. Avoid repeated full reruns when code is unchanged; rerun only after a fix or when collecting the explicit 3-run perf snapshot for baseline comparison.
