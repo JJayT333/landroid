@@ -12,6 +12,21 @@ function createLocalStorageMock() {
   };
 }
 
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function waitForWorkspaces(api, minCount, attempts = 20) {
+  for (let i = 0; i < attempts; i += 1) {
+    const all = await api.getAllWorkspaces();
+    if (Array.isArray(all) && all.length >= minCount) return all;
+    await sleep(10);
+  }
+  const last = await api.getAllWorkspaces();
+  return Array.isArray(last) ? last : [];
+}
+
 function createIndexedDbMock() {
   const databases = new Map();
   const createRequest = () => ({ onsuccess: null, onerror: null, onupgradeneeded: null, result: null, error: null });
@@ -145,7 +160,8 @@ async function run() {
 
   await api.saveWorkspace({ id: 'older', updatedAt: 1, name: 'older' });
   await api.saveWorkspace({ id: 'newer', updatedAt: Number.MAX_SAFE_INTEGER - 1, name: 'newer' });
-  const all = await api.getAllWorkspaces();
+  const all = await waitForWorkspaces(api, 2);
+  assert(all.length >= 2, 'getAllWorkspaces should include saved records');
   assert(all[0].id === 'newer', 'getAllWorkspaces should sort by updatedAt desc');
 
   await api.deleteWorkspace(saved.id);
