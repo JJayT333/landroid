@@ -1,4 +1,4 @@
-const { useState, useMemo, useRef, useEffect } = React;
+const { useState, useMemo, useRef, useEffect, useCallback } = React;
 const { flushSync } = ReactDOM;
 const appId = 'default-app-id';
 
@@ -30,6 +30,16 @@ const fromStoredWorkspace = workspaceDomainApi.fromStoredWorkspace || ((payload)
 
 const auditLogApi = globalThis.LANDroidAuditLog || {};
 const recordAuditEvent = auditLogApi.recordAuditEvent || (() => null);
+const listAuditEvents = auditLogApi.listAuditEvents || (() => []);
+const getRecentBranchAuditEvents = () => {
+    try {
+        return listAuditEvents()
+            .filter(event => event?.type === 'branch_recalculated')
+            .slice(0, 8);
+    } catch (_error) {
+        return [];
+    }
+};
 
 const syncEngineApi = globalThis.LANDroidSyncEngine || {};
 const getSyncSummary = syncEngineApi.getSyncSummary || (() => ({ pendingCount: 0, status: 'synced', lastOperationAt: null }));
@@ -195,6 +205,18 @@ const Icon = ({ name, size = 18, className = "" }) => {
             const [interestForm, setInterestForm] = useState({ contactId: '', tractId: '', interestType: 'MI', interestValue: '', status: 'confirmed' });
             const [logForm, setLogForm] = useState({ contactId: '', tractId: '', method: 'call', outcome: '', nextFollowupAt: '', notes: '' });
 
+            const toSortTimestamp = (value) => {
+                const ts = Date.parse(value || '');
+                return Number.isFinite(ts) ? ts : 0;
+            };
+
+            const decorateRunsheetNode = (node, deskMapId, deskMapLabel) => ({
+                ...node,
+                __deskMapId: deskMapId,
+                __deskMapLabel: deskMapLabel,
+                __sortTs: toSortTimestamp(node?.date)
+            });
+
 
             const formatDeskMapLabel = (map) => {
                 if (!map) return 'DeskMap';
@@ -207,26 +229,48 @@ const Icon = ({ name, size = 18, className = "" }) => {
             // PERFORMANCE: Memoized calculated arrays
             const activeOwners = useMemo(() => nodes.filter(n => n.type !== 'related' && n.fraction > 0.00000001), [nodes]);
             const totalRemaining = useMemo(() => activeOwners.reduce((sum, n) => sum + parseFloat(n.fraction), 0), [activeOwners]);
+            const ownershipHealth = useMemo(() => {
+                const delta = totalRemaining - 1;
+                if (Math.abs(delta) <= 0.00000001) return { status: 'balanced', label: 'Balanced', delta };
+                if (delta > 0) return { status: 'over', label: 'Over', delta };
+                return { status: 'under', label: 'Under', delta };
+            }, [totalRemaining]);
             const uniqueGrantees = useMemo(() => [...new Set(nodes.map(n => n.grantee).filter(Boolean))].sort(), [nodes]);
+            const [recentMathAuditEvents, setRecentMathAuditEvents] = useState(() => getRecentBranchAuditEvents());
             
             // PERFORMANCE: Runsheet sorting/filtering memoization
+            const nodeById = useMemo(() => Object.fromEntries(nodes.map(node => [node.id, node])), [nodes]);
+            const deskMapById = useMemo(() => Object.fromEntries(deskMaps.map(map => [map.id, map])), [deskMaps]);
+            const runsheetAllDecoratedNodes = useMemo(
+                () => deskMaps.flatMap(map => {
+                    const label = formatDeskMapLabel(map);
+                    return (map.nodes || []).map(node => decorateRunsheetNode(node, map.id, label));
+                }),
+                [deskMaps]
+            );
             const runsheetNodesSource = useMemo(() => {
                 if (runsheetDeskMapFilter === 'all') {
-                    return deskMaps.flatMap(map => (map.nodes || []).map(n => ({ ...n, __deskMapId: map.id, __deskMapLabel: formatDeskMapLabel(map) })));
+                    return runsheetAllDecoratedNodes;
                 }
                 if (runsheetDeskMapFilter === 'active') {
-                    const activeMap = deskMaps.find(map => map.id === activeDeskMapId);
-                    return (activeMap?.nodes || nodes || []).map(n => ({ ...n, __deskMapId: activeMap?.id || activeDeskMapId, __deskMapLabel: activeMap ? formatDeskMapLabel(activeMap) : 'Active DeskMap' }));
+                    const activeMap = deskMapById[activeDeskMapId];
+                    const activeMapLabel = activeMap ? formatDeskMapLabel(activeMap) : 'Active DeskMap';
+                    return (activeMap?.nodes || nodes || []).map(n => decorateRunsheetNode(n, activeMap?.id || activeDeskMapId, activeMapLabel));
                 }
-                const chosenMap = deskMaps.find(map => map.id === runsheetDeskMapFilter);
-                return (chosenMap?.nodes || []).map(n => ({ ...n, __deskMapId: chosenMap?.id, __deskMapLabel: chosenMap ? formatDeskMapLabel(chosenMap) : 'Selected DeskMap' }));
-            }, [runsheetDeskMapFilter, deskMaps, activeDeskMapId, nodes]);
+                const chosenMap = deskMapById[runsheetDeskMapFilter];
+                return (chosenMap?.nodes || []).map(n => decorateRunsheetNode(n, chosenMap?.id, chosenMap ? formatDeskMapLabel(chosenMap) : 'Selected DeskMap'));
+            }, [runsheetDeskMapFilter, runsheetAllDecoratedNodes, activeDeskMapId, nodes, deskMapById]);
 
             const filteredSortedNodes = useMemo(() => {
-                return [...runsheetNodesSource]
-                    .sort((a,b) => new Date(a.date) - new Date(b.date))
-                    .filter(n => showOnlyConveyances ? (n.type !== 'related' && n.parentId !== 'unlinked') : true);
+                const scopedNodes = showOnlyConveyances
+                    ? runsheetNodesSource.filter(n => n.type !== 'related' && n.parentId !== 'unlinked')
+                    : runsheetNodesSource;
+                return [...scopedNodes].sort((a,b) => a.__sortTs - b.__sortTs);
             }, [runsheetNodesSource, showOnlyConveyances]);
+            const looseRecordCount = useMemo(
+                () => filteredSortedNodes.reduce((count, node) => count + (node.parentId === 'unlinked' ? 1 : 0), 0),
+                [filteredSortedNodes]
+            );
 
             const tractById = useMemo(() => Object.fromEntries(tracts.map(t => [t.id, t])), [tracts]);
             const contactById = useMemo(() => Object.fromEntries(contacts.map(c => [c.id, c])), [contacts]);
@@ -273,6 +317,15 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 setDeskMapNameDraft(activeMap?.name || '');
                 setDeskMapCodeDraft(activeMap?.code || '');
             }, [activeDeskMapId, deskMaps, isEditingDeskMapName]);
+
+            const refreshRecentMathAuditEvents = useCallback(() => {
+                setRecentMathAuditEvents(getRecentBranchAuditEvents());
+            }, []);
+
+            const recordBranchRecalculationAudit = useCallback((detail) => {
+                recordAuditEvent('branch_recalculated', detail);
+                refreshRecentMathAuditEvents();
+            }, [refreshRecentMathAuditEvents]);
 
             const updateActiveDeskMapNodes = (updater) => {
                 const mapId = activeDeskMapId;
@@ -661,10 +714,23 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 });
             };
 
+            const applyBranchScale = (allNodes, rootId, scaleFactor) => {
+                if (!Number.isFinite(scaleFactor)) return allNodes;
+                const descendants = collectDescendantIds(allNodes, rootId);
+                return allNodes.map(n => {
+                    if (n.id !== rootId && !descendants.has(n.id)) return n;
+                    return {
+                        ...n,
+                        fraction: clampFraction((n.fraction || 0) * scaleFactor),
+                        initialFraction: clampFraction((n.initialFraction || 0) * scaleFactor)
+                    };
+                });
+            };
+
             const calcShare = useMemo(() => {
                 if (modalMode !== 'convey' && modalMode !== 'attach') return 0;
                 const parentIdToUse = modalMode === 'attach' ? attachParentId : activeNode?.id;
-                const parent = nodes.find(n => n.id === parentIdToUse);
+                const parent = nodeById[parentIdToUse];
                 if (!parent) return 0;
                 const ratio = (parseFloat(form.numerator || 0) / parseFloat(form.denominator || 1));
                 if (form.conveyanceMode === 'all') return parent.fraction;
@@ -677,7 +743,65 @@ const Icon = ({ name, size = 18, className = "" }) => {
                     return base * ratio;
                 }
                 return 0;
-            }, [form, nodes, modalMode, activeNode, attachParentId]);
+            }, [form, nodeById, modalMode, activeNode, attachParentId]);
+
+            const attachImpact = useMemo(() => {
+                if (modalMode !== 'attach' || attachType !== 'conveyance' || !activeNode) return null;
+                const destination = nodeById[attachParentId];
+                if (!destination) return { valid: false, reason: 'Select a valid destination record.' };
+                const descendants = collectDescendantIds(nodes, activeNode.id);
+                if (attachParentId === activeNode.id || descendants.has(attachParentId)) {
+                    return { valid: false, reason: 'Cannot attach to itself or a descendant.' };
+                }
+                const oldRootFraction = Math.max(activeNode.fraction || 0, FRACTION_EPSILON);
+                const newRootFraction = clampFraction(calcShare);
+                const scaleFactor = newRootFraction / oldRootFraction;
+                return {
+                    valid: true,
+                    destinationName: destination.grantee || destination.instrument || 'Selected destination',
+                    destinationBefore: destination.fraction || 0,
+                    destinationAfter: clampFraction((destination.fraction || 0) - newRootFraction),
+                    rootBefore: activeNode.fraction || 0,
+                    rootAfter: newRootFraction,
+                    scaleFactor,
+                    descendantCount: descendants.size
+                };
+            }, [modalMode, attachType, activeNode, nodes, attachParentId, calcShare, nodeById]);
+
+            const rebalanceImpact = useMemo(() => {
+                if (modalMode !== 'rebalance' || !activeNode) return null;
+                const parent = nodeById[activeNode.parentId];
+                const oldInitialFraction = Math.max(activeNode.initialFraction || 0, FRACTION_EPSILON);
+                const newInitialFraction = clampFraction(form.initialFraction);
+                const scaleFactor = newInitialFraction / oldInitialFraction;
+                const descendants = collectDescendantIds(nodes, activeNode.id);
+                return {
+                    oldInitialFraction,
+                    newInitialFraction,
+                    scaleFactor,
+                    descendantCount: descendants.size,
+                    parentBefore: parent?.fraction || 0,
+                    parentAfter: parent ? clampFraction((parent.fraction || 0) + oldInitialFraction - newInitialFraction) : null
+                };
+            }, [modalMode, activeNode, nodes, form.initialFraction, nodeById]);
+
+            const precedeImpact = useMemo(() => {
+                if (modalMode !== 'precede' || !activeNode) return null;
+                const parent = nodeById[activeNode.parentId];
+                const oldInitialFraction = Math.max(activeNode.initialFraction || 0, FRACTION_EPSILON);
+                const newInitialFraction = clampFraction(form.initialFraction);
+                const scaleFactor = newInitialFraction / oldInitialFraction;
+                const descendants = collectDescendantIds(nodes, activeNode.id);
+                return {
+                    oldInitialFraction,
+                    newInitialFraction,
+                    scaleFactor,
+                    descendantCount: descendants.size,
+                    parentBefore: parent?.fraction || 0,
+                    parentAfter: parent ? clampFraction((parent.fraction || 0) + oldInitialFraction - newInitialFraction) : null,
+                    predecessorRetained: clampFraction(newInitialFraction - (activeNode.initialFraction || 0))
+                };
+            }, [modalMode, activeNode, nodes, form.initialFraction, nodeById]);
 
             // CRUD Actions
             const openEdit = (node) => {
@@ -725,6 +849,16 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 setShowModal(true);
             };
 
+            const openRebalance = (node) => {
+                setIsAddingInst(false); setShowGranteeList(false); setModalMode('rebalance'); setActiveNode(node);
+                setForm({
+                    ...node,
+                    initialFraction: node.initialFraction || node.fraction,
+                    remarks: (node.remarks ? node.remarks + ' ' : '') + '[Branch rebalance]'
+                });
+                setShowModal(true);
+            };
+
             const openNewChain = () => {
                 setIsAddingInst(false); setShowGranteeList(false); setModalMode('add_chain'); setActiveNode(null);
                 const today = new Date().toISOString().split('T')[0];
@@ -759,26 +893,117 @@ const Icon = ({ name, size = 18, className = "" }) => {
 
             const toggleDeceased = (node) => updateActiveDeskMapNodes(prev => prev.map(n => n.id === node.id ? { ...n, isDeceased: !n.isDeceased } : n));
 
+            const commitBranchRebalance = (baseNodes, options) => {
+                const { node, newInitialFraction, includeFormFields = false } = options;
+                const oldInitialFraction = Math.max(node.initialFraction || 0, FRACTION_EPSILON);
+                const normalizedNewInitialFraction = clampFraction(newInitialFraction);
+                const scaleFactor = normalizedNewInitialFraction / oldInitialFraction;
+                const scaledNodes = applyBranchScale(baseNodes, node.id, scaleFactor);
+                const affectedCount = collectDescendantIds(baseNodes, node.id).size + 1;
+                const updatedNodes = scaledNodes.map(n => {
+                    if (n.id === node.id) {
+                        const mergedNode = includeFormFields ? { ...n, ...form } : n;
+                        return { ...mergedNode, initialFraction: normalizedNewInitialFraction };
+                    }
+                    if (node.parentId && n.id === node.parentId) {
+                        return { ...n, fraction: clampFraction((n.fraction || 0) + oldInitialFraction - normalizedNewInitialFraction) };
+                    }
+                    return n;
+                });
+                return {
+                    updatedNodes,
+                    oldInitialFraction,
+                    newInitialFraction: normalizedNewInitialFraction,
+                    scaleFactor,
+                    affectedCount
+                };
+            };
+
             const handleCommit = () => {
                 if (modalMode === 'convey' || modalMode === 'attach') {
                     setLastMathProps({ conveyanceMode: form.conveyanceMode, splitBasis: form.splitBasis, numerator: form.numerator, denominator: form.denominator, manualAmount: form.manualAmount });
                 }
-                if (modalMode === 'edit') updateActiveDeskMapNodes(prev => prev.map(n => n.id === activeNode.id ? { ...n, ...form } : n));
+                if (modalMode === 'edit') {
+                    const isRebalanceEdit = activeNode
+                        && activeNode.type === 'conveyance'
+                        && activeNode.parentId !== 'unlinked'
+                        && Number.isFinite(form.initialFraction)
+                        && Math.abs(clampFraction(form.initialFraction) - (activeNode.initialFraction || 0)) > FRACTION_EPSILON;
+
+                    if (!isRebalanceEdit) {
+                        updateActiveDeskMapNodes(prev => prev.map(n => n.id === activeNode.id ? { ...n, ...form } : n));
+                    } else {
+                        const shouldContinue = window.confirm('Changing initial fraction will recalculate this branch and descendants. Continue?');
+                        if (!shouldContinue) return;
+                        const result = commitBranchRebalance(nodes, {
+                            node: activeNode,
+                            newInitialFraction: form.initialFraction,
+                            includeFormFields: true
+                        });
+                        updateActiveDeskMapNodes(result.updatedNodes);
+                        recordBranchRecalculationAudit({
+                            action: 'edit_rebalance',
+                            nodeId: activeNode.id,
+                            oldInitialFraction: result.oldInitialFraction,
+                            newInitialFraction: result.newInitialFraction,
+                            scaleFactor: result.scaleFactor,
+                            affectedCount: result.affectedCount
+                        });
+                    }
+                }
                 else if (modalMode === 'convey') {
                     const newId = makeId();
                     const updatedNodes = nodes.map(n => n.id === activeNode.id ? { ...n, fraction: Math.max(0, n.fraction - calcShare) } : n);
                     updateActiveDeskMapNodes([...updatedNodes, { ...form, id: newId, type: 'conveyance', fraction: calcShare, initialFraction: calcShare, parentId: activeNode.id }]);
                 } else if (modalMode === 'precede') {
                     const newId = makeId();
-                    const updatedNodes = nodes.map(n => {
+                    const oldInitialFraction = Math.max(activeNode.initialFraction || 0, FRACTION_EPSILON);
+                    const newInitialFraction = clampFraction(form.initialFraction);
+                    if (Math.abs(newInitialFraction - oldInitialFraction) > FRACTION_EPSILON) {
+                        const shouldContinue = window.confirm('This predecessor change will recalculate every descendant in this branch. Continue?');
+                        if (!shouldContinue) return;
+                    }
+                    const scaleFactor = newInitialFraction / oldInitialFraction;
+                    const scaledNodes = applyBranchScale(nodes, activeNode.id, scaleFactor);
+                    const affectedCount = collectDescendantIds(nodes, activeNode.id).size + 1;
+                    const updatedNodes = scaledNodes.map(n => {
                         if (n.id === activeNode.id) return { ...n, parentId: newId };
                         if (activeNode.parentId && n.id === activeNode.parentId) {
-                            return { ...n, fraction: n.fraction + activeNode.initialFraction - form.initialFraction };
+                            return { ...n, fraction: clampFraction((n.fraction || 0) + oldInitialFraction - newInitialFraction) };
                         }
                         return n;
                     });
-                    const fractionRetained = form.initialFraction - activeNode.initialFraction;
-                    updateActiveDeskMapNodes([...updatedNodes, { ...form, id: newId, type: 'conveyance', parentId: activeNode.parentId, initialFraction: form.initialFraction, fraction: Math.max(0, fractionRetained) }]);
+                    updateActiveDeskMapNodes([...updatedNodes, { ...form, id: newId, type: 'conveyance', parentId: activeNode.parentId, initialFraction: newInitialFraction, fraction: 0 }]);
+                    recordBranchRecalculationAudit({
+                        action: 'precede',
+                        nodeId: activeNode.id,
+                        predecessorId: newId,
+                        oldInitialFraction,
+                        newInitialFraction,
+                        scaleFactor,
+                        affectedCount
+                    });
+                } else if (modalMode === 'rebalance') {
+                    const oldInitialFraction = Math.max(activeNode.initialFraction || 0, FRACTION_EPSILON);
+                    const newInitialFraction = clampFraction(form.initialFraction);
+                    if (Math.abs(newInitialFraction - oldInitialFraction) > FRACTION_EPSILON) {
+                        const shouldContinue = window.confirm('This rebalance will recalculate every descendant in this branch. Continue?');
+                        if (!shouldContinue) return;
+                    }
+                    const result = commitBranchRebalance(nodes, {
+                        node: activeNode,
+                        newInitialFraction: form.initialFraction,
+                        includeFormFields: false
+                    });
+                    updateActiveDeskMapNodes(result.updatedNodes);
+                    recordBranchRecalculationAudit({
+                        action: 'rebalance',
+                        nodeId: activeNode.id,
+                        oldInitialFraction: result.oldInitialFraction,
+                        newInitialFraction: result.newInitialFraction,
+                        scaleFactor: result.scaleFactor,
+                        affectedCount: result.affectedCount
+                    });
                 } else if (modalMode === 'add_chain') {
                     const newId = makeId();
                     updateActiveDeskMapNodes(prev => [...prev, { ...form, id: newId, type: 'conveyance', parentId: null }]);
@@ -795,7 +1020,24 @@ const Icon = ({ name, size = 18, className = "" }) => {
                             window.alert('Cannot attach a record to itself or one of its descendants.');
                             return;
                         }
+                        const shouldContinue = window.confirm('Attaching this conveyance will recalculate ownership for this branch. Continue?');
+                        if (!shouldContinue) return;
+                        const destinationNode = nodeById[attachParentId];
+                        const oldRootFraction = Math.max(activeNode.fraction || 0, FRACTION_EPSILON);
+                        const newRootFraction = clampFraction(calcShare);
+                        const scaleFactor = newRootFraction / oldRootFraction;
+                        const affectedCount = collectDescendantIds(nodes, activeNode.id).size + 1;
                         updateActiveDeskMapNodes(prev => applyAttachConveyanceUpdate(prev));
+                        recordBranchRecalculationAudit({
+                            action: 'attach_conveyance',
+                            nodeId: activeNode.id,
+                            destinationId: attachParentId,
+                            destinationName: destinationNode?.grantee || destinationNode?.instrument || '',
+                            oldRootFraction,
+                            newRootFraction,
+                            scaleFactor,
+                            affectedCount
+                        });
                     } else {
                         updateActiveDeskMapNodes(prev => prev.map(n => n.id === activeNode.id ? { ...form, parentId: attachParentId, type: 'related', fraction: 0, initialFraction: 0 } : n));
                     }
@@ -1290,6 +1532,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
                                     <button onClick={(e) => { e.stopPropagation(); openAttach(n); }} className="bg-sepia text-parchment border border-sepia rounded-sm px-3 py-1 text-[10px] font-bold hover:bg-sepia/80 shadow-md flex items-center gap-1 hover:-translate-y-0.5 transition-all"><Icon name="Link" size={12} /> ATTACH</button>
                                 )}
                                 <button onClick={(e) => { e.stopPropagation(); openPrecede(n); }} className="bg-ink text-parchment border border-parchment rounded-sm px-3 py-1 text-[10px] font-bold hover:bg-ink/80 shadow-md flex items-center gap-1 hover:-translate-y-0.5 transition-transform"><Icon name="ArrowUp" size={12} /> PRECEDE</button>
+                                <button onClick={(e) => { e.stopPropagation(); openRebalance(n); }} className="bg-fountain text-parchment border border-fountain rounded-sm px-3 py-1 text-[10px] font-bold hover:bg-fountain/80 shadow-md flex items-center gap-1 hover:-translate-y-0.5 transition-transform"><Icon name="Adjust" size={12} /> REBALANCE</button>
                                 <button onClick={(e) => { e.stopPropagation(); openRelated(n); }} className="bg-parchment text-ink border border-ink/40 rounded-sm px-3 py-1 text-[10px] font-bold hover:bg-teastain shadow-md flex items-center gap-1 hover:-translate-y-0.5 transition-transform"><Icon name="Paperclip" size={12} /> + DOC</button>
                                 <button onClick={(e) => { e.stopPropagation(); openConvey(n); }} className="bg-teastain text-sepia border border-sepia/60 rounded-sm px-4 py-1 text-[10px] font-bold hover:bg-parchment hover:border-sepia shadow-lg flex items-center gap-1 hover:-translate-y-0.5 transition-all"><Icon name="Convey" size={12} /> CONVEY</button>
                                 {nodes.length > 1 && <button onClick={(e) => { e.stopPropagation(); requestDeleteRecord(n); }} className="bg-parchment text-stamp border border-stamp/60 rounded-sm p-1.5 text-[10px] font-bold hover:bg-teastain hover:border-stamp shadow-lg flex items-center justify-center hover:-translate-y-0.5 transition-all"><Icon name="Trash" size={14} /></button>}
@@ -1455,29 +1698,32 @@ const Icon = ({ name, size = 18, className = "" }) => {
             const handleDeleteWorkspace = async (workspaceId) => {
                 if (!workspaceId) return;
                 if (!window.confirm('Delete this saved workspace permanently?')) return;
+                const deletingActiveWorkspace = currentWorkspaceId === workspaceId;
+                if (deletingActiveWorkspace) {
+                    setWorkspaceLoaded(false);
+                    setCurrentWorkspaceId(null);
+                    setShowHome(true);
+                }
                 await deleteWorkspace(workspaceId);
                 const projects = await listWorkspaces();
                 setSavedProjects(projects);
-                if (currentWorkspaceId === workspaceId) {
-                    setCurrentWorkspaceId(null);
+                if (deletingActiveWorkspace) {
                     setProjectName('My Workspace');
-                    setWorkspaceLoaded(false);
                     setShowCloudModal(false);
-                    setShowHome(true);
                 }
             };
 
             const handleDeleteAllWorkspaces = async () => {
                 if (!savedProjects.length) return;
                 if (!window.confirm('Delete ALL saved workspaces? This cannot be undone.')) return;
+                setWorkspaceLoaded(false);
+                setCurrentWorkspaceId(null);
+                setShowHome(true);
                 await deleteAllWorkspaces();
                 recordAuditEvent('workspace_deleted_all', { deletedCount: savedProjects.length });
                 setSavedProjects([]);
-                setCurrentWorkspaceId(null);
                 setProjectName('My Workspace');
-                setWorkspaceLoaded(false);
                 setShowCloudModal(false);
-                setShowHome(true);
             };
 
             const handleReturnHome = async () => {
@@ -1852,11 +2098,20 @@ const Icon = ({ name, size = 18, className = "" }) => {
                                 </h1>
                             </div>
                             
-                            <div className="group">
-                                <div className={`rubber-stamp bg-parchment shadow-sm ${totalRemaining > 1.00000001 ? 'error animate-vibrate' : ''}`}>
+                            <div className="group flex items-center gap-2 flex-wrap">
+                                <div className={`rubber-stamp bg-parchment shadow-sm ${ownershipHealth.status === 'over' ? 'error animate-vibrate' : ''}`}>
                                     <span className="opacity-80 text-xs mr-2">Master Total:</span>
                                     <span className="text-lg">{formatFraction(totalRemaining)}</span>
                                 </div>
+                                <span className={`px-2 py-1 text-[10px] border rounded font-bold uppercase tracking-widest ${
+                                    ownershipHealth.status === 'balanced'
+                                        ? 'border-green-700/40 text-green-800 bg-green-100/60'
+                                        : ownershipHealth.status === 'over'
+                                            ? 'border-stamp/60 text-stamp bg-stamp/10'
+                                            : 'border-amber-700/50 text-amber-900 bg-amber-100/70'
+                                }`}>
+                                    {ownershipHealth.label} {formatFraction(Math.abs(ownershipHealth.delta))}
+                                </span>
                             </div>
                         </div>
 
@@ -1962,15 +2217,31 @@ const Icon = ({ name, size = 18, className = "" }) => {
                                                 <button onClick={() => setShowOnlyConveyances(true)} className={`px-3 py-1 text-[9px] font-bold uppercase transition-all rounded-sm ${showOnlyConveyances ? 'bg-parchment text-ink shadow-sm' : 'text-parchment/60 hover:text-parchment'}`}>Conveyances Only</button>
                                             </div>
                                             <div className="text-[10px] font-mono opacity-60 hidden sm:flex items-center">
-                                                {filteredSortedNodes.filter(n => n.parentId === 'unlinked').length > 0 && !showOnlyConveyances && (
+                                                {looseRecordCount > 0 && !showOnlyConveyances && (
                                                     <span className="text-parchment bg-stamp/80 px-2 py-0.5 rounded-sm mr-3 font-bold inline-flex items-center gap-1">
-                                                        {filteredSortedNodes.filter(n => n.parentId === 'unlinked').length} Loose Record(s) pending link
+                                                        {looseRecordCount} Loose Record(s) pending link
                                                     </span>
                                                 )}
                                                 Sorted by Effective Date
                                             </div>
                                         </div>
                                     </div>
+                                    {recentMathAuditEvents.length > 0 && (
+                                        <div className="px-4 py-3 border-b border-ink/20 bg-teastain/40">
+                                            <div className="text-[10px] uppercase tracking-widest font-bold mb-2 text-sepia">Recent Math Change Log</div>
+                                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 text-[11px]">
+                                                {recentMathAuditEvents.map(event => (
+                                                    <div key={event.id} className="border border-ink/20 bg-parchment px-2 py-1.5 font-mono">
+                                                        <span className="font-bold uppercase text-[10px]">{event.detail?.action || event.type}</span>
+                                                        <span className="opacity-70"> · node {event.detail?.nodeId || '-'}</span>
+                                                        <span className="opacity-70"> · x{Number(event.detail?.scaleFactor || 0).toFixed(6)}</span>
+                                                        <span className="opacity-70"> · affected {event.detail?.affectedCount || 0}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
                                     <div className="overflow-x-auto">
                                         <table className="w-full text-left text-sm whitespace-nowrap">
                                             <thead className="bg-teastain/90 border-b border-ink/40 text-[9px] text-ink font-bold uppercase tracking-widest sticky top-0 z-10">
@@ -2022,6 +2293,9 @@ const Icon = ({ name, size = 18, className = "" }) => {
                                                                     </button>
                                                                     <button onClick={(e) => { e.stopPropagation(); openRelated(n); }} className="p-1 border border-transparent hover:border-sepia/50 rounded-sm transition-colors" title="Attach Related Doc">
                                                                         <Icon name="Paperclip" size={14}/>
+                                                                    </button>
+                                                                    <button onClick={(e) => { e.stopPropagation(); openRebalance(n); }} className="p-1 border border-transparent hover:border-sepia/50 rounded-sm transition-colors" title="Rebalance Branch Ownership">
+                                                                        <Icon name="Adjust" size={14} />
                                                                     </button>
                                                                     <button onClick={(e) => { e.stopPropagation(); openConvey(n); }} className="p-1 border border-transparent hover:border-sepia text-sepia rounded-sm transition-colors" title="Convey from this row">
                                                                         <Icon name="Convey" size={14}/>
@@ -2449,6 +2723,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
                                     modalMode === 'add_related' ? 'bg-fountain text-parchment' : 
                                     modalMode === 'attach' ? 'bg-fountain text-parchment' :
                                     modalMode === 'precede' ? 'bg-ink text-parchment' :
+                                    modalMode === 'rebalance' ? 'bg-fountain text-parchment' :
                                     modalMode === 'add_unlinked' ? 'bg-fountain text-parchment' :
                                     modalMode === 'add_chain' ? 'bg-fountain text-parchment' :
                                     'bg-ink text-parchment'
@@ -2459,6 +2734,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
                                              modalMode === 'add_related' ? 'Attach Related Document' : 
                                              modalMode === 'attach' ? 'Link Imported Document to Lineage' :
                                              modalMode === 'precede' ? 'Insert Preceding Record' :
+                                             modalMode === 'rebalance' ? 'Rebalance Branch Ownership' :
                                              modalMode === 'add_unlinked' ? 'Add Loose Document' :
                                              modalMode === 'add_chain' ? 'Start New Title Chain' :
                                              'Convey Title Link'}
@@ -2499,6 +2775,22 @@ const Icon = ({ name, size = 18, className = "" }) => {
                                                         </select>
                                                     </div>
                                                 </div>
+                                                {attachType === 'conveyance' && (
+                                                    <div className={`mt-4 border p-3 text-xs ${attachImpact?.valid ? 'border-ink/40 bg-parchment/80' : 'border-stamp/40 bg-stamp/10 text-stamp'}`}>
+                                                        <div className="text-[10px] uppercase tracking-widest font-bold mb-2">Attach Impact Preview</div>
+                                                        {attachImpact?.valid ? (
+                                                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 font-mono">
+                                                                <div><span className="opacity-60">Destination:</span> {attachImpact.destinationName}</div>
+                                                                <div><span className="opacity-60">Destination Balance:</span> {formatFraction(attachImpact.destinationBefore)} → {formatFraction(attachImpact.destinationAfter)}</div>
+                                                                <div><span className="opacity-60">Attached Root:</span> {formatFraction(attachImpact.rootBefore)} → {formatFraction(attachImpact.rootAfter)}</div>
+                                                                <div><span className="opacity-60">Scale Factor:</span> {attachImpact.scaleFactor.toFixed(6)}x</div>
+                                                                <div><span className="opacity-60">Descendants Updated:</span> {attachImpact.descendantCount}</div>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="font-bold">{attachImpact?.reason || 'Select a valid destination to preview impact.'}</div>
+                                                        )}
+                                                    </div>
+                                                )}
                                             </div>
                                         )}
                                         
@@ -2770,16 +3062,84 @@ const Icon = ({ name, size = 18, className = "" }) => {
                                                         <div className="px-4 py-3 border bg-parchment border-ink text-left sm:text-right w-full">
                                                             <div className="text-[9px] font-black uppercase tracking-widest mb-1 opacity-60">Succession Deduction</div>
                                                             <div className="font-mono text-xs flex items-center sm:justify-end gap-2">
-                                                                <span title="Predecessor Interest">{formatFraction(form.initialFraction)}</span>
+                                                                <span title="Predecessor Interest">{formatFraction(precedeImpact?.newInitialFraction)}</span>
                                                                 <span className="opacity-40">-</span>
-                                                                <span title="Successor Interest (Current Record)">{formatFraction(activeNode?.initialFraction)}</span>
+                                                                <span title="Successor Interest (Current Record)">{formatFraction(precedeImpact?.oldInitialFraction)}</span>
                                                                 <span className="opacity-40">=</span>
                                                                 <span className="text-sm border-l border-ink pl-2 font-bold text-sepia">
-                                                                    {formatFraction((form.initialFraction || 0) - (activeNode?.initialFraction || 0))}
-                                                                </span>
+                                                                    {formatFraction(precedeImpact?.predecessorRetained)}</span>
                                                             </div>
                                                         </div>
-                                                        <div className="text-[10px] uppercase font-bold text-sepia/60 tracking-widest">Calculated Predecessor Retained Balance</div>
+                                                        <div className="px-4 py-3 border bg-parchment border-ink text-left sm:text-right w-full">
+                                                            <div className="text-[9px] font-black uppercase tracking-widest mb-1 opacity-60">Branch Scale Preview</div>
+                                                            <div className="font-mono text-xs flex items-center sm:justify-end gap-2">
+                                                                <span>{formatFraction(precedeImpact?.oldInitialFraction)}</span>
+                                                                <span className="opacity-40">→</span>
+                                                                <span>{formatFraction(precedeImpact?.newInitialFraction)}</span>
+                                                                <span className="opacity-40">(x</span>
+                                                                <span className="font-bold">{precedeImpact?.scaleFactor?.toFixed(6)}</span>
+                                                                <span className="opacity-40">)</span>
+                                                            </div>
+                                                        </div>
+                                                        <div className="px-4 py-3 border bg-parchment border-ink text-left sm:text-right w-full">
+                                                            <div className="text-[9px] font-black uppercase tracking-widest mb-1 opacity-60">Parent Balance Preview</div>
+                                                            <div className="font-mono text-xs flex items-center sm:justify-end gap-2">
+                                                                <span>{formatFraction(precedeImpact?.parentBefore)}</span>
+                                                                <span className="opacity-40">→</span>
+                                                                <span className="font-bold">{formatFraction(precedeImpact?.parentAfter)}</span>
+                                                            </div>
+                                                        </div>
+                                                        <div className="text-[10px] uppercase font-bold text-sepia/60 tracking-widest">Descendants Updated: {precedeImpact?.descendantCount || 0}</div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+
+
+                                        {modalMode === 'rebalance' && (
+                                            <div className="col-span-6 bg-parchment border border-ink rounded-sm p-6 relative overflow-hidden">
+                                                <div className="absolute top-0 left-0 w-1.5 h-full bg-fountain"></div>
+                                                <div className="flex justify-between items-center mb-6 pl-2">
+                                                    <span className="text-xs font-black uppercase tracking-widest flex items-center gap-2">
+                                                        <Icon name="Adjust" size={16} /> Branch Rebalance Engine
+                                                    </span>
+                                                </div>
+                                                <div className="flex flex-col sm:flex-row items-start justify-between gap-6 bg-teastain p-5 border border-ink ml-2">
+                                                    <div>
+                                                        <label className="text-[10px] font-bold text-sepia uppercase tracking-widest block mb-2">Corrected Root Interest for this Branch</label>
+                                                        <input
+                                                            type="number"
+                                                            step="0.00000001"
+                                                            className="w-full sm:w-64 p-3 font-mono font-bold border border-ink bg-parchment focus:ring-2 focus:ring-sepia outline-none text-lg shadow-inner"
+                                                            value={form.initialFraction === 0 ? '' : form.initialFraction}
+                                                            onFocus={e => e.target.select()}
+                                                            onChange={e => setForm({...form, initialFraction: parseFloat(e.target.value) || 0})}
+                                                        />
+                                                        <p className="text-[9px] opacity-60 mt-2 font-mono uppercase tracking-wider max-w-[320px]">
+                                                            Rebalance this record and every descendant proportionally without inserting a predecessor record.
+                                                        </p>
+                                                    </div>
+                                                    <div className="flex flex-col sm:items-end gap-3 w-full sm:w-auto mt-4 sm:mt-0">
+                                                        <div className="px-4 py-3 border bg-parchment border-ink text-left sm:text-right w-full">
+                                                            <div className="text-[9px] font-black uppercase tracking-widest mb-1 opacity-60">Branch Scale Preview</div>
+                                                            <div className="font-mono text-xs flex items-center sm:justify-end gap-2">
+                                                                <span>{formatFraction(rebalanceImpact?.oldInitialFraction)}</span>
+                                                                <span className="opacity-40">→</span>
+                                                                <span>{formatFraction(rebalanceImpact?.newInitialFraction)}</span>
+                                                                <span className="opacity-40">(x</span>
+                                                                <span className="font-bold">{rebalanceImpact?.scaleFactor?.toFixed(6)}</span>
+                                                                <span className="opacity-40">)</span>
+                                                            </div>
+                                                        </div>
+                                                        <div className="px-4 py-3 border bg-parchment border-ink text-left sm:text-right w-full">
+                                                            <div className="text-[9px] font-black uppercase tracking-widest mb-1 opacity-60">Parent Balance Preview</div>
+                                                            <div className="font-mono text-xs flex items-center sm:justify-end gap-2">
+                                                                <span>{formatFraction(rebalanceImpact?.parentBefore)}</span>
+                                                                <span className="opacity-40">→</span>
+                                                                <span className="font-bold">{formatFraction(rebalanceImpact?.parentAfter)}</span>
+                                                            </div>
+                                                        </div>
+                                                        <div className="text-[10px] uppercase font-bold text-sepia/60 tracking-widest">Descendants Updated: {rebalanceImpact?.descendantCount || 0}</div>
                                                     </div>
                                                 </div>
                                             </div>
@@ -2832,11 +3192,12 @@ const Icon = ({ name, size = 18, className = "" }) => {
                                         modalMode === 'add_related' ? 'bg-fountain' :
                                         modalMode === 'attach' ? 'bg-fountain' :
                                         modalMode === 'precede' ? 'bg-ink' :
+                                        modalMode === 'rebalance' ? 'bg-fountain' :
                                         modalMode === 'add_unlinked' ? 'bg-fountain' :
                                         modalMode === 'add_chain' ? 'bg-fountain' :
                                         'bg-sepia'
                                     }`}>
-                                        Commit {modalMode === 'add_related' ? 'Document' : modalMode === 'attach' ? 'Linked Record' : modalMode === 'precede' ? 'Predecessor' : modalMode === 'add_unlinked' ? 'Loose Record' : modalMode === 'add_chain' ? 'New Chain' : 'Transaction'}
+                                        Commit {modalMode === 'add_related' ? 'Document' : modalMode === 'attach' ? 'Linked Record' : modalMode === 'precede' ? 'Predecessor' : modalMode === 'rebalance' ? 'Rebalance' : modalMode === 'add_unlinked' ? 'Loose Record' : modalMode === 'add_chain' ? 'New Chain' : 'Transaction'}
                                     </button>
                                     <button onClick={() => setShowModal(false)} className="px-10 py-4 bg-teastain border border-ink hover:border-stamp hover:text-stamp font-bold uppercase tracking-widest transition-colors hover:-translate-y-0.5">
                                         Cancel
