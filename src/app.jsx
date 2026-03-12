@@ -55,7 +55,7 @@ const requireMathEngineFunction = (name) => {
     }
     return fn;
 };
-const FRACTION_EPSILON = mathEngineApi.FRACTION_EPSILON || 0.00000001;
+const FRACTION_EPSILON = mathEngineApi.FRACTION_EPSILON || 0.0000000001;
 const clampFraction = mathEngineApi.clampFraction || ((value) => {
     const numeric = Number(value || 0);
     if (!Number.isFinite(numeric)) return 0;
@@ -130,7 +130,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
             });
 
             const [nodes, setNodes] = useState([defaultRoot]);
-            const [deskMaps, setDeskMaps] = useState([createDeskMap()]);
+            const [deskMaps, setDeskMaps] = useState([]);
             const [activeDeskMapId, setActiveDeskMapId] = useState('');
             const skipDeskMapSyncRef = useRef(false);
             const [view, setView] = useState('chart'); 
@@ -205,6 +205,9 @@ const Icon = ({ name, size = 18, className = "" }) => {
             const wheelFrameRef = useRef(null);
             const wheelAccumulatedDeltaRef = useRef(0);
             const wheelPointerRef = useRef({ x: 0, y: 0 });
+            const zoomIdleTimerRef = useRef(null);
+            const chartViewportRef = useRef(null);
+            const livePzRef = useRef({ ...defaultViewport });
             const chartPanFrameRef = useRef(null);
             const chartPanPointRef = useRef(null);
             const flowPanFrameRef = useRef(null);
@@ -263,7 +266,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
             const totalRootOwnership = useMemo(() => rootOwnershipTotal(nodes), [nodes]);
             const ownershipHealth = useMemo(() => {
                 const delta = totalRootOwnership - 1;
-                if (Math.abs(delta) <= 0.00000001) return { status: 'balanced', label: 'Balanced', delta };
+                if (Math.abs(delta) <= 0.0000000001) return { status: 'balanced', label: 'Balanced', delta };
                 if (delta > 0) return { status: 'over', label: 'Over', delta };
                 return { status: 'under', label: 'Under', delta };
             }, [totalRootOwnership]);
@@ -325,9 +328,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 
             useEffect(() => {
                 if (!deskMaps.length) {
-                    const fallback = createDeskMap();
-                    setDeskMaps([fallback]);
-                    setActiveDeskMapId(fallback.id);
+                    if (activeDeskMapId) setActiveDeskMapId('');
                     return;
                 }
                 if (!activeDeskMapId || !deskMaps.some(map => map.id === activeDeskMapId)) {
@@ -671,7 +672,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 e.target.value = ''; 
             };
 
-            const formatFraction = (num) => (isNaN(num) || num === null || num === undefined ? "0.00000000" : Number(num).toFixed(8));
+            const formatFraction = (num) => (isNaN(num) || num === null || num === undefined ? "0.000000000" : Number(num).toFixed(9));
             const formatConveyanceFraction = (node) => {
                 if (!node || node.type !== 'conveyance' || node.conveyanceMode !== 'fraction') return '';
                 const numerator = Number(node.numerator || 0);
@@ -996,10 +997,6 @@ const Icon = ({ name, size = 18, className = "" }) => {
                         const shouldContinue = window.confirm('Attaching this conveyance will recalculate ownership for this branch. Continue?');
                         if (!shouldContinue) return;
                         const destinationNode = nodeById[attachParentId];
-                        const oldRootFraction = Math.max(activeNode.fraction || 0, FRACTION_EPSILON);
-                        const newRootFraction = clampFraction(calcShare);
-                        const scaleFactor = newRootFraction / oldRootFraction;
-                        const affectedCount = collectDescendantIds(nodes, activeNode.id).size + 1;
                         const attachResult = executeAttachConveyance({ allNodes: nodes, activeNodeId: activeNode.id, attachParentId, calcShare, form });
                         if (!attachResult.ok) {
                             window.alert(`Unable to complete attach conveyance: ${attachResult.error?.message || 'Unknown error'}`);
@@ -1011,10 +1008,10 @@ const Icon = ({ name, size = 18, className = "" }) => {
                             nodeId: activeNode.id,
                             destinationId: attachParentId,
                             destinationName: destinationNode?.grantee || destinationNode?.instrument || '',
-                            oldRootFraction,
-                            newRootFraction,
-                            scaleFactor,
-                            affectedCount
+                            oldRootFraction: attachResult.audit?.oldRootFraction,
+                            newRootFraction: attachResult.audit?.newRootFraction,
+                            scaleFactor: attachResult.audit?.scaleFactor,
+                            affectedCount: attachResult.audit?.affectedCount
                         });
                     } else {
                         updateActiveDeskMapNodes(prev => prev.map(n => n.id === activeNode.id ? { ...form, parentId: attachParentId, type: 'related', fraction: 0, initialFraction: 0 } : n));
@@ -1305,11 +1302,29 @@ const Icon = ({ name, size = 18, className = "" }) => {
                     cancelAnimationFrame(wheelFrameRef.current);
                     wheelFrameRef.current = null;
                 }
+                if (zoomIdleTimerRef.current) {
+                    clearTimeout(zoomIdleTimerRef.current);
+                    zoomIdleTimerRef.current = null;
+                }
             }, []);
+
+            const applyDeskMapTransform = (viewport) => {
+                const viewportEl = chartViewportRef.current;
+                if (!viewportEl) return;
+                viewportEl.style.transform = `translate3d(${viewport.x}px, ${viewport.y}px, 0) scale(${viewport.scale})`;
+            };
+
+            useEffect(() => {
+                livePzRef.current = pz;
+                applyDeskMapTransform(pz);
+            }, [pz]);
 
             const handlePointerDown = (e) => {
                 if (e.button !== 0 || e.target.closest('button') || e.target.closest('.treenode-body')) return;
-                isDragging.current = true; dragStart.current = { x: e.clientX - pz.x, y: e.clientY - pz.y }; e.currentTarget.setPointerCapture(e.pointerId);
+                isDragging.current = true;
+                const currentPz = livePzRef.current;
+                dragStart.current = { x: e.clientX - currentPz.x, y: e.clientY - currentPz.y };
+                e.currentTarget.setPointerCapture(e.pointerId);
             };
             const handlePointerMove = (e) => {
                 if (!isDragging.current) return;
@@ -1319,7 +1334,9 @@ const Icon = ({ name, size = 18, className = "" }) => {
                     chartPanFrameRef.current = null;
                     const point = chartPanPointRef.current;
                     if (!point) return;
-                    setPz(prev => ({ ...prev, x: point.x - dragStart.current.x, y: point.y - dragStart.current.y }));
+                    const nextViewport = { ...livePzRef.current, x: point.x - dragStart.current.x, y: point.y - dragStart.current.y };
+                    livePzRef.current = nextViewport;
+                    applyDeskMapTransform(nextViewport);
                 });
             };
             const handlePointerUp = (e) => {
@@ -1329,6 +1346,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
                     chartPanFrameRef.current = null;
                 }
                 chartPanPointRef.current = null;
+                setPz(livePzRef.current);
             };
             const handleWheel = (e) => {
                 e.preventDefault();
@@ -1338,6 +1356,8 @@ const Icon = ({ name, size = 18, className = "" }) => {
                     y: e.clientY - rect.top
                 };
                 wheelAccumulatedDeltaRef.current += e.deltaY;
+                if (zoomIdleTimerRef.current) clearTimeout(zoomIdleTimerRef.current);
+                zoomIdleTimerRef.current = setTimeout(() => setPz(livePzRef.current), 120);
 
                 if (wheelFrameRef.current !== null) return;
 
@@ -1346,24 +1366,25 @@ const Icon = ({ name, size = 18, className = "" }) => {
                     wheelAccumulatedDeltaRef.current = 0;
                     wheelFrameRef.current = null;
 
-                    const scaleAdjust = totalDelta * -0.001;
                     const pointerX = wheelPointerRef.current.x;
                     const pointerY = wheelPointerRef.current.y;
 
-                    setPz(prev => {
-                        const nextScale = Math.min(Math.max(0.1, prev.scale + scaleAdjust), 5);
-                        if (nextScale === prev.scale) return prev;
+                    const currentViewport = livePzRef.current;
+                    const zoomFactor = Math.exp(totalDelta * -0.001);
+                    const nextScale = Math.min(Math.max(0.1, currentViewport.scale * zoomFactor), 5);
+                    if (nextScale === currentViewport.scale) return;
 
-                        const worldX = (pointerX - prev.x) / prev.scale;
-                        const worldY = (pointerY - prev.y) / prev.scale;
+                    const worldX = (pointerX - currentViewport.x) / currentViewport.scale;
+                    const worldY = (pointerY - currentViewport.y) / currentViewport.scale;
 
-                        return {
-                            ...prev,
-                            scale: nextScale,
-                            x: pointerX - worldX * nextScale,
-                            y: pointerY - worldY * nextScale
-                        };
-                    });
+                    const nextViewport = {
+                        ...currentViewport,
+                        scale: nextScale,
+                        x: pointerX - worldX * nextScale,
+                        y: pointerY - worldY * nextScale
+                    };
+                    livePzRef.current = nextViewport;
+                    applyDeskMapTransform(nextViewport);
                 });
             };
 
@@ -1448,10 +1469,10 @@ const Icon = ({ name, size = 18, className = "" }) => {
                                         </div>
                                     </div>
                                     <div className="flex justify-between items-end">
-                                        <span className={`text-[10px] uppercase tracking-widest italic ${n.fraction < 0.00000001 ? 'text-stamp font-bold' : 'opacity-60'}`}>Rem</span>
+                                        <span className={`text-[10px] uppercase tracking-widest italic ${n.fraction < 0.0000000001 ? 'text-stamp font-bold' : 'opacity-60'}`}>Rem</span>
                                         <div className="text-right">
-                                            <div className={`text-xs italic ${n.fraction < 0.00000001 ? 'text-stamp font-bold' : ''}`}>{formatFraction(n.fraction)}</div>
-                                            <div className={`text-[10px] ${n.fraction < 0.00000001 ? 'text-stamp font-bold' : 'opacity-70'}`}>{remainingFractionDisplay}</div>
+                                            <div className={`text-xs italic ${n.fraction < 0.0000000001 ? 'text-stamp font-bold' : ''}`}>{formatFraction(n.fraction)}</div>
+                                            <div className={`text-[10px] ${n.fraction < 0.0000000001 ? 'text-stamp font-bold' : 'opacity-70'}`}>{remainingFractionDisplay}</div>
                                         </div>
                                     </div>
                                 </div>
@@ -1716,6 +1737,11 @@ const Icon = ({ name, size = 18, className = "" }) => {
                     console.error(e);
                 } finally {
                     setView('chart');
+                    setWorkspaceLoaded(false);
+                    setActiveDeskMapId('');
+                    setDeskMaps([]);
+                    setNodes([{ ...defaultRoot }]);
+                    setPz({ ...defaultViewport });
                     setShowHome(true);
                 }
             };
@@ -2381,7 +2407,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
                                                     <select className="w-full border border-ink p-2" value={interestForm.contactId} onChange={e => setInterestForm({ ...interestForm, contactId: e.target.value })}><option value="">Contact</option>{contacts.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
                                                     <select className="w-full border border-ink p-2" value={interestForm.tractId} onChange={e => setInterestForm({ ...interestForm, tractId: e.target.value })}><option value="">Tract</option>{tracts.map(t => <option key={t.id} value={t.id}>{t.code} {t.name ? `- ${t.name}` : ''}</option>)}</select>
                                                     <select className="w-full border border-ink p-2" value={interestForm.interestType} onChange={e => setInterestForm({ ...interestForm, interestType: e.target.value })}><option value="MI">MI</option><option value="RI">RI</option><option value="NRI">NRI</option><option value="ORRI">ORRI</option></select>
-                                                    <input className="w-full border border-ink p-2" type="number" step="0.00000001" placeholder="Interest (decimal)" value={interestForm.interestValue} onChange={e => setInterestForm({ ...interestForm, interestValue: e.target.value })} />
+                                                    <input className="w-full border border-ink p-2" type="number" step="0.0000000001" placeholder="Interest (decimal)" value={interestForm.interestValue} onChange={e => setInterestForm({ ...interestForm, interestValue: e.target.value })} />
                                                     <select className="w-full border border-ink p-2" value={interestForm.status} onChange={e => setInterestForm({ ...interestForm, status: e.target.value })}><option value="confirmed">Confirmed</option><option value="proposed">Proposed</option><option value="disputed">Disputed</option></select>
                                                 </div>
                                                 <button onClick={addInterest} className="mt-3 px-3 py-1.5 text-xs font-bold border border-ink hover:bg-ink hover:text-parchment transition-colors">Add Interest</button>
@@ -2445,7 +2471,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
                                     }} className="border border-ink/40 p-1 text-xs min-w-[140px] bg-parchment" placeholder="DeskMap name" />
                                     <button onClick={() => renameActiveDeskMap()} className="px-2 py-1 text-[10px] font-bold border border-ink/40 hover:bg-teastain transition-colors">Save Name</button>
                                 </div>
-                                <div style={{ transform: `translate(${pz.x}px, ${pz.y}px) scale(${pz.scale})`, transformOrigin: '0 0' }} className="w-max h-max min-w-full min-h-full flex justify-start pt-24 pb-48 gap-24">
+                                <div ref={chartViewportRef} style={{ transform: `translate3d(${pz.x}px, ${pz.y}px, 0) scale(${pz.scale})`, transformOrigin: '0 0', willChange: 'transform', contain: 'layout paint style' }} className="w-max h-max min-w-full min-h-full flex justify-start pt-24 pb-48 gap-24">
                                     {tree.map(n => renderTreeNode(n))}
                                 </div>
                             </div>
@@ -3000,7 +3026,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
                                                         {form.conveyanceMode === 'fixed' && (
                                                             <div className="relative w-full">
                                                                 <div className="text-[8px] font-bold opacity-60 uppercase absolute -top-4 left-0">Fixed Decimal Amount</div>
-                                                                <input type="number" step="0.00000001" className="w-full sm:w-48 p-3 font-mono font-bold border border-ink bg-parchment focus:ring-2 focus:ring-sepia outline-none text-lg shadow-inner" value={form.manualAmount === 0 ? '' : form.manualAmount} placeholder="0.000" onFocus={e => e.target.select()} onChange={e => setForm({...form, manualAmount: e.target.value})} />
+                                                                <input type="number" step="0.0000000001" className="w-full sm:w-48 p-3 font-mono font-bold border border-ink bg-parchment focus:ring-2 focus:ring-sepia outline-none text-lg shadow-inner" value={form.manualAmount === 0 ? '' : form.manualAmount} placeholder="0.000" onFocus={e => e.target.select()} onChange={e => setForm({...form, manualAmount: e.target.value})} />
                                                             </div>
                                                         )}
                                                         {form.conveyanceMode === 'all' && (
@@ -3013,14 +3039,14 @@ const Icon = ({ name, size = 18, className = "" }) => {
                                                             <div className="text-[10px] font-bold uppercase text-sepia mb-0.5 tracking-widest">To Be Conveyed</div>
                                                             <div className="text-2xl font-black font-mono tracking-tight">{formatFraction(calcShare)}</div>
                                                         </div>
-                                                        <div className={`px-4 py-2 border text-left sm:text-right transition-colors ${ (parentForMath?.fraction - calcShare) < -0.00000001 ? 'bg-[#E0D7D7] border-stamp/50' : 'bg-parchment border-ink ' }`}>
-                                                            <div className={`text-[9px] font-black uppercase tracking-widest mb-1 ${ (parentForMath?.fraction - calcShare) < -0.00000001 ? 'text-stamp' : 'opacity-60' }`}>Grantor Retention Balance</div>
-                                                            <div className={`font-mono text-xs flex items-center sm:justify-end gap-2 ${ (parentForMath?.fraction - calcShare) < -0.00000001 ? 'text-stamp font-bold' : '' }`}>
+                                                        <div className={`px-4 py-2 border text-left sm:text-right transition-colors ${ (parentForMath?.fraction - calcShare) < -0.0000000001 ? 'bg-[#E0D7D7] border-stamp/50' : 'bg-parchment border-ink ' }`}>
+                                                            <div className={`text-[9px] font-black uppercase tracking-widest mb-1 ${ (parentForMath?.fraction - calcShare) < -0.0000000001 ? 'text-stamp' : 'opacity-60' }`}>Grantor Retention Balance</div>
+                                                            <div className={`font-mono text-xs flex items-center sm:justify-end gap-2 ${ (parentForMath?.fraction - calcShare) < -0.0000000001 ? 'text-stamp font-bold' : '' }`}>
                                                                 <span>{formatFraction(parentForMath?.fraction)}</span>
                                                                 <span className="opacity-40">-</span>
                                                                 <span>{formatFraction(calcShare)}</span>
                                                                 <span className="opacity-40">=</span>
-                                                                <span className={`text-sm border-l border-ink pl-2 ${ (parentForMath?.fraction - calcShare) < -0.00000001 ? 'text-stamp' : 'font-bold' }`}>{formatFraction(parentForMath?.fraction - calcShare)}</span>
+                                                                <span className={`text-sm border-l border-ink pl-2 ${ (parentForMath?.fraction - calcShare) < -0.0000000001 ? 'text-stamp' : 'font-bold' }`}>{formatFraction(parentForMath?.fraction - calcShare)}</span>
                                                             </div>
                                                         </div>
                                                     </div>
@@ -3045,7 +3071,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
                                                         <label className="text-[10px] font-bold text-sepia uppercase tracking-widest block mb-2">Predecessor Total Interest Received</label>
                                                         <input 
                                                             type="number" 
-                                                            step="0.00000001" 
+                                                            step="0.0000000001" 
                                                             className="w-full sm:w-64 p-3 font-mono font-bold border border-ink bg-parchment focus:ring-2 focus:ring-sepia outline-none text-lg shadow-inner" 
                                                             value={form.initialFraction === 0 ? '' : form.initialFraction} 
                                                             onFocus={e => e.target.select()} 
@@ -3107,7 +3133,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
                                                         <label className="text-[10px] font-bold text-sepia uppercase tracking-widest block mb-2">Corrected Root Interest for this Branch</label>
                                                         <input
                                                             type="number"
-                                                            step="0.00000001"
+                                                            step="0.0000000001"
                                                             className="w-full sm:w-64 p-3 font-mono font-bold border border-ink bg-parchment focus:ring-2 focus:ring-sepia outline-none text-lg shadow-inner"
                                                             value={form.initialFraction === 0 ? '' : form.initialFraction}
                                                             onFocus={e => e.target.select()}
@@ -3147,11 +3173,11 @@ const Icon = ({ name, size = 18, className = "" }) => {
                                             <>
                                                 <div className="col-span-3">
                                                     <label className="text-[10px] font-bold text-sepia uppercase mb-1.5 block tracking-widest">Initial Granted Share {modalMode === 'edit' ? '(Override)' : ''}</label>
-                                                    <input type="number" step="0.00000001" className="w-full border border-ink p-3 bg-teastain font-bold focus:ring-2 focus:ring-sepia outline-none" value={form.initialFraction === 0 ? '' : form.initialFraction} onFocus={e => e.target.select()} onChange={(e) => setForm({...form, initialFraction: parseFloat(e.target.value) || 0})} />
+                                                    <input type="number" step="0.0000000001" className="w-full border border-ink p-3 bg-teastain font-bold focus:ring-2 focus:ring-sepia outline-none" value={form.initialFraction === 0 ? '' : form.initialFraction} onFocus={e => e.target.select()} onChange={(e) => setForm({...form, initialFraction: parseFloat(e.target.value) || 0})} />
                                                 </div>
                                                 <div className="col-span-3">
                                                     <label className="text-[10px] font-bold text-sepia uppercase mb-1.5 block tracking-widest">Remaining Retained Share {modalMode === 'edit' ? '(Override)' : ''}</label>
-                                                    <input type="number" step="0.00000001" className="w-full border border-ink p-3 bg-teastain font-bold focus:ring-2 focus:ring-sepia outline-none" value={form.fraction === 0 ? '' : form.fraction} onFocus={e => e.target.select()} onChange={(e) => setForm({...form, fraction: parseFloat(e.target.value) || 0})} />
+                                                    <input type="number" step="0.0000000001" className="w-full border border-ink p-3 bg-teastain font-bold focus:ring-2 focus:ring-sepia outline-none" value={form.fraction === 0 ? '' : form.fraction} onFocus={e => e.target.select()} onChange={(e) => setForm({...form, fraction: parseFloat(e.target.value) || 0})} />
                                                 </div>
                                             </>
                                         )}
