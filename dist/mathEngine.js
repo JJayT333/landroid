@@ -5,7 +5,7 @@
     root.LANDroidMathEngine = factory();
   }
 })(typeof self !== 'undefined' ? self : globalThis, function () {
-  const FRACTION_EPSILON = 0.00000001;
+  const FRACTION_EPSILON = 0.000000001;
   const OWNERSHIP_TOTAL_TOLERANCE = 0.05;
 
   function clampFraction(value) {
@@ -51,9 +51,8 @@
     if (form?.conveyanceMode === 'all') return clampFraction(parent.fraction);
     if (form?.conveyanceMode === 'fixed') return clampFraction(parseFloat(form?.manualAmount || 0));
     if (form?.conveyanceMode === 'fraction') {
-      let base = 1.0;
-      if (form?.splitBasis === 'initial') base = parent.initialFraction ?? parent.fraction;
-      else if (form?.splitBasis === 'remaining') base = parent.fraction;
+      let base = parent.initialFraction ?? parent.fraction;
+      if (form?.splitBasis === 'remaining') base = parent.fraction;
       return clampFraction(base * ratio);
     }
     return 0;
@@ -234,6 +233,25 @@
       }
     });
 
+    safeNodes.forEach((node) => {
+      if (!node || !node.id || node.type === 'related') return;
+      const initial = clampFraction(node.initialFraction ?? node.fraction);
+      const remaining = clampFraction(node.fraction);
+      const childInitialTotal = safeNodes.reduce((sum, child) => {
+        if (!child || child.type === 'related' || child.parentId !== node.id) return sum;
+        return sum + clampFraction(child.initialFraction ?? child.fraction);
+      }, 0);
+      const allocated = remaining + childInitialTotal;
+      if (allocated - initial > FRACTION_EPSILON) {
+        issues.push({
+          code: 'over_allocated_branch',
+          nodeId: node.id,
+          message: `Allocated branch interest exceeds initial grant at ${node.id}`,
+          details: { initial, remaining, childInitialTotal, allocated },
+        });
+      }
+    });
+
     return {
       valid: issues.length === 0,
       issues,
@@ -382,6 +400,13 @@
     if (!parentNode) return resultErr('missing_node', `parentId ${parentId} was not found`);
     const normalizedShare = clampFraction(share);
     if (!Number.isFinite(Number(share || 0))) return resultErr('invalid_input', 'share must be a finite number');
+    if (normalizedShare - clampFraction(parentNode.fraction) > FRACTION_EPSILON) {
+      return resultErr('invalid_input', 'share exceeds parent remaining fraction', {
+        parentId,
+        parentFraction: clampFraction(parentNode.fraction),
+        requestedShare: normalizedShare,
+      });
+    }
     const updatedNodes = applyConveyanceUpdate(params);
     const validation = validateOwnershipGraph(updatedNodes);
     if (!validation.valid) return resultErr('invalid_graph', 'Conveyance would produce invalid ownership graph', validation.issues);
@@ -447,6 +472,13 @@
     }
     const normalizedShare = clampFraction(calcShare);
     if (!Number.isFinite(Number(calcShare || 0))) return resultErr('invalid_input', 'calcShare must be a finite number');
+    if (normalizedShare - clampFraction(destination.fraction) > FRACTION_EPSILON) {
+      return resultErr('invalid_input', 'calcShare exceeds destination remaining fraction', {
+        attachParentId,
+        destinationFraction: clampFraction(destination.fraction),
+        requestedShare: normalizedShare,
+      });
+    }
     const updatedNodes = applyAttachConveyanceUpdate(params || {});
     const validation = validateOwnershipGraph(updatedNodes);
     if (!validation.valid) return resultErr('invalid_graph', 'Attach would produce invalid ownership graph', validation.issues);
@@ -462,8 +494,7 @@
   function rootOwnershipTotal(nodes) {
     return (nodes || []).reduce((sum, node) => {
       if (node.type === 'related' || node.parentId === 'unlinked') return sum;
-      if (node.parentId !== null) return sum;
-      return sum + clampFraction(node.initialFraction ?? node.fraction);
+      return sum + clampFraction(node.fraction);
     }, 0);
   }
 

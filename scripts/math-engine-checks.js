@@ -34,7 +34,7 @@ function runConveyScenario() {
 function runRebalanceScenario() {
   const nodes = [
     { id: 'root', parentId: null, type: 'conveyance', fraction: 0.6, initialFraction: 1 },
-    { id: 'child', parentId: 'root', type: 'conveyance', fraction: 0.3, initialFraction: 0.3 },
+    { id: 'child', parentId: 'root', type: 'conveyance', fraction: 0.2, initialFraction: 0.3 },
     { id: 'grand', parentId: 'child', type: 'conveyance', fraction: 0.1, initialFraction: 0.1 },
   ];
 
@@ -50,7 +50,7 @@ function runRebalanceScenario() {
   const result = execute.audit;
   const updatedNodes = execute.data;
   near(result.newInitialFraction, 0.15, 'rebalance should normalize new initial');
-  near(byId(updatedNodes, 'child').fraction, 0.15, 'rebalance should scale node fraction');
+  near(byId(updatedNodes, 'child').fraction, 0.1, 'rebalance should scale node fraction');
   near(byId(updatedNodes, 'grand').fraction, 0.05, 'rebalance should scale descendant fraction');
   near(byId(updatedNodes, 'root').fraction, 0.75, 'rebalance should return interest to parent');
 }
@@ -58,7 +58,7 @@ function runRebalanceScenario() {
 function runPredecessorScenario() {
   const nodes = [
     { id: 'root', parentId: null, type: 'conveyance', fraction: 0.7, initialFraction: 1 },
-    { id: 'child', parentId: 'root', type: 'conveyance', fraction: 0.3, initialFraction: 0.3 },
+    { id: 'child', parentId: 'root', type: 'conveyance', fraction: 0.2, initialFraction: 0.3 },
     { id: 'grand', parentId: 'child', type: 'conveyance', fraction: 0.1, initialFraction: 0.1 },
   ];
 
@@ -82,7 +82,7 @@ function runPredecessorScenario() {
 
 function runValidationScenario() {
   const valid = mathEngine.validateOwnershipGraph([
-    { id: 'a', parentId: null, type: 'conveyance', fraction: 1, initialFraction: 1 },
+    { id: 'a', parentId: null, type: 'conveyance', fraction: 0.7, initialFraction: 1 },
     { id: 'b', parentId: 'a', type: 'conveyance', fraction: 0.3, initialFraction: 0.3 },
   ]);
   assert(valid.valid, 'valid graph should pass validation');
@@ -93,6 +93,13 @@ function runValidationScenario() {
   ]);
   assert(!invalid.valid, 'cycle graph should fail validation');
   assert(invalid.issues.some((issue) => issue.code === 'cycle_detected'), 'cycle validation should report cycle_detected');
+
+  const overAllocated = mathEngine.validateOwnershipGraph([
+    { id: 'root', parentId: null, type: 'conveyance', fraction: 0.7, initialFraction: 0.5 },
+    { id: 'child', parentId: 'root', type: 'conveyance', fraction: 0.3, initialFraction: 0.3 },
+  ]);
+  assert(!overAllocated.valid, 'over-allocated branch should fail validation');
+  assert(overAllocated.issues.some((issue) => issue.code === 'over_allocated_branch'), 'over-allocation should report over_allocated_branch');
 }
 
 
@@ -125,8 +132,8 @@ function runOperationFailureScenario() {
 
   const nodes = [{ id: 'root', parentId: null, type: 'conveyance', fraction: 0.2, initialFraction: 1 }];
   const exceedsParent = mathEngine.executeConveyance({ allNodes: nodes, parentId: 'root', newNodeId: 'x', share: 0.5, form: {} });
-  assert(exceedsParent.ok, 'conveyance over parent remaining should still execute (legacy over-convey behavior)');
-  near(byId(exceedsParent.data, 'x').fraction, 0.5, 'conveyance should preserve requested share');
+  assert(!exceedsParent.ok, 'conveyance over parent remaining should fail');
+  assert(exceedsParent.error?.code === 'invalid_input', 'conveyance over parent should return invalid_input envelope');
 
   const wrongParent = mathEngine.executeRebalance({
     allNodes: [
@@ -170,12 +177,12 @@ function runMineralInterestChainScenario() {
 
 function runRootOwnershipTotalScenario() {
   const nodes = [
-    { id: 'r1', parentId: null, type: 'conveyance', initialFraction: 0.5, fraction: 0 },
-    { id: 'r2', parentId: null, type: 'conveyance', initialFraction: 0.5, fraction: 0 },
+    { id: 'r1', parentId: null, type: 'conveyance', initialFraction: 0.5, fraction: 0.25 },
+    { id: 'r2', parentId: null, type: 'conveyance', initialFraction: 0.5, fraction: 0.5 },
     { id: 'c1', parentId: 'r1', type: 'conveyance', initialFraction: 0.25, fraction: 0.25 },
     { id: 'u1', parentId: 'unlinked', type: 'conveyance', initialFraction: 0.2, fraction: 0.2 },
   ];
-  near(mathEngine.rootOwnershipTotal(nodes), 1, 'master total should sum root ownership grants, excluding unlinked');
+  near(mathEngine.rootOwnershipTotal(nodes), 1, 'master total should sum distributed conveyance fractions, excluding unlinked');
 }
 
 function run() {

@@ -34,6 +34,9 @@ function buildSyntheticWorkspace(mapCount, nodesPerMap, seed) {
         const share = parent && parent.type === 'conveyance' ? Math.min(parent.fraction || 0, 0.01 + rng() * 0.2) : 0;
         fraction = mathEngine.clampFraction(share);
         initialFraction = fraction;
+        if (parent && parent.type === 'conveyance') {
+          parent.fraction = mathEngine.clampFraction((parent.fraction || 0) - fraction);
+        }
       }
       nodes.push({ id, parentId: parent ? parent.id : rootId, type, fraction, initialFraction });
     }
@@ -77,6 +80,9 @@ function buildShapedWorkspace({ name, nodeCount, seed, shape }) {
       const share = maxShare * (0.15 + rng() * 0.85);
       fraction = mathEngine.clampFraction(share);
       initialFraction = fraction;
+      if (parent && parent.type === 'conveyance') {
+        parent.fraction = mathEngine.clampFraction((parent.fraction || 0) - fraction);
+      }
       conveyanceIds.push(id);
     }
 
