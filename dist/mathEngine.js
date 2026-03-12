@@ -362,10 +362,26 @@
     return { ok: false, error: { code, message, details: details || null } };
   }
 
-  function executeConveyance(params) {
-    const { allNodes, parentId, newNodeId } = params || {};
+  function ensureArrayNodes(allNodes) {
     if (!Array.isArray(allNodes)) return resultErr('invalid_input', 'allNodes must be an array');
+    return null;
+  }
+
+  function findNodeById(allNodes, nodeId) {
+    if (!nodeId) return null;
+    return allNodes.find((node) => node.id === nodeId) || null;
+  }
+
+  function executeConveyance(params) {
+    const { allNodes, parentId, newNodeId, share } = params || {};
+    const nodesErr = ensureArrayNodes(allNodes);
+    if (nodesErr) return nodesErr;
     if (!parentId || !newNodeId) return resultErr('invalid_input', 'parentId and newNodeId are required');
+    if (findNodeById(allNodes, newNodeId)) return resultErr('conflicting_structure', `newNodeId ${newNodeId} already exists`);
+    const parentNode = findNodeById(allNodes, parentId);
+    if (!parentNode) return resultErr('missing_node', `parentId ${parentId} was not found`);
+    const normalizedShare = clampFraction(share);
+    if (!Number.isFinite(Number(share || 0))) return resultErr('invalid_input', 'share must be a finite number');
     const updatedNodes = applyConveyanceUpdate(params);
     const validation = validateOwnershipGraph(updatedNodes);
     if (!validation.valid) return resultErr('invalid_graph', 'Conveyance would produce invalid ownership graph', validation.issues);
@@ -373,7 +389,15 @@
   }
 
   function executeRebalance(params) {
-    const result = applyRebalanceUpdate(params || {});
+    const { allNodes, nodeId, parentId } = params || {};
+    const nodesErr = ensureArrayNodes(allNodes);
+    if (nodesErr) return nodesErr;
+    if (!nodeId) return resultErr('invalid_input', 'nodeId is required');
+    const node = findNodeById(allNodes, nodeId);
+    if (!node) return resultErr('missing_node', 'Unable to rebalance missing node');
+    const effectiveParentId = node.parentId;
+    const resolvedParentId = effectiveParentId ?? parentId ?? null;
+    const result = applyRebalanceUpdate({ ...(params || {}), parentId: resolvedParentId });
     if (!result) return resultErr('missing_node', 'Unable to rebalance missing node');
     const validation = validateOwnershipGraph(result.updatedNodes);
     if (!validation.valid) return resultErr('invalid_graph', 'Rebalance would produce invalid ownership graph', validation.issues);
@@ -387,6 +411,14 @@
   }
 
   function executePredecessorInsert(params) {
+    const { allNodes, activeNodeId, activeNodeParentId, newPredecessorId } = params || {};
+    const nodesErr = ensureArrayNodes(allNodes);
+    if (nodesErr) return nodesErr;
+    if (!activeNodeId || !newPredecessorId) return resultErr('invalid_input', 'activeNodeId and newPredecessorId are required');
+    const activeNode = findNodeById(allNodes, activeNodeId);
+    if (!activeNode) return resultErr('missing_node', 'Unable to insert predecessor for missing node');
+    if (findNodeById(allNodes, newPredecessorId)) return resultErr('conflicting_structure', `newPredecessorId ${newPredecessorId} already exists`);
+    if (newPredecessorId === activeNodeId) return resultErr('conflicting_structure', 'newPredecessorId cannot equal activeNodeId');
     const result = applyPredecessorInsertUpdate(params || {});
     if (!result) return resultErr('missing_node', 'Unable to insert predecessor for missing node');
     const validation = validateOwnershipGraph(result.updatedNodes);
@@ -401,19 +433,37 @@
   }
 
   function executeAttachConveyance(params) {
-    const { allNodes } = params || {};
-    if (!Array.isArray(allNodes)) return resultErr('invalid_input', 'allNodes must be an array');
+    const { allNodes, activeNodeId, attachParentId, calcShare } = params || {};
+    const nodesErr = ensureArrayNodes(allNodes);
+    if (nodesErr) return nodesErr;
+    if (!activeNodeId || !attachParentId) return resultErr('invalid_input', 'activeNodeId and attachParentId are required');
+    const sourceRoot = findNodeById(allNodes, activeNodeId);
+    if (!sourceRoot) return resultErr('missing_node', `activeNodeId ${activeNodeId} was not found`);
+    const destination = findNodeById(allNodes, attachParentId);
+    if (!destination) return resultErr('missing_node', `attachParentId ${attachParentId} was not found`);
+    const descendants = collectDescendantIds(allNodes, activeNodeId);
+    if (attachParentId === activeNodeId || descendants.has(attachParentId)) {
+      return resultErr('conflicting_structure', 'Cannot attach to self or descendant');
+    }
+    const normalizedShare = clampFraction(calcShare);
+    if (!Number.isFinite(Number(calcShare || 0))) return resultErr('invalid_input', 'calcShare must be a finite number');
     const updatedNodes = applyAttachConveyanceUpdate(params || {});
     const validation = validateOwnershipGraph(updatedNodes);
     if (!validation.valid) return resultErr('invalid_graph', 'Attach would produce invalid ownership graph', validation.issues);
-    return resultOk(updatedNodes, { action: 'attach_conveyance' });
+    return resultOk(updatedNodes, {
+      action: 'attach_conveyance',
+      oldRootFraction: clampFraction(sourceRoot.fraction),
+      newRootFraction: normalizedShare,
+      scaleFactor: clampFraction(sourceRoot.fraction) > FRACTION_EPSILON ? normalizedShare / clampFraction(sourceRoot.fraction) : 0,
+      affectedCount: descendants.size + 1,
+    });
   }
 
   function rootOwnershipTotal(nodes) {
     return (nodes || []).reduce((sum, node) => {
       if (node.type === 'related' || node.parentId === 'unlinked') return sum;
       if (node.parentId !== null) return sum;
-      return sum + clampFraction(node.fraction);
+      return sum + clampFraction(node.initialFraction ?? node.fraction);
     }, 0);
   }
 

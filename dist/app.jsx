@@ -130,7 +130,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
             });
 
             const [nodes, setNodes] = useState([defaultRoot]);
-            const [deskMaps, setDeskMaps] = useState([createDeskMap()]);
+            const [deskMaps, setDeskMaps] = useState([]);
             const [activeDeskMapId, setActiveDeskMapId] = useState('');
             const skipDeskMapSyncRef = useRef(false);
             const [view, setView] = useState('chart'); 
@@ -325,9 +325,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 
             useEffect(() => {
                 if (!deskMaps.length) {
-                    const fallback = createDeskMap();
-                    setDeskMaps([fallback]);
-                    setActiveDeskMapId(fallback.id);
+                    if (activeDeskMapId) setActiveDeskMapId('');
                     return;
                 }
                 if (!activeDeskMapId || !deskMaps.some(map => map.id === activeDeskMapId)) {
@@ -996,10 +994,6 @@ const Icon = ({ name, size = 18, className = "" }) => {
                         const shouldContinue = window.confirm('Attaching this conveyance will recalculate ownership for this branch. Continue?');
                         if (!shouldContinue) return;
                         const destinationNode = nodeById[attachParentId];
-                        const oldRootFraction = Math.max(activeNode.fraction || 0, FRACTION_EPSILON);
-                        const newRootFraction = clampFraction(calcShare);
-                        const scaleFactor = newRootFraction / oldRootFraction;
-                        const affectedCount = collectDescendantIds(nodes, activeNode.id).size + 1;
                         const attachResult = executeAttachConveyance({ allNodes: nodes, activeNodeId: activeNode.id, attachParentId, calcShare, form });
                         if (!attachResult.ok) {
                             window.alert(`Unable to complete attach conveyance: ${attachResult.error?.message || 'Unknown error'}`);
@@ -1011,10 +1005,10 @@ const Icon = ({ name, size = 18, className = "" }) => {
                             nodeId: activeNode.id,
                             destinationId: attachParentId,
                             destinationName: destinationNode?.grantee || destinationNode?.instrument || '',
-                            oldRootFraction,
-                            newRootFraction,
-                            scaleFactor,
-                            affectedCount
+                            oldRootFraction: attachResult.audit?.oldRootFraction,
+                            newRootFraction: attachResult.audit?.newRootFraction,
+                            scaleFactor: attachResult.audit?.scaleFactor,
+                            affectedCount: attachResult.audit?.affectedCount
                         });
                     } else {
                         updateActiveDeskMapNodes(prev => prev.map(n => n.id === activeNode.id ? { ...form, parentId: attachParentId, type: 'related', fraction: 0, initialFraction: 0 } : n));
@@ -1083,34 +1077,9 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 link.click();
             };
 
-            const chooseImportMode = () => {
-                const choice = window.prompt(
-                    [
-                        'Choose CSV import mode:',
-                        '1 = Replace current project',
-                        '2 = Merge into active desk map',
-                        '3 = Create new desk map from CSV',
-                        '',
-                        'Enter 1, 2, or 3 (Cancel to abort).'
-                    ].join('\n')
-                );
-                if (choice === null) return null;
-                const normalized = String(choice).trim().toLowerCase();
-                if (normalized === '1' || normalized === 'replace') return 'replace';
-                if (normalized === '2' || normalized === 'merge') return 'merge';
-                if (normalized === '3' || normalized === 'new') return 'new_map';
-                window.alert('Import cancelled: invalid choice. Please enter 1, 2, or 3.');
-                return null;
-            };
-
             const importCSV = (e) => {
                 const file = e.target.files[0];
                 if (!file) return;
-                const importMode = chooseImportMode();
-                if (!importMode) {
-                    e.target.value = '';
-                    return;
-                }
                 Papa.parse(file, {
                     header: true, skipEmptyLines: true,
                     complete: (results) => {
@@ -1120,38 +1089,47 @@ const Icon = ({ name, size = 18, className = "" }) => {
                             try {
                                 return JSON.parse(raw);
                             } catch {
-                                try {
-                                    return JSON.parse(String(raw).replace(/""/g, '"'));
-                                } catch {
-                                    return [];
-                                }
+                                return [];
                             }
                         };
-                        const findHeader = (row, patterns) => {
-                            const keys = Object.keys(row);
-                            for (let pattern of patterns) {
-                                const match = keys.find(k => pattern.test(k));
-                                if (match) return row[match].trim();
-                            }
-                            return "";
-                        };
+
+                        const firstRow = results.data[0] || {};
+                        const requiredHeaders = [
+                            'INTERNAL_ID',
+                            'INTERNAL_PID',
+                            'INTERNAL_TYPE',
+                            'INTERNAL_REMAINING_FRACTION',
+                            'INTERNAL_INITIAL_FRACTION',
+                            'INTERNAL_DESKMAPS'
+                        ];
+                        const missingHeaders = requiredHeaders.filter(header => !(header in firstRow));
+                        if (missingHeaders.length) {
+                            window.alert(`Import failed: this CSV is not in the current LANDroid workspace format. Missing columns: ${missingHeaders.join(', ')}`);
+                            return;
+                        }
+
+                        const importedDeskMaps = parseJsonField(firstRow, 'INTERNAL_DESKMAPS');
+                        if (!Array.isArray(importedDeskMaps) || !importedDeskMaps.length) {
+                            window.alert('Import failed: INTERNAL_DESKMAPS payload is missing or invalid.');
+                            return;
+                        }
+
                         const parsedRows = results.data.map(row => {
-                            const isInternal = !!row['INTERNAL_ID'];
                             return {
                                 originalId: row['INTERNAL_ID'] || null,
-                                instrument: findHeader(row, [/^Instrument$/i, /^Instrument \(/i, /Instrument/i]),
-                                vol: findHeader(row, [/^Vol/i]),
-                                page: findHeader(row, [/^Page/i]),
-                                docNo: findHeader(row, [/Inst[\s\S]*No/i, /Doc[\s\S]*No/i]),
-                                fileDate: findHeader(row, [/File[\s\S]*Date/i]),
-                                date: findHeader(row, [/Inst[\s\S]*Eff/i, /Inst[\s\S]*Date/i, /Effective[\s\S]*Date/i, /^Date$/i]),
-                                grantor: findHeader(row, [/Grantor/i, /Assignor/i, /Lessor/i]),
-                                grantee: findHeader(row, [/Grantee/i, /Assignee/i, /Lessee/i, /Subject/i]),
-                                landDesc: findHeader(row, [/Land[\s\S]*Desc/i, /Description/i]),
-                                remarks: findHeader(row, [/Remark/i, /Note/i]),
-                                fraction: isInternal ? parseFloat(row['INTERNAL_REMAINING_FRACTION'] || 0) : 0,
-                                initialFraction: isInternal ? parseFloat(row['INTERNAL_INITIAL_FRACTION'] || 0) : 0,
-                                parentId: isInternal ? (row['INTERNAL_PID'] === "NULL" ? null : row['INTERNAL_PID']) : 'unlinked', 
+                                instrument: row['Instrument'] || '',
+                                vol: row['Vol'] || '',
+                                page: row['Page'] || '',
+                                docNo: row['Inst No.'] || '',
+                                fileDate: row['File Date'] || '',
+                                date: row['Inst Date'] || '',
+                                grantor: row['Grantor / Assignor'] || '',
+                                grantee: row['Grantee / Assignee'] || '',
+                                landDesc: row['Land Desc.'] || '',
+                                remarks: row['Remarks'] || '',
+                                fraction: parseFloat(row['INTERNAL_REMAINING_FRACTION'] || 0),
+                                initialFraction: parseFloat(row['INTERNAL_INITIAL_FRACTION'] || 0),
+                                parentId: row['INTERNAL_PID'] === "NULL" ? null : row['INTERNAL_PID'],
                                 docData: row['INTERNAL_DOC'] ? row['INTERNAL_DOC'].replace(/(^"|"$)/g, '') : "",
                                 type: row['INTERNAL_TYPE'] || 'conveyance',
                                 isDeceased: row['INTERNAL_DECEASED'] === 'true',
@@ -1185,61 +1163,23 @@ const Icon = ({ name, size = 18, className = "" }) => {
                         if (newNodes.length) {
                             const newInsts = [...new Set(newNodes.map(n => n.instrument).filter(Boolean))];
                             setInstrumentList(prev => [...new Set([...prev, ...newInsts])]);
-
-                            const firstRow = results.data[0] || {};
-                            const importedDeskMaps = parseJsonField(firstRow, 'INTERNAL_DESKMAPS');
                             const importedActiveDeskMapId = firstRow['INTERNAL_ACTIVE_DESKMAP_ID'] || '';
-                            const hasEmbeddedWorkspace = importedDeskMaps.length > 0;
-                            const normalizedImportMode = hasEmbeddedWorkspace && importMode !== 'replace' ? 'replace' : importMode;
-
-                            if (hasEmbeddedWorkspace && importMode !== 'replace') {
-                                window.alert('This CSV contains a full multi-map workspace payload. Import mode was switched to Replace so Desk Maps stay separated and performant.');
-                            }
-
-                            if (normalizedImportMode === 'replace') {
-                                setNodes(newNodes);
-                                setTracts(parseJsonField(firstRow, 'INTERNAL_TRACTS'));
-                                const importedContacts = parseJsonField(firstRow, 'INTERNAL_CONTACTS');
-                                setContacts(importedContacts);
-                                setOwnershipInterests(parseJsonField(firstRow, 'INTERNAL_INTERESTS'));
-                                setContactLogs(parseJsonField(firstRow, 'INTERNAL_CONTACT_LOGS'));
-                                if (importedDeskMaps.length) {
-                                    setDeskMaps(importedDeskMaps);
-                                    const nextDeskMapId = importedDeskMaps.some(map => map.id === importedActiveDeskMapId) ? importedActiveDeskMapId : importedDeskMaps[0].id;
-                                    setActiveDeskMapId(nextDeskMapId);
-                                    const activeMap = importedDeskMaps.find(map => map.id === nextDeskMapId) || importedDeskMaps[0];
-                                    setNodes(activeMap.nodes || newNodes);
-                                    setPz(activeMap.pz || { ...defaultViewport });
-                                } else {
-                                    const fallback = createDeskMap();
-                                    fallback.nodes = newNodes;
-                                    setDeskMaps([fallback]);
-                                    setActiveDeskMapId(fallback.id);
-                                    setPz({ ...defaultViewport });
-                                }
-                                setSelectedContactId((importedContacts[0] && importedContacts[0].id) || null);
-                            } else if (normalizedImportMode === 'merge') {
-                                setDeskMaps(prev => prev.map(map => {
-                                    if (map.id !== activeDeskMapId) return map;
-                                    return { ...map, nodes: [...(map.nodes || []), ...newNodes] };
-                                }));
-                                setNodes(prev => [...prev, ...newNodes]);
-                            } else {
-                                const mapNumber = deskMaps.length + 1;
-                                const newDeskMap = createDeskMap({ name: `Imported Map ${mapNumber}`, code: `IMPORTED-${mapNumber}` });
-                                newDeskMap.nodes = newNodes;
-                                setDeskMaps(prev => [...prev, newDeskMap]);
-                                setActiveDeskMapId(newDeskMap.id);
-                                setPz({ ...defaultViewport });
-                            }
-
-                            const modeLabel = normalizedImportMode === 'replace' ? 'replace' : normalizedImportMode === 'merge' ? 'merge' : 'new map';
-                            const mapSummary = normalizedImportMode === 'replace'
-                                ? 'Maps updated: project desk maps replaced from import (or rebuilt fallback map).'
-                                : normalizedImportMode === 'merge'
-                                    ? 'Maps updated: active desk map merged; other maps preserved.'
-                                    : 'Maps created: 1 new desk map from CSV; existing maps preserved.';
-                            window.alert(`Import complete.\nRecords imported: ${newNodes.length}\nMode: ${modeLabel}\n${mapSummary}`);
+                            setNodes(newNodes);
+                            setTracts(parseJsonField(firstRow, 'INTERNAL_TRACTS'));
+                            const importedContacts = parseJsonField(firstRow, 'INTERNAL_CONTACTS');
+                            setContacts(importedContacts);
+                            setOwnershipInterests(parseJsonField(firstRow, 'INTERNAL_INTERESTS'));
+                            setContactLogs(parseJsonField(firstRow, 'INTERNAL_CONTACT_LOGS'));
+                            setDeskMaps(importedDeskMaps);
+                            const nextDeskMapId = importedDeskMaps.some(map => map.id === importedActiveDeskMapId)
+                                ? importedActiveDeskMapId
+                                : importedDeskMaps[0].id;
+                            setActiveDeskMapId(nextDeskMapId);
+                            const activeMap = importedDeskMaps.find(map => map.id === nextDeskMapId) || importedDeskMaps[0];
+                            setNodes(activeMap.nodes || newNodes);
+                            setPz(activeMap.pz || { ...defaultViewport });
+                            setSelectedContactId((importedContacts[0] && importedContacts[0].id) || null);
+                            window.alert(`Import complete.\nRecords imported: ${newNodes.length}\nMode: replace\nMaps updated from embedded workspace payload.`);
                         }
                     },
                     error: (error) => console.error("Error parsing CSV:", error)
@@ -1770,6 +1710,11 @@ const Icon = ({ name, size = 18, className = "" }) => {
                     console.error(e);
                 } finally {
                     setView('chart');
+                    setWorkspaceLoaded(false);
+                    setActiveDeskMapId('');
+                    setDeskMaps([]);
+                    setNodes([{ ...defaultRoot }]);
+                    setPz({ ...defaultViewport });
                     setShowHome(true);
                 }
             };
