@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const mathEngine = require('../src/mathEngine.js');
 
 const FRACTION_EPSILON = 0.00000001;
 
@@ -105,6 +106,14 @@ function validateCsvFixture(filePath) {
   if (filePath.endsWith('deskmap-stress-5x200.import.csv')) {
     assert(rowCount === 1000, `${filePath}: expected 1000 rows, got ${rowCount}`);
     assert(deskMaps.length === 5, `${filePath}: expected embedded 5 desk maps, got ${deskMaps.length}`);
+  }
+
+
+  if (filePath.endsWith('upload-assorted-200.import.csv')) {
+    assert(rowCount === 200, `${filePath}: expected 200 rows, got ${rowCount}`);
+    assert(deskMaps.length === 1, `${filePath}: expected a single desk map, got ${deskMaps.length}`);
+    const total = mathEngine.rootOwnershipTotal(deskMaps[0].nodes || []);
+    assert(Math.abs(total - 1) <= FRACTION_EPSILON, `${filePath}: expected root ownership total to equal 1, got ${total}`);
   }
 }
 

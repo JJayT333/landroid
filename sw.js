@@ -1,4 +1,4 @@
-const CACHE_NAME = 'landroid-shell-v3';
+const CACHE_NAME = 'landroid-shell-v4';
 const APP_SHELL = [
   './',
   './index.html',
@@ -10,7 +10,8 @@ const APP_SHELL = [
   './dist/workspaceDomain.js',
   './dist/auditLog.js',
   './dist/syncEngine.js',
-  './dist/dropboxIntegration.js'
+  './dist/dropboxIntegration.js',
+  './dist/mathEngine.js'
 ];
 
 self.addEventListener('install', (event) => {
@@ -25,15 +26,32 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
+function isNavigationRequest(request) {
+  return request.mode === 'navigate' || request.destination === 'document';
+}
+
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
-  event.respondWith(
-    fetch(event.request)
-      .then((response) => {
+
+  event.respondWith((async () => {
+    try {
+      const response = await fetch(event.request);
+      if (response && response.ok) {
         const copy = response.clone();
         caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
-        return response;
-      })
-      .catch(() => caches.match(event.request).then((cached) => cached || caches.match('./index.html')))
-  );
+      }
+      return response;
+    } catch (_) {
+      const cached = await caches.match(event.request);
+      if (cached) return cached;
+      if (isNavigationRequest(event.request)) {
+        const cachedIndex = await caches.match('./index.html');
+        if (cachedIndex) return cachedIndex;
+      }
+      return new Response('Offline', {
+        status: 503,
+        headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+      });
+    }
+  })());
 });
