@@ -49,6 +49,7 @@
   - validates every `.csv` fixture under `testdata/`
   - checks required internal headers and embedded `INTERNAL_DESKMAPS` integrity
   - enforces expected row counts for 5x200 aggregate and split-tract fixture imports
+  - includes `testdata/upload-assorted-200.import.csv` for 200-row upload coverage across mixed conveyance/related/unlinked combinations
 
 - `npm run test:stress-tiers`
   - generated in-memory tiered stress checks (`1x50`, `5x200`, `10x500`) with `5x200` retained as a baseline gate

@@ -1710,6 +1710,11 @@ const Icon = ({ name, size = 18, className = "" }) => {
                     console.error(e);
                 } finally {
                     setView('chart');
+                    setWorkspaceLoaded(false);
+                    setActiveDeskMapId('');
+                    setDeskMaps([]);
+                    setNodes([{ ...defaultRoot }]);
+                    setPz({ ...defaultViewport });
                     setShowHome(true);
                 }
             };

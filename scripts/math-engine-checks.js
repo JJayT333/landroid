@@ -167,6 +167,17 @@ function runMineralInterestChainScenario() {
   near(badRiRecord.decimalInterest, 0.1, 'clamped royalty decimal should keep RI decimal deterministic');
 }
 
+
+function runRootOwnershipTotalScenario() {
+  const nodes = [
+    { id: 'r1', parentId: null, type: 'conveyance', initialFraction: 0.5, fraction: 0 },
+    { id: 'r2', parentId: null, type: 'conveyance', initialFraction: 0.5, fraction: 0 },
+    { id: 'c1', parentId: 'r1', type: 'conveyance', initialFraction: 0.25, fraction: 0.25 },
+    { id: 'u1', parentId: 'unlinked', type: 'conveyance', initialFraction: 0.2, fraction: 0.2 },
+  ];
+  near(mathEngine.rootOwnershipTotal(nodes), 1, 'master total should sum root ownership grants, excluding unlinked');
+}
+
 function run() {
   runConveyScenario();
   runRebalanceScenario();
@@ -175,6 +186,7 @@ function run() {
   runTractMetricScenario();
   runOperationFailureScenario();
   runMineralInterestChainScenario();
+  runRootOwnershipTotalScenario();
   console.log('Math engine checks passed');
 }
 

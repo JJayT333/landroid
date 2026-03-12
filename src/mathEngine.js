@@ -463,7 +463,7 @@
     return (nodes || []).reduce((sum, node) => {
       if (node.type === 'related' || node.parentId === 'unlinked') return sum;
       if (node.parentId !== null) return sum;
-      return sum + clampFraction(node.fraction);
+      return sum + clampFraction(node.initialFraction ?? node.fraction);
     }, 0);
   }
 
