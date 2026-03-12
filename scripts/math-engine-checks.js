@@ -122,6 +122,60 @@ function runTractMetricScenario() {
 function runOperationFailureScenario() {
   const failed = mathEngine.executeConveyance({ allNodes: null, parentId: 'root', newNodeId: 'x', share: 0.1, form: {} });
   assert(!failed.ok, 'invalid input should fail with envelope');
+
+  const nodes = [{ id: 'root', parentId: null, type: 'conveyance', fraction: 0.2, initialFraction: 1 }];
+  const exceedsParent = mathEngine.executeConveyance({ allNodes: nodes, parentId: 'root', newNodeId: 'x', share: 0.5, form: {} });
+  assert(exceedsParent.ok, 'conveyance over parent remaining should still execute (legacy over-convey behavior)');
+  near(byId(exceedsParent.data, 'x').fraction, 0.5, 'conveyance should preserve requested share');
+
+  const wrongParent = mathEngine.executeRebalance({
+    allNodes: [
+      { id: 'root', parentId: null, type: 'conveyance', fraction: 0.7, initialFraction: 1 },
+      { id: 'child', parentId: 'root', type: 'conveyance', fraction: 0.3, initialFraction: 0.3 },
+    ],
+    nodeId: 'child',
+    parentId: 'different-parent',
+    newInitialFraction: 0.2,
+  });
+  assert(wrongParent.ok, 'rebalance should resolve parent from node shape for compatibility');
+}
+
+function runMineralInterestChainScenario() {
+  const tracts = [
+    { id: 't1', code: 'TRACT-CHAIN', name: 'Gamma', acres: 160 },
+  ];
+  const ownershipInterests = [
+    { id: 'mi1', tractId: 't1', contactId: 'c-mi', interestType: 'MI', interestValue: 0.5, leaseBurdenDecimal: 0.25 },
+    { id: 'ri1', tractId: 't1', contactId: 'c-ri', interestType: 'RI', interestValue: 0.2, royaltyDecimal: 0.25 },
+    { id: 'orri1', tractId: 't1', contactId: 'c-orri', interestType: 'ORRI', interestValue: 0.04, royaltyDecimal: 0.5 },
+    { id: 'nma-bad', tractId: 't1', contactId: 'c-bad', interestType: 'MI', interestValue: 2.4, leaseBurdenDecimal: -1 },
+    { id: 'decimal-bad', tractId: 't1', contactId: 'c-dec', interestType: 'RI', interestValue: 0.1, royaltyDecimal: 5 },
+  ];
+
+  const [summary] = mathEngine.computeTractMetrics({ tracts, ownershipInterests });
+  near(summary.totalMI, 1.5, 'MI totals should include clamped in-range + out-of-range MI values');
+  near(summary.totalNetMineralAcres, 240, 'NMA should follow clamped MI values by tract acres');
+  near(summary.totalDecimalInterest, 1.545, 'decimal total should apply burden and royalty rules to MI/RI/ORRI records');
+
+  const nmaRecord = summary.lineItems.find((item) => item.id === 'nma-bad');
+  near(nmaRecord.inputDecimal, 1, 'out-of-range MI decimal should clamp to 1');
+  near(nmaRecord.leaseBurdenDecimal, 0, 'negative lease burden should clamp to 0');
+  near(nmaRecord.netMineralAcres, 160, 'clamped MI should produce deterministic NMA');
+
+  const badRiRecord = summary.lineItems.find((item) => item.id === 'decimal-bad');
+  near(badRiRecord.royaltyDecimal, 1, 'royalty decimal should clamp to 1');
+  near(badRiRecord.decimalInterest, 0.1, 'clamped royalty decimal should keep RI decimal deterministic');
+}
+
+
+function runRootOwnershipTotalScenario() {
+  const nodes = [
+    { id: 'r1', parentId: null, type: 'conveyance', initialFraction: 0.5, fraction: 0 },
+    { id: 'r2', parentId: null, type: 'conveyance', initialFraction: 0.5, fraction: 0 },
+    { id: 'c1', parentId: 'r1', type: 'conveyance', initialFraction: 0.25, fraction: 0.25 },
+    { id: 'u1', parentId: 'unlinked', type: 'conveyance', initialFraction: 0.2, fraction: 0.2 },
+  ];
+  near(mathEngine.rootOwnershipTotal(nodes), 1, 'master total should sum root ownership grants, excluding unlinked');
 }
 
 function run() {
@@ -131,6 +185,8 @@ function run() {
   runValidationScenario();
   runTractMetricScenario();
   runOperationFailureScenario();
+  runMineralInterestChainScenario();
+  runRootOwnershipTotalScenario();
   console.log('Math engine checks passed');
 }
 
