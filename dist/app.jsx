@@ -55,7 +55,7 @@ const requireMathEngineFunction = (name) => {
     }
     return fn;
 };
-const FRACTION_EPSILON = mathEngineApi.FRACTION_EPSILON || 0.00000001;
+const FRACTION_EPSILON = mathEngineApi.FRACTION_EPSILON || 0.0000000001;
 const clampFraction = mathEngineApi.clampFraction || ((value) => {
     const numeric = Number(value || 0);
     if (!Number.isFinite(numeric)) return 0;
@@ -130,7 +130,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
             });
 
             const [nodes, setNodes] = useState([defaultRoot]);
-            const [deskMaps, setDeskMaps] = useState([createDeskMap()]);
+            const [deskMaps, setDeskMaps] = useState([]);
             const [activeDeskMapId, setActiveDeskMapId] = useState('');
             const skipDeskMapSyncRef = useRef(false);
             const [view, setView] = useState('chart'); 
@@ -205,6 +205,8 @@ const Icon = ({ name, size = 18, className = "" }) => {
             const wheelFrameRef = useRef(null);
             const wheelAccumulatedDeltaRef = useRef(0);
             const wheelPointerRef = useRef({ x: 0, y: 0 });
+            const zoomIdleTimerRef = useRef(null);
+            const [isZooming, setIsZooming] = useState(false);
             const chartPanFrameRef = useRef(null);
             const chartPanPointRef = useRef(null);
             const flowPanFrameRef = useRef(null);
@@ -263,7 +265,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
             const totalRootOwnership = useMemo(() => rootOwnershipTotal(nodes), [nodes]);
             const ownershipHealth = useMemo(() => {
                 const delta = totalRootOwnership - 1;
-                if (Math.abs(delta) <= 0.00000001) return { status: 'balanced', label: 'Balanced', delta };
+                if (Math.abs(delta) <= 0.0000000001) return { status: 'balanced', label: 'Balanced', delta };
                 if (delta > 0) return { status: 'over', label: 'Over', delta };
                 return { status: 'under', label: 'Under', delta };
             }, [totalRootOwnership]);
@@ -325,9 +327,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 
             useEffect(() => {
                 if (!deskMaps.length) {
-                    const fallback = createDeskMap();
-                    setDeskMaps([fallback]);
-                    setActiveDeskMapId(fallback.id);
+                    if (activeDeskMapId) setActiveDeskMapId('');
                     return;
                 }
                 if (!activeDeskMapId || !deskMaps.some(map => map.id === activeDeskMapId)) {
@@ -671,7 +671,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 e.target.value = ''; 
             };
 
-            const formatFraction = (num) => (isNaN(num) || num === null || num === undefined ? "0.00000000" : Number(num).toFixed(8));
+            const formatFraction = (num) => (isNaN(num) || num === null || num === undefined ? "0.000000000" : Number(num).toFixed(9));
             const formatConveyanceFraction = (node) => {
                 if (!node || node.type !== 'conveyance' || node.conveyanceMode !== 'fraction') return '';
                 const numerator = Number(node.numerator || 0);
@@ -996,10 +996,6 @@ const Icon = ({ name, size = 18, className = "" }) => {
                         const shouldContinue = window.confirm('Attaching this conveyance will recalculate ownership for this branch. Continue?');
                         if (!shouldContinue) return;
                         const destinationNode = nodeById[attachParentId];
-                        const oldRootFraction = Math.max(activeNode.fraction || 0, FRACTION_EPSILON);
-                        const newRootFraction = clampFraction(calcShare);
-                        const scaleFactor = newRootFraction / oldRootFraction;
-                        const affectedCount = collectDescendantIds(nodes, activeNode.id).size + 1;
                         const attachResult = executeAttachConveyance({ allNodes: nodes, activeNodeId: activeNode.id, attachParentId, calcShare, form });
                         if (!attachResult.ok) {
                             window.alert(`Unable to complete attach conveyance: ${attachResult.error?.message || 'Unknown error'}`);
@@ -1011,10 +1007,10 @@ const Icon = ({ name, size = 18, className = "" }) => {
                             nodeId: activeNode.id,
                             destinationId: attachParentId,
                             destinationName: destinationNode?.grantee || destinationNode?.instrument || '',
-                            oldRootFraction,
-                            newRootFraction,
-                            scaleFactor,
-                            affectedCount
+                            oldRootFraction: attachResult.audit?.oldRootFraction,
+                            newRootFraction: attachResult.audit?.newRootFraction,
+                            scaleFactor: attachResult.audit?.scaleFactor,
+                            affectedCount: attachResult.audit?.affectedCount
                         });
                     } else {
                         updateActiveDeskMapNodes(prev => prev.map(n => n.id === activeNode.id ? { ...form, parentId: attachParentId, type: 'related', fraction: 0, initialFraction: 0 } : n));
@@ -1083,34 +1079,9 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 link.click();
             };
 
-            const chooseImportMode = () => {
-                const choice = window.prompt(
-                    [
-                        'Choose CSV import mode:',
-                        '1 = Replace current project',
-                        '2 = Merge into active desk map',
-                        '3 = Create new desk map from CSV',
-                        '',
-                        'Enter 1, 2, or 3 (Cancel to abort).'
-                    ].join('\n')
-                );
-                if (choice === null) return null;
-                const normalized = String(choice).trim().toLowerCase();
-                if (normalized === '1' || normalized === 'replace') return 'replace';
-                if (normalized === '2' || normalized === 'merge') return 'merge';
-                if (normalized === '3' || normalized === 'new') return 'new_map';
-                window.alert('Import cancelled: invalid choice. Please enter 1, 2, or 3.');
-                return null;
-            };
-
             const importCSV = (e) => {
                 const file = e.target.files[0];
                 if (!file) return;
-                const importMode = chooseImportMode();
-                if (!importMode) {
-                    e.target.value = '';
-                    return;
-                }
                 Papa.parse(file, {
                     header: true, skipEmptyLines: true,
                     complete: (results) => {
@@ -1120,38 +1091,47 @@ const Icon = ({ name, size = 18, className = "" }) => {
                             try {
                                 return JSON.parse(raw);
                             } catch {
-                                try {
-                                    return JSON.parse(String(raw).replace(/""/g, '"'));
-                                } catch {
-                                    return [];
-                                }
+                                return [];
                             }
                         };
-                        const findHeader = (row, patterns) => {
-                            const keys = Object.keys(row);
-                            for (let pattern of patterns) {
-                                const match = keys.find(k => pattern.test(k));
-                                if (match) return row[match].trim();
-                            }
-                            return "";
-                        };
+
+                        const firstRow = results.data[0] || {};
+                        const requiredHeaders = [
+                            'INTERNAL_ID',
+                            'INTERNAL_PID',
+                            'INTERNAL_TYPE',
+                            'INTERNAL_REMAINING_FRACTION',
+                            'INTERNAL_INITIAL_FRACTION',
+                            'INTERNAL_DESKMAPS'
+                        ];
+                        const missingHeaders = requiredHeaders.filter(header => !(header in firstRow));
+                        if (missingHeaders.length) {
+                            window.alert(`Import failed: this CSV is not in the current LANDroid workspace format. Missing columns: ${missingHeaders.join(', ')}`);
+                            return;
+                        }
+
+                        const importedDeskMaps = parseJsonField(firstRow, 'INTERNAL_DESKMAPS');
+                        if (!Array.isArray(importedDeskMaps) || !importedDeskMaps.length) {
+                            window.alert('Import failed: INTERNAL_DESKMAPS payload is missing or invalid.');
+                            return;
+                        }
+
                         const parsedRows = results.data.map(row => {
-                            const isInternal = !!row['INTERNAL_ID'];
                             return {
                                 originalId: row['INTERNAL_ID'] || null,
-                                instrument: findHeader(row, [/^Instrument$/i, /^Instrument \(/i, /Instrument/i]),
-                                vol: findHeader(row, [/^Vol/i]),
-                                page: findHeader(row, [/^Page/i]),
-                                docNo: findHeader(row, [/Inst[\s\S]*No/i, /Doc[\s\S]*No/i]),
-                                fileDate: findHeader(row, [/File[\s\S]*Date/i]),
-                                date: findHeader(row, [/Inst[\s\S]*Eff/i, /Inst[\s\S]*Date/i, /Effective[\s\S]*Date/i, /^Date$/i]),
-                                grantor: findHeader(row, [/Grantor/i, /Assignor/i, /Lessor/i]),
-                                grantee: findHeader(row, [/Grantee/i, /Assignee/i, /Lessee/i, /Subject/i]),
-                                landDesc: findHeader(row, [/Land[\s\S]*Desc/i, /Description/i]),
-                                remarks: findHeader(row, [/Remark/i, /Note/i]),
-                                fraction: isInternal ? parseFloat(row['INTERNAL_REMAINING_FRACTION'] || 0) : 0,
-                                initialFraction: isInternal ? parseFloat(row['INTERNAL_INITIAL_FRACTION'] || 0) : 0,
-                                parentId: isInternal ? (row['INTERNAL_PID'] === "NULL" ? null : row['INTERNAL_PID']) : 'unlinked', 
+                                instrument: row['Instrument'] || '',
+                                vol: row['Vol'] || '',
+                                page: row['Page'] || '',
+                                docNo: row['Inst No.'] || '',
+                                fileDate: row['File Date'] || '',
+                                date: row['Inst Date'] || '',
+                                grantor: row['Grantor / Assignor'] || '',
+                                grantee: row['Grantee / Assignee'] || '',
+                                landDesc: row['Land Desc.'] || '',
+                                remarks: row['Remarks'] || '',
+                                fraction: parseFloat(row['INTERNAL_REMAINING_FRACTION'] || 0),
+                                initialFraction: parseFloat(row['INTERNAL_INITIAL_FRACTION'] || 0),
+                                parentId: row['INTERNAL_PID'] === "NULL" ? null : row['INTERNAL_PID'],
                                 docData: row['INTERNAL_DOC'] ? row['INTERNAL_DOC'].replace(/(^"|"$)/g, '') : "",
                                 type: row['INTERNAL_TYPE'] || 'conveyance',
                                 isDeceased: row['INTERNAL_DECEASED'] === 'true',
@@ -1185,61 +1165,23 @@ const Icon = ({ name, size = 18, className = "" }) => {
                         if (newNodes.length) {
                             const newInsts = [...new Set(newNodes.map(n => n.instrument).filter(Boolean))];
                             setInstrumentList(prev => [...new Set([...prev, ...newInsts])]);
-
-                            const firstRow = results.data[0] || {};
-                            const importedDeskMaps = parseJsonField(firstRow, 'INTERNAL_DESKMAPS');
                             const importedActiveDeskMapId = firstRow['INTERNAL_ACTIVE_DESKMAP_ID'] || '';
-                            const hasEmbeddedWorkspace = importedDeskMaps.length > 0;
-                            const normalizedImportMode = hasEmbeddedWorkspace && importMode !== 'replace' ? 'replace' : importMode;
-
-                            if (hasEmbeddedWorkspace && importMode !== 'replace') {
-                                window.alert('This CSV contains a full multi-map workspace payload. Import mode was switched to Replace so Desk Maps stay separated and performant.');
-                            }
-
-                            if (normalizedImportMode === 'replace') {
-                                setNodes(newNodes);
-                                setTracts(parseJsonField(firstRow, 'INTERNAL_TRACTS'));
-                                const importedContacts = parseJsonField(firstRow, 'INTERNAL_CONTACTS');
-                                setContacts(importedContacts);
-                                setOwnershipInterests(parseJsonField(firstRow, 'INTERNAL_INTERESTS'));
-                                setContactLogs(parseJsonField(firstRow, 'INTERNAL_CONTACT_LOGS'));
-                                if (importedDeskMaps.length) {
-                                    setDeskMaps(importedDeskMaps);
-                                    const nextDeskMapId = importedDeskMaps.some(map => map.id === importedActiveDeskMapId) ? importedActiveDeskMapId : importedDeskMaps[0].id;
-                                    setActiveDeskMapId(nextDeskMapId);
-                                    const activeMap = importedDeskMaps.find(map => map.id === nextDeskMapId) || importedDeskMaps[0];
-                                    setNodes(activeMap.nodes || newNodes);
-                                    setPz(activeMap.pz || { ...defaultViewport });
-                                } else {
-                                    const fallback = createDeskMap();
-                                    fallback.nodes = newNodes;
-                                    setDeskMaps([fallback]);
-                                    setActiveDeskMapId(fallback.id);
-                                    setPz({ ...defaultViewport });
-                                }
-                                setSelectedContactId((importedContacts[0] && importedContacts[0].id) || null);
-                            } else if (normalizedImportMode === 'merge') {
-                                setDeskMaps(prev => prev.map(map => {
-                                    if (map.id !== activeDeskMapId) return map;
-                                    return { ...map, nodes: [...(map.nodes || []), ...newNodes] };
-                                }));
-                                setNodes(prev => [...prev, ...newNodes]);
-                            } else {
-                                const mapNumber = deskMaps.length + 1;
-                                const newDeskMap = createDeskMap({ name: `Imported Map ${mapNumber}`, code: `IMPORTED-${mapNumber}` });
-                                newDeskMap.nodes = newNodes;
-                                setDeskMaps(prev => [...prev, newDeskMap]);
-                                setActiveDeskMapId(newDeskMap.id);
-                                setPz({ ...defaultViewport });
-                            }
-
-                            const modeLabel = normalizedImportMode === 'replace' ? 'replace' : normalizedImportMode === 'merge' ? 'merge' : 'new map';
-                            const mapSummary = normalizedImportMode === 'replace'
-                                ? 'Maps updated: project desk maps replaced from import (or rebuilt fallback map).'
-                                : normalizedImportMode === 'merge'
-                                    ? 'Maps updated: active desk map merged; other maps preserved.'
-                                    : 'Maps created: 1 new desk map from CSV; existing maps preserved.';
-                            window.alert(`Import complete.\nRecords imported: ${newNodes.length}\nMode: ${modeLabel}\n${mapSummary}`);
+                            setNodes(newNodes);
+                            setTracts(parseJsonField(firstRow, 'INTERNAL_TRACTS'));
+                            const importedContacts = parseJsonField(firstRow, 'INTERNAL_CONTACTS');
+                            setContacts(importedContacts);
+                            setOwnershipInterests(parseJsonField(firstRow, 'INTERNAL_INTERESTS'));
+                            setContactLogs(parseJsonField(firstRow, 'INTERNAL_CONTACT_LOGS'));
+                            setDeskMaps(importedDeskMaps);
+                            const nextDeskMapId = importedDeskMaps.some(map => map.id === importedActiveDeskMapId)
+                                ? importedActiveDeskMapId
+                                : importedDeskMaps[0].id;
+                            setActiveDeskMapId(nextDeskMapId);
+                            const activeMap = importedDeskMaps.find(map => map.id === nextDeskMapId) || importedDeskMaps[0];
+                            setNodes(activeMap.nodes || newNodes);
+                            setPz(activeMap.pz || { ...defaultViewport });
+                            setSelectedContactId((importedContacts[0] && importedContacts[0].id) || null);
+                            window.alert(`Import complete.\nRecords imported: ${newNodes.length}\nMode: replace\nMaps updated from embedded workspace payload.`);
                         }
                     },
                     error: (error) => console.error("Error parsing CSV:", error)
@@ -1344,6 +1286,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 return children.map(n => ({ ...n, children: buildTree(n.id) }));
             };
             const tree = useMemo(() => buildTree(), [nodes]);
+            const simplifyZoomSubtrees = isZooming && nodes.length > 180;
             const relatedByParentId = useMemo(() => {
                 const grouped = {};
                 nodes.forEach(node => {
@@ -1358,6 +1301,10 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 if (wheelFrameRef.current !== null) {
                     cancelAnimationFrame(wheelFrameRef.current);
                     wheelFrameRef.current = null;
+                }
+                if (zoomIdleTimerRef.current) {
+                    clearTimeout(zoomIdleTimerRef.current);
+                    zoomIdleTimerRef.current = null;
                 }
             }, []);
 
@@ -1392,6 +1339,9 @@ const Icon = ({ name, size = 18, className = "" }) => {
                     y: e.clientY - rect.top
                 };
                 wheelAccumulatedDeltaRef.current += e.deltaY;
+                setIsZooming(true);
+                if (zoomIdleTimerRef.current) clearTimeout(zoomIdleTimerRef.current);
+                zoomIdleTimerRef.current = setTimeout(() => setIsZooming(false), 120);
 
                 if (wheelFrameRef.current !== null) return;
 
@@ -1400,12 +1350,12 @@ const Icon = ({ name, size = 18, className = "" }) => {
                     wheelAccumulatedDeltaRef.current = 0;
                     wheelFrameRef.current = null;
 
-                    const scaleAdjust = totalDelta * -0.001;
                     const pointerX = wheelPointerRef.current.x;
                     const pointerY = wheelPointerRef.current.y;
 
                     setPz(prev => {
-                        const nextScale = Math.min(Math.max(0.1, prev.scale + scaleAdjust), 5);
+                        const zoomFactor = Math.exp(totalDelta * -0.001);
+                        const nextScale = Math.min(Math.max(0.1, prev.scale * zoomFactor), 5);
                         if (nextScale === prev.scale) return prev;
 
                         const worldX = (pointerX - prev.x) / prev.scale;
@@ -1433,7 +1383,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
             };
 
             // PERFORMANCE: Extracted to a standard render function to prevent destructive unmounting/remounting on every frame
-            const renderTreeNode = (n) => {
+            const renderTreeNode = (n, depth = 0) => {
                 const relatedDocs = relatedByParentId[n.id] || [];
                 const isDeceased = n.isDeceased;
                 const conveyanceFractionLabel = formatConveyanceFraction(n);
@@ -1442,13 +1392,15 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 const hasChildren = n.children.length > 0;
                 const isCollapsed = Boolean(n.isCollapsed);
                 const hiddenDescendantCount = isCollapsed ? countTreeDescendants(n) : 0;
+                const shouldSimplifyChildren = simplifyZoomSubtrees && depth >= 1 && hasChildren;
+                const simplifiedHiddenCount = shouldSimplifyChildren ? countTreeDescendants(n) : 0;
                 return (
                     <div key={n.id} className="flex flex-col items-center relative animate-fade-in treenode">
                         <div className="z-10 group relative treenode-body">
                             <div 
                                 onClick={() => openEdit(n)} 
                                 className={`p-4 border min-w-[260px] max-w-[300px] cursor-pointer transition-all duration-300 relative ${
-                                    isDeceased ? 'bg-teastain border-sepia text-sepia ink-shadow' : 'bg-parchment border-ink text-ink ink-shadow ink-shadow-hover'
+                                    isDeceased ? (isZooming ? 'bg-teastain border-sepia text-sepia' : 'bg-teastain border-sepia text-sepia ink-shadow') : (isZooming ? 'bg-parchment border-ink text-ink' : 'bg-parchment border-ink text-ink ink-shadow ink-shadow-hover')
                                 }`}
                             >
                                 <div className={`flex justify-between items-start mb-2 border-b pb-2 ${isDeceased ? 'border-sepia/20' : 'border-ink/20'}`}>
@@ -1502,10 +1454,10 @@ const Icon = ({ name, size = 18, className = "" }) => {
                                         </div>
                                     </div>
                                     <div className="flex justify-between items-end">
-                                        <span className={`text-[10px] uppercase tracking-widest italic ${n.fraction < 0.00000001 ? 'text-stamp font-bold' : 'opacity-60'}`}>Rem</span>
+                                        <span className={`text-[10px] uppercase tracking-widest italic ${n.fraction < 0.0000000001 ? 'text-stamp font-bold' : 'opacity-60'}`}>Rem</span>
                                         <div className="text-right">
-                                            <div className={`text-xs italic ${n.fraction < 0.00000001 ? 'text-stamp font-bold' : ''}`}>{formatFraction(n.fraction)}</div>
-                                            <div className={`text-[10px] ${n.fraction < 0.00000001 ? 'text-stamp font-bold' : 'opacity-70'}`}>{remainingFractionDisplay}</div>
+                                            <div className={`text-xs italic ${n.fraction < 0.0000000001 ? 'text-stamp font-bold' : ''}`}>{formatFraction(n.fraction)}</div>
+                                            <div className={`text-[10px] ${n.fraction < 0.0000000001 ? 'text-stamp font-bold' : 'opacity-70'}`}>{remainingFractionDisplay}</div>
                                         </div>
                                     </div>
                                 </div>
@@ -1560,6 +1512,14 @@ const Icon = ({ name, size = 18, className = "" }) => {
                                         +{hiddenDescendantCount} descendants
                                     </div>
                                 )}
+
+                                {shouldSimplifyChildren && simplifiedHiddenCount > 0 && (
+                                    <div className={`mt-3 inline-flex items-center px-2 py-1 border rounded-sm text-[10px] font-mono uppercase tracking-wider ${
+                                        isDeceased ? 'border-sepia/40 bg-sepia/10 text-sepia' : 'border-ink/40 bg-ink/5 text-ink/80'
+                                    }`}>
+                                        Zoom Preview: +{simplifiedHiddenCount} hidden descendants
+                                    </div>
+                                )}
                             </div>
                             
                             <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 flex gap-1 opacity-0 group-hover:opacity-100 transition-all duration-300 z-20">
@@ -1573,13 +1533,13 @@ const Icon = ({ name, size = 18, className = "" }) => {
                                 {nodes.length > 1 && <button onClick={(e) => { e.stopPropagation(); requestDeleteRecord(n); }} className="bg-parchment text-stamp border border-stamp/60 rounded-sm p-1.5 text-[10px] font-bold hover:bg-teastain hover:border-stamp shadow-lg flex items-center justify-center hover:-translate-y-0.5 transition-all"><Icon name="Trash" size={14} /></button>}
                             </div>
                         </div>
-                        {hasChildren && !isCollapsed && (
+                        {hasChildren && !isCollapsed && !shouldSimplifyChildren && (
                             <div className="flex relative justify-center pt-8">
                                 {n.children.map((c, i) => (
                                     <div key={c.id} className="relative flex flex-col items-center px-4">
                                         <div className="absolute top-0 left-1/2 w-[1px] h-8 bg-ink -translate-x-1/2 -mt-8 z-0"></div>
                                         {n.children.length > 1 && <div className={`absolute -top-8 h-[1px] bg-ink z-0 ${i === 0 ? 'left-1/2 right-0' : i === n.children.length - 1 ? 'left-0 right-1/2' : 'left-0 right-0'}`}></div>}
-                                        {renderTreeNode(c)}
+                                        {renderTreeNode(c, depth + 1)}
                                     </div>
                                 ))}
                             </div>
@@ -1770,6 +1730,11 @@ const Icon = ({ name, size = 18, className = "" }) => {
                     console.error(e);
                 } finally {
                     setView('chart');
+                    setWorkspaceLoaded(false);
+                    setActiveDeskMapId('');
+                    setDeskMaps([]);
+                    setNodes([{ ...defaultRoot }]);
+                    setPz({ ...defaultViewport });
                     setShowHome(true);
                 }
             };
@@ -2435,7 +2400,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
                                                     <select className="w-full border border-ink p-2" value={interestForm.contactId} onChange={e => setInterestForm({ ...interestForm, contactId: e.target.value })}><option value="">Contact</option>{contacts.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
                                                     <select className="w-full border border-ink p-2" value={interestForm.tractId} onChange={e => setInterestForm({ ...interestForm, tractId: e.target.value })}><option value="">Tract</option>{tracts.map(t => <option key={t.id} value={t.id}>{t.code} {t.name ? `- ${t.name}` : ''}</option>)}</select>
                                                     <select className="w-full border border-ink p-2" value={interestForm.interestType} onChange={e => setInterestForm({ ...interestForm, interestType: e.target.value })}><option value="MI">MI</option><option value="RI">RI</option><option value="NRI">NRI</option><option value="ORRI">ORRI</option></select>
-                                                    <input className="w-full border border-ink p-2" type="number" step="0.00000001" placeholder="Interest (decimal)" value={interestForm.interestValue} onChange={e => setInterestForm({ ...interestForm, interestValue: e.target.value })} />
+                                                    <input className="w-full border border-ink p-2" type="number" step="0.0000000001" placeholder="Interest (decimal)" value={interestForm.interestValue} onChange={e => setInterestForm({ ...interestForm, interestValue: e.target.value })} />
                                                     <select className="w-full border border-ink p-2" value={interestForm.status} onChange={e => setInterestForm({ ...interestForm, status: e.target.value })}><option value="confirmed">Confirmed</option><option value="proposed">Proposed</option><option value="disputed">Disputed</option></select>
                                                 </div>
                                                 <button onClick={addInterest} className="mt-3 px-3 py-1.5 text-xs font-bold border border-ink hover:bg-ink hover:text-parchment transition-colors">Add Interest</button>
@@ -2499,7 +2464,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
                                     }} className="border border-ink/40 p-1 text-xs min-w-[140px] bg-parchment" placeholder="DeskMap name" />
                                     <button onClick={() => renameActiveDeskMap()} className="px-2 py-1 text-[10px] font-bold border border-ink/40 hover:bg-teastain transition-colors">Save Name</button>
                                 </div>
-                                <div style={{ transform: `translate(${pz.x}px, ${pz.y}px) scale(${pz.scale})`, transformOrigin: '0 0' }} className="w-max h-max min-w-full min-h-full flex justify-start pt-24 pb-48 gap-24">
+                                <div style={{ transform: `translate3d(${pz.x}px, ${pz.y}px, 0) scale(${pz.scale})`, transformOrigin: '0 0', willChange: 'transform', contain: 'layout paint style' }} className="w-max h-max min-w-full min-h-full flex justify-start pt-24 pb-48 gap-24">
                                     {tree.map(n => renderTreeNode(n))}
                                 </div>
                             </div>
@@ -3054,7 +3019,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
                                                         {form.conveyanceMode === 'fixed' && (
                                                             <div className="relative w-full">
                                                                 <div className="text-[8px] font-bold opacity-60 uppercase absolute -top-4 left-0">Fixed Decimal Amount</div>
-                                                                <input type="number" step="0.00000001" className="w-full sm:w-48 p-3 font-mono font-bold border border-ink bg-parchment focus:ring-2 focus:ring-sepia outline-none text-lg shadow-inner" value={form.manualAmount === 0 ? '' : form.manualAmount} placeholder="0.000" onFocus={e => e.target.select()} onChange={e => setForm({...form, manualAmount: e.target.value})} />
+                                                                <input type="number" step="0.0000000001" className="w-full sm:w-48 p-3 font-mono font-bold border border-ink bg-parchment focus:ring-2 focus:ring-sepia outline-none text-lg shadow-inner" value={form.manualAmount === 0 ? '' : form.manualAmount} placeholder="0.000" onFocus={e => e.target.select()} onChange={e => setForm({...form, manualAmount: e.target.value})} />
                                                             </div>
                                                         )}
                                                         {form.conveyanceMode === 'all' && (
@@ -3067,14 +3032,14 @@ const Icon = ({ name, size = 18, className = "" }) => {
                                                             <div className="text-[10px] font-bold uppercase text-sepia mb-0.5 tracking-widest">To Be Conveyed</div>
                                                             <div className="text-2xl font-black font-mono tracking-tight">{formatFraction(calcShare)}</div>
                                                         </div>
-                                                        <div className={`px-4 py-2 border text-left sm:text-right transition-colors ${ (parentForMath?.fraction - calcShare) < -0.00000001 ? 'bg-[#E0D7D7] border-stamp/50' : 'bg-parchment border-ink ' }`}>
-                                                            <div className={`text-[9px] font-black uppercase tracking-widest mb-1 ${ (parentForMath?.fraction - calcShare) < -0.00000001 ? 'text-stamp' : 'opacity-60' }`}>Grantor Retention Balance</div>
-                                                            <div className={`font-mono text-xs flex items-center sm:justify-end gap-2 ${ (parentForMath?.fraction - calcShare) < -0.00000001 ? 'text-stamp font-bold' : '' }`}>
+                                                        <div className={`px-4 py-2 border text-left sm:text-right transition-colors ${ (parentForMath?.fraction - calcShare) < -0.0000000001 ? 'bg-[#E0D7D7] border-stamp/50' : 'bg-parchment border-ink ' }`}>
+                                                            <div className={`text-[9px] font-black uppercase tracking-widest mb-1 ${ (parentForMath?.fraction - calcShare) < -0.0000000001 ? 'text-stamp' : 'opacity-60' }`}>Grantor Retention Balance</div>
+                                                            <div className={`font-mono text-xs flex items-center sm:justify-end gap-2 ${ (parentForMath?.fraction - calcShare) < -0.0000000001 ? 'text-stamp font-bold' : '' }`}>
                                                                 <span>{formatFraction(parentForMath?.fraction)}</span>
                                                                 <span className="opacity-40">-</span>
                                                                 <span>{formatFraction(calcShare)}</span>
                                                                 <span className="opacity-40">=</span>
-                                                                <span className={`text-sm border-l border-ink pl-2 ${ (parentForMath?.fraction - calcShare) < -0.00000001 ? 'text-stamp' : 'font-bold' }`}>{formatFraction(parentForMath?.fraction - calcShare)}</span>
+                                                                <span className={`text-sm border-l border-ink pl-2 ${ (parentForMath?.fraction - calcShare) < -0.0000000001 ? 'text-stamp' : 'font-bold' }`}>{formatFraction(parentForMath?.fraction - calcShare)}</span>
                                                             </div>
                                                         </div>
                                                     </div>
@@ -3099,7 +3064,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
                                                         <label className="text-[10px] font-bold text-sepia uppercase tracking-widest block mb-2">Predecessor Total Interest Received</label>
                                                         <input 
                                                             type="number" 
-                                                            step="0.00000001" 
+                                                            step="0.0000000001" 
                                                             className="w-full sm:w-64 p-3 font-mono font-bold border border-ink bg-parchment focus:ring-2 focus:ring-sepia outline-none text-lg shadow-inner" 
                                                             value={form.initialFraction === 0 ? '' : form.initialFraction} 
                                                             onFocus={e => e.target.select()} 
@@ -3161,7 +3126,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
                                                         <label className="text-[10px] font-bold text-sepia uppercase tracking-widest block mb-2">Corrected Root Interest for this Branch</label>
                                                         <input
                                                             type="number"
-                                                            step="0.00000001"
+                                                            step="0.0000000001"
                                                             className="w-full sm:w-64 p-3 font-mono font-bold border border-ink bg-parchment focus:ring-2 focus:ring-sepia outline-none text-lg shadow-inner"
                                                             value={form.initialFraction === 0 ? '' : form.initialFraction}
                                                             onFocus={e => e.target.select()}
@@ -3201,11 +3166,11 @@ const Icon = ({ name, size = 18, className = "" }) => {
                                             <>
                                                 <div className="col-span-3">
                                                     <label className="text-[10px] font-bold text-sepia uppercase mb-1.5 block tracking-widest">Initial Granted Share {modalMode === 'edit' ? '(Override)' : ''}</label>
-                                                    <input type="number" step="0.00000001" className="w-full border border-ink p-3 bg-teastain font-bold focus:ring-2 focus:ring-sepia outline-none" value={form.initialFraction === 0 ? '' : form.initialFraction} onFocus={e => e.target.select()} onChange={(e) => setForm({...form, initialFraction: parseFloat(e.target.value) || 0})} />
+                                                    <input type="number" step="0.0000000001" className="w-full border border-ink p-3 bg-teastain font-bold focus:ring-2 focus:ring-sepia outline-none" value={form.initialFraction === 0 ? '' : form.initialFraction} onFocus={e => e.target.select()} onChange={(e) => setForm({...form, initialFraction: parseFloat(e.target.value) || 0})} />
                                                 </div>
                                                 <div className="col-span-3">
                                                     <label className="text-[10px] font-bold text-sepia uppercase mb-1.5 block tracking-widest">Remaining Retained Share {modalMode === 'edit' ? '(Override)' : ''}</label>
-                                                    <input type="number" step="0.00000001" className="w-full border border-ink p-3 bg-teastain font-bold focus:ring-2 focus:ring-sepia outline-none" value={form.fraction === 0 ? '' : form.fraction} onFocus={e => e.target.select()} onChange={(e) => setForm({...form, fraction: parseFloat(e.target.value) || 0})} />
+                                                    <input type="number" step="0.0000000001" className="w-full border border-ink p-3 bg-teastain font-bold focus:ring-2 focus:ring-sepia outline-none" value={form.fraction === 0 ? '' : form.fraction} onFocus={e => e.target.select()} onChange={(e) => setForm({...form, fraction: parseFloat(e.target.value) || 0})} />
                                                 </div>
                                             </>
                                         )}
