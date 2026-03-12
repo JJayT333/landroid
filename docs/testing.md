@@ -27,7 +27,8 @@
 
 - `npm run test:math-engine`
   - focused unit-style checks for extracted math engine operations
-  - covers conveyance update, rebalance scaling, predecessor insertion, and graph validation
+  - covers conveyance/rebalance/predecessor/attach contracts with explicit error envelopes
+  - validates mineral-interest chain math for tract/NMA/decimal/royalty-burden paths
 
 - `npm run test:storage`
   - workspace persistence flow
@@ -50,9 +51,10 @@
   - enforces expected row counts for 5x200 aggregate and split-tract fixture imports
 
 - `npm run test:stress-tiers`
-  - generated in-memory tiered stress checks (`1x50`, `5x200`, `10x500`)
-  - validates graph invariants on each tier
-  - reports runsheet and flow derivation timing by tier
+  - generated in-memory tiered stress checks (`1x50`, `5x200`, `10x500`) with `5x200` retained as a baseline gate
+  - adds deterministic shape-diverse stress tiers (deep chain, wide fan, unlinked-dense)
+  - includes seeded invariant matrix runs to verify deterministic property coverage across seeds
+  - validates graph invariants and reports runsheet/flow metrics by tier
 
 - `npm run test:perf`
   - lightweight performance benchmark on 5x200 stress workspace
