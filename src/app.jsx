@@ -1287,6 +1287,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 return children.map(n => ({ ...n, children: buildTree(n.id) }));
             };
             const tree = useMemo(() => buildTree(), [nodes]);
+            const simplifyZoomSubtrees = isZooming && nodes.length > 180;
             const relatedByParentId = useMemo(() => {
                 const grouped = {};
                 nodes.forEach(node => {
@@ -1413,7 +1414,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
             };
 
             // PERFORMANCE: Extracted to a standard render function to prevent destructive unmounting/remounting on every frame
-            const renderTreeNode = (n) => {
+            const renderTreeNode = (n, depth = 0) => {
                 const relatedDocs = relatedByParentId[n.id] || [];
                 const isDeceased = n.isDeceased;
                 const conveyanceFractionLabel = formatConveyanceFraction(n);
@@ -1422,13 +1423,15 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 const hasChildren = n.children.length > 0;
                 const isCollapsed = Boolean(n.isCollapsed);
                 const hiddenDescendantCount = isCollapsed ? countTreeDescendants(n) : 0;
+                const shouldSimplifyChildren = simplifyZoomSubtrees && depth >= 1 && hasChildren;
+                const simplifiedHiddenCount = shouldSimplifyChildren ? countTreeDescendants(n) : 0;
                 return (
                     <div key={n.id} className="flex flex-col items-center relative animate-fade-in treenode">
                         <div className="z-10 group relative treenode-body">
                             <div 
                                 onClick={() => openEdit(n)} 
                                 className={`p-4 border min-w-[260px] max-w-[300px] cursor-pointer transition-all duration-300 relative ${
-                                    isDeceased ? 'bg-teastain border-sepia text-sepia ink-shadow' : 'bg-parchment border-ink text-ink ink-shadow ink-shadow-hover'
+                                    isDeceased ? (isZooming ? 'bg-teastain border-sepia text-sepia' : 'bg-teastain border-sepia text-sepia ink-shadow') : (isZooming ? 'bg-parchment border-ink text-ink' : 'bg-parchment border-ink text-ink ink-shadow ink-shadow-hover')
                                 }`}
                             >
                                 <div className={`flex justify-between items-start mb-2 border-b pb-2 ${isDeceased ? 'border-sepia/20' : 'border-ink/20'}`}>
@@ -1540,6 +1543,14 @@ const Icon = ({ name, size = 18, className = "" }) => {
                                         +{hiddenDescendantCount} descendants
                                     </div>
                                 )}
+
+                                {shouldSimplifyChildren && simplifiedHiddenCount > 0 && (
+                                    <div className={`mt-3 inline-flex items-center px-2 py-1 border rounded-sm text-[10px] font-mono uppercase tracking-wider ${
+                                        isDeceased ? 'border-sepia/40 bg-sepia/10 text-sepia' : 'border-ink/40 bg-ink/5 text-ink/80'
+                                    }`}>
+                                        Zoom Preview: +{simplifiedHiddenCount} hidden descendants
+                                    </div>
+                                )}
                             </div>
                             
                             <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 flex gap-1 opacity-0 group-hover:opacity-100 transition-all duration-300 z-20">
@@ -1553,13 +1564,13 @@ const Icon = ({ name, size = 18, className = "" }) => {
                                 {nodes.length > 1 && <button onClick={(e) => { e.stopPropagation(); requestDeleteRecord(n); }} className="bg-parchment text-stamp border border-stamp/60 rounded-sm p-1.5 text-[10px] font-bold hover:bg-teastain hover:border-stamp shadow-lg flex items-center justify-center hover:-translate-y-0.5 transition-all"><Icon name="Trash" size={14} /></button>}
                             </div>
                         </div>
-                        {hasChildren && !isCollapsed && (
+                        {hasChildren && !isCollapsed && !shouldSimplifyChildren && (
                             <div className="flex relative justify-center pt-8">
                                 {n.children.map((c, i) => (
                                     <div key={c.id} className="relative flex flex-col items-center px-4">
                                         <div className="absolute top-0 left-1/2 w-[1px] h-8 bg-ink -translate-x-1/2 -mt-8 z-0"></div>
                                         {n.children.length > 1 && <div className={`absolute -top-8 h-[1px] bg-ink z-0 ${i === 0 ? 'left-1/2 right-0' : i === n.children.length - 1 ? 'left-0 right-1/2' : 'left-0 right-0'}`}></div>}
-                                        {renderTreeNode(c)}
+                                        {renderTreeNode(c, depth + 1)}
                                     </div>
                                 ))}
                             </div>
