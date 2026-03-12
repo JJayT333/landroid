@@ -980,6 +980,12 @@ const Icon = ({ name, size = 18, className = "" }) => {
                     });
                 } else if (modalMode === 'add_chain') {
                     const newId = makeId();
+                    const available = Math.max(0, 1.0 - totalRootOwnership);
+                    const requested = clampFraction(form.initialFraction);
+                    if (requested - available > FRACTION_EPSILON) {
+                        window.alert(`Only ${formatFraction(available)} ownership capacity remains in this map. Reduce the initial granted share to ${formatFraction(available)} or less.`);
+                        return;
+                    }
                     updateActiveDeskMapNodes(prev => [...prev, { ...form, id: newId, type: 'conveyance', parentId: null }]);
                 } else if (modalMode === 'add_related') {
                     const newId = makeId();
@@ -1653,6 +1659,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
                             grantee: n.grantee,
                             grantor: n.grantor,
                             fraction: formatFraction(n.fraction),
+                            fractionDisplay: n.fraction > FRACTION_EPSILON ? formatAsFraction(n.fraction) : null,
                             details: `${n.date} ${n.vol && n.page ? `• Vol ${n.vol}/Pg ${n.page}` : ''}`
                         }
                     });
@@ -2046,7 +2053,10 @@ const Icon = ({ name, size = 18, className = "" }) => {
                                         </div>
                                         <div className="border-t border-current/20 pt-2 flex justify-between items-end">
                                             <span className="text-[10px] uppercase tracking-widest opacity-60 font-mono">Interest</span>
-                                            <span className="font-mono font-bold text-sm">{n.data.fraction}</span>
+                                            <div className="text-right">
+                                                <div className="font-mono font-bold text-sm">{n.data.fraction}</div>
+                                                {n.data.fractionDisplay && <div className="font-mono text-[10px] opacity-60">{n.data.fractionDisplay}</div>}
+                                            </div>
                                         </div>
                                     </div>
                                 ) : (
@@ -3196,12 +3206,12 @@ const Icon = ({ name, size = 18, className = "" }) => {
                                         {(modalMode === 'edit' || modalMode === 'add_chain') && form.type !== 'related' && form.parentId !== 'unlinked' && (
                                             <>
                                                 <div className="col-span-3">
-                                                    <label className="text-[10px] font-bold text-sepia uppercase mb-1.5 block tracking-widest">Initial Granted Share {modalMode === 'edit' ? '(Override)' : ''}</label>
+                                                    <label className="text-[10px] font-bold text-sepia uppercase mb-1.5 block tracking-widest">Initial Granted Share {modalMode === 'edit' ? '(Rebalances branch)' : ''}</label>
                                                     <input type="number" step="0.0000000001" className="w-full border border-ink p-3 bg-teastain font-bold focus:ring-2 focus:ring-sepia outline-none" value={form.initialFraction === 0 ? '' : form.initialFraction} onFocus={e => e.target.select()} onChange={(e) => setForm({...form, initialFraction: parseFloat(e.target.value) || 0})} />
                                                 </div>
                                                 <div className="col-span-3">
-                                                    <label className="text-[10px] font-bold text-sepia uppercase mb-1.5 block tracking-widest">Remaining Retained Share {modalMode === 'edit' ? '(Override)' : ''}</label>
-                                                    <input type="number" step="0.0000000001" className="w-full border border-ink p-3 bg-teastain font-bold focus:ring-2 focus:ring-sepia outline-none" value={form.fraction === 0 ? '' : form.fraction} onFocus={e => e.target.select()} onChange={(e) => setForm({...form, fraction: parseFloat(e.target.value) || 0})} />
+                                                    <label className="text-[10px] font-bold text-sepia uppercase mb-1.5 block tracking-widest">Remaining Retained Share <span className="normal-case text-sepia/60">(derived · read-only)</span></label>
+                                                    <div className="w-full border border-ink/40 p-3 bg-teastain/50 font-bold font-mono text-sm text-sepia/80 select-none">{formatFraction(activeNode?.fraction ?? form.fraction)}</div>
                                                 </div>
                                             </>
                                         )}
