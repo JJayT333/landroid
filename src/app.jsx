@@ -206,7 +206,8 @@ const Icon = ({ name, size = 18, className = "" }) => {
             const wheelAccumulatedDeltaRef = useRef(0);
             const wheelPointerRef = useRef({ x: 0, y: 0 });
             const zoomIdleTimerRef = useRef(null);
-            const [isZooming, setIsZooming] = useState(false);
+            const chartViewportRef = useRef(null);
+            const livePzRef = useRef({ ...defaultViewport });
             const chartPanFrameRef = useRef(null);
             const chartPanPointRef = useRef(null);
             const flowPanFrameRef = useRef(null);
@@ -1308,9 +1309,23 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 }
             }, []);
 
+            const applyDeskMapTransform = (viewport) => {
+                const viewportEl = chartViewportRef.current;
+                if (!viewportEl) return;
+                viewportEl.style.transform = `translate3d(${viewport.x}px, ${viewport.y}px, 0) scale(${viewport.scale})`;
+            };
+
+            useEffect(() => {
+                livePzRef.current = pz;
+                applyDeskMapTransform(pz);
+            }, [pz]);
+
             const handlePointerDown = (e) => {
                 if (e.button !== 0 || e.target.closest('button') || e.target.closest('.treenode-body')) return;
-                isDragging.current = true; dragStart.current = { x: e.clientX - pz.x, y: e.clientY - pz.y }; e.currentTarget.setPointerCapture(e.pointerId);
+                isDragging.current = true;
+                const currentPz = livePzRef.current;
+                dragStart.current = { x: e.clientX - currentPz.x, y: e.clientY - currentPz.y };
+                e.currentTarget.setPointerCapture(e.pointerId);
             };
             const handlePointerMove = (e) => {
                 if (!isDragging.current) return;
@@ -1320,7 +1335,9 @@ const Icon = ({ name, size = 18, className = "" }) => {
                     chartPanFrameRef.current = null;
                     const point = chartPanPointRef.current;
                     if (!point) return;
-                    setPz(prev => ({ ...prev, x: point.x - dragStart.current.x, y: point.y - dragStart.current.y }));
+                    const nextViewport = { ...livePzRef.current, x: point.x - dragStart.current.x, y: point.y - dragStart.current.y };
+                    livePzRef.current = nextViewport;
+                    applyDeskMapTransform(nextViewport);
                 });
             };
             const handlePointerUp = (e) => {
@@ -1330,6 +1347,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
                     chartPanFrameRef.current = null;
                 }
                 chartPanPointRef.current = null;
+                setPz(livePzRef.current);
             };
             const handleWheel = (e) => {
                 e.preventDefault();
@@ -1339,9 +1357,8 @@ const Icon = ({ name, size = 18, className = "" }) => {
                     y: e.clientY - rect.top
                 };
                 wheelAccumulatedDeltaRef.current += e.deltaY;
-                setIsZooming(true);
                 if (zoomIdleTimerRef.current) clearTimeout(zoomIdleTimerRef.current);
-                zoomIdleTimerRef.current = setTimeout(() => setIsZooming(false), 120);
+                zoomIdleTimerRef.current = setTimeout(() => setPz(livePzRef.current), 120);
 
                 if (wheelFrameRef.current !== null) return;
 
@@ -1353,21 +1370,22 @@ const Icon = ({ name, size = 18, className = "" }) => {
                     const pointerX = wheelPointerRef.current.x;
                     const pointerY = wheelPointerRef.current.y;
 
-                    setPz(prev => {
-                        const zoomFactor = Math.exp(totalDelta * -0.001);
-                        const nextScale = Math.min(Math.max(0.1, prev.scale * zoomFactor), 5);
-                        if (nextScale === prev.scale) return prev;
+                    const currentViewport = livePzRef.current;
+                    const zoomFactor = Math.exp(totalDelta * -0.001);
+                    const nextScale = Math.min(Math.max(0.1, currentViewport.scale * zoomFactor), 5);
+                    if (nextScale === currentViewport.scale) return;
 
-                        const worldX = (pointerX - prev.x) / prev.scale;
-                        const worldY = (pointerY - prev.y) / prev.scale;
+                    const worldX = (pointerX - currentViewport.x) / currentViewport.scale;
+                    const worldY = (pointerY - currentViewport.y) / currentViewport.scale;
 
-                        return {
-                            ...prev,
-                            scale: nextScale,
-                            x: pointerX - worldX * nextScale,
-                            y: pointerY - worldY * nextScale
-                        };
-                    });
+                    const nextViewport = {
+                        ...currentViewport,
+                        scale: nextScale,
+                        x: pointerX - worldX * nextScale,
+                        y: pointerY - worldY * nextScale
+                    };
+                    livePzRef.current = nextViewport;
+                    applyDeskMapTransform(nextViewport);
                 });
             };
 
@@ -2464,7 +2482,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
                                     }} className="border border-ink/40 p-1 text-xs min-w-[140px] bg-parchment" placeholder="DeskMap name" />
                                     <button onClick={() => renameActiveDeskMap()} className="px-2 py-1 text-[10px] font-bold border border-ink/40 hover:bg-teastain transition-colors">Save Name</button>
                                 </div>
-                                <div style={{ transform: `translate3d(${pz.x}px, ${pz.y}px, 0) scale(${pz.scale})`, transformOrigin: '0 0', willChange: 'transform', contain: 'layout paint style' }} className="w-max h-max min-w-full min-h-full flex justify-start pt-24 pb-48 gap-24">
+                                <div ref={chartViewportRef} style={{ transform: `translate3d(${pz.x}px, ${pz.y}px, 0) scale(${pz.scale})`, transformOrigin: '0 0', willChange: 'transform', contain: 'layout paint style' }} className="w-max h-max min-w-full min-h-full flex justify-start pt-24 pb-48 gap-24">
                                     {tree.map(n => renderTreeNode(n))}
                                 </div>
                             </div>
