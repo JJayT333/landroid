@@ -1,16 +1,14 @@
+const mathEngine = require('../src/mathEngine.js');
 const fs = require('fs');
 const path = require('path');
 
-const FRACTION_EPSILON = 0.00000001;
+const FRACTION_EPSILON = mathEngine.FRACTION_EPSILON;
+const OWNERSHIP_TOTAL_TOLERANCE = mathEngine.OWNERSHIP_TOTAL_TOLERANCE || 0.05;
+const clampFraction = mathEngine.clampFraction;
+const collectDescendantIds = mathEngine.collectDescendantIds;
+const applyBranchScale = mathEngine.applyBranchScale;
 const MAP_COUNT = 5;
 const NODES_PER_MAP = 200;
-
-function clampFraction(value) {
-  const numeric = Number(value || 0);
-  if (!Number.isFinite(numeric)) return 0;
-  if (numeric < 0 && numeric > -FRACTION_EPSILON) return 0;
-  return Math.max(0, numeric);
-}
 
 function createRng(seed) {
   let state = seed >>> 0;
@@ -23,33 +21,6 @@ function createRng(seed) {
 function makeIdFactory(prefix) {
   let index = 0;
   return () => `${prefix}-${++index}`;
-}
-
-function collectDescendantIds(allNodes, rootId) {
-  const descendants = new Set();
-  const queue = [rootId];
-  while (queue.length) {
-    const current = queue.shift();
-    for (const node of allNodes) {
-      if (node.parentId !== current || descendants.has(node.id)) continue;
-      descendants.add(node.id);
-      queue.push(node.id);
-    }
-  }
-  return descendants;
-}
-
-function applyBranchScale(allNodes, rootId, scaleFactor) {
-  if (!Number.isFinite(scaleFactor)) return allNodes;
-  const descendants = collectDescendantIds(allNodes, rootId);
-  return allNodes.map((node) => {
-    if (node.id !== rootId && !descendants.has(node.id)) return node;
-    return {
-      ...node,
-      fraction: clampFraction((node.fraction || 0) * scaleFactor),
-      initialFraction: clampFraction((node.initialFraction || 0) * scaleFactor),
-    };
-  });
 }
 
 function randomDate(rng) {
@@ -132,7 +103,7 @@ function validateMap(map) {
     rootSums.set(cursor.id, (rootSums.get(cursor.id) || 0) + node.fraction);
   }
   for (const [rootId, sum] of rootSums.entries()) {
-    assert(sum <= 1.05, `${map.code}: root ${rootId} > 100% (${sum})`);
+    assert(sum <= 1 + OWNERSHIP_TOTAL_TOLERANCE, `${map.code}: root ${rootId} > 100% (${sum})`);
     assert(sum >= -FRACTION_EPSILON, `${map.code}: root ${rootId} negative (${sum})`);
   }
 }

@@ -30,6 +30,7 @@ function run() {
   const syncEngine = require('../src/syncEngine.js');
   const dropboxIntegration = require('../src/dropboxIntegration.js');
   const workspaceStorage = require('../src/workspaceStorage.js');
+  const mathEngine = require('../src/mathEngine.js');
 
   assert(typeof workspaceDomain.toWorkspaceSavePayload === 'function', 'workspaceDomain export missing');
   assert(typeof storageProvider.createLocalStorageProvider === 'function', 'storageProvider export missing');
@@ -37,6 +38,24 @@ function run() {
   assert(typeof syncEngine.recordSyncOperation === 'function', 'syncEngine export missing');
   assert(typeof dropboxIntegration.normalizeAttachmentMetadata === 'function', 'dropbox export missing');
   assert(typeof workspaceStorage.saveWorkspace === 'function', 'workspaceStorage export missing');
+  assert(typeof mathEngine.calculateShare === 'function', 'mathEngine calculateShare export missing');
+  assert(typeof mathEngine.rootOwnershipTotal === 'function', 'mathEngine rootOwnershipTotal export missing');
+  assert(typeof mathEngine.computeTractMetrics === 'function', 'mathEngine computeTractMetrics export missing');
+  assert(typeof mathEngine.aggregatePortfolioMetrics === 'function', 'mathEngine aggregatePortfolioMetrics export missing');
+
+
+  const share = mathEngine.calculateShare({
+    form: { conveyanceMode: 'fraction', splitBasis: 'remaining', numerator: 1, denominator: 2 },
+    parent: { fraction: 0.8, initialFraction: 1 },
+  });
+  assert(Math.abs(share - 0.4) < 0.00000001, 'math engine share calculation failed');
+
+
+  const tractMetrics = mathEngine.computeTractMetrics({
+    tracts: [{ id: 't1', code: 'T1', acres: 100 }],
+    ownershipInterests: [{ id: 'i1', tractId: 't1', contactId: 'c1', interestType: 'MI', interestValue: 0.25 }],
+  });
+  assert(tractMetrics.length === 1 && tractMetrics[0].totalNetMineralAcres === 25, 'math engine tract metric calculation failed');
 
   auditLog.clearAuditEvents();
   const auditEntry = auditLog.recordAuditEvent('smoke_event', { ok: true });

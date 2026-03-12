@@ -4,12 +4,15 @@
   "version": "1.0.0",
   "type": "commonjs",
   "scripts": {
-    "test": "npm run test:smoke && npm run test:storage && npm run test:math-regression && npm run test:title-scenarios && npm run test:cross-surface && npm run test:perf",
+    "test": "npm run test:smoke && npm run test:math-engine && npm run test:storage && npm run test:math-regression && npm run test:title-scenarios && npm run test:cross-surface && npm run test:csv-fixtures && npm run test:stress-tiers && npm run test:perf",
     "test:smoke": "node scripts/smoke-checks.js",
     "test:storage": "node scripts/workspace-storage-checks.js",
     "test:math-regression": "node scripts/math-regression-checks.js",
     "test:title-scenarios": "node scripts/title-scenario-checks.js",
     "test:cross-surface": "node scripts/cross-surface-parity-checks.js",
-    "test:perf": "node scripts/perf-benchmark-5x200.js"
+    "test:perf": "node scripts/perf-benchmark-5x200.js",
+    "test:csv-fixtures": "node scripts/csv-fixture-checks.js",
+    "test:math-engine": "node scripts/math-engine-checks.js",
+    "test:stress-tiers": "node scripts/stress-tier-checks.js"
   }
 }
