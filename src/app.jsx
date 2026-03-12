@@ -130,7 +130,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
             });
 
             const [nodes, setNodes] = useState([defaultRoot]);
-            const [deskMaps, setDeskMaps] = useState([createDeskMap()]);
+            const [deskMaps, setDeskMaps] = useState([]);
             const [activeDeskMapId, setActiveDeskMapId] = useState('');
             const skipDeskMapSyncRef = useRef(false);
             const [view, setView] = useState('chart'); 
@@ -325,9 +325,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 
             useEffect(() => {
                 if (!deskMaps.length) {
-                    const fallback = createDeskMap();
-                    setDeskMaps([fallback]);
-                    setActiveDeskMapId(fallback.id);
+                    if (activeDeskMapId) setActiveDeskMapId('');
                     return;
                 }
                 if (!activeDeskMapId || !deskMaps.some(map => map.id === activeDeskMapId)) {
@@ -996,10 +994,6 @@ const Icon = ({ name, size = 18, className = "" }) => {
                         const shouldContinue = window.confirm('Attaching this conveyance will recalculate ownership for this branch. Continue?');
                         if (!shouldContinue) return;
                         const destinationNode = nodeById[attachParentId];
-                        const oldRootFraction = Math.max(activeNode.fraction || 0, FRACTION_EPSILON);
-                        const newRootFraction = clampFraction(calcShare);
-                        const scaleFactor = newRootFraction / oldRootFraction;
-                        const affectedCount = collectDescendantIds(nodes, activeNode.id).size + 1;
                         const attachResult = executeAttachConveyance({ allNodes: nodes, activeNodeId: activeNode.id, attachParentId, calcShare, form });
                         if (!attachResult.ok) {
                             window.alert(`Unable to complete attach conveyance: ${attachResult.error?.message || 'Unknown error'}`);
@@ -1011,10 +1005,10 @@ const Icon = ({ name, size = 18, className = "" }) => {
                             nodeId: activeNode.id,
                             destinationId: attachParentId,
                             destinationName: destinationNode?.grantee || destinationNode?.instrument || '',
-                            oldRootFraction,
-                            newRootFraction,
-                            scaleFactor,
-                            affectedCount
+                            oldRootFraction: attachResult.audit?.oldRootFraction,
+                            newRootFraction: attachResult.audit?.newRootFraction,
+                            scaleFactor: attachResult.audit?.scaleFactor,
+                            affectedCount: attachResult.audit?.affectedCount
                         });
                     } else {
                         updateActiveDeskMapNodes(prev => prev.map(n => n.id === activeNode.id ? { ...form, parentId: attachParentId, type: 'related', fraction: 0, initialFraction: 0 } : n));
@@ -1716,6 +1710,11 @@ const Icon = ({ name, size = 18, className = "" }) => {
                     console.error(e);
                 } finally {
                     setView('chart');
+                    setWorkspaceLoaded(false);
+                    setActiveDeskMapId('');
+                    setDeskMaps([]);
+                    setNodes([{ ...defaultRoot }]);
+                    setPz({ ...defaultViewport });
                     setShowHome(true);
                 }
             };

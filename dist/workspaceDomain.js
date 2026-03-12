@@ -72,24 +72,15 @@
     const tracts = workspace.tracts || [];
     const contacts = workspace.contacts || [];
 
-    const fallbackDeskMap = {
-      id: makeId(),
-      name: tracts[0]?.name || 'Unit Tract 1',
-      code: tracts[0]?.code || 'TRACT-1',
-      tractId: tracts[0]?.id || null,
-      nodes: workspace.nodes || [{ ...defaultRoot }],
-      pz: { ...defaultViewport },
-    };
-
-    const deskMaps = workspace.deskMaps && workspace.deskMaps.length ? workspace.deskMaps : [fallbackDeskMap];
+    const deskMaps = Array.isArray(workspace.deskMaps) ? workspace.deskMaps : [];
     const activeDeskMapId =
       workspace.activeDeskMapId && deskMaps.some((map) => map.id === workspace.activeDeskMapId)
         ? workspace.activeDeskMapId
-        : deskMaps[0].id;
-    const activeDeskMap = deskMaps.find((map) => map.id === activeDeskMapId) || deskMaps[0];
+        : (deskMaps[0]?.id || '');
+    const activeDeskMap = deskMaps.find((map) => map.id === activeDeskMapId) || null;
 
     return {
-      nodes: activeDeskMap.nodes || workspace.nodes || [{ ...defaultRoot }],
+      nodes: activeDeskMap?.nodes || workspace.nodes || [{ ...defaultRoot }],
       instrumentList: workspace.instrumentList,
       flowNodes,
       flowEdges: workspace.flowEdges,
@@ -105,7 +96,7 @@
       selectedContactId: (contacts[0] && contacts[0].id) || null,
       deskMaps,
       activeDeskMapId,
-      pz: activeDeskMap.pz || { ...defaultViewport },
+      pz: activeDeskMap?.pz || { ...defaultViewport },
       projectName: workspace.name || '',
       workspaceId: workspace.id || null,
     };
