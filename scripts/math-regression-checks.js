@@ -1,42 +1,13 @@
+const mathEngine = require('../src/mathEngine.js');
 function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
 
-const FRACTION_EPSILON = 0.00000001;
-
-function clampFraction(value) {
-  const numeric = Number(value || 0);
-  if (!Number.isFinite(numeric)) return 0;
-  if (numeric < 0 && numeric > -FRACTION_EPSILON) return 0;
-  return Math.max(0, numeric);
-}
-
-function collectDescendantIds(allNodes, rootId) {
-  const descendants = new Set();
-  const queue = [rootId];
-  while (queue.length) {
-    const currentId = queue.shift();
-    allNodes.forEach((node) => {
-      if (node.parentId !== currentId || descendants.has(node.id)) return;
-      descendants.add(node.id);
-      queue.push(node.id);
-    });
-  }
-  return descendants;
-}
-
-function applyBranchScale(allNodes, rootId, scaleFactor) {
-  if (!Number.isFinite(scaleFactor)) return allNodes;
-  const descendants = collectDescendantIds(allNodes, rootId);
-  return allNodes.map((n) => {
-    if (n.id !== rootId && !descendants.has(n.id)) return n;
-    return {
-      ...n,
-      fraction: clampFraction((n.fraction || 0) * scaleFactor),
-      initialFraction: clampFraction((n.initialFraction || 0) * scaleFactor),
-    };
-  });
-}
+const FRACTION_EPSILON = mathEngine.FRACTION_EPSILON;
+const OWNERSHIP_TOTAL_TOLERANCE = mathEngine.OWNERSHIP_TOTAL_TOLERANCE || 0.05;
+const clampFraction = mathEngine.clampFraction;
+const collectDescendantIds = mathEngine.collectDescendantIds;
+const applyBranchScale = mathEngine.applyBranchScale;
 
 function createRng(seed) {
   let state = seed >>> 0;
@@ -92,7 +63,7 @@ function validateNodes(nodes, label) {
     rootSums.set(cursor.id, (rootSums.get(cursor.id) || 0) + node.fraction);
   });
   rootSums.forEach((sum, rootId) => {
-    assert(sum <= 1.05, `${label}: root ${rootId} exceeds 100% (${sum})`);
+    assert(sum <= 1 + OWNERSHIP_TOTAL_TOLERANCE, `${label}: root ${rootId} exceeds 100% (${sum})`);
     assert(sum >= -FRACTION_EPSILON, `${label}: root ${rootId} negative total (${sum})`);
   });
 }

@@ -47,6 +47,31 @@ const getSyncSummary = syncEngineApi.getSyncSummary || (() => ({ pendingCount: 0
 const dropboxIntegrationApi = globalThis.LANDroidDropboxIntegration || {};
 const normalizeAttachmentMetadata = dropboxIntegrationApi.normalizeAttachmentMetadata || (() => null);
 
+const mathEngineApi = globalThis.LANDroidMathEngine || {};
+const requireMathEngineFunction = (name) => {
+    const fn = mathEngineApi[name];
+    if (typeof fn !== 'function') {
+        throw new Error(`LANDroidMathEngine.${name} is unavailable. Ensure dist/mathEngine.js is loaded before app.jsx.`);
+    }
+    return fn;
+};
+const FRACTION_EPSILON = mathEngineApi.FRACTION_EPSILON || 0.00000001;
+const clampFraction = mathEngineApi.clampFraction || ((value) => {
+    const numeric = Number(value || 0);
+    if (!Number.isFinite(numeric)) return 0;
+    if (numeric < 0 && numeric > -FRACTION_EPSILON) return 0;
+    return Math.max(0, numeric);
+});
+const collectDescendantIds = mathEngineApi.collectDescendantIds || (() => new Set());
+const calculateShare = mathEngineApi.calculateShare || (() => 0);
+const executeConveyance = requireMathEngineFunction('executeConveyance');
+const executeRebalance = requireMathEngineFunction('executeRebalance');
+const executePredecessorInsert = requireMathEngineFunction('executePredecessorInsert');
+const executeAttachConveyance = requireMathEngineFunction('executeAttachConveyance');
+const validateOwnershipGraph = requireMathEngineFunction('validateOwnershipGraph');
+const rootOwnershipTotal = mathEngineApi.rootOwnershipTotal || (() => 0);
+const formatAsFraction = mathEngineApi.formatAsFraction || ((value) => `${Number(value || 0)}/1`);
+
 const Icon = ({ name, size = 18, className = "" }) => {
             const icons = {
                 Plus: <path d="M12 5v14M5 12h14" />,
@@ -150,6 +175,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
             
             const moveTreeStartPos = useRef(null);
             const initialTreeNodes = useRef(null);
+            const initialTreeNodeById = useRef(null);
             const moveTreeGroupId = useRef(null);
 
             // Dynamic Paper Size Calculation (96 DPI)
@@ -179,6 +205,10 @@ const Icon = ({ name, size = 18, className = "" }) => {
             const wheelFrameRef = useRef(null);
             const wheelAccumulatedDeltaRef = useRef(0);
             const wheelPointerRef = useRef({ x: 0, y: 0 });
+            const chartPanFrameRef = useRef(null);
+            const chartPanPointRef = useRef(null);
+            const flowPanFrameRef = useRef(null);
+            const flowPanPointRef = useRef(null);
 
             const [form, setForm] = useState({
                 instrument: '', vol: '', page: '', docNo: '', fileDate: '', date: '', grantor: '', grantee: '', 
@@ -230,17 +260,13 @@ const Icon = ({ name, size = 18, className = "" }) => {
             };
 
             // PERFORMANCE: Memoized calculated arrays
-            const activeOwners = useMemo(
-                () => nodes.filter(n => n.type !== 'related' && n.parentId !== 'unlinked' && n.fraction > 0.00000001),
-                [nodes]
-            );
-            const totalRemaining = useMemo(() => activeOwners.reduce((sum, n) => sum + parseFloat(n.fraction), 0), [activeOwners]);
+            const totalRootOwnership = useMemo(() => rootOwnershipTotal(nodes), [nodes]);
             const ownershipHealth = useMemo(() => {
-                const delta = totalRemaining - 1;
+                const delta = totalRootOwnership - 1;
                 if (Math.abs(delta) <= 0.00000001) return { status: 'balanced', label: 'Balanced', delta };
                 if (delta > 0) return { status: 'over', label: 'Over', delta };
                 return { status: 'under', label: 'Under', delta };
-            }, [totalRemaining]);
+            }, [totalRootOwnership]);
             const uniqueGrantees = useMemo(() => [...new Set(nodes.map(n => n.grantee).filter(Boolean))].sort(), [nodes]);
             const [recentMathAuditEvents, setRecentMathAuditEvents] = useState(() => getRecentBranchAuditEvents());
             
@@ -662,93 +688,11 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 return `${numerator}/${denominator} ${basisLabel}`;
             };
 
-            const FRACTION_EPSILON = 0.00000001;
-            const clampFraction = (value) => {
-                const numeric = Number(value || 0);
-                if (!Number.isFinite(numeric)) return 0;
-                if (numeric < 0 && numeric > -FRACTION_EPSILON) return 0;
-                return Math.max(0, numeric);
-            };
-
-            const collectDescendantIds = (allNodes, rootId) => {
-                const descendants = new Set();
-                const queue = [rootId];
-                while (queue.length) {
-                    const currentId = queue.shift();
-                    allNodes.forEach(node => {
-                        if (node.parentId !== currentId || descendants.has(node.id)) return;
-                        descendants.add(node.id);
-                        queue.push(node.id);
-                    });
-                }
-                return descendants;
-            };
-
-            const applyAttachConveyanceUpdate = (allNodes) => {
-                const descendants = collectDescendantIds(allNodes, activeNode.id);
-                if (attachParentId === activeNode.id || descendants.has(attachParentId)) return allNodes;
-
-                const sourceRoot = allNodes.find(n => n.id === activeNode.id);
-                if (!sourceRoot) return allNodes;
-
-                const oldRootFraction = Math.max(sourceRoot.fraction || 0, FRACTION_EPSILON);
-                const newRootFraction = clampFraction(calcShare);
-                const scaleFactor = newRootFraction / oldRootFraction;
-
-                return allNodes.map(n => {
-                    if (n.id === attachParentId) {
-                        return { ...n, fraction: clampFraction((n.fraction || 0) - newRootFraction) };
-                    }
-                    if (n.id === activeNode.id) {
-                        return {
-                            ...n,
-                            ...form,
-                            parentId: attachParentId,
-                            type: 'conveyance',
-                            fraction: newRootFraction,
-                            initialFraction: newRootFraction
-                        };
-                    }
-                    if (descendants.has(n.id)) {
-                        return {
-                            ...n,
-                            fraction: clampFraction((n.fraction || 0) * scaleFactor),
-                            initialFraction: clampFraction((n.initialFraction || 0) * scaleFactor)
-                        };
-                    }
-                    return n;
-                });
-            };
-
-            const applyBranchScale = (allNodes, rootId, scaleFactor) => {
-                if (!Number.isFinite(scaleFactor)) return allNodes;
-                const descendants = collectDescendantIds(allNodes, rootId);
-                return allNodes.map(n => {
-                    if (n.id !== rootId && !descendants.has(n.id)) return n;
-                    return {
-                        ...n,
-                        fraction: clampFraction((n.fraction || 0) * scaleFactor),
-                        initialFraction: clampFraction((n.initialFraction || 0) * scaleFactor)
-                    };
-                });
-            };
-
             const calcShare = useMemo(() => {
                 if (modalMode !== 'convey' && modalMode !== 'attach') return 0;
                 const parentIdToUse = modalMode === 'attach' ? attachParentId : activeNode?.id;
                 const parent = nodeById[parentIdToUse];
-                if (!parent) return 0;
-                const ratio = (parseFloat(form.numerator || 0) / parseFloat(form.denominator || 1));
-                if (form.conveyanceMode === 'all') return parent.fraction;
-                if (form.conveyanceMode === 'fixed') return parseFloat(form.manualAmount || 0);
-                if (form.conveyanceMode === 'fraction') {
-                    let base = 1.0;
-                    if (form.splitBasis === 'whole') base = 1.0;
-                    else if (form.splitBasis === 'initial') base = parent.initialFraction ?? parent.fraction;
-                    else if (form.splitBasis === 'remaining') base = parent.fraction;
-                    return base * ratio;
-                }
-                return 0;
+                return calculateShare({ form, parent });
             }, [form, nodeById, modalMode, activeNode, attachParentId]);
 
             const attachImpact = useMemo(() => {
@@ -901,36 +845,41 @@ const Icon = ({ name, size = 18, className = "" }) => {
 
             const commitBranchRebalance = (baseNodes, options) => {
                 const { node, newInitialFraction, includeFormFields = false } = options;
-                const oldInitialFraction = Math.max(node.initialFraction || 0, FRACTION_EPSILON);
-                const normalizedNewInitialFraction = clampFraction(newInitialFraction);
-                const scaleFactor = normalizedNewInitialFraction / oldInitialFraction;
-                const scaledNodes = applyBranchScale(baseNodes, node.id, scaleFactor);
-                const affectedCount = collectDescendantIds(baseNodes, node.id).size + 1;
-                const updatedNodes = scaledNodes.map(n => {
-                    if (n.id === node.id) {
-                        if (includeFormFields) {
-                            const {
-                                fraction: _ignoredFraction,
-                                initialFraction: _ignoredInitialFraction,
-                                parentId: _ignoredParentId,
-                                ...safeFormFields
-                            } = form;
-                            return { ...n, ...safeFormFields, initialFraction: normalizedNewInitialFraction };
-                        }
-                        return { ...n, initialFraction: normalizedNewInitialFraction };
-                    }
-                    if (node.parentId && n.id === node.parentId) {
-                        return { ...n, fraction: clampFraction((n.fraction || 0) + oldInitialFraction - normalizedNewInitialFraction) };
-                    }
-                    return n;
+                const safeFormFields = includeFormFields
+                    ? (() => {
+                        const {
+                            fraction: _ignoredFraction,
+                            initialFraction: _ignoredInitialFraction,
+                            parentId: _ignoredParentId,
+                            ...rest
+                        } = form;
+                        return rest;
+                    })()
+                    : null;
+                const executed = executeRebalance({
+                    allNodes: baseNodes,
+                    nodeId: node.id,
+                    parentId: node.parentId,
+                    newInitialFraction,
+                    formFields: safeFormFields,
                 });
+                if (!executed.ok) return null;
                 return {
-                    updatedNodes,
-                    oldInitialFraction,
-                    newInitialFraction: normalizedNewInitialFraction,
-                    scaleFactor,
-                    affectedCount
+                    updatedNodes: executed.data,
+                    oldInitialFraction: executed.audit?.oldInitialFraction,
+                    newInitialFraction: executed.audit?.newInitialFraction,
+                    scaleFactor: executed.audit?.scaleFactor,
+                    affectedCount: executed.audit?.affectedCount,
                 };
+            };
+
+            const ensureValidOwnershipGraph = (candidateNodes, actionLabel) => {
+                const validation = validateOwnershipGraph(candidateNodes);
+                if (validation.valid) return true;
+                const firstIssue = validation.issues[0];
+                const detail = firstIssue?.message || `${actionLabel} produced an invalid ownership graph.`;
+                window.alert(`Unable to complete ${actionLabel}: ${detail}`);
+                return false;
             };
 
             const handleCommit = () => {
@@ -954,6 +903,8 @@ const Icon = ({ name, size = 18, className = "" }) => {
                             newInitialFraction: form.initialFraction,
                             includeFormFields: true
                         });
+                        if (!result) return;
+                        if (!ensureValidOwnershipGraph(result.updatedNodes, 'rebalance edit')) return;
                         updateActiveDeskMapNodes(result.updatedNodes);
                         recordBranchRecalculationAudit({
                             action: 'edit_rebalance',
@@ -967,8 +918,12 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 }
                 else if (modalMode === 'convey') {
                     const newId = makeId();
-                    const updatedNodes = nodes.map(n => n.id === activeNode.id ? { ...n, fraction: Math.max(0, n.fraction - calcShare) } : n);
-                    updateActiveDeskMapNodes([...updatedNodes, { ...form, id: newId, type: 'conveyance', fraction: calcShare, initialFraction: calcShare, parentId: activeNode.id }]);
+                    const conveyResult = executeConveyance({ allNodes: nodes, parentId: activeNode.id, newNodeId: newId, share: calcShare, form });
+                    if (!conveyResult.ok) {
+                        window.alert(`Unable to complete conveyance: ${conveyResult.error?.message || 'Unknown error'}`);
+                        return;
+                    }
+                    updateActiveDeskMapNodes(conveyResult.data);
                 } else if (modalMode === 'precede') {
                     const newId = makeId();
                     const oldInitialFraction = Math.max(activeNode.initialFraction || 0, FRACTION_EPSILON);
@@ -977,25 +932,27 @@ const Icon = ({ name, size = 18, className = "" }) => {
                         const shouldContinue = window.confirm('This predecessor change will recalculate every descendant in this branch. Continue?');
                         if (!shouldContinue) return;
                     }
-                    const scaleFactor = newInitialFraction / oldInitialFraction;
-                    const scaledNodes = applyBranchScale(nodes, activeNode.id, scaleFactor);
-                    const affectedCount = collectDescendantIds(nodes, activeNode.id).size + 1;
-                    const updatedNodes = scaledNodes.map(n => {
-                        if (n.id === activeNode.id) return { ...n, parentId: newId };
-                        if (activeNode.parentId && n.id === activeNode.parentId) {
-                            return { ...n, fraction: clampFraction((n.fraction || 0) + oldInitialFraction - newInitialFraction) };
-                        }
-                        return n;
+                    const precedeResult = executePredecessorInsert({
+                        allNodes: nodes,
+                        activeNodeId: activeNode.id,
+                        activeNodeParentId: activeNode.parentId,
+                        newPredecessorId: newId,
+                        form,
+                        newInitialFraction: form.initialFraction,
                     });
-                    updateActiveDeskMapNodes([...updatedNodes, { ...form, id: newId, type: 'conveyance', parentId: activeNode.parentId, initialFraction: newInitialFraction, fraction: 0 }]);
+                    if (!precedeResult.ok) {
+                        window.alert(`Unable to complete predecessor insertion: ${precedeResult.error?.message || 'Unknown error'}`);
+                        return;
+                    }
+                    updateActiveDeskMapNodes(precedeResult.data);
                     recordBranchRecalculationAudit({
                         action: 'precede',
                         nodeId: activeNode.id,
                         predecessorId: newId,
-                        oldInitialFraction,
-                        newInitialFraction,
-                        scaleFactor,
-                        affectedCount
+                        oldInitialFraction: precedeResult.audit?.oldInitialFraction,
+                        newInitialFraction: precedeResult.audit?.newInitialFraction,
+                        scaleFactor: precedeResult.audit?.scaleFactor,
+                        affectedCount: precedeResult.audit?.affectedCount
                     });
                 } else if (modalMode === 'rebalance') {
                     const oldInitialFraction = Math.max(activeNode.initialFraction || 0, FRACTION_EPSILON);
@@ -1009,6 +966,8 @@ const Icon = ({ name, size = 18, className = "" }) => {
                         newInitialFraction: form.initialFraction,
                         includeFormFields: false
                     });
+                    if (!result) return;
+                    if (!ensureValidOwnershipGraph(result.updatedNodes, 'rebalance')) return;
                     updateActiveDeskMapNodes(result.updatedNodes);
                     recordBranchRecalculationAudit({
                         action: 'rebalance',
@@ -1041,7 +1000,12 @@ const Icon = ({ name, size = 18, className = "" }) => {
                         const newRootFraction = clampFraction(calcShare);
                         const scaleFactor = newRootFraction / oldRootFraction;
                         const affectedCount = collectDescendantIds(nodes, activeNode.id).size + 1;
-                        updateActiveDeskMapNodes(prev => applyAttachConveyanceUpdate(prev));
+                        const attachResult = executeAttachConveyance({ allNodes: nodes, activeNodeId: activeNode.id, attachParentId, calcShare, form });
+                        if (!attachResult.ok) {
+                            window.alert(`Unable to complete attach conveyance: ${attachResult.error?.message || 'Unknown error'}`);
+                            return;
+                        }
+                        updateActiveDeskMapNodes(attachResult.data);
                         recordBranchRecalculationAudit({
                             action: 'attach_conveyance',
                             nodeId: activeNode.id,
@@ -1119,34 +1083,9 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 link.click();
             };
 
-            const chooseImportMode = () => {
-                const choice = window.prompt(
-                    [
-                        'Choose CSV import mode:',
-                        '1 = Replace current project',
-                        '2 = Merge into active desk map',
-                        '3 = Create new desk map from CSV',
-                        '',
-                        'Enter 1, 2, or 3 (Cancel to abort).'
-                    ].join('\n')
-                );
-                if (choice === null) return null;
-                const normalized = String(choice).trim().toLowerCase();
-                if (normalized === '1' || normalized === 'replace') return 'replace';
-                if (normalized === '2' || normalized === 'merge') return 'merge';
-                if (normalized === '3' || normalized === 'new') return 'new_map';
-                window.alert('Import cancelled: invalid choice. Please enter 1, 2, or 3.');
-                return null;
-            };
-
             const importCSV = (e) => {
                 const file = e.target.files[0];
                 if (!file) return;
-                const importMode = chooseImportMode();
-                if (!importMode) {
-                    e.target.value = '';
-                    return;
-                }
                 Papa.parse(file, {
                     header: true, skipEmptyLines: true,
                     complete: (results) => {
@@ -1156,38 +1095,47 @@ const Icon = ({ name, size = 18, className = "" }) => {
                             try {
                                 return JSON.parse(raw);
                             } catch {
-                                try {
-                                    return JSON.parse(String(raw).replace(/""/g, '"'));
-                                } catch {
-                                    return [];
-                                }
+                                return [];
                             }
                         };
-                        const findHeader = (row, patterns) => {
-                            const keys = Object.keys(row);
-                            for (let pattern of patterns) {
-                                const match = keys.find(k => pattern.test(k));
-                                if (match) return row[match].trim();
-                            }
-                            return "";
-                        };
+
+                        const firstRow = results.data[0] || {};
+                        const requiredHeaders = [
+                            'INTERNAL_ID',
+                            'INTERNAL_PID',
+                            'INTERNAL_TYPE',
+                            'INTERNAL_REMAINING_FRACTION',
+                            'INTERNAL_INITIAL_FRACTION',
+                            'INTERNAL_DESKMAPS'
+                        ];
+                        const missingHeaders = requiredHeaders.filter(header => !(header in firstRow));
+                        if (missingHeaders.length) {
+                            window.alert(`Import failed: this CSV is not in the current LANDroid workspace format. Missing columns: ${missingHeaders.join(', ')}`);
+                            return;
+                        }
+
+                        const importedDeskMaps = parseJsonField(firstRow, 'INTERNAL_DESKMAPS');
+                        if (!Array.isArray(importedDeskMaps) || !importedDeskMaps.length) {
+                            window.alert('Import failed: INTERNAL_DESKMAPS payload is missing or invalid.');
+                            return;
+                        }
+
                         const parsedRows = results.data.map(row => {
-                            const isInternal = !!row['INTERNAL_ID'];
                             return {
                                 originalId: row['INTERNAL_ID'] || null,
-                                instrument: findHeader(row, [/^Instrument$/i, /^Instrument \(/i, /Instrument/i]),
-                                vol: findHeader(row, [/^Vol/i]),
-                                page: findHeader(row, [/^Page/i]),
-                                docNo: findHeader(row, [/Inst[\s\S]*No/i, /Doc[\s\S]*No/i]),
-                                fileDate: findHeader(row, [/File[\s\S]*Date/i]),
-                                date: findHeader(row, [/Inst[\s\S]*Eff/i, /Inst[\s\S]*Date/i, /Effective[\s\S]*Date/i, /^Date$/i]),
-                                grantor: findHeader(row, [/Grantor/i, /Assignor/i, /Lessor/i]),
-                                grantee: findHeader(row, [/Grantee/i, /Assignee/i, /Lessee/i, /Subject/i]),
-                                landDesc: findHeader(row, [/Land[\s\S]*Desc/i, /Description/i]),
-                                remarks: findHeader(row, [/Remark/i, /Note/i]),
-                                fraction: isInternal ? parseFloat(row['INTERNAL_REMAINING_FRACTION'] || 0) : 0,
-                                initialFraction: isInternal ? parseFloat(row['INTERNAL_INITIAL_FRACTION'] || 0) : 0,
-                                parentId: isInternal ? (row['INTERNAL_PID'] === "NULL" ? null : row['INTERNAL_PID']) : 'unlinked', 
+                                instrument: row['Instrument'] || '',
+                                vol: row['Vol'] || '',
+                                page: row['Page'] || '',
+                                docNo: row['Inst No.'] || '',
+                                fileDate: row['File Date'] || '',
+                                date: row['Inst Date'] || '',
+                                grantor: row['Grantor / Assignor'] || '',
+                                grantee: row['Grantee / Assignee'] || '',
+                                landDesc: row['Land Desc.'] || '',
+                                remarks: row['Remarks'] || '',
+                                fraction: parseFloat(row['INTERNAL_REMAINING_FRACTION'] || 0),
+                                initialFraction: parseFloat(row['INTERNAL_INITIAL_FRACTION'] || 0),
+                                parentId: row['INTERNAL_PID'] === "NULL" ? null : row['INTERNAL_PID'],
                                 docData: row['INTERNAL_DOC'] ? row['INTERNAL_DOC'].replace(/(^"|"$)/g, '') : "",
                                 type: row['INTERNAL_TYPE'] || 'conveyance',
                                 isDeceased: row['INTERNAL_DECEASED'] === 'true',
@@ -1221,61 +1169,23 @@ const Icon = ({ name, size = 18, className = "" }) => {
                         if (newNodes.length) {
                             const newInsts = [...new Set(newNodes.map(n => n.instrument).filter(Boolean))];
                             setInstrumentList(prev => [...new Set([...prev, ...newInsts])]);
-
-                            const firstRow = results.data[0] || {};
-                            const importedDeskMaps = parseJsonField(firstRow, 'INTERNAL_DESKMAPS');
                             const importedActiveDeskMapId = firstRow['INTERNAL_ACTIVE_DESKMAP_ID'] || '';
-                            const hasEmbeddedWorkspace = importedDeskMaps.length > 0;
-                            const normalizedImportMode = hasEmbeddedWorkspace && importMode !== 'replace' ? 'replace' : importMode;
-
-                            if (hasEmbeddedWorkspace && importMode !== 'replace') {
-                                window.alert('This CSV contains a full multi-map workspace payload. Import mode was switched to Replace so Desk Maps stay separated and performant.');
-                            }
-
-                            if (normalizedImportMode === 'replace') {
-                                setNodes(newNodes);
-                                setTracts(parseJsonField(firstRow, 'INTERNAL_TRACTS'));
-                                const importedContacts = parseJsonField(firstRow, 'INTERNAL_CONTACTS');
-                                setContacts(importedContacts);
-                                setOwnershipInterests(parseJsonField(firstRow, 'INTERNAL_INTERESTS'));
-                                setContactLogs(parseJsonField(firstRow, 'INTERNAL_CONTACT_LOGS'));
-                                if (importedDeskMaps.length) {
-                                    setDeskMaps(importedDeskMaps);
-                                    const nextDeskMapId = importedDeskMaps.some(map => map.id === importedActiveDeskMapId) ? importedActiveDeskMapId : importedDeskMaps[0].id;
-                                    setActiveDeskMapId(nextDeskMapId);
-                                    const activeMap = importedDeskMaps.find(map => map.id === nextDeskMapId) || importedDeskMaps[0];
-                                    setNodes(activeMap.nodes || newNodes);
-                                    setPz(activeMap.pz || { ...defaultViewport });
-                                } else {
-                                    const fallback = createDeskMap();
-                                    fallback.nodes = newNodes;
-                                    setDeskMaps([fallback]);
-                                    setActiveDeskMapId(fallback.id);
-                                    setPz({ ...defaultViewport });
-                                }
-                                setSelectedContactId((importedContacts[0] && importedContacts[0].id) || null);
-                            } else if (normalizedImportMode === 'merge') {
-                                setDeskMaps(prev => prev.map(map => {
-                                    if (map.id !== activeDeskMapId) return map;
-                                    return { ...map, nodes: [...(map.nodes || []), ...newNodes] };
-                                }));
-                                setNodes(prev => [...prev, ...newNodes]);
-                            } else {
-                                const mapNumber = deskMaps.length + 1;
-                                const newDeskMap = createDeskMap({ name: `Imported Map ${mapNumber}`, code: `IMPORTED-${mapNumber}` });
-                                newDeskMap.nodes = newNodes;
-                                setDeskMaps(prev => [...prev, newDeskMap]);
-                                setActiveDeskMapId(newDeskMap.id);
-                                setPz({ ...defaultViewport });
-                            }
-
-                            const modeLabel = normalizedImportMode === 'replace' ? 'replace' : normalizedImportMode === 'merge' ? 'merge' : 'new map';
-                            const mapSummary = normalizedImportMode === 'replace'
-                                ? 'Maps updated: project desk maps replaced from import (or rebuilt fallback map).'
-                                : normalizedImportMode === 'merge'
-                                    ? 'Maps updated: active desk map merged; other maps preserved.'
-                                    : 'Maps created: 1 new desk map from CSV; existing maps preserved.';
-                            window.alert(`Import complete.\nRecords imported: ${newNodes.length}\nMode: ${modeLabel}\n${mapSummary}`);
+                            setNodes(newNodes);
+                            setTracts(parseJsonField(firstRow, 'INTERNAL_TRACTS'));
+                            const importedContacts = parseJsonField(firstRow, 'INTERNAL_CONTACTS');
+                            setContacts(importedContacts);
+                            setOwnershipInterests(parseJsonField(firstRow, 'INTERNAL_INTERESTS'));
+                            setContactLogs(parseJsonField(firstRow, 'INTERNAL_CONTACT_LOGS'));
+                            setDeskMaps(importedDeskMaps);
+                            const nextDeskMapId = importedDeskMaps.some(map => map.id === importedActiveDeskMapId)
+                                ? importedActiveDeskMapId
+                                : importedDeskMaps[0].id;
+                            setActiveDeskMapId(nextDeskMapId);
+                            const activeMap = importedDeskMaps.find(map => map.id === nextDeskMapId) || importedDeskMaps[0];
+                            setNodes(activeMap.nodes || newNodes);
+                            setPz(activeMap.pz || { ...defaultViewport });
+                            setSelectedContactId((importedContacts[0] && importedContacts[0].id) || null);
+                            window.alert(`Import complete.\nRecords imported: ${newNodes.length}\nMode: replace\nMaps updated from embedded workspace payload.`);
                         }
                     },
                     error: (error) => console.error("Error parsing CSV:", error)
@@ -1403,10 +1313,22 @@ const Icon = ({ name, size = 18, className = "" }) => {
             };
             const handlePointerMove = (e) => {
                 if (!isDragging.current) return;
-                setPz(prev => ({ ...prev, x: e.clientX - dragStart.current.x, y: e.clientY - dragStart.current.y }));
+                chartPanPointRef.current = { x: e.clientX, y: e.clientY };
+                if (chartPanFrameRef.current !== null) return;
+                chartPanFrameRef.current = requestAnimationFrame(() => {
+                    chartPanFrameRef.current = null;
+                    const point = chartPanPointRef.current;
+                    if (!point) return;
+                    setPz(prev => ({ ...prev, x: point.x - dragStart.current.x, y: point.y - dragStart.current.y }));
+                });
             };
             const handlePointerUp = (e) => {
                 isDragging.current = false; e.currentTarget.releasePointerCapture(e.pointerId);
+                if (chartPanFrameRef.current !== null) {
+                    cancelAnimationFrame(chartPanFrameRef.current);
+                    chartPanFrameRef.current = null;
+                }
+                chartPanPointRef.current = null;
             };
             const handleWheel = (e) => {
                 e.preventDefault();
@@ -1461,6 +1383,8 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 const relatedDocs = relatedByParentId[n.id] || [];
                 const isDeceased = n.isDeceased;
                 const conveyanceFractionLabel = formatConveyanceFraction(n);
+                const grantFractionDisplay = formatAsFraction(n.initialFraction || n.fraction);
+                const remainingFractionDisplay = formatAsFraction(n.fraction);
                 const hasChildren = n.children.length > 0;
                 const isCollapsed = Boolean(n.isCollapsed);
                 const hiddenDescendantCount = isCollapsed ? countTreeDescendants(n) : 0;
@@ -1518,11 +1442,17 @@ const Icon = ({ name, size = 18, className = "" }) => {
                                 <div className={`flex flex-col border-t pt-2 font-mono ${isDeceased ? 'border-sepia/20' : 'border-ink/20'}`}>
                                     <div className="flex justify-between items-end mb-1 ">
                                         <span className="text-[10px] uppercase tracking-widest opacity-60">Grant</span>
-                                        <span className="text-sm font-bold text-sepia">{formatFraction(n.initialFraction || n.fraction)}</span>
+                                        <div className="text-right">
+                                            <div className="text-sm font-bold text-sepia">{formatFraction(n.initialFraction || n.fraction)}</div>
+                                            <div className="text-[10px] opacity-70">{grantFractionDisplay}</div>
+                                        </div>
                                     </div>
                                     <div className="flex justify-between items-end">
                                         <span className={`text-[10px] uppercase tracking-widest italic ${n.fraction < 0.00000001 ? 'text-stamp font-bold' : 'opacity-60'}`}>Rem</span>
-                                        <span className={`text-xs italic ${n.fraction < 0.00000001 ? 'text-stamp font-bold' : ''}`}>{formatFraction(n.fraction)}</span>
+                                        <div className="text-right">
+                                            <div className={`text-xs italic ${n.fraction < 0.00000001 ? 'text-stamp font-bold' : ''}`}>{formatFraction(n.fraction)}</div>
+                                            <div className={`text-[10px] ${n.fraction < 0.00000001 ? 'text-stamp font-bold' : 'opacity-70'}`}>{remainingFractionDisplay}</div>
+                                        </div>
                                     </div>
                                 </div>
                                 
@@ -1825,6 +1755,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
                     isDragging.current = true;
                     moveTreeStartPos.current = { x: e.clientX, y: e.clientY };
                     initialTreeNodes.current = flowNodes.map(n => ({ id: n.id, x: n.x, y: n.y }));
+                    initialTreeNodeById.current = Object.fromEntries(initialTreeNodes.current.map(item => [item.id, item]));
                     moveTreeGroupId.current = null;
                     e.currentTarget.setPointerCapture(e.pointerId); setSelectedFlowNode(null);
                 }
@@ -1838,7 +1769,14 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 if (!isDragging.current) return;
                 
                 if (flowTool === 'pan') {
-                    setFlowPz(prev => ({ ...prev, x: e.clientX - dragStart.current.x, y: e.clientY - dragStart.current.y }));
+                    flowPanPointRef.current = { x: e.clientX, y: e.clientY };
+                    if (flowPanFrameRef.current !== null) return;
+                    flowPanFrameRef.current = requestAnimationFrame(() => {
+                        flowPanFrameRef.current = null;
+                        const point = flowPanPointRef.current;
+                        if (!point) return;
+                        setFlowPz(prev => ({ ...prev, x: point.x - dragStart.current.x, y: point.y - dragStart.current.y }));
+                    });
                 } else if (flowTool === 'move-tree' && moveTreeStartPos.current && initialTreeNodes.current) {
                     const dx = (e.clientX - moveTreeStartPos.current.x) / (flowPz.scale * treeScale);
                     const dy = (e.clientY - moveTreeStartPos.current.y) / (flowPz.scale * treeScale);
@@ -1846,7 +1784,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
                     const targetGroup = moveTreeGroupId.current;
                     setFlowNodes(prev => prev.map(n => {
                         if (targetGroup && resolveTreeGroupId(n) !== targetGroup) return n;
-                        const orig = initialNodes.find(o => o.id === n.id);
+                        const orig = initialTreeNodeById.current ? initialTreeNodeById.current[n.id] : initialNodes.find(o => o.id === n.id);
                         return orig ? { ...n, x: orig.x + dx, y: orig.y + dy } : n;
                     }));
                 }
@@ -1858,7 +1796,13 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 if (connectingStart) setConnectingStart(null); 
                 moveTreeStartPos.current = null;
                 initialTreeNodes.current = null;
+                initialTreeNodeById.current = null;
                 moveTreeGroupId.current = null;
+                if (flowPanFrameRef.current !== null) {
+                    cancelAnimationFrame(flowPanFrameRef.current);
+                    flowPanFrameRef.current = null;
+                }
+                flowPanPointRef.current = null;
             };
             
             const handleFlowWheel = (e) => {
@@ -1902,6 +1846,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
                     isDragging.current = true;
                     moveTreeStartPos.current = { x: e.clientX, y: e.clientY };
                     initialTreeNodes.current = flowNodes.map(n => ({ id: n.id, x: n.x, y: n.y }));
+                    initialTreeNodeById.current = Object.fromEntries(initialTreeNodes.current.map(item => [item.id, item]));
                     moveTreeGroupId.current = resolveTreeGroupId(node);
                     e.currentTarget.setPointerCapture(e.pointerId);
                     setSelectedFlowNode(null);
@@ -1927,7 +1872,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
                     
                     setFlowNodes(prev => prev.map(n => {
                         if (targetGroup && resolveTreeGroupId(n) !== targetGroup) return n;
-                        const orig = initialNodes.find(o => o.id === n.id);
+                        const orig = initialTreeNodeById.current ? initialTreeNodeById.current[n.id] : initialNodes.find(o => o.id === n.id);
                         return orig ? { ...n, x: orig.x + dx, y: orig.y + dy } : n;
                     }));
                 }
@@ -1951,6 +1896,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
                     isDragging.current = false;
                     moveTreeStartPos.current = null;
                     initialTreeNodes.current = null;
+                    initialTreeNodeById.current = null;
                     e.currentTarget.releasePointerCapture(e.pointerId);
                 }
             };
@@ -1976,6 +1922,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 const yMid = (y1 + y2) / 2;
                 return `M ${x1} ${y1} C ${x1} ${yMid}, ${x2} ${yMid}, ${x2} ${y2}`;
             };
+            const flowNodeById = useMemo(() => Object.fromEntries(flowNodes.map(n => [n.id, n])), [flowNodes]);
 
             // Abstract out the tree rendering so we can use it on the Interactive screen AND the Print slices
             const renderTree = (isInteractive) => (
@@ -1986,8 +1933,8 @@ const Icon = ({ name, size = 18, className = "" }) => {
                             <marker id="arrowhead-ink" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#1A1A1B" /></marker>
                         </defs>
                         {flowEdges.map(edge => {
-                            const source = flowNodes.find(n => n.id === edge.source);
-                            const target = flowNodes.find(n => n.id === edge.target);
+                            const source = flowNodeById[edge.source];
+                            const target = flowNodeById[edge.target];
                             if (!source || !target) return null;
                             const x1 = source.x + (source.type === 'template' ? 140 : (source.data.width ? source.data.width/2 : 140)); 
                             const y1 = source.y + (source.type === 'template' ? 140 : 50);
@@ -2000,11 +1947,11 @@ const Icon = ({ name, size = 18, className = "" }) => {
                             );
                         })}
                         {/* Temp connecting line */}
-                        {isInteractive && flowTool === 'connect' && connectingStart && flowNodes.find(n => n.id === connectingStart) && (
+                        {isInteractive && flowTool === 'connect' && connectingStart && flowNodeById[connectingStart] && (
                             <path 
                                 d={drawEdge(
-                                    flowNodes.find(n => n.id === connectingStart).x + (flowNodes.find(n => n.id === connectingStart).type === 'template' ? 140 : (flowNodes.find(n => n.id === connectingStart).data.width/2 || 140)), 
-                                    flowNodes.find(n => n.id === connectingStart).y + 100, 
+                                    flowNodeById[connectingStart].x + (flowNodeById[connectingStart].type === 'template' ? 140 : (flowNodeById[connectingStart].data.width/2 || 140)), 
+                                    flowNodeById[connectingStart].y + 100, 
                                     mousePos.x, mousePos.y
                                 )} 
                                 fill="none" stroke="#1A1A1B" strokeWidth="2" strokeDasharray="5,5" 
@@ -2152,7 +2099,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
                             <div className="group flex items-center gap-2 flex-wrap">
                                 <div className={`rubber-stamp bg-parchment shadow-sm ${ownershipHealth.status === 'over' ? 'error animate-vibrate' : ''}`}>
                                     <span className="opacity-80 text-xs mr-2">Master Total:</span>
-                                    <span className="text-lg">{formatFraction(totalRemaining)}</span>
+                                    <span className="text-lg">{formatFraction(totalRootOwnership)}</span>
                                 </div>
                                 <span className={`px-2 py-1 text-[10px] border rounded font-bold uppercase tracking-widest ${
                                     ownershipHealth.status === 'balanced'

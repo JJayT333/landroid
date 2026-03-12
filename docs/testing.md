@@ -4,11 +4,14 @@
 - `npm test`
 - Runs local Node-based validation chain:
   1. `npm run test:smoke`
-  2. `npm run test:storage`
-  3. `npm run test:math-regression`
-  4. `npm run test:title-scenarios`
-  5. `npm run test:cross-surface`
-  6. `npm run test:perf`
+  2. `npm run test:math-engine`
+  3. `npm run test:storage`
+  4. `npm run test:math-regression`
+  5. `npm run test:title-scenarios`
+  6. `npm run test:cross-surface`
+  7. `npm run test:csv-fixtures`
+  8. `npm run test:stress-tiers`
+  9. `npm run test:perf`
 
 ## Why this path
 - LANDroid currently uses local Node scripts for regression and hardening checks in constrained environments.
@@ -21,6 +24,10 @@
   - sync op-log pending/synced summary behavior
   - dropbox metadata normalization seam
   - workspace domain save payload hygiene
+
+- `npm run test:math-engine`
+  - focused unit-style checks for extracted math engine operations
+  - covers conveyance update, rebalance scaling, predecessor insertion, and graph validation
 
 - `npm run test:storage`
   - workspace persistence flow
@@ -35,6 +42,17 @@
 
 - `npm run test:cross-surface`
   - Desk Map ↔ Title Ledger ↔ Flow source consistency checks on stress fixture
+
+
+- `npm run test:csv-fixtures`
+  - validates every `.csv` fixture under `testdata/`
+  - checks required internal headers and embedded `INTERNAL_DESKMAPS` integrity
+  - enforces expected row counts for 5x200 aggregate and split-tract fixture imports
+
+- `npm run test:stress-tiers`
+  - generated in-memory tiered stress checks (`1x50`, `5x200`, `10x500`)
+  - validates graph invariants on each tier
+  - reports runsheet and flow derivation timing by tier
 
 - `npm run test:perf`
   - lightweight performance benchmark on 5x200 stress workspace
