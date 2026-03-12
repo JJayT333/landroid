@@ -1309,21 +1309,34 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 }
             }, []);
 
+            const normalizeViewport = (viewport) => {
+                const safeScale = Number.isFinite(Number(viewport?.scale)) ? Number(viewport.scale) : defaultViewport.scale;
+                const safeX = Number.isFinite(Number(viewport?.x)) ? Number(viewport.x) : defaultViewport.x;
+                const safeY = Number.isFinite(Number(viewport?.y)) ? Number(viewport.y) : defaultViewport.y;
+                return {
+                    x: safeX,
+                    y: safeY,
+                    scale: Math.min(Math.max(0.1, safeScale), 5)
+                };
+            };
+
             const applyDeskMapTransform = (viewport) => {
                 const viewportEl = chartViewportRef.current;
                 if (!viewportEl) return;
-                viewportEl.style.transform = `translate3d(${viewport.x}px, ${viewport.y}px, 0) scale(${viewport.scale})`;
+                const safeViewport = normalizeViewport(viewport);
+                viewportEl.style.transform = `translate3d(${safeViewport.x}px, ${safeViewport.y}px, 0) scale(${safeViewport.scale})`;
             };
 
             useEffect(() => {
-                livePzRef.current = pz;
-                applyDeskMapTransform(pz);
+                const safeViewport = normalizeViewport(pz);
+                livePzRef.current = safeViewport;
+                applyDeskMapTransform(safeViewport);
             }, [pz]);
 
             const handlePointerDown = (e) => {
                 if (e.button !== 0 || e.target.closest('button') || e.target.closest('.treenode-body')) return;
                 isDragging.current = true;
-                const currentPz = livePzRef.current;
+                const currentPz = normalizeViewport(livePzRef.current);
                 dragStart.current = { x: e.clientX - currentPz.x, y: e.clientY - currentPz.y };
                 e.currentTarget.setPointerCapture(e.pointerId);
             };
@@ -1335,7 +1348,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
                     chartPanFrameRef.current = null;
                     const point = chartPanPointRef.current;
                     if (!point) return;
-                    const nextViewport = { ...livePzRef.current, x: point.x - dragStart.current.x, y: point.y - dragStart.current.y };
+                    const nextViewport = normalizeViewport({ ...livePzRef.current, x: point.x - dragStart.current.x, y: point.y - dragStart.current.y });
                     livePzRef.current = nextViewport;
                     applyDeskMapTransform(nextViewport);
                 });
@@ -1347,7 +1360,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
                     chartPanFrameRef.current = null;
                 }
                 chartPanPointRef.current = null;
-                setPz(livePzRef.current);
+                setPz(normalizeViewport(livePzRef.current));
             };
             const handleWheel = (e) => {
                 e.preventDefault();
@@ -1358,7 +1371,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 };
                 wheelAccumulatedDeltaRef.current += e.deltaY;
                 if (zoomIdleTimerRef.current) clearTimeout(zoomIdleTimerRef.current);
-                zoomIdleTimerRef.current = setTimeout(() => setPz(livePzRef.current), 120);
+                zoomIdleTimerRef.current = setTimeout(() => setPz(normalizeViewport(livePzRef.current)), 120);
 
                 if (wheelFrameRef.current !== null) return;
 
@@ -1370,7 +1383,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
                     const pointerX = wheelPointerRef.current.x;
                     const pointerY = wheelPointerRef.current.y;
 
-                    const currentViewport = livePzRef.current;
+                    const currentViewport = normalizeViewport(livePzRef.current);
                     const zoomFactor = Math.exp(totalDelta * -0.001);
                     const nextScale = Math.min(Math.max(0.1, currentViewport.scale * zoomFactor), 5);
                     if (nextScale === currentViewport.scale) return;
@@ -1378,12 +1391,12 @@ const Icon = ({ name, size = 18, className = "" }) => {
                     const worldX = (pointerX - currentViewport.x) / currentViewport.scale;
                     const worldY = (pointerY - currentViewport.y) / currentViewport.scale;
 
-                    const nextViewport = {
+                    const nextViewport = normalizeViewport({
                         ...currentViewport,
                         scale: nextScale,
                         x: pointerX - worldX * nextScale,
                         y: pointerY - worldY * nextScale
-                    };
+                    });
                     livePzRef.current = nextViewport;
                     applyDeskMapTransform(nextViewport);
                 });
