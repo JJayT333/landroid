@@ -79,7 +79,8 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 Trash: <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2M10 11v6M14 11v6" />,
                 Download: <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" />,
                 Upload: <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" />,
-                Printer: <path d="M6 9V2h12v7M6 18H4a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-5a2 2 0 0 0-2-2h-2M6 14h12v8H6v-8z" />,
+                Printer: <><path d="M6 9V2h12v7" /><path d="M6 18H4a2 2 0 0 0-2 2v3a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2h-2" /><rect x="6" y="14" width="12" height="8" /></>,
+                Adjust: <><line x1="4" y1="6" x2="20" y2="6" /><line x1="4" y1="12" x2="20" y2="12" /><line x1="4" y1="18" x2="20" y2="18" /><circle cx="8" cy="6" r="2" fill="currentColor" stroke="none" /><circle cx="16" cy="12" r="2" fill="currentColor" stroke="none" /><circle cx="10" cy="18" r="2" fill="currentColor" stroke="none" /></>,
                 List: <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />,
                 Close: <path d="M18 6L6 18M6 6l12 12" />,
                 Eye: <><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></>,
@@ -147,6 +148,8 @@ const Icon = ({ name, size = 18, className = "" }) => {
             
             // PERFORMANCE: Defer massive print grid DOM rendering until exact moment of printing
             const [isPrinting, setIsPrinting] = useState(false);
+            const [isZooming, setIsZooming] = useState(false);
+            const zoomEndTimerRef = useRef(null);
 
             // -------------------------------------------------------------
             // FLOWCHART ENGINE STATE
@@ -266,7 +269,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
             const totalRootOwnership = useMemo(() => rootOwnershipTotal(nodes), [nodes]);
             const ownershipHealth = useMemo(() => {
                 const delta = totalRootOwnership - 1;
-                if (Math.abs(delta) <= 0.0000000001) return { status: 'balanced', label: 'Balanced', delta };
+                if (Math.abs(delta) <= FRACTION_EPSILON) return { status: 'balanced', label: 'Balanced', delta };
                 if (delta > 0) return { status: 'over', label: 'Over', delta };
                 return { status: 'under', label: 'Under', delta };
             }, [totalRootOwnership]);
@@ -555,7 +558,6 @@ const Icon = ({ name, size = 18, className = "" }) => {
                     normalizeFlowNodeGroups,
                 });
 
-                setNodes(hydrated.nodes);
                 if (hydrated.instrumentList) setInstrumentList(hydrated.instrumentList);
                 if (hydrated.flowNodes) setFlowNodes(hydrated.flowNodes);
                 if (hydrated.flowEdges) setFlowEdges(hydrated.flowEdges);
@@ -1069,6 +1071,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 link.href = URL.createObjectURL(blob);
                 link.download = `LANDroid_Data_Save_${new Date().toISOString().split('T')[0]}.csv`;
                 link.click();
+                URL.revokeObjectURL(link.href);
             };
 
             const exportToRunsheet = () => {
@@ -1084,6 +1087,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 link.href = URL.createObjectURL(blob);
                 link.download = `Runsheet_Export_${new Date().toISOString().split('T')[0]}.csv`;
                 link.click();
+                URL.revokeObjectURL(link.href);
             };
 
             const importCSV = (e) => {
@@ -1313,6 +1317,10 @@ const Icon = ({ name, size = 18, className = "" }) => {
                     clearTimeout(zoomIdleTimerRef.current);
                     zoomIdleTimerRef.current = null;
                 }
+                if (zoomEndTimerRef.current) {
+                    clearTimeout(zoomEndTimerRef.current);
+                    zoomEndTimerRef.current = null;
+                }
             }, []);
 
             const normalizeViewport = (viewport) => {
@@ -1376,8 +1384,11 @@ const Icon = ({ name, size = 18, className = "" }) => {
                     y: e.clientY - rect.top
                 };
                 wheelAccumulatedDeltaRef.current += e.deltaY;
+                if (!isZooming) setIsZooming(true);
                 if (zoomIdleTimerRef.current) clearTimeout(zoomIdleTimerRef.current);
                 zoomIdleTimerRef.current = setTimeout(() => setPz(normalizeViewport(livePzRef.current)), 120);
+                if (zoomEndTimerRef.current) clearTimeout(zoomEndTimerRef.current);
+                zoomEndTimerRef.current = setTimeout(() => setIsZooming(false), 150);
 
                 if (wheelFrameRef.current !== null) return;
 
@@ -1491,10 +1502,10 @@ const Icon = ({ name, size = 18, className = "" }) => {
                                         </div>
                                     </div>
                                     <div className="flex justify-between items-end">
-                                        <span className={`text-[10px] uppercase tracking-widest italic ${n.fraction < 0.0000000001 ? 'text-stamp font-bold' : 'opacity-60'}`}>Rem</span>
+                                        <span className={`text-[10px] uppercase tracking-widest italic ${n.fraction < FRACTION_EPSILON ? 'text-stamp font-bold' : 'opacity-60'}`}>Rem</span>
                                         <div className="text-right">
-                                            <div className={`text-xs italic ${n.fraction < 0.0000000001 ? 'text-stamp font-bold' : ''}`}>{formatFraction(n.fraction)}</div>
-                                            <div className={`text-[10px] ${n.fraction < 0.0000000001 ? 'text-stamp font-bold' : 'opacity-70'}`}>{remainingFractionDisplay}</div>
+                                            <div className={`text-xs italic ${n.fraction < FRACTION_EPSILON ? 'text-stamp font-bold' : ''}`}>{formatFraction(n.fraction)}</div>
+                                            <div className={`text-[10px] ${n.fraction < FRACTION_EPSILON ? 'text-stamp font-bold' : 'opacity-70'}`}>{remainingFractionDisplay}</div>
                                         </div>
                                     </div>
                                 </div>
@@ -1970,6 +1981,10 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 setSelectedFlowNode(null);
             };
 
+            const deleteFlowEdge = (edgeId) => {
+                setFlowEdges(edges => edges.filter(e => e.id !== edgeId));
+            };
+
             const commitFlowEdit = () => {
                 setFlowNodes(nodes => nodes.map(n => n.id === selectedFlowNode ? { ...n, data: flowForm } : n));
                 setShowFlowEditModal(false);
@@ -1998,7 +2013,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
                             const x2 = target.x + (target.type === 'template' ? 140 : (target.data.width ? target.data.width/2 : 140)); 
                             const y2 = target.y;
                             return (
-                                <g key={edge.id} className={isInteractive ? "cursor-pointer pointer-events-auto" : "pointer-events-none"} onClick={(e) => { if(isInteractive) { e.stopPropagation(); if (flowTool === 'select') deleteSelectedFlowElement(edge.id); }}}>
+                                <g key={edge.id} className={isInteractive ? "cursor-pointer pointer-events-auto" : "pointer-events-none"} onClick={(e) => { if(isInteractive) { e.stopPropagation(); if (flowTool === 'select') deleteFlowEdge(edge.id); }}}>
                                     <path d={drawEdge(x1, y1, x2, y2)} fill="none" stroke="#1A1A1B" strokeWidth="2" markerEnd="url(#arrowhead-ink)" />
                                 </g>
                             );
@@ -2106,7 +2121,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
             return (
                 <>
                 {/* Dynamically assign the physical print page size based on orientation toggle */}
-                <style dangerouslySetInnerHTML={{ __html: `@media print { @page { size: letter ${printOrientation}; margin: 0; } }` }} />
+                <style dangerouslySetInnerHTML={{ __html: `@media print { @page { size: letter ${['landscape', 'portrait'].includes(printOrientation) ? printOrientation : 'portrait'}; margin: 0; } }` }} />
                 
                 {showHome ? (
                     <div className="h-screen w-screen p-4 sm:p-8 font-mono text-ink flex items-center justify-center">
@@ -3053,7 +3068,8 @@ const Icon = ({ name, size = 18, className = "" }) => {
                                                                 <span className="font-black text-ink opacity-40 text-2xl pt-2">/</span>
                                                                 <div className="relative">
                                                                     <div className="text-[8px] font-bold opacity-60 uppercase absolute -top-4 left-0">Denominator</div>
-                                                                    <input type="number" className="w-24 p-3 text-center font-bold border border-ink bg-parchment focus:ring-2 focus:ring-sepia outline-none text-lg shadow-inner" value={form.denominator === 0 ? '' : form.denominator} placeholder="2" onFocus={e => e.target.select()} onChange={e => setForm({...form, denominator: e.target.value})} />
+                                                                    <input type="number" className={`w-24 p-3 text-center font-bold border bg-parchment focus:ring-2 focus:ring-sepia outline-none text-lg shadow-inner ${parseFloat(form.denominator) <= 0 ? 'border-stamp text-stamp' : 'border-ink'}`} value={form.denominator === 0 ? '' : form.denominator} placeholder="2" onFocus={e => e.target.select()} onChange={e => setForm({...form, denominator: e.target.value})} />
+                                                                    {parseFloat(form.denominator) <= 0 && <div className="absolute -bottom-5 left-0 text-[9px] text-stamp font-bold whitespace-nowrap">Denominator must be &gt; 0</div>}
                                                                 </div>
                                                             </>
                                                         )}
@@ -3073,14 +3089,14 @@ const Icon = ({ name, size = 18, className = "" }) => {
                                                             <div className="text-[10px] font-bold uppercase text-sepia mb-0.5 tracking-widest">To Be Conveyed</div>
                                                             <div className="text-2xl font-black font-mono tracking-tight">{formatFraction(calcShare)}</div>
                                                         </div>
-                                                        <div className={`px-4 py-2 border text-left sm:text-right transition-colors ${ (parentForMath?.fraction - calcShare) < -0.0000000001 ? 'bg-[#E0D7D7] border-stamp/50' : 'bg-parchment border-ink ' }`}>
-                                                            <div className={`text-[9px] font-black uppercase tracking-widest mb-1 ${ (parentForMath?.fraction - calcShare) < -0.0000000001 ? 'text-stamp' : 'opacity-60' }`}>Grantor Retention Balance</div>
-                                                            <div className={`font-mono text-xs flex items-center sm:justify-end gap-2 ${ (parentForMath?.fraction - calcShare) < -0.0000000001 ? 'text-stamp font-bold' : '' }`}>
+                                                        <div className={`px-4 py-2 border text-left sm:text-right transition-colors ${ (parentForMath?.fraction - calcShare) < -FRACTION_EPSILON ? 'bg-[#E0D7D7] border-stamp/50' : 'bg-parchment border-ink ' }`}>
+                                                            <div className={`text-[9px] font-black uppercase tracking-widest mb-1 ${ (parentForMath?.fraction - calcShare) < -FRACTION_EPSILON ? 'text-stamp' : 'opacity-60' }`}>Grantor Retention Balance</div>
+                                                            <div className={`font-mono text-xs flex items-center sm:justify-end gap-2 ${ (parentForMath?.fraction - calcShare) < -FRACTION_EPSILON ? 'text-stamp font-bold' : '' }`}>
                                                                 <span>{formatFraction(parentForMath?.fraction)}</span>
                                                                 <span className="opacity-40">-</span>
                                                                 <span>{formatFraction(calcShare)}</span>
                                                                 <span className="opacity-40">=</span>
-                                                                <span className={`text-sm border-l border-ink pl-2 ${ (parentForMath?.fraction - calcShare) < -0.0000000001 ? 'text-stamp' : 'font-bold' }`}>{formatFraction(parentForMath?.fraction - calcShare)}</span>
+                                                                <span className={`text-sm border-l border-ink pl-2 ${ (parentForMath?.fraction - calcShare) < -FRACTION_EPSILON ? 'text-stamp' : 'font-bold' }`}>{formatFraction(parentForMath?.fraction - calcShare)}</span>
                                                             </div>
                                                         </div>
                                                     </div>

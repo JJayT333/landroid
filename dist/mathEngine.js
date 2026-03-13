@@ -6,7 +6,6 @@
   }
 })(typeof self !== 'undefined' ? self : globalThis, function () {
   const FRACTION_EPSILON = 0.000000001;
-  const OWNERSHIP_TOTAL_TOLERANCE = 0.05;
 
   function clampFraction(value) {
     const numeric = Number(value || 0);
@@ -52,7 +51,8 @@
     if (form?.conveyanceMode === 'fixed') return clampFraction(parseFloat(form?.manualAmount || 0));
     if (form?.conveyanceMode === 'fraction') {
       let base = parent.initialFraction ?? parent.fraction;
-      if (form?.splitBasis === 'remaining') base = parent.fraction;
+      if (form?.splitBasis === 'whole') base = 1.0;
+      else if (form?.splitBasis === 'remaining') base = parent.fraction;
       return clampFraction(base * ratio);
     }
     return 0;
@@ -531,7 +531,6 @@
 
   return {
     FRACTION_EPSILON,
-    OWNERSHIP_TOTAL_TOLERANCE,
     clampFraction,
     collectDescendantIds,
     applyBranchScale,
