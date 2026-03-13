@@ -154,6 +154,43 @@ const Icon = ({ name, size = 18, className = "" }) => {
             useEffect(() => { flowPzRef.current = flowPz; }, [flowPz]);
             useEffect(() => { treeScaleRef.current = treeScale; }, [treeScale]);
 
+            // ACCESSIBILITY: Modal focus trap
+            const modalRef = useRef(null);
+            const modalTriggerRef = useRef(null);
+            const showModalAndCaptureTrigger = () => {
+                modalTriggerRef.current = document.activeElement;
+                showModalAndCaptureTrigger();
+            };
+            useEffect(() => {
+                if (!showModal) {
+                    if (modalTriggerRef.current && typeof modalTriggerRef.current.focus === 'function') {
+                        modalTriggerRef.current.focus();
+                    }
+                    return;
+                }
+                if (modalRef.current) {
+                    const focusable = modalRef.current.querySelectorAll(
+                        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+                    );
+                    if (focusable.length > 0) focusable[0].focus();
+                }
+            }, [showModal]);
+            const handleModalKeyDown = (e) => {
+                if (e.key === 'Escape') { e.preventDefault(); setShowModal(false); return; }
+                if (e.key !== 'Tab' || !modalRef.current) return;
+                const focusable = Array.from(modalRef.current.querySelectorAll(
+                    'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+                ));
+                if (focusable.length === 0) return;
+                const first = focusable[0];
+                const last = focusable[focusable.length - 1];
+                if (e.shiftKey) {
+                    if (document.activeElement === first) { e.preventDefault(); last.focus(); }
+                } else {
+                    if (document.activeElement === last) { e.preventDefault(); first.focus(); }
+                }
+            };
+
             // -------------------------------------------------------------
             // FLOWCHART ENGINE STATE
             // -------------------------------------------------------------
@@ -769,7 +806,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 if (!instrumentList.includes(node.instrument)) setInstrumentList(prev => [...prev, node.instrument]);
                 setIsAddingInst(false); setShowGranteeList(false); setModalMode('edit'); setActiveNode(node);
                 setForm({ ...node, conveyanceMode: 'fraction', splitBasis: 'initial', numerator: 1, denominator: 2, manualAmount: 0 });
-                setShowModal(true);
+                showModalAndCaptureTrigger();
             };
 
             const openConvey = (node) => {
@@ -782,7 +819,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
                     denominator: lastMathProps.denominator, manualAmount: lastMathProps.manualAmount, 
                     docData: '', isDeceased: false, obituary: '', graveyardLink: ''
                 });
-                setShowModal(true);
+                showModalAndCaptureTrigger();
             };
 
             const openRelated = (node) => {
@@ -794,7 +831,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
                     conveyanceMode: 'fraction', splitBasis: 'initial', numerator: 1, denominator: 2, manualAmount: 0, docData: '',
                     isDeceased: false, obituary: '', graveyardLink: ''
                 });
-                setShowModal(true);
+                showModalAndCaptureTrigger();
             };
 
             const openPrecede = (node) => {
@@ -807,7 +844,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
                     docData: '', isDeceased: false, obituary: '', graveyardLink: '',
                     initialFraction: node.initialFraction || node.fraction 
                 });
-                setShowModal(true);
+                showModalAndCaptureTrigger();
             };
 
             const openRebalance = (node) => {
@@ -817,7 +854,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
                     initialFraction: node.initialFraction || node.fraction,
                     remarks: (node.remarks ? node.remarks + ' ' : '') + '[Branch rebalance]'
                 });
-                setShowModal(true);
+                showModalAndCaptureTrigger();
             };
 
             const openNewChain = () => {
@@ -830,7 +867,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
                     isDeceased: false, obituary: '', graveyardLink: '',
                     initialFraction: 1.0, fraction: 1.0
                 });
-                setShowModal(true);
+                showModalAndCaptureTrigger();
             };
 
             const openAddUnlinked = () => {
@@ -842,14 +879,14 @@ const Icon = ({ name, size = 18, className = "" }) => {
                     conveyanceMode: 'fraction', splitBasis: 'initial', numerator: 1, denominator: 2, manualAmount: 0, docData: '',
                     isDeceased: false, obituary: '', graveyardLink: ''
                 });
-                setShowModal(true);
+                showModalAndCaptureTrigger();
             };
 
             const openAttach = (node) => {
                 setIsAddingInst(false); setShowGranteeList(false); setModalMode('attach'); setActiveNode(node);
                 setAttachParentId(nodes.filter(n => n.id !== node.id && n.parentId !== 'unlinked')[0]?.id || 'root'); setAttachType('conveyance');
                 setForm({ ...node, estateType: node.estateType || 'Minerals', conveyanceMode: lastMathProps.conveyanceMode, splitBasis: lastMathProps.splitBasis, numerator: lastMathProps.numerator, denominator: lastMathProps.denominator, manualAmount: lastMathProps.manualAmount });
-                setShowModal(true);
+                showModalAndCaptureTrigger();
             };
 
             const toggleDeceased = (node) => updateActiveDeskMapNodes(prev => prev.map(n => n.id === node.id ? { ...n, isDeceased: !n.isDeceased } : n));
@@ -1453,8 +1490,11 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 return (
                     <div key={n.id} className="flex flex-col items-center relative animate-fade-in treenode">
                         <div className="z-10 group relative treenode-body">
-                            <div 
-                                onClick={() => openEdit(n)} 
+                            <div
+                                role="button"
+                                tabIndex={0}
+                                onClick={() => openEdit(n)}
+                                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openEdit(n); } }}
                                 className={`p-4 border min-w-[260px] max-w-[300px] cursor-pointer transition-all duration-300 relative ${
                                     isDeceased ? (isZooming ? 'bg-teastain border-sepia text-sepia' : 'bg-teastain border-sepia text-sepia ink-shadow') : (isZooming ? 'bg-parchment border-ink text-ink' : 'bg-parchment border-ink text-ink ink-shadow ink-shadow-hover')
                                 }`}
@@ -2796,7 +2836,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
                     {/* DYNAMIC RECORD MODAL SYSTEM - VINTAGE STYLING */}
                     {showModal && (
                         <div className="fixed inset-0 bg-ink/80 backdrop-blur-md z-[100] flex items-center justify-center p-4 sm:p-6 animate-fade-in font-mono text-ink">
-                            <div className="bg-parchment border border-ink ink-shadow-lg w-full max-w-5xl overflow-hidden flex flex-col max-h-full animate-slide-up">
+                            <div ref={modalRef} tabIndex={-1} onKeyDown={handleModalKeyDown} className="bg-parchment border border-ink ink-shadow-lg w-full max-w-5xl overflow-hidden flex flex-col max-h-full animate-slide-up outline-none">
                                 
                                 {/* Modal Header */}
                                 <div className={`px-8 py-6 flex justify-between items-center border-b-[2px] border-ink ${

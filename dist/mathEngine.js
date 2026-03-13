@@ -160,9 +160,12 @@
     const sourceRoot = allNodes.find((n) => n.id === activeNodeId);
     if (!sourceRoot) return allNodes;
 
-    const oldRootFraction = Math.max(sourceRoot.fraction || 0, FRACTION_EPSILON);
+    // Scale relative to initialFraction so the invariant
+    // (fraction + sum(children.initialFraction) == initialFraction) is preserved
+    // for the attached root and all its descendants.
+    const oldRootInitialFraction = Math.max(sourceRoot.initialFraction || sourceRoot.fraction || 0, FRACTION_EPSILON);
     const newRootFraction = clampFraction(calcShare);
-    const scaleFactor = newRootFraction / oldRootFraction;
+    const scaleFactor = newRootFraction / oldRootInitialFraction;
 
     return allNodes.map((n) => {
       if (n.id === attachParentId) {
@@ -174,7 +177,7 @@
           ...form,
           parentId: attachParentId,
           type: 'conveyance',
-          fraction: newRootFraction,
+          fraction: clampFraction((n.fraction || 0) * scaleFactor),
           initialFraction: newRootFraction,
         };
       }

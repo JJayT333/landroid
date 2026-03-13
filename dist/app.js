@@ -151,6 +151,51 @@ const App = () => {
   useEffect(() => {
     treeScaleRef.current = treeScale;
   }, [treeScale]);
+  const modalRef = useRef(null);
+  const modalTriggerRef = useRef(null);
+  const showModalAndCaptureTrigger = () => {
+    modalTriggerRef.current = document.activeElement;
+    showModalAndCaptureTrigger();
+  };
+  useEffect(() => {
+    if (!showModal) {
+      if (modalTriggerRef.current && typeof modalTriggerRef.current.focus === "function") {
+        modalTriggerRef.current.focus();
+      }
+      return;
+    }
+    if (modalRef.current) {
+      const focusable = modalRef.current.querySelectorAll(
+        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      );
+      if (focusable.length > 0) focusable[0].focus();
+    }
+  }, [showModal]);
+  const handleModalKeyDown = (e) => {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      setShowModal(false);
+      return;
+    }
+    if (e.key !== "Tab" || !modalRef.current) return;
+    const focusable = Array.from(modalRef.current.querySelectorAll(
+      'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    ));
+    if (focusable.length === 0) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (e.shiftKey) {
+      if (document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      }
+    } else {
+      if (document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
+  };
   const [flowNodes, setFlowNodes] = useState([]);
   const [flowEdges, setFlowEdges] = useState([]);
   const [flowTool, setFlowTool] = useState("select");
@@ -754,7 +799,7 @@ const App = () => {
     setModalMode("edit");
     setActiveNode(node);
     setForm({ ...node, conveyanceMode: "fraction", splitBasis: "initial", numerator: 1, denominator: 2, manualAmount: 0 });
-    setShowModal(true);
+    showModalAndCaptureTrigger();
   };
   const openConvey = (node) => {
     setIsAddingInst(false);
@@ -784,7 +829,7 @@ const App = () => {
       obituary: "",
       graveyardLink: ""
     });
-    setShowModal(true);
+    showModalAndCaptureTrigger();
   };
   const openRelated = (node) => {
     setIsAddingInst(false);
@@ -814,7 +859,7 @@ const App = () => {
       obituary: "",
       graveyardLink: ""
     });
-    setShowModal(true);
+    showModalAndCaptureTrigger();
   };
   const openPrecede = (node) => {
     setIsAddingInst(false);
@@ -846,7 +891,7 @@ const App = () => {
       graveyardLink: "",
       initialFraction: node.initialFraction || node.fraction
     });
-    setShowModal(true);
+    showModalAndCaptureTrigger();
   };
   const openRebalance = (node) => {
     setIsAddingInst(false);
@@ -858,7 +903,7 @@ const App = () => {
       initialFraction: node.initialFraction || node.fraction,
       remarks: (node.remarks ? node.remarks + " " : "") + "[Branch rebalance]"
     });
-    setShowModal(true);
+    showModalAndCaptureTrigger();
   };
   const openNewChain = () => {
     setIsAddingInst(false);
@@ -891,7 +936,7 @@ const App = () => {
       initialFraction: 1,
       fraction: 1
     });
-    setShowModal(true);
+    showModalAndCaptureTrigger();
   };
   const openAddUnlinked = () => {
     setIsAddingInst(false);
@@ -922,7 +967,7 @@ const App = () => {
       obituary: "",
       graveyardLink: ""
     });
-    setShowModal(true);
+    showModalAndCaptureTrigger();
   };
   const openAttach = (node) => {
     setIsAddingInst(false);
@@ -932,7 +977,7 @@ const App = () => {
     setAttachParentId(nodes.filter((n) => n.id !== node.id && n.parentId !== "unlinked")[0]?.id || "root");
     setAttachType("conveyance");
     setForm({ ...node, estateType: node.estateType || "Minerals", conveyanceMode: lastMathProps.conveyanceMode, splitBasis: lastMathProps.splitBasis, numerator: lastMathProps.numerator, denominator: lastMathProps.denominator, manualAmount: lastMathProps.manualAmount });
-    setShowModal(true);
+    showModalAndCaptureTrigger();
   };
   const toggleDeceased = (node) => updateActiveDeskMapNodes((prev) => prev.map((n) => n.id === node.id ? { ...n, isDeceased: !n.isDeceased } : n));
   const commitBranchRebalance = (baseNodes, options) => {
@@ -1539,7 +1584,15 @@ Maps updated from embedded workspace payload.`);
     return /* @__PURE__ */ React.createElement("div", { key: n.id, className: "flex flex-col items-center relative animate-fade-in treenode" }, /* @__PURE__ */ React.createElement("div", { className: "z-10 group relative treenode-body" }, /* @__PURE__ */ React.createElement(
       "div",
       {
+        role: "button",
+        tabIndex: 0,
         onClick: () => openEdit(n),
+        onKeyDown: (e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            openEdit(n);
+          }
+        },
         className: `p-4 border min-w-[260px] max-w-[300px] cursor-pointer transition-all duration-300 relative ${isDeceased ? isZooming ? "bg-teastain border-sepia text-sepia" : "bg-teastain border-sepia text-sepia ink-shadow" : isZooming ? "bg-parchment border-ink text-ink" : "bg-parchment border-ink text-ink ink-shadow ink-shadow-hover"}`
       },
       /* @__PURE__ */ React.createElement("div", { className: `flex justify-between items-start mb-2 border-b pb-2 ${isDeceased ? "border-sepia/20" : "border-ink/20"}` }, /* @__PURE__ */ React.createElement("span", { className: "font-serif text-xs font-bold uppercase tracking-widest text-sepia" }, n.instrument), /* @__PURE__ */ React.createElement("div", { className: "flex gap-1 items-center" }, hasChildren && /* @__PURE__ */ React.createElement(
@@ -2226,7 +2279,7 @@ Maps updated from embedded workspace payload.`);
     )
   ), isPrinting && /* @__PURE__ */ React.createElement("div", { className: "print-only w-full" }, Array.from({ length: gridRows }).map(
     (_, r) => Array.from({ length: gridCols }).map((_2, c) => /* @__PURE__ */ React.createElement("div", { key: `print-page-${r}-${c}`, className: "print-page-break bg-white", style: { width: pw + "px", height: ph + "px" } }, /* @__PURE__ */ React.createElement("div", { className: "absolute", style: { top: -(r * ph) + "px", left: -(c * pw) + "px", width: pw * gridCols + "px", height: ph * gridRows + "px" } }, /* @__PURE__ */ React.createElement("div", { style: { transform: `scale(${treeScale})`, transformOrigin: "0 0", width: "100%", height: "100%" } }, renderTree(false)))))
-  )), showFlowEditModal && flowForm && /* @__PURE__ */ React.createElement("div", { className: "absolute inset-0 bg-ink/50 backdrop-blur-sm z-[200] flex items-center justify-center p-4 animate-fade-in no-print pointer-events-auto" }, /* @__PURE__ */ React.createElement("div", { className: "bg-parchment border border-ink p-6 w-full max-w-md ink-shadow-lg flex flex-col gap-4 animate-slide-up" }, /* @__PURE__ */ React.createElement("h3", { className: "font-serif font-black text-xl border-b-[2px] border-ink pb-2" }, "Edit Canvas Element"), flowNodes.find((n) => n.id === selectedFlowNode)?.type === "template" ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { className: "text-[10px] font-bold uppercase tracking-widest block mb-1" }, "Instrument Title"), /* @__PURE__ */ React.createElement("input", { type: "text", className: "w-full border border-ink p-2 bg-teastain", value: flowForm.title, onChange: (e) => setFlowForm({ ...flowForm, title: e.target.value }) })), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { className: "text-[10px] font-bold uppercase tracking-widest block mb-1" }, "Grantee"), /* @__PURE__ */ React.createElement("input", { type: "text", className: "w-full border border-ink p-2 bg-teastain font-serif font-bold", value: flowForm.grantee, onChange: (e) => setFlowForm({ ...flowForm, grantee: e.target.value }) })), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { className: "text-[10px] font-bold uppercase tracking-widest block mb-1" }, "Grantor"), /* @__PURE__ */ React.createElement("input", { type: "text", className: "w-full border border-ink p-2 bg-teastain", value: flowForm.grantor, onChange: (e) => setFlowForm({ ...flowForm, grantor: e.target.value }) })), /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-2 gap-4" }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { className: "text-[10px] font-bold uppercase tracking-widest block mb-1" }, "Date / Vol / Page"), /* @__PURE__ */ React.createElement("input", { type: "text", className: "w-full border border-ink p-2 bg-teastain", value: flowForm.details, onChange: (e) => setFlowForm({ ...flowForm, details: e.target.value }) })), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { className: "text-[10px] font-bold uppercase tracking-widest block mb-1" }, "Fraction"), /* @__PURE__ */ React.createElement("input", { type: "text", className: "w-full border border-ink p-2 bg-teastain font-mono", value: flowForm.fraction, onChange: (e) => setFlowForm({ ...flowForm, fraction: e.target.value }) })))) : /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { className: "text-[10px] font-bold uppercase tracking-widest block mb-1" }, "Text Content"), /* @__PURE__ */ React.createElement("textarea", { className: "w-full border border-ink p-2 bg-teastain h-32 font-serif resize-y", value: flowForm.text, onChange: (e) => setFlowForm({ ...flowForm, text: e.target.value }) }), /* @__PURE__ */ React.createElement("label", { className: "text-[10px] font-bold uppercase tracking-widest block mt-4 mb-1" }, "Box Width: ", flowForm.width || 280, "px"), /* @__PURE__ */ React.createElement("input", { type: "range", min: "150", max: "800", value: flowForm.width || 280, onChange: (e) => setFlowForm({ ...flowForm, width: parseInt(e.target.value) }), className: "w-full accent-sepia cursor-pointer" })), /* @__PURE__ */ React.createElement("div", { className: "flex justify-end gap-2 mt-2" }, /* @__PURE__ */ React.createElement("button", { onClick: () => setShowFlowEditModal(false), className: "px-4 py-2 border border-ink/30 text-xs font-bold uppercase tracking-widest hover:border-stamp/50 hover:text-stamp transition-colors" }, "Cancel"), /* @__PURE__ */ React.createElement("button", { onClick: commitFlowEdit, className: "px-6 py-2 bg-sepia/10 text-sepia border border-sepia/40 text-xs font-bold uppercase tracking-widest hover:-translate-y-0.5 transition-all" }, "Save")))))), showModal && /* @__PURE__ */ React.createElement("div", { className: "fixed inset-0 bg-ink/80 backdrop-blur-md z-[100] flex items-center justify-center p-4 sm:p-6 animate-fade-in font-mono text-ink" }, /* @__PURE__ */ React.createElement("div", { className: "bg-parchment border border-ink ink-shadow-lg w-full max-w-5xl overflow-hidden flex flex-col max-h-full animate-slide-up" }, /* @__PURE__ */ React.createElement("div", { className: `px-8 py-6 flex justify-between items-center border-b-[2px] border-ink ${modalMode === "convey" ? "bg-sepia text-parchment" : modalMode === "add_related" ? "bg-fountain text-parchment" : modalMode === "attach" ? "bg-fountain text-parchment" : modalMode === "precede" ? "bg-ink text-parchment" : modalMode === "rebalance" ? "bg-fountain text-parchment" : modalMode === "add_unlinked" ? "bg-fountain text-parchment" : modalMode === "add_chain" ? "bg-fountain text-parchment" : "bg-ink text-parchment"}` }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("h2", { className: "text-xl font-serif font-black tracking-tight text-parchment" }, modalMode === "edit" ? "Update Record" : modalMode === "add_related" ? "Attach Related Document" : modalMode === "attach" ? "Link Imported Document to Lineage" : modalMode === "precede" ? "Insert Preceding Record" : modalMode === "rebalance" ? "Rebalance Branch Ownership" : modalMode === "add_unlinked" ? "Add Loose Document" : modalMode === "add_chain" ? "Start New Title Chain" : "Convey Title Link"), /* @__PURE__ */ React.createElement("p", { className: "text-[10px] opacity-80 uppercase font-bold tracking-widest mt-1" }, modalMode === "add_related" ? "Non-Conveying Title Work (e.g., Probates, Affidavits)" : modalMode === "add_unlinked" ? "Parking lot record to be attached to the main lineage later" : modalMode === "add_chain" ? "Independent starting point for a separate lineage map" : "Protocol Lineage Analysis & Net-interest Database")), /* @__PURE__ */ React.createElement("button", { onClick: () => setShowModal(false), className: "border border-transparent hover:border-current p-2 rounded-sm transition-all" }, /* @__PURE__ */ React.createElement(Icon, { name: "Close", size: 20 }))), /* @__PURE__ */ React.createElement("div", { className: "p-8 overflow-y-auto custom-scrollbar flex-1 bg-parchment" }, /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-6 gap-6" }, modalMode === "attach" && /* @__PURE__ */ React.createElement("div", { className: "col-span-6 bg-teastain border border-ink p-5 mb-2 shadow-inner" }, /* @__PURE__ */ React.createElement("div", { className: "flex flex-col sm:flex-row gap-6" }, /* @__PURE__ */ React.createElement("div", { className: "flex-1" }, /* @__PURE__ */ React.createElement("label", { className: "text-[10px] font-bold uppercase mb-1.5 block tracking-widest" }, "Select Parent Title Link"), /* @__PURE__ */ React.createElement("select", { className: "w-full border border-ink rounded-sm p-3 bg-teastain outline-none font-bold", value: attachParentId, onChange: (e) => setAttachParentId(e.target.value) }, nodes.filter((n) => n.parentId !== "unlinked" && n.id !== activeNode?.id).map((n) => /* @__PURE__ */ React.createElement("option", { key: n.id, value: n.id }, n.instrument, " - ", n.grantee, " (", n.date, ")")))), /* @__PURE__ */ React.createElement("div", { className: "w-full sm:w-1/3" }, /* @__PURE__ */ React.createElement("label", { className: "text-[10px] font-bold uppercase mb-1.5 block tracking-widest" }, "Attachment Type"), /* @__PURE__ */ React.createElement("select", { className: "w-full border border-ink rounded-sm p-3 bg-teastain outline-none font-bold", value: attachType, onChange: (e) => setAttachType(e.target.value) }, /* @__PURE__ */ React.createElement("option", { value: "conveyance" }, "Conveyance (Math Engine)"), /* @__PURE__ */ React.createElement("option", { value: "related" }, "Related Branch Doc")))), attachType === "conveyance" && /* @__PURE__ */ React.createElement("div", { className: `mt-4 border p-3 text-xs ${attachImpact?.valid ? "border-ink/40 bg-parchment/80" : "border-stamp/40 bg-stamp/10 text-stamp"}` }, /* @__PURE__ */ React.createElement("div", { className: "text-[10px] uppercase tracking-widest font-bold mb-2" }, "Attach Impact Preview"), attachImpact?.valid ? /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 font-mono" }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", { className: "opacity-60" }, "Destination:"), " ", attachImpact.destinationName), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", { className: "opacity-60" }, "Destination Balance:"), " ", formatFraction(attachImpact.destinationBefore), " \u2192 ", formatFraction(attachImpact.destinationAfter)), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", { className: "opacity-60" }, "Attached Root:"), " ", formatFraction(attachImpact.rootBefore), " \u2192 ", formatFraction(attachImpact.rootAfter)), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", { className: "opacity-60" }, "Scale Factor:"), " ", attachImpact.scaleFactor.toFixed(6), "x"), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", { className: "opacity-60" }, "Descendants Updated:"), " ", attachImpact.descendantCount)) : /* @__PURE__ */ React.createElement("div", { className: "font-bold" }, attachImpact?.reason || "Select a valid destination to preview impact."))), /* @__PURE__ */ React.createElement("div", { className: "col-span-6 sm:col-span-3" }, /* @__PURE__ */ React.createElement("label", { className: "text-[10px] font-bold uppercase mb-1.5 block tracking-wider text-sepia/80" }, "Instrument (B)"), isAddingInst ? /* @__PURE__ */ React.createElement("div", { className: "flex gap-2" }, /* @__PURE__ */ React.createElement("input", { type: "text", className: "flex-1 border border-ink rounded-sm p-3 bg-teastain focus:ring-2 focus:ring-sepia outline-none font-bold", value: newInst, onChange: (e) => setNewInst(e.target.value), placeholder: "New Instrument Type...", autoFocus: true }), /* @__PURE__ */ React.createElement("button", { onClick: () => {
+  )), showFlowEditModal && flowForm && /* @__PURE__ */ React.createElement("div", { className: "absolute inset-0 bg-ink/50 backdrop-blur-sm z-[200] flex items-center justify-center p-4 animate-fade-in no-print pointer-events-auto" }, /* @__PURE__ */ React.createElement("div", { className: "bg-parchment border border-ink p-6 w-full max-w-md ink-shadow-lg flex flex-col gap-4 animate-slide-up" }, /* @__PURE__ */ React.createElement("h3", { className: "font-serif font-black text-xl border-b-[2px] border-ink pb-2" }, "Edit Canvas Element"), flowNodes.find((n) => n.id === selectedFlowNode)?.type === "template" ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { className: "text-[10px] font-bold uppercase tracking-widest block mb-1" }, "Instrument Title"), /* @__PURE__ */ React.createElement("input", { type: "text", className: "w-full border border-ink p-2 bg-teastain", value: flowForm.title, onChange: (e) => setFlowForm({ ...flowForm, title: e.target.value }) })), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { className: "text-[10px] font-bold uppercase tracking-widest block mb-1" }, "Grantee"), /* @__PURE__ */ React.createElement("input", { type: "text", className: "w-full border border-ink p-2 bg-teastain font-serif font-bold", value: flowForm.grantee, onChange: (e) => setFlowForm({ ...flowForm, grantee: e.target.value }) })), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { className: "text-[10px] font-bold uppercase tracking-widest block mb-1" }, "Grantor"), /* @__PURE__ */ React.createElement("input", { type: "text", className: "w-full border border-ink p-2 bg-teastain", value: flowForm.grantor, onChange: (e) => setFlowForm({ ...flowForm, grantor: e.target.value }) })), /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-2 gap-4" }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { className: "text-[10px] font-bold uppercase tracking-widest block mb-1" }, "Date / Vol / Page"), /* @__PURE__ */ React.createElement("input", { type: "text", className: "w-full border border-ink p-2 bg-teastain", value: flowForm.details, onChange: (e) => setFlowForm({ ...flowForm, details: e.target.value }) })), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { className: "text-[10px] font-bold uppercase tracking-widest block mb-1" }, "Fraction"), /* @__PURE__ */ React.createElement("input", { type: "text", className: "w-full border border-ink p-2 bg-teastain font-mono", value: flowForm.fraction, onChange: (e) => setFlowForm({ ...flowForm, fraction: e.target.value }) })))) : /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { className: "text-[10px] font-bold uppercase tracking-widest block mb-1" }, "Text Content"), /* @__PURE__ */ React.createElement("textarea", { className: "w-full border border-ink p-2 bg-teastain h-32 font-serif resize-y", value: flowForm.text, onChange: (e) => setFlowForm({ ...flowForm, text: e.target.value }) }), /* @__PURE__ */ React.createElement("label", { className: "text-[10px] font-bold uppercase tracking-widest block mt-4 mb-1" }, "Box Width: ", flowForm.width || 280, "px"), /* @__PURE__ */ React.createElement("input", { type: "range", min: "150", max: "800", value: flowForm.width || 280, onChange: (e) => setFlowForm({ ...flowForm, width: parseInt(e.target.value) }), className: "w-full accent-sepia cursor-pointer" })), /* @__PURE__ */ React.createElement("div", { className: "flex justify-end gap-2 mt-2" }, /* @__PURE__ */ React.createElement("button", { onClick: () => setShowFlowEditModal(false), className: "px-4 py-2 border border-ink/30 text-xs font-bold uppercase tracking-widest hover:border-stamp/50 hover:text-stamp transition-colors" }, "Cancel"), /* @__PURE__ */ React.createElement("button", { onClick: commitFlowEdit, className: "px-6 py-2 bg-sepia/10 text-sepia border border-sepia/40 text-xs font-bold uppercase tracking-widest hover:-translate-y-0.5 transition-all" }, "Save")))))), showModal && /* @__PURE__ */ React.createElement("div", { className: "fixed inset-0 bg-ink/80 backdrop-blur-md z-[100] flex items-center justify-center p-4 sm:p-6 animate-fade-in font-mono text-ink" }, /* @__PURE__ */ React.createElement("div", { ref: modalRef, tabIndex: -1, onKeyDown: handleModalKeyDown, className: "bg-parchment border border-ink ink-shadow-lg w-full max-w-5xl overflow-hidden flex flex-col max-h-full animate-slide-up outline-none" }, /* @__PURE__ */ React.createElement("div", { className: `px-8 py-6 flex justify-between items-center border-b-[2px] border-ink ${modalMode === "convey" ? "bg-sepia text-parchment" : modalMode === "add_related" ? "bg-fountain text-parchment" : modalMode === "attach" ? "bg-fountain text-parchment" : modalMode === "precede" ? "bg-ink text-parchment" : modalMode === "rebalance" ? "bg-fountain text-parchment" : modalMode === "add_unlinked" ? "bg-fountain text-parchment" : modalMode === "add_chain" ? "bg-fountain text-parchment" : "bg-ink text-parchment"}` }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("h2", { className: "text-xl font-serif font-black tracking-tight text-parchment" }, modalMode === "edit" ? "Update Record" : modalMode === "add_related" ? "Attach Related Document" : modalMode === "attach" ? "Link Imported Document to Lineage" : modalMode === "precede" ? "Insert Preceding Record" : modalMode === "rebalance" ? "Rebalance Branch Ownership" : modalMode === "add_unlinked" ? "Add Loose Document" : modalMode === "add_chain" ? "Start New Title Chain" : "Convey Title Link"), /* @__PURE__ */ React.createElement("p", { className: "text-[10px] opacity-80 uppercase font-bold tracking-widest mt-1" }, modalMode === "add_related" ? "Non-Conveying Title Work (e.g., Probates, Affidavits)" : modalMode === "add_unlinked" ? "Parking lot record to be attached to the main lineage later" : modalMode === "add_chain" ? "Independent starting point for a separate lineage map" : "Protocol Lineage Analysis & Net-interest Database")), /* @__PURE__ */ React.createElement("button", { onClick: () => setShowModal(false), className: "border border-transparent hover:border-current p-2 rounded-sm transition-all" }, /* @__PURE__ */ React.createElement(Icon, { name: "Close", size: 20 }))), /* @__PURE__ */ React.createElement("div", { className: "p-8 overflow-y-auto custom-scrollbar flex-1 bg-parchment" }, /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-6 gap-6" }, modalMode === "attach" && /* @__PURE__ */ React.createElement("div", { className: "col-span-6 bg-teastain border border-ink p-5 mb-2 shadow-inner" }, /* @__PURE__ */ React.createElement("div", { className: "flex flex-col sm:flex-row gap-6" }, /* @__PURE__ */ React.createElement("div", { className: "flex-1" }, /* @__PURE__ */ React.createElement("label", { className: "text-[10px] font-bold uppercase mb-1.5 block tracking-widest" }, "Select Parent Title Link"), /* @__PURE__ */ React.createElement("select", { className: "w-full border border-ink rounded-sm p-3 bg-teastain outline-none font-bold", value: attachParentId, onChange: (e) => setAttachParentId(e.target.value) }, nodes.filter((n) => n.parentId !== "unlinked" && n.id !== activeNode?.id).map((n) => /* @__PURE__ */ React.createElement("option", { key: n.id, value: n.id }, n.instrument, " - ", n.grantee, " (", n.date, ")")))), /* @__PURE__ */ React.createElement("div", { className: "w-full sm:w-1/3" }, /* @__PURE__ */ React.createElement("label", { className: "text-[10px] font-bold uppercase mb-1.5 block tracking-widest" }, "Attachment Type"), /* @__PURE__ */ React.createElement("select", { className: "w-full border border-ink rounded-sm p-3 bg-teastain outline-none font-bold", value: attachType, onChange: (e) => setAttachType(e.target.value) }, /* @__PURE__ */ React.createElement("option", { value: "conveyance" }, "Conveyance (Math Engine)"), /* @__PURE__ */ React.createElement("option", { value: "related" }, "Related Branch Doc")))), attachType === "conveyance" && /* @__PURE__ */ React.createElement("div", { className: `mt-4 border p-3 text-xs ${attachImpact?.valid ? "border-ink/40 bg-parchment/80" : "border-stamp/40 bg-stamp/10 text-stamp"}` }, /* @__PURE__ */ React.createElement("div", { className: "text-[10px] uppercase tracking-widest font-bold mb-2" }, "Attach Impact Preview"), attachImpact?.valid ? /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 font-mono" }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", { className: "opacity-60" }, "Destination:"), " ", attachImpact.destinationName), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", { className: "opacity-60" }, "Destination Balance:"), " ", formatFraction(attachImpact.destinationBefore), " \u2192 ", formatFraction(attachImpact.destinationAfter)), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", { className: "opacity-60" }, "Attached Root:"), " ", formatFraction(attachImpact.rootBefore), " \u2192 ", formatFraction(attachImpact.rootAfter)), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", { className: "opacity-60" }, "Scale Factor:"), " ", attachImpact.scaleFactor.toFixed(6), "x"), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", { className: "opacity-60" }, "Descendants Updated:"), " ", attachImpact.descendantCount)) : /* @__PURE__ */ React.createElement("div", { className: "font-bold" }, attachImpact?.reason || "Select a valid destination to preview impact."))), /* @__PURE__ */ React.createElement("div", { className: "col-span-6 sm:col-span-3" }, /* @__PURE__ */ React.createElement("label", { className: "text-[10px] font-bold uppercase mb-1.5 block tracking-wider text-sepia/80" }, "Instrument (B)"), isAddingInst ? /* @__PURE__ */ React.createElement("div", { className: "flex gap-2" }, /* @__PURE__ */ React.createElement("input", { type: "text", className: "flex-1 border border-ink rounded-sm p-3 bg-teastain focus:ring-2 focus:ring-sepia outline-none font-bold", value: newInst, onChange: (e) => setNewInst(e.target.value), placeholder: "New Instrument Type...", autoFocus: true }), /* @__PURE__ */ React.createElement("button", { onClick: () => {
     if (newInst.trim() && !instrumentList.includes(newInst.trim())) {
       setInstrumentList([...instrumentList, newInst.trim()]);
       setForm({ ...form, instrument: newInst.trim() });
