@@ -88,7 +88,7 @@
     const node = allNodes.find((item) => item.id === nodeId);
     if (!node) return null;
 
-    const oldInitialFraction = Math.max(node.initialFraction || 0, FRACTION_EPSILON);
+    const oldInitialFraction = Math.max(node.initialFraction ?? node.fraction ?? 0, FRACTION_EPSILON);
     const normalizedNewInitialFraction = clampFraction(newInitialFraction);
     const scaleFactor = normalizedNewInitialFraction / oldInitialFraction;
     const scaledNodes = applyBranchScale(allNodes, nodeId, scaleFactor);

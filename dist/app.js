@@ -143,19 +143,14 @@ const App = () => {
   const [deskMapCodeDraft, setDeskMapCodeDraft] = useState("");
   const [isEditingDeskMapName, setIsEditingDeskMapName] = useState(false);
   const [isPrinting, setIsPrinting] = useState(false);
+  const [printOffset, setPrintOffset] = useState({ x: 0, y: 0 });
   const [isZooming, setIsZooming] = useState(false);
   const zoomEndTimerRef = useRef(null);
-  useEffect(() => {
-    flowPzRef.current = flowPz;
-  }, [flowPz]);
-  useEffect(() => {
-    treeScaleRef.current = treeScale;
-  }, [treeScale]);
   const modalRef = useRef(null);
   const modalTriggerRef = useRef(null);
   const showModalAndCaptureTrigger = () => {
     modalTriggerRef.current = document.activeElement;
-    showModalAndCaptureTrigger();
+    setShowModal(true);
   };
   useEffect(() => {
     if (!showModal) {
@@ -203,6 +198,12 @@ const App = () => {
   const flowPzRef = useRef({ ...defaultFlowViewport });
   const [treeScale, setTreeScale] = useState(1);
   const treeScaleRef = useRef(1);
+  useEffect(() => {
+    flowPzRef.current = flowPz;
+  }, [flowPz]);
+  useEffect(() => {
+    treeScaleRef.current = treeScale;
+  }, [treeScale]);
   const [gridCols, setGridCols] = useState(defaultFlowGrid.cols);
   const [gridRows, setGridRows] = useState(defaultFlowGrid.rows);
   const [connectingStart, setConnectingStart] = useState(null);
@@ -213,9 +214,20 @@ const App = () => {
   const [printOrientation, setPrintOrientation] = useState("landscape");
   const [showFlowLayoutMenu, setShowFlowLayoutMenu] = useState(false);
   const [showActionsMenu, setShowActionsMenu] = useState(false);
+  const [flowGlobalCompact, setFlowGlobalCompact] = useState(true);
+  const [ctxMenu, setCtxMenu] = useState(null);
+  const [inlineEdit, setInlineEdit] = useState(null);
+  const [clickPopover, setClickPopover] = useState(null);
+  const [clickPopoverForm, setClickPopoverForm] = useState({ name: "", acreage: "", nodeType: "Party" });
   const flowDraggingNode = useRef(null);
+  const canvasPointerDownPos = useRef(null);
   const flowDragStart = useRef({ x: 0, y: 0 });
   const flowCanvasRef = useRef(null);
+  const flowPanZoomLayerRef = useRef(null);
+  const flowWheelDeltaRef = useRef(0);
+  const flowWheelFrameRef = useRef(null);
+  const flowWheelPointerRef = useRef({ x: 0, y: 0 });
+  const flowWheelIdleRef = useRef(null);
   const flowLayoutMenuRef = useRef(null);
   const actionsMenuRef = useRef(null);
   const moveTreeStartPos = useRef(null);
@@ -324,7 +336,10 @@ const App = () => {
     if (code && name) return `${code} - ${name}`;
     return code || name || "DeskMap";
   };
-  const totalRootOwnership = useMemo(() => rootOwnershipTotal(nodes), [nodes]);
+  const totalRootOwnership = useMemo(
+    () => nodes.filter((n) => !n.parentId && n.type !== "related").reduce((s, n) => s + clampFraction(n.initialFraction ?? n.fraction), 0),
+    [nodes]
+  );
   const ownershipHealth = useMemo(() => {
     const delta = totalRootOwnership - 1;
     if (Math.abs(delta) <= FRACTION_EPSILON) return { status: "balanced", label: "Balanced", delta };
@@ -723,6 +738,16 @@ const App = () => {
     e.target.value = "";
   };
   const formatFraction = (num) => isNaN(num) || num === null || num === void 0 ? "0.000000000" : Number(num).toFixed(9);
+  const formatMasterFraction = (value) => {
+    const num = Number(value || 0);
+    if (!Number.isFinite(num)) return "0";
+    if (Math.abs(num) <= FRACTION_EPSILON) return "0";
+    for (let d = 1; d <= 128; d++) {
+      const n = Math.round(num * d);
+      if (Math.abs(n / d - num) < 1e-9) return `${n}/${d}`;
+    }
+    return formatFraction(num);
+  };
   const formatConveyanceFraction = (node) => {
     if (!node || node.type !== "conveyance" || node.conveyanceMode !== "fraction") return "";
     const numerator = Number(node.numerator || 0);
@@ -1106,13 +1131,14 @@ const App = () => {
       });
     } else if (modalMode === "add_chain") {
       const newId = makeId();
-      const available = Math.max(0, 1 - totalRootOwnership);
+      const rootInitialTotal = nodes.filter((n) => !n.parentId).reduce((s, n) => s + clampFraction(n.initialFraction ?? n.fraction), 0);
+      const available = Math.max(0, 1 - rootInitialTotal);
       const requested = clampFraction(form.initialFraction);
       if (requested - available > FRACTION_EPSILON) {
         window.alert(`Only ${formatFraction(available)} ownership capacity remains in this map. Reduce the initial granted share to ${formatFraction(available)} or less.`);
         return;
       }
-      updateActiveDeskMapNodes((prev) => [...prev, { ...form, id: newId, type: "conveyance", parentId: null }]);
+      updateActiveDeskMapNodes((prev) => [...prev, { ...form, id: newId, type: "conveyance", parentId: null, fraction: clampFraction(form.initialFraction) }]);
     } else if (modalMode === "add_related") {
       const newId = makeId();
       updateActiveDeskMapNodes((prev) => [...prev, { ...form, id: newId, type: "related", fraction: 0, initialFraction: 0, parentId: activeNode.id }]);
@@ -1593,7 +1619,7 @@ Maps updated from embedded workspace payload.`);
             openEdit(n);
           }
         },
-        className: `p-4 border min-w-[260px] max-w-[300px] cursor-pointer transition-all duration-300 relative ${isDeceased ? isZooming ? "bg-teastain border-sepia text-sepia" : "bg-teastain border-sepia text-sepia ink-shadow" : isZooming ? "bg-parchment border-ink text-ink" : "bg-parchment border-ink text-ink ink-shadow ink-shadow-hover"}`
+        className: `p-4 border min-w-[260px] max-w-[300px] cursor-pointer transition-all duration-300 relative select-none ${isDeceased ? isZooming ? "bg-teastain border-sepia text-sepia" : "bg-teastain border-sepia text-sepia ink-shadow" : isZooming ? "bg-parchment border-ink text-ink" : "bg-parchment border-ink text-ink ink-shadow ink-shadow-hover"}`
       },
       /* @__PURE__ */ React.createElement("div", { className: `flex justify-between items-start mb-2 border-b pb-2 ${isDeceased ? "border-sepia/20" : "border-ink/20"}` }, /* @__PURE__ */ React.createElement("span", { className: "font-serif text-xs font-bold uppercase tracking-widest text-sepia" }, n.instrument), /* @__PURE__ */ React.createElement("div", { className: "flex gap-1 items-center" }, hasChildren && /* @__PURE__ */ React.createElement(
         "button",
@@ -1645,25 +1671,25 @@ Maps updated from embedded workspace payload.`);
       ))),
       isCollapsed && hiddenDescendantCount > 0 && /* @__PURE__ */ React.createElement("div", { className: `mt-3 inline-flex items-center px-2 py-1 border rounded-sm text-[10px] font-mono uppercase tracking-wider ${isDeceased ? "border-sepia/40 bg-sepia/10 text-sepia" : "border-ink/40 bg-ink/5 text-ink/80"}` }, "+", hiddenDescendantCount, " descendants"),
       shouldSimplifyChildren && simplifiedHiddenCount > 0 && /* @__PURE__ */ React.createElement("div", { className: `mt-3 inline-flex items-center px-2 py-1 border rounded-sm text-[10px] font-mono uppercase tracking-wider ${isDeceased ? "border-sepia/40 bg-sepia/10 text-sepia" : "border-ink/40 bg-ink/5 text-ink/80"}` }, "Zoom Preview: +", simplifiedHiddenCount, " hidden descendants")
-    ), /* @__PURE__ */ React.createElement("div", { className: "absolute -bottom-4 left-1/2 -translate-x-1/2 flex gap-1 opacity-0 group-hover:opacity-100 transition-all duration-300 z-20" }, n.parentId === null && nodes.length > 1 && /* @__PURE__ */ React.createElement("button", { onClick: (e) => {
+    ), /* @__PURE__ */ React.createElement("div", { className: "opacity-0 group-hover:opacity-100 transition-all duration-300 mt-2 flex flex-col gap-1" }, /* @__PURE__ */ React.createElement("div", { className: "flex gap-1 justify-center" }, n.parentId === null && nodes.length > 1 && /* @__PURE__ */ React.createElement("button", { onClick: (e) => {
       e.stopPropagation();
       openAttach(n);
-    }, className: "bg-sepia text-parchment border border-sepia rounded-sm px-3 py-1 text-[10px] font-bold hover:bg-sepia/80 shadow-md flex items-center gap-1 hover:-translate-y-0.5 transition-all" }, /* @__PURE__ */ React.createElement(Icon, { name: "Link", size: 12 }), " ATTACH"), /* @__PURE__ */ React.createElement("button", { onClick: (e) => {
+    }, className: "bg-sepia text-parchment border border-sepia rounded-sm px-2 py-1 text-[10px] font-bold hover:bg-sepia/80 shadow-md flex items-center gap-1 hover:-translate-y-0.5 transition-all" }, /* @__PURE__ */ React.createElement(Icon, { name: "Link", size: 12 }), " ATTACH"), /* @__PURE__ */ React.createElement("button", { onClick: (e) => {
       e.stopPropagation();
       openPrecede(n);
-    }, className: "bg-ink text-parchment border border-parchment rounded-sm px-3 py-1 text-[10px] font-bold hover:bg-ink/80 shadow-md flex items-center gap-1 hover:-translate-y-0.5 transition-transform" }, /* @__PURE__ */ React.createElement(Icon, { name: "ArrowUp", size: 12 }), " PRECEDE"), /* @__PURE__ */ React.createElement("button", { onClick: (e) => {
+    }, className: "bg-ink text-parchment border border-parchment rounded-sm px-2 py-1 text-[10px] font-bold hover:bg-ink/80 shadow-md flex items-center gap-1 hover:-translate-y-0.5 transition-transform" }, /* @__PURE__ */ React.createElement(Icon, { name: "ArrowUp", size: 12 }), " PRECEDE"), /* @__PURE__ */ React.createElement("button", { onClick: (e) => {
       e.stopPropagation();
       openRebalance(n);
-    }, className: "bg-fountain text-parchment border border-fountain rounded-sm px-3 py-1 text-[10px] font-bold hover:bg-fountain/80 shadow-md flex items-center gap-1 hover:-translate-y-0.5 transition-transform" }, /* @__PURE__ */ React.createElement(Icon, { name: "Adjust", size: 12 }), " REBALANCE"), /* @__PURE__ */ React.createElement("button", { onClick: (e) => {
-      e.stopPropagation();
-      openRelated(n);
-    }, className: "bg-parchment text-ink border border-ink/40 rounded-sm px-3 py-1 text-[10px] font-bold hover:bg-teastain shadow-md flex items-center gap-1 hover:-translate-y-0.5 transition-transform" }, /* @__PURE__ */ React.createElement(Icon, { name: "Paperclip", size: 12 }), " + DOC"), /* @__PURE__ */ React.createElement("button", { onClick: (e) => {
+    }, className: "bg-fountain text-parchment border border-fountain rounded-sm px-2 py-1 text-[10px] font-bold hover:bg-fountain/80 shadow-md flex items-center gap-1 hover:-translate-y-0.5 transition-transform" }, /* @__PURE__ */ React.createElement(Icon, { name: "Adjust", size: 12 }), " REBALANCE")), /* @__PURE__ */ React.createElement("div", { className: "flex gap-1 justify-center" }, /* @__PURE__ */ React.createElement("button", { onClick: (e) => {
       e.stopPropagation();
       openConvey(n);
-    }, className: "bg-teastain text-sepia border border-sepia/60 rounded-sm px-4 py-1 text-[10px] font-bold hover:bg-parchment hover:border-sepia shadow-lg flex items-center gap-1 hover:-translate-y-0.5 transition-all" }, /* @__PURE__ */ React.createElement(Icon, { name: "Convey", size: 12 }), " CONVEY"), nodes.length > 1 && /* @__PURE__ */ React.createElement("button", { onClick: (e) => {
+    }, className: "bg-teastain text-sepia border border-sepia/60 rounded-sm px-2 py-1 text-[10px] font-bold hover:bg-parchment hover:border-sepia shadow-lg flex items-center gap-1 hover:-translate-y-0.5 transition-all" }, /* @__PURE__ */ React.createElement(Icon, { name: "Convey", size: 12 }), " CONVEY"), /* @__PURE__ */ React.createElement("button", { onClick: (e) => {
+      e.stopPropagation();
+      openRelated(n);
+    }, className: "bg-parchment text-ink border border-ink/40 rounded-sm px-2 py-1 text-[10px] font-bold hover:bg-teastain shadow-md flex items-center gap-1 hover:-translate-y-0.5 transition-transform" }, /* @__PURE__ */ React.createElement(Icon, { name: "Paperclip", size: 12 }), " + DOC"), nodes.length > 1 && /* @__PURE__ */ React.createElement("button", { onClick: (e) => {
       e.stopPropagation();
       requestDeleteRecord(n);
-    }, className: "bg-parchment text-stamp border border-stamp/60 rounded-sm p-1.5 text-[10px] font-bold hover:bg-teastain hover:border-stamp shadow-lg flex items-center justify-center hover:-translate-y-0.5 transition-all" }, /* @__PURE__ */ React.createElement(Icon, { name: "Trash", size: 14 })))), hasChildren && !isCollapsed && !shouldSimplifyChildren && /* @__PURE__ */ React.createElement("div", { className: "flex relative justify-center pt-8" }, n.children.map((c, i) => /* @__PURE__ */ React.createElement("div", { key: c.id, className: "relative flex flex-col items-center px-4" }, /* @__PURE__ */ React.createElement("div", { className: "absolute top-0 left-1/2 w-[1px] h-8 bg-ink -translate-x-1/2 -mt-8 z-0" }), n.children.length > 1 && /* @__PURE__ */ React.createElement("div", { className: `absolute -top-8 h-[1px] bg-ink z-0 ${i === 0 ? "left-1/2 right-0" : i === n.children.length - 1 ? "left-0 right-1/2" : "left-0 right-0"}` }), renderTreeNode(c, depth + 1)))));
+    }, className: "bg-parchment text-stamp border border-stamp/60 rounded-sm p-1.5 text-[10px] font-bold hover:bg-teastain hover:border-stamp shadow-lg flex items-center justify-center hover:-translate-y-0.5 transition-all" }, /* @__PURE__ */ React.createElement(Icon, { name: "Trash", size: 14 }))))), hasChildren && !isCollapsed && !shouldSimplifyChildren && /* @__PURE__ */ React.createElement("div", { className: "flex relative justify-center pt-8" }, n.children.map((c, i) => /* @__PURE__ */ React.createElement("div", { key: c.id, className: "relative flex flex-col items-center px-4" }, /* @__PURE__ */ React.createElement("div", { className: "absolute top-0 left-1/2 w-[1px] h-8 bg-ink -translate-x-1/2 -mt-8 z-0" }), n.children.length > 1 && /* @__PURE__ */ React.createElement("div", { className: `absolute -top-8 h-[1px] bg-ink z-0 ${i === 0 ? "left-1/2 right-0" : i === n.children.length - 1 ? "left-0 right-1/2" : "left-0 right-0"}` }), renderTreeNode(c, depth + 1)))));
   };
   const createTreeGroupId = () => `tg_${makeId()}`;
   const resolveTreeGroupId = (node) => node?.treeGroupId || (node?.id ? `tg_${node.id}` : createTreeGroupId());
@@ -1684,53 +1710,110 @@ Maps updated from embedded workspace payload.`);
   };
   const buildFlowLayoutFromNodes = (sourceNodes, idPrefix = "", xShift = 0, treeGroupId = "") => {
     const safePrefix = idPrefix ? `${idPrefix}-` : "";
-    const normalNodes = sourceNodes.filter((n) => n.type !== "related");
+    const normalNodes = sourceNodes.filter((n) => n.type !== "related" && n.parentId !== "unlinked");
     if (!normalNodes.length) return { nodes: [], edges: [], width: 0 };
-    const newFlowNodes = [];
-    const newFlowEdges = [];
-    const nodePositions = {};
-    let leafX = 0;
-    const levelYSpacing = 280;
-    const startY = 60;
-    const childrenOf = (id) => normalNodes.filter((c) => c.parentId === id);
-    const layoutNode = (nId, depth) => {
-      const children = childrenOf(nId);
-      if (children.length === 0) {
-        nodePositions[nId] = { x: leafX, y: startY + depth * levelYSpacing };
-        leafX += 340;
-        return nodePositions[nId].x;
-      }
-      const childXs = children.map((c) => {
-        newFlowEdges.push({ id: `e-${safePrefix}${nId}-${safePrefix}${c.id}`, source: `${safePrefix}${nId}`, target: `${safePrefix}${c.id}` });
-        return layoutNode(c.id, depth + 1);
-      });
-      const myX = childXs.reduce((a, b) => a + b, 0) / childXs.length;
-      nodePositions[nId] = { x: myX, y: startY + depth * levelYSpacing };
-      return myX;
-    };
-    const roots = normalNodes.filter((n) => n.parentId === null);
-    roots.forEach((root2) => {
-      layoutNode(root2.id, 0);
-      leafX += 200;
-    });
-    const minX = Math.min(...Object.values(nodePositions).map((p) => p.x));
-    const maxX = Math.max(...Object.values(nodePositions).map((p) => p.x + 280));
-    const width = Math.max(280, maxX - minX);
+    if (normalNodes.length > 300) {
+      window.alert(`This desk map has ${normalNodes.length} nodes \u2014 too large to auto-layout (limit: 300). Import cancelled.`);
+      return { nodes: [], edges: [], width: 0 };
+    }
+    const NODE_W = 200;
+    const NODE_H = 56;
+    const H_GAP = 40;
+    const V_GAP = 80;
+    const ROOT_GAP = 120;
+    const LEAF_SLOT = NODE_W + H_GAP;
+    const nodeMap = {};
     normalNodes.forEach((n) => {
-      const pos = nodePositions[n.id] || { x: 0, y: 0 };
+      nodeMap[n.id] = { id: n.id, src: n, children: [] };
+    });
+    const roots = [];
+    const attached = /* @__PURE__ */ new Set();
+    normalNodes.forEach((n) => {
+      if (n.parentId && nodeMap[n.parentId]) {
+        let isCycle = false;
+        let ancestor = nodeMap[n.parentId];
+        const visited = /* @__PURE__ */ new Set([n.id]);
+        while (ancestor) {
+          if (visited.has(ancestor.id)) {
+            isCycle = true;
+            break;
+          }
+          visited.add(ancestor.id);
+          const parentSrc = ancestor.src;
+          ancestor = parentSrc.parentId ? nodeMap[parentSrc.parentId] : null;
+        }
+        if (!isCycle) {
+          nodeMap[n.parentId].children.push(nodeMap[n.id]);
+          attached.add(n.id);
+        } else {
+          roots.push(nodeMap[n.id]);
+        }
+      } else {
+        roots.push(nodeMap[n.id]);
+      }
+    });
+    const computeWidth = (treeNode) => {
+      if (treeNode.children.length === 0) {
+        treeNode.subtreeWidth = LEAF_SLOT;
+        return;
+      }
+      treeNode.children.forEach(computeWidth);
+      const childrenTotalWidth = treeNode.children.reduce((sum, c) => sum + c.subtreeWidth, 0);
+      treeNode.subtreeWidth = Math.max(LEAF_SLOT, childrenTotalWidth);
+    };
+    roots.forEach(computeWidth);
+    const positions = {};
+    const assignPositions = (treeNode, centerX, depth) => {
+      positions[treeNode.id] = { x: centerX - NODE_W / 2, y: depth * (NODE_H + V_GAP) };
+      if (treeNode.children.length === 0) return;
+      const childrenTotalWidth = treeNode.children.reduce((sum, c) => sum + c.subtreeWidth, 0);
+      let cursor = centerX - childrenTotalWidth / 2;
+      treeNode.children.forEach((child) => {
+        const childCenter = cursor + child.subtreeWidth / 2;
+        assignPositions(child, childCenter, depth + 1);
+        cursor += child.subtreeWidth;
+      });
+    };
+    let rootCursor = 0;
+    roots.forEach((root2, i) => {
+      const rootCenter = rootCursor + root2.subtreeWidth / 2;
+      assignPositions(root2, rootCenter, 0);
+      rootCursor += root2.subtreeWidth + (i < roots.length - 1 ? ROOT_GAP : 0);
+    });
+    const allPositioned = Object.keys(positions);
+    const minX = Math.min(...allPositioned.map((id) => positions[id].x));
+    const maxX = Math.max(...allPositioned.map((id) => positions[id].x + NODE_W));
+    const width = Math.max(280, maxX - minX);
+    const newFlowEdges = [];
+    const buildEdges = (treeNode) => {
+      treeNode.children.forEach((child) => {
+        newFlowEdges.push({
+          id: `e-${safePrefix}${treeNode.id}-${safePrefix}${child.id}`,
+          source: `${safePrefix}${treeNode.id}`,
+          target: `${safePrefix}${child.id}`
+        });
+        buildEdges(child);
+      });
+    };
+    roots.forEach(buildEdges);
+    const newFlowNodes = [];
+    normalNodes.forEach((n) => {
+      const pos = positions[n.id];
+      if (!pos) return;
       newFlowNodes.push({
         id: `${safePrefix}${n.id}`,
         treeGroupId: treeGroupId || safePrefix || "default-tree",
         x: pos.x - minX + xShift,
         y: pos.y,
         type: "template",
+        compact: true,
         color: n.isDeceased ? "bg-teastain text-sepia border-sepia" : "bg-parchment text-ink border-ink",
         data: {
           title: n.instrument,
           grantee: n.grantee,
           grantor: n.grantor,
           fraction: formatFraction(n.fraction),
-          fractionDisplay: n.fraction > FRACTION_EPSILON ? formatAsFraction(n.fraction) : null,
+          fractionDisplay: n.fraction > FRACTION_EPSILON ? formatMasterFraction(n.fraction) : null,
           details: `${n.date} ${n.vol && n.page ? `\u2022 Vol ${n.vol}/Pg ${n.page}` : ""}`
         }
       });
@@ -1742,6 +1825,16 @@ Maps updated from embedded workspace payload.`);
     if (flowDeskMapFilter === "active") return deskMaps.filter((map) => map.id === activeDeskMapId);
     return deskMaps.filter((map) => map.id === flowDeskMapFilter);
   };
+  const commitInlineEdit = () => {
+    if (!inlineEdit) return;
+    setFlowNodes((prev) => prev.map((n) => {
+      if (n.id !== inlineEdit.id) return n;
+      if (inlineEdit.field === "grantee") return { ...n, data: { ...n.data, grantee: inlineEdit.value } };
+      if (inlineEdit.field === "text") return { ...n, data: { ...n.data, text: inlineEdit.value } };
+      return n;
+    }));
+    setInlineEdit(null);
+  };
   const fitFlowToView = (targetNodes) => {
     const scopeNodes = targetNodes || flowNodes;
     if (!scopeNodes.length) return;
@@ -1749,18 +1842,18 @@ Maps updated from embedded workspace payload.`);
     const viewportW = Math.max(700, (containerRect?.width || window.innerWidth) - 80);
     const viewportH = Math.max(500, (containerRect?.height || window.innerHeight) - 110);
     const minX = Math.min(...scopeNodes.map((n) => n.x));
-    const maxX = Math.max(...scopeNodes.map((n) => n.x + (n.type === "template" ? 280 : n.data.width || 280)));
+    const maxX = Math.max(...scopeNodes.map((n) => n.x + (n.type === "template" ? 200 : n.data.width || 280)));
     const minY = Math.min(...scopeNodes.map((n) => n.y));
-    const maxY = Math.max(...scopeNodes.map((n) => n.y + (n.type === "template" ? 150 : 80)));
+    const maxY = Math.max(...scopeNodes.map((n) => n.y + (n.type === "template" ? 56 : 80)));
     const contentW = Math.max(300, maxX - minX);
     const contentH = Math.max(200, maxY - minY);
-    const fitScale = Math.min(viewportW / contentW, viewportH / contentH, 1);
-    setTreeScale(fitScale);
+    const fitScale = Math.max(0.02, Math.min(viewportW * 0.9 / contentW, viewportH * 0.9 / contentH, 2));
+    setTreeScale(1);
     const centerX = minX + contentW / 2;
     const centerY = minY + contentH / 2;
     const targetX = viewportW / 2 - centerX * fitScale;
     const targetY = viewportH / 2 - centerY * fitScale;
-    setFlowPz({ x: Math.min(600, Math.max(-6e3, targetX)), y: Math.min(400, Math.max(-6e3, targetY)), scale: fitScale });
+    setFlowPz({ x: Math.min(600, Math.max(-6e4, targetX)), y: Math.min(400, Math.max(-6e4, targetY)), scale: fitScale });
   };
   const importToFlowchart = (append = false) => {
     const selectedMaps = getFlowSelectedDeskMaps();
@@ -1785,10 +1878,32 @@ Maps updated from embedded workspace payload.`);
     if (nextNodes.length) fitFlowToView(nextNodes);
   };
   const handlePrintFlowchart = () => {
-    flushSync(() => setIsPrinting(true));
+    let printScale = 1;
+    let pOffsetX = 0, pOffsetY = 0;
+    if (flowNodes.length) {
+      const minX = Math.min(...flowNodes.map((n) => n.x));
+      const maxX = Math.max(...flowNodes.map((n) => n.x + (n.type === "template" ? 200 : n.data.width || 280)));
+      const minY = Math.min(...flowNodes.map((n) => n.y));
+      const maxY = Math.max(...flowNodes.map((n) => n.y + (n.type === "template" ? 56 : 80)));
+      const contentW = Math.max(300, maxX - minX);
+      const contentH = Math.max(200, maxY - minY);
+      const printW = pw * gridCols * 0.92;
+      const printH = ph * gridRows * 0.92;
+      printScale = Math.max(0.02, Math.min(printW / contentW, printH / contentH));
+      pOffsetX = minX;
+      pOffsetY = minY;
+    }
+    setPrintOffset({ x: pOffsetX, y: pOffsetY });
+    flushSync(() => {
+      setTreeScale(printScale);
+      setIsPrinting(true);
+    });
     setTimeout(() => {
       window.print();
-      setTimeout(() => setIsPrinting(false), 150);
+      setTimeout(() => {
+        setIsPrinting(false);
+        setTreeScale(1);
+      }, 150);
     }, 50);
   };
   const handleDeleteWorkspace = async (workspaceId) => {
@@ -1850,6 +1965,7 @@ Maps updated from embedded workspace payload.`);
       type,
       treeGroupId: selectedFlowNode ? resolveTreeGroupId(flowNodes.find((n) => n.id === selectedFlowNode)) : createTreeGroupId(),
       color: "bg-parchment text-ink border-ink",
+      compact: type === "template",
       data: type === "template" ? {
         title: "Instrument",
         grantee: "Grantee Name",
@@ -1882,7 +1998,7 @@ Maps updated from embedded workspace payload.`);
     }
   };
   const handleFlowPointerMove = (e) => {
-    if (flowTool === "connect" && connectingStart) {
+    if (connectingStart) {
       const rect = document.getElementById("tree-scaler").getBoundingClientRect();
       setMousePos({ x: (e.clientX - rect.left) / (flowPz.scale * treeScale), y: (e.clientY - rect.top) / (flowPz.scale * treeScale) });
     }
@@ -1925,21 +2041,30 @@ Maps updated from embedded workspace payload.`);
   const handleFlowWheel = (e) => {
     if (e.ctrlKey || e.metaKey || flowTool === "pan") {
       e.preventDefault();
-      const scaleAdjust = e.deltaY * -2e-3;
       const rect = e.currentTarget.getBoundingClientRect();
-      const pointerX = e.clientX - rect.left;
-      const pointerY = e.clientY - rect.top;
-      setFlowPz((prev) => {
-        const nextScale = Math.min(Math.max(0.1, prev.scale + scaleAdjust), 3);
-        if (nextScale === prev.scale) return prev;
+      flowWheelPointerRef.current = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+      flowWheelDeltaRef.current += e.deltaY;
+      if (flowWheelIdleRef.current) clearTimeout(flowWheelIdleRef.current);
+      flowWheelIdleRef.current = setTimeout(() => {
+        setFlowPz({ ...flowPzRef.current });
+      }, 150);
+      if (flowWheelFrameRef.current !== null) return;
+      flowWheelFrameRef.current = requestAnimationFrame(() => {
+        const delta = flowWheelDeltaRef.current;
+        flowWheelDeltaRef.current = 0;
+        flowWheelFrameRef.current = null;
+        const prev = flowPzRef.current;
+        const zoomFactor = Math.exp(delta * -2e-3);
+        const nextScale = Math.min(Math.max(0.1, prev.scale * zoomFactor), 3);
+        if (nextScale === prev.scale) return;
+        const { x: pointerX, y: pointerY } = flowWheelPointerRef.current;
         const worldX = (pointerX - prev.x) / prev.scale;
         const worldY = (pointerY - prev.y) / prev.scale;
-        return {
-          ...prev,
-          scale: nextScale,
-          x: pointerX - worldX * nextScale,
-          y: pointerY - worldY * nextScale
-        };
+        const next = { ...prev, scale: nextScale, x: pointerX - worldX * nextScale, y: pointerY - worldY * nextScale };
+        flowPzRef.current = next;
+        if (flowPanZoomLayerRef.current) {
+          flowPanZoomLayerRef.current.style.transform = `translate(${next.x}px, ${next.y}px) scale(${next.scale})`;
+        }
       });
     }
   };
@@ -1947,8 +2072,8 @@ Maps updated from embedded workspace payload.`);
     e.stopPropagation();
     if (flowTool === "connect") {
       setConnectingStart(node.id);
-      const wOffset = node.type === "template" ? 140 : node.data.width ? node.data.width / 2 : 140;
-      setMousePos({ x: node.x + wOffset, y: node.y + 100 });
+      const wOffset = node.type === "template" ? node.compact ? 100 : 140 : node.data.width ? node.data.width / 2 : 140;
+      setMousePos({ x: node.x + wOffset, y: node.y + (node.compact ? 28 : 100) });
     } else if (flowTool === "select") {
       setSelectedFlowNode(node.id);
       flowDraggingNode.current = { id: node.id, origX: node.x, origY: node.y };
@@ -2023,31 +2148,68 @@ Maps updated from embedded workspace payload.`);
     setFlowNodes((nodes2) => nodes2.map((n) => n.id === selectedFlowNode ? { ...n, data: flowForm } : n));
     setShowFlowEditModal(false);
   };
-  const drawEdge = (x1, y1, x2, y2) => {
+  const confirmClickPlace = () => {
+    if (!clickPopover || !clickPopoverForm.name.trim()) return;
+    const id = `fn_${makeId()}`;
+    const { worldX, worldY } = clickPopover;
+    const { name, acreage, nodeType } = clickPopoverForm;
+    const newNode = nodeType === "Annotation" ? { id, x: worldX, y: worldY, type: "blank", treeGroupId: createTreeGroupId(), color: "bg-parchment text-ink border-ink", data: { text: name.trim(), width: 200 } } : {
+      id,
+      x: worldX,
+      y: worldY,
+      type: "template",
+      compact: true,
+      treeGroupId: createTreeGroupId(),
+      color: "bg-parchment text-ink border-ink",
+      data: { title: nodeType === "Conveyance" ? name.trim() : "Party", grantee: nodeType === "Party" ? name.trim() : "", grantor: "", fraction: "1.00000000", fractionDisplay: formatMasterFraction(1), details: acreage.trim() ? acreage.trim() + " NMA" : "" }
+    };
+    setFlowNodes((prev) => [...prev, newNode]);
+    setSelectedFlowNode(id);
+    setClickPopover(null);
+  };
+  const drawEdge = (x1, y1, x2, y2, bendFactor = 0) => {
     const yMid = (y1 + y2) / 2;
-    return `M ${x1} ${y1} C ${x1} ${yMid}, ${x2} ${yMid}, ${x2} ${y2}`;
+    return `M ${x1} ${y1} C ${x1 + bendFactor} ${yMid}, ${x2 + bendFactor} ${yMid}, ${x2} ${y2}`;
   };
   const flowNodeById = useMemo(() => Object.fromEntries(flowNodes.map((n) => [n.id, n])), [flowNodes]);
-  const renderTree = (isInteractive) => /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("svg", { className: "absolute top-0 left-0 w-full h-full overflow-visible pointer-events-none z-10" }, /* @__PURE__ */ React.createElement("defs", null, /* @__PURE__ */ React.createElement("marker", { id: "arrowhead-ink", markerWidth: "10", markerHeight: "7", refX: "9", refY: "3.5", orient: "auto" }, /* @__PURE__ */ React.createElement("polygon", { points: "0 0, 10 3.5, 0 7", fill: "#1A1A1B" }))), flowEdges.map((edge) => {
-    const source = flowNodeById[edge.source];
-    const target = flowNodeById[edge.target];
-    if (!source || !target) return null;
-    const x1 = source.x + (source.type === "template" ? 140 : source.data.width ? source.data.width / 2 : 140);
-    const y1 = source.y + (source.type === "template" ? 140 : 50);
-    const x2 = target.x + (target.type === "template" ? 140 : target.data.width ? target.data.width / 2 : 140);
-    const y2 = target.y;
-    return /* @__PURE__ */ React.createElement("g", { key: edge.id, className: isInteractive ? "cursor-pointer pointer-events-auto" : "pointer-events-none", onClick: (e) => {
-      if (isInteractive) {
-        e.stopPropagation();
-        if (flowTool === "select") deleteFlowEdge(edge.id);
-      }
-    } }, /* @__PURE__ */ React.createElement("path", { d: drawEdge(x1, y1, x2, y2), fill: "none", stroke: "#1A1A1B", strokeWidth: "2", markerEnd: "url(#arrowhead-ink)" }));
-  }), isInteractive && flowTool === "connect" && connectingStart && flowNodeById[connectingStart] && /* @__PURE__ */ React.createElement(
+  const flowContentBounds = useMemo(() => {
+    if (!flowNodes.length) return { w: 0, h: 0 };
+    const maxX = Math.max(...flowNodes.map((n) => n.x + (n.type === "template" ? 200 : n.data.width || 280)));
+    const maxY = Math.max(...flowNodes.map((n) => n.y + (n.type === "template" ? 56 : 80)));
+    return { w: maxX + 40, h: maxY + 40 };
+  }, [flowNodes]);
+  const renderTree = (isInteractive, forPrint = false) => /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("svg", { className: "absolute top-0 left-0 w-full h-full overflow-visible pointer-events-none z-10" }, /* @__PURE__ */ React.createElement("defs", null, /* @__PURE__ */ React.createElement("marker", { id: "arrowhead-ink", markerWidth: "10", markerHeight: "7", refX: "9", refY: "3.5", orient: "auto" }, /* @__PURE__ */ React.createElement("polygon", { points: "0 0, 10 3.5, 0 7", fill: "#1A1A1B" }))), (() => {
+    const siblingMap = {};
+    flowEdges.forEach((edge) => {
+      if (!siblingMap[edge.source]) siblingMap[edge.source] = [];
+      siblingMap[edge.source].push(edge.target);
+    });
+    return flowEdges.map((edge) => {
+      const source = flowNodeById[edge.source];
+      const target = flowNodeById[edge.target];
+      if (!source || !target) return null;
+      const srcCompact = source.compact || forPrint;
+      const tgtCompact = target.compact || forPrint;
+      const x1 = source.x + (source.type === "template" ? srcCompact ? 100 : 140 : source.data.width ? source.data.width / 2 : 140);
+      const y1 = source.y + (source.type === "template" ? srcCompact ? 56 : 140 : 50);
+      const x2 = target.x + (target.type === "template" ? tgtCompact ? 100 : 140 : target.data.width ? target.data.width / 2 : 140);
+      const y2 = target.y;
+      const siblings = siblingMap[edge.source] || [];
+      const sibIdx = siblings.indexOf(edge.target);
+      const bendFactor = siblings.length > 1 ? (sibIdx - (siblings.length - 1) / 2) * 40 : 0;
+      return /* @__PURE__ */ React.createElement("g", { key: edge.id, className: isInteractive ? "cursor-pointer pointer-events-auto" : "pointer-events-none", onClick: (e) => {
+        if (isInteractive) {
+          e.stopPropagation();
+          if (flowTool === "select") deleteFlowEdge(edge.id);
+        }
+      } }, /* @__PURE__ */ React.createElement("path", { d: drawEdge(x1, y1, x2, y2, bendFactor), fill: "none", stroke: "#1A1A1B", strokeWidth: "2", markerEnd: "url(#arrowhead-ink)" }));
+    });
+  })(), isInteractive && connectingStart && flowNodeById[connectingStart] && /* @__PURE__ */ React.createElement(
     "path",
     {
       d: drawEdge(
-        flowNodeById[connectingStart].x + (flowNodeById[connectingStart].type === "template" ? 140 : flowNodeById[connectingStart].data.width / 2 || 140),
-        flowNodeById[connectingStart].y + 100,
+        flowNodeById[connectingStart].x + (flowNodeById[connectingStart].type === "template" ? flowNodeById[connectingStart].compact ? 100 : 140 : flowNodeById[connectingStart].data.width / 2 || 140),
+        flowNodeById[connectingStart].y + (flowNodeById[connectingStart].compact ? 28 : 100),
         mousePos.x,
         mousePos.y
       ),
@@ -2056,35 +2218,136 @@ Maps updated from embedded workspace payload.`);
       strokeWidth: "2",
       strokeDasharray: "5,5"
     }
-  )), /* @__PURE__ */ React.createElement("div", { className: "absolute top-0 left-0 w-full h-full z-20 pointer-events-none" }, flowNodes.map((n) => /* @__PURE__ */ React.createElement(
-    "div",
-    {
-      key: n.id,
-      id: isInteractive ? n.id : void 0,
-      className: `flow-node absolute transition-shadow bg-parchment ${isInteractive ? "pointer-events-auto " + (flowTool === "select" ? "cursor-grab active:cursor-grabbing" : flowTool === "move-tree" ? "cursor-move" : flowTool === "connect" ? "cursor-crosshair" : "") : ""} ${isInteractive && selectedFlowNode === n.id ? "ring-4 ring-sepia/50 ring-offset-4 ring-offset-transparent" : ""}`,
-      style: { transform: `translate(${n.x}px, ${n.y}px)` },
-      onPointerDown: isInteractive ? (e) => handleNodePointerDown(e, n) : void 0,
-      onPointerMove: isInteractive ? handleNodePointerMove : void 0,
-      onPointerUp: isInteractive ? (e) => handleNodePointerUp(e, n) : void 0,
-      onPointerCancel: isInteractive ? (e) => handleNodePointerUp(e, n) : void 0,
-      onDoubleClick: isInteractive ? (e) => {
-        e.stopPropagation();
-        if (flowTool === "select") {
-          setSelectedFlowNode(n.id);
-          setFlowForm(n.data);
-          setShowFlowEditModal(true);
-        }
-      } : void 0
-    },
-    n.type === "template" ? /* @__PURE__ */ React.createElement("div", { className: `w-[280px] p-4 border ${isInteractive ? "ink-shadow" : "border-ink"} ${n.color}` }, /* @__PURE__ */ React.createElement("div", { className: "border-b border-current/20 pb-2 mb-2" }, /* @__PURE__ */ React.createElement("div", { className: "font-serif text-xs font-bold uppercase tracking-widest text-sepia" }, n.data.title), /* @__PURE__ */ React.createElement("div", { className: "font-mono text-[10px] opacity-60 mt-1" }, n.data.details)), /* @__PURE__ */ React.createElement("div", { className: "mb-2" }, /* @__PURE__ */ React.createElement("div", { className: "text-[10px] uppercase tracking-widest text-sepia/60 font-mono mb-0.5" }, "Grantee / Assignee"), /* @__PURE__ */ React.createElement("div", { className: "font-display font-bold text-base leading-tight" }, n.data.grantee)), /* @__PURE__ */ React.createElement("div", { className: "mb-3" }, /* @__PURE__ */ React.createElement("div", { className: "text-[10px] uppercase tracking-widest text-sepia/60 font-mono mb-0.5" }, "Grantor / Assignor"), /* @__PURE__ */ React.createElement("div", { className: "font-mono text-xs truncate opacity-80" }, n.data.grantor)), /* @__PURE__ */ React.createElement("div", { className: "border-t border-current/20 pt-2 flex justify-between items-end" }, /* @__PURE__ */ React.createElement("span", { className: "text-[10px] uppercase tracking-widest opacity-60 font-mono" }, "Interest"), /* @__PURE__ */ React.createElement("div", { className: "text-right" }, /* @__PURE__ */ React.createElement("div", { className: "font-mono font-bold text-sm" }, n.data.fraction), n.data.fractionDisplay && /* @__PURE__ */ React.createElement("div", { className: "font-mono text-[10px] opacity-60" }, n.data.fractionDisplay)))) : /* @__PURE__ */ React.createElement(
+  )), /* @__PURE__ */ React.createElement("div", { className: "absolute top-0 left-0 w-full h-full z-20 pointer-events-none" }, flowNodes.map((n) => {
+    const showCompact = n.compact || forPrint;
+    const isEditing = isInteractive && inlineEdit?.id === n.id;
+    return /* @__PURE__ */ React.createElement(
       "div",
       {
-        className: `p-5 border ${isInteractive ? "ink-shadow" : "border-ink"} ${n.color}`,
-        style: { width: n.data.width || 280 }
+        key: n.id,
+        id: isInteractive ? n.id : void 0,
+        className: `flow-node absolute transition-shadow bg-parchment group relative ${isInteractive ? "pointer-events-auto " + (flowTool === "select" ? "cursor-grab active:cursor-grabbing" : flowTool === "move-tree" ? "cursor-move" : flowTool === "connect" ? "cursor-crosshair" : "") : ""} ${isInteractive && selectedFlowNode === n.id ? "ring-4 ring-sepia/50 ring-offset-4 ring-offset-transparent" : ""}`,
+        style: { transform: `translate(${n.x}px, ${n.y}px)` },
+        onPointerDown: isInteractive ? (e) => handleNodePointerDown(e, n) : void 0,
+        onPointerMove: isInteractive ? handleNodePointerMove : void 0,
+        onPointerUp: isInteractive ? (e) => handleNodePointerUp(e, n) : void 0,
+        onPointerCancel: isInteractive ? (e) => handleNodePointerUp(e, n) : void 0,
+        onContextMenu: isInteractive ? (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setCtxMenu({ nodeId: n.id, x: e.clientX, y: e.clientY });
+        } : void 0,
+        onDoubleClick: isInteractive ? (e) => {
+          e.stopPropagation();
+          if (flowTool === "select") {
+            setSelectedFlowNode(n.id);
+            setFlowForm(n.data);
+            setShowFlowEditModal(true);
+          }
+        } : void 0
       },
-      /* @__PURE__ */ React.createElement("div", { className: "font-serif text-sm whitespace-pre-wrap break-words" }, n.data.text)
-    )
-  ))));
+      isInteractive && (() => {
+        const wOff = n.type === "template" ? n.compact ? 100 : 140 : (n.data.width || 280) / 2;
+        const hOff = n.type === "template" ? n.compact ? 56 : 140 : 50;
+        const startConnect = (fromBottom) => (e) => {
+          e.stopPropagation();
+          e.preventDefault();
+          setConnectingStart(n.id);
+          setMousePos({ x: n.x + wOff, y: n.y + (fromBottom ? hOff : 0) });
+        };
+        return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { onPointerDown: startConnect(false), className: "absolute -top-[5px] left-1/2 -translate-x-1/2 w-[10px] h-[10px] rounded-full bg-sepia border border-ink/60 opacity-0 group-hover:opacity-100 transition-opacity cursor-crosshair z-30" }), /* @__PURE__ */ React.createElement("div", { onPointerDown: startConnect(true), className: "absolute -bottom-[5px] left-1/2 -translate-x-1/2 w-[10px] h-[10px] rounded-full bg-sepia border border-ink/60 opacity-0 group-hover:opacity-100 transition-opacity cursor-crosshair z-30" }));
+      })(),
+      n.type === "template" ? showCompact ? /* @__PURE__ */ React.createElement("div", { className: `w-[200px] px-3 py-2 border rounded-lg shadow-sm ${n.color}` }, isEditing && inlineEdit.field === "grantee" ? /* @__PURE__ */ React.createElement(
+        "input",
+        {
+          autoFocus: true,
+          className: "w-full bg-transparent border-b border-sepia font-display font-bold text-sm leading-tight outline-none",
+          value: inlineEdit.value,
+          onChange: (e) => setInlineEdit((prev) => ({ ...prev, value: e.target.value })),
+          onBlur: commitInlineEdit,
+          onKeyDown: (e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              commitInlineEdit();
+            }
+            if (e.key === "Escape") setInlineEdit(null);
+          },
+          onPointerDown: (e) => e.stopPropagation(),
+          onClick: (e) => e.stopPropagation()
+        }
+      ) : /* @__PURE__ */ React.createElement(
+        "div",
+        {
+          className: "font-display font-bold text-sm leading-tight truncate",
+          onDoubleClick: isInteractive ? (e) => {
+            e.stopPropagation();
+            setInlineEdit({ id: n.id, field: "grantee", value: n.data.grantee });
+          } : void 0
+        },
+        n.data.grantee
+      ), /* @__PURE__ */ React.createElement("div", { className: "font-mono text-[10px] opacity-60 truncate" }, n.data.fractionDisplay || n.data.fraction)) : /* @__PURE__ */ React.createElement("div", { className: `w-[280px] p-4 border rounded-lg shadow-sm ${n.color}` }, /* @__PURE__ */ React.createElement("div", { className: "border-b border-current/20 pb-2 mb-2" }, /* @__PURE__ */ React.createElement("div", { className: "font-serif text-xs font-bold uppercase tracking-widest text-sepia" }, n.data.title), /* @__PURE__ */ React.createElement("div", { className: "font-mono text-[10px] opacity-60 mt-1" }, n.data.details)), /* @__PURE__ */ React.createElement("div", { className: "mb-2" }, /* @__PURE__ */ React.createElement("div", { className: "text-[10px] uppercase tracking-widest text-sepia/60 font-mono mb-0.5" }, "Grantee / Assignee"), isEditing && inlineEdit.field === "grantee" ? /* @__PURE__ */ React.createElement(
+        "input",
+        {
+          autoFocus: true,
+          className: "w-full bg-transparent border-b border-sepia font-display font-bold text-base leading-tight outline-none",
+          value: inlineEdit.value,
+          onChange: (e) => setInlineEdit((prev) => ({ ...prev, value: e.target.value })),
+          onBlur: commitInlineEdit,
+          onKeyDown: (e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              commitInlineEdit();
+            }
+            if (e.key === "Escape") setInlineEdit(null);
+          },
+          onPointerDown: (e) => e.stopPropagation(),
+          onClick: (e) => e.stopPropagation()
+        }
+      ) : /* @__PURE__ */ React.createElement(
+        "div",
+        {
+          className: "font-display font-bold text-base leading-tight",
+          onDoubleClick: isInteractive ? (e) => {
+            e.stopPropagation();
+            setInlineEdit({ id: n.id, field: "grantee", value: n.data.grantee });
+          } : void 0
+        },
+        n.data.grantee
+      )), /* @__PURE__ */ React.createElement("div", { className: "mb-3" }, /* @__PURE__ */ React.createElement("div", { className: "text-[10px] uppercase tracking-widest text-sepia/60 font-mono mb-0.5" }, "Grantor / Assignor"), /* @__PURE__ */ React.createElement("div", { className: "font-mono text-xs truncate opacity-80" }, n.data.grantor)), /* @__PURE__ */ React.createElement("div", { className: "border-t border-current/20 pt-2 flex justify-between items-end" }, /* @__PURE__ */ React.createElement("span", { className: "text-[10px] uppercase tracking-widest opacity-60 font-mono" }, "Interest"), /* @__PURE__ */ React.createElement("div", { className: "text-right" }, /* @__PURE__ */ React.createElement("div", { className: "font-mono font-bold text-sm" }, n.data.fraction), n.data.fractionDisplay && /* @__PURE__ */ React.createElement("div", { className: "font-mono text-[10px] opacity-60" }, n.data.fractionDisplay)))) : /* @__PURE__ */ React.createElement(
+        "div",
+        {
+          className: `p-4 border-2 border-dashed rounded-lg shadow-sm ${n.color}`,
+          style: { width: n.data.width || 280 }
+        },
+        isEditing && inlineEdit.field === "text" ? /* @__PURE__ */ React.createElement(
+          "textarea",
+          {
+            autoFocus: true,
+            className: "w-full bg-transparent border-b border-sepia font-serif text-sm outline-none resize-none",
+            rows: 3,
+            value: inlineEdit.value,
+            onChange: (e) => setInlineEdit((prev) => ({ ...prev, value: e.target.value })),
+            onBlur: commitInlineEdit,
+            onKeyDown: (e) => {
+              if (e.key === "Escape") setInlineEdit(null);
+            },
+            onPointerDown: (e) => e.stopPropagation(),
+            onClick: (e) => e.stopPropagation()
+          }
+        ) : /* @__PURE__ */ React.createElement(
+          "div",
+          {
+            className: "font-serif text-sm whitespace-pre-wrap break-words",
+            onDoubleClick: isInteractive ? (e) => {
+              e.stopPropagation();
+              setInlineEdit({ id: n.id, field: "text", value: n.data.text });
+            } : void 0
+          },
+          n.data.text
+        )
+      )
+    );
+  })));
   const viewActions = {
     chart: [
       { key: "new-tree", label: "New Tree", icon: "Plus", onClick: openNewChain, title: "Start a completely separate independent lineage tree" },
@@ -2118,7 +2381,7 @@ Maps updated from embedded workspace payload.`);
     importCSV(e);
     setWorkspaceLoaded(true);
     setShowHome(false);
-  }, className: "hidden", accept: ".csv" }), /* @__PURE__ */ React.createElement("div", { className: "mt-6" }, /* @__PURE__ */ React.createElement("div", { className: "flex items-center justify-between gap-2" }, /* @__PURE__ */ React.createElement("h2", { className: "text-xs font-bold uppercase tracking-widest text-sepia" }, "Saved Workspaces"), /* @__PURE__ */ React.createElement("button", { "aria-label": "Delete All Workspaces", onClick: handleDeleteAllWorkspaces, className: "px-2 py-1 text-[10px] font-bold border border-stamp/60 text-stamp hover:bg-stamp hover:text-parchment rounded transition-colors" }, "Delete All")), /* @__PURE__ */ React.createElement("div", { className: "mt-2 max-h-[45vh] overflow-auto border border-ink/20 rounded-lg bg-parchment" }, savedProjects.length === 0 ? /* @__PURE__ */ React.createElement("div", { className: "p-4 text-sm text-ink/60" }, "No saved workspaces yet.") : savedProjects.map((p) => /* @__PURE__ */ React.createElement("div", { key: p.id, className: "w-full border-b last:border-b-0 border-ink/10 flex items-center gap-2 p-2 hover:bg-teastain/40" }, /* @__PURE__ */ React.createElement("button", { onClick: () => handleLoadWorkspace(p, false), className: "flex-1 text-left p-1" }, /* @__PURE__ */ React.createElement("div", { className: "font-bold text-sm" }, p.name || "Untitled Workspace"), /* @__PURE__ */ React.createElement("div", { className: "text-[11px] text-ink/60" }, "Updated ", new Date(p.updatedAt || Date.now()).toLocaleString())), /* @__PURE__ */ React.createElement("button", { "aria-label": `Delete Workspace ${p.name || p.id}`, onClick: () => handleDeleteWorkspace(p.id), className: "px-2 py-1 text-[10px] font-bold border border-stamp/60 text-stamp hover:bg-stamp hover:text-parchment transition-colors rounded", title: "Delete workspace" }, "Delete"))))))) : /* @__PURE__ */ React.createElement("div", { className: "h-screen w-screen overflow-hidden flex flex-col relative font-mono text-ink px-3 sm:px-5 py-3 sm:py-4 gap-3" }, /* @__PURE__ */ React.createElement("header", { className: "cyber-header-bg z-40 relative px-4 sm:px-6 py-4 flex justify-between items-start no-print rounded-2xl ink-shadow" }, /* @__PURE__ */ React.createElement("div", { className: "flex flex-col gap-3" }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("h1", { className: "font-serif text-2xl font-black tracking-tight flex items-baseline gap-2" }, "LANDroid", /* @__PURE__ */ React.createElement("span", { className: "text-sm font-normal text-sepia opacity-80 font-mono not-italic" }, "> by Abstract Mapping"))), /* @__PURE__ */ React.createElement("div", { className: "group flex items-center gap-2 flex-wrap" }, /* @__PURE__ */ React.createElement("div", { className: `rubber-stamp bg-parchment shadow-sm ${ownershipHealth.status === "over" ? "error animate-vibrate" : ""}` }, /* @__PURE__ */ React.createElement("span", { className: "opacity-80 text-xs mr-2" }, "Master Total:"), /* @__PURE__ */ React.createElement("span", { className: "text-lg" }, formatFraction(totalRootOwnership))), /* @__PURE__ */ React.createElement("span", { className: `px-2 py-1 text-[10px] border rounded font-bold uppercase tracking-widest ${ownershipHealth.status === "balanced" ? "border-green-700/40 text-green-800 bg-green-100/60" : ownershipHealth.status === "over" ? "border-stamp/60 text-stamp bg-stamp/10" : "border-amber-700/50 text-amber-900 bg-amber-100/70"}` }, ownershipHealth.label, " ", formatFraction(Math.abs(ownershipHealth.delta))))), /* @__PURE__ */ React.createElement("div", { className: "flex flex-col items-end gap-3 pt-1" }, /* @__PURE__ */ React.createElement("div", { className: "flex flex-col items-end gap-1 text-[11px] font-bold" }, /* @__PURE__ */ React.createElement("span", { className: "px-2 py-1 rounded border border-ink/30 bg-teastain/60" }, "Offline mode active: ", bootChecks.offlineModeActive ? "Yes" : "No"), /* @__PURE__ */ React.createElement("span", { className: "px-2 py-1 rounded border border-ink/30 bg-teastain/60" }, "Cloud sync unavailable: ", !isOnline || bootChecks.cloudSyncUnavailable ? "Yes" : "No"), /* @__PURE__ */ React.createElement("span", { className: "px-2 py-1 rounded border border-ink/30 bg-teastain/60" }, "Sync status: ", syncSummary.status === "pending" ? `Pending (${syncSummary.pendingCount})` : "Synced")), /* @__PURE__ */ React.createElement("div", { className: "flex flex-wrap items-center justify-end gap-2 sm:gap-3" }, /* @__PURE__ */ React.createElement("div", { className: "inline-flex items-center bg-teastain/40 rounded-xl border border-ink/20 p-1.5 shadow-sm" }, /* @__PURE__ */ React.createElement("button", { onClick: () => setView("chart"), className: `px-4 py-1.5 rounded text-xs font-bold transition-all flex items-center gap-2 ${view === "chart" ? "bg-ink text-parchment shadow-sm" : "text-ink/60 hover:text-ink hover:bg-parchment/50"}` }, /* @__PURE__ */ React.createElement(Icon, { name: "Chart", size: 14 }), " ", /* @__PURE__ */ React.createElement("span", { className: "hidden md:inline" }, "Desk Map"), /* @__PURE__ */ React.createElement("span", { className: "md:hidden" }, "Map")), /* @__PURE__ */ React.createElement("button", { onClick: () => setView("master"), className: `px-4 py-1.5 rounded text-xs font-bold transition-all flex items-center gap-2 ${view === "master" ? "bg-ink text-parchment shadow-sm" : "text-ink/60 hover:text-ink hover:bg-parchment/50"}` }, /* @__PURE__ */ React.createElement(Icon, { name: "Clock", size: 14 }), " ", /* @__PURE__ */ React.createElement("span", { className: "hidden md:inline" }, "Runsheet"), /* @__PURE__ */ React.createElement("span", { className: "md:hidden" }, "Runsheet")), /* @__PURE__ */ React.createElement("div", { className: "hidden sm:block w-px h-5 bg-ink/20 mx-1" }), /* @__PURE__ */ React.createElement("button", { onClick: () => setView("flowchart"), className: `px-4 py-1.5 rounded text-xs font-bold transition-all flex items-center gap-2 ${view === "flowchart" ? "bg-sepia text-parchment shadow-sm" : "text-sepia/80 hover:text-sepia hover:bg-parchment/50"}` }, /* @__PURE__ */ React.createElement(Icon, { name: "Flowchart", size: 14 }), " ", /* @__PURE__ */ React.createElement("span", { className: "hidden md:inline" }, "Flow Chart"), /* @__PURE__ */ React.createElement("span", { className: "md:hidden" }, "Flow")), /* @__PURE__ */ React.createElement("button", { onClick: () => setView("research"), className: `px-4 py-1.5 rounded text-xs font-bold transition-all flex items-center gap-2 ${view === "research" ? "bg-fountain text-parchment shadow-sm" : "text-fountain/80 hover:text-fountain hover:bg-parchment/50"}` }, /* @__PURE__ */ React.createElement(Icon, { name: "Users", size: 14 }), " ", /* @__PURE__ */ React.createElement("span", { className: "hidden md:inline" }, "Research Hub"), /* @__PURE__ */ React.createElement("span", { className: "md:hidden" }, "Hub")))), /* @__PURE__ */ React.createElement("div", { className: "inline-flex flex-wrap items-center justify-end gap-1.5 sm:gap-2 bg-parchment/70 rounded-xl border border-ink/20 p-1.5 shadow-sm" }, quickActions.map((action) => /* @__PURE__ */ React.createElement("button", { key: action.key, onClick: action.onClick, className: "px-3 py-1.5 text-xs font-bold text-ink/85 hover:text-ink hover:bg-parchment rounded transition-all flex items-center gap-2", title: action.title }, /* @__PURE__ */ React.createElement(Icon, { name: action.icon, size: 14 }), " ", /* @__PURE__ */ React.createElement("span", null, action.label))), /* @__PURE__ */ React.createElement("span", { className: "px-2 py-1 text-[10px] uppercase tracking-widest rounded border border-ink/20 bg-parchment/60 text-ink/60" }, isSaving ? "Saving\u2026" : "AutoSave On"), /* @__PURE__ */ React.createElement("div", { className: "relative", ref: actionsMenuRef }, /* @__PURE__ */ React.createElement(
+  }, className: "hidden", accept: ".csv" }), /* @__PURE__ */ React.createElement("div", { className: "mt-6" }, /* @__PURE__ */ React.createElement("div", { className: "flex items-center justify-between gap-2" }, /* @__PURE__ */ React.createElement("h2", { className: "text-xs font-bold uppercase tracking-widest text-sepia" }, "Saved Workspaces"), /* @__PURE__ */ React.createElement("button", { "aria-label": "Delete All Workspaces", onClick: handleDeleteAllWorkspaces, className: "px-2 py-1 text-[10px] font-bold border border-stamp/60 text-stamp hover:bg-stamp hover:text-parchment rounded transition-colors" }, "Delete All")), /* @__PURE__ */ React.createElement("div", { className: "mt-2 max-h-[45vh] overflow-auto border border-ink/20 rounded-lg bg-parchment" }, savedProjects.length === 0 ? /* @__PURE__ */ React.createElement("div", { className: "p-4 text-sm text-ink/60" }, "No saved workspaces yet.") : savedProjects.map((p) => /* @__PURE__ */ React.createElement("div", { key: p.id, className: "w-full border-b last:border-b-0 border-ink/10 flex items-center gap-2 p-2 hover:bg-teastain/40" }, /* @__PURE__ */ React.createElement("button", { onClick: () => handleLoadWorkspace(p, false), className: "flex-1 text-left p-1" }, /* @__PURE__ */ React.createElement("div", { className: "font-bold text-sm" }, p.name || "Untitled Workspace"), /* @__PURE__ */ React.createElement("div", { className: "text-[11px] text-ink/60" }, "Updated ", new Date(p.updatedAt || Date.now()).toLocaleString())), /* @__PURE__ */ React.createElement("button", { "aria-label": `Delete Workspace ${p.name || p.id}`, onClick: () => handleDeleteWorkspace(p.id), className: "px-2 py-1 text-[10px] font-bold border border-stamp/60 text-stamp hover:bg-stamp hover:text-parchment transition-colors rounded", title: "Delete workspace" }, "Delete"))))))) : /* @__PURE__ */ React.createElement("div", { className: "h-screen w-screen overflow-hidden flex flex-col relative font-mono text-ink px-3 sm:px-5 py-3 sm:py-4 gap-3" }, /* @__PURE__ */ React.createElement("header", { className: "cyber-header-bg z-40 relative px-4 sm:px-6 py-4 flex justify-between items-start no-print rounded-2xl ink-shadow" }, /* @__PURE__ */ React.createElement("div", { className: "flex flex-col gap-3" }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("h1", { className: "font-serif text-2xl font-black tracking-tight flex items-baseline gap-2" }, "LANDroid", /* @__PURE__ */ React.createElement("span", { className: "text-sm font-normal text-sepia opacity-80 font-mono not-italic" }, "> by Abstract Mapping"))), /* @__PURE__ */ React.createElement("div", { className: "group flex items-center gap-2 flex-wrap" }, /* @__PURE__ */ React.createElement("div", { className: `rubber-stamp bg-parchment shadow-sm ${ownershipHealth.status === "over" ? "error animate-vibrate" : ""}` }, /* @__PURE__ */ React.createElement("span", { className: "opacity-80 text-xs mr-2" }, "Master Total:"), /* @__PURE__ */ React.createElement("span", { className: "text-lg" }, formatMasterFraction(totalRootOwnership))), /* @__PURE__ */ React.createElement("span", { className: `px-2 py-1 text-[10px] border rounded font-bold uppercase tracking-widest ${ownershipHealth.status === "balanced" ? "border-green-700/40 text-green-800 bg-green-100/60" : ownershipHealth.status === "over" ? "border-stamp/60 text-stamp bg-stamp/10" : "border-amber-700/50 text-amber-900 bg-amber-100/70"}` }, ownershipHealth.label, " ", formatMasterFraction(Math.abs(ownershipHealth.delta))))), /* @__PURE__ */ React.createElement("div", { className: "flex flex-col items-end gap-3 pt-1" }, /* @__PURE__ */ React.createElement("div", { className: "flex flex-col items-end gap-1 text-[11px] font-bold" }, /* @__PURE__ */ React.createElement("span", { className: "px-2 py-1 rounded border border-ink/30 bg-teastain/60" }, "Offline mode active: ", bootChecks.offlineModeActive ? "Yes" : "No"), /* @__PURE__ */ React.createElement("span", { className: "px-2 py-1 rounded border border-ink/30 bg-teastain/60" }, "Cloud sync unavailable: ", !isOnline || bootChecks.cloudSyncUnavailable ? "Yes" : "No"), /* @__PURE__ */ React.createElement("span", { className: "px-2 py-1 rounded border border-ink/30 bg-teastain/60" }, "Sync status: ", syncSummary.status === "pending" ? `Pending (${syncSummary.pendingCount})` : "Synced")), /* @__PURE__ */ React.createElement("div", { className: "flex flex-wrap items-center justify-end gap-2 sm:gap-3" }, /* @__PURE__ */ React.createElement("div", { className: "inline-flex items-center bg-teastain/40 rounded-xl border border-ink/20 p-1.5 shadow-sm" }, /* @__PURE__ */ React.createElement("button", { onClick: () => setView("chart"), className: `px-4 py-1.5 rounded text-xs font-bold transition-all flex items-center gap-2 ${view === "chart" ? "bg-ink text-parchment shadow-sm" : "text-ink/60 hover:text-ink hover:bg-parchment/50"}` }, /* @__PURE__ */ React.createElement(Icon, { name: "Chart", size: 14 }), " ", /* @__PURE__ */ React.createElement("span", { className: "hidden md:inline" }, "Desk Map"), /* @__PURE__ */ React.createElement("span", { className: "md:hidden" }, "Map")), /* @__PURE__ */ React.createElement("button", { onClick: () => setView("master"), className: `px-4 py-1.5 rounded text-xs font-bold transition-all flex items-center gap-2 ${view === "master" ? "bg-ink text-parchment shadow-sm" : "text-ink/60 hover:text-ink hover:bg-parchment/50"}` }, /* @__PURE__ */ React.createElement(Icon, { name: "Clock", size: 14 }), " ", /* @__PURE__ */ React.createElement("span", { className: "hidden md:inline" }, "Runsheet"), /* @__PURE__ */ React.createElement("span", { className: "md:hidden" }, "Runsheet")), /* @__PURE__ */ React.createElement("div", { className: "hidden sm:block w-px h-5 bg-ink/20 mx-1" }), /* @__PURE__ */ React.createElement("button", { onClick: () => setView("flowchart"), className: `px-4 py-1.5 rounded text-xs font-bold transition-all flex items-center gap-2 ${view === "flowchart" ? "bg-sepia text-parchment shadow-sm" : "text-sepia/80 hover:text-sepia hover:bg-parchment/50"}` }, /* @__PURE__ */ React.createElement(Icon, { name: "Flowchart", size: 14 }), " ", /* @__PURE__ */ React.createElement("span", { className: "hidden md:inline" }, "Flow Chart"), /* @__PURE__ */ React.createElement("span", { className: "md:hidden" }, "Flow")), /* @__PURE__ */ React.createElement("button", { onClick: () => setView("research"), className: `px-4 py-1.5 rounded text-xs font-bold transition-all flex items-center gap-2 ${view === "research" ? "bg-fountain text-parchment shadow-sm" : "text-fountain/80 hover:text-fountain hover:bg-parchment/50"}` }, /* @__PURE__ */ React.createElement(Icon, { name: "Users", size: 14 }), " ", /* @__PURE__ */ React.createElement("span", { className: "hidden md:inline" }, "Research Hub"), /* @__PURE__ */ React.createElement("span", { className: "md:hidden" }, "Hub")))), /* @__PURE__ */ React.createElement("div", { className: "inline-flex flex-wrap items-center justify-end gap-1.5 sm:gap-2 bg-parchment/70 rounded-xl border border-ink/20 p-1.5 shadow-sm" }, quickActions.map((action) => /* @__PURE__ */ React.createElement("button", { key: action.key, onClick: action.onClick, className: "px-3 py-1.5 text-xs font-bold text-ink/85 hover:text-ink hover:bg-parchment rounded transition-all flex items-center gap-2", title: action.title }, /* @__PURE__ */ React.createElement(Icon, { name: action.icon, size: 14 }), " ", /* @__PURE__ */ React.createElement("span", null, action.label))), /* @__PURE__ */ React.createElement("span", { className: "px-2 py-1 text-[10px] uppercase tracking-widest rounded border border-ink/20 bg-parchment/60 text-ink/60" }, isSaving ? "Saving\u2026" : "AutoSave On"), /* @__PURE__ */ React.createElement("div", { className: "relative", ref: actionsMenuRef }, /* @__PURE__ */ React.createElement(
     "button",
     {
       onClick: () => setShowActionsMenu((prev) => !prev),
@@ -2208,7 +2471,19 @@ Maps updated from embedded workspace payload.`);
     /* @__PURE__ */ React.createElement("option", { value: "move-tree" }, "Move Tree"),
     /* @__PURE__ */ React.createElement("option", { value: "pan" }, "Pan Canvas"),
     /* @__PURE__ */ React.createElement("option", { value: "connect" }, "Link Boxes")
-  )), /* @__PURE__ */ React.createElement("button", { onClick: () => addFlowNode("template"), "aria-label": "Add templated flowchart box", className: "px-2 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-ink bg-parchment hover:bg-teastain flex items-center gap-1 shadow-sm transition-all hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sepia" }, /* @__PURE__ */ React.createElement(Icon, { name: "Plus", size: 12 }), " Box"), /* @__PURE__ */ React.createElement("button", { onClick: () => addFlowNode("blank"), "aria-label": "Add blank note box", className: "px-2 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-ink bg-parchment hover:bg-teastain flex items-center gap-1 shadow-sm transition-all hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sepia" }, /* @__PURE__ */ React.createElement(Icon, { name: "Plus", size: 12 }), " Note"), /* @__PURE__ */ React.createElement("button", { onClick: () => fitFlowToView(), "aria-label": "Fit all flow nodes to view", className: "px-2 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-ink/40 text-ink hover:bg-ink hover:text-parchment flex items-center gap-1 shadow-sm transition-all hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sepia", title: "Recenter and fit all flow nodes to the current canvas" }, /* @__PURE__ */ React.createElement(Icon, { name: "Move", size: 12 }), " Fit View"), /* @__PURE__ */ React.createElement("button", { onClick: handlePrintFlowchart, "aria-label": "Print flowchart", className: "px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-ink bg-ink text-parchment hover:bg-ink/80 flex items-center gap-1 shadow-sm transition-all hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sepia" }, /* @__PURE__ */ React.createElement(Icon, { name: "Printer", size: 12 }), " Print"), /* @__PURE__ */ React.createElement("div", { className: "relative", ref: flowLayoutMenuRef }, /* @__PURE__ */ React.createElement(
+  )), /* @__PURE__ */ React.createElement("button", { onClick: () => addFlowNode("template"), "aria-label": "Add templated flowchart box", className: "px-2 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-ink bg-parchment hover:bg-teastain flex items-center gap-1 shadow-sm transition-all hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sepia" }, /* @__PURE__ */ React.createElement(Icon, { name: "Plus", size: 12 }), " Box"), /* @__PURE__ */ React.createElement("button", { onClick: () => addFlowNode("blank"), "aria-label": "Add blank note box", className: "px-2 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-ink bg-parchment hover:bg-teastain flex items-center gap-1 shadow-sm transition-all hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sepia" }, /* @__PURE__ */ React.createElement(Icon, { name: "Plus", size: 12 }), " Note"), /* @__PURE__ */ React.createElement("button", { onClick: () => fitFlowToView(), "aria-label": "Fit all flow nodes to view", className: "px-2 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-ink/40 text-ink hover:bg-ink hover:text-parchment flex items-center gap-1 shadow-sm transition-all hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sepia", title: "Recenter and fit all flow nodes to the current canvas" }, /* @__PURE__ */ React.createElement(Icon, { name: "Move", size: 12 }), " Fit View"), /* @__PURE__ */ React.createElement("button", { onClick: handlePrintFlowchart, "aria-label": "Print flowchart", className: "px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-ink bg-ink text-parchment hover:bg-ink/80 flex items-center gap-1 shadow-sm transition-all hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sepia" }, /* @__PURE__ */ React.createElement(Icon, { name: "Printer", size: 12 }), " Print"), /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      onClick: () => {
+        const next = !flowGlobalCompact;
+        setFlowGlobalCompact(next);
+        setFlowNodes((nodes2) => nodes2.map((n) => n.type === "template" ? { ...n, compact: next } : n));
+      },
+      "aria-label": flowGlobalCompact ? "Expand all nodes to full view" : "Collapse all nodes to compact view",
+      className: "px-2 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-ink/40 text-ink hover:bg-ink hover:text-parchment flex items-center gap-1 shadow-sm transition-all hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sepia"
+    },
+    flowGlobalCompact ? "Full" : "Compact"
+  ), /* @__PURE__ */ React.createElement("div", { className: "relative", ref: flowLayoutMenuRef }, /* @__PURE__ */ React.createElement(
     "button",
     {
       onClick: () => setShowFlowLayoutMenu((v) => !v),
@@ -2236,23 +2511,130 @@ Maps updated from embedded workspace payload.`);
     const node = flowNodes.find((n) => n.id === selectedFlowNode);
     setFlowForm(node.data);
     setShowFlowEditModal(true);
-  }, className: "w-full py-2 border border-ink mb-2 text-xs font-bold uppercase hover:bg-ink hover:text-parchment transition-colors" }, "Edit Content"), /* @__PURE__ */ React.createElement("div", { className: "mb-2 border border-ink/20 bg-teastain/20 px-2 py-1.5 text-[10px]" }, /* @__PURE__ */ React.createElement("div", { className: "font-bold uppercase tracking-widest text-ink/70 mb-1" }, "Tree Group"), /* @__PURE__ */ React.createElement("label", { className: "flex items-center justify-between gap-2 text-[10px] text-ink" }, /* @__PURE__ */ React.createElement("span", null, "Move as tree group"), /* @__PURE__ */ React.createElement("input", { type: "checkbox", checked: true, readOnly: true, "aria-label": "Move as tree group" })), /* @__PURE__ */ React.createElement("div", { className: "mt-1 font-mono text-[9px] break-all text-ink/70" }, resolveTreeGroupId(flowNodes.find((n) => n.id === selectedFlowNode)))), /* @__PURE__ */ React.createElement("button", { onClick: deleteSelectedFlowElement, className: "w-full py-2 border border-transparent text-stamp hover:border-stamp/50 text-xs font-bold uppercase transition-colors flex items-center justify-center gap-2" }, /* @__PURE__ */ React.createElement(Icon, { name: "Trash", size: 14 }), " Delete Node")), /* @__PURE__ */ React.createElement(
+  }, className: "w-full py-2 border border-ink mb-2 text-xs font-bold uppercase hover:bg-ink hover:text-parchment transition-colors" }, "Edit Content"), /* @__PURE__ */ React.createElement("div", { className: "mb-2 border border-ink/20 bg-teastain/20 px-2 py-1.5 text-[10px]" }, /* @__PURE__ */ React.createElement("div", { className: "font-bold uppercase tracking-widest text-ink/70 mb-1" }, "Tree Group"), /* @__PURE__ */ React.createElement("label", { className: "flex items-center justify-between gap-2 text-[10px] text-ink" }, /* @__PURE__ */ React.createElement("span", null, "Move as tree group"), /* @__PURE__ */ React.createElement("input", { type: "checkbox", checked: true, readOnly: true, "aria-label": "Move as tree group" })), /* @__PURE__ */ React.createElement("div", { className: "mt-1 font-mono text-[9px] break-all text-ink/70" }, resolveTreeGroupId(flowNodes.find((n) => n.id === selectedFlowNode)))), /* @__PURE__ */ React.createElement("button", { onClick: deleteSelectedFlowElement, className: "w-full py-2 border border-transparent text-stamp hover:border-stamp/50 text-xs font-bold uppercase transition-colors flex items-center justify-center gap-2" }, /* @__PURE__ */ React.createElement(Icon, { name: "Trash", size: 14 }), " Delete Node")), clickPopover && /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      className: "fixed z-[300] bg-parchment border border-ink/60 rounded-lg shadow-lg p-3 w-52 animate-fade-in no-print",
+      style: { top: clickPopover.screenY, left: clickPopover.screenX },
+      onPointerDown: (e) => e.stopPropagation(),
+      onClick: (e) => e.stopPropagation()
+    },
+    /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-1 mb-2" }, ["Party", "Conveyance", "Annotation"].map((t) => /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        key: t,
+        onClick: () => setClickPopoverForm((f) => ({ ...f, nodeType: t })),
+        className: `flex-1 py-0.5 text-[9px] font-bold uppercase tracking-widest border transition-colors ${clickPopoverForm.nodeType === t ? "bg-ink text-parchment border-ink" : "bg-parchment text-ink border-ink/30 hover:bg-teastain"}`
+      },
+      t
+    ))),
+    /* @__PURE__ */ React.createElement(
+      "input",
+      {
+        autoFocus: true,
+        type: "text",
+        placeholder: clickPopoverForm.nodeType === "Annotation" ? "Note text..." : "Name...",
+        value: clickPopoverForm.name,
+        onChange: (e) => setClickPopoverForm((f) => ({ ...f, name: e.target.value })),
+        onKeyDown: (e) => {
+          if (e.key === "Enter") confirmClickPlace();
+          if (e.key === "Escape") setClickPopover(null);
+        },
+        className: "w-full border border-ink/40 bg-teastain px-2 py-1.5 text-sm font-serif mb-2 focus:outline-none focus:ring-1 focus:ring-sepia"
+      }
+    ),
+    clickPopoverForm.nodeType !== "Annotation" && /* @__PURE__ */ React.createElement(
+      "input",
+      {
+        type: "text",
+        placeholder: "Acreage (optional)",
+        value: clickPopoverForm.acreage,
+        onChange: (e) => setClickPopoverForm((f) => ({ ...f, acreage: e.target.value })),
+        onKeyDown: (e) => {
+          if (e.key === "Enter") confirmClickPlace();
+          if (e.key === "Escape") setClickPopover(null);
+        },
+        className: "w-full border border-ink/40 bg-teastain px-2 py-1.5 text-xs font-mono mb-2 focus:outline-none focus:ring-1 focus:ring-sepia"
+      }
+    ),
+    /* @__PURE__ */ React.createElement("div", { className: "flex gap-2" }, /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: confirmClickPlace,
+        disabled: !clickPopoverForm.name.trim(),
+        className: "flex-1 py-1.5 border border-ink bg-ink text-parchment text-[10px] font-bold uppercase tracking-widest hover:bg-ink/80 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+      },
+      "\u2713 Place"
+    ), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: () => setClickPopover(null),
+        className: "px-3 py-1.5 border border-ink/40 text-[10px] font-bold uppercase tracking-widest hover:bg-teastain transition-colors"
+      },
+      "\u2715"
+    ))
+  ), ctxMenu && /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      className: "fixed z-[300] bg-parchment border border-ink/40 shadow-lg rounded-lg overflow-hidden",
+      style: { top: ctxMenu.y, left: ctxMenu.x },
+      onPointerDown: (e) => e.stopPropagation()
+    },
+    flowNodes.find((n) => n.id === ctxMenu.nodeId)?.type === "template" && /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        className: "w-full px-4 py-2 text-left text-[11px] font-mono hover:bg-teastain transition-colors whitespace-nowrap",
+        onClick: () => {
+          const node = flowNodes.find((n) => n.id === ctxMenu.nodeId);
+          setFlowNodes((nodes2) => nodes2.map((n) => n.id === ctxMenu.nodeId ? { ...n, compact: !node.compact } : n));
+          setCtxMenu(null);
+        }
+      },
+      flowNodes.find((n) => n.id === ctxMenu.nodeId)?.compact ? "Show Full" : "Show Compact"
+    ),
+    /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        className: "w-full px-4 py-2 text-left text-[11px] font-mono hover:bg-teastain transition-colors whitespace-nowrap",
+        onClick: () => setCtxMenu(null)
+      },
+      "Close"
+    )
+  ), /* @__PURE__ */ React.createElement(
     "div",
     {
       ref: flowCanvasRef,
       className: `flex-1 relative overflow-hidden no-print ${flowTool === "pan" ? "cursor-grab active:cursor-grabbing" : flowTool === "move-tree" ? "cursor-move" : flowTool === "connect" ? "cursor-crosshair" : "cursor-default"}`,
       onPointerDown: (e) => {
+        canvasPointerDownPos.current = { x: e.clientX, y: e.clientY };
         if (flowTool === "pan" || flowTool === "move-tree") handleFlowPointerDown(e);
       },
       onPointerMove: handleFlowPointerMove,
       onPointerUp: handleFlowPointerUp,
       onPointerCancel: handleFlowPointerUp,
       onWheel: handleFlowWheel,
-      onClick: () => flowTool === "select" && setSelectedFlowNode(null)
+      onClick: (e) => {
+        setCtxMenu(null);
+        if (clickPopover) {
+          setClickPopover(null);
+          return;
+        }
+        if (flowTool === "select") setSelectedFlowNode(null);
+        const p = canvasPointerDownPos.current;
+        const moved = p && (Math.abs(e.clientX - p.x) > 5 || Math.abs(e.clientY - p.y) > 5);
+        if (!moved && flowTool === "select" && !e.target.closest(".flow-node") && !e.target.closest(".flow-ui")) {
+          const rect = document.getElementById("tree-scaler")?.getBoundingClientRect();
+          if (rect) {
+            setClickPopover({ screenX: e.clientX, screenY: e.clientY, worldX: (e.clientX - rect.left) / (flowPz.scale * treeScale), worldY: (e.clientY - rect.top) / (flowPz.scale * treeScale) });
+            setClickPopoverForm({ name: "", acreage: "", nodeType: "Party" });
+          }
+        }
+      }
     },
     /* @__PURE__ */ React.createElement(
       "div",
       {
+        ref: flowPanZoomLayerRef,
         className: "absolute top-0 left-0 pan-zoom-layer",
         style: { transform: `translate(${flowPz.x}px, ${flowPz.y}px) scale(${flowPz.scale})`, transformOrigin: "0 0" }
       },
@@ -2261,8 +2643,8 @@ Maps updated from embedded workspace payload.`);
         {
           className: "paper-visual bg-parchment shadow-[12px_12px_0px_rgba(26,26,27,0.2)] relative border border-ink",
           style: {
-            width: pw * gridCols,
-            height: ph * gridRows
+            width: Math.max(pw * gridCols, flowContentBounds.w),
+            height: Math.max(ph * gridRows, flowContentBounds.h)
           }
         },
         /* @__PURE__ */ React.createElement("div", { className: "absolute inset-0 pointer-events-none z-30 overflow-hidden" }, Array.from({ length: gridCols - 1 }).map((_, i) => /* @__PURE__ */ React.createElement("div", { key: `v-${i}`, className: "absolute top-0 bottom-0 border-l-[2px] border-dashed border-stamp/40", style: { left: (i + 1) * pw } })), Array.from({ length: gridRows - 1 }).map((_, i) => /* @__PURE__ */ React.createElement("div", { key: `h-${i}`, className: "absolute left-0 right-0 border-t-[2px] border-dashed border-stamp/40", style: { top: (i + 1) * ph } })), /* @__PURE__ */ React.createElement("div", { className: "absolute inset-0 border border-dashed border-ink/30 m-8 flex items-end justify-end p-2" }, /* @__PURE__ */ React.createElement("div", { className: "text-ink/50 font-bold text-[10px] uppercase tracking-widest text-right bg-parchment px-2" }, "Print Boundary (", gridCols, "x", gridRows, " ", printOrientation, ")"))),
@@ -2278,7 +2660,7 @@ Maps updated from embedded workspace payload.`);
       )
     )
   ), isPrinting && /* @__PURE__ */ React.createElement("div", { className: "print-only w-full" }, Array.from({ length: gridRows }).map(
-    (_, r) => Array.from({ length: gridCols }).map((_2, c) => /* @__PURE__ */ React.createElement("div", { key: `print-page-${r}-${c}`, className: "print-page-break bg-white", style: { width: pw + "px", height: ph + "px" } }, /* @__PURE__ */ React.createElement("div", { className: "absolute", style: { top: -(r * ph) + "px", left: -(c * pw) + "px", width: pw * gridCols + "px", height: ph * gridRows + "px" } }, /* @__PURE__ */ React.createElement("div", { style: { transform: `scale(${treeScale})`, transformOrigin: "0 0", width: "100%", height: "100%" } }, renderTree(false)))))
+    (_, r) => Array.from({ length: gridCols }).map((_2, c) => /* @__PURE__ */ React.createElement("div", { key: `print-page-${r}-${c}`, className: "print-page-break bg-white", style: { width: pw + "px", height: ph + "px" } }, r === 0 && c === 0 && /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", top: 16, left: 20, zIndex: 100, background: "white", padding: "5px 10px", borderLeft: "3px solid #1A1A1B" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 900, fontFamily: "Georgia, serif", color: "#1A1A1B" } }, projectName), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, fontFamily: "Courier Prime, monospace", color: "#1A1A1B", opacity: 0.6 } }, "Flowchart \xB7 ", (/* @__PURE__ */ new Date()).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }))), /* @__PURE__ */ React.createElement("div", { className: "absolute", style: { top: -(r * ph) + "px", left: -(c * pw) + "px", width: pw * gridCols + "px", height: ph * gridRows + "px" } }, /* @__PURE__ */ React.createElement("div", { style: { transform: `scale(${treeScale})`, transformOrigin: "0 0", width: "100%", height: "100%" } }, /* @__PURE__ */ React.createElement("div", { style: { transform: `translate(${-printOffset.x}px, ${-printOffset.y}px)` } }, renderTree(false, true))))))
   )), showFlowEditModal && flowForm && /* @__PURE__ */ React.createElement("div", { className: "absolute inset-0 bg-ink/50 backdrop-blur-sm z-[200] flex items-center justify-center p-4 animate-fade-in no-print pointer-events-auto" }, /* @__PURE__ */ React.createElement("div", { className: "bg-parchment border border-ink p-6 w-full max-w-md ink-shadow-lg flex flex-col gap-4 animate-slide-up" }, /* @__PURE__ */ React.createElement("h3", { className: "font-serif font-black text-xl border-b-[2px] border-ink pb-2" }, "Edit Canvas Element"), flowNodes.find((n) => n.id === selectedFlowNode)?.type === "template" ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { className: "text-[10px] font-bold uppercase tracking-widest block mb-1" }, "Instrument Title"), /* @__PURE__ */ React.createElement("input", { type: "text", className: "w-full border border-ink p-2 bg-teastain", value: flowForm.title, onChange: (e) => setFlowForm({ ...flowForm, title: e.target.value }) })), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { className: "text-[10px] font-bold uppercase tracking-widest block mb-1" }, "Grantee"), /* @__PURE__ */ React.createElement("input", { type: "text", className: "w-full border border-ink p-2 bg-teastain font-serif font-bold", value: flowForm.grantee, onChange: (e) => setFlowForm({ ...flowForm, grantee: e.target.value }) })), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { className: "text-[10px] font-bold uppercase tracking-widest block mb-1" }, "Grantor"), /* @__PURE__ */ React.createElement("input", { type: "text", className: "w-full border border-ink p-2 bg-teastain", value: flowForm.grantor, onChange: (e) => setFlowForm({ ...flowForm, grantor: e.target.value }) })), /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-2 gap-4" }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { className: "text-[10px] font-bold uppercase tracking-widest block mb-1" }, "Date / Vol / Page"), /* @__PURE__ */ React.createElement("input", { type: "text", className: "w-full border border-ink p-2 bg-teastain", value: flowForm.details, onChange: (e) => setFlowForm({ ...flowForm, details: e.target.value }) })), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { className: "text-[10px] font-bold uppercase tracking-widest block mb-1" }, "Fraction"), /* @__PURE__ */ React.createElement("input", { type: "text", className: "w-full border border-ink p-2 bg-teastain font-mono", value: flowForm.fraction, onChange: (e) => setFlowForm({ ...flowForm, fraction: e.target.value }) })))) : /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { className: "text-[10px] font-bold uppercase tracking-widest block mb-1" }, "Text Content"), /* @__PURE__ */ React.createElement("textarea", { className: "w-full border border-ink p-2 bg-teastain h-32 font-serif resize-y", value: flowForm.text, onChange: (e) => setFlowForm({ ...flowForm, text: e.target.value }) }), /* @__PURE__ */ React.createElement("label", { className: "text-[10px] font-bold uppercase tracking-widest block mt-4 mb-1" }, "Box Width: ", flowForm.width || 280, "px"), /* @__PURE__ */ React.createElement("input", { type: "range", min: "150", max: "800", value: flowForm.width || 280, onChange: (e) => setFlowForm({ ...flowForm, width: parseInt(e.target.value) }), className: "w-full accent-sepia cursor-pointer" })), /* @__PURE__ */ React.createElement("div", { className: "flex justify-end gap-2 mt-2" }, /* @__PURE__ */ React.createElement("button", { onClick: () => setShowFlowEditModal(false), className: "px-4 py-2 border border-ink/30 text-xs font-bold uppercase tracking-widest hover:border-stamp/50 hover:text-stamp transition-colors" }, "Cancel"), /* @__PURE__ */ React.createElement("button", { onClick: commitFlowEdit, className: "px-6 py-2 bg-sepia/10 text-sepia border border-sepia/40 text-xs font-bold uppercase tracking-widest hover:-translate-y-0.5 transition-all" }, "Save")))))), showModal && /* @__PURE__ */ React.createElement("div", { className: "fixed inset-0 bg-ink/80 backdrop-blur-md z-[100] flex items-center justify-center p-4 sm:p-6 animate-fade-in font-mono text-ink" }, /* @__PURE__ */ React.createElement("div", { ref: modalRef, tabIndex: -1, onKeyDown: handleModalKeyDown, className: "bg-parchment border border-ink ink-shadow-lg w-full max-w-5xl overflow-hidden flex flex-col max-h-full animate-slide-up outline-none" }, /* @__PURE__ */ React.createElement("div", { className: `px-8 py-6 flex justify-between items-center border-b-[2px] border-ink ${modalMode === "convey" ? "bg-sepia text-parchment" : modalMode === "add_related" ? "bg-fountain text-parchment" : modalMode === "attach" ? "bg-fountain text-parchment" : modalMode === "precede" ? "bg-ink text-parchment" : modalMode === "rebalance" ? "bg-fountain text-parchment" : modalMode === "add_unlinked" ? "bg-fountain text-parchment" : modalMode === "add_chain" ? "bg-fountain text-parchment" : "bg-ink text-parchment"}` }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("h2", { className: "text-xl font-serif font-black tracking-tight text-parchment" }, modalMode === "edit" ? "Update Record" : modalMode === "add_related" ? "Attach Related Document" : modalMode === "attach" ? "Link Imported Document to Lineage" : modalMode === "precede" ? "Insert Preceding Record" : modalMode === "rebalance" ? "Rebalance Branch Ownership" : modalMode === "add_unlinked" ? "Add Loose Document" : modalMode === "add_chain" ? "Start New Title Chain" : "Convey Title Link"), /* @__PURE__ */ React.createElement("p", { className: "text-[10px] opacity-80 uppercase font-bold tracking-widest mt-1" }, modalMode === "add_related" ? "Non-Conveying Title Work (e.g., Probates, Affidavits)" : modalMode === "add_unlinked" ? "Parking lot record to be attached to the main lineage later" : modalMode === "add_chain" ? "Independent starting point for a separate lineage map" : "Protocol Lineage Analysis & Net-interest Database")), /* @__PURE__ */ React.createElement("button", { onClick: () => setShowModal(false), className: "border border-transparent hover:border-current p-2 rounded-sm transition-all" }, /* @__PURE__ */ React.createElement(Icon, { name: "Close", size: 20 }))), /* @__PURE__ */ React.createElement("div", { className: "p-8 overflow-y-auto custom-scrollbar flex-1 bg-parchment" }, /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-6 gap-6" }, modalMode === "attach" && /* @__PURE__ */ React.createElement("div", { className: "col-span-6 bg-teastain border border-ink p-5 mb-2 shadow-inner" }, /* @__PURE__ */ React.createElement("div", { className: "flex flex-col sm:flex-row gap-6" }, /* @__PURE__ */ React.createElement("div", { className: "flex-1" }, /* @__PURE__ */ React.createElement("label", { className: "text-[10px] font-bold uppercase mb-1.5 block tracking-widest" }, "Select Parent Title Link"), /* @__PURE__ */ React.createElement("select", { className: "w-full border border-ink rounded-sm p-3 bg-teastain outline-none font-bold", value: attachParentId, onChange: (e) => setAttachParentId(e.target.value) }, nodes.filter((n) => n.parentId !== "unlinked" && n.id !== activeNode?.id).map((n) => /* @__PURE__ */ React.createElement("option", { key: n.id, value: n.id }, n.instrument, " - ", n.grantee, " (", n.date, ")")))), /* @__PURE__ */ React.createElement("div", { className: "w-full sm:w-1/3" }, /* @__PURE__ */ React.createElement("label", { className: "text-[10px] font-bold uppercase mb-1.5 block tracking-widest" }, "Attachment Type"), /* @__PURE__ */ React.createElement("select", { className: "w-full border border-ink rounded-sm p-3 bg-teastain outline-none font-bold", value: attachType, onChange: (e) => setAttachType(e.target.value) }, /* @__PURE__ */ React.createElement("option", { value: "conveyance" }, "Conveyance (Math Engine)"), /* @__PURE__ */ React.createElement("option", { value: "related" }, "Related Branch Doc")))), attachType === "conveyance" && /* @__PURE__ */ React.createElement("div", { className: `mt-4 border p-3 text-xs ${attachImpact?.valid ? "border-ink/40 bg-parchment/80" : "border-stamp/40 bg-stamp/10 text-stamp"}` }, /* @__PURE__ */ React.createElement("div", { className: "text-[10px] uppercase tracking-widest font-bold mb-2" }, "Attach Impact Preview"), attachImpact?.valid ? /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 font-mono" }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", { className: "opacity-60" }, "Destination:"), " ", attachImpact.destinationName), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", { className: "opacity-60" }, "Destination Balance:"), " ", formatFraction(attachImpact.destinationBefore), " \u2192 ", formatFraction(attachImpact.destinationAfter)), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", { className: "opacity-60" }, "Attached Root:"), " ", formatFraction(attachImpact.rootBefore), " \u2192 ", formatFraction(attachImpact.rootAfter)), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", { className: "opacity-60" }, "Scale Factor:"), " ", attachImpact.scaleFactor.toFixed(6), "x"), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", { className: "opacity-60" }, "Descendants Updated:"), " ", attachImpact.descendantCount)) : /* @__PURE__ */ React.createElement("div", { className: "font-bold" }, attachImpact?.reason || "Select a valid destination to preview impact."))), /* @__PURE__ */ React.createElement("div", { className: "col-span-6 sm:col-span-3" }, /* @__PURE__ */ React.createElement("label", { className: "text-[10px] font-bold uppercase mb-1.5 block tracking-wider text-sepia/80" }, "Instrument (B)"), isAddingInst ? /* @__PURE__ */ React.createElement("div", { className: "flex gap-2" }, /* @__PURE__ */ React.createElement("input", { type: "text", className: "flex-1 border border-ink rounded-sm p-3 bg-teastain focus:ring-2 focus:ring-sepia outline-none font-bold", value: newInst, onChange: (e) => setNewInst(e.target.value), placeholder: "New Instrument Type...", autoFocus: true }), /* @__PURE__ */ React.createElement("button", { onClick: () => {
     if (newInst.trim() && !instrumentList.includes(newInst.trim())) {
       setInstrumentList([...instrumentList, newInst.trim()]);
@@ -2362,7 +2744,7 @@ Maps updated from embedded workspace payload.`);
       onFocus: (e) => e.target.select(),
       onChange: (e) => setForm({ ...form, initialFraction: parseFloat(e.target.value) || 0 })
     }
-  ), /* @__PURE__ */ React.createElement("p", { className: "text-[9px] opacity-60 mt-2 font-mono uppercase tracking-wider max-w-[320px]" }, "Rebalance this record and every descendant proportionally without inserting a predecessor record.")), /* @__PURE__ */ React.createElement("div", { className: "flex flex-col sm:items-end gap-3 w-full sm:w-auto mt-4 sm:mt-0" }, /* @__PURE__ */ React.createElement("div", { className: "px-4 py-3 border bg-parchment border-ink text-left sm:text-right w-full" }, /* @__PURE__ */ React.createElement("div", { className: "text-[9px] font-black uppercase tracking-widest mb-1 opacity-60" }, "Branch Scale Preview"), /* @__PURE__ */ React.createElement("div", { className: "font-mono text-xs flex items-center sm:justify-end gap-2" }, /* @__PURE__ */ React.createElement("span", null, formatFraction(rebalanceImpact?.oldInitialFraction)), /* @__PURE__ */ React.createElement("span", { className: "opacity-40" }, "\u2192"), /* @__PURE__ */ React.createElement("span", null, formatFraction(rebalanceImpact?.newInitialFraction)), /* @__PURE__ */ React.createElement("span", { className: "opacity-40" }, "(x"), /* @__PURE__ */ React.createElement("span", { className: "font-bold" }, rebalanceImpact?.scaleFactor?.toFixed(6)), /* @__PURE__ */ React.createElement("span", { className: "opacity-40" }, ")"))), /* @__PURE__ */ React.createElement("div", { className: "px-4 py-3 border bg-parchment border-ink text-left sm:text-right w-full" }, /* @__PURE__ */ React.createElement("div", { className: "text-[9px] font-black uppercase tracking-widest mb-1 opacity-60" }, "Parent Balance Preview"), /* @__PURE__ */ React.createElement("div", { className: "font-mono text-xs flex items-center sm:justify-end gap-2" }, /* @__PURE__ */ React.createElement("span", null, formatFraction(rebalanceImpact?.parentBefore)), /* @__PURE__ */ React.createElement("span", { className: "opacity-40" }, "\u2192"), /* @__PURE__ */ React.createElement("span", { className: "font-bold" }, formatFraction(rebalanceImpact?.parentAfter)))), /* @__PURE__ */ React.createElement("div", { className: "text-[10px] uppercase font-bold text-sepia/60 tracking-widest" }, "Descendants Updated: ", rebalanceImpact?.descendantCount || 0)))), (modalMode === "edit" || modalMode === "add_chain") && form.type !== "related" && form.parentId !== "unlinked" && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { className: "col-span-3" }, /* @__PURE__ */ React.createElement("label", { className: "text-[10px] font-bold text-sepia uppercase mb-1.5 block tracking-widest" }, "Initial Granted Share ", modalMode === "edit" ? "(Rebalances branch)" : ""), /* @__PURE__ */ React.createElement("input", { type: "number", step: "0.0000000001", className: "w-full border border-ink p-3 bg-teastain font-bold focus:ring-2 focus:ring-sepia outline-none", value: form.initialFraction === 0 ? "" : form.initialFraction, onFocus: (e) => e.target.select(), onChange: (e) => setForm({ ...form, initialFraction: parseFloat(e.target.value) || 0 }) })), /* @__PURE__ */ React.createElement("div", { className: "col-span-3" }, /* @__PURE__ */ React.createElement("label", { className: "text-[10px] font-bold text-sepia uppercase mb-1.5 block tracking-widest" }, "Remaining Retained Share ", /* @__PURE__ */ React.createElement("span", { className: "normal-case text-sepia/60" }, "(derived \xB7 read-only)")), /* @__PURE__ */ React.createElement("div", { className: "w-full border border-ink/40 p-3 bg-teastain/50 font-bold font-mono text-sm text-sepia/80 select-none" }, formatFraction(activeNode?.fraction ?? form.fraction)))), /* @__PURE__ */ React.createElement("div", { className: "col-span-6 pt-2" }, /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-4 p-4 border border-dashed border-ink bg-teastain hover:bg-[#D9D1BF] transition-colors" }, /* @__PURE__ */ React.createElement("div", { className: "bg-teastain p-3 border border-sepia/30" }, /* @__PURE__ */ React.createElement(Icon, { name: "Upload", size: 20 })), /* @__PURE__ */ React.createElement("div", { className: "flex-1" }, /* @__PURE__ */ React.createElement("h4", { className: "text-sm font-bold text-sepia/80" }, "Vault PDF Link"), /* @__PURE__ */ React.createElement("p", { className: "text-[10px] text-sepia/60 mt-0.5" }, "Uploading automatically populates the Inst No. field.")), /* @__PURE__ */ React.createElement("input", { type: "file", ref: modalUploadRef, onChange: handleDocSelection, accept: ".pdf", className: "hidden" }), /* @__PURE__ */ React.createElement("div", { className: "flex gap-2" }, form.docData && /* @__PURE__ */ React.createElement("button", { onClick: () => setViewerData(form.docData), className: "px-4 py-2 bg-teastain border border-ink font-bold text-xs hover:border-sepia hover:text-sepia flex items-center gap-2 transition-colors" }, /* @__PURE__ */ React.createElement(Icon, { name: "Eye", size: 14 }), " View"), /* @__PURE__ */ React.createElement("button", { onClick: () => modalUploadRef.current.click(), className: "px-6 py-2 bg-sepia/10 text-sepia border border-sepia/40 font-bold uppercase text-xs hover:bg-sepia/20 transition-all tracking-widest" }, "Browse")))))), /* @__PURE__ */ React.createElement("div", { className: "p-6 bg-parchment border-t border-ink flex gap-4" }, /* @__PURE__ */ React.createElement("button", { onClick: handleCommit, className: `flex-1 py-4 text-parchment font-black uppercase tracking-widest transition-all border border-ink hover:-translate-y-0.5 ${modalMode === "edit" ? "bg-ink" : modalMode === "add_related" ? "bg-fountain" : modalMode === "attach" ? "bg-fountain" : modalMode === "precede" ? "bg-ink" : modalMode === "rebalance" ? "bg-fountain" : modalMode === "add_unlinked" ? "bg-fountain" : modalMode === "add_chain" ? "bg-fountain" : "bg-sepia"}` }, "Commit ", modalMode === "add_related" ? "Document" : modalMode === "attach" ? "Linked Record" : modalMode === "precede" ? "Predecessor" : modalMode === "rebalance" ? "Rebalance" : modalMode === "add_unlinked" ? "Loose Record" : modalMode === "add_chain" ? "New Chain" : "Transaction"), /* @__PURE__ */ React.createElement("button", { onClick: () => setShowModal(false), className: "px-10 py-4 bg-teastain border border-ink hover:border-stamp hover:text-stamp font-bold uppercase tracking-widest transition-colors hover:-translate-y-0.5" }, "Cancel")))), confirmAction && /* @__PURE__ */ React.createElement("div", { className: "fixed inset-0 bg-ink/80 backdrop-blur-md z-[300] flex items-center justify-center p-4 animate-fade-in font-mono text-ink no-print" }, /* @__PURE__ */ React.createElement("div", { className: "bg-parchment border border-stamp/40 p-8 ink-shadow-lg max-w-sm w-full text-center animate-slide-up" }, /* @__PURE__ */ React.createElement("div", { className: "text-stamp flex items-center justify-center mx-auto mb-4 border border-stamp/50 w-16 h-16 bg-stamp/10" }, /* @__PURE__ */ React.createElement(Icon, { name: "Trash", size: 32 })), /* @__PURE__ */ React.createElement("h3", { className: "text-xl font-serif font-black mb-2 text-stamp" }, confirmAction.title), /* @__PURE__ */ React.createElement("p", { className: "text-sm opacity-70 mb-8 leading-relaxed" }, confirmAction.message), /* @__PURE__ */ React.createElement("div", { className: "flex gap-3" }, /* @__PURE__ */ React.createElement("button", { onClick: () => setConfirmAction(null), className: "flex-1 py-3 border border-ink bg-teastain hover:bg-ink hover:text-parchment font-bold transition-colors uppercase tracking-widest text-xs " }, "Cancel"), /* @__PURE__ */ React.createElement("button", { onClick: () => {
+  ), /* @__PURE__ */ React.createElement("p", { className: "text-[9px] opacity-60 mt-2 font-mono uppercase tracking-wider max-w-[320px]" }, "Rebalance this record and every descendant proportionally without inserting a predecessor record.")), /* @__PURE__ */ React.createElement("div", { className: "flex flex-col sm:items-end gap-3 w-full sm:w-auto mt-4 sm:mt-0" }, /* @__PURE__ */ React.createElement("div", { className: "px-4 py-3 border bg-parchment border-ink text-left sm:text-right w-full" }, /* @__PURE__ */ React.createElement("div", { className: "text-[9px] font-black uppercase tracking-widest mb-1 opacity-60" }, "Branch Scale Preview"), /* @__PURE__ */ React.createElement("div", { className: "font-mono text-xs flex items-center sm:justify-end gap-2" }, /* @__PURE__ */ React.createElement("span", null, formatFraction(rebalanceImpact?.oldInitialFraction)), /* @__PURE__ */ React.createElement("span", { className: "opacity-40" }, "\u2192"), /* @__PURE__ */ React.createElement("span", null, formatFraction(rebalanceImpact?.newInitialFraction)), /* @__PURE__ */ React.createElement("span", { className: "opacity-40" }, "(x"), /* @__PURE__ */ React.createElement("span", { className: "font-bold" }, rebalanceImpact?.scaleFactor?.toFixed(6)), /* @__PURE__ */ React.createElement("span", { className: "opacity-40" }, ")"))), /* @__PURE__ */ React.createElement("div", { className: "px-4 py-3 border bg-parchment border-ink text-left sm:text-right w-full" }, /* @__PURE__ */ React.createElement("div", { className: "text-[9px] font-black uppercase tracking-widest mb-1 opacity-60" }, "Parent Balance Preview"), /* @__PURE__ */ React.createElement("div", { className: "font-mono text-xs flex items-center sm:justify-end gap-2" }, /* @__PURE__ */ React.createElement("span", null, formatFraction(rebalanceImpact?.parentBefore)), /* @__PURE__ */ React.createElement("span", { className: "opacity-40" }, "\u2192"), /* @__PURE__ */ React.createElement("span", { className: "font-bold" }, formatFraction(rebalanceImpact?.parentAfter)))), /* @__PURE__ */ React.createElement("div", { className: "text-[10px] uppercase font-bold text-sepia/60 tracking-widest" }, "Descendants Updated: ", rebalanceImpact?.descendantCount || 0)))), (modalMode === "edit" || modalMode === "add_chain") && form.type !== "related" && form.parentId !== "unlinked" && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { className: "col-span-3" }, /* @__PURE__ */ React.createElement("label", { className: "text-[10px] font-bold text-sepia uppercase mb-1.5 block tracking-widest" }, "Initial Granted Share ", modalMode === "edit" ? "(Rebalances branch)" : ""), /* @__PURE__ */ React.createElement("input", { type: "number", step: "0.0000000001", className: "w-full border border-ink p-3 bg-teastain font-bold focus:ring-2 focus:ring-sepia outline-none", value: form.initialFraction === 0 ? "" : form.initialFraction, onFocus: (e) => e.target.select(), onChange: (e) => setForm({ ...form, initialFraction: parseFloat(e.target.value) || 0 }) })), /* @__PURE__ */ React.createElement("div", { className: "col-span-3" }, /* @__PURE__ */ React.createElement("label", { className: "text-[10px] font-bold text-sepia uppercase mb-1.5 block tracking-widest" }, "Remaining Retained Share ", /* @__PURE__ */ React.createElement("span", { className: "normal-case text-sepia/60" }, "(derived \xB7 read-only)")), /* @__PURE__ */ React.createElement("div", { className: "w-full border border-ink/40 p-3 bg-teastain/50 font-bold font-mono text-sm text-sepia/80 select-none" }, formatFraction(!activeNode?.parentId ? Math.max(0, 1 - clampFraction(form.initialFraction)) : activeNode?.fraction ?? form.fraction)))), /* @__PURE__ */ React.createElement("div", { className: "col-span-6 pt-2" }, /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-4 p-4 border border-dashed border-ink bg-teastain hover:bg-[#D9D1BF] transition-colors" }, /* @__PURE__ */ React.createElement("div", { className: "bg-teastain p-3 border border-sepia/30" }, /* @__PURE__ */ React.createElement(Icon, { name: "Upload", size: 20 })), /* @__PURE__ */ React.createElement("div", { className: "flex-1" }, /* @__PURE__ */ React.createElement("h4", { className: "text-sm font-bold text-sepia/80" }, "Vault PDF Link"), /* @__PURE__ */ React.createElement("p", { className: "text-[10px] text-sepia/60 mt-0.5" }, "Uploading automatically populates the Inst No. field.")), /* @__PURE__ */ React.createElement("input", { type: "file", ref: modalUploadRef, onChange: handleDocSelection, accept: ".pdf", className: "hidden" }), /* @__PURE__ */ React.createElement("div", { className: "flex gap-2" }, form.docData && /* @__PURE__ */ React.createElement("button", { onClick: () => setViewerData(form.docData), className: "px-4 py-2 bg-teastain border border-ink font-bold text-xs hover:border-sepia hover:text-sepia flex items-center gap-2 transition-colors" }, /* @__PURE__ */ React.createElement(Icon, { name: "Eye", size: 14 }), " View"), /* @__PURE__ */ React.createElement("button", { onClick: () => modalUploadRef.current.click(), className: "px-6 py-2 bg-sepia/10 text-sepia border border-sepia/40 font-bold uppercase text-xs hover:bg-sepia/20 transition-all tracking-widest" }, "Browse")))))), /* @__PURE__ */ React.createElement("div", { className: "p-6 bg-parchment border-t border-ink flex gap-4" }, /* @__PURE__ */ React.createElement("button", { onClick: handleCommit, className: `flex-1 py-4 text-parchment font-black uppercase tracking-widest transition-all border border-ink hover:-translate-y-0.5 ${modalMode === "edit" ? "bg-ink" : modalMode === "add_related" ? "bg-fountain" : modalMode === "attach" ? "bg-fountain" : modalMode === "precede" ? "bg-ink" : modalMode === "rebalance" ? "bg-fountain" : modalMode === "add_unlinked" ? "bg-fountain" : modalMode === "add_chain" ? "bg-fountain" : "bg-sepia"}` }, "Commit ", modalMode === "add_related" ? "Document" : modalMode === "attach" ? "Linked Record" : modalMode === "precede" ? "Predecessor" : modalMode === "rebalance" ? "Rebalance" : modalMode === "add_unlinked" ? "Loose Record" : modalMode === "add_chain" ? "New Chain" : "Transaction"), /* @__PURE__ */ React.createElement("button", { onClick: () => setShowModal(false), className: "px-10 py-4 bg-teastain border border-ink hover:border-stamp hover:text-stamp font-bold uppercase tracking-widest transition-colors hover:-translate-y-0.5" }, "Cancel")))), confirmAction && /* @__PURE__ */ React.createElement("div", { className: "fixed inset-0 bg-ink/80 backdrop-blur-md z-[300] flex items-center justify-center p-4 animate-fade-in font-mono text-ink no-print" }, /* @__PURE__ */ React.createElement("div", { className: "bg-parchment border border-stamp/40 p-8 ink-shadow-lg max-w-sm w-full text-center animate-slide-up" }, /* @__PURE__ */ React.createElement("div", { className: "text-stamp flex items-center justify-center mx-auto mb-4 border border-stamp/50 w-16 h-16 bg-stamp/10" }, /* @__PURE__ */ React.createElement(Icon, { name: "Trash", size: 32 })), /* @__PURE__ */ React.createElement("h3", { className: "text-xl font-serif font-black mb-2 text-stamp" }, confirmAction.title), /* @__PURE__ */ React.createElement("p", { className: "text-sm opacity-70 mb-8 leading-relaxed" }, confirmAction.message), /* @__PURE__ */ React.createElement("div", { className: "flex gap-3" }, /* @__PURE__ */ React.createElement("button", { onClick: () => setConfirmAction(null), className: "flex-1 py-3 border border-ink bg-teastain hover:bg-ink hover:text-parchment font-bold transition-colors uppercase tracking-widest text-xs " }, "Cancel"), /* @__PURE__ */ React.createElement("button", { onClick: () => {
     confirmAction.onConfirm();
     setConfirmAction(null);
   }, className: "flex-1 py-3 border border-stamp/50 bg-stamp/20 text-stamp font-bold hover:bg-stamp/30 transition-colors uppercase tracking-widest text-xs" }, confirmAction.actionText)))), viewerData && /* @__PURE__ */ React.createElement("div", { className: "fixed inset-0 bg-ink/90 backdrop-blur-md z-[200] flex flex-col items-center justify-center p-4 sm:p-8 animate-fade-in font-mono no-print" }, /* @__PURE__ */ React.createElement("div", { className: "w-full max-w-7xl h-full flex flex-col bg-parchment border border-ink ink-shadow-lg" }, /* @__PURE__ */ React.createElement("div", { className: "bg-teastain p-4 text-sepia flex justify-between items-center border-b border-ink" }, /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-3" }, /* @__PURE__ */ React.createElement("div", { className: "border border-ink p-2 bg-parchment" }, /* @__PURE__ */ React.createElement(Icon, { name: "FileText", size: 20 })), /* @__PURE__ */ React.createElement("span", { className: "text-base font-serif font-black tracking-tight uppercase text-sepia" }, "Vault Viewport")), /* @__PURE__ */ React.createElement("button", { onClick: () => setViewerData(null), className: "p-2 border border-transparent hover:border-ink transition-colors" }, /* @__PURE__ */ React.createElement(Icon, { name: "Close", size: 20 }))), /* @__PURE__ */ React.createElement("object", { data: viewerData, type: "application/pdf", className: "w-full h-full border-none bg-[#111d2d]" }, /* @__PURE__ */ React.createElement("div", { className: "flex flex-col items-center justify-center h-full p-20 text-center bg-teastain text-ink" }, /* @__PURE__ */ React.createElement(Icon, { name: "FileText", size: 48, className: "opacity-50 mb-4" }), /* @__PURE__ */ React.createElement("p", { className: "opacity-70 mb-6 font-bold" }, "Your browser does not support inline PDFs."), /* @__PURE__ */ React.createElement("a", { href: viewerData, target: "_blank", className: "bg-ink text-parchment px-8 py-3 border border-ink font-bold transition-colors " }, "Open External Tab")))))));

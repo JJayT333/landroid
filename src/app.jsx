@@ -148,18 +148,16 @@ const Icon = ({ name, size = 18, className = "" }) => {
             
             // PERFORMANCE: Defer massive print grid DOM rendering until exact moment of printing
             const [isPrinting, setIsPrinting] = useState(false);
+            const [printOffset, setPrintOffset] = useState({ x: 0, y: 0 });
             const [isZooming, setIsZooming] = useState(false);
             const zoomEndTimerRef = useRef(null);
-
-            useEffect(() => { flowPzRef.current = flowPz; }, [flowPz]);
-            useEffect(() => { treeScaleRef.current = treeScale; }, [treeScale]);
 
             // ACCESSIBILITY: Modal focus trap
             const modalRef = useRef(null);
             const modalTriggerRef = useRef(null);
             const showModalAndCaptureTrigger = () => {
                 modalTriggerRef.current = document.activeElement;
-                showModalAndCaptureTrigger();
+                setShowModal(true);
             };
             useEffect(() => {
                 if (!showModal) {
@@ -201,6 +199,8 @@ const Icon = ({ name, size = 18, className = "" }) => {
             const flowPzRef = useRef({ ...defaultFlowViewport });
             const [treeScale, setTreeScale] = useState(1);
             const treeScaleRef = useRef(1);
+            useEffect(() => { flowPzRef.current = flowPz; }, [flowPz]);
+            useEffect(() => { treeScaleRef.current = treeScale; }, [treeScale]);
             const [gridCols, setGridCols] = useState(defaultFlowGrid.cols);
             const [gridRows, setGridRows] = useState(defaultFlowGrid.rows);
             const [connectingStart, setConnectingStart] = useState(null);
@@ -211,10 +211,21 @@ const Icon = ({ name, size = 18, className = "" }) => {
             const [printOrientation, setPrintOrientation] = useState('landscape');
             const [showFlowLayoutMenu, setShowFlowLayoutMenu] = useState(false);
             const [showActionsMenu, setShowActionsMenu] = useState(false);
-            
+            const [flowGlobalCompact, setFlowGlobalCompact] = useState(true);
+            const [ctxMenu, setCtxMenu] = useState(null);
+            const [inlineEdit, setInlineEdit] = useState(null);
+            const [clickPopover, setClickPopover] = useState(null);
+            const [clickPopoverForm, setClickPopoverForm] = useState({ name: '', acreage: '', nodeType: 'Party' });
+
             const flowDraggingNode = useRef(null);
+            const canvasPointerDownPos = useRef(null);
             const flowDragStart = useRef({ x: 0, y: 0 });
             const flowCanvasRef = useRef(null);
+            const flowPanZoomLayerRef = useRef(null);
+            const flowWheelDeltaRef = useRef(0);
+            const flowWheelFrameRef = useRef(null);
+            const flowWheelPointerRef = useRef({ x: 0, y: 0 });
+            const flowWheelIdleRef = useRef(null);
             const flowLayoutMenuRef = useRef(null);
             const actionsMenuRef = useRef(null);
             
@@ -308,7 +319,9 @@ const Icon = ({ name, size = 18, className = "" }) => {
             };
 
             // PERFORMANCE: Memoized calculated arrays
-            const totalRootOwnership = useMemo(() => rootOwnershipTotal(nodes), [nodes]);
+            const totalRootOwnership = useMemo(() =>
+                nodes.filter(n => !n.parentId && n.type !== 'related').reduce((s, n) => s + clampFraction(n.initialFraction ?? n.fraction), 0),
+            [nodes]);
             const ownershipHealth = useMemo(() => {
                 const delta = totalRootOwnership - 1;
                 if (Math.abs(delta) <= FRACTION_EPSILON) return { status: 'balanced', label: 'Balanced', delta };
@@ -720,6 +733,16 @@ const Icon = ({ name, size = 18, className = "" }) => {
             };
 
             const formatFraction = (num) => (isNaN(num) || num === null || num === undefined ? "0.000000000" : Number(num).toFixed(9));
+            const formatMasterFraction = (value) => {
+                const num = Number(value || 0);
+                if (!Number.isFinite(num)) return '0';
+                if (Math.abs(num) <= FRACTION_EPSILON) return '0';
+                for (let d = 1; d <= 128; d++) {
+                    const n = Math.round(num * d);
+                    if (Math.abs(n / d - num) < 1e-9) return `${n}/${d}`;
+                }
+                return formatFraction(num);
+            };
             const formatConveyanceFraction = (node) => {
                 if (!node || node.type !== 'conveyance' || node.conveyanceMode !== 'fraction') return '';
                 const numerator = Number(node.numerator || 0);
@@ -1027,13 +1050,14 @@ const Icon = ({ name, size = 18, className = "" }) => {
                     });
                 } else if (modalMode === 'add_chain') {
                     const newId = makeId();
-                    const available = Math.max(0, 1.0 - totalRootOwnership);
+                    const rootInitialTotal = nodes.filter(n => !n.parentId).reduce((s, n) => s + clampFraction(n.initialFraction ?? n.fraction), 0);
+                    const available = Math.max(0, 1.0 - rootInitialTotal);
                     const requested = clampFraction(form.initialFraction);
                     if (requested - available > FRACTION_EPSILON) {
                         window.alert(`Only ${formatFraction(available)} ownership capacity remains in this map. Reduce the initial granted share to ${formatFraction(available)} or less.`);
                         return;
                     }
-                    updateActiveDeskMapNodes(prev => [...prev, { ...form, id: newId, type: 'conveyance', parentId: null }]);
+                    updateActiveDeskMapNodes(prev => [...prev, { ...form, id: newId, type: 'conveyance', parentId: null, fraction: clampFraction(form.initialFraction) }]);
                 } else if (modalMode === 'add_related') {
                     const newId = makeId();
                     updateActiveDeskMapNodes(prev => [...prev, { ...form, id: newId, type: 'related', fraction: 0, initialFraction: 0, parentId: activeNode.id }]);
@@ -1495,7 +1519,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
                                 tabIndex={0}
                                 onClick={() => openEdit(n)}
                                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openEdit(n); } }}
-                                className={`p-4 border min-w-[260px] max-w-[300px] cursor-pointer transition-all duration-300 relative ${
+                                className={`p-4 border min-w-[260px] max-w-[300px] cursor-pointer transition-all duration-300 relative select-none ${
                                     isDeceased ? (isZooming ? 'bg-teastain border-sepia text-sepia' : 'bg-teastain border-sepia text-sepia ink-shadow') : (isZooming ? 'bg-parchment border-ink text-ink' : 'bg-parchment border-ink text-ink ink-shadow ink-shadow-hover')
                                 }`}
                             >
@@ -1618,15 +1642,19 @@ const Icon = ({ name, size = 18, className = "" }) => {
                                 )}
                             </div>
                             
-                            <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 flex gap-1 opacity-0 group-hover:opacity-100 transition-all duration-300 z-20">
-                                {n.parentId === null && nodes.length > 1 && (
-                                    <button onClick={(e) => { e.stopPropagation(); openAttach(n); }} className="bg-sepia text-parchment border border-sepia rounded-sm px-3 py-1 text-[10px] font-bold hover:bg-sepia/80 shadow-md flex items-center gap-1 hover:-translate-y-0.5 transition-all"><Icon name="Link" size={12} /> ATTACH</button>
-                                )}
-                                <button onClick={(e) => { e.stopPropagation(); openPrecede(n); }} className="bg-ink text-parchment border border-parchment rounded-sm px-3 py-1 text-[10px] font-bold hover:bg-ink/80 shadow-md flex items-center gap-1 hover:-translate-y-0.5 transition-transform"><Icon name="ArrowUp" size={12} /> PRECEDE</button>
-                                <button onClick={(e) => { e.stopPropagation(); openRebalance(n); }} className="bg-fountain text-parchment border border-fountain rounded-sm px-3 py-1 text-[10px] font-bold hover:bg-fountain/80 shadow-md flex items-center gap-1 hover:-translate-y-0.5 transition-transform"><Icon name="Adjust" size={12} /> REBALANCE</button>
-                                <button onClick={(e) => { e.stopPropagation(); openRelated(n); }} className="bg-parchment text-ink border border-ink/40 rounded-sm px-3 py-1 text-[10px] font-bold hover:bg-teastain shadow-md flex items-center gap-1 hover:-translate-y-0.5 transition-transform"><Icon name="Paperclip" size={12} /> + DOC</button>
-                                <button onClick={(e) => { e.stopPropagation(); openConvey(n); }} className="bg-teastain text-sepia border border-sepia/60 rounded-sm px-4 py-1 text-[10px] font-bold hover:bg-parchment hover:border-sepia shadow-lg flex items-center gap-1 hover:-translate-y-0.5 transition-all"><Icon name="Convey" size={12} /> CONVEY</button>
-                                {nodes.length > 1 && <button onClick={(e) => { e.stopPropagation(); requestDeleteRecord(n); }} className="bg-parchment text-stamp border border-stamp/60 rounded-sm p-1.5 text-[10px] font-bold hover:bg-teastain hover:border-stamp shadow-lg flex items-center justify-center hover:-translate-y-0.5 transition-all"><Icon name="Trash" size={14} /></button>}
+                            <div className="opacity-0 group-hover:opacity-100 transition-all duration-300 mt-2 flex flex-col gap-1">
+                                <div className="flex gap-1 justify-center">
+                                    {n.parentId === null && nodes.length > 1 && (
+                                        <button onClick={(e) => { e.stopPropagation(); openAttach(n); }} className="bg-sepia text-parchment border border-sepia rounded-sm px-2 py-1 text-[10px] font-bold hover:bg-sepia/80 shadow-md flex items-center gap-1 hover:-translate-y-0.5 transition-all"><Icon name="Link" size={12} /> ATTACH</button>
+                                    )}
+                                    <button onClick={(e) => { e.stopPropagation(); openPrecede(n); }} className="bg-ink text-parchment border border-parchment rounded-sm px-2 py-1 text-[10px] font-bold hover:bg-ink/80 shadow-md flex items-center gap-1 hover:-translate-y-0.5 transition-transform"><Icon name="ArrowUp" size={12} /> PRECEDE</button>
+                                    <button onClick={(e) => { e.stopPropagation(); openRebalance(n); }} className="bg-fountain text-parchment border border-fountain rounded-sm px-2 py-1 text-[10px] font-bold hover:bg-fountain/80 shadow-md flex items-center gap-1 hover:-translate-y-0.5 transition-transform"><Icon name="Adjust" size={12} /> REBALANCE</button>
+                                </div>
+                                <div className="flex gap-1 justify-center">
+                                    <button onClick={(e) => { e.stopPropagation(); openConvey(n); }} className="bg-teastain text-sepia border border-sepia/60 rounded-sm px-2 py-1 text-[10px] font-bold hover:bg-parchment hover:border-sepia shadow-lg flex items-center gap-1 hover:-translate-y-0.5 transition-all"><Icon name="Convey" size={12} /> CONVEY</button>
+                                    <button onClick={(e) => { e.stopPropagation(); openRelated(n); }} className="bg-parchment text-ink border border-ink/40 rounded-sm px-2 py-1 text-[10px] font-bold hover:bg-teastain shadow-md flex items-center gap-1 hover:-translate-y-0.5 transition-transform"><Icon name="Paperclip" size={12} /> + DOC</button>
+                                    {nodes.length > 1 && <button onClick={(e) => { e.stopPropagation(); requestDeleteRecord(n); }} className="bg-parchment text-stamp border border-stamp/60 rounded-sm p-1.5 text-[10px] font-bold hover:bg-teastain hover:border-stamp shadow-lg flex items-center justify-center hover:-translate-y-0.5 transition-all"><Icon name="Trash" size={14} /></button>}
+                                </div>
                             </div>
                         </div>
                         {hasChildren && !isCollapsed && !shouldSimplifyChildren && (
@@ -1671,54 +1699,121 @@ const Icon = ({ name, size = 18, className = "" }) => {
 
             const buildFlowLayoutFromNodes = (sourceNodes, idPrefix = '', xShift = 0, treeGroupId = '') => {
                 const safePrefix = idPrefix ? `${idPrefix}-` : '';
-                const normalNodes = sourceNodes.filter(n => n.type !== 'related');
+                const normalNodes = sourceNodes.filter(n => n.type !== 'related' && n.parentId !== 'unlinked');
                 if (!normalNodes.length) return { nodes: [], edges: [], width: 0 };
-                const newFlowNodes = [];
-                const newFlowEdges = [];
-                const nodePositions = {};
-                let leafX = 0;
-                const levelYSpacing = 280;
-                const startY = 60;
+                if (normalNodes.length > 300) {
+                    window.alert(`This desk map has ${normalNodes.length} nodes — too large to auto-layout (limit: 300). Import cancelled.`);
+                    return { nodes: [], edges: [], width: 0 };
+                }
 
-                const childrenOf = (id) => normalNodes.filter(c => c.parentId === id);
-                const layoutNode = (nId, depth) => {
-                    const children = childrenOf(nId);
-                    if (children.length === 0) {
-                        nodePositions[nId] = { x: leafX, y: startY + (depth * levelYSpacing) };
-                        leafX += 340;
-                        return nodePositions[nId].x;
+                // --- Reingold-Tilford inspired layout ---
+                const NODE_W = 200;
+                const NODE_H = 56;
+                const H_GAP = 40;
+                const V_GAP = 80;
+                const ROOT_GAP = 120;
+                const LEAF_SLOT = NODE_W + H_GAP; // 240
+
+                // STEP 1: Build tree structure from flat array with cycle detection
+                const nodeMap = {};
+                normalNodes.forEach(n => { nodeMap[n.id] = { id: n.id, src: n, children: [] }; });
+                const roots = [];
+                const attached = new Set();
+                normalNodes.forEach(n => {
+                    if (n.parentId && nodeMap[n.parentId]) {
+                        // Cycle detection: walk up the ancestor chain — if we find n.id, it's a cycle
+                        let isCycle = false;
+                        let ancestor = nodeMap[n.parentId];
+                        const visited = new Set([n.id]);
+                        while (ancestor) {
+                            if (visited.has(ancestor.id)) { isCycle = true; break; }
+                            visited.add(ancestor.id);
+                            const parentSrc = ancestor.src;
+                            ancestor = parentSrc.parentId ? nodeMap[parentSrc.parentId] : null;
+                        }
+                        if (!isCycle) {
+                            nodeMap[n.parentId].children.push(nodeMap[n.id]);
+                            attached.add(n.id);
+                        } else {
+                            roots.push(nodeMap[n.id]);
+                        }
+                    } else {
+                        // Root node, or orphan whose parentId isn't in normalNodes — treat as root
+                        roots.push(nodeMap[n.id]);
                     }
-                    const childXs = children.map(c => {
-                        newFlowEdges.push({ id: `e-${safePrefix}${nId}-${safePrefix}${c.id}`, source: `${safePrefix}${nId}`, target: `${safePrefix}${c.id}` });
-                        return layoutNode(c.id, depth + 1);
+                });
+
+                // STEP 2: Compute subtree widths (post-order traversal)
+                const computeWidth = (treeNode) => {
+                    if (treeNode.children.length === 0) {
+                        treeNode.subtreeWidth = LEAF_SLOT;
+                        return;
+                    }
+                    treeNode.children.forEach(computeWidth);
+                    const childrenTotalWidth = treeNode.children.reduce((sum, c) => sum + c.subtreeWidth, 0);
+                    treeNode.subtreeWidth = Math.max(LEAF_SLOT, childrenTotalWidth);
+                };
+                roots.forEach(computeWidth);
+
+                // STEP 3 & 4: Assign x,y positions (pre-order traversal)
+                const positions = {};
+                const assignPositions = (treeNode, centerX, depth) => {
+                    positions[treeNode.id] = { x: centerX - NODE_W / 2, y: depth * (NODE_H + V_GAP) };
+                    if (treeNode.children.length === 0) return;
+                    const childrenTotalWidth = treeNode.children.reduce((sum, c) => sum + c.subtreeWidth, 0);
+                    let cursor = centerX - childrenTotalWidth / 2;
+                    treeNode.children.forEach(child => {
+                        const childCenter = cursor + child.subtreeWidth / 2;
+                        assignPositions(child, childCenter, depth + 1);
+                        cursor += child.subtreeWidth;
                     });
-                    const myX = childXs.reduce((a, b) => a + b, 0) / childXs.length;
-                    nodePositions[nId] = { x: myX, y: startY + (depth * levelYSpacing) };
-                    return myX;
                 };
 
-                const roots = normalNodes.filter(n => n.parentId === null);
-                roots.forEach(root => { layoutNode(root.id, 0); leafX += 200; });
+                // STEP 5: Handle multiple roots — place side by side
+                let rootCursor = 0;
+                roots.forEach((root, i) => {
+                    const rootCenter = rootCursor + root.subtreeWidth / 2;
+                    assignPositions(root, rootCenter, 0);
+                    rootCursor += root.subtreeWidth + (i < roots.length - 1 ? ROOT_GAP : 0);
+                });
 
-                const minX = Math.min(...Object.values(nodePositions).map(p => p.x));
-                const maxX = Math.max(...Object.values(nodePositions).map(p => p.x + 280));
+                // STEP 6: Build output — normalize positions and create edges
+                const allPositioned = Object.keys(positions);
+                const minX = Math.min(...allPositioned.map(id => positions[id].x));
+                const maxX = Math.max(...allPositioned.map(id => positions[id].x + NODE_W));
                 const width = Math.max(280, maxX - minX);
 
+                const newFlowEdges = [];
+                const buildEdges = (treeNode) => {
+                    treeNode.children.forEach(child => {
+                        newFlowEdges.push({
+                            id: `e-${safePrefix}${treeNode.id}-${safePrefix}${child.id}`,
+                            source: `${safePrefix}${treeNode.id}`,
+                            target: `${safePrefix}${child.id}`
+                        });
+                        buildEdges(child);
+                    });
+                };
+                roots.forEach(buildEdges);
+
+                const newFlowNodes = [];
                 normalNodes.forEach(n => {
-                    const pos = nodePositions[n.id] || { x: 0, y: 0 };
+                    const pos = positions[n.id];
+                    if (!pos) return; // should never happen — every normalNode is in the tree
                     newFlowNodes.push({
                         id: `${safePrefix}${n.id}`,
                         treeGroupId: treeGroupId || safePrefix || 'default-tree',
                         x: (pos.x - minX) + xShift,
                         y: pos.y,
                         type: 'template',
+                        compact: true,
                         color: n.isDeceased ? 'bg-teastain text-sepia border-sepia' : 'bg-parchment text-ink border-ink',
                         data: {
                             title: n.instrument,
                             grantee: n.grantee,
                             grantor: n.grantor,
                             fraction: formatFraction(n.fraction),
-                            fractionDisplay: n.fraction > FRACTION_EPSILON ? formatAsFraction(n.fraction) : null,
+                            fractionDisplay: n.fraction > FRACTION_EPSILON ? formatMasterFraction(n.fraction) : null,
                             details: `${n.date} ${n.vol && n.page ? `• Vol ${n.vol}/Pg ${n.page}` : ''}`
                         }
                     });
@@ -1732,6 +1827,17 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 return deskMaps.filter(map => map.id === flowDeskMapFilter);
             };
 
+            const commitInlineEdit = () => {
+                if (!inlineEdit) return;
+                setFlowNodes(prev => prev.map(n => {
+                    if (n.id !== inlineEdit.id) return n;
+                    if (inlineEdit.field === 'grantee') return { ...n, data: { ...n.data, grantee: inlineEdit.value } };
+                    if (inlineEdit.field === 'text') return { ...n, data: { ...n.data, text: inlineEdit.value } };
+                    return n;
+                }));
+                setInlineEdit(null);
+            };
+
             const fitFlowToView = (targetNodes) => {
                 const scopeNodes = targetNodes || flowNodes;
                 if (!scopeNodes.length) return;
@@ -1739,18 +1845,19 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 const viewportW = Math.max(700, (containerRect?.width || window.innerWidth) - 80);
                 const viewportH = Math.max(500, (containerRect?.height || window.innerHeight) - 110);
                 const minX = Math.min(...scopeNodes.map(n => n.x));
-                const maxX = Math.max(...scopeNodes.map(n => n.x + (n.type === 'template' ? 280 : (n.data.width || 280))));
+                const maxX = Math.max(...scopeNodes.map(n => n.x + (n.type === 'template' ? 200 : (n.data.width || 280))));
                 const minY = Math.min(...scopeNodes.map(n => n.y));
-                const maxY = Math.max(...scopeNodes.map(n => n.y + (n.type === 'template' ? 150 : 80)));
+                const maxY = Math.max(...scopeNodes.map(n => n.y + (n.type === 'template' ? 56 : 80)));
                 const contentW = Math.max(300, maxX - minX);
                 const contentH = Math.max(200, maxY - minY);
-                const fitScale = Math.min(viewportW / contentW, viewportH / contentH, 1);
-                setTreeScale(fitScale);
+                // 5% padding on all sides → use 90% of viewport for scale
+                const fitScale = Math.max(0.02, Math.min((viewportW * 0.90) / contentW, (viewportH * 0.90) / contentH, 2));
+                setTreeScale(1);
                 const centerX = minX + contentW / 2;
                 const centerY = minY + contentH / 2;
                 const targetX = (viewportW / 2) - (centerX * fitScale);
                 const targetY = (viewportH / 2) - (centerY * fitScale);
-                setFlowPz({ x: Math.min(600, Math.max(-6000, targetX)), y: Math.min(400, Math.max(-6000, targetY)), scale: fitScale });
+                setFlowPz({ x: Math.min(600, Math.max(-60000, targetX)), y: Math.min(400, Math.max(-60000, targetY)), scale: fitScale });
             };
 
             const importToFlowchart = (append = false) => {
@@ -1780,10 +1887,26 @@ const Icon = ({ name, size = 18, className = "" }) => {
             };
 
             const handlePrintFlowchart = () => {
-                flushSync(() => setIsPrinting(true));
+                let printScale = 1;
+                let pOffsetX = 0, pOffsetY = 0;
+                if (flowNodes.length) {
+                    const minX = Math.min(...flowNodes.map(n => n.x));
+                    const maxX = Math.max(...flowNodes.map(n => n.x + (n.type === 'template' ? 200 : (n.data.width || 280))));
+                    const minY = Math.min(...flowNodes.map(n => n.y));
+                    const maxY = Math.max(...flowNodes.map(n => n.y + (n.type === 'template' ? 56 : 80)));
+                    const contentW = Math.max(300, maxX - minX);
+                    const contentH = Math.max(200, maxY - minY);
+                    const printW = pw * gridCols * 0.92;
+                    const printH = ph * gridRows * 0.92;
+                    printScale = Math.max(0.02, Math.min(printW / contentW, printH / contentH));
+                    pOffsetX = minX;
+                    pOffsetY = minY;
+                }
+                setPrintOffset({ x: pOffsetX, y: pOffsetY });
+                flushSync(() => { setTreeScale(printScale); setIsPrinting(true); });
                 setTimeout(() => {
                     window.print();
-                    setTimeout(() => setIsPrinting(false), 150);
+                    setTimeout(() => { setIsPrinting(false); setTreeScale(1); }, 150);
                 }, 50);
             };
 
@@ -1851,6 +1974,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
                         ? resolveTreeGroupId(flowNodes.find(n => n.id === selectedFlowNode))
                         : createTreeGroupId(),
                     color: 'bg-parchment text-ink border-ink',
+                    compact: type === 'template',
                     data: type === 'template' ? {
                         title: 'Instrument', grantee: 'Grantee Name', grantor: 'Grantor Name', fraction: '1.00000000', details: 'Date • Vol/Page'
                     } : { text: 'Double click to edit text...', width: 280 }
@@ -1878,7 +2002,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
             };
             
             const handleFlowPointerMove = (e) => {
-                if (flowTool === 'connect' && connectingStart) {
+                if (connectingStart) {
                     const rect = document.getElementById('tree-scaler').getBoundingClientRect();
                     setMousePos({ x: (e.clientX - rect.left) / (flowPz.scale * treeScale), y: (e.clientY - rect.top) / (flowPz.scale * treeScale) });
                 }
@@ -1922,26 +2046,34 @@ const Icon = ({ name, size = 18, className = "" }) => {
             };
             
             const handleFlowWheel = (e) => {
-                if (e.ctrlKey || e.metaKey || flowTool === 'pan') { 
+                if (e.ctrlKey || e.metaKey || flowTool === 'pan') {
                     e.preventDefault();
-                    const scaleAdjust = e.deltaY * -0.002;
                     const rect = e.currentTarget.getBoundingClientRect();
-                    const pointerX = e.clientX - rect.left;
-                    const pointerY = e.clientY - rect.top;
+                    flowWheelPointerRef.current = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+                    flowWheelDeltaRef.current += e.deltaY;
 
-                    setFlowPz(prev => {
-                        const nextScale = Math.min(Math.max(0.1, prev.scale + scaleAdjust), 3);
-                        if (nextScale === prev.scale) return prev;
+                    if (flowWheelIdleRef.current) clearTimeout(flowWheelIdleRef.current);
+                    flowWheelIdleRef.current = setTimeout(() => {
+                        setFlowPz({ ...flowPzRef.current });
+                    }, 150);
 
+                    if (flowWheelFrameRef.current !== null) return;
+                    flowWheelFrameRef.current = requestAnimationFrame(() => {
+                        const delta = flowWheelDeltaRef.current;
+                        flowWheelDeltaRef.current = 0;
+                        flowWheelFrameRef.current = null;
+                        const prev = flowPzRef.current;
+                        const zoomFactor = Math.exp(delta * -0.002);
+                        const nextScale = Math.min(Math.max(0.1, prev.scale * zoomFactor), 3);
+                        if (nextScale === prev.scale) return;
+                        const { x: pointerX, y: pointerY } = flowWheelPointerRef.current;
                         const worldX = (pointerX - prev.x) / prev.scale;
                         const worldY = (pointerY - prev.y) / prev.scale;
-
-                        return {
-                            ...prev,
-                            scale: nextScale,
-                            x: pointerX - worldX * nextScale,
-                            y: pointerY - worldY * nextScale
-                        };
+                        const next = { ...prev, scale: nextScale, x: pointerX - worldX * nextScale, y: pointerY - worldY * nextScale };
+                        flowPzRef.current = next;
+                        if (flowPanZoomLayerRef.current) {
+                            flowPanZoomLayerRef.current.style.transform = `translate(${next.x}px, ${next.y}px) scale(${next.scale})`;
+                        }
                     });
                 }
             };
@@ -1951,8 +2083,8 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 if (flowTool === 'connect') {
                     setConnectingStart(node.id);
                     // For template we use center, for note box we approximate width center
-                    const wOffset = node.type === 'template' ? 140 : (node.data.width ? node.data.width/2 : 140);
-                    setMousePos({ x: node.x + wOffset, y: node.y + 100 }); 
+                    const wOffset = node.type === 'template' ? (node.compact ? 100 : 140) : (node.data.width ? node.data.width/2 : 140);
+                    setMousePos({ x: node.x + wOffset, y: node.y + (node.compact ? 28 : 100) });
                 } else if (flowTool === 'select') {
                     setSelectedFlowNode(node.id);
                     flowDraggingNode.current = { id: node.id, origX: node.x, origY: node.y };
@@ -2038,54 +2170,93 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 setShowFlowEditModal(false);
             };
 
-            const drawEdge = (x1, y1, x2, y2) => {
+            const confirmClickPlace = () => {
+                if (!clickPopover || !clickPopoverForm.name.trim()) return;
+                const id = `fn_${makeId()}`;
+                const { worldX, worldY } = clickPopover;
+                const { name, acreage, nodeType } = clickPopoverForm;
+                const newNode = nodeType === 'Annotation'
+                    ? { id, x: worldX, y: worldY, type: 'blank', treeGroupId: createTreeGroupId(), color: 'bg-parchment text-ink border-ink', data: { text: name.trim(), width: 200 } }
+                    : { id, x: worldX, y: worldY, type: 'template', compact: true, treeGroupId: createTreeGroupId(), color: 'bg-parchment text-ink border-ink',
+                        data: { title: nodeType === 'Conveyance' ? name.trim() : 'Party', grantee: nodeType === 'Party' ? name.trim() : '', grantor: '', fraction: '1.00000000', fractionDisplay: formatMasterFraction(1), details: acreage.trim() ? acreage.trim() + ' NMA' : '' }
+                    };
+                setFlowNodes(prev => [...prev, newNode]);
+                setSelectedFlowNode(id);
+                setClickPopover(null);
+            };
+
+            const drawEdge = (x1, y1, x2, y2, bendFactor = 0) => {
                 const yMid = (y1 + y2) / 2;
-                return `M ${x1} ${y1} C ${x1} ${yMid}, ${x2} ${yMid}, ${x2} ${y2}`;
+                return `M ${x1} ${y1} C ${x1 + bendFactor} ${yMid}, ${x2 + bendFactor} ${yMid}, ${x2} ${y2}`;
             };
             const flowNodeById = useMemo(() => Object.fromEntries(flowNodes.map(n => [n.id, n])), [flowNodes]);
 
+            // Compute the bounding box of all flow content so the paper visual can encompass it
+            const flowContentBounds = useMemo(() => {
+                if (!flowNodes.length) return { w: 0, h: 0 };
+                const maxX = Math.max(...flowNodes.map(n => n.x + (n.type === 'template' ? 200 : (n.data.width || 280))));
+                const maxY = Math.max(...flowNodes.map(n => n.y + (n.type === 'template' ? 56 : 80)));
+                return { w: maxX + 40, h: maxY + 40 }; // 40px padding
+            }, [flowNodes]);
+
             // Abstract out the tree rendering so we can use it on the Interactive screen AND the Print slices
-            const renderTree = (isInteractive) => (
+            const renderTree = (isInteractive, forPrint = false) => (
                 <>
                     {/* Edge Layer (SVG) */}
                     <svg className="absolute top-0 left-0 w-full h-full overflow-visible pointer-events-none z-10">
                         <defs>
                             <marker id="arrowhead-ink" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#1A1A1B" /></marker>
                         </defs>
-                        {flowEdges.map(edge => {
-                            const source = flowNodeById[edge.source];
-                            const target = flowNodeById[edge.target];
-                            if (!source || !target) return null;
-                            const x1 = source.x + (source.type === 'template' ? 140 : (source.data.width ? source.data.width/2 : 140)); 
-                            const y1 = source.y + (source.type === 'template' ? 140 : 50);
-                            const x2 = target.x + (target.type === 'template' ? 140 : (target.data.width ? target.data.width/2 : 140)); 
-                            const y2 = target.y;
-                            return (
-                                <g key={edge.id} className={isInteractive ? "cursor-pointer pointer-events-auto" : "pointer-events-none"} onClick={(e) => { if(isInteractive) { e.stopPropagation(); if (flowTool === 'select') deleteFlowEdge(edge.id); }}}>
-                                    <path d={drawEdge(x1, y1, x2, y2)} fill="none" stroke="#1A1A1B" strokeWidth="2" markerEnd="url(#arrowhead-ink)" />
-                                </g>
-                            );
-                        })}
+                        {(() => {
+                            // Build sibling map for fan-out bend calculation
+                            const siblingMap = {};
+                            flowEdges.forEach(edge => {
+                                if (!siblingMap[edge.source]) siblingMap[edge.source] = [];
+                                siblingMap[edge.source].push(edge.target);
+                            });
+                            return flowEdges.map(edge => {
+                                const source = flowNodeById[edge.source];
+                                const target = flowNodeById[edge.target];
+                                if (!source || !target) return null;
+                                const srcCompact = source.compact || forPrint;
+                                const tgtCompact = target.compact || forPrint;
+                                const x1 = source.x + (source.type === 'template' ? (srcCompact ? 100 : 140) : (source.data.width ? source.data.width/2 : 140));
+                                const y1 = source.y + (source.type === 'template' ? (srcCompact ? 56 : 140) : 50);
+                                const x2 = target.x + (target.type === 'template' ? (tgtCompact ? 100 : 140) : (target.data.width ? target.data.width/2 : 140));
+                                const y2 = target.y;
+                                const siblings = siblingMap[edge.source] || [];
+                                const sibIdx = siblings.indexOf(edge.target);
+                                const bendFactor = siblings.length > 1 ? (sibIdx - (siblings.length - 1) / 2) * 40 : 0;
+                                return (
+                                    <g key={edge.id} className={isInteractive ? "cursor-pointer pointer-events-auto" : "pointer-events-none"} onClick={(e) => { if(isInteractive) { e.stopPropagation(); if (flowTool === 'select') deleteFlowEdge(edge.id); }}}>
+                                        <path d={drawEdge(x1, y1, x2, y2, bendFactor)} fill="none" stroke="#1A1A1B" strokeWidth="2" markerEnd="url(#arrowhead-ink)" />
+                                    </g>
+                                );
+                            });
+                        })()}
                         {/* Temp connecting line */}
-                        {isInteractive && flowTool === 'connect' && connectingStart && flowNodeById[connectingStart] && (
-                            <path 
+                        {isInteractive && connectingStart && flowNodeById[connectingStart] && (
+                            <path
                                 d={drawEdge(
-                                    flowNodeById[connectingStart].x + (flowNodeById[connectingStart].type === 'template' ? 140 : (flowNodeById[connectingStart].data.width/2 || 140)), 
-                                    flowNodeById[connectingStart].y + 100, 
+                                    flowNodeById[connectingStart].x + (flowNodeById[connectingStart].type === 'template' ? (flowNodeById[connectingStart].compact ? 100 : 140) : (flowNodeById[connectingStart].data.width/2 || 140)),
+                                    flowNodeById[connectingStart].y + (flowNodeById[connectingStart].compact ? 28 : 100),
                                     mousePos.x, mousePos.y
-                                )} 
-                                fill="none" stroke="#1A1A1B" strokeWidth="2" strokeDasharray="5,5" 
+                                )}
+                                fill="none" stroke="#1A1A1B" strokeWidth="2" strokeDasharray="5,5"
                             />
                         )}
                     </svg>
 
                     {/* HTML Node Layer */}
                     <div className="absolute top-0 left-0 w-full h-full z-20 pointer-events-none">
-                        {flowNodes.map(n => (
-                            <div 
+                        {flowNodes.map(n => {
+                            const showCompact = n.compact || forPrint;
+                            const isEditing = isInteractive && inlineEdit?.id === n.id;
+                            return (
+                            <div
                                 key={n.id}
                                 id={isInteractive ? n.id : undefined}
-                                className={`flow-node absolute transition-shadow bg-parchment ${
+                                className={`flow-node absolute transition-shadow bg-parchment group relative ${
                                     isInteractive ? 'pointer-events-auto ' + (flowTool === 'select' ? 'cursor-grab active:cursor-grabbing' : flowTool === 'move-tree' ? 'cursor-move' : flowTool === 'connect' ? 'cursor-crosshair' : '') : ''
                                 } ${isInteractive && selectedFlowNode === n.id ? 'ring-4 ring-sepia/50 ring-offset-4 ring-offset-transparent' : ''}`}
                                 style={{ transform: `translate(${n.x}px, ${n.y}px)` }}
@@ -2093,6 +2264,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
                                 onPointerMove={isInteractive ? handleNodePointerMove : undefined}
                                 onPointerUp={isInteractive ? (e) => handleNodePointerUp(e, n) : undefined}
                                 onPointerCancel={isInteractive ? (e) => handleNodePointerUp(e, n) : undefined}
+                                onContextMenu={isInteractive ? (e) => { e.preventDefault(); e.stopPropagation(); setCtxMenu({ nodeId: n.id, x: e.clientX, y: e.clientY }); } : undefined}
                                 onDoubleClick={isInteractive ? (e) => {
                                     e.stopPropagation();
                                     if (flowTool === 'select') {
@@ -2100,38 +2272,111 @@ const Icon = ({ name, size = 18, className = "" }) => {
                                     }
                                 } : undefined}
                             >
+                                {isInteractive && (() => {
+                                    const wOff = n.type === 'template' ? (n.compact ? 100 : 140) : ((n.data.width || 280) / 2);
+                                    const hOff = n.type === 'template' ? (n.compact ? 56 : 140) : 50;
+                                    const startConnect = (fromBottom) => (e) => {
+                                        e.stopPropagation();
+                                        e.preventDefault();
+                                        setConnectingStart(n.id);
+                                        setMousePos({ x: n.x + wOff, y: n.y + (fromBottom ? hOff : 0) });
+                                    };
+                                    return (
+                                        <>
+                                            <div onPointerDown={startConnect(false)} className="absolute -top-[5px] left-1/2 -translate-x-1/2 w-[10px] h-[10px] rounded-full bg-sepia border border-ink/60 opacity-0 group-hover:opacity-100 transition-opacity cursor-crosshair z-30" />
+                                            <div onPointerDown={startConnect(true)} className="absolute -bottom-[5px] left-1/2 -translate-x-1/2 w-[10px] h-[10px] rounded-full bg-sepia border border-ink/60 opacity-0 group-hover:opacity-100 transition-opacity cursor-crosshair z-30" />
+                                        </>
+                                    );
+                                })()}
                                 {n.type === 'template' ? (
-                                    <div className={`w-[280px] p-4 border ${isInteractive ? 'ink-shadow' : 'border-ink'} ${n.color}`}>
-                                        <div className="border-b border-current/20 pb-2 mb-2">
-                                            <div className="font-serif text-xs font-bold uppercase tracking-widest text-sepia">{n.data.title}</div>
-                                            <div className="font-mono text-[10px] opacity-60 mt-1">{n.data.details}</div>
+                                    showCompact ? (
+                                        <div className={`w-[200px] px-3 py-2 border rounded-lg shadow-sm ${n.color}`}>
+                                            {isEditing && inlineEdit.field === 'grantee' ? (
+                                                <input
+                                                    autoFocus
+                                                    className="w-full bg-transparent border-b border-sepia font-display font-bold text-sm leading-tight outline-none"
+                                                    value={inlineEdit.value}
+                                                    onChange={e => setInlineEdit(prev => ({ ...prev, value: e.target.value }))}
+                                                    onBlur={commitInlineEdit}
+                                                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); commitInlineEdit(); } if (e.key === 'Escape') setInlineEdit(null); }}
+                                                    onPointerDown={e => e.stopPropagation()}
+                                                    onClick={e => e.stopPropagation()}
+                                                />
+                                            ) : (
+                                                <div
+                                                    className="font-display font-bold text-sm leading-tight truncate"
+                                                    onDoubleClick={isInteractive ? (e) => { e.stopPropagation(); setInlineEdit({ id: n.id, field: 'grantee', value: n.data.grantee }); } : undefined}
+                                                >{n.data.grantee}</div>
+                                            )}
+                                            <div className="font-mono text-[10px] opacity-60 truncate">{n.data.fractionDisplay || n.data.fraction}</div>
                                         </div>
-                                        <div className="mb-2">
-                                            <div className="text-[10px] uppercase tracking-widest text-sepia/60 font-mono mb-0.5">Grantee / Assignee</div>
-                                            <div className="font-display font-bold text-base leading-tight">{n.data.grantee}</div>
-                                        </div>
-                                        <div className="mb-3">
-                                            <div className="text-[10px] uppercase tracking-widest text-sepia/60 font-mono mb-0.5">Grantor / Assignor</div>
-                                            <div className="font-mono text-xs truncate opacity-80">{n.data.grantor}</div>
-                                        </div>
-                                        <div className="border-t border-current/20 pt-2 flex justify-between items-end">
-                                            <span className="text-[10px] uppercase tracking-widest opacity-60 font-mono">Interest</span>
-                                            <div className="text-right">
-                                                <div className="font-mono font-bold text-sm">{n.data.fraction}</div>
-                                                {n.data.fractionDisplay && <div className="font-mono text-[10px] opacity-60">{n.data.fractionDisplay}</div>}
+                                    ) : (
+                                        <div className={`w-[280px] p-4 border rounded-lg shadow-sm ${n.color}`}>
+                                            <div className="border-b border-current/20 pb-2 mb-2">
+                                                <div className="font-serif text-xs font-bold uppercase tracking-widest text-sepia">{n.data.title}</div>
+                                                <div className="font-mono text-[10px] opacity-60 mt-1">{n.data.details}</div>
+                                            </div>
+                                            <div className="mb-2">
+                                                <div className="text-[10px] uppercase tracking-widest text-sepia/60 font-mono mb-0.5">Grantee / Assignee</div>
+                                                {isEditing && inlineEdit.field === 'grantee' ? (
+                                                    <input
+                                                        autoFocus
+                                                        className="w-full bg-transparent border-b border-sepia font-display font-bold text-base leading-tight outline-none"
+                                                        value={inlineEdit.value}
+                                                        onChange={e => setInlineEdit(prev => ({ ...prev, value: e.target.value }))}
+                                                        onBlur={commitInlineEdit}
+                                                        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); commitInlineEdit(); } if (e.key === 'Escape') setInlineEdit(null); }}
+                                                        onPointerDown={e => e.stopPropagation()}
+                                                        onClick={e => e.stopPropagation()}
+                                                    />
+                                                ) : (
+                                                    <div
+                                                        className="font-display font-bold text-base leading-tight"
+                                                        onDoubleClick={isInteractive ? (e) => { e.stopPropagation(); setInlineEdit({ id: n.id, field: 'grantee', value: n.data.grantee }); } : undefined}
+                                                    >{n.data.grantee}</div>
+                                                )}
+                                            </div>
+                                            <div className="mb-3">
+                                                <div className="text-[10px] uppercase tracking-widest text-sepia/60 font-mono mb-0.5">Grantor / Assignor</div>
+                                                <div className="font-mono text-xs truncate opacity-80">{n.data.grantor}</div>
+                                            </div>
+                                            <div className="border-t border-current/20 pt-2 flex justify-between items-end">
+                                                <span className="text-[10px] uppercase tracking-widest opacity-60 font-mono">Interest</span>
+                                                <div className="text-right">
+                                                    <div className="font-mono font-bold text-sm">{n.data.fraction}</div>
+                                                    {n.data.fractionDisplay && <div className="font-mono text-[10px] opacity-60">{n.data.fractionDisplay}</div>}
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
+                                    )
                                 ) : (
-                                    <div 
-                                        className={`p-5 border ${isInteractive ? 'ink-shadow' : 'border-ink'} ${n.color}`}
+                                    <div
+                                        className={`p-4 border-2 border-dashed rounded-lg shadow-sm ${n.color}`}
                                         style={{ width: n.data.width || 280 }}
                                     >
-                                        <div className="font-serif text-sm whitespace-pre-wrap break-words">{n.data.text}</div>
+                                        {isEditing && inlineEdit.field === 'text' ? (
+                                            <textarea
+                                                autoFocus
+                                                className="w-full bg-transparent border-b border-sepia font-serif text-sm outline-none resize-none"
+                                                rows={3}
+                                                value={inlineEdit.value}
+                                                onChange={e => setInlineEdit(prev => ({ ...prev, value: e.target.value }))}
+                                                onBlur={commitInlineEdit}
+                                                onKeyDown={e => { if (e.key === 'Escape') setInlineEdit(null); }}
+                                                onPointerDown={e => e.stopPropagation()}
+                                                onClick={e => e.stopPropagation()}
+                                            />
+                                        ) : (
+                                            <div
+                                                className="font-serif text-sm whitespace-pre-wrap break-words"
+                                                onDoubleClick={isInteractive ? (e) => { e.stopPropagation(); setInlineEdit({ id: n.id, field: 'text', value: n.data.text }); } : undefined}
+                                            >{n.data.text}</div>
+                                        )}
                                     </div>
                                 )}
                             </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 </>
             );
@@ -2222,7 +2467,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
                             <div className="group flex items-center gap-2 flex-wrap">
                                 <div className={`rubber-stamp bg-parchment shadow-sm ${ownershipHealth.status === 'over' ? 'error animate-vibrate' : ''}`}>
                                     <span className="opacity-80 text-xs mr-2">Master Total:</span>
-                                    <span className="text-lg">{formatFraction(totalRootOwnership)}</span>
+                                    <span className="text-lg">{formatMasterFraction(totalRootOwnership)}</span>
                                 </div>
                                 <span className={`px-2 py-1 text-[10px] border rounded font-bold uppercase tracking-widest ${
                                     ownershipHealth.status === 'balanced'
@@ -2231,7 +2476,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
                                             ? 'border-stamp/60 text-stamp bg-stamp/10'
                                             : 'border-amber-700/50 text-amber-900 bg-amber-100/70'
                                 }`}>
-                                    {ownershipHealth.label} {formatFraction(Math.abs(ownershipHealth.delta))}
+                                    {ownershipHealth.label} {formatMasterFraction(Math.abs(ownershipHealth.delta))}
                                 </span>
                             </div>
                         </div>
@@ -2600,6 +2845,11 @@ const Icon = ({ name, size = 18, className = "" }) => {
                                     <button onClick={() => addFlowNode('blank')} aria-label="Add blank note box" className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-ink bg-parchment hover:bg-teastain flex items-center gap-1 shadow-sm transition-all hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sepia"><Icon name="Plus" size={12}/> Note</button>
                                     <button onClick={() => fitFlowToView()} aria-label="Fit all flow nodes to view" className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-ink/40 text-ink hover:bg-ink hover:text-parchment flex items-center gap-1 shadow-sm transition-all hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sepia" title="Recenter and fit all flow nodes to the current canvas"><Icon name="Move" size={12}/> Fit View</button>
                                     <button onClick={handlePrintFlowchart} aria-label="Print flowchart" className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-ink bg-ink text-parchment hover:bg-ink/80 flex items-center gap-1 shadow-sm transition-all hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sepia"><Icon name="Printer" size={12}/> Print</button>
+                                    <button
+                                        onClick={() => { const next = !flowGlobalCompact; setFlowGlobalCompact(next); setFlowNodes(nodes => nodes.map(n => n.type === 'template' ? { ...n, compact: next } : n)); }}
+                                        aria-label={flowGlobalCompact ? 'Expand all nodes to full view' : 'Collapse all nodes to compact view'}
+                                        className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-ink/40 text-ink hover:bg-ink hover:text-parchment flex items-center gap-1 shadow-sm transition-all hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sepia"
+                                    >{flowGlobalCompact ? 'Full' : 'Compact'}</button>
 
                                     <div className="relative" ref={flowLayoutMenuRef}>
                                         <button
@@ -2697,8 +2947,84 @@ const Icon = ({ name, size = 18, className = "" }) => {
                                     </div>
                                 )}
 
+                                {/* Click-to-place node creation popover */}
+                                {clickPopover && (
+                                    <div
+                                        className="fixed z-[300] bg-parchment border border-ink/60 rounded-lg shadow-lg p-3 w-52 animate-fade-in no-print"
+                                        style={{ top: clickPopover.screenY, left: clickPopover.screenX }}
+                                        onPointerDown={e => e.stopPropagation()}
+                                        onClick={e => e.stopPropagation()}
+                                    >
+                                        <div className="flex items-center gap-1 mb-2">
+                                            {['Party', 'Conveyance', 'Annotation'].map(t => (
+                                                <button
+                                                    key={t}
+                                                    onClick={() => setClickPopoverForm(f => ({ ...f, nodeType: t }))}
+                                                    className={`flex-1 py-0.5 text-[9px] font-bold uppercase tracking-widest border transition-colors ${clickPopoverForm.nodeType === t ? 'bg-ink text-parchment border-ink' : 'bg-parchment text-ink border-ink/30 hover:bg-teastain'}`}
+                                                >{t}</button>
+                                            ))}
+                                        </div>
+                                        <input
+                                            autoFocus
+                                            type="text"
+                                            placeholder={clickPopoverForm.nodeType === 'Annotation' ? 'Note text...' : 'Name...'}
+                                            value={clickPopoverForm.name}
+                                            onChange={e => setClickPopoverForm(f => ({ ...f, name: e.target.value }))}
+                                            onKeyDown={e => { if (e.key === 'Enter') confirmClickPlace(); if (e.key === 'Escape') setClickPopover(null); }}
+                                            className="w-full border border-ink/40 bg-teastain px-2 py-1.5 text-sm font-serif mb-2 focus:outline-none focus:ring-1 focus:ring-sepia"
+                                        />
+                                        {clickPopoverForm.nodeType !== 'Annotation' && (
+                                            <input
+                                                type="text"
+                                                placeholder="Acreage (optional)"
+                                                value={clickPopoverForm.acreage}
+                                                onChange={e => setClickPopoverForm(f => ({ ...f, acreage: e.target.value }))}
+                                                onKeyDown={e => { if (e.key === 'Enter') confirmClickPlace(); if (e.key === 'Escape') setClickPopover(null); }}
+                                                className="w-full border border-ink/40 bg-teastain px-2 py-1.5 text-xs font-mono mb-2 focus:outline-none focus:ring-1 focus:ring-sepia"
+                                            />
+                                        )}
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={confirmClickPlace}
+                                                disabled={!clickPopoverForm.name.trim()}
+                                                className="flex-1 py-1.5 border border-ink bg-ink text-parchment text-[10px] font-bold uppercase tracking-widest hover:bg-ink/80 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                                            >✓ Place</button>
+                                            <button
+                                                onClick={() => setClickPopover(null)}
+                                                className="px-3 py-1.5 border border-ink/40 text-[10px] font-bold uppercase tracking-widest hover:bg-teastain transition-colors"
+                                            >✕</button>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Right-click per-node context menu */}
+                                {ctxMenu && (
+                                    <div
+                                        className="fixed z-[300] bg-parchment border border-ink/40 shadow-lg rounded-lg overflow-hidden"
+                                        style={{ top: ctxMenu.y, left: ctxMenu.x }}
+                                        onPointerDown={e => e.stopPropagation()}
+                                    >
+                                        {flowNodes.find(n => n.id === ctxMenu.nodeId)?.type === 'template' && (
+                                            <button
+                                                className="w-full px-4 py-2 text-left text-[11px] font-mono hover:bg-teastain transition-colors whitespace-nowrap"
+                                                onClick={() => {
+                                                    const node = flowNodes.find(n => n.id === ctxMenu.nodeId);
+                                                    setFlowNodes(nodes => nodes.map(n => n.id === ctxMenu.nodeId ? { ...n, compact: !node.compact } : n));
+                                                    setCtxMenu(null);
+                                                }}
+                                            >
+                                                {flowNodes.find(n => n.id === ctxMenu.nodeId)?.compact ? 'Show Full' : 'Show Compact'}
+                                            </button>
+                                        )}
+                                        <button
+                                            className="w-full px-4 py-2 text-left text-[11px] font-mono hover:bg-teastain transition-colors whitespace-nowrap"
+                                            onClick={() => setCtxMenu(null)}
+                                        >Close</button>
+                                    </div>
+                                )}
+
                                 {/* Outer Zoom Viewport (Interactive Screen View) */}
-                                <div 
+                                <div
                                     ref={flowCanvasRef}
                                     className={`flex-1 relative overflow-hidden no-print ${
                                         flowTool === 'pan' ? 'cursor-grab active:cursor-grabbing' 
@@ -2707,24 +3033,39 @@ const Icon = ({ name, size = 18, className = "" }) => {
                                         : 'cursor-default'
                                     }`}
                                     onPointerDown={(e) => {
+                                        canvasPointerDownPos.current = { x: e.clientX, y: e.clientY };
                                         if (flowTool === 'pan' || flowTool === 'move-tree') handleFlowPointerDown(e);
                                     }}
                                     onPointerMove={handleFlowPointerMove}
                                     onPointerUp={handleFlowPointerUp}
                                     onPointerCancel={handleFlowPointerUp}
                                     onWheel={handleFlowWheel}
-                                    onClick={() => flowTool === 'select' && setSelectedFlowNode(null)}
+                                    onClick={(e) => {
+                                        setCtxMenu(null);
+                                        if (clickPopover) { setClickPopover(null); return; }
+                                        if (flowTool === 'select') setSelectedFlowNode(null);
+                                        const p = canvasPointerDownPos.current;
+                                        const moved = p && (Math.abs(e.clientX - p.x) > 5 || Math.abs(e.clientY - p.y) > 5);
+                                        if (!moved && flowTool === 'select' && !e.target.closest('.flow-node') && !e.target.closest('.flow-ui')) {
+                                            const rect = document.getElementById('tree-scaler')?.getBoundingClientRect();
+                                            if (rect) {
+                                                setClickPopover({ screenX: e.clientX, screenY: e.clientY, worldX: (e.clientX - rect.left) / (flowPz.scale * treeScale), worldY: (e.clientY - rect.top) / (flowPz.scale * treeScale) });
+                                                setClickPopoverForm({ name: '', acreage: '', nodeType: 'Party' });
+                                            }
+                                        }
+                                    }}
                                 >
-                                    <div 
+                                    <div
+                                        ref={flowPanZoomLayerRef}
                                         className="absolute top-0 left-0 pan-zoom-layer"
                                         style={{ transform: `translate(${flowPz.x}px, ${flowPz.y}px) scale(${flowPz.scale})`, transformOrigin: '0 0' }}
                                     >
-                                        {/* Physical Multi-Page "Paper" representation bounds */}
+                                        {/* Physical Multi-Page "Paper" representation bounds — sized to fit content or print area, whichever is larger */}
                                         <div
                                             className="paper-visual bg-parchment shadow-[12px_12px_0px_rgba(26,26,27,0.2)] relative border border-ink"
                                             style={{
-                                                width: pw * gridCols,
-                                                height: ph * gridRows,
+                                                width: Math.max(pw * gridCols, flowContentBounds.w),
+                                                height: Math.max(ph * gridRows, flowContentBounds.h),
                                             }}
                                         >
                                             {/* Safety Margin & Page Break Overlay Guide */}
@@ -2766,13 +3107,22 @@ const Icon = ({ name, size = 18, className = "" }) => {
                                 */}
                                 {isPrinting && (
                                     <div className="print-only w-full">
-                                        {Array.from({ length: gridRows }).map((_, r) => 
+                                        {Array.from({ length: gridRows }).map((_, r) =>
                                             Array.from({ length: gridCols }).map((_, c) => (
                                                 <div key={`print-page-${r}-${c}`} className="print-page-break bg-white" style={{ width: pw + 'px', height: ph + 'px' }}>
+                                                    {/* Title block on first page only */}
+                                                    {r === 0 && c === 0 && (
+                                                        <div style={{ position: 'absolute', top: 16, left: 20, zIndex: 100, background: 'white', padding: '5px 10px', borderLeft: '3px solid #1A1A1B' }}>
+                                                            <div style={{ fontSize: 13, fontWeight: 900, fontFamily: 'Georgia, serif', color: '#1A1A1B' }}>{projectName}</div>
+                                                            <div style={{ fontSize: 9, fontFamily: 'Courier Prime, monospace', color: '#1A1A1B', opacity: 0.6 }}>Flowchart · {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</div>
+                                                        </div>
+                                                    )}
                                                     {/* Inside this specific page, we shift the massive canvas container so the correct portion shows through the window */}
                                                     <div className="absolute" style={{ top: -(r * ph) + 'px', left: -(c * pw) + 'px', width: (pw * gridCols) + 'px', height: (ph * gridRows) + 'px' }}>
                                                         <div style={{ transform: `scale(${treeScale})`, transformOrigin: '0 0', width: '100%', height: '100%' }}>
-                                                            {renderTree(false)}
+                                                            <div style={{ transform: `translate(${-printOffset.x}px, ${-printOffset.y}px)` }}>
+                                                                {renderTree(false, true)}
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -3275,7 +3625,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
                                                 </div>
                                                 <div className="col-span-3">
                                                     <label className="text-[10px] font-bold text-sepia uppercase mb-1.5 block tracking-widest">Remaining Retained Share <span className="normal-case text-sepia/60">(derived · read-only)</span></label>
-                                                    <div className="w-full border border-ink/40 p-3 bg-teastain/50 font-bold font-mono text-sm text-sepia/80 select-none">{formatFraction(activeNode?.fraction ?? form.fraction)}</div>
+                                                    <div className="w-full border border-ink/40 p-3 bg-teastain/50 font-bold font-mono text-sm text-sepia/80 select-none">{formatFraction(!activeNode?.parentId ? Math.max(0, 1 - clampFraction(form.initialFraction)) : (activeNode?.fraction ?? form.fraction))}</div>
                                                 </div>
                                             </>
                                         )}
