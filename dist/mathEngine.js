@@ -15,15 +15,21 @@
   }
 
   function collectDescendantIds(allNodes, rootId) {
+    // Build parentId→children index in O(n), then DFS in O(n)
+    const childrenOf = new Map();
+    for (const node of allNodes) {
+      const pid = node.parentId;
+      if (pid == null || pid === 'unlinked') continue;
+      if (!childrenOf.has(pid)) childrenOf.set(pid, []);
+      childrenOf.get(pid).push(node.id);
+    }
     const descendants = new Set();
-    const queue = [rootId];
-    while (queue.length) {
-      const currentId = queue.shift();
-      allNodes.forEach((node) => {
-        if (node.parentId !== currentId || descendants.has(node.id)) return;
-        descendants.add(node.id);
-        queue.push(node.id);
-      });
+    const stack = childrenOf.has(rootId) ? [...childrenOf.get(rootId)] : [];
+    while (stack.length) {
+      const id = stack.pop();
+      if (descendants.has(id)) continue;
+      descendants.add(id);
+      if (childrenOf.has(id)) stack.push(...childrenOf.get(id));
     }
     return descendants;
   }

@@ -39,6 +39,7 @@
       };
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
+      request.onblocked = () => reject(new Error('IndexedDB upgrade blocked: close other tabs using this app and retry'));
     });
   }
 

@@ -151,6 +151,9 @@ const Icon = ({ name, size = 18, className = "" }) => {
             const [isZooming, setIsZooming] = useState(false);
             const zoomEndTimerRef = useRef(null);
 
+            useEffect(() => { flowPzRef.current = flowPz; }, [flowPz]);
+            useEffect(() => { treeScaleRef.current = treeScale; }, [treeScale]);
+
             // -------------------------------------------------------------
             // FLOWCHART ENGINE STATE
             // -------------------------------------------------------------
@@ -158,7 +161,9 @@ const Icon = ({ name, size = 18, className = "" }) => {
             const [flowEdges, setFlowEdges] = useState([]);
             const [flowTool, setFlowTool] = useState('select'); 
             const [flowPz, setFlowPz] = useState({ ...defaultFlowViewport });
-            const [treeScale, setTreeScale] = useState(1); 
+            const flowPzRef = useRef({ ...defaultFlowViewport });
+            const [treeScale, setTreeScale] = useState(1);
+            const treeScaleRef = useRef(1);
             const [gridCols, setGridCols] = useState(defaultFlowGrid.cols);
             const [gridRows, setGridRows] = useState(defaultFlowGrid.rows);
             const [connectingStart, setConnectingStart] = useState(null);
@@ -500,7 +505,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 initLocal();
             }, []);
 
-            const handleSaveWorkspace = async () => {
+            const handleSaveWorkspace = useCallback(async () => {
                 if (!projectName.trim()) return false;
                 setIsSaving(true);
                 try {
@@ -510,8 +515,8 @@ const Icon = ({ name, size = 18, className = "" }) => {
                         instrumentList,
                         flowNodes,
                         flowEdges,
-                        flowPz,
-                        treeScale,
+                        flowPz: flowPzRef.current,
+                        treeScale: treeScaleRef.current,
                         printOrientation,
                         gridCols,
                         gridRows,
@@ -535,18 +540,21 @@ const Icon = ({ name, size = 18, className = "" }) => {
                     setIsSaving(false);
                 }
                 return false;
-            };
+            }, [projectName, nodes, instrumentList, flowNodes, flowEdges, printOrientation,
+                gridCols, gridRows, tracts, contacts, ownershipInterests, contactLogs,
+                deskMaps, activeDeskMapId, currentWorkspaceId]);
 
             useEffect(() => {
                 if (!workspaceLoaded || showHome) return;
                 const timer = setTimeout(() => {
                     handleSaveWorkspace();
-                }, 400);
+                }, 2000);
                 return () => clearTimeout(timer);
             }, [
-                nodes, instrumentList, flowNodes, flowEdges, flowPz, treeScale, printOrientation,
+                nodes, instrumentList, flowNodes, flowEdges, printOrientation,
                 gridCols, gridRows, tracts, contacts, ownershipInterests, contactLogs,
-                deskMaps, activeDeskMapId, projectName, workspaceLoaded, currentWorkspaceId, showHome
+                deskMaps, activeDeskMapId, projectName, workspaceLoaded, currentWorkspaceId,
+                showHome, handleSaveWorkspace
             ]);
 
             const handleLoadWorkspace = (p, closeModal = true) => {
