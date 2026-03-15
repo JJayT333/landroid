@@ -48,7 +48,7 @@ function run() {
     form: { conveyanceMode: 'fraction', splitBasis: 'remaining', numerator: 1, denominator: 2 },
     parent: { fraction: 0.8, initialFraction: 1 },
   });
-  assert(Math.abs(share - 0.4) < 0.00000001, 'math engine share calculation failed');
+  assert(Math.abs(share - 0.4) < mathEngine.FRACTION_EPSILON, 'math engine share calculation failed');
 
 
   const tractMetrics = mathEngine.computeTractMetrics({

@@ -50,8 +50,9 @@
   function calculateShare({ form, parent }) {
     if (!parent) return 0;
     const numerator = parseFloat(form?.numerator || 0);
-    const denominator = parseFloat(form?.denominator || 1);
-    const ratio = denominator > 0 ? numerator / denominator : 0;
+    const denominator = parseFloat(form?.denominator);
+    if (!Number.isFinite(denominator) || denominator <= 0) return 0;
+    const ratio = numerator / denominator;
 
     if (form?.conveyanceMode === 'all') return clampFraction(parent.fraction);
     if (form?.conveyanceMode === 'fixed') return clampFraction(parseFloat(form?.manualAmount || 0));
@@ -59,7 +60,8 @@
       let base = parent.initialFraction ?? parent.fraction;
       if (form?.splitBasis === 'whole') base = 1.0;
       else if (form?.splitBasis === 'remaining') base = parent.fraction;
-      return clampFraction(base * ratio);
+      const raw = clampFraction(base * ratio);
+      return Math.min(raw, clampFraction(parent.fraction));
     }
     return 0;
   }
@@ -217,7 +219,7 @@
 
     safeNodes.forEach((node) => {
       if (!node || !node.id) return;
-      if (node.parentId === null || node.parentId === 'unlinked') return;
+      if (node.parentId == null || node.parentId === 'unlinked') return;
       if (!byId.has(node.parentId)) {
         issues.push({ code: 'missing_parent', nodeId: node.id, parentId: node.parentId, message: `Missing parent ${node.parentId} for ${node.id}` });
       }
@@ -429,6 +431,10 @@
     if (!nodeId) return resultErr('invalid_input', 'nodeId is required');
     const node = findNodeById(allNodes, nodeId);
     if (!node) return resultErr('missing_node', 'Unable to rebalance missing node');
+    const currentInitial = node.initialFraction ?? node.fraction ?? 0;
+    if (currentInitial < FRACTION_EPSILON) {
+      return resultErr('invalid_input', 'Cannot rebalance a node with zero or near-zero initial fraction — set the fraction manually first');
+    }
     const effectiveParentId = node.parentId;
     const resolvedParentId = effectiveParentId ?? parentId ?? null;
     const result = applyRebalanceUpdate({ ...(params || {}), parentId: resolvedParentId });
@@ -453,6 +459,10 @@
     if (!activeNode) return resultErr('missing_node', 'Unable to insert predecessor for missing node');
     if (findNodeById(allNodes, newPredecessorId)) return resultErr('conflicting_structure', `newPredecessorId ${newPredecessorId} already exists`);
     if (newPredecessorId === activeNodeId) return resultErr('conflicting_structure', 'newPredecessorId cannot equal activeNodeId');
+    const currentInitial = activeNode.initialFraction || 0;
+    if (currentInitial < FRACTION_EPSILON) {
+      return resultErr('invalid_input', 'Cannot insert predecessor on a node with zero or near-zero initial fraction');
+    }
     const result = applyPredecessorInsertUpdate(params || {});
     if (!result) return resultErr('missing_node', 'Unable to insert predecessor for missing node');
     const validation = validateOwnershipGraph(result.updatedNodes);
@@ -491,11 +501,12 @@
     const updatedNodes = applyAttachConveyanceUpdate(params || {});
     const validation = validateOwnershipGraph(updatedNodes);
     if (!validation.valid) return resultErr('invalid_graph', 'Attach would produce invalid ownership graph', validation.issues);
+    const oldRootInitialFraction = clampFraction(sourceRoot.initialFraction || sourceRoot.fraction);
     return resultOk(updatedNodes, {
       action: 'attach_conveyance',
-      oldRootFraction: clampFraction(sourceRoot.fraction),
+      oldRootFraction: oldRootInitialFraction,
       newRootFraction: normalizedShare,
-      scaleFactor: clampFraction(sourceRoot.fraction) > FRACTION_EPSILON ? normalizedShare / clampFraction(sourceRoot.fraction) : 0,
+      scaleFactor: oldRootInitialFraction > FRACTION_EPSILON ? normalizedShare / oldRootInitialFraction : 0,
       affectedCount: descendants.size + 1,
     });
   }

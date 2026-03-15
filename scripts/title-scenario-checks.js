@@ -13,7 +13,7 @@ function byId(nodes, id) {
 }
 
 function near(a, b, msg) {
-  assert(Math.abs(a - b) <= 0.0000005, `${msg} (expected ${b}, got ${a})`);
+  assert(Math.abs(a - b) <= mathEngine.FRACTION_EPSILON, `${msg} (expected ${b}, got ${a})`);
 }
 
 function scenarioLateSplitDiscovered() {

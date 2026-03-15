@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const mathEngine = require('../src/mathEngine.js');
 
-const FRACTION_EPSILON = 0.00000001;
+const FRACTION_EPSILON = mathEngine.FRACTION_EPSILON;
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);

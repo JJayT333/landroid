@@ -41,6 +41,7 @@
       instrumentList,
       flowNodes,
       flowEdges,
+      flowLayoutVersion: state.flowLayoutVersion,
       flowPz,
       treeScale,
       printOrientation,
@@ -68,6 +69,7 @@
 
     const workspace = payload || {};
     const flowNodes = workspace.flowNodes ? normalizeFlowNodeGroups(workspace.flowNodes) : undefined;
+    const flowLayoutVersion = workspace.flowLayoutVersion || 0;
     const flowPz = workspace.flowPz || { ...defaultFlowViewport };
     const tracts = workspace.tracts || [];
     const contacts = workspace.contacts || [];
@@ -84,6 +86,7 @@
       instrumentList: workspace.instrumentList,
       flowNodes,
       flowEdges: workspace.flowEdges,
+      flowLayoutVersion,
       flowPz,
       treeScale: workspace.treeScale,
       printOrientation: workspace.printOrientation,

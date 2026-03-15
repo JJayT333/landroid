@@ -31,7 +31,17 @@
       timestamp: Date.now(),
     };
     const next = [entry, ...listAuditEvents()].slice(0, MAX_AUDIT_EVENTS);
-    localStorage.setItem(AUDIT_EVENTS_KEY, JSON.stringify(next));
+    try {
+      localStorage.setItem(AUDIT_EVENTS_KEY, JSON.stringify(next));
+    } catch (_e) {
+      // QuotaExceededError — trim oldest 50 entries and retry once
+      const trimmed = next.slice(0, MAX_AUDIT_EVENTS - 50);
+      try {
+        localStorage.setItem(AUDIT_EVENTS_KEY, JSON.stringify(trimmed));
+      } catch (_e2) {
+        // Storage full even after trim — silently drop
+      }
+    }
     return entry;
   }
 

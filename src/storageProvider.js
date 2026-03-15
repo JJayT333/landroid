@@ -18,6 +18,10 @@
       deleteAllWorkspaces,
       saveWorkspace,
       getLatestWorkspace,
+      saveDocBlobs,
+      loadDocBlobs,
+      deleteDocBlobs,
+      deleteAllDocBlobs,
     } = workspaceStorageApi;
 
     return {
@@ -28,6 +32,10 @@
       deleteWorkspace,
       deleteAllWorkspaces,
       getLatestWorkspace,
+      saveDocBlobs,
+      loadDocBlobs,
+      deleteDocBlobs,
+      deleteAllDocBlobs,
       getLastWorkspaceId() {
         return localStorage.getItem(LOCAL_META_KEY);
       },

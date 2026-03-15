@@ -14,7 +14,7 @@
     "test:csv-fixtures": "node scripts/csv-fixture-checks.js",
     "test:math-engine": "node scripts/math-engine-checks.js",
     "test:stress-tiers": "node scripts/stress-tier-checks.js",
-    "build": "esbuild src/app.jsx --jsx=transform --jsx-factory=React.createElement --jsx-fragment=React.Fragment --outfile=dist/app.js && cp src/mathEngine.js dist/mathEngine.js && cp src/workspaceDomain.js dist/workspaceDomain.js && cp src/workspaceStorage.js dist/workspaceStorage.js && cp src/storageProvider.js dist/storageProvider.js && cp src/auditLog.js dist/auditLog.js && cp src/syncEngine.js dist/syncEngine.js && cp src/dropboxIntegration.js dist/dropboxIntegration.js"
+    "build": "esbuild src/app.jsx --jsx=transform --jsx-factory=React.createElement --jsx-fragment=React.Fragment --minify --sourcemap --outfile=dist/app.js && cp src/mathEngine.js dist/mathEngine.js && cp src/workspaceDomain.js dist/workspaceDomain.js && cp src/workspaceStorage.js dist/workspaceStorage.js && cp src/storageProvider.js dist/storageProvider.js && cp src/auditLog.js dist/auditLog.js && cp src/syncEngine.js dist/syncEngine.js && cp src/dropboxIntegration.js dist/dropboxIntegration.js"
   },
   "devDependencies": {
     "esbuild": "^0.27.4"

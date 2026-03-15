@@ -7,8 +7,9 @@
 })(typeof self !== 'undefined' ? self : globalThis, function () {
   const LOCAL_META_KEY = 'landroid:lastWorkspaceId';
   const DB_NAME = 'landroid-offline-db';
-  const DB_VERSION = 1;
+  const DB_VERSION = 2;
   const WORKSPACES_STORE = 'workspaces';
+  const DOCBLOBS_STORE = 'docblobs';
   const CURRENT_SCHEMA_VERSION = 1;
 
 
@@ -27,8 +28,11 @@
     return crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2, 11);
   }
 
-  function openDb() {
-    return new Promise((resolve, reject) => {
+  let _dbPromise = null;
+
+  function getDb() {
+    if (_dbPromise) return _dbPromise;
+    _dbPromise = new Promise((resolve, reject) => {
       const request = indexedDB.open(DB_NAME, DB_VERSION);
       request.onupgradeneeded = () => {
         const db = request.result;
@@ -36,15 +40,24 @@
           const store = db.createObjectStore(WORKSPACES_STORE, { keyPath: 'id' });
           store.createIndex('updatedAt', 'updatedAt', { unique: false });
         }
+        if (!db.objectStoreNames.contains(DOCBLOBS_STORE)) {
+          db.createObjectStore(DOCBLOBS_STORE, { keyPath: 'key' });
+        }
       };
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
-      request.onblocked = () => reject(new Error('IndexedDB upgrade blocked: close other tabs using this app and retry'));
+      request.onsuccess = () => {
+        const db = request.result;
+        db.onclose = () => { _dbPromise = null; };
+        db.onversionchange = () => { db.close(); _dbPromise = null; };
+        resolve(db);
+      };
+      request.onerror = () => { _dbPromise = null; reject(request.error); };
+      request.onblocked = () => { _dbPromise = null; reject(new Error('IndexedDB upgrade blocked: close other tabs using this app and retry')); };
     });
+    return _dbPromise;
   }
 
-  async function withWorkspaceStore(mode, handler) {
-    const db = await openDb();
+  async function withStore(storeName, mode, handler) {
+    const db = await getDb();
     return new Promise((resolve, reject) => {
       let settled = false;
       let result;
@@ -67,24 +80,25 @@
         reject(error);
       };
 
-      const tx = db.transaction(WORKSPACES_STORE, mode);
-      const store = tx.objectStore(WORKSPACES_STORE);
+      const tx = db.transaction(storeName, mode);
+      const store = tx.objectStore(storeName);
 
       tx.oncomplete = () => {
-        db.close();
         safeResolve(hasResult ? result : undefined);
       };
       tx.onerror = () => {
-        db.close();
         safeReject(tx.error);
       };
       tx.onabort = () => {
-        db.close();
-        safeReject(tx.error || new Error('Workspace transaction aborted'));
+        safeReject(tx.error || new Error('Transaction aborted'));
       };
 
       handler({ store, setResult, reject: safeReject });
     });
+  }
+
+  async function withWorkspaceStore(mode, handler) {
+    return withStore(WORKSPACES_STORE, mode, handler);
   }
 
   async function getAllWorkspaces() {
@@ -145,6 +159,53 @@
     });
   }
 
+  async function saveDocBlobs(workspaceId, nodes) {
+    const blobs = [];
+    (nodes || []).forEach((node) => {
+      if (node.docData) {
+        blobs.push({ key: `${workspaceId}::${node.id}`, workspaceId, nodeId: node.id, docData: node.docData });
+      }
+    });
+    if (!blobs.length) return;
+    await withStore(DOCBLOBS_STORE, 'readwrite', ({ store }) => {
+      blobs.forEach((blob) => store.put(blob));
+    });
+  }
+
+  async function loadDocBlobs(workspaceId) {
+    return withStore(DOCBLOBS_STORE, 'readonly', ({ store, setResult, reject }) => {
+      const entries = [];
+      const request = store.openCursor();
+      request.onsuccess = () => {
+        const cursor = request.result;
+        if (!cursor) { setResult(entries); return; }
+        if (cursor.value.workspaceId === workspaceId) {
+          entries.push(cursor.value);
+        }
+        cursor.continue();
+      };
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async function deleteDocBlobs(workspaceId) {
+    await withStore(DOCBLOBS_STORE, 'readwrite', ({ store }) => {
+      const request = store.openCursor();
+      request.onsuccess = () => {
+        const cursor = request.result;
+        if (!cursor) return;
+        if (cursor.value.workspaceId === workspaceId) cursor.delete();
+        cursor.continue();
+      };
+    });
+  }
+
+  async function deleteAllDocBlobs() {
+    await withStore(DOCBLOBS_STORE, 'readwrite', ({ store }) => {
+      store.clear();
+    });
+  }
+
   return {
     LOCAL_META_KEY,
     getAllWorkspaces,
@@ -153,6 +214,10 @@
     deleteAllWorkspaces,
     saveWorkspace,
     getLatestWorkspace,
+    saveDocBlobs,
+    loadDocBlobs,
+    deleteDocBlobs,
+    deleteAllDocBlobs,
     CURRENT_SCHEMA_VERSION,
   };
 });

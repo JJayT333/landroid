@@ -22,6 +22,10 @@ const {
     deleteWorkspace,
     deleteAllWorkspaces,
     getLatestWorkspace,
+    saveDocBlobs,
+    loadDocBlobs,
+    deleteDocBlobs,
+    deleteAllDocBlobs,
 } = workspaceProvider;
 
 const workspaceDomainApi = globalThis.LANDroidWorkspaceDomain || {};
@@ -268,6 +272,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
             const chartPanPointRef = useRef(null);
             const flowPanFrameRef = useRef(null);
             const flowPanPointRef = useRef(null);
+            const pendingRelayoutRef = useRef(null);
 
             const [form, setForm] = useState({
                 instrument: '', vol: '', page: '', docNo: '', fileDate: '', date: '', grantor: '', grantee: '', 
@@ -565,6 +570,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
                         instrumentList,
                         flowNodes,
                         flowEdges,
+                        flowLayoutVersion: FLOW_LAYOUT_VERSION,
                         flowPz: flowPzRef.current,
                         treeScale: treeScaleRef.current,
                         printOrientation,
@@ -579,6 +585,9 @@ const Icon = ({ name, size = 18, className = "" }) => {
                         appId,
                     });
                     const savedWorkspace = await saveWorkspace(data, currentWorkspaceId);
+                    // Persist PDF docData separately in IDB docblobs store
+                    const allNodesForBlobs = [...nodes, ...(deskMaps || []).flatMap(m => m.nodes || [])];
+                    await saveDocBlobs(savedWorkspace.id, allNodesForBlobs);
                     setCurrentWorkspaceId(savedWorkspace.id);
                     const projects = await listWorkspaces();
                     setSavedProjects(projects);
@@ -607,7 +616,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 showHome, handleSaveWorkspace
             ]);
 
-            const handleLoadWorkspace = (p, closeModal = true) => {
+            const handleLoadWorkspace = async (p, closeModal = true) => {
                 const hydrated = fromStoredWorkspace(p, {
                     makeId,
                     defaultRoot,
@@ -616,9 +625,24 @@ const Icon = ({ name, size = 18, className = "" }) => {
                     normalizeFlowNodeGroups,
                 });
 
+                // Rehydrate docData from separate IDB store
+                if (hydrated.workspaceId) {
+                    try {
+                        const blobs = await loadDocBlobs(hydrated.workspaceId);
+                        if (blobs && blobs.length) {
+                            const blobMap = Object.fromEntries(blobs.map(b => [b.nodeId, b.docData]));
+                            hydrated.nodes = hydrated.nodes.map(n => blobMap[n.id] ? { ...n, docData: blobMap[n.id] } : n);
+                            hydrated.deskMaps = hydrated.deskMaps.map(m => ({
+                                ...m,
+                                nodes: (m.nodes || []).map(n => blobMap[n.id] ? { ...n, docData: blobMap[n.id] } : n),
+                            }));
+                        }
+                    } catch (e) {
+                        console.error('Failed to load doc blobs:', e); // intentional
+                    }
+                }
+
                 if (hydrated.instrumentList) setInstrumentList(hydrated.instrumentList);
-                if (hydrated.flowNodes) setFlowNodes(hydrated.flowNodes);
-                if (hydrated.flowEdges) setFlowEdges(hydrated.flowEdges);
                 if (hydrated.flowPz) setFlowPz(hydrated.flowPz);
                 if (hydrated.treeScale) setTreeScale(hydrated.treeScale);
                 if (hydrated.printOrientation) setPrintOrientation(hydrated.printOrientation);
@@ -638,6 +662,15 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 setWorkspaceLoaded(true);
                 setShowHome(false);
                 if (closeModal) setShowCloudModal(false);
+
+                if (hydrated.flowNodes) setFlowNodes(hydrated.flowNodes);
+                if (hydrated.flowEdges) setFlowEdges(hydrated.flowEdges);
+
+                // Schedule auto-relayout if saved layout version is stale or missing
+                if (hydrated.flowNodes?.length > 0 && (hydrated.flowLayoutVersion || 0) < FLOW_LAYOUT_VERSION) {
+                    pendingRelayoutRef.current = hydrated.deskMaps || [];
+                }
+
                 recordAuditEvent('workspace_loaded', { workspaceId: hydrated.workspaceId, workspaceName: hydrated.projectName });
             };
             
@@ -724,12 +757,18 @@ const Icon = ({ name, size = 18, className = "" }) => {
             const handleDocSelection = (e) => {
                 const file = e.target.files[0];
                 if (!file) return;
+                if (file.size > 10 * 1024 * 1024) {
+                    if (!window.confirm(`This file is ${(file.size / 1024 / 1024).toFixed(1)} MB. Large files may slow down the app. Continue?`)) {
+                        e.target.value = '';
+                        return;
+                    }
+                }
                 const reader = new FileReader();
                 reader.onload = (evt) => {
                     setForm(prev => ({ ...prev, docData: evt.target.result, docNo: file.name.split('.')[0] }));
                 };
                 reader.readAsDataURL(file);
-                e.target.value = ''; 
+                e.target.value = '';
             };
 
             const formatFraction = (num) => (isNaN(num) || num === null || num === undefined ? "0.000000000" : Number(num).toFixed(9));
@@ -1500,17 +1539,28 @@ const Icon = ({ name, size = 18, className = "" }) => {
             };
 
             // PERFORMANCE: Extracted to a standard render function to prevent destructive unmounting/remounting on every frame
+            const MAX_TREE_DEPTH = 150;
             const renderTreeNode = (n, depth = 0) => {
+                if (depth > MAX_TREE_DEPTH) {
+                    return (
+                        <div key={n.id} className="flex flex-col items-center relative">
+                            <div className="p-3 border border-stamp/40 bg-stamp/10 text-stamp text-[10px] font-mono uppercase tracking-wider">
+                                Tree depth limit reached ({MAX_TREE_DEPTH}+ levels)
+                            </div>
+                        </div>
+                    );
+                }
                 const relatedDocs = relatedByParentId[n.id] || [];
                 const isDeceased = n.isDeceased;
                 const conveyanceFractionLabel = formatConveyanceFraction(n);
-                const grantFractionDisplay = formatAsFraction(n.initialFraction || n.fraction);
-                const remainingFractionDisplay = formatAsFraction(n.fraction);
+                const grantFractionDisplay = formatMasterFraction(n.initialFraction || n.fraction);
+                const remainingFractionDisplay = formatMasterFraction(n.fraction);
                 const hasChildren = n.children.length > 0;
                 const isCollapsed = Boolean(n.isCollapsed);
-                const hiddenDescendantCount = isCollapsed ? countTreeDescendants(n) : 0;
                 const shouldSimplifyChildren = simplifyZoomSubtrees && depth >= 1 && hasChildren;
-                const simplifiedHiddenCount = shouldSimplifyChildren ? countTreeDescendants(n) : 0;
+                const descendantCount = (isCollapsed || shouldSimplifyChildren) ? countTreeDescendants(n) : 0;
+                const hiddenDescendantCount = isCollapsed ? descendantCount : 0;
+                const simplifiedHiddenCount = shouldSimplifyChildren ? descendantCount : 0;
                 return (
                     <div key={n.id} className="flex flex-col items-center relative animate-fade-in treenode">
                         <div className="z-10 group relative treenode-body">
@@ -1644,7 +1694,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
                             
                             <div className="opacity-0 group-hover:opacity-100 transition-all duration-300 mt-2 flex flex-col gap-1">
                                 <div className="flex gap-1 justify-center">
-                                    {n.parentId === null && nodes.length > 1 && (
+                                    {n.parentId == null && nodes.length > 1 && (
                                         <button onClick={(e) => { e.stopPropagation(); openAttach(n); }} className="bg-sepia text-parchment border border-sepia rounded-sm px-2 py-1 text-[10px] font-bold hover:bg-sepia/80 shadow-md flex items-center gap-1 hover:-translate-y-0.5 transition-all"><Icon name="Link" size={12} /> ATTACH</button>
                                     )}
                                     <button onClick={(e) => { e.stopPropagation(); openPrecede(n); }} className="bg-ink text-parchment border border-parchment rounded-sm px-2 py-1 text-[10px] font-bold hover:bg-ink/80 shadow-md flex items-center gap-1 hover:-translate-y-0.5 transition-transform"><Icon name="ArrowUp" size={12} /> PRECEDE</button>
@@ -1697,12 +1747,17 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 });
             };
 
+            const FLOW_LAYOUT_VERSION = 1;
+
             const buildFlowLayoutFromNodes = (sourceNodes, idPrefix = '', xShift = 0, treeGroupId = '') => {
                 const safePrefix = idPrefix ? `${idPrefix}-` : '';
                 const normalNodes = sourceNodes.filter(n => n.type !== 'related' && n.parentId !== 'unlinked');
                 if (!normalNodes.length) return { nodes: [], edges: [], width: 0 };
-                if (normalNodes.length > 300) {
-                    window.alert(`This desk map has ${normalNodes.length} nodes — too large to auto-layout (limit: 300). Import cancelled.`);
+                if (normalNodes.length > 1500) {
+                    window.alert(`This desk map has ${normalNodes.length} nodes — too large to auto-layout (limit: 1500). Import cancelled.`);
+                    return { nodes: [], edges: [], width: 0 };
+                }
+                if (normalNodes.length > 500 && !window.confirm(`This desk map has ${normalNodes.length} nodes. Layout may take a moment. Continue?`)) {
                     return { nodes: [], edges: [], width: 0 };
                 }
 
@@ -1851,7 +1906,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 const contentW = Math.max(300, maxX - minX);
                 const contentH = Math.max(200, maxY - minY);
                 // 5% padding on all sides → use 90% of viewport for scale
-                const fitScale = Math.max(0.02, Math.min((viewportW * 0.90) / contentW, (viewportH * 0.90) / contentH, 2));
+                const fitScale = Math.max(0.12, Math.min((viewportW * 0.90) / contentW, (viewportH * 0.90) / contentH, 2));
                 setTreeScale(1);
                 const centerX = minX + contentW / 2;
                 const centerY = minY + contentH / 2;
@@ -1859,6 +1914,30 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 const targetY = (viewportH / 2) - (centerY * fitScale);
                 setFlowPz({ x: Math.min(600, Math.max(-60000, targetX)), y: Math.min(400, Math.max(-60000, targetY)), scale: fitScale });
             };
+
+            const relayoutFlowchart = (maps) => {
+                if (!maps || !maps.length) return;
+                let xCursor = 0;
+                const built = maps.map((map, i) => {
+                    const result = buildFlowLayoutFromNodes(map.nodes || [], `${map.id}-${i}-${makeId()}`, xCursor, map.id);
+                    xCursor += result.width + 220;
+                    return result;
+                });
+                const nextNodes = built.flatMap(b => b.nodes);
+                const nextEdges = built.flatMap(b => b.edges);
+                setFlowNodes(nextNodes);
+                setFlowEdges(nextEdges);
+                if (nextNodes.length) fitFlowToView(nextNodes);
+            };
+
+            // Consume deferred relayout request from workspace load
+            useEffect(() => {
+                const maps = pendingRelayoutRef.current;
+                if (maps && maps.length) {
+                    pendingRelayoutRef.current = null;
+                    relayoutFlowchart(maps);
+                }
+            });
 
             const importToFlowchart = (append = false) => {
                 const selectedMaps = getFlowSelectedDeskMaps();
@@ -1920,6 +1999,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
                     setShowHome(true);
                 }
                 await deleteWorkspace(workspaceId);
+                await deleteDocBlobs(workspaceId);
                 const projects = await listWorkspaces();
                 setSavedProjects(projects);
                 if (deletingActiveWorkspace) {
@@ -1935,6 +2015,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 setCurrentWorkspaceId(null);
                 setShowHome(true);
                 await deleteAllWorkspaces();
+                await deleteAllDocBlobs();
                 recordAuditEvent('workspace_deleted_all', { deletedCount: savedProjects.length });
                 setSavedProjects([]);
                 setProjectName('My Workspace');
@@ -1970,9 +2051,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
                     x: ((anchorX - (scalerRect?.left || 0)) / (flowPz.scale * treeScale)) - 140,
                     y: ((anchorY - (scalerRect?.top || 0)) / (flowPz.scale * treeScale)) - 100,
                     type,
-                    treeGroupId: selectedFlowNode
-                        ? resolveTreeGroupId(flowNodes.find(n => n.id === selectedFlowNode))
-                        : createTreeGroupId(),
+                    treeGroupId: createTreeGroupId(),
                     color: 'bg-parchment text-ink border-ink',
                     compact: type === 'template',
                     data: type === 'template' ? {
@@ -2642,7 +2721,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
                                                         {showOnlyConveyances && <td className="px-4 py-1.5 font-bold font-mono text-[11px] border-r border-ink/20">{formatFraction(n.fraction)}</td>}
                                                         <td className="px-4 py-1.5 text-[10px] truncate max-w-[150px] italic border-r border-ink/20 opacity-60">{n.remarks}</td>
                                                         <td className="px-4 py-1.5 text-right flex items-center justify-end gap-1">
-                                                            {(n.parentId === 'unlinked' || n.parentId === null) && nodes.length > 1 && (
+                                                            {(n.parentId === 'unlinked' || n.parentId == null) && nodes.length > 1 && (
                                                                 <button onClick={(e) => { e.stopPropagation(); openAttach(n); }} className="px-2 py-1 bg-sepia text-parchment border border-sepia hover:bg-sepia/80 rounded-sm transition-colors text-[9px] font-bold uppercase tracking-widest flex items-center gap-1 ink-shadow">
                                                                     <Icon name="Link" size={10}/> Attach
                                                                 </button>
@@ -2708,30 +2787,6 @@ const Icon = ({ name, size = 18, className = "" }) => {
                                         ))}
                                     </div>
 
-                                    {false && (
-                                        <div className="p-4 grid md:grid-cols-2 gap-4">
-                                            <div className="border border-ink/20 rounded-xl p-3 bg-parchment">
-                                                <h3 className="text-xs font-bold uppercase tracking-widest mb-3">Add Tract</h3>
-                                                <div className="grid grid-cols-2 gap-2 text-xs">
-                                                    <input className="border border-ink p-2" placeholder="Tract Code" value={tractForm.code} onChange={e => setTractForm({ ...tractForm, code: e.target.value })} />
-                                                    <input className="border border-ink p-2" placeholder="Display Name" value={tractForm.name} onChange={e => setTractForm({ ...tractForm, name: e.target.value })} />
-                                                    <input className="border border-ink p-2" placeholder="Gross Acres" type="number" value={tractForm.acres} onChange={e => setTractForm({ ...tractForm, acres: e.target.value })} />
-                                                    <input className="border border-ink p-2" placeholder="ArcGIS Feature ID" value={tractForm.mapId} onChange={e => setTractForm({ ...tractForm, mapId: e.target.value })} />
-                                                </div>
-                                                <button onClick={addTract} className="mt-3 px-3 py-1.5 text-xs font-bold border border-ink hover:bg-ink hover:text-parchment transition-colors">Add Tract</button>
-                                            </div>
-                                            <div className="border border-ink/20 rounded-xl p-3 bg-parchment overflow-auto">
-                                                <h3 className="text-xs font-bold uppercase tracking-widest mb-3">Tract Registry</h3>
-                                                <table className="w-full text-xs">
-                                                    <thead><tr className="border-b border-ink/20"><th className="text-left py-1">Code</th><th className="text-left py-1">Name</th><th className="text-left py-1">Acres</th><th className="text-left py-1">Map ID</th><th className="text-right py-1">Actions</th></tr></thead>
-                                                    <tbody>
-                                                        {tracts.map(t => <tr key={t.id} className="border-b border-ink/10"><td className="py-1">{t.code}</td><td>{t.name || '-'}</td><td>{t.acres || '-'}</td><td>{t.mapId || '-'}</td><td className="text-right"><button onClick={() => removeTract(t.id)} className="text-stamp hover:underline">Remove</button></td></tr>)}
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                        </div>
-                                    )}
-
                                     {researchTab === 'contacts' && (
                                         <div className="p-6">
                                             <div className="border border-dashed border-ink/40 rounded-xl p-6 bg-parchment text-center">
@@ -2741,43 +2796,6 @@ const Icon = ({ name, size = 18, className = "" }) => {
                                         </div>
                                     )}
 
-                                    {false && (
-                                        <div className="p-4 grid lg:grid-cols-3 gap-4">
-                                            <div className="border border-ink/20 rounded-xl p-3 bg-parchment lg:col-span-1">
-                                                <h3 className="text-xs font-bold uppercase tracking-widest mb-3">Add Interest</h3>
-                                                <div className="space-y-2 text-xs">
-                                                    <select className="w-full border border-ink p-2" value={interestForm.contactId} onChange={e => setInterestForm({ ...interestForm, contactId: e.target.value })}><option value="">Contact</option>{contacts.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
-                                                    <select className="w-full border border-ink p-2" value={interestForm.tractId} onChange={e => setInterestForm({ ...interestForm, tractId: e.target.value })}><option value="">Tract</option>{tracts.map(t => <option key={t.id} value={t.id}>{t.code} {t.name ? `- ${t.name}` : ''}</option>)}</select>
-                                                    <select className="w-full border border-ink p-2" value={interestForm.interestType} onChange={e => setInterestForm({ ...interestForm, interestType: e.target.value })}><option value="MI">MI</option><option value="RI">RI</option><option value="NRI">NRI</option><option value="ORRI">ORRI</option></select>
-                                                    <input className="w-full border border-ink p-2" type="number" step="0.0000000001" placeholder="Interest (decimal)" value={interestForm.interestValue} onChange={e => setInterestForm({ ...interestForm, interestValue: e.target.value })} />
-                                                    <select className="w-full border border-ink p-2" value={interestForm.status} onChange={e => setInterestForm({ ...interestForm, status: e.target.value })}><option value="confirmed">Confirmed</option><option value="proposed">Proposed</option><option value="disputed">Disputed</option></select>
-                                                </div>
-                                                <button onClick={addInterest} className="mt-3 px-3 py-1.5 text-xs font-bold border border-ink hover:bg-ink hover:text-parchment transition-colors">Add Interest</button>
-                                            </div>
-                                            <div className="border border-ink/20 rounded-xl p-3 bg-parchment overflow-auto lg:col-span-2">
-                                                <h3 className="text-xs font-bold uppercase tracking-widest mb-3">Owner × Tract Matrix</h3>
-                                                <table className="w-full text-xs whitespace-nowrap">
-                                                    <thead>
-                                                        <tr className="border-b border-ink/20">
-                                                            <th className="text-left py-1 pr-2">Owner</th>
-                                                            {tracts.map(t => <th key={t.id} className="text-left py-1 px-2">{t.code}</th>)}
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        {contacts.map(c => (
-                                                            <tr key={c.id} className="border-b border-ink/10">
-                                                                <td className="py-1 pr-2 font-bold">{c.name}</td>
-                                                                {tracts.map(t => {
-                                                                    const records = interestsByContactAndTract[`${c.id}::${t.id}`] || [];
-                                                                    return <td key={t.id} className="px-2 py-1">{records.length ? records.map(r => <span key={r.id} className="inline-flex items-center gap-1 mr-1">{r.interestType}:{r.interestValue}<button onClick={() => removeInterest(r.id)} className="text-stamp" title="Remove interest">×</button></span>) : '-'}</td>;
-                                                                })}
-                                                            </tr>
-                                                        ))}
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                        </div>
-                                    )}
                                 </div>
                             </div>
                         )}
@@ -2844,6 +2862,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
                                     <button onClick={() => addFlowNode('template')} aria-label="Add templated flowchart box" className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-ink bg-parchment hover:bg-teastain flex items-center gap-1 shadow-sm transition-all hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sepia"><Icon name="Plus" size={12}/> Box</button>
                                     <button onClick={() => addFlowNode('blank')} aria-label="Add blank note box" className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-ink bg-parchment hover:bg-teastain flex items-center gap-1 shadow-sm transition-all hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sepia"><Icon name="Plus" size={12}/> Note</button>
                                     <button onClick={() => fitFlowToView()} aria-label="Fit all flow nodes to view" className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-ink/40 text-ink hover:bg-ink hover:text-parchment flex items-center gap-1 shadow-sm transition-all hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sepia" title="Recenter and fit all flow nodes to the current canvas"><Icon name="Move" size={12}/> Fit View</button>
+                                    <button onClick={() => relayoutFlowchart(deskMaps)} aria-label="Re-layout flowchart from desk maps" className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-ink/40 text-ink hover:bg-ink hover:text-parchment flex items-center gap-1 shadow-sm transition-all hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sepia" title="Re-run automatic layout algorithm on all desk map nodes"><Icon name="Chart" size={12}/> Re-layout</button>
                                     <button onClick={handlePrintFlowchart} aria-label="Print flowchart" className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-ink bg-ink text-parchment hover:bg-ink/80 flex items-center gap-1 shadow-sm transition-all hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sepia"><Icon name="Printer" size={12}/> Print</button>
                                     <button
                                         onClick={() => { const next = !flowGlobalCompact; setFlowGlobalCompact(next); setFlowNodes(nodes => nodes.map(n => n.type === 'template' ? { ...n, compact: next } : n)); }}
@@ -3043,10 +3062,16 @@ const Icon = ({ name, size = 18, className = "" }) => {
                                     onClick={(e) => {
                                         setCtxMenu(null);
                                         if (clickPopover) { setClickPopover(null); return; }
-                                        if (flowTool === 'select') setSelectedFlowNode(null);
+                                        // Only deselect when clicking on empty canvas, NOT when click propagates from a node
+                                        if (flowTool === 'select' && !e.target.closest('.flow-node') && !e.target.closest('.flow-ui')) {
+                                            setSelectedFlowNode(null);
+                                        }
+                                    }}
+                                    onDoubleClick={(e) => {
+                                        if (e.target.closest('.flow-node') || e.target.closest('.flow-ui')) return;
                                         const p = canvasPointerDownPos.current;
                                         const moved = p && (Math.abs(e.clientX - p.x) > 5 || Math.abs(e.clientY - p.y) > 5);
-                                        if (!moved && flowTool === 'select' && !e.target.closest('.flow-node') && !e.target.closest('.flow-ui')) {
+                                        if (!moved && flowTool === 'select') {
                                             const rect = document.getElementById('tree-scaler')?.getBoundingClientRect();
                                             if (rect) {
                                                 setClickPopover({ screenX: e.clientX, screenY: e.clientY, worldX: (e.clientX - rect.left) / (flowPz.scale * treeScale), worldY: (e.clientY - rect.top) / (flowPz.scale * treeScale) });

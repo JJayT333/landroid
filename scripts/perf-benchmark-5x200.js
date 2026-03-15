@@ -93,17 +93,22 @@ function evaluateThresholds(results) {
     derive_flow_all: 120,
   };
 
+  const HARD_FAIL_MULTIPLIER = 2;
   let warningCount = 0;
+  let failCount = 0;
   Object.entries(thresholdsMs).forEach(([key, threshold]) => {
     const hit = results.find((row) => row.label === key);
     if (!hit) return;
-    if (hit.durationMs > threshold) {
+    if (hit.durationMs > threshold * HARD_FAIL_MULTIPLIER) {
+      failCount += 1;
+      console.error(`[perf-FAIL] ${key} took ${hit.durationMs.toFixed(2)}ms (hard limit ${threshold * HARD_FAIL_MULTIPLIER}ms)`);
+    } else if (hit.durationMs > threshold) {
       warningCount += 1;
       console.warn(`[perf-warning] ${key} took ${hit.durationMs.toFixed(2)}ms (threshold ${threshold}ms)`);
     }
   });
 
-  return { warningCount, thresholdsMs };
+  return { warningCount, failCount, thresholdsMs };
 }
 
 function run() {
@@ -145,7 +150,7 @@ function run() {
   assert(fixtureStats.deskMapCount === 5, `expected 5 desk maps, got ${fixtureStats.deskMapCount}`);
   assert(fixtureStats.totalNodes === 1000, `expected 1000 nodes, got ${fixtureStats.totalNodes}`);
 
-  const { warningCount } = evaluateThresholds(timingRows);
+  const { warningCount, failCount } = evaluateThresholds(timingRows);
 
   console.log('Performance benchmark (5x200) complete.');
   timingRows.forEach((row) => {
@@ -153,6 +158,10 @@ function run() {
   });
   console.log(`- fixture: maps=${fixtureStats.deskMapCount}, totalNodes=${fixtureStats.totalNodes}, allRunsheetNodes=${fixtureStats.allRunsheetNodeCount}, flowAllEdges=${fixtureStats.flowAllEdges}`);
   console.log(`- warnings: ${warningCount}`);
+  if (failCount > 0) {
+    console.error(`FAIL: ${failCount} metric(s) exceeded 2x hard limit`);
+    process.exit(1);
+  }
 }
 
 run();

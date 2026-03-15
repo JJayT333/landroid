@@ -4,7 +4,7 @@ function assert(condition, message) {
 
 const mathEngine = require('../src/mathEngine.js');
 
-function near(actual, expected, message, epsilon = 0.00000001) {
+function near(actual, expected, message, epsilon = mathEngine.FRACTION_EPSILON) {
   if (Math.abs(actual - expected) > epsilon) {
     throw new Error(`${message}: expected ${expected}, got ${actual}`);
   }

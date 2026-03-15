@@ -30,13 +30,27 @@ function isNavigationRequest(request) {
   return request.mode === 'navigate' || request.destination === 'document';
 }
 
+const CACHEABLE_ORIGINS = new Set([self.location.origin]);
+const CACHEABLE_CDN_PREFIXES = [
+  'https://cdn.tailwindcss.com/',
+  'https://unpkg.com/',
+  'https://cdnjs.cloudflare.com/',
+  'https://fonts.googleapis.com/',
+  'https://fonts.gstatic.com/',
+];
+
+function isCacheable(url) {
+  if (CACHEABLE_ORIGINS.has(new URL(url).origin)) return true;
+  return CACHEABLE_CDN_PREFIXES.some((prefix) => url.startsWith(prefix));
+}
+
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
 
   event.respondWith((async () => {
     try {
       const response = await fetch(event.request);
-      if (response && response.ok) {
+      if (response && response.ok && isCacheable(event.request.url)) {
         const copy = response.clone();
         caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
       }
