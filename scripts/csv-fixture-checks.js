@@ -169,10 +169,24 @@ function walkCsvFiles(rootDir) {
 }
 
 function run() {
-  const root = path.join(process.cwd(), 'testdata');
-  const csvFiles = walkCsvFiles(root);
-  assert(csvFiles.length > 0, 'No CSV fixtures found in testdata');
-  csvFiles.forEach((file) => validateCsvFixture(file));
+  const cwd = process.cwd();
+  const csvFiles = [];
+
+  // Scan root-level realistic test CSVs
+  fs.readdirSync(cwd).forEach((entry) => {
+    if (entry.endsWith('.import.csv') && entry.startsWith('test-')) {
+      csvFiles.push(path.join(cwd, entry));
+    }
+  });
+
+  // Scan testdata/ if it exists
+  const testdataDir = path.join(cwd, 'testdata');
+  if (fs.existsSync(testdataDir)) {
+    csvFiles.push(...walkCsvFiles(testdataDir));
+  }
+
+  assert(csvFiles.length > 0, 'No CSV fixtures found');
+  csvFiles.sort().forEach((file) => validateCsvFixture(file));
   console.log(`CSV fixture checks passed (${csvFiles.length} files)`);
 }
 

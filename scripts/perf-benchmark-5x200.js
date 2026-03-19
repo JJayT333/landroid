@@ -16,12 +16,53 @@ function measure(label, fn) {
   return { label, durationMs: end - start, result };
 }
 
+function parseCsvLine(line) {
+  const cells = [];
+  let current = '';
+  let i = 0;
+  let inQuotes = false;
+  while (i < line.length) {
+    const ch = line[i];
+    if (ch === '"') {
+      if (inQuotes && line[i + 1] === '"') { current += '"'; i += 2; continue; }
+      inQuotes = !inQuotes; i += 1; continue;
+    }
+    if (ch === ',' && !inQuotes) { cells.push(current); current = ''; i += 1; continue; }
+    current += ch; i += 1;
+  }
+  cells.push(current);
+  return cells;
+}
+
+function loadWorkspaceFromCsv(csvPath) {
+  const raw = fs.readFileSync(csvPath, 'utf8').replace(/^\uFEFF/, '');
+  const lines = raw.split(/\r?\n/).filter((l) => l.trim().length > 0);
+  assert(lines.length >= 2, 'CSV missing header or rows');
+  const headers = parseCsvLine(lines[0]);
+  const firstCells = parseCsvLine(lines[1]);
+  const firstRow = {};
+  headers.forEach((h, idx) => { firstRow[h] = firstCells[idx] ?? ''; });
+  const deskMaps = JSON.parse(firstRow['INTERNAL_DESKMAPS'] || '[]');
+  const activeDeskMapId = firstRow['INTERNAL_ACTIVE_DESKMAP_ID'] || (deskMaps[0]?.id || '');
+  assert(Array.isArray(deskMaps) && deskMaps.length > 0, `${csvPath}: no embedded desk maps`);
+  return { deskMaps, activeDeskMapId };
+}
+
 function loadWorkspaceFixture() {
-  const filePath = path.join(process.cwd(), 'testdata', 'deskmap-stress-5x200.workspace.json');
-  const raw = fs.readFileSync(filePath, 'utf8');
-  const workspace = JSON.parse(raw);
-  assert(Array.isArray(workspace.deskMaps), 'workspace fixture missing deskMaps');
-  return workspace;
+  const csvFiles = [
+    'test-200-realistic.import.csv',
+    'test-500-realistic.import.csv',
+    'test-1024-realistic.import.csv',
+  ];
+  const allMaps = [];
+  let activeDeskMapId = '';
+  csvFiles.forEach((file) => {
+    const csvPath = path.join(process.cwd(), file);
+    const ws = loadWorkspaceFromCsv(csvPath);
+    allMaps.push(...ws.deskMaps);
+    if (!activeDeskMapId) activeDeskMapId = ws.activeDeskMapId;
+  });
+  return { deskMaps: allMaps, activeDeskMapId };
 }
 
 function buildRunsheetNodes(workspace, mode = 'all') {
@@ -147,8 +188,8 @@ function run() {
     flowActiveEdges: activeFlowTiming.result.edges.length,
   };
 
-  assert(fixtureStats.deskMapCount === 5, `expected 5 desk maps, got ${fixtureStats.deskMapCount}`);
-  assert(fixtureStats.totalNodes === 1000, `expected 1000 nodes, got ${fixtureStats.totalNodes}`);
+  assert(fixtureStats.deskMapCount === 3, `expected 3 desk maps, got ${fixtureStats.deskMapCount}`);
+  assert(fixtureStats.totalNodes === 1650, `expected 1650 nodes, got ${fixtureStats.totalNodes}`);
 
   const { warningCount, failCount } = evaluateThresholds(timingRows);
 

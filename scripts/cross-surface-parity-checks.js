@@ -5,12 +5,41 @@ function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
 
+function parseCsvLine(line) {
+  const cells = [];
+  let current = '';
+  let i = 0;
+  let inQuotes = false;
+  while (i < line.length) {
+    const ch = line[i];
+    if (ch === '"') {
+      if (inQuotes && line[i + 1] === '"') { current += '"'; i += 2; continue; }
+      inQuotes = !inQuotes; i += 1; continue;
+    }
+    if (ch === ',' && !inQuotes) { cells.push(current); current = ''; i += 1; continue; }
+    current += ch; i += 1;
+  }
+  cells.push(current);
+  return cells;
+}
+
+function loadWorkspaceFromCsv(csvPath) {
+  const raw = fs.readFileSync(csvPath, 'utf8').replace(/^\uFEFF/, '');
+  const lines = raw.split(/\r?\n/).filter((l) => l.trim().length > 0);
+  assert(lines.length >= 2, 'CSV missing header or rows');
+  const headers = parseCsvLine(lines[0]);
+  const firstCells = parseCsvLine(lines[1]);
+  const firstRow = {};
+  headers.forEach((h, idx) => { firstRow[h] = firstCells[idx] ?? ''; });
+  const deskMaps = JSON.parse(firstRow['INTERNAL_DESKMAPS'] || '[]');
+  const activeDeskMapId = firstRow['INTERNAL_ACTIVE_DESKMAP_ID'] || (deskMaps[0]?.id || '');
+  assert(Array.isArray(deskMaps) && deskMaps.length > 0, `${csvPath}: no embedded desk maps`);
+  return { deskMaps, activeDeskMapId };
+}
+
 function loadWorkspace() {
-  const file = path.join(process.cwd(), 'testdata', 'deskmap-stress-5x200.workspace.json');
-  const raw = fs.readFileSync(file, 'utf8');
-  const workspace = JSON.parse(raw);
-  assert(Array.isArray(workspace.deskMaps), 'workspace missing deskMaps array');
-  return workspace;
+  const csvFile = path.join(process.cwd(), 'test-200-realistic.import.csv');
+  return loadWorkspaceFromCsv(csvFile);
 }
 
 function summarizeNodes(nodes) {
@@ -84,45 +113,65 @@ function verifyCycleFree(map) {
   nodes.filter((node) => node.parentId === null).forEach((root) => dfs(root.id));
 }
 
-function run() {
-  const workspace = loadWorkspace();
+function verifyWorkspace(workspace, label) {
   const allMaps = workspace.deskMaps;
-  assert(allMaps.length === 5, `expected 5 desk maps, got ${allMaps.length}`);
+  assert(allMaps.length >= 1, `${label}: expected at least 1 desk map, got ${allMaps.length}`);
 
+  let totalRecords = 0;
   allMaps.forEach((map) => {
     const nodes = map.nodes || [];
-    assert(nodes.length === 200, `${map.id}: expected 200 nodes, got ${nodes.length}`);
+    assert(nodes.length > 0, `${label}/${map.id}: expected nodes, got 0`);
+    totalRecords += nodes.length;
 
     const summary = summarizeNodes(nodes);
-    assert(summary.total === nodes.length, `${map.id}: node summary mismatch`);
+    assert(summary.total === nodes.length, `${label}/${map.id}: node summary mismatch`);
 
     const allRecords = buildRunsheetViewNodes(nodes, false);
     const conveyOnly = buildRunsheetViewNodes(nodes, true);
-    assert(allRecords.length === summary.total, `${map.id}: title ledger all-record count mismatch`);
-    assert(conveyOnly.length === summary.conveyance - summary.unlinked, `${map.id}: conveyance-only count mismatch`);
+    assert(allRecords.length === summary.total, `${label}/${map.id}: title ledger all-record count mismatch`);
+    assert(conveyOnly.length === summary.conveyance - summary.unlinked, `${label}/${map.id}: conveyance-only count mismatch`);
 
     const unlinkedLedgerCount = allRecords.filter((node) => node.parentId === 'unlinked').length;
-    assert(unlinkedLedgerCount === summary.unlinked, `${map.id}: unlinked ledger mismatch`);
+    assert(unlinkedLedgerCount === summary.unlinked, `${label}/${map.id}: unlinked ledger mismatch`);
 
     verifyCycleFree(map);
   });
 
   const allProjection = buildFlowchartProjection(allMaps, workspace.activeDeskMapId, 'all');
-  assert(allProjection.selectedMaps.length === allMaps.length, 'flow all mode map selection mismatch');
-  assert(allProjection.projectedNodes.length === allMaps.reduce((sum, map) => sum + map.nodes.length, 0), 'flow all mode node count mismatch');
+  assert(allProjection.selectedMaps.length === allMaps.length, `${label}: flow all mode map selection mismatch`);
+  assert(allProjection.projectedNodes.length === allMaps.reduce((sum, map) => sum + map.nodes.length, 0), `${label}: flow all mode node count mismatch`);
 
   const activeProjection = buildFlowchartProjection(allMaps, workspace.activeDeskMapId, 'active');
-  assert(activeProjection.selectedMaps.length === 1, 'flow active mode should select exactly one map');
-  assert(activeProjection.selectedMaps[0].id === workspace.activeDeskMapId, 'flow active mode selected wrong map');
+  assert(activeProjection.selectedMaps.length === 1, `${label}: flow active mode should select exactly one map`);
+  assert(activeProjection.selectedMaps[0].id === workspace.activeDeskMapId, `${label}: flow active mode selected wrong map`);
 
   allMaps.forEach((map) => {
     const selectedProjection = buildFlowchartProjection(allMaps, workspace.activeDeskMapId, map.id);
-    assert(selectedProjection.selectedMaps.length === 1, `${map.id}: selected-map filter should return one map`);
-    assert(selectedProjection.selectedMaps[0].id === map.id, `${map.id}: selected-map filter returned wrong map`);
-    assert(selectedProjection.projectedNodes.length === map.nodes.length, `${map.id}: selected-map flow node count mismatch`);
+    assert(selectedProjection.selectedMaps.length === 1, `${label}/${map.id}: selected-map filter should return one map`);
+    assert(selectedProjection.selectedMaps[0].id === map.id, `${label}/${map.id}: selected-map filter returned wrong map`);
+    assert(selectedProjection.projectedNodes.length === map.nodes.length, `${label}/${map.id}: selected-map flow node count mismatch`);
   });
 
-  console.log(`Cross-surface parity checks passed (${allMaps.length} maps, ${allMaps.length * 200} records)`);
+  return { maps: allMaps.length, records: totalRecords };
+}
+
+function run() {
+  const csvFiles = [
+    'test-200-realistic.import.csv',
+    'test-500-realistic.import.csv',
+    'test-1024-realistic.import.csv',
+  ];
+  let totalMaps = 0;
+  let totalRecords = 0;
+  csvFiles.forEach((file) => {
+    const csvPath = path.join(process.cwd(), file);
+    const workspace = loadWorkspaceFromCsv(csvPath);
+    const result = verifyWorkspace(workspace, file);
+    totalMaps += result.maps;
+    totalRecords += result.records;
+  });
+
+  console.log(`Cross-surface parity checks passed (${totalMaps} maps, ${totalRecords} records)`);
 }
 
 run();
