@@ -31,6 +31,7 @@ const {
 const workspaceDomainApi = globalThis.LANDroidWorkspaceDomain || {};
 const toWorkspaceSavePayload = workspaceDomainApi.toWorkspaceSavePayload || ((state) => state);
 const fromStoredWorkspace = workspaceDomainApi.fromStoredWorkspace || ((payload) => payload);
+const FLOW_LAYOUT_VERSION = 5;
 
 const auditLogApi = globalThis.LANDroidAuditLog || {};
 const recordAuditEvent = auditLogApi.recordAuditEvent || (() => null);
@@ -99,6 +100,11 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 Cloud: <><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z" /></>,
                 Tombstone: <><path d="M7 2h10a5 5 0 0 1 5 5v15H2V7a5 5 0 0 1 5-5z" /><line x1="12" y1="5" x2="12" y2="12" /><line x1="9" y1="8" x2="15" y2="8" /></>,
                 Flowchart: <><rect x="3" y="3" width="6" height="6" rx="1" /><rect x="15" y="3" width="6" height="6" rx="1" /><rect x="9" y="15" width="6" height="6" rx="1" /><path d="M6 9v2a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V9" /><line x1="12" y1="13" x2="12" y2="15" /></>,
+                Square: <rect x="4" y="4" width="16" height="16" rx="0" />,
+                RoundedSquare: <rect x="4" y="4" width="16" height="16" rx="4" />,
+                Circle: <circle cx="12" cy="12" r="8" />,
+                Diamond: <path d="M12 3l9 9-9 9-9-9 9-9z" />,
+                Sticky: <><path d="M5 3h11a3 3 0 0 1 3 3v15H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" /><path d="M14 21v-5a2 2 0 0 1 2-2h5" /></>,
                 MousePointer: <><path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z" /><path d="M13 13l6 6" /></>,
                 Move: <><polyline points="5 9 2 12 5 15" /><polyline points="9 5 12 2 15 5" /><polyline points="19 9 22 12 19 15" /><polyline points="9 19 12 22 15 19" /><line x1="2" y1="12" x2="22" y2="12" /><line x1="12" y1="2" x2="12" y2="22" /></>,
                 Hand: <><path d="M18 11V6a2 2 0 0 0-4 0v4"/><path d="M14 10V4a2 2 0 0 0-4 0v6"/><path d="M10 10.5V3a2 2 0 0 0-4 0v9"/><path d="M6 12v-1a2 2 0 0 0-4 0v5a10 10 0 0 0 20 0v-5a2 2 0 0 0-4 0v-4.5"/></>,
@@ -152,7 +158,6 @@ const Icon = ({ name, size = 18, className = "" }) => {
             
             // PERFORMANCE: Defer massive print grid DOM rendering until exact moment of printing
             const [isPrinting, setIsPrinting] = useState(false);
-            const [printOffset, setPrintOffset] = useState({ x: 0, y: 0 });
             const [isZooming, setIsZooming] = useState(false);
             const zoomEndTimerRef = useRef(null);
 
@@ -213,24 +218,20 @@ const Icon = ({ name, size = 18, className = "" }) => {
             const [showFlowEditModal, setShowFlowEditModal] = useState(false);
             const [flowForm, setFlowForm] = useState(null);
             const [printOrientation, setPrintOrientation] = useState('landscape');
-            const [showFlowLayoutMenu, setShowFlowLayoutMenu] = useState(false);
+            const [showFlowShapeMenu, setShowFlowShapeMenu] = useState(false);
+            const [flowDraftShape, setFlowDraftShape] = useState(null);
             const [showActionsMenu, setShowActionsMenu] = useState(false);
-            const [flowGlobalCompact, setFlowGlobalCompact] = useState(true);
-            const [ctxMenu, setCtxMenu] = useState(null);
-            const [inlineEdit, setInlineEdit] = useState(null);
-            const [clickPopover, setClickPopover] = useState(null);
-            const [clickPopoverForm, setClickPopoverForm] = useState({ name: '', acreage: '', nodeType: 'Party' });
 
             const flowDraggingNode = useRef(null);
-            const canvasPointerDownPos = useRef(null);
             const flowDragStart = useRef({ x: 0, y: 0 });
             const flowCanvasRef = useRef(null);
             const flowPanZoomLayerRef = useRef(null);
+            const flowShapeMenuRef = useRef(null);
+            const flowResizeState = useRef(null);
             const flowWheelDeltaRef = useRef(0);
             const flowWheelFrameRef = useRef(null);
             const flowWheelPointerRef = useRef({ x: 0, y: 0 });
             const flowWheelIdleRef = useRef(null);
-            const flowLayoutMenuRef = useRef(null);
             const actionsMenuRef = useRef(null);
             
             const moveTreeStartPos = useRef(null);
@@ -478,19 +479,14 @@ const Icon = ({ name, size = 18, className = "" }) => {
             }, [tracts]);
 
             useEffect(() => {
-                if (!showFlowLayoutMenu && !showActionsMenu) return;
+                if (!showActionsMenu) return;
                 const handleMenuDismiss = (event) => {
-                    if (showFlowLayoutMenu && flowLayoutMenuRef.current && !flowLayoutMenuRef.current.contains(event.target)) {
-                        setShowFlowLayoutMenu(false);
-                    }
                     if (showActionsMenu && actionsMenuRef.current && !actionsMenuRef.current.contains(event.target)) {
                         setShowActionsMenu(false);
                     }
                 };
                 const handleEsc = (event) => {
-                    if (event.key !== 'Escape') return;
-                    if (showFlowLayoutMenu) setShowFlowLayoutMenu(false);
-                    if (showActionsMenu) setShowActionsMenu(false);
+                    if (event.key === 'Escape') setShowActionsMenu(false);
                 };
                 document.addEventListener('mousedown', handleMenuDismiss);
                 document.addEventListener('keydown', handleEsc);
@@ -498,14 +494,30 @@ const Icon = ({ name, size = 18, className = "" }) => {
                     document.removeEventListener('mousedown', handleMenuDismiss);
                     document.removeEventListener('keydown', handleEsc);
                 };
-            }, [showFlowLayoutMenu, showActionsMenu]);
+            }, [showActionsMenu]);
 
             useEffect(() => {
-                if (view !== 'flowchart' && showFlowLayoutMenu) {
-                    setShowFlowLayoutMenu(false);
-                }
                 setShowActionsMenu(false);
-            }, [view, showFlowLayoutMenu]);
+                setShowFlowShapeMenu(false);
+            }, [view]);
+
+            useEffect(() => {
+                if (!showFlowShapeMenu) return;
+                const handleMenuDismiss = (event) => {
+                    if (showFlowShapeMenu && flowShapeMenuRef.current && !flowShapeMenuRef.current.contains(event.target)) {
+                        setShowFlowShapeMenu(false);
+                    }
+                };
+                const handleEsc = (event) => {
+                    if (event.key === 'Escape') setShowFlowShapeMenu(false);
+                };
+                document.addEventListener('mousedown', handleMenuDismiss);
+                document.addEventListener('keydown', handleEsc);
+                return () => {
+                    document.removeEventListener('mousedown', handleMenuDismiss);
+                    document.removeEventListener('keydown', handleEsc);
+                };
+            }, [showFlowShapeMenu]);
 
             // Print interceptor hook
             useEffect(() => {
@@ -750,6 +762,8 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 setTreeScale(1);
                 setGridCols(defaultFlowGrid.cols);
                 setGridRows(defaultFlowGrid.rows);
+                setFlowDraftShape(null);
+                setShowFlowShapeMenu(false);
                 setShowActionsMenu(false);
                 recordAuditEvent('flowchart_cleared', { previousNodeCount: flowNodes.length, previousEdgeCount: flowEdges.length });
             };
@@ -1405,7 +1419,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 return children.map(n => ({ ...n, children: buildTree(n.id) }));
             };
             const tree = useMemo(() => buildTree(), [nodes]);
-            const simplifyZoomSubtrees = isZooming && nodes.length > 180;
+
             const relatedByParentId = useMemo(() => {
                 const grouped = {};
                 nodes.forEach(node => {
@@ -1557,10 +1571,8 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 const remainingFractionDisplay = formatMasterFraction(n.fraction);
                 const hasChildren = n.children.length > 0;
                 const isCollapsed = Boolean(n.isCollapsed);
-                const shouldSimplifyChildren = simplifyZoomSubtrees && depth >= 1 && hasChildren;
-                const descendantCount = (isCollapsed || shouldSimplifyChildren) ? countTreeDescendants(n) : 0;
-                const hiddenDescendantCount = isCollapsed ? descendantCount : 0;
-                const simplifiedHiddenCount = shouldSimplifyChildren ? descendantCount : 0;
+                const descendantCount = isCollapsed ? countTreeDescendants(n) : 0;
+                const hiddenDescendantCount = descendantCount;
                 return (
                     <div key={n.id} className="flex flex-col items-center relative animate-fade-in treenode">
                         <div className="z-10 group relative treenode-body">
@@ -1683,13 +1695,6 @@ const Icon = ({ name, size = 18, className = "" }) => {
                                     </div>
                                 )}
 
-                                {shouldSimplifyChildren && simplifiedHiddenCount > 0 && (
-                                    <div className={`mt-3 inline-flex items-center px-2 py-1 border rounded-sm text-[10px] font-mono uppercase tracking-wider ${
-                                        isDeceased ? 'border-sepia/40 bg-sepia/10 text-sepia' : 'border-ink/40 bg-ink/5 text-ink/80'
-                                    }`}>
-                                        Zoom Preview: +{simplifiedHiddenCount} hidden descendants
-                                    </div>
-                                )}
                             </div>
                             
                             <div className="opacity-0 group-hover:opacity-100 transition-all duration-300 mt-2 flex flex-col gap-1">
@@ -1707,7 +1712,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
                                 </div>
                             </div>
                         </div>
-                        {hasChildren && !isCollapsed && !shouldSimplifyChildren && (
+                        {hasChildren && !isCollapsed && (
                             <div className="flex relative justify-center pt-8">
                                 {n.children.map((c, i) => (
                                     <div key={c.id} className="relative flex flex-col items-center px-4">
@@ -1747,11 +1752,140 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 });
             };
 
-            const FLOW_LAYOUT_VERSION = 1;
+            const getLiveDeskMaps = () => deskMaps.map(map => (
+                map.id === activeDeskMapId ? { ...map, nodes, pz } : map
+            ));
 
-            const buildFlowLayoutFromNodes = (sourceNodes, idPrefix = '', xShift = 0, treeGroupId = '') => {
+            const getFlowSelectedDeskMaps = (sourceMaps = getLiveDeskMaps()) => {
+                if (flowDeskMapFilter === 'all') return sourceMaps;
+                if (flowDeskMapFilter === 'active') return sourceMaps.filter(map => map.id === activeDeskMapId);
+                return sourceMaps.filter(map => map.id === flowDeskMapFilter);
+            };
+
+            const FLOW_CARD_WIDTH = 220;
+            const FLOW_CARD_BASE_HEIGHT = 170;
+            const FLOW_CARD_MIN_HEIGHT = 170;
+            const FLOW_LEVEL_GAP_Y = 250;
+            const FLOW_LEAF_GAP_X = 260;
+            const FLOW_IMPORT_PADDING_X = 48;
+            const FLOW_IMPORT_PADDING_Y = 60;
+            const FLOW_IMPORT_DEFAULT_SCALE = 0.55;
+            const FLOW_DRAW_TOOLS = new Set(['draw-rect', 'draw-round', 'draw-ellipse', 'draw-diamond', 'draw-note']);
+            const isFlowDrawTool = (tool) => FLOW_DRAW_TOOLS.has(tool);
+            const getFlowShapeTypeForTool = (tool) => {
+                switch (tool) {
+                    case 'draw-round': return 'roundRect';
+                    case 'draw-ellipse': return 'ellipse';
+                    case 'draw-diamond': return 'diamond';
+                    case 'draw-note': return 'note';
+                    case 'draw-rect':
+                    default:
+                        return 'rect';
+                }
+            };
+
+            const buildFlowReferenceLine = (node) => {
+                const parts = [];
+                const recordedDate = node.date || node.fileDate;
+                if (recordedDate) parts.push(recordedDate);
+                if (node.vol && node.page) parts.push(`Vol ${node.vol}/Pg ${node.page}`);
+                if (!node.vol && !node.page && node.docNo) parts.push(`Inst ${node.docNo}`);
+                return parts.join(' • ') || 'Unfiled record';
+            };
+
+            const buildFlowAttachedRecords = (sourceNodes, nodeId) => (
+                (sourceNodes || [])
+                    .filter(node => node.type === 'related' && node.parentId === nodeId)
+                    .map(node => ({
+                        id: node.id,
+                        label: [node.instrument, node.date || node.fileDate || '', node.vol && node.page ? `Vol ${node.vol}/Pg ${node.page}` : '']
+                            .filter(Boolean)
+                            .join(' • ')
+                    }))
+            );
+
+            const estimateFlowTemplateHeight = (data = {}) => {
+                let height = FLOW_CARD_BASE_HEIGHT;
+                if (data.conveyance) height += 20;
+                if (data.deathNotes) {
+                    const deathLines = Math.min(2, Math.max(1, Math.ceil(String(data.deathNotes).length / 46)));
+                    height += 20 + (deathLines * 15);
+                }
+                if (Array.isArray(data.attachedRecords) && data.attachedRecords.length > 0) {
+                    height += 20 + (Math.min(2, data.attachedRecords.length) * 16);
+                    if (data.attachedRecords.length > 2) height += 14;
+                }
+                return Math.max(FLOW_CARD_MIN_HEIGHT, height);
+            };
+
+            const createFlowTemplateData = (node, sourceNodes, map) => {
+                const grantFraction = formatFraction(node.initialFraction || node.fraction);
+                const remainingFraction = formatFraction(node.fraction);
+                const relatedDocs = buildFlowAttachedRecords(sourceNodes, node.id);
+                const data = {
+                    title: node.instrument || 'Instrument',
+                    mapLabel: map ? formatDeskMapLabel(map) : '',
+                    grantee: node.grantee || '',
+                    grantor: node.grantor || '',
+                    details: buildFlowReferenceLine(node),
+                    grantFraction,
+                    grantFractionDisplay: formatMasterFraction(node.initialFraction || node.fraction),
+                    fraction: remainingFraction,
+                    fractionDisplay: formatMasterFraction(node.fraction),
+                    conveyance: formatConveyanceFraction(node),
+                    deathNotes: node.isDeceased ? (node.obituary || '') : '',
+                    attachedRecords: relatedDocs,
+                    isDeceased: Boolean(node.isDeceased),
+                };
+                data.height = estimateFlowTemplateHeight(data);
+                return data;
+            };
+
+            const createFlowShapeData = (shapeType, width, height) => ({
+                shapeType,
+                text: shapeType === 'note' ? 'Double click to edit...' : '',
+                width,
+                height,
+                fontSize: 14,
+                textAlign: 'center',
+            });
+
+            const getFlowNodeWidth = (node) => node.type === 'template' ? FLOW_CARD_WIDTH : (node.data.width || 220);
+            const getFlowNodeHeight = (node) => (
+                node.type === 'template'
+                    ? (node.data?.height || estimateFlowTemplateHeight(node.data))
+                    : (node.data.height || 120)
+            );
+            const getFlowNodeAnchorX = (node) => node.x + (getFlowNodeWidth(node) / 2);
+            const getFlowNodeAnchorBottomY = (node) => node.y + getFlowNodeHeight(node);
+            const getFlowWorldPoint = (clientX, clientY) => {
+                const scalerRect = document.getElementById('tree-scaler')?.getBoundingClientRect();
+                if (!scalerRect) return { x: 0, y: 0 };
+                return {
+                    x: (clientX - scalerRect.left) / (flowPz.scale * treeScale),
+                    y: (clientY - scalerRect.top) / (flowPz.scale * treeScale)
+                };
+            };
+
+            const computeFlowchartBounds = (inputNodes) => {
+                if (!inputNodes?.length) return { minX: 0, minY: 0, maxX: 0, maxY: 0, width: 0, height: 0 };
+                const minX = Math.min(...inputNodes.map(n => n.x));
+                const minY = Math.min(...inputNodes.map(n => n.y));
+                const maxX = Math.max(...inputNodes.map(n => n.x + getFlowNodeWidth(n)));
+                const maxY = Math.max(...inputNodes.map(n => n.y + getFlowNodeHeight(n)));
+                return {
+                    minX,
+                    minY,
+                    maxX,
+                    maxY,
+                    width: Math.max(0, maxX - minX),
+                    height: Math.max(0, maxY - minY),
+                };
+            };
+
+            const buildFlowLayoutFromNodes = (sourceNodes, idPrefix = '', xShift = 0, treeGroupId = '', sourceMap = null) => {
                 const safePrefix = idPrefix ? `${idPrefix}-` : '';
-                const normalNodes = sourceNodes.filter(n => n.type !== 'related' && n.parentId !== 'unlinked');
+                const normalNodes = (sourceNodes || []).filter(n => n.type !== 'related' && n.parentId !== 'unlinked');
                 if (!normalNodes.length) return { nodes: [], edges: [], width: 0 };
                 if (normalNodes.length > 1500) {
                     window.alert(`This desk map has ${normalNodes.length} nodes — too large to auto-layout (limit: 1500). Import cancelled.`);
@@ -1761,176 +1895,177 @@ const Icon = ({ name, size = 18, className = "" }) => {
                     return { nodes: [], edges: [], width: 0 };
                 }
 
-                // --- Reingold-Tilford inspired layout ---
-                const NODE_W = 200;
-                const NODE_H = 56;
-                const H_GAP = 40;
-                const V_GAP = 80;
-                const ROOT_GAP = 120;
-                const LEAF_SLOT = NODE_W + H_GAP; // 240
-
-                // STEP 1: Build tree structure from flat array with cycle detection
-                const nodeMap = {};
-                normalNodes.forEach(n => { nodeMap[n.id] = { id: n.id, src: n, children: [] }; });
-                const roots = [];
-                const attached = new Set();
-                normalNodes.forEach(n => {
-                    if (n.parentId && nodeMap[n.parentId]) {
-                        // Cycle detection: walk up the ancestor chain — if we find n.id, it's a cycle
-                        let isCycle = false;
-                        let ancestor = nodeMap[n.parentId];
-                        const visited = new Set([n.id]);
-                        while (ancestor) {
-                            if (visited.has(ancestor.id)) { isCycle = true; break; }
-                            visited.add(ancestor.id);
-                            const parentSrc = ancestor.src;
-                            ancestor = parentSrc.parentId ? nodeMap[parentSrc.parentId] : null;
-                        }
-                        if (!isCycle) {
-                            nodeMap[n.parentId].children.push(nodeMap[n.id]);
-                            attached.add(n.id);
-                        } else {
-                            roots.push(nodeMap[n.id]);
-                        }
-                    } else {
-                        // Root node, or orphan whose parentId isn't in normalNodes — treat as root
-                        roots.push(nodeMap[n.id]);
-                    }
-                });
-
-                // STEP 2: Compute subtree widths (post-order traversal)
-                const computeWidth = (treeNode) => {
-                    if (treeNode.children.length === 0) {
-                        treeNode.subtreeWidth = LEAF_SLOT;
-                        return;
-                    }
-                    treeNode.children.forEach(computeWidth);
-                    const childrenTotalWidth = treeNode.children.reduce((sum, c) => sum + c.subtreeWidth, 0);
-                    treeNode.subtreeWidth = Math.max(LEAF_SLOT, childrenTotalWidth);
-                };
-                roots.forEach(computeWidth);
-
-                // STEP 3 & 4: Assign x,y positions (pre-order traversal)
-                const positions = {};
-                const assignPositions = (treeNode, centerX, depth) => {
-                    positions[treeNode.id] = { x: centerX - NODE_W / 2, y: depth * (NODE_H + V_GAP) };
-                    if (treeNode.children.length === 0) return;
-                    const childrenTotalWidth = treeNode.children.reduce((sum, c) => sum + c.subtreeWidth, 0);
-                    let cursor = centerX - childrenTotalWidth / 2;
-                    treeNode.children.forEach(child => {
-                        const childCenter = cursor + child.subtreeWidth / 2;
-                        assignPositions(child, childCenter, depth + 1);
-                        cursor += child.subtreeWidth;
-                    });
-                };
-
-                // STEP 5: Handle multiple roots — place side by side
-                let rootCursor = 0;
-                roots.forEach((root, i) => {
-                    const rootCenter = rootCursor + root.subtreeWidth / 2;
-                    assignPositions(root, rootCenter, 0);
-                    rootCursor += root.subtreeWidth + (i < roots.length - 1 ? ROOT_GAP : 0);
-                });
-
-                // STEP 6: Build output — normalize positions and create edges
-                const allPositioned = Object.keys(positions);
-                const minX = Math.min(...allPositioned.map(id => positions[id].x));
-                const maxX = Math.max(...allPositioned.map(id => positions[id].x + NODE_W));
-                const width = Math.max(280, maxX - minX);
-
-                const newFlowEdges = [];
-                const buildEdges = (treeNode) => {
-                    treeNode.children.forEach(child => {
-                        newFlowEdges.push({
-                            id: `e-${safePrefix}${treeNode.id}-${safePrefix}${child.id}`,
-                            source: `${safePrefix}${treeNode.id}`,
-                            target: `${safePrefix}${child.id}`
-                        });
-                        buildEdges(child);
-                    });
-                };
-                roots.forEach(buildEdges);
-
                 const newFlowNodes = [];
-                normalNodes.forEach(n => {
-                    const pos = positions[n.id];
-                    if (!pos) return; // should never happen — every normalNode is in the tree
+                const newFlowEdges = [];
+                const nodePositions = {};
+                const nodeById = Object.fromEntries(normalNodes.map(node => [node.id, node]));
+                const childrenOf = (id) => normalNodes.filter(child => child.parentId === id);
+                const levelYSpacing = FLOW_LEVEL_GAP_Y;
+                const startY = FLOW_IMPORT_PADDING_Y;
+                const leafSpacing = FLOW_LEAF_GAP_X;
+                let leafX = 0;
+
+                const layoutNode = (nodeId, depth, visited = new Set()) => {
+                    if (visited.has(nodeId)) {
+                        nodePositions[nodeId] = nodePositions[nodeId] || { x: leafX, y: startY + (depth * levelYSpacing) };
+                        leafX += leafSpacing;
+                        return nodePositions[nodeId].x;
+                    }
+
+                    const nextVisited = new Set(visited);
+                    nextVisited.add(nodeId);
+                    const children = childrenOf(nodeId).filter(child => !nextVisited.has(child.id));
+                    if (children.length === 0) {
+                        nodePositions[nodeId] = { x: leafX, y: startY + (depth * levelYSpacing) };
+                        leafX += leafSpacing;
+                        return nodePositions[nodeId].x;
+                    }
+
+                    const childXs = children.map(child => {
+                        newFlowEdges.push({
+                            id: `e-${safePrefix}${nodeId}-${safePrefix}${child.id}`,
+                            source: `${safePrefix}${nodeId}`,
+                            target: `${safePrefix}${child.id}`,
+                            isTreeEdge: true
+                        });
+                        return layoutNode(child.id, depth + 1, nextVisited);
+                    });
+
+                    const avgX = childXs.reduce((sum, value) => sum + value, 0) / childXs.length;
+                    nodePositions[nodeId] = { x: avgX, y: startY + (depth * levelYSpacing) };
+                    return avgX;
+                };
+
+                const roots = normalNodes.filter(node => node.parentId == null || !nodeById[node.parentId]);
+                const rootNodes = roots.length ? roots : [normalNodes[0]];
+                rootNodes.forEach((root, index) => {
+                    layoutNode(root.id, 0, new Set());
+                    if (index < rootNodes.length - 1) leafX += 200;
+                });
+
+                const positioned = Object.values(nodePositions);
+                const minX = positioned.length ? Math.min(...positioned.map(pos => pos.x)) : 0;
+                const maxX = positioned.length ? Math.max(...positioned.map(pos => pos.x + FLOW_CARD_WIDTH)) : FLOW_CARD_WIDTH;
+                const width = Math.max(FLOW_CARD_WIDTH, maxX - minX) + (FLOW_IMPORT_PADDING_X * 2);
+
+                normalNodes.forEach(node => {
+                    const pos = nodePositions[node.id] || { x: 0, y: 0 };
                     newFlowNodes.push({
-                        id: `${safePrefix}${n.id}`,
+                        id: `${safePrefix}${node.id}`,
                         treeGroupId: treeGroupId || safePrefix || 'default-tree',
-                        x: (pos.x - minX) + xShift,
+                        x: (pos.x - minX) + xShift + FLOW_IMPORT_PADDING_X,
                         y: pos.y,
                         type: 'template',
-                        compact: true,
-                        color: n.isDeceased ? 'bg-teastain text-sepia border-sepia' : 'bg-parchment text-ink border-ink',
-                        data: {
-                            title: n.instrument,
-                            grantee: n.grantee,
-                            grantor: n.grantor,
-                            fraction: formatFraction(n.fraction),
-                            fractionDisplay: n.fraction > FRACTION_EPSILON ? formatMasterFraction(n.fraction) : null,
-                            details: `${n.date} ${n.vol && n.page ? `• Vol ${n.vol}/Pg ${n.page}` : ''}`
-                        }
+                        color: node.isDeceased ? 'bg-teastain text-sepia border-sepia' : 'bg-parchment text-ink border-ink',
+                        data: createFlowTemplateData(node, sourceNodes, sourceMap)
                     });
                 });
+
                 return { nodes: newFlowNodes, edges: newFlowEdges, width };
             };
 
-            const getFlowSelectedDeskMaps = () => {
-                if (flowDeskMapFilter === 'all') return deskMaps;
-                if (flowDeskMapFilter === 'active') return deskMaps.filter(map => map.id === activeDeskMapId);
-                return deskMaps.filter(map => map.id === flowDeskMapFilter);
-            };
-
-            const commitInlineEdit = () => {
-                if (!inlineEdit) return;
-                setFlowNodes(prev => prev.map(n => {
-                    if (n.id !== inlineEdit.id) return n;
-                    if (inlineEdit.field === 'grantee') return { ...n, data: { ...n.data, grantee: inlineEdit.value } };
-                    if (inlineEdit.field === 'text') return { ...n, data: { ...n.data, text: inlineEdit.value } };
-                    return n;
-                }));
-                setInlineEdit(null);
-            };
-
-            const fitFlowToView = (targetNodes) => {
+            const fitFlowToView = (targetNodes, treeScaleOverride = treeScaleRef.current || 1) => {
                 const scopeNodes = targetNodes || flowNodes;
                 if (!scopeNodes.length) return;
                 const containerRect = flowCanvasRef.current?.getBoundingClientRect();
                 const viewportW = Math.max(700, (containerRect?.width || window.innerWidth) - 80);
                 const viewportH = Math.max(500, (containerRect?.height || window.innerHeight) - 110);
-                const minX = Math.min(...scopeNodes.map(n => n.x));
-                const maxX = Math.max(...scopeNodes.map(n => n.x + (n.type === 'template' ? 200 : (n.data.width || 280))));
-                const minY = Math.min(...scopeNodes.map(n => n.y));
-                const maxY = Math.max(...scopeNodes.map(n => n.y + (n.type === 'template' ? 56 : 80)));
-                const contentW = Math.max(300, maxX - minX);
-                const contentH = Math.max(200, maxY - minY);
-                // 5% padding on all sides → use 90% of viewport for scale
-                const fitScale = Math.max(0.12, Math.min((viewportW * 0.90) / contentW, (viewportH * 0.90) / contentH, 2));
-                setTreeScale(1);
-                const centerX = minX + contentW / 2;
-                const centerY = minY + contentH / 2;
-                const targetX = (viewportW / 2) - (centerX * fitScale);
-                const targetY = (viewportH / 2) - (centerY * fitScale);
-                setFlowPz({ x: Math.min(600, Math.max(-60000, targetX)), y: Math.min(400, Math.max(-60000, targetY)), scale: fitScale });
+                const bounds = computeFlowchartBounds(scopeNodes);
+                const contentW = Math.max(320, bounds.width * treeScaleOverride);
+                const contentH = Math.max(220, bounds.height * treeScaleOverride);
+                const fitScale = Math.max(0.08, Math.min((viewportW * 0.92) / contentW, (viewportH * 0.92) / contentH, 1));
+                const centerX = bounds.minX + (bounds.width / 2);
+                const centerY = bounds.minY + (bounds.height / 2);
+                setFlowPz({
+                    x: Math.min(600, Math.max(-6000, (viewportW / 2) - (centerX * fitScale * treeScaleOverride))),
+                    y: Math.min(400, Math.max(-6000, (viewportH / 2) - (centerY * fitScale * treeScaleOverride))),
+                    scale: fitScale
+                });
             };
 
-            const relayoutFlowchart = (maps) => {
-                if (!maps || !maps.length) return;
+            const fitFlowPaperToView = (colsOverride = gridCols, rowsOverride = gridRows) => {
+                const containerRect = flowCanvasRef.current?.getBoundingClientRect();
+                const viewportW = Math.max(700, (containerRect?.width || window.innerWidth) - 80);
+                const viewportH = Math.max(500, (containerRect?.height || window.innerHeight) - 110);
+                const paperWidth = pw * colsOverride;
+                const paperHeight = ph * rowsOverride;
+                const fitScale = Math.max(0.08, Math.min((viewportW * 0.96) / paperWidth, (viewportH * 0.96) / paperHeight, 1));
+                setFlowPz({
+                    x: (viewportW - (paperWidth * fitScale)) / 2,
+                    y: (viewportH - (paperHeight * fitScale)) / 2,
+                    scale: fitScale
+                });
+            };
+
+            const focusFlowImportView = (targetNodes) => {
+                const scopeNodes = targetNodes || flowNodes;
+                if (!scopeNodes.length) return;
+
+                const containerRect = flowCanvasRef.current?.getBoundingClientRect();
+                const viewportW = Math.max(700, (containerRect?.width || window.innerWidth) - 80);
+                const viewportH = Math.max(500, (containerRect?.height || window.innerHeight) - 110);
+                const bounds = computeFlowchartBounds(scopeNodes);
+                const contentW = Math.max(320, bounds.width);
+                const contentH = Math.max(220, bounds.height);
+                const fitScale = Math.max(0.08, Math.min((viewportW * 0.92) / contentW, (viewportH * 0.92) / contentH, 1));
+                const centerX = bounds.minX + (bounds.width / 2);
+                const centerY = bounds.minY + (bounds.height / 2);
+
+                setFlowPz({
+                    x: Math.min(800, Math.max(-12000, (viewportW / 2) - (centerX * fitScale))),
+                    y: Math.min(600, Math.max(-12000, (viewportH / 2) - (centerY * fitScale))),
+                    scale: fitScale
+                });
+            };
+
+            const scaleFlowToPrintGrid = () => {
+                if (!flowNodes.length) return;
+                const bounds = computeFlowchartBounds(flowNodes);
+                const paperWidth = pw * gridCols;
+                const paperHeight = ph * gridRows;
+                const nextScale = Math.max(0.2, Math.min(
+                    1.8,
+                    (paperWidth - 80) / Math.max(320, bounds.width),
+                    (paperHeight - 80) / Math.max(220, bounds.height)
+                ));
+                setTreeScale(Number(nextScale.toFixed(2)));
+            };
+
+            const ensureFlowGridFitsNodes = (targetNodes, scaleValue = treeScaleRef.current || 1, preserveExisting = true) => {
+                if (!targetNodes?.length) return { cols: gridCols, rows: gridRows };
+                const bounds = computeFlowchartBounds(targetNodes);
+                const neededCols = Math.max(1, Math.ceil(((bounds.maxX * scaleValue) + 96) / pw));
+                const neededRows = Math.max(1, Math.ceil(((bounds.maxY * scaleValue) + 96) / ph));
+                const nextCols = preserveExisting ? Math.max(gridCols, neededCols) : neededCols;
+                const nextRows = preserveExisting ? Math.max(gridRows, neededRows) : neededRows;
+                setGridCols(nextCols);
+                setGridRows(nextRows);
+                return { cols: nextCols, rows: nextRows };
+            };
+
+            const relayoutFlowchart = (mapsArg) => {
+                const maps = mapsArg || getFlowSelectedDeskMaps();
+                if (!maps?.length) return;
                 let xCursor = 0;
                 const built = maps.map((map, i) => {
-                    const result = buildFlowLayoutFromNodes(map.nodes || [], `${map.id}-${i}-${makeId()}`, xCursor, map.id);
+                    const result = buildFlowLayoutFromNodes(map.nodes || [], `${map.id}-${i}-${makeId()}`, xCursor, map.id, map);
                     xCursor += result.width + 220;
                     return result;
                 });
-                const nextNodes = built.flatMap(b => b.nodes);
-                const nextEdges = built.flatMap(b => b.edges);
+                const nextNodes = built.flatMap(result => result.nodes);
+                const nextEdges = built.flatMap(result => result.edges);
+                if (!nextNodes.length) {
+                    window.alert('No importable Desk Map nodes were found for the selected source.');
+                    return;
+                }
                 setFlowNodes(nextNodes);
                 setFlowEdges(nextEdges);
-                if (nextNodes.length) fitFlowToView(nextNodes);
+                setSelectedFlowNode(null);
+                setTreeScale(1);
+                ensureFlowGridFitsNodes(nextNodes, 1, false);
+                focusFlowImportView(nextNodes);
             };
 
-            // Consume deferred relayout request from workspace load
             useEffect(() => {
                 const maps = pendingRelayoutRef.current;
                 if (maps && maps.length) {
@@ -1947,45 +2082,37 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 }
                 if (!append && flowNodes.length > 0 && !window.confirm("This will overwrite your current Flow Chart canvas. Proceed?")) return;
 
-                let xCursor = append && flowNodes.length ? (Math.max(...flowNodes.map(n => n.x + 300)) + 200) : 0;
+                const existingBounds = computeFlowchartBounds(flowNodes);
+                let xCursor = append && flowNodes.length ? (existingBounds.maxX + 200) : 0;
                 const built = selectedMaps.map((map, i) => {
-                    const result = buildFlowLayoutFromNodes(map.nodes || [], `${map.id}-${i}-${makeId()}`, xCursor, map.id);
+                    const result = buildFlowLayoutFromNodes(map.nodes || [], `${map.id}-${i}-${makeId()}`, xCursor, map.id, map);
                     xCursor += result.width + 220;
                     return result;
                 });
 
-                const importedNodes = built.flatMap(b => b.nodes);
-                const importedEdges = built.flatMap(b => b.edges);
+                const importedNodes = built.flatMap(result => result.nodes);
+                const importedEdges = built.flatMap(result => result.edges);
+                if (!importedNodes.length) {
+                    window.alert('No importable Desk Map nodes were found for the selected source.');
+                    return;
+                }
+
                 const nextNodes = append ? [...flowNodes, ...importedNodes] : importedNodes;
                 const nextEdges = append ? [...flowEdges, ...importedEdges] : importedEdges;
                 setFlowNodes(nextNodes);
                 setFlowEdges(nextEdges);
+                setSelectedFlowNode(null);
                 recordAuditEvent('flowchart_imported', { append, deskMapCount: selectedMaps.length, nodeCount: nextNodes.length, edgeCount: nextEdges.length });
-
-                if (nextNodes.length) fitFlowToView(nextNodes);
+                setTreeScale(1);
+                ensureFlowGridFitsNodes(nextNodes, 1, append);
+                focusFlowImportView(append ? importedNodes : nextNodes);
             };
 
             const handlePrintFlowchart = () => {
-                let printScale = 1;
-                let pOffsetX = 0, pOffsetY = 0;
-                if (flowNodes.length) {
-                    const minX = Math.min(...flowNodes.map(n => n.x));
-                    const maxX = Math.max(...flowNodes.map(n => n.x + (n.type === 'template' ? 200 : (n.data.width || 280))));
-                    const minY = Math.min(...flowNodes.map(n => n.y));
-                    const maxY = Math.max(...flowNodes.map(n => n.y + (n.type === 'template' ? 56 : 80)));
-                    const contentW = Math.max(300, maxX - minX);
-                    const contentH = Math.max(200, maxY - minY);
-                    const printW = pw * gridCols * 0.92;
-                    const printH = ph * gridRows * 0.92;
-                    printScale = Math.max(0.02, Math.min(printW / contentW, printH / contentH));
-                    pOffsetX = minX;
-                    pOffsetY = minY;
-                }
-                setPrintOffset({ x: pOffsetX, y: pOffsetY });
-                flushSync(() => { setTreeScale(printScale); setIsPrinting(true); });
+                flushSync(() => setIsPrinting(true));
                 setTimeout(() => {
                     window.print();
-                    setTimeout(() => { setIsPrinting(false); setTreeScale(1); }, 150);
+                    setTimeout(() => setIsPrinting(false), 150);
                 }, 50);
             };
 
@@ -2040,29 +2167,140 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 }
             };
 
-            const addFlowNode = (type) => {
+            const addFlowNode = (type, shapeType = 'rect') => {
                 const id = `fn_${makeId()}`;
                 const scalerRect = document.getElementById('tree-scaler')?.getBoundingClientRect();
                 const canvasRect = flowCanvasRef.current?.getBoundingClientRect();
                 const anchorX = canvasRect ? canvasRect.left + (canvasRect.width / 2) : (window.innerWidth / 2);
                 const anchorY = canvasRect ? canvasRect.top + (canvasRect.height / 2) : (window.innerHeight / 2);
+                const isShapeNode = type === 'shape';
+                const defaultWidth = isShapeNode ? 220 : FLOW_CARD_WIDTH;
+                const defaultHeight = isShapeNode ? (shapeType === 'note' ? 140 : 120) : estimateFlowTemplateHeight({});
                 const newNode = {
                     id,
-                    x: ((anchorX - (scalerRect?.left || 0)) / (flowPz.scale * treeScale)) - 140,
-                    y: ((anchorY - (scalerRect?.top || 0)) / (flowPz.scale * treeScale)) - 100,
+                    x: ((anchorX - (scalerRect?.left || 0)) / (flowPz.scale * treeScale)) - (defaultWidth / 2),
+                    y: ((anchorY - (scalerRect?.top || 0)) / (flowPz.scale * treeScale)) - (defaultHeight / 2),
                     type,
-                    treeGroupId: createTreeGroupId(),
-                    color: 'bg-parchment text-ink border-ink',
-                    compact: type === 'template',
+                    shapeType: isShapeNode ? shapeType : null,
+                    treeGroupId: selectedFlowNode
+                        ? resolveTreeGroupId(flowNodes.find(n => n.id === selectedFlowNode))
+                        : createTreeGroupId(),
+                    color: shapeType === 'note'
+                        ? 'bg-[#fff1a8] text-ink border-[#c7a63b]'
+                        : 'bg-parchment text-ink border-ink',
                     data: type === 'template' ? {
-                        title: 'Instrument', grantee: 'Grantee Name', grantor: 'Grantor Name', fraction: '1.00000000', details: 'Date • Vol/Page'
-                    } : { text: 'Double click to edit text...', width: 280 }
+                        title: 'Instrument',
+                        mapLabel: '',
+                        grantee: 'Grantee Name',
+                        grantor: 'Grantor Name',
+                        details: 'Date • Vol/Page',
+                        grantFraction: '1.000000000',
+                        grantFractionDisplay: formatMasterFraction(1),
+                        fraction: '1.000000000',
+                        fractionDisplay: formatMasterFraction(1),
+                        conveyance: '',
+                        deathNotes: '',
+                        attachedRecords: [],
+                        height: defaultHeight
+                    } : createFlowShapeData(shapeType, defaultWidth, defaultHeight)
                 };
                 setFlowNodes([...flowNodes, newNode]);
                 setSelectedFlowNode(id);
-                setFlowForm(newNode.data);
+                setFlowForm({
+                    ...newNode.data,
+                    attachedRecordsText: ''
+                });
                 setFlowTool('select');
                 setShowFlowEditModal(true);
+            };
+
+            const commitFlowDrawShape = (draft) => {
+                if (!draft) return;
+                const width = Math.max(48, draft.width);
+                const height = Math.max(48, draft.height);
+                const shapeType = getFlowShapeTypeForTool(draft.tool);
+                const newNode = {
+                    id: `fn_${makeId()}`,
+                    x: draft.x,
+                    y: draft.y,
+                    type: 'shape',
+                    shapeType,
+                    treeGroupId: createTreeGroupId(),
+                    color: shapeType === 'note'
+                        ? 'bg-[#fff1a8] text-ink border-[#c7a63b]'
+                        : 'bg-parchment text-ink border-ink',
+                    data: createFlowShapeData(shapeType, width, height)
+                };
+                setFlowNodes(prev => [...prev, newNode]);
+                setSelectedFlowNode(newNode.id);
+                setFlowTool('select');
+            };
+
+            const openFlowNodeEditor = (node) => {
+                if (!node) return;
+                const attachedRecordsText = Array.isArray(node.data?.attachedRecords)
+                    ? node.data.attachedRecords.map(record => record.label || '').filter(Boolean).join('\n')
+                    : '';
+                setSelectedFlowNode(node.id);
+                setFlowForm({
+                    ...node.data,
+                    attachedRecordsText,
+                });
+                setShowFlowEditModal(true);
+            };
+
+            const startFlowResize = (e, node, handle) => {
+                e.stopPropagation();
+                e.preventDefault();
+                flowResizeState.current = {
+                    nodeId: node.id,
+                    handle,
+                    originX: e.clientX,
+                    originY: e.clientY,
+                    nodeX: node.x,
+                    nodeY: node.y,
+                    width: getFlowNodeWidth(node),
+                    height: getFlowNodeHeight(node),
+                };
+                e.currentTarget.setPointerCapture?.(e.pointerId);
+            };
+
+            const handleFlowResizeMove = (e) => {
+                if (!flowResizeState.current) return;
+                e.stopPropagation();
+                const active = flowResizeState.current;
+                const dx = (e.clientX - active.originX) / (flowPz.scale * treeScale);
+                const dy = (e.clientY - active.originY) / (flowPz.scale * treeScale);
+                let nextX = active.nodeX;
+                let nextY = active.nodeY;
+                let nextWidth = active.width;
+                let nextHeight = active.height;
+
+                if (active.handle.includes('e')) nextWidth = Math.max(48, active.width + dx);
+                if (active.handle.includes('s')) nextHeight = Math.max(48, active.height + dy);
+                if (active.handle.includes('w')) {
+                    nextWidth = Math.max(48, active.width - dx);
+                    nextX = active.nodeX + (active.width - nextWidth);
+                }
+                if (active.handle.includes('n')) {
+                    nextHeight = Math.max(48, active.height - dy);
+                    nextY = active.nodeY + (active.height - nextHeight);
+                }
+
+                setFlowNodes(nodes => nodes.map(node => (
+                    node.id === active.nodeId
+                        ? { ...node, x: nextX, y: nextY, data: { ...node.data, width: nextWidth, height: nextHeight } }
+                        : node
+                )));
+            };
+
+            const handleFlowResizeEnd = (e) => {
+                if (!flowResizeState.current) return;
+                e.stopPropagation();
+                flowResizeState.current = null;
+                if (e.currentTarget.hasPointerCapture?.(e.pointerId)) {
+                    e.currentTarget.releasePointerCapture(e.pointerId);
+                }
             };
 
             const handleFlowPointerDown = (e) => {
@@ -2077,11 +2315,38 @@ const Icon = ({ name, size = 18, className = "" }) => {
                     initialTreeNodeById.current = Object.fromEntries(initialTreeNodes.current.map(item => [item.id, item]));
                     moveTreeGroupId.current = null;
                     e.currentTarget.setPointerCapture(e.pointerId); setSelectedFlowNode(null);
+                } else if (isFlowDrawTool(flowTool)) {
+                    const point = getFlowWorldPoint(e.clientX, e.clientY);
+                    setFlowDraftShape({
+                        tool: flowTool,
+                        startX: point.x,
+                        startY: point.y,
+                        x: point.x,
+                        y: point.y,
+                        width: 0,
+                        height: 0,
+                    });
+                    e.currentTarget.setPointerCapture(e.pointerId);
+                    setSelectedFlowNode(null);
                 }
             };
             
             const handleFlowPointerMove = (e) => {
-                if (connectingStart) {
+                if (flowDraftShape) {
+                    const point = getFlowWorldPoint(e.clientX, e.clientY);
+                    setFlowDraftShape(prev => {
+                        if (!prev) return prev;
+                        return {
+                            ...prev,
+                            x: Math.min(prev.startX, point.x),
+                            y: Math.min(prev.startY, point.y),
+                            width: Math.abs(point.x - prev.startX),
+                            height: Math.abs(point.y - prev.startY),
+                        };
+                    });
+                    return;
+                }
+                if (flowTool === 'connect' && connectingStart) {
                     const rect = document.getElementById('tree-scaler').getBoundingClientRect();
                     setMousePos({ x: (e.clientX - rect.left) / (flowPz.scale * treeScale), y: (e.clientY - rect.top) / (flowPz.scale * treeScale) });
                 }
@@ -2099,7 +2364,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 } else if (flowTool === 'move-tree' && moveTreeStartPos.current && initialTreeNodes.current) {
                     const dx = (e.clientX - moveTreeStartPos.current.x) / (flowPz.scale * treeScale);
                     const dy = (e.clientY - moveTreeStartPos.current.y) / (flowPz.scale * treeScale);
-                    const initialNodes = initialTreeNodes.current; // Capture ref to prevent null error in async state updater
+                    const initialNodes = initialTreeNodes.current;
                     const targetGroup = moveTreeGroupId.current;
                     setFlowNodes(prev => prev.map(n => {
                         if (targetGroup && resolveTreeGroupId(n) !== targetGroup) return n;
@@ -2110,6 +2375,11 @@ const Icon = ({ name, size = 18, className = "" }) => {
             };
             
             const handleFlowPointerUp = (e) => {
+                if (flowDraftShape) {
+                    const draft = flowDraftShape;
+                    setFlowDraftShape(null);
+                    if (draft.width >= 12 && draft.height >= 12) commitFlowDrawShape(draft);
+                }
                 isDragging.current = false;
                 if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
                 if (connectingStart) setConnectingStart(null); 
@@ -2161,9 +2431,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 e.stopPropagation();
                 if (flowTool === 'connect') {
                     setConnectingStart(node.id);
-                    // For template we use center, for note box we approximate width center
-                    const wOffset = node.type === 'template' ? (node.compact ? 100 : 140) : (node.data.width ? node.data.width/2 : 140);
-                    setMousePos({ x: node.x + wOffset, y: node.y + (node.compact ? 28 : 100) });
+                    setMousePos({ x: getFlowNodeAnchorX(node), y: getFlowNodeAnchorBottomY(node) });
                 } else if (flowTool === 'select') {
                     setSelectedFlowNode(node.id);
                     flowDraggingNode.current = { id: node.id, origX: node.x, origY: node.y };
@@ -2194,7 +2462,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
                     e.stopPropagation();
                     const dx = (e.clientX - moveTreeStartPos.current.x) / (flowPz.scale * treeScale);
                     const dy = (e.clientY - moveTreeStartPos.current.y) / (flowPz.scale * treeScale);
-                    const initialNodes = initialTreeNodes.current; // Capture ref to prevent null error in async state updater
+                    const initialNodes = initialTreeNodes.current;
                     const targetGroup = moveTreeGroupId.current;
                     
                     setFlowNodes(prev => prev.map(n => {
@@ -2209,7 +2477,9 @@ const Icon = ({ name, size = 18, className = "" }) => {
                 e.stopPropagation();
                 if (flowDraggingNode.current) {
                     flowDraggingNode.current = null;
-                    e.currentTarget.releasePointerCapture(e.pointerId);
+                    if (e.currentTarget.hasPointerCapture?.(e.pointerId)) {
+                        e.currentTarget.releasePointerCapture(e.pointerId);
+                    }
                 }
                 if (flowTool === 'connect' && connectingStart && connectingStart !== targetNode.id) {
                     const edgeExists = flowEdges.find(ed => ed.source === connectingStart && ed.target === targetNode.id);
@@ -2224,7 +2494,9 @@ const Icon = ({ name, size = 18, className = "" }) => {
                     moveTreeStartPos.current = null;
                     initialTreeNodes.current = null;
                     initialTreeNodeById.current = null;
-                    e.currentTarget.releasePointerCapture(e.pointerId);
+                    if (e.currentTarget.hasPointerCapture?.(e.pointerId)) {
+                        e.currentTarget.releasePointerCapture(e.pointerId);
+                    }
                 }
             };
 
@@ -2245,93 +2517,185 @@ const Icon = ({ name, size = 18, className = "" }) => {
             };
 
             const commitFlowEdit = () => {
-                setFlowNodes(nodes => nodes.map(n => n.id === selectedFlowNode ? { ...n, data: flowForm } : n));
+                const nextData = { ...flowForm };
+                if (Object.prototype.hasOwnProperty.call(nextData, 'attachedRecordsText')) {
+                    nextData.attachedRecords = String(nextData.attachedRecordsText || '')
+                        .split('\n')
+                        .map(line => line.trim())
+                        .filter(Boolean)
+                        .map((label, index) => ({ id: `manual-flow-record-${index}`, label }));
+                    delete nextData.attachedRecordsText;
+                }
+                if (flowNodes.find(n => n.id === selectedFlowNode)?.type === 'template') {
+                    const nextGrant = Number(nextData.grantFraction);
+                    const nextRemaining = Number(nextData.fraction);
+                    if (Number.isFinite(nextGrant)) nextData.grantFractionDisplay = formatMasterFraction(nextGrant);
+                    if (Number.isFinite(nextRemaining)) nextData.fractionDisplay = formatMasterFraction(nextRemaining);
+                    nextData.height = estimateFlowTemplateHeight(nextData);
+                }
+                setFlowNodes(nodes => nodes.map(n => n.id === selectedFlowNode ? { ...n, data: nextData } : n));
                 setShowFlowEditModal(false);
             };
-
-            const confirmClickPlace = () => {
-                if (!clickPopover || !clickPopoverForm.name.trim()) return;
-                const id = `fn_${makeId()}`;
-                const { worldX, worldY } = clickPopover;
-                const { name, acreage, nodeType } = clickPopoverForm;
-                const newNode = nodeType === 'Annotation'
-                    ? { id, x: worldX, y: worldY, type: 'blank', treeGroupId: createTreeGroupId(), color: 'bg-parchment text-ink border-ink', data: { text: name.trim(), width: 200 } }
-                    : { id, x: worldX, y: worldY, type: 'template', compact: true, treeGroupId: createTreeGroupId(), color: 'bg-parchment text-ink border-ink',
-                        data: { title: nodeType === 'Conveyance' ? name.trim() : 'Party', grantee: nodeType === 'Party' ? name.trim() : '', grantor: '', fraction: '1.00000000', fractionDisplay: formatMasterFraction(1), details: acreage.trim() ? acreage.trim() + ' NMA' : '' }
-                    };
-                setFlowNodes(prev => [...prev, newNode]);
-                setSelectedFlowNode(id);
-                setClickPopover(null);
-            };
-
-            const drawEdge = (x1, y1, x2, y2, bendFactor = 0) => {
+            const drawEdge = (x1, y1, x2, y2) => {
                 const yMid = (y1 + y2) / 2;
-                return `M ${x1} ${y1} C ${x1 + bendFactor} ${yMid}, ${x2 + bendFactor} ${yMid}, ${x2} ${y2}`;
+                return `M ${x1} ${y1} C ${x1} ${yMid}, ${x2} ${yMid}, ${x2} ${y2}`;
             };
             const flowNodeById = useMemo(() => Object.fromEntries(flowNodes.map(n => [n.id, n])), [flowNodes]);
+            const liveFlowDeskMaps = useMemo(() => getLiveDeskMaps(), [deskMaps, activeDeskMapId, nodes, pz]);
+            const flowSelectedDeskMaps = useMemo(() => getFlowSelectedDeskMaps(liveFlowDeskMaps), [liveFlowDeskMaps, flowDeskMapFilter]);
+            const selectedFlowNodeData = useMemo(() => flowNodes.find(n => n.id === selectedFlowNode) || null, [flowNodes, selectedFlowNode]);
+            const flowTreeCount = useMemo(() => new Set(flowNodes.map(node => resolveTreeGroupId(node))).size, [flowNodes]);
+            const paperWidth = pw * gridCols;
+            const paperHeight = ph * gridRows;
+            const flowPageTiles = useMemo(() => (
+                Array.from({ length: gridRows }).flatMap((_, row) => (
+                    Array.from({ length: gridCols }).map((__, col) => ({
+                        row,
+                        col,
+                        label: `${String.fromCharCode(65 + row)}${col + 1}`,
+                    }))
+                ))
+            ), [gridRows, gridCols]);
+            const flowPrintOverflow = useMemo(() => {
+                if (!flowNodes.length) return { left: false, top: false, right: false, bottom: false };
+                const bounds = computeFlowchartBounds(flowNodes);
+                return {
+                    left: bounds.minX * treeScale < 24,
+                    top: bounds.minY * treeScale < 24,
+                    right: bounds.maxX * treeScale > paperWidth - 24,
+                    bottom: bounds.maxY * treeScale > paperHeight - 24,
+                };
+            }, [flowNodes, treeScale, paperWidth, paperHeight]);
 
-            // Compute the bounding box of all flow content so the paper visual can encompass it
-            const flowContentBounds = useMemo(() => {
-                if (!flowNodes.length) return { w: 0, h: 0 };
-                const maxX = Math.max(...flowNodes.map(n => n.x + (n.type === 'template' ? 200 : (n.data.width || 280))));
-                const maxY = Math.max(...flowNodes.map(n => n.y + (n.type === 'template' ? 56 : 80)));
-                return { w: maxX + 40, h: maxY + 40 }; // 40px padding
-            }, [flowNodes]);
+            const getFlowNodeCenter = (node) => ({
+                x: node.x + (getFlowNodeWidth(node) / 2),
+                y: node.y + (getFlowNodeHeight(node) / 2),
+            });
 
-            // Abstract out the tree rendering so we can use it on the Interactive screen AND the Print slices
-            const renderTree = (isInteractive, forPrint = false) => (
+            const getFlowEdgePoint = (node, otherNode) => {
+                const width = getFlowNodeWidth(node);
+                const height = getFlowNodeHeight(node);
+                const center = getFlowNodeCenter(node);
+                const otherCenter = otherNode ? getFlowNodeCenter(otherNode) : { x: center.x, y: center.y + height };
+                const dx = otherCenter.x - center.x;
+                const dy = otherCenter.y - center.y;
+
+                if (Math.abs(dx) > Math.abs(dy)) {
+                    return dx >= 0
+                        ? { x: node.x + width, y: center.y }
+                        : { x: node.x, y: center.y };
+                }
+                return dy >= 0
+                    ? { x: center.x, y: node.y + height }
+                    : { x: center.x, y: node.y };
+            };
+
+            const renderFlowShapeBody = (node) => {
+                const shapeType = node.shapeType || node.data?.shapeType || 'rect';
+                const width = getFlowNodeWidth(node);
+                const height = getFlowNodeHeight(node);
+                const textAlignClass = node.data?.textAlign === 'left'
+                    ? 'text-left'
+                    : node.data?.textAlign === 'right'
+                        ? 'text-right'
+                        : 'text-center';
+                const textSize = node.data?.fontSize || 14;
+                const content = (
+                    <div
+                        className={`w-full h-full flex items-center justify-center px-4 py-3 font-serif whitespace-pre-wrap break-words ${textAlignClass}`}
+                        style={{ fontSize: `${textSize}px`, lineHeight: 1.2 }}
+                    >
+                        {node.data?.text || ''}
+                    </div>
+                );
+
+                if (shapeType === 'ellipse') {
+                    return (
+                        <div className={`border-2 rounded-full shadow-sm ${node.color}`} style={{ width, height }}>
+                            {content}
+                        </div>
+                    );
+                }
+
+                if (shapeType === 'diamond') {
+                    return (
+                        <div style={{ width, height }} className="relative">
+                            <div
+                                className={`absolute inset-0 border-2 shadow-sm ${node.color}`}
+                                style={{ transform: 'rotate(45deg)' }}
+                            />
+                            <div className="absolute inset-0 flex items-center justify-center px-6 py-4 text-center font-serif whitespace-pre-wrap break-words" style={{ fontSize: `${textSize}px`, lineHeight: 1.2 }}>
+                                {node.data?.text || ''}
+                            </div>
+                        </div>
+                    );
+                }
+
+                if (shapeType === 'note') {
+                    return (
+                        <div className={`relative border-2 shadow-sm ${node.color}`} style={{ width, height }}>
+                            <div className="absolute top-0 right-0 w-6 h-6 border-l-2 border-b-2 border-current/40 bg-white/40" style={{ clipPath: 'polygon(0 0, 100% 0, 100% 100%)' }} />
+                            {content}
+                        </div>
+                    );
+                }
+
+                return (
+                    <div className={`border-2 shadow-sm ${node.color} ${shapeType === 'roundRect' ? 'rounded-2xl' : ''}`} style={{ width, height }}>
+                        {content}
+                    </div>
+                );
+            };
+
+            const renderTree = (isInteractive) => (
                 <>
-                    {/* Edge Layer (SVG) */}
                     <svg className="absolute top-0 left-0 w-full h-full overflow-visible pointer-events-none z-10">
                         <defs>
-                            <marker id="arrowhead-ink" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#1A1A1B" /></marker>
+                            <marker id="arrowhead-ink" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                                <polygon points="0 0, 10 3.5, 0 7" fill="#1A1A1B" />
+                            </marker>
                         </defs>
-                        {(() => {
-                            // Build sibling map for fan-out bend calculation
-                            const siblingMap = {};
-                            flowEdges.forEach(edge => {
-                                if (!siblingMap[edge.source]) siblingMap[edge.source] = [];
-                                siblingMap[edge.source].push(edge.target);
-                            });
-                            return flowEdges.map(edge => {
-                                const source = flowNodeById[edge.source];
-                                const target = flowNodeById[edge.target];
-                                if (!source || !target) return null;
-                                const srcCompact = source.compact || forPrint;
-                                const tgtCompact = target.compact || forPrint;
-                                const x1 = source.x + (source.type === 'template' ? (srcCompact ? 100 : 140) : (source.data.width ? source.data.width/2 : 140));
-                                const y1 = source.y + (source.type === 'template' ? (srcCompact ? 56 : 140) : 50);
-                                const x2 = target.x + (target.type === 'template' ? (tgtCompact ? 100 : 140) : (target.data.width ? target.data.width/2 : 140));
+                        {flowEdges.map(edge => {
+                            const source = flowNodeById[edge.source];
+                            const target = flowNodeById[edge.target];
+                            if (!source || !target) return null;
+                            let path;
+                            if (edge.isTreeEdge) {
+                                const x1 = getFlowNodeAnchorX(source);
+                                const y1 = getFlowNodeAnchorBottomY(source);
+                                const x2 = getFlowNodeAnchorX(target);
                                 const y2 = target.y;
-                                const siblings = siblingMap[edge.source] || [];
-                                const sibIdx = siblings.indexOf(edge.target);
-                                const bendFactor = siblings.length > 1 ? (sibIdx - (siblings.length - 1) / 2) * 40 : 0;
-                                return (
-                                    <g key={edge.id} className={isInteractive ? "cursor-pointer pointer-events-auto" : "pointer-events-none"} onClick={(e) => { if(isInteractive) { e.stopPropagation(); if (flowTool === 'select') deleteFlowEdge(edge.id); }}}>
-                                        <path d={drawEdge(x1, y1, x2, y2, bendFactor)} fill="none" stroke="#1A1A1B" strokeWidth="2" markerEnd="url(#arrowhead-ink)" />
-                                    </g>
-                                );
-                            });
-                        })()}
-                        {/* Temp connecting line */}
+                                path = drawEdge(x1, y1, x2, y2);
+                            } else {
+                                const sourcePoint = getFlowEdgePoint(source, target);
+                                const targetPoint = getFlowEdgePoint(target, source);
+                                const isVertical = Math.abs(targetPoint.y - sourcePoint.y) >= Math.abs(targetPoint.x - sourcePoint.x);
+                                const bend = Math.max(28, isVertical
+                                    ? Math.abs(targetPoint.y - sourcePoint.y) / 2
+                                    : Math.abs(targetPoint.x - sourcePoint.x) / 2);
+                                path = isVertical
+                                    ? `M ${sourcePoint.x} ${sourcePoint.y} C ${sourcePoint.x} ${sourcePoint.y + bend} ${targetPoint.x} ${targetPoint.y - bend} ${targetPoint.x} ${targetPoint.y}`
+                                    : `M ${sourcePoint.x} ${sourcePoint.y} C ${sourcePoint.x + bend} ${sourcePoint.y} ${targetPoint.x - bend} ${targetPoint.y} ${targetPoint.x} ${targetPoint.y}`;
+                            }
+                            return (
+                                <g key={edge.id} className={isInteractive ? 'cursor-pointer pointer-events-auto' : 'pointer-events-none'} onClick={(e) => { if (isInteractive && flowTool === 'select') { e.stopPropagation(); deleteFlowEdge(edge.id); } }}>
+                                    <path d={path} fill="none" stroke="#1A1A1B" strokeWidth="1.6" markerEnd="url(#arrowhead-ink)" />
+                                </g>
+                            );
+                        })}
                         {isInteractive && connectingStart && flowNodeById[connectingStart] && (
                             <path
-                                d={drawEdge(
-                                    flowNodeById[connectingStart].x + (flowNodeById[connectingStart].type === 'template' ? (flowNodeById[connectingStart].compact ? 100 : 140) : (flowNodeById[connectingStart].data.width/2 || 140)),
-                                    flowNodeById[connectingStart].y + (flowNodeById[connectingStart].compact ? 28 : 100),
-                                    mousePos.x, mousePos.y
-                                )}
-                                fill="none" stroke="#1A1A1B" strokeWidth="2" strokeDasharray="5,5"
+                                d={drawEdge(getFlowNodeAnchorX(flowNodeById[connectingStart]), getFlowNodeAnchorBottomY(flowNodeById[connectingStart]), mousePos.x, mousePos.y)}
+                                fill="none"
+                                stroke="#1A1A1B"
+                                strokeWidth="2"
+                                strokeDasharray="5,5"
                             />
                         )}
                     </svg>
 
-                    {/* HTML Node Layer */}
                     <div className="absolute top-0 left-0 w-full h-full z-20 pointer-events-none">
-                        {flowNodes.map(n => {
-                            const showCompact = n.compact || forPrint;
-                            const isEditing = isInteractive && inlineEdit?.id === n.id;
-                            return (
+                        {flowNodes.map(n => (
                             <div
                                 key={n.id}
                                 id={isInteractive ? n.id : undefined}
@@ -2343,119 +2707,115 @@ const Icon = ({ name, size = 18, className = "" }) => {
                                 onPointerMove={isInteractive ? handleNodePointerMove : undefined}
                                 onPointerUp={isInteractive ? (e) => handleNodePointerUp(e, n) : undefined}
                                 onPointerCancel={isInteractive ? (e) => handleNodePointerUp(e, n) : undefined}
-                                onContextMenu={isInteractive ? (e) => { e.preventDefault(); e.stopPropagation(); setCtxMenu({ nodeId: n.id, x: e.clientX, y: e.clientY }); } : undefined}
                                 onDoubleClick={isInteractive ? (e) => {
                                     e.stopPropagation();
-                                    if (flowTool === 'select') {
-                                        setSelectedFlowNode(n.id); setFlowForm(n.data); setShowFlowEditModal(true);
-                                    }
+                                    if (flowTool === 'select') openFlowNodeEditor(n);
                                 } : undefined}
                             >
-                                {isInteractive && (() => {
-                                    const wOff = n.type === 'template' ? (n.compact ? 100 : 140) : ((n.data.width || 280) / 2);
-                                    const hOff = n.type === 'template' ? (n.compact ? 56 : 140) : 50;
-                                    const startConnect = (fromBottom) => (e) => {
-                                        e.stopPropagation();
-                                        e.preventDefault();
-                                        setConnectingStart(n.id);
-                                        setMousePos({ x: n.x + wOff, y: n.y + (fromBottom ? hOff : 0) });
-                                    };
-                                    return (
-                                        <>
-                                            <div onPointerDown={startConnect(false)} className="absolute -top-[5px] left-1/2 -translate-x-1/2 w-[10px] h-[10px] rounded-full bg-sepia border border-ink/60 opacity-0 group-hover:opacity-100 transition-opacity cursor-crosshair z-30" />
-                                            <div onPointerDown={startConnect(true)} className="absolute -bottom-[5px] left-1/2 -translate-x-1/2 w-[10px] h-[10px] rounded-full bg-sepia border border-ink/60 opacity-0 group-hover:opacity-100 transition-opacity cursor-crosshair z-30" />
-                                        </>
-                                    );
-                                })()}
+                                {isInteractive && (
+                                    <>
+                                        <div onPointerDown={(e) => { e.stopPropagation(); e.preventDefault(); setConnectingStart(n.id); setMousePos({ x: getFlowNodeAnchorX(n), y: n.y }); }} className="absolute -top-[5px] left-1/2 -translate-x-1/2 w-[10px] h-[10px] rounded-full bg-sepia border border-ink/60 opacity-0 group-hover:opacity-100 transition-opacity cursor-crosshair z-30" />
+                                        <div onPointerDown={(e) => { e.stopPropagation(); e.preventDefault(); setConnectingStart(n.id); setMousePos({ x: getFlowNodeAnchorX(n), y: getFlowNodeAnchorBottomY(n) }); }} className="absolute -bottom-[5px] left-1/2 -translate-x-1/2 w-[10px] h-[10px] rounded-full bg-sepia border border-ink/60 opacity-0 group-hover:opacity-100 transition-opacity cursor-crosshair z-30" />
+                                    </>
+                                )}
                                 {n.type === 'template' ? (
-                                    showCompact ? (
-                                        <div className={`w-[200px] px-3 py-2 border rounded-lg shadow-sm ${n.color}`}>
-                                            {isEditing && inlineEdit.field === 'grantee' ? (
-                                                <input
-                                                    autoFocus
-                                                    className="w-full bg-transparent border-b border-sepia font-display font-bold text-sm leading-tight outline-none"
-                                                    value={inlineEdit.value}
-                                                    onChange={e => setInlineEdit(prev => ({ ...prev, value: e.target.value }))}
-                                                    onBlur={commitInlineEdit}
-                                                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); commitInlineEdit(); } if (e.key === 'Escape') setInlineEdit(null); }}
-                                                    onPointerDown={e => e.stopPropagation()}
-                                                    onClick={e => e.stopPropagation()}
-                                                />
-                                            ) : (
-                                                <div
-                                                    className="font-display font-bold text-sm leading-tight truncate"
-                                                    onDoubleClick={isInteractive ? (e) => { e.stopPropagation(); setInlineEdit({ id: n.id, field: 'grantee', value: n.data.grantee }); } : undefined}
-                                                >{n.data.grantee}</div>
-                                            )}
-                                            <div className="font-mono text-[10px] opacity-60 truncate">{n.data.fractionDisplay || n.data.fraction}</div>
+                                    <div className={`p-3 border shadow-sm ${n.color}`} style={{ width: FLOW_CARD_WIDTH, minHeight: getFlowNodeHeight(n) }}>
+                                        <div className="border-b border-current/20 pb-2 mb-2 flex items-start justify-between gap-2">
+                                            <div>
+                                                <div className="font-serif text-[11px] font-bold uppercase tracking-[0.18em] text-sepia">{n.data.title}</div>
+                                                {n.data.mapLabel && <div className="font-mono text-[9px] uppercase tracking-[0.18em] opacity-60 mt-1">{n.data.mapLabel}</div>}
+                                                <div className="font-mono text-[9px] opacity-60 mt-1">{n.data.details}</div>
+                                            </div>
+                                            {n.data.isDeceased && <Icon name="Tombstone" size={14} className="text-sepia/70" />}
                                         </div>
-                                    ) : (
-                                        <div className={`w-[280px] p-4 border rounded-lg shadow-sm ${n.color}`}>
-                                            <div className="border-b border-current/20 pb-2 mb-2">
-                                                <div className="font-serif text-xs font-bold uppercase tracking-widest text-sepia">{n.data.title}</div>
-                                                <div className="font-mono text-[10px] opacity-60 mt-1">{n.data.details}</div>
+                                        <div className="mb-2">
+                                            <div className="text-[9px] uppercase tracking-[0.18em] text-sepia/60 font-mono mb-0.5">Grantee</div>
+                                            <div className="font-display font-bold text-[15px] leading-tight">{n.data.grantee}</div>
+                                        </div>
+                                        <div className="mb-2.5">
+                                            <div className="text-[9px] uppercase tracking-[0.18em] text-sepia/60 font-mono mb-0.5">Grantor</div>
+                                            <div className="font-mono text-[11px] truncate opacity-80">{n.data.grantor}</div>
+                                        </div>
+                                        {n.data.conveyance && (
+                                            <div className="mb-2.5">
+                                                <div className="text-[9px] uppercase tracking-[0.18em] text-sepia/60 font-mono mb-0.5">Conveyance</div>
+                                                <div className="font-mono text-[11px]">{n.data.conveyance}</div>
                                             </div>
-                                            <div className="mb-2">
-                                                <div className="text-[10px] uppercase tracking-widest text-sepia/60 font-mono mb-0.5">Grantee / Assignee</div>
-                                                {isEditing && inlineEdit.field === 'grantee' ? (
-                                                    <input
-                                                        autoFocus
-                                                        className="w-full bg-transparent border-b border-sepia font-display font-bold text-base leading-tight outline-none"
-                                                        value={inlineEdit.value}
-                                                        onChange={e => setInlineEdit(prev => ({ ...prev, value: e.target.value }))}
-                                                        onBlur={commitInlineEdit}
-                                                        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); commitInlineEdit(); } if (e.key === 'Escape') setInlineEdit(null); }}
-                                                        onPointerDown={e => e.stopPropagation()}
-                                                        onClick={e => e.stopPropagation()}
-                                                    />
-                                                ) : (
-                                                    <div
-                                                        className="font-display font-bold text-base leading-tight"
-                                                        onDoubleClick={isInteractive ? (e) => { e.stopPropagation(); setInlineEdit({ id: n.id, field: 'grantee', value: n.data.grantee }); } : undefined}
-                                                    >{n.data.grantee}</div>
-                                                )}
-                                            </div>
-                                            <div className="mb-3">
-                                                <div className="text-[10px] uppercase tracking-widest text-sepia/60 font-mono mb-0.5">Grantor / Assignor</div>
-                                                <div className="font-mono text-xs truncate opacity-80">{n.data.grantor}</div>
-                                            </div>
-                                            <div className="border-t border-current/20 pt-2 flex justify-between items-end">
-                                                <span className="text-[10px] uppercase tracking-widest opacity-60 font-mono">Interest</span>
+                                        )}
+                                        <div className="flex flex-col border-t border-current/20 pt-2 font-mono">
+                                            <div className="flex justify-between items-end mb-1">
+                                                <span className="text-[9px] uppercase tracking-[0.18em] opacity-60">Grant</span>
                                                 <div className="text-right">
-                                                    <div className="font-mono font-bold text-sm">{n.data.fraction}</div>
-                                                    {n.data.fractionDisplay && <div className="font-mono text-[10px] opacity-60">{n.data.fractionDisplay}</div>}
+                                                    <div className="text-[12px] font-bold text-sepia">{n.data.grantFraction}</div>
+                                                    {n.data.grantFractionDisplay && <div className="text-[9px] opacity-70">{n.data.grantFractionDisplay}</div>}
+                                                </div>
+                                            </div>
+                                            <div className="flex justify-between items-end">
+                                                <span className={`text-[9px] uppercase tracking-[0.18em] italic ${n.data.fraction === '0.000000000' ? 'text-stamp font-bold' : 'opacity-60'}`}>Rem</span>
+                                                <div className="text-right">
+                                                    <div className={`text-[11px] italic ${n.data.fraction === '0.000000000' ? 'text-stamp font-bold' : ''}`}>{n.data.fraction}</div>
+                                                    {n.data.fractionDisplay && <div className={`text-[9px] ${n.data.fraction === '0.000000000' ? 'text-stamp font-bold' : 'opacity-70'}`}>{n.data.fractionDisplay}</div>}
                                                 </div>
                                             </div>
                                         </div>
-                                    )
-                                ) : (
-                                    <div
-                                        className={`p-4 border-2 border-dashed rounded-lg shadow-sm ${n.color}`}
-                                        style={{ width: n.data.width || 280 }}
-                                    >
-                                        {isEditing && inlineEdit.field === 'text' ? (
-                                            <textarea
-                                                autoFocus
-                                                className="w-full bg-transparent border-b border-sepia font-serif text-sm outline-none resize-none"
-                                                rows={3}
-                                                value={inlineEdit.value}
-                                                onChange={e => setInlineEdit(prev => ({ ...prev, value: e.target.value }))}
-                                                onBlur={commitInlineEdit}
-                                                onKeyDown={e => { if (e.key === 'Escape') setInlineEdit(null); }}
-                                                onPointerDown={e => e.stopPropagation()}
-                                                onClick={e => e.stopPropagation()}
-                                            />
-                                        ) : (
-                                            <div
-                                                className="font-serif text-sm whitespace-pre-wrap break-words"
-                                                onDoubleClick={isInteractive ? (e) => { e.stopPropagation(); setInlineEdit({ id: n.id, field: 'text', value: n.data.text }); } : undefined}
-                                            >{n.data.text}</div>
+                                        {n.data.deathNotes && (
+                                            <div className="mt-3 pt-3 border-t border-current/20 text-left">
+                                                <div className="text-[9px] uppercase tracking-[0.18em] text-sepia/60 font-mono mb-1">Death Notes</div>
+                                                <div className="text-[12px] text-fountain whitespace-pre-wrap font-handwriting leading-relaxed overflow-hidden" style={{ maxHeight: '2.5rem' }}>
+                                                    {n.data.deathNotes}
+                                                </div>
+                                            </div>
+                                        )}
+                                        {Array.isArray(n.data.attachedRecords) && n.data.attachedRecords.length > 0 && (
+                                            <div className="mt-3 pt-3 border-t border-current/20 text-left flex flex-col gap-1.5">
+                                                <div className="text-[9px] uppercase tracking-[0.18em] opacity-60">Attached Records</div>
+                                                {n.data.attachedRecords.slice(0, 2).map(record => (
+                                                    <div key={record.id || record.label} className="flex items-center gap-1.5 border border-current/30 px-2 py-1 bg-white/40">
+                                                        <Icon name="Paperclip" size={9} className="opacity-70" />
+                                                        <span className="font-serif font-bold text-[9px] uppercase tracking-[0.14em] truncate">{record.label}</span>
+                                                    </div>
+                                                ))}
+                                                {n.data.attachedRecords.length > 2 && (
+                                                    <div className="text-[9px] font-mono opacity-70">+{n.data.attachedRecords.length - 2} more</div>
+                                                )}
+                                            </div>
                                         )}
                                     </div>
+                                ) : (
+                                    renderFlowShapeBody(n)
+                                )}
+                                {isInteractive && selectedFlowNode === n.id && n.type === 'shape' && flowTool === 'select' && (
+                                    <>
+                                        {[
+                                            { handle: 'nw', className: '-top-2 -left-2' },
+                                            { handle: 'ne', className: '-top-2 -right-2' },
+                                            { handle: 'sw', className: '-bottom-2 -left-2' },
+                                            { handle: 'se', className: '-bottom-2 -right-2' },
+                                        ].map(item => (
+                                            <div
+                                                key={item.handle}
+                                                className={`absolute ${item.className} w-4 h-4 rounded-full bg-white border-2 border-sepia shadow-sm z-40 cursor-nwse-resize`}
+                                                onPointerDown={(e) => startFlowResize(e, n, item.handle)}
+                                                onPointerMove={handleFlowResizeMove}
+                                                onPointerUp={handleFlowResizeEnd}
+                                                onPointerCancel={handleFlowResizeEnd}
+                                            />
+                                        ))}
+                                    </>
                                 )}
                             </div>
-                            );
-                        })}
+                        ))}
+                        {flowDraftShape && (
+                            <div
+                                className="absolute border-2 border-dashed border-sepia/70 bg-sepia/10 pointer-events-none"
+                                style={{
+                                    transform: `translate(${flowDraftShape.x}px, ${flowDraftShape.y}px)`,
+                                    width: Math.max(1, flowDraftShape.width),
+                                    height: Math.max(1, flowDraftShape.height),
+                                    borderRadius: getFlowShapeTypeForTool(flowDraftShape.tool) === 'roundRect' ? '18px' : getFlowShapeTypeForTool(flowDraftShape.tool) === 'ellipse' ? '999px' : '0px'
+                                }}
+                            />
+                        )}
                     </div>
                 </>
             );
@@ -2840,244 +3200,233 @@ const Icon = ({ name, size = 18, className = "" }) => {
                         {/* -------------------- FLOW CHART ENGINE -------------------- */}
                         {view === 'flowchart' && (
                             <div className="flex-1 overflow-hidden relative parchment-grid animate-fade-in flex flex-col print-canvas-container rounded-2xl">
-                                
-                                {/* UI Toolbar (Hidden on actual print) */}
-                                <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-parchment/95 border border-ink/30 ink-shadow-lg z-50 flex items-center p-2 gap-2 no-print rounded-2xl max-w-[94vw]">
-                                    <div className="flex items-center gap-2 bg-teastain border border-ink px-2 py-1 rounded-md">
-                                        <label className="text-[9px] font-bold uppercase tracking-widest text-ink" htmlFor="flow-tool-select">Tool</label>
-                                        <select
-                                            id="flow-tool-select"
-                                            value={flowTool}
-                                            onChange={e => setFlowTool(e.target.value)}
-                                            aria-label="Flowchart active tool"
-                                            className="px-2 py-1 text-[10px] font-bold uppercase border border-ink/30 bg-parchment focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sepia"
-                                        >
-                                            <option value="select">Move Box</option>
-                                            <option value="move-tree">Move Tree</option>
-                                            <option value="pan">Pan Canvas</option>
-                                            <option value="connect">Link Boxes</option>
-                                        </select>
+                                <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 no-print w-[min(96vw,1360px)]">
+                                    <div className="bg-parchment/95 border border-ink/30 ink-shadow-lg rounded-2xl px-4 py-3 flex flex-wrap items-center gap-3">
+                                        <div className="flex items-center gap-1 border-r border-ink/15 pr-3">
+                                            {[
+                                                { key: 'select', label: 'Move Box', icon: 'MousePointer', title: 'Move individual boxes' },
+                                                { key: 'move-tree', label: 'Move Tree', icon: 'Move', title: 'Move an entire connected tree' },
+                                                { key: 'pan', label: 'Pan', icon: 'Hand', title: 'Pan across the canvas' },
+                                                { key: 'connect', label: 'Arrow', icon: 'Link', title: 'Connect two boxes manually' },
+                                            ].map(tool => (
+                                                <button
+                                                    key={tool.key}
+                                                    onClick={() => setFlowTool(tool.key)}
+                                                    title={tool.title}
+                                                    className={`px-3 py-2 text-[10px] font-bold uppercase tracking-widest border transition-all flex items-center gap-1.5 ${
+                                                        flowTool === tool.key ? 'bg-ink text-parchment border-ink' : 'bg-parchment text-ink border-ink/30 hover:bg-teastain'
+                                                    }`}
+                                                >
+                                                    <Icon name={tool.icon} size={12} />
+                                                    {tool.label}
+                                                </button>
+                                            ))}
+                                        </div>
+
+                                        <div className="flex items-center gap-2 border-r border-ink/15 pr-3">
+                                            <div className="relative flow-ui" ref={flowShapeMenuRef}>
+                                                <button
+                                                    onClick={() => setShowFlowShapeMenu(prev => !prev)}
+                                                    className={`px-3 py-2 text-[10px] font-bold uppercase tracking-widest border flex items-center gap-1.5 transition-all ${
+                                                        isFlowDrawTool(flowTool) ? 'bg-ink text-parchment border-ink' : 'border-ink bg-parchment hover:bg-teastain'
+                                                    }`}
+                                                >
+                                                    <Icon name="Square" size={12} /> Shapes
+                                                </button>
+                                                {showFlowShapeMenu && (
+                                                    <div className="absolute top-full left-0 mt-2 w-64 bg-parchment border border-ink/20 ink-shadow-lg rounded-2xl p-3 z-[80]">
+                                                        <div className="grid grid-cols-3 gap-2">
+                                                            {[
+                                                                { tool: 'draw-rect', label: 'Rect', icon: 'Square' },
+                                                                { tool: 'draw-round', label: 'Round', icon: 'RoundedSquare' },
+                                                                { tool: 'draw-ellipse', label: 'Ellipse', icon: 'Circle' },
+                                                                { tool: 'draw-diamond', label: 'Diamond', icon: 'Diamond' },
+                                                                { tool: 'draw-note', label: 'Note', icon: 'Sticky' },
+                                                            ].map(shape => (
+                                                                <button
+                                                                    key={shape.tool}
+                                                                    onClick={() => {
+                                                                        setFlowTool(shape.tool);
+                                                                        setShowFlowShapeMenu(false);
+                                                                    }}
+                                                                    className={`h-20 border rounded-xl text-[10px] font-bold uppercase tracking-widest flex flex-col items-center justify-center gap-2 transition-all ${
+                                                                        flowTool === shape.tool ? 'bg-ink text-parchment border-ink' : 'bg-parchment hover:bg-teastain border-ink/20'
+                                                                    }`}
+                                                                >
+                                                                    <Icon name={shape.icon} size={18} />
+                                                                    {shape.label}
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                        <div className="mt-3 text-[10px] text-ink/60 uppercase tracking-widest">
+                                                            Pick a shape, then drag on the canvas to size it.
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <button onClick={() => addFlowNode('template')} className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest border border-ink bg-parchment hover:bg-teastain flex items-center gap-1.5 transition-all">
+                                                <Icon name="Plus" size={12} /> Desk Card
+                                            </button>
+                                            <button onClick={() => fitFlowToView()} className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest border border-ink/40 bg-parchment hover:bg-teastain flex items-center gap-1.5 transition-all">
+                                                <Icon name="Move" size={12} /> Fit Tree
+                                            </button>
+                                            <button onClick={fitFlowPaperToView} className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest border border-ink/40 bg-parchment hover:bg-teastain flex items-center gap-1.5 transition-all">
+                                                <Icon name="Table" size={12} /> Fit Pages
+                                            </button>
+                                            <button onClick={scaleFlowToPrintGrid} className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest border border-ink/40 bg-parchment hover:bg-teastain flex items-center gap-1.5 transition-all">
+                                                <Icon name="Adjust" size={12} /> Scale To Pages
+                                            </button>
+                                            <button onClick={() => relayoutFlowchart(flowSelectedDeskMaps)} className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest border border-sepia text-sepia bg-parchment hover:bg-teastain flex items-center gap-1.5 transition-all">
+                                                <Icon name="Chart" size={12} /> Re-layout
+                                            </button>
+                                        </div>
+
+                                        <div className="flex items-center gap-2 border-r border-ink/15 pr-3 min-w-[320px] flex-1">
+                                            <label className="text-[9px] font-bold uppercase tracking-widest text-ink/70">Source</label>
+                                            <select value={flowDeskMapFilter} onChange={e => setFlowDeskMapFilter(e.target.value)} aria-label="Flow source selector" className="min-w-[220px] flex-1 px-2 py-1.5 text-[10px] font-bold border border-ink/30 bg-parchment">
+                                                <option value="active">Active DeskMap</option>
+                                                <option value="all">All DeskMaps</option>
+                                                {liveFlowDeskMaps.map(map => <option key={`flow-${map.id}`} value={map.id}>{formatDeskMapLabel(map)}</option>)}
+                                            </select>
+                                            <button onClick={() => importToFlowchart(false)} className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest border border-sepia text-sepia bg-parchment hover:bg-teastain flex items-center gap-1.5 transition-all">
+                                                <Icon name="Download" size={12} /> Import
+                                            </button>
+                                            <button onClick={() => importToFlowchart(true)} className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest border border-sepia/50 text-sepia bg-parchment hover:bg-teastain flex items-center gap-1.5 transition-all">
+                                                <Icon name="Plus" size={12} /> Append
+                                            </button>
+                                        </div>
+
+                                        <div className="flex items-center gap-2">
+                                            <div className="flex items-center gap-1 border border-ink/30 bg-teastain px-2 py-1.5">
+                                                <button onClick={() => setGridCols(c => Math.max(1, c - 1))} className="w-5 h-5 border border-ink/30 bg-parchment font-bold">-</button>
+                                                <span className="text-[10px] font-bold uppercase tracking-widest min-w-[52px] text-center">{gridCols} Cols</span>
+                                                <button onClick={() => setGridCols(c => c + 1)} className="w-5 h-5 border border-ink/30 bg-parchment font-bold">+</button>
+                                            </div>
+                                            <div className="flex items-center gap-1 border border-ink/30 bg-teastain px-2 py-1.5">
+                                                <button onClick={() => setGridRows(r => Math.max(1, r - 1))} className="w-5 h-5 border border-ink/30 bg-parchment font-bold">-</button>
+                                                <span className="text-[10px] font-bold uppercase tracking-widest min-w-[52px] text-center">{gridRows} Rows</span>
+                                                <button onClick={() => setGridRows(r => r + 1)} className="w-5 h-5 border border-ink/30 bg-parchment font-bold">+</button>
+                                            </div>
+                                            <div className="flex items-center gap-2 border border-ink/30 bg-teastain px-2 py-1.5">
+                                                <span className="text-[9px] font-bold uppercase tracking-widest">Scale</span>
+                                                <input
+                                                    type="range"
+                                                    min="0.2"
+                                                    max="1.8"
+                                                    step="0.05"
+                                                    value={treeScale}
+                                                    onChange={e => setTreeScale(Number(e.target.value))}
+                                                    aria-label="Adjust tree scale"
+                                                    className="w-28 accent-sepia cursor-pointer"
+                                                />
+                                                <span className="text-[10px] font-mono min-w-[44px] text-right">{treeScale.toFixed(2)}x</span>
+                                            </div>
+                                            <button onClick={() => setPrintOrientation(prev => prev === 'portrait' ? 'landscape' : 'portrait')} className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest border border-ink bg-parchment hover:bg-teastain flex items-center gap-1.5 transition-all">
+                                                <Icon name="FileText" size={12} /> {printOrientation}
+                                            </button>
+                                            <button onClick={handlePrintFlowchart} className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest border border-ink bg-ink text-parchment hover:bg-ink/80 flex items-center gap-1.5 transition-all">
+                                                <Icon name="Printer" size={12} /> Print
+                                            </button>
+                                            <button onClick={handleClearFlowchart} className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest border border-stamp/50 text-stamp bg-parchment hover:bg-teastain flex items-center gap-1.5 transition-all">
+                                                <Icon name="Trash" size={12} /> Clear
+                                            </button>
+                                        </div>
                                     </div>
 
-                                    <button onClick={() => addFlowNode('template')} aria-label="Add templated flowchart box" className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-ink bg-parchment hover:bg-teastain flex items-center gap-1 shadow-sm transition-all hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sepia"><Icon name="Plus" size={12}/> Box</button>
-                                    <button onClick={() => addFlowNode('blank')} aria-label="Add blank note box" className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-ink bg-parchment hover:bg-teastain flex items-center gap-1 shadow-sm transition-all hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sepia"><Icon name="Plus" size={12}/> Note</button>
-                                    <button onClick={() => fitFlowToView()} aria-label="Fit all flow nodes to view" className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-ink/40 text-ink hover:bg-ink hover:text-parchment flex items-center gap-1 shadow-sm transition-all hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sepia" title="Recenter and fit all flow nodes to the current canvas"><Icon name="Move" size={12}/> Fit View</button>
-                                    <button onClick={() => relayoutFlowchart(deskMaps)} aria-label="Re-layout flowchart from desk maps" className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-ink/40 text-ink hover:bg-ink hover:text-parchment flex items-center gap-1 shadow-sm transition-all hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sepia" title="Re-run automatic layout algorithm on all desk map nodes"><Icon name="Chart" size={12}/> Re-layout</button>
-                                    <button onClick={handlePrintFlowchart} aria-label="Print flowchart" className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-ink bg-ink text-parchment hover:bg-ink/80 flex items-center gap-1 shadow-sm transition-all hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sepia"><Icon name="Printer" size={12}/> Print</button>
-                                    <button
-                                        onClick={() => { const next = !flowGlobalCompact; setFlowGlobalCompact(next); setFlowNodes(nodes => nodes.map(n => n.type === 'template' ? { ...n, compact: next } : n)); }}
-                                        aria-label={flowGlobalCompact ? 'Expand all nodes to full view' : 'Collapse all nodes to compact view'}
-                                        className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-ink/40 text-ink hover:bg-ink hover:text-parchment flex items-center gap-1 shadow-sm transition-all hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sepia"
-                                    >{flowGlobalCompact ? 'Full' : 'Compact'}</button>
-
-                                    <div className="relative" ref={flowLayoutMenuRef}>
-                                        <button
-                                            onClick={() => setShowFlowLayoutMenu(v => !v)}
-                                            aria-label="Toggle layout and import controls"
-                                            aria-haspopup="menu"
-                                            aria-expanded={showFlowLayoutMenu}
-                                            className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-sepia text-sepia hover:bg-sepia hover:text-parchment flex items-center gap-1 shadow-sm transition-all hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sepia"
-                                        >
-                                            <Icon name="List" size={12}/> Layout & Import
-                                        </button>
-
-                                        {showFlowLayoutMenu && (
-                                            <div className="absolute right-0 mt-2 w-[320px] bg-parchment border border-ink/40 ink-shadow-lg rounded-lg p-3 space-y-3" role="menu" aria-label="Layout and import controls">
-                                                <div>
-                                                    <div className="text-[9px] font-bold uppercase tracking-widest text-ink/60 mb-1 flex items-center gap-1"><Icon name="Chart" size={11}/> Paper Boundaries</div>
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="text-[10px] font-bold uppercase text-ink">Grid</span>
-                                                        <div className="flex items-center">
-                                                            <button onClick={() => setGridCols(c => Math.max(1, c-1))} aria-label="Decrease grid columns" className="w-5 h-5 flex items-center justify-center bg-teastain hover:bg-ink hover:text-parchment border border-ink text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sepia">-</button>
-                                                            <span className="w-5 text-center text-[10px] font-mono font-bold" aria-label={`Grid columns ${gridCols}`}>{gridCols}</span>
-                                                            <button onClick={() => setGridCols(c => c+1)} aria-label="Increase grid columns" className="w-5 h-5 flex items-center justify-center bg-teastain hover:bg-ink hover:text-parchment border border-ink text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sepia">+</button>
-                                                        </div>
-                                                        <span className="text-[10px] font-bold text-ink/50">x</span>
-                                                        <div className="flex items-center">
-                                                            <button onClick={() => setGridRows(r => Math.max(1, r-1))} aria-label="Decrease grid rows" className="w-5 h-5 flex items-center justify-center bg-teastain hover:bg-ink hover:text-parchment border border-ink text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sepia">-</button>
-                                                            <span className="w-5 text-center text-[10px] font-mono font-bold" aria-label={`Grid rows ${gridRows}`}>{gridRows}</span>
-                                                            <button onClick={() => setGridRows(r => r+1)} aria-label="Increase grid rows" className="w-5 h-5 flex items-center justify-center bg-teastain hover:bg-ink hover:text-parchment border border-ink text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sepia">+</button>
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex items-center gap-2 mt-2">
-                                                        <span className="text-[10px] font-bold uppercase tracking-widest text-ink">Scale</span>
-                                                        <input
-                                                            type="range"
-                                                            min="0.2"
-                                                            max="1.5"
-                                                            step="0.05"
-                                                            value={treeScale}
-                                                            onChange={e => setTreeScale(Number(e.target.value))}
-                                                            aria-label="Adjust tree scale"
-                                                            className="w-full accent-sepia cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sepia"
-                                                            title="Scale the tree to fit inside the paper bounds"
-                                                        />
-                                                    </div>
-                                                    <button onClick={() => setPrintOrientation(prev => prev === 'portrait' ? 'landscape' : 'portrait')} aria-label="Toggle print orientation" className="mt-2 px-2 py-1.5 w-full text-[10px] font-bold uppercase tracking-widest border border-ink bg-parchment hover:bg-teastain flex items-center justify-center gap-1 shadow-sm transition-all hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sepia">
-                                                        <Icon name="FileText" size={12}/> {printOrientation === 'portrait' ? 'Portrait' : 'Landscape'}
-                                                    </button>
-                                                </div>
-
-                                                <div>
-                                                    <div className="text-[9px] font-bold uppercase tracking-widest text-ink/60 mb-1 flex items-center gap-1"><Icon name="Download" size={11}/> Import Source</div>
-                                                    <select value={flowDeskMapFilter} onChange={e => setFlowDeskMapFilter(e.target.value)} aria-label="Flow source selector" className="w-full px-2 py-1.5 text-[10px] font-bold border border-ink/30 bg-parchment focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sepia">
-                                                        <option value="active">Flow Source: Active DeskMap</option>
-                                                        <option value="all">Flow Source: All DeskMaps</option>
-                                                        {deskMaps.map(map => <option key={`flow-${map.id}`} value={map.id}>Flow Source: {map.code} {map.name ? `- ${map.name}` : ''}</option>)}
-                                                    </select>
-                                                    <div className="grid grid-cols-2 gap-2 mt-2">
-                                                        <button onClick={() => importToFlowchart(false)} aria-label="Import selected deskmaps into flowchart" className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-sepia text-sepia hover:bg-sepia hover:text-parchment flex items-center justify-center gap-1 shadow-sm transition-all hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sepia" title="Load selected DeskMap(s) into Flow Chart"><Icon name="Download" size={12}/> Import</button>
-                                                        <button onClick={() => importToFlowchart(true)} aria-label="Import and append selected deskmaps into flowchart" className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-widest border border-sepia/50 text-sepia hover:bg-sepia/10 flex items-center justify-center gap-1 shadow-sm transition-all hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sepia" title="Append selected DeskMap(s) to existing Flow Chart"><Icon name="Plus" size={12}/> Append</button>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        )}
+                                    <div className="mt-2 bg-parchment/90 border border-ink/20 ink-shadow rounded-xl px-4 py-2 flex flex-wrap items-center gap-3 text-[10px] uppercase tracking-widest text-ink/70">
+                                        <span>{flowNodes.length} boxes</span>
+                                        <span>{flowEdges.length} links</span>
+                                        <span>{flowTreeCount} trees</span>
+                                        <span>{flowSelectedDeskMaps.length === 0 ? 'No import source selected' : `${flowSelectedDeskMaps.length} desk map${flowSelectedDeskMaps.length === 1 ? '' : 's'} ready`}</span>
+                                        <span>{gridCols}x{gridRows} {printOrientation}</span>
+                                        {[
+                                            { key: 'left', label: 'Left', hit: flowPrintOverflow.left },
+                                            { key: 'top', label: 'Top', hit: flowPrintOverflow.top },
+                                            { key: 'right', label: 'Right', hit: flowPrintOverflow.right },
+                                            { key: 'bottom', label: 'Bottom', hit: flowPrintOverflow.bottom },
+                                        ].map(item => (
+                                            <span key={item.key} className={item.hit ? 'text-stamp font-bold' : ''}>
+                                                {item.label}: {item.hit ? 'Outside' : 'Inside'}
+                                            </span>
+                                        ))}
                                     </div>
                                 </div>
 
-                                {/* Flowchart Property Panel (Hidden on Print) */}
-                                {selectedFlowNode && flowTool === 'select' && (
-                                    <div className="absolute top-20 right-4 bg-parchment border border-ink ink-shadow-lg z-50 p-4 w-64 no-print animate-fade-in">
+                                {selectedFlowNodeData && flowTool === 'select' && (
+                                    <div className="absolute top-[132px] right-4 bg-parchment border border-ink ink-shadow-lg z-50 p-4 w-72 no-print animate-fade-in">
                                         <div className="text-[10px] font-bold uppercase tracking-widest mb-3 border-b border-ink/20 pb-2 flex justify-between items-center">
                                             <span>Box Properties</span>
-                                            <button onClick={() => setSelectedFlowNode(null)}><Icon name="Close" size={12}/></button>
+                                            <button onClick={() => setSelectedFlowNode(null)}><Icon name="Close" size={12} /></button>
                                         </div>
-                                        <div className="flex gap-2 mb-4 justify-between">
-                                            <button onClick={() => changeNodeColor('bg-parchment text-ink border-ink')} className="w-8 h-8 rounded-sm border border-ink bg-parchment" title="Parchment"></button>
-                                            <button onClick={() => changeNodeColor('bg-teastain text-sepia border-sepia')} className="w-8 h-8 rounded-sm border border-sepia bg-teastain" title="Tea-Stain"></button>
-                                            <button onClick={() => changeNodeColor('bg-sepia text-parchment border-sepia')} className="w-8 h-8 rounded-sm border border-sepia bg-sepia" title="Sepia"></button>
-                                            <button onClick={() => changeNodeColor('bg-ink text-parchment border-ink')} className="w-8 h-8 rounded-sm border border-ink bg-ink" title="Ink"></button>
-                                        </div>
-                                        <button onClick={() => {
-                                            const node = flowNodes.find(n => n.id === selectedFlowNode);
-                                            setFlowForm(node.data); setShowFlowEditModal(true);
-                                        }} className="w-full py-2 border border-ink mb-2 text-xs font-bold uppercase hover:bg-ink hover:text-parchment transition-colors">Edit Content</button>
-                                        <div className="mb-2 border border-ink/20 bg-teastain/20 px-2 py-1.5 text-[10px]">
-                                            <div className="font-bold uppercase tracking-widest text-ink/70 mb-1">Tree Group</div>
-                                            <label className="flex items-center justify-between gap-2 text-[10px] text-ink">
-                                                <span>Move as tree group</span>
-                                                <input type="checkbox" checked readOnly aria-label="Move as tree group" />
-                                            </label>
-                                            <div className="mt-1 font-mono text-[9px] break-all text-ink/70">
-                                                {resolveTreeGroupId(flowNodes.find(n => n.id === selectedFlowNode))}
+                                        <div className="space-y-3">
+                                            <div>
+                                                <div className="text-[9px] uppercase tracking-widest text-ink/50">{selectedFlowNodeData.data.mapLabel || 'Canvas Box'}</div>
+                                                <div className="font-serif font-black text-lg">{selectedFlowNodeData.data.grantee || selectedFlowNodeData.data.text || 'Untitled'}</div>
+                                                <div className="text-[11px] font-mono opacity-70">{selectedFlowNodeData.data.title || 'Annotation'}</div>
                                             </div>
-                                        </div>
-                                        <button onClick={deleteSelectedFlowElement} className="w-full py-2 border border-transparent text-stamp hover:border-stamp/50 text-xs font-bold uppercase transition-colors flex items-center justify-center gap-2"><Icon name="Trash" size={14}/> Delete Node</button>
-                                    </div>
-                                )}
-
-                                {/* Click-to-place node creation popover */}
-                                {clickPopover && (
-                                    <div
-                                        className="fixed z-[300] bg-parchment border border-ink/60 rounded-lg shadow-lg p-3 w-52 animate-fade-in no-print"
-                                        style={{ top: clickPopover.screenY, left: clickPopover.screenX }}
-                                        onPointerDown={e => e.stopPropagation()}
-                                        onClick={e => e.stopPropagation()}
-                                    >
-                                        <div className="flex items-center gap-1 mb-2">
-                                            {['Party', 'Conveyance', 'Annotation'].map(t => (
-                                                <button
-                                                    key={t}
-                                                    onClick={() => setClickPopoverForm(f => ({ ...f, nodeType: t }))}
-                                                    className={`flex-1 py-0.5 text-[9px] font-bold uppercase tracking-widest border transition-colors ${clickPopoverForm.nodeType === t ? 'bg-ink text-parchment border-ink' : 'bg-parchment text-ink border-ink/30 hover:bg-teastain'}`}
-                                                >{t}</button>
-                                            ))}
-                                        </div>
-                                        <input
-                                            autoFocus
-                                            type="text"
-                                            placeholder={clickPopoverForm.nodeType === 'Annotation' ? 'Note text...' : 'Name...'}
-                                            value={clickPopoverForm.name}
-                                            onChange={e => setClickPopoverForm(f => ({ ...f, name: e.target.value }))}
-                                            onKeyDown={e => { if (e.key === 'Enter') confirmClickPlace(); if (e.key === 'Escape') setClickPopover(null); }}
-                                            className="w-full border border-ink/40 bg-teastain px-2 py-1.5 text-sm font-serif mb-2 focus:outline-none focus:ring-1 focus:ring-sepia"
-                                        />
-                                        {clickPopoverForm.nodeType !== 'Annotation' && (
-                                            <input
-                                                type="text"
-                                                placeholder="Acreage (optional)"
-                                                value={clickPopoverForm.acreage}
-                                                onChange={e => setClickPopoverForm(f => ({ ...f, acreage: e.target.value }))}
-                                                onKeyDown={e => { if (e.key === 'Enter') confirmClickPlace(); if (e.key === 'Escape') setClickPopover(null); }}
-                                                className="w-full border border-ink/40 bg-teastain px-2 py-1.5 text-xs font-mono mb-2 focus:outline-none focus:ring-1 focus:ring-sepia"
-                                            />
-                                        )}
-                                        <div className="flex gap-2">
-                                            <button
-                                                onClick={confirmClickPlace}
-                                                disabled={!clickPopoverForm.name.trim()}
-                                                className="flex-1 py-1.5 border border-ink bg-ink text-parchment text-[10px] font-bold uppercase tracking-widest hover:bg-ink/80 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                                            >✓ Place</button>
-                                            <button
-                                                onClick={() => setClickPopover(null)}
-                                                className="px-3 py-1.5 border border-ink/40 text-[10px] font-bold uppercase tracking-widest hover:bg-teastain transition-colors"
-                                            >✕</button>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* Right-click per-node context menu */}
-                                {ctxMenu && (
-                                    <div
-                                        className="fixed z-[300] bg-parchment border border-ink/40 shadow-lg rounded-lg overflow-hidden"
-                                        style={{ top: ctxMenu.y, left: ctxMenu.x }}
-                                        onPointerDown={e => e.stopPropagation()}
-                                    >
-                                        {flowNodes.find(n => n.id === ctxMenu.nodeId)?.type === 'template' && (
-                                            <button
-                                                className="w-full px-4 py-2 text-left text-[11px] font-mono hover:bg-teastain transition-colors whitespace-nowrap"
-                                                onClick={() => {
-                                                    const node = flowNodes.find(n => n.id === ctxMenu.nodeId);
-                                                    setFlowNodes(nodes => nodes.map(n => n.id === ctxMenu.nodeId ? { ...n, compact: !node.compact } : n));
-                                                    setCtxMenu(null);
-                                                }}
-                                            >
-                                                {flowNodes.find(n => n.id === ctxMenu.nodeId)?.compact ? 'Show Full' : 'Show Compact'}
+                                            <div className="flex gap-2">
+                                                <button onClick={() => openFlowNodeEditor(selectedFlowNodeData)} className="w-full py-2 border border-ink text-xs font-bold uppercase hover:bg-ink hover:text-parchment transition-colors">Edit Content</button>
+                                            </div>
+                                            <div className="flex gap-2 mb-1 justify-between">
+                                                <button onClick={() => changeNodeColor('bg-parchment text-ink border-ink')} className="w-8 h-8 border border-ink bg-parchment" title="Parchment" />
+                                                <button onClick={() => changeNodeColor('bg-teastain text-sepia border-sepia')} className="w-8 h-8 border border-sepia bg-teastain" title="Tea-stain" />
+                                                <button onClick={() => changeNodeColor('bg-[#e7f0ff] text-[#17324a] border-[#5e88b0]')} className="w-8 h-8 border border-[#5e88b0] bg-[#e7f0ff]" title="Blue" />
+                                                <button onClick={() => changeNodeColor('bg-[#ffe2e2] text-[#7a1f1f] border-[#cf5c5c]')} className="w-8 h-8 border border-[#cf5c5c] bg-[#ffe2e2]" title="Rose" />
+                                                <button onClick={() => changeNodeColor('bg-sepia text-parchment border-sepia')} className="w-8 h-8 border border-sepia bg-sepia" title="Sepia" />
+                                                <button onClick={() => changeNodeColor('bg-ink text-parchment border-ink')} className="w-8 h-8 border border-ink bg-ink" title="Ink" />
+                                            </div>
+                                            {selectedFlowNodeData.type === 'shape' && (
+                                                <div className="grid grid-cols-3 gap-2">
+                                                    {[
+                                                        { shapeType: 'rect', icon: 'Square' },
+                                                        { shapeType: 'roundRect', icon: 'RoundedSquare' },
+                                                        { shapeType: 'ellipse', icon: 'Circle' },
+                                                        { shapeType: 'diamond', icon: 'Diamond' },
+                                                        { shapeType: 'note', icon: 'Sticky' },
+                                                    ].map(shape => (
+                                                        <button
+                                                            key={shape.shapeType}
+                                                            onClick={() => setFlowNodes(nodes => nodes.map(node => node.id === selectedFlowNodeData.id ? { ...node, shapeType: shape.shapeType } : node))}
+                                                            className={`h-10 border rounded-lg flex items-center justify-center transition-colors ${
+                                                                ((selectedFlowNodeData.shapeType || selectedFlowNodeData.data?.shapeType || 'rect') === shape.shapeType) ? 'bg-ink text-parchment border-ink' : 'bg-parchment border-ink/20 hover:bg-teastain'
+                                                            }`}
+                                                            title={`Switch to ${shape.shapeType}`}
+                                                        >
+                                                            <Icon name={shape.icon} size={16} />
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            )}
+                                            <div className="border border-ink/20 bg-teastain/20 px-2 py-1.5 text-[10px]">
+                                                <div className="font-bold uppercase tracking-widest text-ink/70 mb-1">Tree Group</div>
+                                                <div className="font-mono text-[9px] break-all text-ink/70">
+                                                    {resolveTreeGroupId(selectedFlowNodeData)}
+                                                </div>
+                                            </div>
+                                            <button onClick={deleteSelectedFlowElement} className="w-full py-2 border border-transparent text-stamp hover:border-stamp/50 text-xs font-bold uppercase transition-colors flex items-center justify-center gap-2">
+                                                <Icon name="Trash" size={14} /> Delete Node
                                             </button>
-                                        )}
-                                        <button
-                                            className="w-full px-4 py-2 text-left text-[11px] font-mono hover:bg-teastain transition-colors whitespace-nowrap"
-                                            onClick={() => setCtxMenu(null)}
-                                        >Close</button>
+                                        </div>
                                     </div>
                                 )}
 
-                                {/* Outer Zoom Viewport (Interactive Screen View) */}
                                 <div
                                     ref={flowCanvasRef}
                                     className={`flex-1 relative overflow-hidden no-print ${
-                                        flowTool === 'pan' ? 'cursor-grab active:cursor-grabbing' 
-                                        : flowTool === 'move-tree' ? 'cursor-move' 
-                                        : flowTool === 'connect' ? 'cursor-crosshair' 
+                                        flowTool === 'pan' ? 'cursor-grab active:cursor-grabbing'
+                                        : flowTool === 'move-tree' ? 'cursor-move'
+                                        : flowTool === 'connect' || isFlowDrawTool(flowTool) ? 'cursor-crosshair'
                                         : 'cursor-default'
                                     }`}
                                     onPointerDown={(e) => {
-                                        canvasPointerDownPos.current = { x: e.clientX, y: e.clientY };
-                                        if (flowTool === 'pan' || flowTool === 'move-tree') handleFlowPointerDown(e);
+                                        handleFlowPointerDown(e);
                                     }}
                                     onPointerMove={handleFlowPointerMove}
                                     onPointerUp={handleFlowPointerUp}
                                     onPointerCancel={handleFlowPointerUp}
                                     onWheel={handleFlowWheel}
                                     onClick={(e) => {
-                                        setCtxMenu(null);
-                                        if (clickPopover) { setClickPopover(null); return; }
-                                        // Only deselect when clicking on empty canvas, NOT when click propagates from a node
-                                        if (flowTool === 'select' && !e.target.closest('.flow-node') && !e.target.closest('.flow-ui')) {
-                                            setSelectedFlowNode(null);
-                                        }
-                                    }}
-                                    onDoubleClick={(e) => {
-                                        if (e.target.closest('.flow-node') || e.target.closest('.flow-ui')) return;
-                                        const p = canvasPointerDownPos.current;
-                                        const moved = p && (Math.abs(e.clientX - p.x) > 5 || Math.abs(e.clientY - p.y) > 5);
-                                        if (!moved && flowTool === 'select') {
-                                            const rect = document.getElementById('tree-scaler')?.getBoundingClientRect();
-                                            if (rect) {
-                                                setClickPopover({ screenX: e.clientX, screenY: e.clientY, worldX: (e.clientX - rect.left) / (flowPz.scale * treeScale), worldY: (e.clientY - rect.top) / (flowPz.scale * treeScale) });
-                                                setClickPopoverForm({ name: '', acreage: '', nodeType: 'Party' });
-                                            }
-                                        }
+                                        if (flowTool === 'select' && !e.target.closest('.flow-node')) setSelectedFlowNode(null);
                                     }}
                                 >
                                     <div
@@ -3085,25 +3434,26 @@ const Icon = ({ name, size = 18, className = "" }) => {
                                         className="absolute top-0 left-0 pan-zoom-layer"
                                         style={{ transform: `translate(${flowPz.x}px, ${flowPz.y}px) scale(${flowPz.scale})`, transformOrigin: '0 0' }}
                                     >
-                                        {/* Physical Multi-Page "Paper" representation bounds — sized to fit content or print area, whichever is larger */}
                                         <div
-                                            className="paper-visual bg-parchment shadow-[12px_12px_0px_rgba(26,26,27,0.2)] relative border border-ink"
-                                            style={{
-                                                width: Math.max(pw * gridCols, flowContentBounds.w),
-                                                height: Math.max(ph * gridRows, flowContentBounds.h),
-                                            }}
+                                            className="paper-visual bg-parchment shadow-[12px_12px_0px_rgba(26,26,27,0.2)] relative border border-ink overflow-visible"
+                                            style={{ width: paperWidth, height: paperHeight }}
                                         >
-                                            {/* Safety Margin & Page Break Overlay Guide */}
                                             <div className="absolute inset-0 pointer-events-none z-30 overflow-hidden">
-                                                {/* Vertical Page Seams */}
-                                                {Array.from({length: gridCols - 1}).map((_, i) => (
-                                                    <div key={`v-${i}`} className="absolute top-0 bottom-0 border-l-[2px] border-dashed border-stamp/40" style={{ left: (i + 1) * pw }} />
+                                                {Array.from({ length: gridCols - 1 }).map((_, i) => (
+                                                    <div key={`v-${i}`} className="absolute top-0 bottom-0 border-l-[2px] border-dashed border-stamp/30" style={{ left: (i + 1) * pw }} />
                                                 ))}
-                                                {/* Horizontal Page Seams */}
-                                                {Array.from({length: gridRows - 1}).map((_, i) => (
-                                                    <div key={`h-${i}`} className="absolute left-0 right-0 border-t-[2px] border-dashed border-stamp/40" style={{ top: (i + 1) * ph }} />
+                                                {Array.from({ length: gridRows - 1 }).map((_, i) => (
+                                                    <div key={`h-${i}`} className="absolute left-0 right-0 border-t-[2px] border-dashed border-stamp/30" style={{ top: (i + 1) * ph }} />
                                                 ))}
-                                                {/* Overall Border */}
+                                                {flowPageTiles.map(tile => (
+                                                    <div
+                                                        key={`label-${tile.label}`}
+                                                        className="absolute bg-parchment px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-ink/60"
+                                                        style={{ top: tile.row * ph + 12, left: tile.col * pw + 12 }}
+                                                    >
+                                                        {tile.label}
+                                                    </div>
+                                                ))}
                                                 <div className="absolute inset-0 border border-dashed border-ink/30 m-8 flex items-end justify-end p-2">
                                                     <div className="text-ink/50 font-bold text-[10px] uppercase tracking-widest text-right bg-parchment px-2">
                                                         Print Boundary ({gridCols}x{gridRows} {printOrientation})
@@ -3111,8 +3461,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
                                                 </div>
                                             </div>
 
-                                            {/* Scalable Container FOR THE CONTENTS inside the paper */}
-                                            <div 
+                                            <div
                                                 id="tree-scaler"
                                                 className="absolute top-0 left-0 w-full h-full"
                                                 style={{ transform: `scale(${treeScale})`, transformOrigin: '0 0' }}
@@ -3122,31 +3471,24 @@ const Icon = ({ name, size = 18, className = "" }) => {
                                         </div>
                                     </div>
                                 </div>
-                                
-                                {/* ===================================================================
-                                   PRINT ONLY SLICES
-                                   This DOM block does not render until the exact moment of printing.
-                                   This removes up to thousands of invisible DOM elements, perfectly 
-                                   optimizing Flow Chart interaction and drag frames.
-                                   ===================================================================
-                                */}
+
                                 {isPrinting && (
                                     <div className="print-only w-full">
                                         {Array.from({ length: gridRows }).map((_, r) =>
                                             Array.from({ length: gridCols }).map((_, c) => (
                                                 <div key={`print-page-${r}-${c}`} className="print-page-break bg-white" style={{ width: pw + 'px', height: ph + 'px' }}>
-                                                    {/* Title block on first page only */}
                                                     {r === 0 && c === 0 && (
-                                                        <div style={{ position: 'absolute', top: 16, left: 20, zIndex: 100, background: 'white', padding: '5px 10px', borderLeft: '3px solid #1A1A1B' }}>
-                                                            <div style={{ fontSize: 13, fontWeight: 900, fontFamily: 'Georgia, serif', color: '#1A1A1B' }}>{projectName}</div>
-                                                            <div style={{ fontSize: 9, fontFamily: 'Courier Prime, monospace', color: '#1A1A1B', opacity: 0.6 }}>Flowchart · {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</div>
+                                                        <div style={{ position: 'absolute', top: 16, left: 20, zIndex: 100, background: 'white', padding: '6px 12px', borderLeft: '3px solid #1A1A1B' }}>
+                                                            <div style={{ fontSize: 13, fontWeight: 900, fontFamily: '"Playfair Display", serif', color: '#1A1A1B' }}>{projectName}</div>
+                                                            <div style={{ fontSize: 9, fontFamily: '"Courier Prime", monospace', color: '#704214', opacity: 0.7 }}>
+                                                                Flowchart · {gridCols}x{gridRows} · {printOrientation}
+                                                            </div>
                                                         </div>
                                                     )}
-                                                    {/* Inside this specific page, we shift the massive canvas container so the correct portion shows through the window */}
-                                                    <div className="absolute" style={{ top: -(r * ph) + 'px', left: -(c * pw) + 'px', width: (pw * gridCols) + 'px', height: (ph * gridRows) + 'px' }}>
-                                                        <div style={{ transform: `scale(${treeScale})`, transformOrigin: '0 0', width: '100%', height: '100%' }}>
-                                                            <div style={{ transform: `translate(${-printOffset.x}px, ${-printOffset.y}px)` }}>
-                                                                {renderTree(false, true)}
+                                                    <div className="absolute" style={{ top: -(r * ph) + 'px', left: -(c * pw) + 'px', width: paperWidth + 'px', height: paperHeight + 'px' }}>
+                                                        <div style={{ width: paperWidth + 'px', height: paperHeight + 'px' }}>
+                                                            <div style={{ transform: `scale(${treeScale})`, transformOrigin: '0 0', width: '100%', height: '100%' }}>
+                                                                {renderTree(false)}
                                                             </div>
                                                         </div>
                                                     </div>
@@ -3169,6 +3511,10 @@ const Icon = ({ name, size = 18, className = "" }) => {
                                                         <input type="text" className="w-full border border-ink p-2 bg-teastain" value={flowForm.title} onChange={e => setFlowForm({...flowForm, title: e.target.value})} />
                                                     </div>
                                                     <div>
+                                                        <label className="text-[10px] font-bold uppercase tracking-widest block mb-1">Desk Map Label</label>
+                                                        <input type="text" className="w-full border border-ink p-2 bg-teastain" value={flowForm.mapLabel || ''} onChange={e => setFlowForm({...flowForm, mapLabel: e.target.value})} />
+                                                    </div>
+                                                    <div>
                                                         <label className="text-[10px] font-bold uppercase tracking-widest block mb-1">Grantee</label>
                                                         <input type="text" className="w-full border border-ink p-2 bg-teastain font-serif font-bold" value={flowForm.grantee} onChange={e => setFlowForm({...flowForm, grantee: e.target.value})} />
                                                     </div>
@@ -3176,24 +3522,62 @@ const Icon = ({ name, size = 18, className = "" }) => {
                                                         <label className="text-[10px] font-bold uppercase tracking-widest block mb-1">Grantor</label>
                                                         <input type="text" className="w-full border border-ink p-2 bg-teastain" value={flowForm.grantor} onChange={e => setFlowForm({...flowForm, grantor: e.target.value})} />
                                                     </div>
+                                                    <div>
+                                                        <label className="text-[10px] font-bold uppercase tracking-widest block mb-1">Reference Line</label>
+                                                        <input type="text" className="w-full border border-ink p-2 bg-teastain" value={flowForm.details || ''} onChange={e => setFlowForm({...flowForm, details: e.target.value})} />
+                                                    </div>
                                                     <div className="grid grid-cols-2 gap-4">
                                                         <div>
-                                                            <label className="text-[10px] font-bold uppercase tracking-widest block mb-1">Date / Vol / Page</label>
-                                                            <input type="text" className="w-full border border-ink p-2 bg-teastain" value={flowForm.details} onChange={e => setFlowForm({...flowForm, details: e.target.value})} />
+                                                            <label className="text-[10px] font-bold uppercase tracking-widest block mb-1">Grant</label>
+                                                            <input type="text" className="w-full border border-ink p-2 bg-teastain font-mono" value={flowForm.grantFraction || ''} onChange={e => setFlowForm({...flowForm, grantFraction: e.target.value})} />
                                                         </div>
                                                         <div>
-                                                            <label className="text-[10px] font-bold uppercase tracking-widest block mb-1">Fraction</label>
+                                                            <label className="text-[10px] font-bold uppercase tracking-widest block mb-1">Remaining</label>
                                                             <input type="text" className="w-full border border-ink p-2 bg-teastain font-mono" value={flowForm.fraction} onChange={e => setFlowForm({...flowForm, fraction: e.target.value})} />
                                                         </div>
+                                                    </div>
+                                                    <div>
+                                                        <label className="text-[10px] font-bold uppercase tracking-widest block mb-1">Conveyance</label>
+                                                        <input type="text" className="w-full border border-ink p-2 bg-teastain" value={flowForm.conveyance || ''} onChange={e => setFlowForm({...flowForm, conveyance: e.target.value})} />
+                                                    </div>
+                                                    <div>
+                                                        <label className="text-[10px] font-bold uppercase tracking-widest block mb-1">Death Notes</label>
+                                                        <textarea className="w-full border border-ink p-2 bg-teastain h-24 resize-y" value={flowForm.deathNotes || ''} onChange={e => setFlowForm({...flowForm, deathNotes: e.target.value})} />
+                                                    </div>
+                                                    <div>
+                                                        <label className="text-[10px] font-bold uppercase tracking-widest block mb-1">Attached Records</label>
+                                                        <textarea
+                                                            className="w-full border border-ink p-2 bg-teastain h-24 resize-y"
+                                                            value={flowForm.attachedRecordsText || ''}
+                                                            onChange={e => setFlowForm({...flowForm, attachedRecordsText: e.target.value})}
+                                                            placeholder="One attached record per line"
+                                                        />
                                                     </div>
                                                 </>
                                             ) : (
                                                 <div>
                                                     <label className="text-[10px] font-bold uppercase tracking-widest block mb-1">Text Content</label>
                                                     <textarea className="w-full border border-ink p-2 bg-teastain h-32 font-serif resize-y" value={flowForm.text} onChange={e => setFlowForm({...flowForm, text: e.target.value})} />
+                                                    <div className="grid grid-cols-2 gap-4 mt-4">
+                                                        <div>
+                                                            <label className="text-[10px] font-bold uppercase tracking-widest block mb-1">Font Size</label>
+                                                            <input type="range" min="12" max="36" value={flowForm.fontSize || 14} onChange={e => setFlowForm({...flowForm, fontSize: parseInt(e.target.value)})} className="w-full accent-sepia cursor-pointer" />
+                                                            <div className="text-[10px] font-mono mt-1">{flowForm.fontSize || 14}px</div>
+                                                        </div>
+                                                        <div>
+                                                            <label className="text-[10px] font-bold uppercase tracking-widest block mb-1">Text Align</label>
+                                                            <select className="w-full border border-ink p-2 bg-teastain" value={flowForm.textAlign || 'center'} onChange={e => setFlowForm({...flowForm, textAlign: e.target.value})}>
+                                                                <option value="left">Left</option>
+                                                                <option value="center">Center</option>
+                                                                <option value="right">Right</option>
+                                                            </select>
+                                                        </div>
+                                                    </div>
                                                     
                                                     <label className="text-[10px] font-bold uppercase tracking-widest block mt-4 mb-1">Box Width: {flowForm.width || 280}px</label>
                                                     <input type="range" min="150" max="800" value={flowForm.width || 280} onChange={e => setFlowForm({...flowForm, width: parseInt(e.target.value)})} className="w-full accent-sepia cursor-pointer" />
+                                                    <label className="text-[10px] font-bold uppercase tracking-widest block mt-4 mb-1">Box Height: {flowForm.height || 120}px</label>
+                                                    <input type="range" min="110" max="360" value={flowForm.height || 120} onChange={e => setFlowForm({...flowForm, height: parseInt(e.target.value)})} className="w-full accent-sepia cursor-pointer" />
                                                 </div>
                                             )}
 

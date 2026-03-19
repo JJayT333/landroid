@@ -1,4 +1,4 @@
-const CACHE_NAME = 'landroid-shell-v5';
+const CACHE_NAME = 'landroid-shell-v8';
 const APP_SHELL = [
   './',
   './index.html',
