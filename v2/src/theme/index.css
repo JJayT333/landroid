@@ -1,0 +1,56 @@
+@import "tailwindcss";
+
+/* ── Courthouse Theme Tokens ────────────────────────────── */
+@theme {
+  --color-parchment: #faf3e8;
+  --color-parchment-dark: #f0e6d3;
+  --color-ink: #2c1810;
+  --color-ink-light: #5c3d2e;
+  --color-leather: #8b4513;
+  --color-leather-light: #a0522d;
+  --color-gold: #daa520;
+  --color-gold-light: #f0c75e;
+  --color-seal: #b22222;
+  --color-seal-light: #cd5c5c;
+  --color-ledger: #f5f0e1;
+  --color-ledger-line: #d4c5a9;
+  --color-canvas-bg: #e8dcc8;
+  --color-canvas-dot: #c4b89a;
+
+  --font-display: "Playfair Display", Georgia, "Times New Roman", serif;
+  --font-mono: "Courier Prime", "Courier New", monospace;
+  --font-body: system-ui, -apple-system, sans-serif;
+}
+
+/* ── Base ────────────────────────────────────────────────── */
+body {
+  font-family: var(--font-body);
+  background-color: var(--color-parchment);
+  color: var(--color-ink);
+}
+
+/* ── React Flow overrides ────────────────────────────────── */
+.react-flow__background {
+  background-color: var(--color-canvas-bg) !important;
+}
+
+.react-flow__minimap {
+  border: 1px solid var(--color-ledger-line);
+  border-radius: 0.5rem;
+}
+
+.react-flow__controls button {
+  background-color: var(--color-parchment);
+  border-color: var(--color-ledger-line);
+  color: var(--color-ink);
+}
+
+.react-flow__controls button:hover {
+  background-color: var(--color-parchment-dark);
+}
+
+/* ── Print ───────────────────────────────────────────────── */
+@media print {
+  body { background: white; }
+  .no-print { display: none !important; }
+}
