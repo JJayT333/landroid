@@ -1,8 +1,11 @@
 /**
- * Top navigation bar — view switcher + workspace name.
+ * Top navigation bar — view switcher, workspace name, save/load.
  */
+import { useRef } from 'react';
 import { useUIStore, type ViewMode } from '../../store/ui-store';
 import { useWorkspaceStore } from '../../store/workspace-store';
+import { downloadLandroidFile, importLandroidFile } from '../../storage/workspace-persistence';
+import { importCSV } from '../../storage/csv-io';
 
 const views: { id: ViewMode; label: string }[] = [
   { id: 'chart', label: 'Desk Map' },
@@ -15,6 +18,45 @@ export default function Navbar() {
   const view = useUIStore((s) => s.view);
   const setView = useUIStore((s) => s.setView);
   const projectName = useWorkspaceStore((s) => s.projectName);
+  const loadWorkspace = useWorkspaceStore((s) => s.loadWorkspace);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleSave = () => {
+    const state = useWorkspaceStore.getState();
+    downloadLandroidFile({
+      projectName: state.projectName,
+      nodes: state.nodes,
+      deskMaps: state.deskMaps,
+      activeDeskMapId: state.activeDeskMapId,
+      instrumentTypes: state.instrumentTypes,
+    });
+  };
+
+  const handleLoad = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      if (file.name.endsWith('.landroid')) {
+        const data = await importLandroidFile(file);
+        loadWorkspace(data);
+      } else if (file.name.endsWith('.csv')) {
+        const text = await file.text();
+        const result = importCSV(text);
+        loadWorkspace(result);
+      } else {
+        alert('Unsupported file type. Use .landroid or .csv files.');
+      }
+    } catch (err) {
+      alert(`Import failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    }
+
+    e.target.value = '';
+  };
 
   return (
     <nav className="no-print flex items-center justify-between px-4 py-2 bg-ink text-parchment border-b border-leather">
@@ -23,22 +65,47 @@ export default function Navbar() {
         <span className="text-sm text-parchment/60 font-mono">{projectName}</span>
       </div>
 
-      <div className="flex gap-1">
-        {views.map((v) => (
+      <div className="flex items-center gap-4">
+        <div className="flex gap-1">
+          {views.map((v) => (
+            <button
+              key={v.id}
+              onClick={() => setView(v.id)}
+              className={`
+                px-4 py-1.5 rounded-lg text-sm font-medium transition-colors
+                ${view === v.id
+                  ? 'bg-leather text-parchment'
+                  : 'text-parchment/70 hover:text-parchment hover:bg-ink-light/30'}
+              `}
+            >
+              {v.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex gap-1 border-l border-parchment/20 pl-3">
           <button
-            key={v.id}
-            onClick={() => setView(v.id)}
-            className={`
-              px-4 py-1.5 rounded-lg text-sm font-medium transition-colors
-              ${view === v.id
-                ? 'bg-leather text-parchment'
-                : 'text-parchment/70 hover:text-parchment hover:bg-ink-light/30'}
-            `}
+            onClick={handleSave}
+            className="px-3 py-1.5 rounded-lg text-xs font-medium text-parchment/70 hover:text-parchment hover:bg-ink-light/30 transition-colors"
           >
-            {v.label}
+            Save
           </button>
-        ))}
+          <button
+            onClick={handleLoad}
+            className="px-3 py-1.5 rounded-lg text-xs font-medium text-parchment/70 hover:text-parchment hover:bg-ink-light/30 transition-colors"
+          >
+            Load
+          </button>
+        </div>
       </div>
+
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".landroid,.csv"
+        className="hidden"
+        onChange={handleFileChange}
+      />
     </nav>
   );
 }

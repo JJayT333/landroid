@@ -4,6 +4,8 @@
 import { useUIStore } from './store/ui-store';
 import Navbar from './components/shared/Navbar';
 import FlowchartView from './views/FlowchartView';
+import DeskMapView from './views/DeskMapView';
+import RunsheetView from './views/RunsheetView';
 
 function PlaceholderView({ name }: { name: string }) {
   return (
@@ -24,8 +26,8 @@ export default function App() {
       <Navbar />
       <main className="flex-1 overflow-hidden">
         {view === 'flowchart' && <FlowchartView />}
-        {view === 'chart' && <PlaceholderView name="Desk Map" />}
-        {view === 'master' && <PlaceholderView name="Master Runsheet" />}
+        {view === 'chart' && <DeskMapView />}
+        {view === 'master' && <RunsheetView />}
         {view === 'research' && <PlaceholderView name="Research Hub" />}
       </main>
     </div>

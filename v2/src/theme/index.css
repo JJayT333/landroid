@@ -49,8 +49,96 @@ body {
   background-color: var(--color-parchment-dark);
 }
 
-/* ── Print ───────────────────────────────────────────────── */
+/* ── Desk Map tree connectors ───────────────────────────── */
+
+.tree-branch {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+}
+
+.tree-children {
+  display: flex;
+  padding-top: 40px;
+  position: relative;
+}
+
+.tree-children > .tree-branch {
+  padding: 0 16px;
+}
+
+/* Vertical line from parent card down to horizontal bar */
+.tree-children::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  height: 20px;
+  border-left: 2px solid var(--color-leather);
+}
+
+/* Horizontal bar connecting siblings */
+.tree-children > .tree-branch::after {
+  content: '';
+  position: absolute;
+  top: -20px;
+  left: 0;
+  right: 0;
+  border-top: 2px solid var(--color-leather);
+}
+
+/* First child: horizontal bar only right half */
+.tree-children > .tree-branch:first-child::after {
+  left: 50%;
+}
+
+/* Last child: horizontal bar only left half */
+.tree-children > .tree-branch:last-child::after {
+  right: 50%;
+}
+
+/* Only child: no horizontal bar needed */
+.tree-children > .tree-branch:only-child::after {
+  display: none;
+}
+
+/* Vertical line from horizontal bar down to child card */
+.tree-children > .tree-branch::before {
+  content: '';
+  position: absolute;
+  top: -20px;
+  left: 50%;
+  height: 20px;
+  border-left: 2px solid var(--color-leather);
+  z-index: 1;
+}
+
+/* ── Print / Screen visibility ──────────────────────────── */
+
+/* Print overlay is hidden on screen */
+.print-only {
+  display: none;
+}
+
+/* ── Print media ────────────────────────────────────────── */
 @media print {
-  body { background: white; }
-  .no-print { display: none !important; }
+  /* @page rule is injected dynamically by PrintOverlay (orientation-aware) */
+
+  /* Hide everything except the print overlay */
+  body {
+    background: white !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Hide the entire app — the print overlay is portaled to body */
+  #root {
+    display: none !important;
+  }
+
+  /* Show the print overlay */
+  .print-only {
+    display: block !important;
+  }
 }
