@@ -17,7 +17,6 @@ interface PredecessorModalProps {
 
 export default function PredecessorModal({ node, onClose }: PredecessorModalProps) {
   const insertPredecessor = useWorkspaceStore((s) => s.insertPredecessor);
-  const lastError = useWorkspaceStore((s) => s.lastError);
 
   const [form, setForm] = useState({
     instrument: '',
@@ -57,7 +56,7 @@ export default function PredecessorModal({ node, onClose }: PredecessorModalProp
     });
 
     if (!success) {
-      setError(lastError || 'Insert predecessor failed');
+      setError(useWorkspaceStore.getState().lastError || 'Insert predecessor failed');
       return;
     }
 

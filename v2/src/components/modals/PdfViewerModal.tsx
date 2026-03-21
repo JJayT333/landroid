@@ -19,9 +19,11 @@ export default function PdfViewerModal({ nodeId, onClose }: PdfViewerModalProps)
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
     let url: string | null = null;
 
     getPdf(nodeId).then((attachment) => {
+      if (cancelled) return;
       if (!attachment) {
         setError('No PDF found for this node.');
         return;
@@ -32,6 +34,7 @@ export default function PdfViewerModal({ nodeId, onClose }: PdfViewerModalProps)
     });
 
     return () => {
+      cancelled = true;
       if (url) URL.revokeObjectURL(url);
     };
   }, [nodeId]);

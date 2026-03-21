@@ -39,6 +39,9 @@ interface WorkspaceState {
   activeDeskMapId: string | null;
   instrumentTypes: string[];
 
+  // Lifecycle
+  _hydrated: boolean;
+
   // UI
   activeNodeId: string | null;
   lastAudit: Audit | null;
@@ -67,6 +70,7 @@ interface WorkspaceState {
   updateNode: (id: string, fields: Partial<OwnershipNode>) => void;
   removeNode: (id: string) => void;
   addNodeToActiveDeskMap: (nodeId: string) => void;
+  setHydrated: () => void;
   loadWorkspace: (data: { projectName: string; nodes: OwnershipNode[]; deskMaps: DeskMap[]; activeDeskMapId: string | null; instrumentTypes?: string[] }) => void;
 }
 
@@ -81,6 +85,7 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
   deskMaps: [],
   activeDeskMapId: null,
   instrumentTypes: [...DEFAULT_INSTRUMENT_TYPES],
+  _hydrated: false,
   activeNodeId: null,
   lastAudit: null,
   lastError: null,
@@ -196,6 +201,11 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
   removeNode: (id) =>
     set((state) => ({
       nodes: state.nodes.filter((n) => n.id !== id),
+      deskMaps: state.deskMaps.map((dm) =>
+        dm.nodeIds.includes(id)
+          ? { ...dm, nodeIds: dm.nodeIds.filter((nid) => nid !== id) }
+          : dm
+      ),
       activeNodeId: state.activeNodeId === id ? null : state.activeNodeId,
     })),
 
@@ -211,6 +221,8 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
       };
     }),
 
+  setHydrated: () => set({ _hydrated: true }),
+
   loadWorkspace: (data) =>
     set({
       projectName: data.projectName,
@@ -218,6 +230,7 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
       deskMaps: data.deskMaps,
       activeDeskMapId: data.activeDeskMapId ?? data.deskMaps[0]?.id ?? null,
       instrumentTypes: data.instrumentTypes?.length ? data.instrumentTypes : [...DEFAULT_INSTRUMENT_TYPES],
+      _hydrated: true,
       activeNodeId: null,
       lastAudit: null,
       lastError: null,

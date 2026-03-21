@@ -26,6 +26,7 @@ interface TreeNode {
 }
 
 function buildTree(nodes: OwnershipNode[]): TreeNode[] {
+  const nodeIds = new Set(nodes.map((n) => n.id));
   const childrenOf = new Map<string, OwnershipNode[]>();
   const relatedOf = new Map<string, OwnershipNode[]>();
 
@@ -52,11 +53,16 @@ function buildTree(nodes: OwnershipNode[]): TreeNode[] {
     };
   }
 
+  // Root detection: nodes with no parentId (null, undefined, or empty string)
+  // OR nodes whose parentId points to a node not in the current visible set.
+  // This handles CSV imports where root parentId might be "" instead of null,
+  // and desk map filtering where a parent exists but isn't in this desk map.
   const roots = nodes.filter(
-    (n) => n.parentId == null && n.type !== 'related'
+    (n) =>
+      n.type !== 'related' &&
+      (!n.parentId || n.parentId === 'unlinked' || !nodeIds.has(n.parentId))
   );
-  const unlinked = nodes.filter((n) => n.parentId === 'unlinked');
-  return [...roots, ...unlinked].map(build);
+  return roots.map(build);
 }
 
 // ── Tree branch renderer ────────────────────────────────
@@ -116,95 +122,94 @@ function TreeBranch({
 }
 
 // ── Pan/zoom container ──────────────────────────────────
+// Uses Pointer Events with setPointerCapture for reliable drag tracking.
+// setPointerCapture routes ALL subsequent pointer events to the capturing
+// element, even if the pointer leaves the window. No window-level listeners needed.
 
 function PanZoomContainer({ children }: { children: React.ReactNode }) {
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(0.8);
   const containerRef = useRef<HTMLDivElement>(null);
-  const isPanning = useRef(false);
-  const lastPos = useRef({ x: 0, y: 0 });
+  const dragging = useRef(false);
   const startPos = useRef({ x: 0, y: 0 });
+  const lastPos = useRef({ x: 0, y: 0 });
   const hasDragged = useRef(false);
-  const zoomRef = useRef(zoom);
-  const panRef = useRef(pan);
-  zoomRef.current = zoom;
-  panRef.current = pan;
 
-  // Native event listeners — mousemove/mouseup on window so drag
-  // continues reliably even when the cursor leaves the container.
+  const handlePointerDown = useCallback((e: React.PointerEvent) => {
+    if (e.button !== 0 && e.button !== 1) return;
+    e.preventDefault();
+    const el = containerRef.current;
+    if (el) el.setPointerCapture(e.pointerId);
+    dragging.current = true;
+    hasDragged.current = false;
+    startPos.current = { x: e.clientX, y: e.clientY };
+    lastPos.current = { x: e.clientX, y: e.clientY };
+  }, []);
+
+  const handlePointerMove = useCallback((e: React.PointerEvent) => {
+    if (!dragging.current) return;
+    const dx = e.clientX - startPos.current.x;
+    const dy = e.clientY - startPos.current.y;
+    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+      hasDragged.current = true;
+    }
+    const moveX = e.clientX - lastPos.current.x;
+    const moveY = e.clientY - lastPos.current.y;
+    lastPos.current = { x: e.clientX, y: e.clientY };
+    setPan((p) => ({ x: p.x + moveX, y: p.y + moveY }));
+  }, []);
+
+  const handlePointerUp = useCallback(() => {
+    dragging.current = false;
+  }, []);
+
+  // Wheel zoom toward cursor position — needs native listener for { passive: false }
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
-
-    const onMouseDown = (e: MouseEvent) => {
-      if (e.button !== 0 && e.button !== 1) return;
-      isPanning.current = true;
-      hasDragged.current = false;
-      startPos.current = { x: e.clientX, y: e.clientY };
-      lastPos.current = { x: e.clientX, y: e.clientY };
-    };
-
-    const onMouseMove = (e: MouseEvent) => {
-      if (!isPanning.current) return;
-      const dx = e.clientX - startPos.current.x;
-      const dy = e.clientY - startPos.current.y;
-      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
-        hasDragged.current = true;
-      }
-      setPan((p) => ({
-        x: p.x + e.clientX - lastPos.current.x,
-        y: p.y + e.clientY - lastPos.current.y,
-      }));
-      lastPos.current = { x: e.clientX, y: e.clientY };
-    };
-
-    const onMouseUp = () => {
-      isPanning.current = false;
-    };
 
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
       const rect = el.getBoundingClientRect();
       const mouseX = e.clientX - rect.left;
       const mouseY = e.clientY - rect.top;
-      const oldZoom = zoomRef.current;
-      const factor = e.deltaY > 0 ? 0.92 : 1.08;
-      const newZoom = Math.max(0.1, Math.min(3, oldZoom * factor));
-      const p = panRef.current;
 
-      const newPanX = mouseX - ((mouseX - p.x) / oldZoom) * newZoom;
-      const newPanY = mouseY - ((mouseY - p.y) / oldZoom) * newZoom;
+      setZoom((oldZoom) => {
+        const factor = e.deltaY > 0 ? 0.92 : 1.08;
+        const newZoom = Math.max(0.1, Math.min(3, oldZoom * factor));
 
-      setZoom(newZoom);
-      setPan({ x: newPanX, y: newPanY });
+        setPan((p) => ({
+          x: mouseX - ((mouseX - p.x) / oldZoom) * newZoom,
+          y: mouseY - ((mouseY - p.y) / oldZoom) * newZoom,
+        }));
+
+        return newZoom;
+      });
     };
 
-    el.addEventListener('mousedown', onMouseDown);
-    window.addEventListener('mousemove', onMouseMove);
-    window.addEventListener('mouseup', onMouseUp);
     el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-    return () => {
-      el.removeEventListener('mousedown', onMouseDown);
-      window.removeEventListener('mousemove', onMouseMove);
-      window.removeEventListener('mouseup', onMouseUp);
-      el.removeEventListener('wheel', onWheel);
-    };
-  }, []);
-
-  // After a drag, suppress the click so card onClick handlers don't fire
+  // Suppress click after drag so card onClick doesn't fire
   const handleClickCapture = useCallback((e: React.MouseEvent) => {
     if (hasDragged.current) {
       e.stopPropagation();
       e.preventDefault();
+      hasDragged.current = false;
     }
   }, []);
 
   return (
     <div
       ref={containerRef}
-      className="w-full h-full overflow-hidden bg-canvas-bg cursor-grab active:cursor-grabbing select-none"
+      className="w-full h-full overflow-hidden bg-canvas-bg cursor-grab active:cursor-grabbing select-none touch-none"
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerUp}
       onClickCapture={handleClickCapture}
+      onDragStart={(e) => e.preventDefault()}
     >
       <div
         style={{
@@ -238,14 +243,17 @@ export default function DeskMapView() {
   const [attachDocParentId, setAttachDocParentId] = useState<string | null>(null);
   const [pdfViewNodeId, setPdfViewNodeId] = useState<string | null>(null);
 
-  // Auto-create a desk map if none exist (assigning any existing nodes to it)
+  const hydrated = useWorkspaceStore((s) => s._hydrated);
+
+  // Auto-create a desk map if none exist — only after persistence has loaded
   useEffect(() => {
+    if (!hydrated) return;
     if (deskMaps.length === 0) {
       const currentNodes = useWorkspaceStore.getState().nodes;
       const nodeIds = currentNodes.map((n) => n.id);
       createDeskMap('Tract 1', 'T1', nodeIds.length > 0 ? nodeIds : undefined);
     }
-  }, [deskMaps.length, createDeskMap]);
+  }, [hydrated, deskMaps.length, createDeskMap]);
 
   // Show nodes for active desk map (or all if none selected)
   const visibleNodes = getActiveDeskMapNodes();

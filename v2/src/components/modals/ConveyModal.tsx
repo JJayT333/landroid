@@ -21,7 +21,6 @@ interface ConveyModalProps {
 
 export default function ConveyModal({ parentNode, onClose }: ConveyModalProps) {
   const convey = useWorkspaceStore((s) => s.convey);
-  const lastError = useWorkspaceStore((s) => s.lastError);
 
   const [form, setForm] = useState({
     instrument: '',
@@ -88,7 +87,7 @@ export default function ConveyModal({ parentNode, onClose }: ConveyModalProps) {
     });
 
     if (!success) {
-      setError(lastError || 'Conveyance failed');
+      setError(useWorkspaceStore.getState().lastError || 'Conveyance failed');
       return;
     }
 

@@ -1,11 +1,12 @@
 /**
  * Top navigation bar — view switcher, workspace name, save/load.
  */
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { useUIStore, type ViewMode } from '../../store/ui-store';
 import { useWorkspaceStore } from '../../store/workspace-store';
 import { downloadLandroidFile, importLandroidFile } from '../../storage/workspace-persistence';
 import { importCSV } from '../../storage/csv-io';
+import { seedTestData, seedStressTestData } from '../../storage/seed-test-data';
 
 const views: { id: ViewMode; label: string }[] = [
   { id: 'chart', label: 'Desk Map' },
@@ -20,6 +21,29 @@ export default function Navbar() {
   const projectName = useWorkspaceStore((s) => s.projectName);
   const loadWorkspace = useWorkspaceStore((s) => s.loadWorkspace);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [seeding, setSeeding] = useState<false | 'demo' | 'stress'>(false);
+
+  const handleSeedTestData = async () => {
+    setSeeding('demo');
+    try {
+      const { nodeCount, pdfCount } = await seedTestData();
+      console.log(`[seed] Loaded ${nodeCount} nodes, attached ${pdfCount} PDFs`);
+    } catch (err) {
+      console.error('[seed] Failed:', err);
+    }
+    setSeeding(false);
+  };
+
+  const handleStressTest = async () => {
+    setSeeding('stress');
+    try {
+      const { nodeCount, pdfCount } = await seedStressTestData();
+      console.log(`[stress] Loaded ${nodeCount} nodes, attached ${pdfCount} PDFs`);
+    } catch (err) {
+      console.error('[stress] Failed:', err);
+    }
+    setSeeding(false);
+  };
 
   const handleSave = () => {
     const state = useWorkspaceStore.getState();
@@ -95,6 +119,20 @@ export default function Navbar() {
             className="px-3 py-1.5 rounded-lg text-xs font-medium text-parchment/70 hover:text-parchment hover:bg-ink-light/30 transition-colors"
           >
             Load
+          </button>
+          <button
+            onClick={handleSeedTestData}
+            disabled={!!seeding}
+            className="px-3 py-1.5 rounded-lg text-xs font-medium text-gold/70 hover:text-gold hover:bg-gold/10 transition-colors disabled:opacity-50"
+          >
+            {seeding === 'demo' ? 'Loading...' : 'Demo (18)'}
+          </button>
+          <button
+            onClick={handleStressTest}
+            disabled={!!seeding}
+            className="px-3 py-1.5 rounded-lg text-xs font-medium text-seal/70 hover:text-seal hover:bg-seal/10 transition-colors disabled:opacity-50"
+          >
+            {seeding === 'stress' ? 'Loading...' : 'Stress (~200)'}
           </button>
         </div>
       </div>

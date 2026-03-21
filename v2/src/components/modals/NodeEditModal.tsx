@@ -24,7 +24,6 @@ interface NodeEditModalProps {
 export default function NodeEditModal({ node, onClose, onViewPdf }: NodeEditModalProps) {
   const updateNode = useWorkspaceStore((s) => s.updateNode);
   const rebalance = useWorkspaceStore((s) => s.rebalance);
-  const lastError = useWorkspaceStore((s) => s.lastError);
   const pdfInputRef = useRef<HTMLInputElement>(null);
 
   const [form, setForm] = useState({
@@ -60,7 +59,7 @@ export default function NodeEditModal({ node, onClose, onViewPdf }: NodeEditModa
       const { initialFraction, ...otherFields } = form;
       const success = rebalance(node.id, initialFraction, otherFields);
       if (!success) {
-        setError(lastError || 'Rebalance failed');
+        setError(useWorkspaceStore.getState().lastError || 'Rebalance failed');
         return;
       }
     } else {

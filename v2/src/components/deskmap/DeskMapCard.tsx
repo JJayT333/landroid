@@ -142,10 +142,10 @@ export default function DeskMapCard({
 
         {/* Action buttons */}
         <div className="hidden group-hover:flex px-2 py-1.5 border-t border-ledger-line bg-parchment-dark rounded-b-lg gap-1 justify-center">
-          <ActionBtn label="PRECEDE" color="ink-light" onClick={() => onPrecede(node.id)} />
-          <ActionBtn label="CONVEY" color="leather" onClick={() => onConvey(node.id)} />
-          <ActionBtn label="ATTACH" color="gold" onClick={() => onAttachDoc(node.id)} />
-          <ActionBtn label="DELETE" color="seal" onClick={() => onDelete(node.id)} />
+          <ActionBtn label="PRECEDE" variant="muted" onClick={() => onPrecede(node.id)} />
+          <ActionBtn label="CONVEY" variant="primary" onClick={() => onConvey(node.id)} />
+          <ActionBtn label="ATTACH" variant="accent" onClick={() => onAttachDoc(node.id)} />
+          <ActionBtn label="DELETE" variant="danger" onClick={() => onDelete(node.id)} />
         </div>
       </div>
     </div>
@@ -198,13 +198,20 @@ function RelatedDocChip({
 
 // ── Action button ───────────────────────────────────────
 
+const ACTION_VARIANTS = {
+  muted: 'text-ink-light hover:bg-ink-light/10',
+  primary: 'text-leather hover:bg-leather/10',
+  accent: 'text-gold hover:bg-gold/10',
+  danger: 'text-seal hover:bg-seal/10',
+} as const;
+
 function ActionBtn({
   label,
-  color,
+  variant,
   onClick,
 }: {
   label: string;
-  color: string;
+  variant: keyof typeof ACTION_VARIANTS;
   onClick: () => void;
 }) {
   return (
@@ -213,7 +220,7 @@ function ActionBtn({
         e.stopPropagation();
         onClick();
       }}
-      className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider text-${color} hover:bg-${color}/10 transition-colors`}
+      className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider transition-colors ${ACTION_VARIANTS[variant]}`}
     >
       {label}
     </button>
