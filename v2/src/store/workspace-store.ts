@@ -124,7 +124,7 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
 
   getActiveDeskMapNodes: () => {
     const { nodes, deskMaps, activeDeskMapId } = get();
-    if (!activeDeskMapId || deskMaps.length === 0) return nodes;
+    if (!activeDeskMapId) return [];
     const dm = deskMaps.find((d) => d.id === activeDeskMapId);
     if (!dm) return [];
     if (dm.nodeIds.length === 0) return [];

@@ -22,14 +22,27 @@ export interface WorkspaceRecord {
   savedAt: string;
 }
 
+export interface CanvasRecord {
+  id: string;
+  data: string; // JSON-serialized canvas state
+  savedAt: string;
+}
+
 const db = new Dexie('landroid-v2') as Dexie & {
   pdfs: EntityTable<PdfAttachment, 'nodeId'>;
   workspaces: EntityTable<WorkspaceRecord, 'id'>;
+  canvases: EntityTable<CanvasRecord, 'id'>;
 };
 
 db.version(1).stores({
   pdfs: 'nodeId',
   workspaces: 'id',
+});
+
+db.version(2).stores({
+  pdfs: 'nodeId',
+  workspaces: 'id',
+  canvases: 'id',
 });
 
 export default db;

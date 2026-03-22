@@ -18,6 +18,7 @@ import type { OwnershipNodeData } from '../../types/flowchart';
 
 function OwnershipNodeComponent({ data, selected }: NodeProps & { data: OwnershipNodeData }) {
   const nodeData = data as OwnershipNodeData;
+  const scale = nodeData.nodeScale ?? 1;
   const relShare = d(nodeData.relativeShare);
   const absInterest = d(nodeData.grantFraction);
   const remaining = d(nodeData.remainingFraction);
@@ -30,6 +31,7 @@ function OwnershipNodeComponent({ data, selected }: NodeProps & { data: Ownershi
 
   return (
     <div
+      style={scale !== 1 ? { zoom: scale } : undefined}
       className={`
         w-72 rounded-lg border-2 shadow-md transition-shadow
         ${selected ? 'border-leather shadow-lg ring-2 ring-gold/50' : 'border-ledger-line'}

@@ -76,6 +76,7 @@ function TreeBranch({
   onPrecede,
   onAttachDoc,
   onDelete,
+  onViewPdf,
 }: {
   tree: TreeNode;
   parentInitialFraction: string | null;
@@ -85,6 +86,7 @@ function TreeBranch({
   onPrecede: (id: string) => void;
   onAttachDoc: (id: string) => void;
   onDelete: (id: string) => void;
+  onViewPdf: (id: string) => void;
 }) {
   return (
     <div className="tree-branch">
@@ -97,6 +99,7 @@ function TreeBranch({
         onPrecede={onPrecede}
         onAttachDoc={onAttachDoc}
         onDelete={onDelete}
+        onViewPdf={onViewPdf}
         isActive={activeNodeId === tree.node.id}
       />
 
@@ -113,6 +116,7 @@ function TreeBranch({
               onPrecede={onPrecede}
               onAttachDoc={onAttachDoc}
               onDelete={onDelete}
+              onViewPdf={onViewPdf}
             />
           ))}
         </div>
@@ -134,14 +138,18 @@ function PanZoomContainer({ children }: { children: React.ReactNode }) {
   const startPos = useRef({ x: 0, y: 0 });
   const lastPos = useRef({ x: 0, y: 0 });
   const hasDragged = useRef(false);
+  const pendingPointerId = useRef<number | null>(null);
 
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
     if (e.button !== 0 && e.button !== 1) return;
-    e.preventDefault();
-    const el = containerRef.current;
-    if (el) el.setPointerCapture(e.pointerId);
+    // Do NOT call setPointerCapture here — it redirects ALL compatibility
+    // mouse events (mousedown, mouseup, click) to the capturing element per
+    // the Pointer Events spec, which prevents onClick on child elements
+    // (cards, buttons) from ever firing. Instead, defer capture until a drag
+    // is detected in handlePointerMove.
     dragging.current = true;
     hasDragged.current = false;
+    pendingPointerId.current = e.pointerId;
     startPos.current = { x: e.clientX, y: e.clientY };
     lastPos.current = { x: e.clientX, y: e.clientY };
   }, []);
@@ -150,9 +158,17 @@ function PanZoomContainer({ children }: { children: React.ReactNode }) {
     if (!dragging.current) return;
     const dx = e.clientX - startPos.current.x;
     const dy = e.clientY - startPos.current.y;
-    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+    if (!hasDragged.current && (Math.abs(dx) > 3 || Math.abs(dy) > 3)) {
       hasDragged.current = true;
+      // Now that a real drag is confirmed, capture the pointer for smooth
+      // panning even if the cursor leaves the container/window.
+      if (pendingPointerId.current !== null) {
+        const el = containerRef.current;
+        if (el) el.setPointerCapture(pendingPointerId.current);
+        pendingPointerId.current = null;
+      }
     }
+    if (!hasDragged.current) return;
     const moveX = e.clientX - lastPos.current.x;
     const moveY = e.clientY - lastPos.current.y;
     lastPos.current = { x: e.clientX, y: e.clientY };
@@ -161,6 +177,7 @@ function PanZoomContainer({ children }: { children: React.ReactNode }) {
 
   const handlePointerUp = useCallback(() => {
     dragging.current = false;
+    pendingPointerId.current = null;
   }, []);
 
   // Wheel zoom toward cursor position — needs native listener for { passive: false }
@@ -236,6 +253,10 @@ export default function DeskMapView() {
   const createDeskMap = useWorkspaceStore((s) => s.createDeskMap);
   const addNodeToActiveDeskMap = useWorkspaceStore((s) => s.addNodeToActiveDeskMap);
   const getActiveDeskMapNodes = useWorkspaceStore((s) => s.getActiveDeskMapNodes);
+  // Subscribe to activeDeskMapId so the view re-renders when tabs switch.
+  // Used below in the effect dependency and referenced by getActiveDeskMapNodes.
+  const activeDeskMapId = useWorkspaceStore((s) => s.activeDeskMapId);
+  void activeDeskMapId;
 
   const [editNodeId, setEditNodeId] = useState<string | null>(null);
   const [conveyParentId, setConveyParentId] = useState<string | null>(null);
@@ -249,9 +270,9 @@ export default function DeskMapView() {
   useEffect(() => {
     if (!hydrated) return;
     if (deskMaps.length === 0) {
-      const currentNodes = useWorkspaceStore.getState().nodes;
-      const nodeIds = currentNodes.map((n) => n.id);
-      createDeskMap('Tract 1', 'T1', nodeIds.length > 0 ? nodeIds : undefined);
+      // Create an empty desk map — do NOT auto-assign existing nodes,
+      // so the user can start with a blank canvas after deleting all desk maps
+      createDeskMap('Tract 1', 'T1');
     }
   }, [hydrated, deskMaps.length, createDeskMap]);
 
@@ -284,6 +305,10 @@ export default function DeskMapView() {
       removeNode(id);
     }
   }, [removeNode]);
+
+  const handleViewPdf = useCallback((id: string) => {
+    setPdfViewNodeId(id);
+  }, []);
 
   const handleAddRoot = useCallback(() => {
     const id = `node-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
@@ -349,6 +374,7 @@ export default function DeskMapView() {
                   onPrecede={handlePrecede}
                   onAttachDoc={handleAttachDoc}
                   onDelete={handleDelete}
+                  onViewPdf={handleViewPdf}
                 />
               ))}
             </div>

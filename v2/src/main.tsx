@@ -3,7 +3,9 @@ import { createRoot } from 'react-dom/client';
 import App from './App';
 import './theme/index.css';
 import { useWorkspaceStore } from './store/workspace-store';
+import { useCanvasStore } from './store/canvas-store';
 import { saveWorkspaceToDb, loadWorkspaceFromDb } from './storage/workspace-persistence';
+import { saveCanvasToDb, loadCanvasFromDb } from './storage/canvas-persistence';
 
 // ── Auto-load saved workspace on startup ─────────────────
 loadWorkspaceFromDb().then((data) => {
@@ -14,8 +16,16 @@ loadWorkspaceFromDb().then((data) => {
   }
 });
 
-// ── Auto-save on changes (debounced 2s) ──────────────────
-// Only save when data-relevant fields change, not UI-only state (activeNodeId, lastAudit, lastError).
+// ── Auto-load saved canvas on startup ────────────────────
+loadCanvasFromDb().then((data) => {
+  if (data) {
+    useCanvasStore.getState().loadCanvas(data);
+  } else {
+    useCanvasStore.getState().setHydrated();
+  }
+});
+
+// ── Auto-save workspace on changes (debounced 2s) ────────
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 let prevSnapshot: string | null = null;
 
@@ -39,6 +49,40 @@ useWorkspaceStore.subscribe((state) => {
       deskMaps: state.deskMaps,
       activeDeskMapId: state.activeDeskMapId,
       instrumentTypes: state.instrumentTypes,
+    });
+  }, 2000);
+});
+
+// ── Auto-save canvas on changes (debounced 2s) ───────────
+let canvasSaveTimer: ReturnType<typeof setTimeout> | null = null;
+let prevCanvasSnapshot: string | null = null;
+
+useCanvasStore.subscribe((state) => {
+  if (!state._hydrated) return;
+  const snapshot = JSON.stringify({
+    nodes: state.nodes,
+    edges: state.edges,
+    viewport: state.viewport,
+    gridCols: state.gridCols,
+    gridRows: state.gridRows,
+    orientation: state.orientation,
+    snapToGrid: state.snapToGrid,
+    gridSize: state.gridSize,
+  });
+  if (snapshot === prevCanvasSnapshot) return;
+  prevCanvasSnapshot = snapshot;
+
+  if (canvasSaveTimer) clearTimeout(canvasSaveTimer);
+  canvasSaveTimer = setTimeout(() => {
+    saveCanvasToDb({
+      nodes: state.nodes,
+      edges: state.edges,
+      viewport: state.viewport,
+      gridCols: state.gridCols,
+      gridRows: state.gridRows,
+      orientation: state.orientation,
+      snapToGrid: state.snapToGrid,
+      gridSize: state.gridSize,
     });
   }, 2000);
 });

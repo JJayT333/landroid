@@ -1,23 +1,17 @@
 /**
- * Toolbar for the flowchart canvas — tool selection, import, page grid, print.
+ * Toolbar for the flowchart canvas — tools, undo/redo, page grid, print.
+ *
+ * Reads tool/grid/snap state directly from canvas-store.
+ * Callbacks for actions needing React Flow instance are passed as props.
  */
+import { useCanvasStore } from '../../store/canvas-store';
 import type { FlowTool } from '../../types/flowchart';
-import type { PageOrientation } from './PageGrid';
 
 interface CanvasToolbarProps {
-  activeTool: FlowTool;
-  onToolChange: (tool: FlowTool) => void;
   onImportTree: () => void;
-  onClear: () => void;
-  // Page grid
-  gridCols: number;
-  gridRows: number;
-  orientation: PageOrientation;
-  onGridColsChange: (cols: number) => void;
-  onGridRowsChange: (rows: number) => void;
-  onOrientationChange: (orientation: PageOrientation) => void;
   onFitToGrid: () => void;
-  onSelectAll: () => void;
+  onResize: () => void;
+  resizeMode: boolean;
   onPrint: () => void;
 }
 
@@ -72,27 +66,57 @@ function StepperButton({
 }
 
 export default function CanvasToolbar({
-  activeTool,
-  onToolChange,
   onImportTree,
-  onClear,
-  gridCols,
-  gridRows,
-  orientation,
-  onGridColsChange,
-  onGridRowsChange,
-  onOrientationChange,
   onFitToGrid,
-  onSelectAll,
+  onResize,
+  resizeMode,
   onPrint,
 }: CanvasToolbarProps) {
+  // Read from canvas store
+  const activeTool = useCanvasStore((s) => s.activeTool);
+  const setActiveTool = useCanvasStore((s) => s.setActiveTool);
+  const gridCols = useCanvasStore((s) => s.gridCols);
+  const setGridCols = useCanvasStore((s) => s.setGridCols);
+  const gridRows = useCanvasStore((s) => s.gridRows);
+  const setGridRows = useCanvasStore((s) => s.setGridRows);
+  const orientation = useCanvasStore((s) => s.orientation);
+  const setOrientation = useCanvasStore((s) => s.setOrientation);
+  const snapToGrid = useCanvasStore((s) => s.snapToGrid);
+  const setSnapToGrid = useCanvasStore((s) => s.setSnapToGrid);
+  const selectAll = useCanvasStore((s) => s.selectAll);
+  const clearCanvas = useCanvasStore((s) => s.clearCanvas);
+  const undo = useCanvasStore((s) => s.undo);
+  const redo = useCanvasStore((s) => s.redo);
+  const canUndo = useCanvasStore((s) => s._past.length > 0);
+  const canRedo = useCanvasStore((s) => s._future.length > 0);
+
   return (
     <div className="no-print absolute top-3 left-3 z-10 flex items-center gap-1 rounded-xl bg-parchment/95 backdrop-blur border border-ledger-line shadow-lg px-2 py-1.5">
+      {/* Undo / Redo */}
+      <button
+        onClick={undo}
+        disabled={!canUndo}
+        className="px-2 py-1.5 rounded-lg text-sm transition-colors text-ink-light hover:bg-parchment-dark disabled:opacity-30"
+        title="Undo (Ctrl+Z)"
+      >
+        ↩
+      </button>
+      <button
+        onClick={redo}
+        disabled={!canRedo}
+        className="px-2 py-1.5 rounded-lg text-sm transition-colors text-ink-light hover:bg-parchment-dark disabled:opacity-30"
+        title="Redo (Ctrl+Shift+Z)"
+      >
+        ↪
+      </button>
+
+      <div className="w-px h-6 bg-ledger-line mx-1" />
+
       {/* Drawing tools */}
       {tools.map((tool) => (
         <button
           key={tool.id}
-          onClick={() => onToolChange(tool.id)}
+          onClick={() => setActiveTool(tool.id)}
           className={`
             px-2.5 py-1.5 rounded-lg text-sm transition-colors
             ${activeTool === tool.id
@@ -118,27 +142,40 @@ export default function CanvasToolbar({
 
       <div className="w-px h-6 bg-ledger-line mx-1" />
 
+      {/* Snap toggle */}
+      <button
+        onClick={() => setSnapToGrid(!snapToGrid)}
+        className={`px-2 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+          snapToGrid
+            ? 'bg-leather/20 text-leather font-semibold'
+            : 'text-ink-light hover:bg-parchment-dark'
+        }`}
+        title={`Snap to grid (${snapToGrid ? 'on' : 'off'})`}
+      >
+        ⊞
+      </button>
+
+      <div className="w-px h-6 bg-ledger-line mx-1" />
+
       {/* Page grid controls */}
       <StepperButton
         label="Col"
         value={gridCols}
         min={1}
         max={26}
-        onChange={onGridColsChange}
+        onChange={setGridCols}
       />
       <StepperButton
         label="Row"
         value={gridRows}
         min={1}
         max={26}
-        onChange={onGridRowsChange}
+        onChange={setGridRows}
       />
 
       <button
         onClick={() =>
-          onOrientationChange(
-            orientation === 'landscape' ? 'portrait' : 'landscape'
-          )
+          setOrientation(orientation === 'landscape' ? 'portrait' : 'landscape')
         }
         className="px-2 py-1.5 rounded-lg text-xs font-medium text-ink-light hover:bg-parchment-dark transition-colors"
         title={`Switch to ${orientation === 'landscape' ? 'portrait' : 'landscape'}`}
@@ -157,9 +194,20 @@ export default function CanvasToolbar({
         Fit to Grid
       </button>
       <button
-        onClick={onSelectAll}
+        onClick={onResize}
+        className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+          resizeMode
+            ? 'bg-leather text-parchment'
+            : 'text-leather hover:bg-leather/10'
+        }`}
+        title="Drag corners to resize all nodes and edges uniformly"
+      >
+        Resize All
+      </button>
+      <button
+        onClick={selectAll}
         className="px-3 py-1.5 rounded-lg text-xs font-medium text-ink-light hover:bg-parchment-dark transition-colors"
-        title="Select all nodes (then drag to move entire tree)"
+        title="Select all nodes (Ctrl+A)"
       >
         Select All
       </button>
@@ -178,7 +226,7 @@ export default function CanvasToolbar({
       <div className="w-px h-6 bg-ledger-line mx-1" />
 
       <button
-        onClick={onClear}
+        onClick={clearCanvas}
         className="px-3 py-1.5 rounded-lg text-xs font-medium text-seal hover:bg-seal/10 transition-colors"
         title="Clear all canvas nodes"
       >

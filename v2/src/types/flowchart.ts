@@ -1,6 +1,7 @@
 /** Types for the React Flow canvas. */
 
 export type ShapeType = 'rect' | 'roundRect' | 'ellipse' | 'diamond' | 'note';
+export type PageOrientation = 'landscape' | 'portrait';
 
 export interface OwnershipNodeData {
   label: string;
@@ -13,6 +14,7 @@ export interface OwnershipNodeData {
   relativeShare: string;        // Fraction of PARENT's interest that was granted
   nodeId: string;               // Reference to OwnershipNode.id
   color?: string;
+  nodeScale?: number;            // 0.35–1.0, set by Fit to Grid
 }
 
 export interface ShapeNodeData {

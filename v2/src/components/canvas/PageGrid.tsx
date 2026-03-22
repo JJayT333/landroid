@@ -9,13 +9,14 @@
  *   Portrait:  816 x 1056  (8.5" x 11")
  */
 import { useViewport } from '@xyflow/react';
+import type { PageOrientation } from '../../types/flowchart';
+
+export type { PageOrientation };
 
 export const PAGE_W_LANDSCAPE = 1056;
 export const PAGE_H_LANDSCAPE = 816;
 export const PAGE_W_PORTRAIT = 816;
 export const PAGE_H_PORTRAIT = 1056;
-
-export type PageOrientation = 'landscape' | 'portrait';
 
 export function getPageDimensions(orientation: PageOrientation) {
   return {

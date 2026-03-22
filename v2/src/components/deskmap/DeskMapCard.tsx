@@ -19,6 +19,7 @@ interface DeskMapCardProps {
   onPrecede: (nodeId: string) => void;
   onAttachDoc: (nodeId: string) => void;
   onDelete: (nodeId: string) => void;
+  onViewPdf: (nodeId: string) => void;
   isActive: boolean;
 }
 
@@ -31,6 +32,7 @@ export default function DeskMapCard({
   onPrecede,
   onAttachDoc,
   onDelete,
+  onViewPdf,
   isActive,
 }: DeskMapCardProps) {
   const initial = d(node.initialFraction);
@@ -100,7 +102,15 @@ export default function DeskMapCard({
             )}
           </div>
           {node.hasDoc && (
-            <div className="text-[9px] text-leather font-semibold mt-0.5">PDF attached</div>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onViewPdf(node.id);
+              }}
+              className="text-[9px] text-leather font-semibold mt-0.5 hover:underline cursor-pointer"
+            >
+              View PDF
+            </button>
           )}
         </div>
 
@@ -135,6 +145,7 @@ export default function DeskMapCard({
                 doc={doc}
                 onEdit={onEdit}
                 onDelete={onDelete}
+                onViewPdf={onViewPdf}
               />
             ))}
           </div>
@@ -158,10 +169,12 @@ function RelatedDocChip({
   doc,
   onEdit,
   onDelete,
+  onViewPdf,
 }: {
   doc: OwnershipNode;
   onEdit: (id: string) => void;
   onDelete: (id: string) => void;
+  onViewPdf: (id: string) => void;
 }) {
   return (
     <div
@@ -181,7 +194,22 @@ function RelatedDocChip({
         {doc.remarks && (
           <div className="text-[9px] text-ink-light truncate">{doc.remarks}</div>
         )}
+        {doc.hasDoc && (
+          <div className="text-[8px] text-leather font-semibold mt-0.5">PDF attached</div>
+        )}
       </div>
+      {doc.hasDoc && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onViewPdf(doc.id);
+          }}
+          className="text-[9px] text-leather font-bold hover:bg-leather/10 px-1.5 py-0.5 rounded shrink-0"
+          title="View PDF"
+        >
+          PDF
+        </button>
+      )}
       <button
         onClick={(e) => {
           e.stopPropagation();
