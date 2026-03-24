@@ -20,28 +20,180 @@ import {
   ReactFlowProvider,
   type Node,
   type Edge,
+  type EdgeTypes,
   type NodeTypes,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
 import OwnershipNodeComponent from '../components/canvas/OwnershipNode';
+import OwnershipEdgeComponent from '../components/canvas/OwnershipEdge';
 import ShapeNodeComponent from '../components/canvas/ShapeNode';
 import CanvasToolbar from '../components/canvas/CanvasToolbar';
-import PageGrid, { getPageDimensions } from '../components/canvas/PageGrid';
+import PageGrid from '../components/canvas/PageGrid';
 import PrintOverlay from '../components/canvas/PrintOverlay';
+import { getPageDimensions } from '../engine/flowchart-pages';
 import { useWorkspaceStore } from '../store/workspace-store';
 import { useCanvasStore } from '../store/canvas-store';
-import { layoutOwnershipTree } from '../engine/tree-layout';
+import {
+  BASE_NODE_HEIGHT,
+  BASE_NODE_WIDTH,
+  clampNodeScale,
+  clampTreeSpacingFactor,
+  getOwnershipNodeDimensions,
+  MIN_NODE_SCALE,
+} from '../engine/flowchart-metrics';
+import { layoutOwnershipTreeWithElk } from '../engine/tree-layout';
 import useCanvasKeyboardShortcuts from '../hooks/useCanvasKeyboardShortcuts';
-import type { OwnershipNodeData } from '../types/flowchart';
-
-const NODE_WIDTH = 288;
-const NODE_HEIGHT = 160;
+import type { FlowEdgeData, OwnershipNodeData } from '../types/flowchart';
+import type { OwnershipNode } from '../types/node';
 
 const nodeTypes: NodeTypes = {
   ownership: OwnershipNodeComponent,
   shape: ShapeNodeComponent,
 };
+
+const edgeTypes: EdgeTypes = {
+  ownership: OwnershipEdgeComponent,
+};
+
+function getOwnershipScale(data: unknown): number {
+  return clampNodeScale((data as OwnershipNodeData | undefined)?.nodeScale ?? 1);
+}
+
+function getNodeDimensions(node: Node) {
+  if (node.type === 'ownership') {
+    const scale = getOwnershipScale(node.data);
+    const dims = getOwnershipNodeDimensions(scale);
+    return {
+      width: node.measured?.width ?? dims.width,
+      height: node.measured?.height ?? dims.height,
+      scale,
+    };
+  }
+
+  const data = node.data as Record<string, unknown>;
+  return {
+    width: node.measured?.width ?? (typeof data?.width === 'number' ? data.width : BASE_NODE_WIDTH),
+    height: node.measured?.height ?? (typeof data?.height === 'number' ? data.height : BASE_NODE_HEIGHT),
+    scale: 1,
+  };
+}
+
+function scaleNode(
+  node: Node,
+  factor: number,
+  origin: { minX: number; minY: number },
+  offset: { x: number; y: number }
+) {
+  const position = {
+    x: (node.position.x - origin.minX) * factor + offset.x,
+    y: (node.position.y - origin.minY) * factor + offset.y,
+  };
+
+  if (node.type === 'ownership') {
+    return {
+      ...node,
+      position,
+      data: {
+        ...node.data,
+        nodeScale: clampNodeScale(getOwnershipScale(node.data) * factor),
+      },
+    };
+  }
+
+  const data = node.data as Record<string, unknown>;
+  return {
+    ...node,
+    position,
+    data: {
+      ...data,
+      width: typeof data.width === 'number' ? data.width * factor : data.width,
+      height: typeof data.height === 'number' ? data.height * factor : data.height,
+      fontSize: typeof data.fontSize === 'number' ? data.fontSize * factor : data.fontSize,
+    },
+  };
+}
+
+function getTreeRootIds(ownershipNodes: OwnershipNode[]): Set<string> {
+  const nodeIds = new Set(ownershipNodes.map((node) => node.id));
+  return new Set(
+    ownershipNodes
+      .filter(
+        (node) =>
+          node.type !== 'related' &&
+          (!node.parentId || node.parentId === 'unlinked' || !nodeIds.has(node.parentId))
+      )
+      .map((node) => node.id)
+  );
+}
+
+function getChartAnchor(nodes: Node[], rootIds: Set<string>) {
+  const rootNodes = nodes.filter((node) => rootIds.has(node.id));
+  if (rootNodes.length > 0) {
+    const rootCenters = rootNodes.map((node) => {
+      const { width } = getNodeDimensions(node);
+      return node.position.x + width / 2;
+    });
+
+    return {
+      x: rootCenters.reduce((sum, centerX) => sum + centerX, 0) / rootCenters.length,
+      y: Math.min(...rootNodes.map((node) => node.position.y)),
+    };
+  }
+
+  const bounds = getNodeBounds(nodes);
+  return {
+    x: bounds.minX + bounds.w / 2,
+    y: bounds.minY,
+  };
+}
+
+function getNodeBounds(nodes: Node[]) {
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+
+  for (const node of nodes) {
+    const { width, height } = getNodeDimensions(node);
+    minX = Math.min(minX, node.position.x);
+    minY = Math.min(minY, node.position.y);
+    maxX = Math.max(maxX, node.position.x + width);
+    maxY = Math.max(maxY, node.position.y + height);
+  }
+
+  return {
+    minX,
+    minY,
+    maxX,
+    maxY,
+    w: maxX - minX,
+    h: maxY - minY,
+  };
+}
+
+function translateNodesToAnchor(nodes: Node[], rootIds: Set<string>, targetAnchor: { x: number; y: number }) {
+  if (nodes.length === 0) return nodes;
+
+  const sourceAnchor = getChartAnchor(nodes, rootIds);
+  const dx = targetAnchor.x - sourceAnchor.x;
+  const dy = targetAnchor.y - sourceAnchor.y;
+
+  if (dx === 0 && dy === 0) return nodes;
+
+  return nodes.map((node) => ({
+    ...node,
+    position: {
+      x: node.position.x + dx,
+      y: node.position.y + dy,
+    },
+  }));
+}
+
+function getCurrentOwnershipScale(nodes: Node[]) {
+  const ownershipNode = nodes.find((node) => node.type === 'ownership');
+  return ownershipNode ? getOwnershipScale(ownershipNode.data) : 1;
+}
 
 // ── Resize overlay ────────────────────────────────────────
 // Renders a bounding box with a corner drag handle over the canvas.
@@ -86,17 +238,34 @@ function ResizeOverlay({
             n.type === 'ownership'
               ? {
                   ...n.data,
-                  nodeScale: Math.max(
-                    0.2,
-                    ((n.data as unknown as OwnershipNodeData).nodeScale ?? 1) * newScale
+                  nodeScale: clampNodeScale(
+                    getOwnershipScale(n.data) * newScale
                   ),
                 }
-              : n.data,
+              : {
+                  ...(n.data as Record<string, unknown>),
+                  width:
+                    typeof (n.data as Record<string, unknown>)?.width === 'number'
+                      ? ((n.data as Record<string, unknown>).width as number) * newScale
+                      : (n.data as Record<string, unknown>)?.width,
+                  height:
+                    typeof (n.data as Record<string, unknown>)?.height === 'number'
+                      ? ((n.data as Record<string, unknown>).height as number) * newScale
+                      : (n.data as Record<string, unknown>)?.height,
+                  fontSize:
+                    typeof (n.data as Record<string, unknown>)?.fontSize === 'number'
+                      ? ((n.data as Record<string, unknown>).fontSize as number) * newScale
+                      : (n.data as Record<string, unknown>)?.fontSize,
+                },
         }))
       );
       setEdges(
         originals.edges.map((e) => ({
           ...e,
+          data: {
+            ...(e.data as FlowEdgeData | undefined),
+            edgeScale: clampNodeScale(((e.data as FlowEdgeData | undefined)?.edgeScale ?? 1) * newScale),
+          },
           style: {
             ...e.style,
             strokeWidth: Math.max(
@@ -126,7 +295,7 @@ function ResizeOverlay({
       const dx = e.clientX - dragRef.current.startX;
       const startScreenW = bbox.w * dragRef.current.startScale * viewport.zoom;
       const newScale = Math.max(
-        0.2,
+        MIN_NODE_SCALE,
         Math.min(3, dragRef.current.startScale * ((startScreenW + dx) / startScreenW))
       );
       applyScale(newScale);
@@ -225,6 +394,9 @@ function FlowchartCanvas() {
   const gridCols = useCanvasStore((s) => s.gridCols);
   const gridRows = useCanvasStore((s) => s.gridRows);
   const orientation = useCanvasStore((s) => s.orientation);
+  const pageSize = useCanvasStore((s) => s.pageSize);
+  const horizontalSpacingFactor = useCanvasStore((s) => s.horizontalSpacingFactor);
+  const verticalSpacingFactor = useCanvasStore((s) => s.verticalSpacingFactor);
   const snapToGrid = useCanvasStore((s) => s.snapToGrid);
   const gridSize = useCanvasStore((s) => s.gridSize);
   const onNodesChange = useCanvasStore((s) => s.onNodesChange);
@@ -232,99 +404,230 @@ function FlowchartCanvas() {
   const onConnect = useCanvasStore((s) => s.onConnect);
   const importGraph = useCanvasStore((s) => s.importGraph);
   const pushHistory = useCanvasStore((s) => s.pushHistory);
+  const setHorizontalSpacingFactor = useCanvasStore((s) => s.setHorizontalSpacingFactor);
+  const setVerticalSpacingFactor = useCanvasStore((s) => s.setVerticalSpacingFactor);
   const setViewport = useCanvasStore((s) => s.setViewport);
 
   const { fitView } = useReactFlow();
+  const spacingRequestIdRef = useRef(0);
 
   // ── Keyboard shortcuts ─────────────────────────────────
   useCanvasKeyboardShortcuts();
 
+  const getFlowchartDeskMapNodes = useCallback(
+    () => getActiveDeskMapNodes().filter((node) => node.type !== 'related'),
+    [getActiveDeskMapNodes]
+  );
+
+  const getRelatedDeskMapNodeIds = useCallback(
+    () =>
+      new Set(
+        getActiveDeskMapNodes()
+          .filter((node) => node.type === 'related')
+          .map((node) => node.id)
+      ),
+    [getActiveDeskMapNodes]
+  );
+
   // ── Import ownership tree from active desk map ─────────
   const handleImportTree = useCallback(() => {
-    const deskMapNodes = getActiveDeskMapNodes();
-    if (deskMapNodes.length === 0) return;
-    const { flowNodes, flowEdges } = layoutOwnershipTree(deskMapNodes);
-    importGraph(flowNodes as Node[], flowEdges);
-    setTimeout(() => fitView({ padding: 0.1, duration: 300 }), 50);
-  }, [getActiveDeskMapNodes, importGraph, fitView]);
+    void (async () => {
+      const deskMapNodes = getFlowchartDeskMapNodes();
+      if (deskMapNodes.length === 0) return;
+      const rootIds = getTreeRootIds(deskMapNodes);
+      const { pw } = getPageDimensions(pageSize, orientation);
+      const gridCenterX = (pw * gridCols) / 2;
+      const importScale = getCurrentOwnershipScale(useCanvasStore.getState().nodes);
+
+      const { flowNodes, flowEdges } = await layoutOwnershipTreeWithElk(deskMapNodes, {
+        horizontalSpacingFactor,
+        verticalSpacingFactor,
+        nodeScale: importScale,
+      });
+      const centeredFlowNodes = translateNodesToAnchor(
+        flowNodes as Node[],
+        rootIds,
+        { x: gridCenterX, y: 40 }
+      );
+      importGraph(centeredFlowNodes, flowEdges);
+      setTimeout(() => fitView({ padding: 0.1, duration: 300 }), 50);
+    })();
+  }, [
+    getFlowchartDeskMapNodes,
+    gridCols,
+    horizontalSpacingFactor,
+    importGraph,
+    fitView,
+    orientation,
+    pageSize,
+    verticalSpacingFactor,
+  ]);
+
+  const applySpacingFactors = useCallback(
+    (nextHorizontalSpacingFactor: number, nextVerticalSpacingFactor: number) => {
+      const safeHorizontalSpacingFactor = clampTreeSpacingFactor(nextHorizontalSpacingFactor);
+      const safeVerticalSpacingFactor = clampTreeSpacingFactor(nextVerticalSpacingFactor);
+      if (
+        safeHorizontalSpacingFactor === horizontalSpacingFactor &&
+        safeVerticalSpacingFactor === verticalSpacingFactor
+      ) {
+        return;
+      }
+
+      const store = useCanvasStore.getState();
+      const layoutNodes = getFlowchartDeskMapNodes();
+      const relatedNodeIds = getRelatedDeskMapNodeIds();
+      const rootIds = getTreeRootIds(layoutNodes);
+      const hasCanvasChanges = store.nodes.some((node) => node.type === 'ownership');
+      const currentOwnershipNodes = store.nodes.filter(
+        (node) => node.type === 'ownership' && !relatedNodeIds.has(node.id)
+      );
+      const currentScale = getCurrentOwnershipScale(currentOwnershipNodes);
+      const { pw } = getPageDimensions(pageSize, orientation);
+      const currentAnchor =
+        currentOwnershipNodes.length > 0
+          ? getChartAnchor(currentOwnershipNodes, rootIds)
+          : { x: (pw * gridCols) / 2, y: 40 };
+
+      if (hasCanvasChanges) {
+        pushHistory();
+      }
+
+      setHorizontalSpacingFactor(safeHorizontalSpacingFactor);
+      setVerticalSpacingFactor(safeVerticalSpacingFactor);
+
+      if (layoutNodes.length === 0) {
+        if (relatedNodeIds.size === 0) return;
+
+        store.setNodes(store.nodes.filter((node) => !relatedNodeIds.has(node.id)));
+        store.setEdges(
+          store.edges.filter(
+            (edge) => !relatedNodeIds.has(edge.source) && !relatedNodeIds.has(edge.target)
+          )
+        );
+        return;
+      }
+
+      const requestId = ++spacingRequestIdRef.current;
+      void (async () => {
+        const { flowNodes } = await layoutOwnershipTreeWithElk(layoutNodes, {
+          horizontalSpacingFactor: safeHorizontalSpacingFactor,
+          verticalSpacingFactor: safeVerticalSpacingFactor,
+          nodeScale: currentScale,
+        });
+        if (requestId !== spacingRequestIdRef.current) return;
+
+        const anchoredFlowNodes = translateNodesToAnchor(
+          flowNodes as Node[],
+          rootIds,
+          currentAnchor
+        );
+        const positions = new Map(anchoredFlowNodes.map((node) => [node.id, node.position]));
+        const latestStore = useCanvasStore.getState();
+        latestStore.setNodes(
+          latestStore.nodes
+            .filter((node) => !relatedNodeIds.has(node.id))
+            .map((node) => {
+              if (node.type !== 'ownership') return node;
+              const position = positions.get(node.id);
+              return position ? { ...node, position } : node;
+            })
+        );
+        latestStore.setEdges(
+          latestStore.edges.filter(
+            (edge) => !relatedNodeIds.has(edge.source) && !relatedNodeIds.has(edge.target)
+          )
+        );
+      })();
+    },
+    [
+      getFlowchartDeskMapNodes,
+      getRelatedDeskMapNodeIds,
+      horizontalSpacingFactor,
+      gridCols,
+      orientation,
+      pageSize,
+      pushHistory,
+      setHorizontalSpacingFactor,
+      setVerticalSpacingFactor,
+      verticalSpacingFactor,
+    ]
+  );
+
+  const handleHorizontalSpacingChange = useCallback(
+    (nextHorizontalSpacingFactor: number) => {
+      applySpacingFactors(nextHorizontalSpacingFactor, verticalSpacingFactor);
+    },
+    [applySpacingFactors, verticalSpacingFactor]
+  );
+
+  const handleVerticalSpacingChange = useCallback(
+    (nextVerticalSpacingFactor: number) => {
+      applySpacingFactors(horizontalSpacingFactor, nextVerticalSpacingFactor);
+    },
+    [applySpacingFactors, horizontalSpacingFactor]
+  );
 
   // ── Fit to Grid ────────────────────────────────────────
   // Scales both node positions AND node sizes uniformly so the tree
-  // maintains its shape at a smaller size. Minimum scale 0.35 keeps
-  // text legible; if the tree is still too large, the grid auto-expands.
+  // maintains its shape at a smaller size. It no longer auto-expands the
+  // grid; paper size and grid counts stay under explicit user control.
   const handleFitToGrid = useCallback(() => {
     if (nodes.length === 0) return;
     pushHistory();
 
-    // 1. Bounding box of all nodes at their current (unscaled) size
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    for (const n of nodes) {
-      const nw = n.type === 'ownership' ? NODE_WIDTH : ((n.data as Record<string, unknown>)?.width as number ?? NODE_WIDTH);
-      const nh = n.measured?.height ?? (n.type === 'ownership' ? NODE_HEIGHT : ((n.data as Record<string, unknown>)?.height as number ?? NODE_HEIGHT));
-      minX = Math.min(minX, n.position.x);
-      minY = Math.min(minY, n.position.y);
-      maxX = Math.max(maxX, n.position.x + nw);
-      maxY = Math.max(maxY, n.position.y + nh);
-    }
-
-    const treeW = maxX - minX;
-    const treeH = maxY - minY;
+    // 1. Bounding box of all nodes using their actual rendered dimensions
+    const bounds = getNodeBounds(nodes);
+    const treeW = bounds.w;
+    const treeH = bounds.h;
     if (treeW === 0 || treeH === 0) return;
 
-    const { pw, ph } = getPageDimensions(orientation);
+    const { pw, ph } = getPageDimensions(pageSize, orientation);
     const margin = 40;
 
-    // 2. Uniform scale to fit tree into grid
-    const MIN_NODE_SCALE = 0.35;
+    // 2. Uniform factor to fit the current chart geometry into the page grid
     const gridW = pw * gridCols;
     const gridH = ph * gridRows;
-    const rawScale = Math.min(
+    const rawFactor = Math.min(
       (gridW - 2 * margin) / treeW,
       (gridH - 2 * margin) / treeH
     );
 
-    // Clamp: never enlarge nodes (cap at 1), never shrink below 0.35
-    const nodeScale = Math.min(Math.max(rawScale, MIN_NODE_SCALE), 1);
+    const ownershipNodes = nodes.filter((n) => n.type === 'ownership');
+    const currentScale = ownershipNodes.length > 0 ? getOwnershipScale(ownershipNodes[0].data) : 1;
+    const minFactor = MIN_NODE_SCALE / currentScale;
+    const maxFactor = 1 / currentScale;
+    const appliedFactor = Math.min(Math.max(rawFactor, minFactor), maxFactor);
+    const centeredOffsetX = Math.max(margin, (gridW - treeW * appliedFactor) / 2);
+    const centeredOffsetY = margin;
 
-    // 3. If tree doesn't fit even at minimum scale, expand the grid
-    if (rawScale < MIN_NODE_SCALE) {
-      const neededW = treeW * MIN_NODE_SCALE + 2 * margin;
-      const neededH = treeH * MIN_NODE_SCALE + 2 * margin;
-      const newCols = Math.max(gridCols, Math.ceil(neededW / pw));
-      const newRows = Math.max(gridRows, Math.ceil(neededH / ph));
-      useCanvasStore.getState().setGridCols(newCols);
-      useCanvasStore.getState().setGridRows(newRows);
-    }
-
-    // 4. Scale positions uniformly and set nodeScale on ownership nodes
+    // 4. Scale positions, card geometry, and shape dimensions together
     const store = useCanvasStore.getState();
     store.setNodes(
-      nodes.map((n) => ({
-        ...n,
-        position: {
-          x: (n.position.x - minX) * nodeScale + margin,
-          y: (n.position.y - minY) * nodeScale + margin,
-        },
-        data: n.type === 'ownership'
-          ? { ...n.data, nodeScale }
-          : n.data,
+      nodes.map((n) => scaleNode(n, appliedFactor, { minX: bounds.minX, minY: bounds.minY }, {
+        x: centeredOffsetX,
+        y: centeredOffsetY,
       }))
     );
 
-    // 5. Scale edge stroke widths to match node scale
+    // 5. Scale edge strokes by the same factor
     const currentEdges = store.edges;
     store.setEdges(
       currentEdges.map((e) => {
-        const baseStroke = (e.style?.stroke === '#a0522d') ? 1 : 2;
+        const currentStroke = Number(e.style?.strokeWidth ?? ((e.style?.stroke === '#a0522d') ? 1 : 2));
         return {
           ...e,
-          style: { ...e.style, strokeWidth: Math.max(0.5, baseStroke * nodeScale) },
+          data: {
+            ...(e.data as FlowEdgeData | undefined),
+            edgeScale: clampNodeScale(((e.data as FlowEdgeData | undefined)?.edgeScale ?? 1) * appliedFactor),
+          },
+          style: { ...e.style, strokeWidth: Math.max(0.5, currentStroke * appliedFactor) },
         };
       })
     );
 
     setTimeout(() => fitView({ padding: 0.05, duration: 300 }), 50);
-  }, [nodes, pushHistory, fitView, gridCols, gridRows, orientation]);
+  }, [nodes, pushHistory, fitView, gridCols, gridRows, orientation, pageSize]);
 
   // ── Print ──────────────────────────────────────────────
   const handlePrint = useCallback(() => {
@@ -347,7 +650,7 @@ function FlowchartCanvas() {
   // ── Auto-import if desk map has nodes but canvas is empty
   const deskMapNodes = getActiveDeskMapNodes();
   useEffect(() => {
-    if (deskMapNodes.length > 0 && nodes.length === 0) {
+    if (deskMapNodes.some((node) => node.type !== 'related') && nodes.length === 0) {
       handleImportTree();
     }
   }, [deskMapNodes.length]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -366,9 +669,7 @@ function FlowchartCanvas() {
 
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     for (const n of nodes) {
-      const ns = n.type === 'ownership' ? ((n.data as unknown as OwnershipNodeData).nodeScale ?? 1) : 1;
-      const nw = n.type === 'ownership' ? NODE_WIDTH * ns : ((n.data as Record<string, unknown>)?.width as number ?? NODE_WIDTH);
-      const nh = n.measured?.height ?? (n.type === 'ownership' ? NODE_HEIGHT * ns : ((n.data as Record<string, unknown>)?.height as number ?? NODE_HEIGHT));
+      const { width: nw, height: nh } = getNodeDimensions(n);
       minX = Math.min(minX, n.position.x);
       minY = Math.min(minY, n.position.y);
       maxX = Math.max(maxX, n.position.x + nw);
@@ -408,6 +709,11 @@ function FlowchartCanvas() {
   const printEdges = edges.map((e) => ({
     source: e.source,
     target: e.target,
+    data: e.data as FlowEdgeData | undefined,
+    style: {
+      stroke: typeof e.style?.stroke === 'string' ? e.style.stroke : undefined,
+      strokeWidth: typeof e.style?.strokeWidth === 'number' ? e.style.strokeWidth : undefined,
+    },
   }));
 
   return (
@@ -416,6 +722,8 @@ function FlowchartCanvas() {
         onImportTree={handleImportTree}
         onFitToGrid={handleFitToGrid}
         onResize={handleEnterResize}
+        onHorizontalSpacingChange={handleHorizontalSpacingChange}
+        onVerticalSpacingChange={handleVerticalSpacingChange}
         resizeMode={resizeMode}
         onPrint={handlePrint}
       />
@@ -435,8 +743,14 @@ function FlowchartCanvas() {
         onNodeDragStart={handleNodeDragStart}
         onMoveEnd={handleMoveEnd}
         nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
         fitView
         fitViewOptions={{ padding: 0.1 }}
+        defaultEdgeOptions={{
+          type: 'ownership',
+          data: { edgeScale: 1, variant: 'primary' },
+          style: { stroke: '#8b4513', strokeWidth: 2 },
+        }}
         panOnDrag={!resizeMode}
         selectionOnDrag={!resizeMode && activeTool === 'select'}
         nodesDraggable={!resizeMode}
@@ -448,7 +762,7 @@ function FlowchartCanvas() {
         maxZoom={4}
         proOptions={{ hideAttribution: true }}
       >
-        <PageGrid cols={gridCols} rows={gridRows} orientation={orientation} />
+        <PageGrid cols={gridCols} rows={gridRows} orientation={orientation} pageSize={pageSize} />
         <Background
           variant={BackgroundVariant.Dots}
           gap={20}
@@ -483,6 +797,7 @@ function FlowchartCanvas() {
           cols={gridCols}
           rows={gridRows}
           orientation={orientation}
+          pageSize={pageSize}
         />,
         document.body
       )}

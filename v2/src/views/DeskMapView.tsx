@@ -278,6 +278,7 @@ export default function DeskMapView() {
 
   // Show nodes for active desk map (or all if none selected)
   const visibleNodes = getActiveDeskMapNodes();
+  const visibleCardCount = visibleNodes.filter((node) => node.type !== 'related').length;
   const trees = buildTree(visibleNodes);
   const editNode = editNodeId ? nodes.find((n) => n.id === editNodeId) : null;
   const conveyParent = conveyParentId ? nodes.find((n) => n.id === conveyParentId) : null;
@@ -339,7 +340,7 @@ export default function DeskMapView() {
             + Add Root
           </button>
           <span className="text-[10px] text-ink-light font-mono">
-            {visibleNodes.length} nodes
+            {visibleCardCount} cards
           </span>
         </div>
 

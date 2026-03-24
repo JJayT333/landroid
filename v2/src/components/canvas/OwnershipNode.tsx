@@ -14,11 +14,32 @@ import { Handle, Position } from '@xyflow/react';
 import type { NodeProps } from '@xyflow/react';
 import { formatAsFraction } from '../../engine/fraction-display';
 import { d } from '../../engine/decimal';
+import {
+  clampNodeScale,
+  getOwnershipNodeDimensions,
+} from '../../engine/flowchart-metrics';
 import type { OwnershipNodeData } from '../../types/flowchart';
 
 function OwnershipNodeComponent({ data, selected }: NodeProps & { data: OwnershipNodeData }) {
   const nodeData = data as OwnershipNodeData;
-  const scale = nodeData.nodeScale ?? 1;
+  const scale = clampNodeScale(nodeData.nodeScale ?? 1);
+  const metrics = getOwnershipNodeDimensions(scale);
+  const handleSize = Math.max(4, 10 * scale);
+  const handleBorderWidth = Math.max(1, 2 * scale);
+  const borderRadius = 8 * scale;
+  const borderWidth = Math.max(1, 2 * scale);
+  const headerPaddingX = 12 * scale;
+  const headerPaddingY = 6 * scale;
+  const bodyPaddingX = 12 * scale;
+  const bodyPaddingY = 8 * scale;
+  const footerPaddingX = 12 * scale;
+  const footerPaddingY = 8 * scale;
+  const headerLabelSize = 10 * scale;
+  const dateSize = 10 * scale;
+  const fromSize = 10 * scale;
+  const nameSize = 14 * scale;
+  const fractionLabelSize = 10 * scale;
+  const fractionValueSize = 14 * scale;
   const relShare = d(nodeData.relativeShare);
   const absInterest = d(nodeData.grantFraction);
   const remaining = d(nodeData.remainingFraction);
@@ -31,61 +52,131 @@ function OwnershipNodeComponent({ data, selected }: NodeProps & { data: Ownershi
 
   return (
     <div
-      style={scale !== 1 ? { zoom: scale } : undefined}
+      style={{
+        width: metrics.width,
+        minHeight: metrics.height,
+        borderRadius,
+        borderWidth,
+      }}
       className={`
-        w-72 rounded-lg border-2 shadow-md transition-shadow
+        flex flex-col border-solid shadow-md transition-shadow
         ${selected ? 'border-leather shadow-lg ring-2 ring-gold/50' : 'border-ledger-line'}
         bg-parchment text-ink
       `}
     >
       {/* Top handle */}
-      <Handle type="target" position={Position.Top} className="!bg-leather !w-3 !h-3" />
+      <Handle
+        type="target"
+        position={Position.Top}
+        className="!bg-leather"
+        style={{
+          width: handleSize,
+          height: handleSize,
+          borderRadius: '9999px',
+          borderWidth: handleBorderWidth,
+          borderColor: 'var(--color-parchment)',
+        }}
+      />
 
       {/* Header — instrument + date */}
-      <div className="px-3 py-1.5 border-b border-ledger-line bg-parchment-dark rounded-t-lg">
+      <div
+        className="border-b border-ledger-line bg-parchment-dark"
+        style={{
+          padding: `${headerPaddingY}px ${headerPaddingX}px`,
+          borderTopLeftRadius: borderRadius,
+          borderTopRightRadius: borderRadius,
+        }}
+      >
         <div className="flex items-center justify-between">
-          <span className="text-[10px] font-semibold text-ink-light uppercase tracking-wide truncate">
+          <span
+            className="font-semibold text-ink-light uppercase truncate"
+            style={{ fontSize: headerLabelSize, letterSpacing: `${0.05 * scale}em` }}
+          >
             {nodeData.instrument || 'Document'}
           </span>
           {nodeData.date && (
-            <span className="text-[10px] text-ink-light font-mono ml-2 shrink-0">{nodeData.date}</span>
+            <span
+              className="text-ink-light font-mono ml-2 shrink-0"
+              style={{ fontSize: dateSize }}
+            >
+              {nodeData.date}
+            </span>
           )}
         </div>
       </div>
 
       {/* Body — grantor → grantee */}
-      <div className="px-3 py-2">
+      <div
+        className="flex-1"
+        style={{ padding: `${bodyPaddingY}px ${bodyPaddingX}px` }}
+      >
         {nodeData.grantor && (
-          <div className="text-[10px] text-ink-light truncate">
+          <div className="text-ink-light truncate" style={{ fontSize: fromSize }}>
             From: {nodeData.grantor}
           </div>
         )}
-        <div className="text-sm font-bold font-display truncate">
+        <div
+          className="font-bold font-display truncate"
+          style={{ fontSize: nameSize, lineHeight: 1.2 }}
+        >
           {nodeData.grantee || 'Unknown'}
         </div>
       </div>
 
       {/* Fractions */}
-      <div className="px-3 py-2 border-t border-ledger-line bg-ledger rounded-b-lg space-y-0.5">
+      <div
+        className="border-t border-ledger-line bg-ledger space-y-0.5"
+        style={{
+          padding: `${footerPaddingY}px ${footerPaddingX}px`,
+          borderBottomLeftRadius: borderRadius,
+          borderBottomRightRadius: borderRadius,
+        }}
+      >
         {/* Line 1: Granted — what this deed conveyed */}
         <div className="flex items-center justify-between gap-2">
-          <span className="text-ink-light text-[10px] uppercase tracking-wider shrink-0">Granted</span>
-          <span className="text-sm font-mono font-semibold text-leather">{grantedFrac}</span>
+          <span
+            className="text-ink-light uppercase shrink-0"
+            style={{ fontSize: fractionLabelSize, letterSpacing: `${0.05 * scale}em` }}
+          >
+            Granted
+          </span>
+          <span
+            className="font-mono font-semibold text-leather"
+            style={{ fontSize: fractionValueSize }}
+          >
+            {grantedFrac}
+          </span>
         </div>
 
         {/* Line 2: Of Whole — absolute interest in the tract */}
         <div className="flex items-center justify-between gap-2">
-          <span className="text-ink-light text-[10px] uppercase tracking-wider shrink-0">Of Whole</span>
-          <span className="text-sm font-mono font-semibold text-ink">{ofWholeFrac}</span>
+          <span
+            className="text-ink-light uppercase shrink-0"
+            style={{ fontSize: fractionLabelSize, letterSpacing: `${0.05 * scale}em` }}
+          >
+            Of Whole
+          </span>
+          <span
+            className="font-mono font-semibold text-ink"
+            style={{ fontSize: fractionValueSize }}
+          >
+            {ofWholeFrac}
+          </span>
         </div>
 
         {/* Line 3: Remaining — only shown if grantee has conveyed some away */}
         {hasConveyedSome && (
           <div className="flex items-center justify-between gap-2">
-            <span className="text-ink-light text-[10px] uppercase tracking-wider shrink-0">
+            <span
+              className="text-ink-light uppercase shrink-0"
+              style={{ fontSize: fractionLabelSize, letterSpacing: `${0.05 * scale}em` }}
+            >
               {isFullyConveyed ? 'Conveyed All' : 'Remaining'}
             </span>
-            <span className={`text-sm font-mono font-semibold ${isFullyConveyed ? 'text-ink-light' : 'text-seal'}`}>
+            <span
+              className={`font-mono font-semibold ${isFullyConveyed ? 'text-ink-light' : 'text-seal'}`}
+              style={{ fontSize: fractionValueSize }}
+            >
               {isFullyConveyed ? '—' : remainingFrac}
             </span>
           </div>
@@ -93,7 +184,18 @@ function OwnershipNodeComponent({ data, selected }: NodeProps & { data: Ownershi
       </div>
 
       {/* Bottom handle */}
-      <Handle type="source" position={Position.Bottom} className="!bg-leather !w-3 !h-3" />
+      <Handle
+        type="source"
+        position={Position.Bottom}
+        className="!bg-leather"
+        style={{
+          width: handleSize,
+          height: handleSize,
+          borderRadius: '9999px',
+          borderWidth: handleBorderWidth,
+          borderColor: 'var(--color-parchment)',
+        }}
+      />
     </div>
   );
 }

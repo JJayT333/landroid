@@ -4,7 +4,7 @@
  * Sortable by clicking column headers (instrument date or file date).
  * Shows every node including related documents (visually distinguished).
  */
-import { useState, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useWorkspaceStore } from '../store/workspace-store';
 import { formatAsFraction } from '../engine/fraction-display';
 import { d } from '../engine/decimal';
@@ -12,6 +12,7 @@ import type { OwnershipNode } from '../types/node';
 
 type SortField = 'date' | 'fileDate' | 'instrument' | 'grantor' | 'grantee';
 type SortDir = 'asc' | 'desc';
+type TractFilter = 'all' | string;
 
 function parseDate(s: string): number {
   if (!s) return 0;
@@ -34,12 +35,40 @@ function sortNodes(nodes: OwnershipNode[], field: SortField, dir: SortDir): Owne
 
 export default function RunsheetView() {
   const nodes = useWorkspaceStore((s) => s.nodes);
+  const deskMaps = useWorkspaceStore((s) => s.deskMaps);
   const [sortField, setSortField] = useState<SortField>('date');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
+  const [tractFilter, setTractFilter] = useState<TractFilter>('all');
+
+  const tractOptions = useMemo(
+    () =>
+      deskMaps
+        .filter((deskMap) => deskMap.nodeIds.length > 0)
+        .map((deskMap) => ({
+          id: deskMap.id,
+          label: deskMap.name,
+          nodeIds: new Set(deskMap.nodeIds),
+        })),
+    [deskMaps]
+  );
+
+  useEffect(() => {
+    if (tractFilter === 'all') return;
+    if (!tractOptions.some((option) => option.id === tractFilter)) {
+      setTractFilter('all');
+    }
+  }, [tractFilter, tractOptions]);
+
+  const filteredNodes = useMemo(() => {
+    if (tractFilter === 'all') return nodes;
+    const tract = tractOptions.find((option) => option.id === tractFilter);
+    if (!tract) return nodes;
+    return nodes.filter((node) => tract.nodeIds.has(node.id));
+  }, [nodes, tractFilter, tractOptions]);
 
   const sorted = useMemo(
-    () => sortNodes(nodes, sortField, sortDir),
-    [nodes, sortField, sortDir]
+    () => sortNodes(filteredNodes, sortField, sortDir),
+    [filteredNodes, sortField, sortDir]
   );
 
   const handleSort = (field: SortField) => {
@@ -67,6 +96,38 @@ export default function RunsheetView() {
 
   return (
     <div className="h-full overflow-auto p-4">
+      <div className="mb-4 flex items-center gap-2 overflow-x-auto">
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-light shrink-0">
+          Tract Filter
+        </span>
+        <button
+          onClick={() => setTractFilter('all')}
+          className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors ${
+            tractFilter === 'all'
+              ? 'bg-leather text-parchment'
+              : 'bg-parchment-dark text-ink-light hover:bg-parchment'
+          }`}
+        >
+          All Tracts
+        </button>
+        {tractOptions.map((tract) => (
+          <button
+            key={tract.id}
+            onClick={() => setTractFilter(tract.id)}
+            className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors ${
+              tractFilter === tract.id
+                ? 'bg-leather text-parchment'
+                : 'bg-parchment-dark text-ink-light hover:bg-parchment'
+            }`}
+          >
+            {tract.label}
+          </button>
+        ))}
+        <span className="ml-auto text-xs font-mono text-ink-light shrink-0">
+          {sorted.length} entries
+        </span>
+      </div>
+
       <table className="w-full border-collapse text-sm">
         <thead>
           <tr className="bg-parchment-dark border-b-2 border-leather">

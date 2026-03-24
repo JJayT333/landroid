@@ -17,7 +17,8 @@ import {
   type Connection,
   type Viewport,
 } from '@xyflow/react';
-import type { FlowTool, PageOrientation } from '../types/flowchart';
+import { DEFAULT_PAGE_SIZE } from '../engine/flowchart-pages';
+import type { FlowTool, PageOrientation, PageSizeId } from '../types/flowchart';
 
 // ── History ──────────────────────────────────────────────
 
@@ -26,6 +27,12 @@ const MAX_HISTORY = 50;
 interface Snapshot {
   nodes: Node[];
   edges: Edge[];
+  gridCols: number;
+  gridRows: number;
+  orientation: PageOrientation;
+  pageSize: PageSizeId;
+  horizontalSpacingFactor: number;
+  verticalSpacingFactor: number;
 }
 
 // ── Store interface ──────────────────────────────────────
@@ -42,6 +49,9 @@ interface CanvasState {
   gridCols: number;
   gridRows: number;
   orientation: PageOrientation;
+  pageSize: PageSizeId;
+  horizontalSpacingFactor: number;
+  verticalSpacingFactor: number;
 
   // Snap
   snapToGrid: boolean;
@@ -82,6 +92,9 @@ interface CanvasState {
   setGridCols: (cols: number) => void;
   setGridRows: (rows: number) => void;
   setOrientation: (o: PageOrientation) => void;
+  setPageSize: (pageSize: PageSizeId) => void;
+  setHorizontalSpacingFactor: (factor: number) => void;
+  setVerticalSpacingFactor: (factor: number) => void;
 
   // ── Snap ──
   setSnapToGrid: (snap: boolean) => void;
@@ -106,6 +119,9 @@ export interface CanvasSaveData {
   gridCols?: number;
   gridRows?: number;
   orientation?: PageOrientation;
+  pageSize?: PageSizeId;
+  horizontalSpacingFactor?: number;
+  verticalSpacingFactor?: number;
   snapToGrid?: boolean;
   gridSize?: number;
 }
@@ -113,7 +129,16 @@ export interface CanvasSaveData {
 // ── Helper: push current state onto history ──────────────
 
 function captureSnapshot(state: CanvasState): Snapshot {
-  return { nodes: state.nodes, edges: state.edges };
+  return {
+    nodes: state.nodes,
+    edges: state.edges,
+    gridCols: state.gridCols,
+    gridRows: state.gridRows,
+    orientation: state.orientation,
+    pageSize: state.pageSize,
+    horizontalSpacingFactor: state.horizontalSpacingFactor,
+    verticalSpacingFactor: state.verticalSpacingFactor,
+  };
 }
 
 function pushToPast(past: Snapshot[], snapshot: Snapshot): Snapshot[] {
@@ -131,6 +156,9 @@ export const useCanvasStore = create<CanvasState>()((set, get) => ({
   gridCols: 4,
   gridRows: 2,
   orientation: 'landscape',
+  pageSize: DEFAULT_PAGE_SIZE,
+  horizontalSpacingFactor: 1,
+  verticalSpacingFactor: 1,
   snapToGrid: false,
   gridSize: 20,
   viewport: { x: 0, y: 0, zoom: 1 },
@@ -232,6 +260,9 @@ export const useCanvasStore = create<CanvasState>()((set, get) => ({
   setGridCols: (gridCols) => set({ gridCols }),
   setGridRows: (gridRows) => set({ gridRows }),
   setOrientation: (orientation) => set({ orientation }),
+  setPageSize: (pageSize) => set({ pageSize }),
+  setHorizontalSpacingFactor: (horizontalSpacingFactor) => set({ horizontalSpacingFactor }),
+  setVerticalSpacingFactor: (verticalSpacingFactor) => set({ verticalSpacingFactor }),
 
   // ── Snap ───────────────────────────────────────────────
 
@@ -258,6 +289,12 @@ export const useCanvasStore = create<CanvasState>()((set, get) => ({
     set({
       nodes: prev.nodes,
       edges: prev.edges,
+      gridCols: prev.gridCols,
+      gridRows: prev.gridRows,
+      orientation: prev.orientation,
+      pageSize: prev.pageSize,
+      horizontalSpacingFactor: prev.horizontalSpacingFactor,
+      verticalSpacingFactor: prev.verticalSpacingFactor,
       _past: s._past.slice(0, -1),
       _future: [captureSnapshot(s), ...s._future],
     });
@@ -270,6 +307,12 @@ export const useCanvasStore = create<CanvasState>()((set, get) => ({
     set({
       nodes: next.nodes,
       edges: next.edges,
+      gridCols: next.gridCols,
+      gridRows: next.gridRows,
+      orientation: next.orientation,
+      pageSize: next.pageSize,
+      horizontalSpacingFactor: next.horizontalSpacingFactor,
+      verticalSpacingFactor: next.verticalSpacingFactor,
       _past: pushToPast(s._past, captureSnapshot(s)),
       _future: s._future.slice(1),
     });
@@ -287,6 +330,9 @@ export const useCanvasStore = create<CanvasState>()((set, get) => ({
       gridCols: data.gridCols ?? 4,
       gridRows: data.gridRows ?? 2,
       orientation: data.orientation ?? 'landscape',
+      pageSize: data.pageSize ?? DEFAULT_PAGE_SIZE,
+      horizontalSpacingFactor: data.horizontalSpacingFactor ?? 1,
+      verticalSpacingFactor: data.verticalSpacingFactor ?? 1,
       snapToGrid: data.snapToGrid ?? false,
       gridSize: data.gridSize ?? 20,
       _past: [],

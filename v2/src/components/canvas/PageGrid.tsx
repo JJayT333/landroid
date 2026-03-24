@@ -4,36 +4,21 @@
  * Renders dashed page boundaries in canvas coordinates so they
  * pan/zoom with the canvas. pointer-events: none so clicks pass through.
  *
- * Page dimensions at 96 DPI:
- *   Landscape: 1056 x 816  (11" x 8.5")
- *   Portrait:  816 x 1056  (8.5" x 11")
  */
 import { useViewport } from '@xyflow/react';
-import type { PageOrientation } from '../../types/flowchart';
-
-export type { PageOrientation };
-
-export const PAGE_W_LANDSCAPE = 1056;
-export const PAGE_H_LANDSCAPE = 816;
-export const PAGE_W_PORTRAIT = 816;
-export const PAGE_H_PORTRAIT = 1056;
-
-export function getPageDimensions(orientation: PageOrientation) {
-  return {
-    pw: orientation === 'landscape' ? PAGE_W_LANDSCAPE : PAGE_W_PORTRAIT,
-    ph: orientation === 'landscape' ? PAGE_H_LANDSCAPE : PAGE_H_PORTRAIT,
-  };
-}
+import { getPageDimensions } from '../../engine/flowchart-pages';
+import type { PageOrientation, PageSizeId } from '../../types/flowchart';
 
 interface PageGridProps {
   cols: number;
   rows: number;
   orientation: PageOrientation;
+  pageSize: PageSizeId;
 }
 
-export default function PageGrid({ cols, rows, orientation }: PageGridProps) {
+export default function PageGrid({ cols, rows, orientation, pageSize }: PageGridProps) {
   const { x, y, zoom } = useViewport();
-  const { pw, ph } = getPageDimensions(orientation);
+  const { pw, ph } = getPageDimensions(pageSize, orientation);
   const totalWidth = pw * cols;
   const totalHeight = ph * rows;
 

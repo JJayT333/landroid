@@ -66,6 +66,9 @@ useCanvasStore.subscribe((state) => {
     gridCols: state.gridCols,
     gridRows: state.gridRows,
     orientation: state.orientation,
+    pageSize: state.pageSize,
+    horizontalSpacingFactor: state.horizontalSpacingFactor,
+    verticalSpacingFactor: state.verticalSpacingFactor,
     snapToGrid: state.snapToGrid,
     gridSize: state.gridSize,
   });
@@ -81,6 +84,9 @@ useCanvasStore.subscribe((state) => {
       gridCols: state.gridCols,
       gridRows: state.gridRows,
       orientation: state.orientation,
+      pageSize: state.pageSize,
+      horizontalSpacingFactor: state.horizontalSpacingFactor,
+      verticalSpacingFactor: state.verticalSpacingFactor,
       snapToGrid: state.snapToGrid,
       gridSize: state.gridSize,
     });

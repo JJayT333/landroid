@@ -10,7 +10,7 @@
  */
 import { useWorkspaceStore } from '../store/workspace-store';
 import { savePdf } from './pdf-store';
-import type { OwnershipNode } from '../types/node';
+import type { DeskMap, OwnershipNode } from '../types/node';
 import { createBlankNode } from '../types/node';
 
 // ── Node factory ────────────────────────────────────────
@@ -441,6 +441,13 @@ const STRESS_PDFS = [
   'OGML-Tyra_R.pdf', 'P2018-68.pdf', 'P2025-4.pdf',
 ];
 
+const STRESS_INSTRUMENT_TYPES = [
+  'Patent', 'Warranty Deed', 'Mineral Deed', 'Royalty Deed',
+  'Oil & Gas Lease', 'Assignment', 'Probate', 'Affidavit of Heirship',
+  'Death Certificate', 'Quitclaim Deed', 'Correction Deed', 'Release',
+  'Will', 'Order',
+];
+
 const FIRST = [
   'James', 'Mary', 'Robert', 'Patricia', 'William', 'Elizabeth', 'John', 'Linda',
   'Thomas', 'Barbara', 'Charles', 'Susan', 'Daniel', 'Margaret', 'Michael', 'Dorothy',
@@ -460,6 +467,9 @@ const OPERATORS = [
 ];
 
 interface StressConfig {
+  name: string;
+  code: string;
+  targetCardCount: number;
   landDesc: string;
   surnames: string[];
   patentYear: number;
@@ -470,36 +480,37 @@ interface StressConfig {
 
 const STRESS_CHAINS: StressConfig[] = [
   {
+    name: 'Tract 1',
+    code: 'T1',
+    targetCardCount: 100,
     landDesc: 'Section 14, Block B, T&P RR Co. Survey, Henderson County, Texas',
     surnames: ['Henderson', 'Shaw', 'Pearson', 'Whitfield', 'Langley', 'Underwood', 'Calloway', 'Ashworth'],
     patentYear: 1895,
     patentGrantee: 'Thomas J. Henderson',
-    maxDepth: 4,
-    rootSplit: 3,
+    maxDepth: 5,
+    rootSplit: 2,
   },
   {
+    name: 'Tract 2',
+    code: 'T2',
+    targetCardCount: 150,
     landDesc: 'Section 20, Block C, H&TC RR Co. Survey, Crockett County, Texas',
     surnames: ['Morales', 'Garza', 'Vega', 'Salazar', 'Fuentes', 'Cardenas', 'Delgado', 'Rios'],
     patentYear: 1901,
     patentGrantee: 'Alejandro Morales',
-    maxDepth: 3,
+    maxDepth: 5,
     rootSplit: 3,
   },
   {
+    name: 'Tract 3',
+    code: 'T3',
+    targetCardCount: 200,
     landDesc: 'Section 8, Block A, SP RR Co. Survey, Pecos County, Texas',
     surnames: ['Thompson', 'Mitchell', 'Crawford', 'Barnett', 'Hayes', 'Coleman', 'Weaver', 'Foster'],
     patentYear: 1898,
     patentGrantee: 'Samuel W. Thompson',
-    maxDepth: 4,
+    maxDepth: 6,
     rootSplit: 2,
-  },
-  {
-    landDesc: 'Section 32, Block D, T&NO RR Co. Survey, Reeves County, Texas',
-    surnames: ["O'Brien", 'Fitzgerald', 'Murphy', 'Kelly', 'Sullivan', 'Walsh', 'Brennan', 'Quinn'],
-    patentYear: 1907,
-    patentGrantee: "Patrick H. O'Brien",
-    maxDepth: 3,
-    rootSplit: 3,
   },
 ];
 
@@ -685,12 +696,78 @@ function expandStressBranch(
   }
 }
 
-// ── Stress test entry point ──────────────────────────────
+const EXTRA_STRESS_ASSIGNMENT_GRANTEES = [
+  'Blue Mesa Energy, LLC',
+  'High Plains Operating Co.',
+  'Lariat Minerals, LP',
+  'Cimarron Royalty Partners',
+] as const;
 
-export async function seedStressTestData(): Promise<{ nodeCount: number; pdfCount: number }> {
+function getTractNodes(nodes: OwnershipNode[], landDesc: string): OwnershipNode[] {
+  return nodes.filter((node) => node.landDesc === landDesc);
+}
+
+function getTractCardNodes(nodes: OwnershipNode[], landDesc: string): OwnershipNode[] {
+  return getTractNodes(nodes, landDesc).filter((node) => node.type !== 'related');
+}
+
+function addSupplementalStressCards(builder: StressBuilder, config: StressConfig): void {
+  const existingCards = getTractCardNodes(builder.nodes, config.landDesc);
+  const extraNeeded = config.targetCardCount - existingCards.length;
+  if (extraNeeded < 0) {
+    throw new Error(`Stress tract ${config.name} exceeded target card count of ${config.targetCardCount}`);
+  }
+  if (extraNeeded === 0) return;
+
+  const tractNodeIds = new Set(existingCards.map((node) => node.id));
+  const parentIds = new Set(
+    builder.nodes
+      .filter((node) => node.type !== 'related' && node.parentId && tractNodeIds.has(node.parentId))
+      .map((node) => node.parentId as string)
+  );
+  const leafTargets = existingCards.filter((node) => !parentIds.has(node.id));
+
+  if (leafTargets.length < extraNeeded) {
+    throw new Error(`Stress tract ${config.name} does not have enough leaf cards to reach ${config.targetCardCount}`);
+  }
+
+  for (let index = 0; index < extraNeeded; index += 1) {
+    const target = leafTargets[index];
+    const share = Number(target.fraction || target.initialFraction || '0');
+    if (!Number.isFinite(share) || share <= 0) {
+      throw new Error(`Stress tract ${config.name} has invalid supplemental share on ${target.id}`);
+    }
+
+    const year = config.patentYear + 120 + index;
+    const month = ((index * 3) % 12) + 1;
+    const day = ((index * 5) % 28) + 1;
+    const assignmentId = builder.addChild(target.id, share, {
+      instrument: 'Assignment',
+      date: `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`,
+      fileDate: `${year}-${String(month).padStart(2, '0')}-${String(Math.min(day + 7, 28)).padStart(2, '0')}`,
+      grantor: target.grantee,
+      grantee: EXTRA_STRESS_ASSIGNMENT_GRANTEES[index % EXTRA_STRESS_ASSIGNMENT_GRANTEES.length],
+      remarks: `Supplemental assignment added for ${config.name} desk map stress coverage.`,
+      conveyanceMode: 'all',
+      splitBasis: 'initial',
+      numerator: '1',
+      denominator: '1',
+    });
+    if (index % 2 === 0) builder.assignPdf(assignmentId);
+  }
+}
+
+export function buildStressWorkspaceData(): {
+  projectName: string;
+  nodes: OwnershipNode[];
+  deskMaps: DeskMap[];
+  activeDeskMapId: string | null;
+  instrumentTypes: string[];
+  pdfMappings: PdfMapping[];
+} {
   const builder = new StressBuilder();
 
-  // Build 4 independent title chains
+  // Build 3 independent tract-sized title chains
   for (const chain of STRESS_CHAINS) {
     const rootId = builder.addRoot(chain.landDesc, chain.patentGrantee, chain.patentYear);
     expandStressBranch(builder, rootId, 1.0, chain.maxDepth, 0, chain);
@@ -708,41 +785,54 @@ export async function seedStressTestData(): Promise<{ nodeCount: number; pdfCoun
     }
   }
 
-  const { nodes, pdfMappings } = builder;
+  for (const chain of STRESS_CHAINS) {
+    addSupplementalStressCards(builder, chain);
+  }
 
-  // Create 3 desk maps for testing desk map switching
-  const allIds = nodes.map((n) => n.id);
-  const hendersonIds = nodes.filter((n) => n.landDesc.includes('Section 14')).map((n) => n.id);
-  const thompsonIds = nodes.filter((n) => n.landDesc.includes('Section 8')).map((n) => n.id);
+  const { nodes, pdfMappings } = builder;
   const ts = Date.now();
 
-  const deskMaps = [
-    { id: `dm-all-${ts}`, name: 'All Tracts (Full)', code: 'ALL', tractId: null, nodeIds: allIds },
-    { id: `dm-s14-${ts}`, name: 'Henderson — Sec. 14, Blk B', code: 'S14', tractId: null, nodeIds: hendersonIds },
-    { id: `dm-s08-${ts}`, name: 'Thompson — Sec. 8, Blk A', code: 'S08', tractId: null, nodeIds: thompsonIds },
-  ];
+  const deskMaps = STRESS_CHAINS.map((chain, index) => ({
+    id: `dm-stress-${index + 1}-${ts}`,
+    name: chain.name,
+    code: chain.code,
+    tractId: chain.code,
+    nodeIds: getTractNodes(nodes, chain.landDesc).map((node) => node.id),
+  }));
+
+  return {
+    projectName: `Stress Test — ${deskMaps.length} Tracts`,
+    nodes,
+    deskMaps,
+    activeDeskMapId: deskMaps[0]?.id ?? null,
+    instrumentTypes: [...STRESS_INSTRUMENT_TYPES],
+    pdfMappings,
+  };
+}
+
+// ── Stress test entry point ──────────────────────────────
+
+export async function seedStressTestData(): Promise<{ nodeCount: number; pdfCount: number }> {
+  const workspace = buildStressWorkspaceData();
 
   // Load into store
   useWorkspaceStore.getState().loadWorkspace({
-    projectName: 'Stress Test — 4 Tracts',
-    nodes,
-    deskMaps,
-    activeDeskMapId: deskMaps[0].id,
-    instrumentTypes: [
-      'Patent', 'Warranty Deed', 'Mineral Deed', 'Royalty Deed',
-      'Oil & Gas Lease', 'Assignment', 'Probate', 'Affidavit of Heirship',
-      'Death Certificate', 'Quitclaim Deed', 'Correction Deed', 'Release',
-      'Will', 'Order',
-    ],
+    projectName: workspace.projectName,
+    nodes: workspace.nodes,
+    deskMaps: workspace.deskMaps,
+    activeDeskMapId: workspace.activeDeskMapId,
+    instrumentTypes: workspace.instrumentTypes,
   });
 
   // Attach PDFs from TORS_Documents/
   let pdfCount = 0;
-  for (const mapping of pdfMappings) {
+  for (const mapping of workspace.pdfMappings) {
     const ok = await attachPdf(mapping.nodeId, mapping.fileName);
     if (ok) pdfCount++;
   }
 
-  console.log(`[stress] Built ${nodes.length} nodes, attached ${pdfCount} PDFs, ${deskMaps.length} desk maps`);
-  return { nodeCount: nodes.length, pdfCount };
+  console.log(
+    `[stress] Built ${workspace.nodes.length} nodes, attached ${pdfCount} PDFs, ${workspace.deskMaps.length} desk maps`
+  );
+  return { nodeCount: workspace.nodes.length, pdfCount };
 }

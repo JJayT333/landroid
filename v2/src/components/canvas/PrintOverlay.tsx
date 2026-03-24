@@ -10,8 +10,14 @@
  */
 import { formatAsFraction } from '../../engine/fraction-display';
 import { d } from '../../engine/decimal';
-import { getPageDimensions, type PageOrientation } from './PageGrid';
-import type { OwnershipNodeData } from '../../types/flowchart';
+import {
+  clampNodeScale,
+  getOwnershipNodeDimensions,
+} from '../../engine/flowchart-metrics';
+import { getPageDimensions, getPrintPageSize } from '../../engine/flowchart-pages';
+import type { FlowEdgeData, OwnershipNodeData } from '../../types/flowchart';
+import { getOwnershipEdgeGeometry } from './ownership-edge-geometry';
+import type { PageOrientation, PageSizeId } from '../../types/flowchart';
 
 // ── Types ───────────────────────────────────────────────
 
@@ -25,6 +31,11 @@ interface PrintNode {
 interface PrintEdge {
   source: string;
   target: string;
+  data?: FlowEdgeData;
+  style?: {
+    stroke?: string;
+    strokeWidth?: number;
+  };
 }
 
 interface PrintOverlayProps {
@@ -33,14 +44,28 @@ interface PrintOverlayProps {
   cols: number;
   rows: number;
   orientation: PageOrientation;
+  pageSize: PageSizeId;
 }
 
 // ── Lightweight card (no React Flow context) ────────────
 
-const NODE_WIDTH = 288;
-const NODE_HEIGHT = 160;
-
 function PrintCard({ data }: { data: OwnershipNodeData }) {
+  const scale = clampNodeScale(data.nodeScale ?? 1);
+  const metrics = getOwnershipNodeDimensions(scale);
+  const borderRadius = 8 * scale;
+  const borderWidth = Math.max(1, 2 * scale);
+  const headerPaddingX = 12 * scale;
+  const headerPaddingY = 6 * scale;
+  const bodyPaddingX = 12 * scale;
+  const bodyPaddingY = 8 * scale;
+  const footerPaddingX = 12 * scale;
+  const footerPaddingY = 8 * scale;
+  const headerLabelSize = 10 * scale;
+  const dateSize = 10 * scale;
+  const fromSize = 10 * scale;
+  const nameSize = 14 * scale;
+  const fractionLabelSize = 10 * scale;
+  const fractionValueSize = 14 * scale;
   const relShare = d(data.relativeShare);
   const absInterest = d(data.grantFraction);
   const remaining = d(data.remainingFraction);
@@ -56,19 +81,19 @@ function PrintCard({ data }: { data: OwnershipNodeData }) {
   return (
     <div
       style={{
-        width: NODE_WIDTH,
-        borderRadius: 8,
-        border: '2px solid #d4c5a9',
+        width: metrics.width,
+        minHeight: metrics.height,
+        borderRadius,
+        border: `${borderWidth}px solid #d4c5a9`,
         background: '#faf3e8',
         color: '#2c1810',
-        fontSize: 12,
         overflow: 'hidden',
       }}
     >
       {/* Header */}
       <div
         style={{
-          padding: '4px 10px',
+          padding: `${headerPaddingY}px ${headerPaddingX}px`,
           borderBottom: '1px solid #d4c5a9',
           background: '#f0e6d3',
           display: 'flex',
@@ -78,11 +103,11 @@ function PrintCard({ data }: { data: OwnershipNodeData }) {
       >
         <span
           style={{
-            fontSize: 10,
+            fontSize: headerLabelSize,
             fontWeight: 600,
             color: '#5c3d2e',
             textTransform: 'uppercase',
-            letterSpacing: '0.05em',
+            letterSpacing: `${0.05 * scale}em`,
           }}
         >
           {data.instrument || 'Document'}
@@ -90,7 +115,7 @@ function PrintCard({ data }: { data: OwnershipNodeData }) {
         {data.date && (
           <span
             style={{
-              fontSize: 10,
+              fontSize: dateSize,
               color: '#5c3d2e',
               fontFamily: '"Courier Prime", monospace',
             }}
@@ -101,15 +126,15 @@ function PrintCard({ data }: { data: OwnershipNodeData }) {
       </div>
 
       {/* Body */}
-      <div style={{ padding: '6px 10px' }}>
+      <div style={{ padding: `${bodyPaddingY}px ${bodyPaddingX}px` }}>
         {data.grantor && (
-          <div style={{ fontSize: 10, color: '#5c3d2e' }}>
+          <div style={{ fontSize: fromSize, color: '#5c3d2e' }}>
             From: {data.grantor}
           </div>
         )}
         <div
           style={{
-            fontSize: 13,
+            fontSize: nameSize,
             fontWeight: 700,
             fontFamily: '"Playfair Display", Georgia, serif',
           }}
@@ -121,7 +146,7 @@ function PrintCard({ data }: { data: OwnershipNodeData }) {
       {/* Fractions */}
       <div
         style={{
-          padding: '6px 10px',
+          padding: `${footerPaddingY}px ${footerPaddingX}px`,
           borderTop: '1px solid #d4c5a9',
           background: '#f5f0e1',
         }}
@@ -135,17 +160,17 @@ function PrintCard({ data }: { data: OwnershipNodeData }) {
         >
           <span
             style={{
-              fontSize: 10,
+              fontSize: fractionLabelSize,
               color: '#5c3d2e',
               textTransform: 'uppercase',
-              letterSpacing: '0.05em',
+              letterSpacing: `${0.05 * scale}em`,
             }}
           >
             Granted
           </span>
           <span
             style={{
-              fontSize: 13,
+              fontSize: fractionValueSize,
               fontFamily: '"Courier Prime", monospace',
               fontWeight: 600,
               color: '#8b4513',
@@ -163,17 +188,17 @@ function PrintCard({ data }: { data: OwnershipNodeData }) {
         >
           <span
             style={{
-              fontSize: 10,
+              fontSize: fractionLabelSize,
               color: '#5c3d2e',
               textTransform: 'uppercase',
-              letterSpacing: '0.05em',
+              letterSpacing: `${0.05 * scale}em`,
             }}
           >
             Of Whole
           </span>
           <span
             style={{
-              fontSize: 13,
+              fontSize: fractionValueSize,
               fontFamily: '"Courier Prime", monospace',
               fontWeight: 600,
               color: '#2c1810',
@@ -186,17 +211,17 @@ function PrintCard({ data }: { data: OwnershipNodeData }) {
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
             <span
               style={{
-                fontSize: 10,
+                fontSize: fractionLabelSize,
                 color: '#5c3d2e',
                 textTransform: 'uppercase',
-                letterSpacing: '0.05em',
+                letterSpacing: `${0.05 * scale}em`,
               }}
             >
               {isFullyConveyed ? 'Conveyed All' : 'Remaining'}
             </span>
             <span
               style={{
-                fontSize: 13,
+                fontSize: fractionValueSize,
                 fontFamily: '"Courier Prime", monospace',
                 fontWeight: 600,
                 color: isFullyConveyed ? '#5c3d2e' : '#b22222',
@@ -229,31 +254,40 @@ function renderEdges(
       const tgt = nodeMap.get(edge.target);
       if (!src || !tgt) return null;
 
-      const srcH = src.measured?.height ?? NODE_HEIGHT;
+      const srcDims = getOwnershipNodeDimensions(src.data.nodeScale ?? 1);
+      const tgtDims = getOwnershipNodeDimensions(tgt.data.nodeScale ?? 1);
+      const srcW = src.measured?.width ?? srcDims.width;
+      const srcH = src.measured?.height ?? srcDims.height;
+      const tgtW = tgt.measured?.width ?? tgtDims.width;
 
       // Source bottom center → target top center
-      const x1 = src.position.x + NODE_WIDTH / 2 - offsetX;
+      const x1 = src.position.x + srcW / 2 - offsetX;
       const y1 = src.position.y + srcH - offsetY;
-      const x2 = tgt.position.x + NODE_WIDTH / 2 - offsetX;
+      const x2 = tgt.position.x + tgtW / 2 - offsetX;
       const y2 = tgt.position.y - offsetY;
 
       // Skip edges entirely outside this page
-      if (x1 < -NODE_WIDTH && x2 < -NODE_WIDTH) return null;
-      if (x1 > pw + NODE_WIDTH && x2 > pw + NODE_WIDTH) return null;
-      if (y1 < -NODE_HEIGHT && y2 < -NODE_HEIGHT) return null;
-      if (y1 > ph + NODE_HEIGHT && y2 > ph + NODE_HEIGHT) return null;
+      if (x1 < -srcW && x2 < -tgtW) return null;
+      if (x1 > pw + srcW && x2 > pw + tgtW) return null;
+      if (y1 < -srcH && y2 < -tgtDims.height) return null;
+      if (y1 > ph + srcH && y2 > ph + tgtDims.height) return null;
 
-      // Simple step path: down, across, down
-      const midY = (y1 + y2) / 2;
-      const pathD = `M ${x1} ${y1} L ${x1} ${midY} L ${x2} ${midY} L ${x2} ${y2}`;
+      const geometry = getOwnershipEdgeGeometry({
+        sourceX: x1,
+        sourceY: y1,
+        targetX: x2,
+        targetY: y2,
+        edgeData: edge.data,
+        strokeWidth: edge.style?.strokeWidth,
+      });
 
       return (
         <path
           key={i}
-          d={pathD}
+          d={geometry.path}
           fill="none"
-          stroke="#8b4513"
-          strokeWidth={1.5}
+          stroke={edge.style?.stroke ?? '#8b4513'}
+          strokeWidth={geometry.strokeWidth}
         />
       );
     })
@@ -268,8 +302,10 @@ export default function PrintOverlay({
   cols,
   rows,
   orientation,
+  pageSize,
 }: PrintOverlayProps) {
-  const { pw, ph } = getPageDimensions(orientation);
+  const { pw, ph } = getPageDimensions(pageSize, orientation);
+  const printPageSize = getPrintPageSize(pageSize, orientation);
 
   const tiles: { row: number; col: number; label: string }[] = [];
   for (let row = 0; row < rows; row++) {
@@ -285,7 +321,7 @@ export default function PrintOverlay({
   return (
     <div className="print-only" id="print-overlay">
       {/* Dynamic @page orientation */}
-      <style>{`@media print { @page { size: letter ${orientation}; margin: 0; } }`}</style>
+      <style>{`@media print { @page { size: ${printPageSize}; margin: 0; } }`}</style>
       {tiles.map((tile, idx) => {
         const offsetX = tile.col * pw;
         const offsetY = tile.row * ph;
@@ -319,12 +355,14 @@ export default function PrintOverlay({
 
             {/* Node cards */}
             {nodes.map((node) => {
+              const dims = getOwnershipNodeDimensions(node.data.nodeScale ?? 1);
               const nx = node.position.x - offsetX;
               const ny = node.position.y - offsetY;
-              const nh = node.measured?.height ?? NODE_HEIGHT;
+              const nw = node.measured?.width ?? dims.width;
+              const nh = node.measured?.height ?? dims.height;
 
               // Skip nodes entirely outside this page
-              if (nx + NODE_WIDTH < 0 || nx > pw) return null;
+              if (nx + nw < 0 || nx > pw) return null;
               if (ny + nh < 0 || ny > ph) return null;
 
               return (

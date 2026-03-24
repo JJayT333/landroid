@@ -45,15 +45,15 @@ export default function DeskMapTabs() {
   if (deskMaps.length === 0) return null;
 
   return (
-    <div className="flex items-center gap-1 px-3 py-1.5 bg-parchment-dark/50 border-b border-ledger-line overflow-x-auto">
+    <div className="flex items-center gap-3 px-4 py-3 bg-parchment border-b border-ledger-line overflow-x-auto">
       {deskMaps.map((dm) => (
         <div
           key={dm.id}
           onClick={() => setActiveDeskMap(dm.id)}
-          className={`group flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium cursor-pointer transition-colors ${
+          className={`group flex items-center gap-2 px-6 py-2.5 rounded-2xl text-sm font-semibold whitespace-nowrap cursor-pointer transition-colors ${
             activeDeskMapId === dm.id
               ? 'bg-leather text-parchment'
-              : 'text-ink-light hover:bg-parchment-dark'
+              : 'text-ink-light hover:bg-parchment-dark/70'
           }`}
         >
           {editingId === dm.id ? (
@@ -67,7 +67,7 @@ export default function DeskMapTabs() {
                 if (e.key === 'Escape') setEditingId(null);
               }}
               onClick={(e) => e.stopPropagation()}
-              className="w-24 px-1 py-0.5 rounded text-xs bg-parchment text-ink border border-ledger-line outline-none"
+              className="w-36 px-2 py-1 rounded-lg text-sm bg-parchment text-ink border border-ledger-line outline-none"
             />
           ) : (
             <span onDoubleClick={() => handleStartRename(dm.id, dm.name)}>
@@ -77,7 +77,7 @@ export default function DeskMapTabs() {
           {activeDeskMapId === dm.id && editingId !== dm.id && (
             <button
               onClick={(e) => handleDelete(dm.id, e)}
-              className="opacity-0 group-hover:opacity-100 text-parchment/60 hover:text-parchment text-[10px] transition-opacity"
+              className="opacity-0 group-hover:opacity-100 text-parchment/60 hover:text-parchment text-xs transition-opacity"
             >
               ×
             </button>
@@ -86,7 +86,7 @@ export default function DeskMapTabs() {
       ))}
       <button
         onClick={handleCreate}
-        className="px-2.5 py-1 rounded-lg text-xs font-semibold text-leather hover:bg-leather/10 border border-dashed border-leather/30 transition-colors"
+        className="px-5 py-2.5 rounded-2xl text-sm font-semibold whitespace-nowrap text-leather hover:bg-leather/10 border border-dashed border-leather/40 transition-colors"
         title="Add new desk map"
       >
         + Add Tract

@@ -11,17 +11,11 @@
  *
  * Performance: O(n) for n nodes — handles 1000+ nodes.
  */
+import ELK, { type ElkNode, type ElkExtendedEdge } from 'elkjs/lib/elk.bundled.js';
 import type { OwnershipNode } from '../types/node';
-import type { OwnershipNodeData } from '../types/flowchart';
+import type { FlowEdgeData, OwnershipNodeData } from '../types/flowchart';
 import { d, serialize } from './decimal';
-
-// ── Layout constants ────────────────────────────────────────
-
-const NODE_WIDTH = 288;   // px — matches the w-72 in OwnershipNode
-const NODE_HEIGHT = 160;  // px — approximate rendered height
-const H_GAP = 32;         // horizontal gap between sibling subtrees
-const V_GAP = 48;         // vertical gap between parent and children
-const RELATED_OFFSET_X = NODE_WIDTH + 16; // related docs sit beside their parent
+import { getTreeLayoutMetrics } from './flowchart-metrics';
 
 // ── Types ───────────────────────────────────────────────────
 
@@ -36,15 +30,24 @@ export interface LayoutEdge {
   id: string;
   source: string;
   target: string;
-  type: 'smoothstep';
+  type: 'ownership';
   animated: boolean;
   style: { stroke: string; strokeWidth: number };
+  data?: FlowEdgeData;
 }
 
 export interface LayoutResult {
   flowNodes: LayoutNode[];
   flowEdges: LayoutEdge[];
 }
+
+export interface TreeLayoutOptions {
+  horizontalSpacingFactor?: number;
+  verticalSpacingFactor?: number;
+  nodeScale?: number;
+}
+
+const elk = new ELK();
 
 // ── Internal tree node for layout computation ───────────────
 
@@ -102,24 +105,26 @@ function buildTree(nodes: OwnershipNode[]): TreeNode[] {
 
 // ── Compute subtree widths bottom-up ────────────────────────
 
-function computeWidths(tree: TreeNode): void {
+function computeWidths(tree: TreeNode, metrics: ReturnType<typeof getTreeLayoutMetrics>): void {
+  const { nodeWidth, horizontalGap, relatedOffsetX } = metrics;
+
   if (tree.children.length === 0) {
     // Leaf node: width = node + any related docs beside it
-    tree.subtreeWidth = NODE_WIDTH + (tree.relatedDocs.length > 0 ? RELATED_OFFSET_X : 0);
+    tree.subtreeWidth = nodeWidth + (tree.relatedDocs.length > 0 ? relatedOffsetX : 0);
     return;
   }
 
   for (const child of tree.children) {
-    computeWidths(child);
+    computeWidths(child, metrics);
   }
 
   // Width = sum of children widths + gaps
   const childrenTotalWidth = tree.children.reduce(
     (sum, child) => sum + child.subtreeWidth, 0
-  ) + H_GAP * (tree.children.length - 1);
+  ) + horizontalGap * (tree.children.length - 1);
 
   // Parent node needs at least NODE_WIDTH (+ related offset)
-  const selfWidth = NODE_WIDTH + (tree.relatedDocs.length > 0 ? RELATED_OFFSET_X : 0);
+  const selfWidth = nodeWidth + (tree.relatedDocs.length > 0 ? relatedOffsetX : 0);
 
   tree.subtreeWidth = Math.max(childrenTotalWidth, selfWidth);
 }
@@ -134,20 +139,12 @@ function computeRelativeShare(node: OwnershipNode, parentInitialFraction: string
   return serialize(nodeDec.div(parentDec));
 }
 
-function positionNodes(
-  tree: TreeNode,
-  centerX: number,
-  y: number,
-  result: LayoutResult,
-  parentId: string | null,
+function createOwnershipNodeData(
+  node: OwnershipNode,
   parentInitialFraction: string | null,
-): void {
-  const x = centerX - NODE_WIDTH / 2;
-
-  // Create flow node
-  const node = tree.ownershipNode;
-  const relativeShare = computeRelativeShare(node, parentInitialFraction);
-  const data = {
+  nodeScale = 1,
+): OwnershipNodeData {
+  return {
     label: node.grantee || node.instrument || 'Document',
     grantee: node.grantee,
     grantor: node.grantor,
@@ -155,9 +152,27 @@ function positionNodes(
     date: node.date || node.fileDate,
     grantFraction: node.initialFraction,
     remainingFraction: node.fraction,
-    relativeShare,
+    relativeShare: computeRelativeShare(node, parentInitialFraction),
     nodeId: node.id,
-  } satisfies OwnershipNodeData;
+    nodeScale,
+  };
+}
+
+function positionNodes(
+  tree: TreeNode,
+  centerX: number,
+  y: number,
+  result: LayoutResult,
+  parentId: string | null,
+  parentInitialFraction: string | null,
+  metrics: ReturnType<typeof getTreeLayoutMetrics>,
+): void {
+  const { nodeWidth, nodeHeight, verticalGap, horizontalGap, relatedOffsetX } = metrics;
+  const x = centerX - nodeWidth / 2;
+
+  // Create flow node
+  const node = tree.ownershipNode;
+  const data = createOwnershipNodeData(node, parentInitialFraction, metrics.nodeScale);
 
   result.flowNodes.push({
     id: node.id,
@@ -172,9 +187,10 @@ function positionNodes(
       id: `e-${parentId}-${node.id}`,
       source: parentId,
       target: node.id,
-      type: 'smoothstep',
+      type: 'ownership',
       animated: false,
       style: { stroke: '#8b4513', strokeWidth: 2 },
+      data: { edgeScale: 1, variant: 'primary' },
     });
   }
 
@@ -182,20 +198,9 @@ function positionNodes(
   for (let i = 0; i < tree.relatedDocs.length; i++) {
     const rel = tree.relatedDocs[i];
     const relNode = rel.ownershipNode;
-    const relX = x + RELATED_OFFSET_X;
-    const relY = y + i * (NODE_HEIGHT * 0.6);
-
-    const relData = {
-      label: relNode.instrument || 'Related',
-      grantee: relNode.grantee,
-      grantor: relNode.grantor,
-      instrument: relNode.instrument,
-      date: relNode.date || relNode.fileDate,
-      grantFraction: relNode.initialFraction,
-      remainingFraction: relNode.fraction,
-      relativeShare: computeRelativeShare(relNode, node.initialFraction),
-      nodeId: relNode.id,
-    } satisfies OwnershipNodeData;
+    const relX = x + relatedOffsetX;
+    const relY = y + i * (nodeHeight * 0.6);
+    const relData = createOwnershipNodeData(relNode, node.initialFraction, metrics.nodeScale);
 
     result.flowNodes.push({
       id: relNode.id,
@@ -208,26 +213,27 @@ function positionNodes(
       id: `e-${node.id}-${relNode.id}`,
       source: node.id,
       target: relNode.id,
-      type: 'smoothstep',
+      type: 'ownership',
       animated: false,
       style: { stroke: '#a0522d', strokeWidth: 1, },
+      data: { edgeScale: 1, variant: 'related' },
     });
   }
 
   // Position children centered below
   if (tree.children.length === 0) return;
 
-  const childY = y + NODE_HEIGHT + V_GAP;
+  const childY = y + nodeHeight + verticalGap;
   const totalChildWidth = tree.children.reduce(
     (sum, child) => sum + child.subtreeWidth, 0
-  ) + H_GAP * (tree.children.length - 1);
+  ) + horizontalGap * (tree.children.length - 1);
 
   let childCenterX = centerX - totalChildWidth / 2;
 
   for (const child of tree.children) {
     const childCenter = childCenterX + child.subtreeWidth / 2;
-    positionNodes(child, childCenter, childY, result, node.id, node.initialFraction);
-    childCenterX += child.subtreeWidth + H_GAP;
+    positionNodes(child, childCenter, childY, result, node.id, node.initialFraction, metrics);
+    childCenterX += child.subtreeWidth + horizontalGap;
   }
 }
 
@@ -239,11 +245,16 @@ function positionNodes(
  * All nodes land on a single canvas. No pages, no sheets.
  * The tree is compact and hierarchical. Zoom out to see the whole thing.
  */
-export function layoutOwnershipTree(nodes: OwnershipNode[]): LayoutResult {
+export function layoutOwnershipTree(nodes: OwnershipNode[], options: TreeLayoutOptions = {}): LayoutResult {
   if (nodes.length === 0) return { flowNodes: [], flowEdges: [] };
 
+  const metrics = getTreeLayoutMetrics(
+    options.horizontalSpacingFactor,
+    options.verticalSpacingFactor,
+    options.nodeScale
+  );
   const trees = buildTree(nodes);
-  for (const tree of trees) computeWidths(tree);
+  for (const tree of trees) computeWidths(tree, metrics);
 
   const result: LayoutResult = { flowNodes: [], flowEdges: [] };
 
@@ -251,8 +262,148 @@ export function layoutOwnershipTree(nodes: OwnershipNode[]): LayoutResult {
   let offsetX = 0;
   for (const tree of trees) {
     const centerX = offsetX + tree.subtreeWidth / 2;
-    positionNodes(tree, centerX, 0, result, null, null);
-    offsetX += tree.subtreeWidth + H_GAP * 4;
+    positionNodes(tree, centerX, 0, result, null, null, metrics);
+    offsetX += tree.subtreeWidth + metrics.rootGap;
+  }
+
+  return result;
+}
+
+function createCoreEdgeStyle(): LayoutEdge['style'] {
+  return { stroke: '#8b4513', strokeWidth: 2 };
+}
+
+function createRelatedEdgeStyle(): LayoutEdge['style'] {
+  return { stroke: '#a0522d', strokeWidth: 1 };
+}
+
+export async function layoutOwnershipTreeWithElk(
+  nodes: OwnershipNode[],
+  options: TreeLayoutOptions = {},
+): Promise<LayoutResult> {
+  if (nodes.length === 0) return { flowNodes: [], flowEdges: [] };
+
+  const metrics = getTreeLayoutMetrics(
+    options.horizontalSpacingFactor,
+    options.verticalSpacingFactor,
+    options.nodeScale
+  );
+  const allNodes = new Map(nodes.map((node) => [node.id, node]));
+  const ownershipNodes = nodes.filter((node) => node.type !== 'related');
+  const relatedByParent = new Map<string, OwnershipNode[]>();
+
+  for (const node of nodes) {
+    if (node.type !== 'related' || !node.parentId || node.parentId === 'unlinked') continue;
+    if (!relatedByParent.has(node.parentId)) relatedByParent.set(node.parentId, []);
+    relatedByParent.get(node.parentId)!.push(node);
+  }
+
+  const elkGraph: ElkNode = {
+    id: 'root',
+    layoutOptions: {
+      'elk.algorithm': 'layered',
+      'elk.direction': 'DOWN',
+      'elk.edgeRouting': 'ORTHOGONAL',
+      'elk.spacing.nodeNode': String(metrics.horizontalGap),
+      'elk.layered.spacing.nodeNodeBetweenLayers': String(metrics.elkLayerGap),
+      'elk.layered.considerModelOrder.strategy': 'NODES_AND_EDGES',
+      'elk.padding': '[top=24,left=24,bottom=24,right=24]',
+    },
+    children: ownershipNodes.map((node) => ({
+      id: node.id,
+      width: metrics.nodeWidth,
+      height: metrics.nodeHeight,
+    })),
+    edges: ownershipNodes
+      .filter((node) => node.parentId && node.parentId !== 'unlinked')
+      .map<ElkExtendedEdge>((node) => ({
+        id: `e-${node.parentId}-${node.id}`,
+        sources: [node.parentId as string],
+        targets: [node.id],
+      })),
+  };
+
+  let layout: Awaited<ReturnType<typeof elk.layout<ElkNode>>>;
+  try {
+    layout = await elk.layout(elkGraph);
+  } catch {
+    return layoutOwnershipTree(nodes, options);
+  }
+
+  const positionedNodes = new Map((layout.children ?? []).map((node) => [node.id, node]));
+  if (positionedNodes.size !== ownershipNodes.length) {
+    return layoutOwnershipTree(nodes, options);
+  }
+
+  const centeredLayout = layoutOwnershipTree(nodes, options);
+  const centeredPositions = new Map(
+    centeredLayout.flowNodes.map((node) => [node.id, node.position])
+  );
+
+  const result: LayoutResult = { flowNodes: [], flowEdges: [] };
+
+  for (const node of ownershipNodes) {
+    const positioned = positionedNodes.get(node.id);
+    const centeredPosition = centeredPositions.get(node.id);
+    if (!positioned) continue;
+
+    result.flowNodes.push({
+      id: node.id,
+      type: 'ownership',
+      position: {
+        x: centeredPosition?.x ?? positioned.x ?? 0,
+        y: positioned.y ?? 0,
+      },
+      data: createOwnershipNodeData(
+        node,
+        node.parentId && node.parentId !== 'unlinked'
+          ? allNodes.get(node.parentId)?.initialFraction ?? null
+          : null,
+        metrics.nodeScale,
+      ) as OwnershipNodeData & Record<string, unknown>,
+    });
+
+    if (node.parentId && node.parentId !== 'unlinked') {
+      result.flowEdges.push({
+        id: `e-${node.parentId}-${node.id}`,
+        source: node.parentId,
+        target: node.id,
+        type: 'ownership',
+        animated: false,
+        style: createCoreEdgeStyle(),
+        data: { edgeScale: 1, variant: 'primary' },
+      });
+    }
+  }
+
+  for (const [parentId, relatedDocs] of relatedByParent) {
+    const parentFlowNode = result.flowNodes.find((node) => node.id === parentId);
+    const parentSource = allNodes.get(parentId);
+    if (!parentFlowNode || !parentSource) continue;
+
+    for (let index = 0; index < relatedDocs.length; index += 1) {
+      const relNode = relatedDocs[index];
+      const centeredPosition = centeredPositions.get(relNode.id);
+      result.flowNodes.push({
+        id: relNode.id,
+        type: 'ownership',
+        position: {
+          x: centeredPosition?.x ?? parentFlowNode.position.x + metrics.relatedOffsetX,
+          y: centeredPosition?.y ?? parentFlowNode.position.y + index * (metrics.nodeHeight * 0.6),
+        },
+        data: createOwnershipNodeData(relNode, parentSource.initialFraction, metrics.nodeScale) as OwnershipNodeData & Record<string, unknown>,
+      });
+
+      result.flowEdges.push({
+        id: `e-${parentId}-${relNode.id}`,
+        source: parentId,
+        target: relNode.id,
+        type: 'ownership',
+        animated: false,
+        style: createRelatedEdgeStyle(),
+        data: { edgeScale: 1, variant: 'related' },
+      });
+    }
   }
 
   return result;

@@ -4,6 +4,12 @@
  * Reads tool/grid/snap state directly from canvas-store.
  * Callbacks for actions needing React Flow instance are passed as props.
  */
+import { PAGE_SIZE_DEFINITIONS, getPageSizeOptionLabel } from '../../engine/flowchart-pages';
+import {
+  MAX_TREE_SPACING_FACTOR,
+  MIN_TREE_SPACING_FACTOR,
+  TREE_SPACING_STEP,
+} from '../../engine/flowchart-metrics';
 import { useCanvasStore } from '../../store/canvas-store';
 import type { FlowTool } from '../../types/flowchart';
 
@@ -11,6 +17,8 @@ interface CanvasToolbarProps {
   onImportTree: () => void;
   onFitToGrid: () => void;
   onResize: () => void;
+  onHorizontalSpacingChange: (value: number) => void;
+  onVerticalSpacingChange: (value: number) => void;
   resizeMode: boolean;
   onPrint: () => void;
 }
@@ -65,10 +73,59 @@ function StepperButton({
   );
 }
 
+function FactorStepperButton({
+  label,
+  value,
+  min,
+  max,
+  step,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+  onChange: (v: number) => void;
+}) {
+  const decimals = 2;
+  const decreaseValue = Number(Math.max(min, value - step).toFixed(decimals));
+  const increaseValue = Number(Math.min(max, value + step).toFixed(decimals));
+
+  return (
+    <div className="flex items-center gap-0.5">
+      <span className="text-[10px] text-ink-light uppercase tracking-wider mr-1">
+        {label}
+      </span>
+      <button
+        onClick={() => onChange(decreaseValue)}
+        disabled={value <= min}
+        className="w-5 h-5 rounded text-xs font-bold text-ink-light hover:bg-parchment-dark disabled:opacity-30 transition-colors flex items-center justify-center"
+        title={`Decrease ${label.toLowerCase()} spacing`}
+      >
+        -
+      </button>
+      <span className="text-xs font-mono font-semibold text-ink w-10 text-center">
+        {value.toFixed(decimals)}x
+      </span>
+      <button
+        onClick={() => onChange(increaseValue)}
+        disabled={value >= max}
+        className="w-5 h-5 rounded text-xs font-bold text-ink-light hover:bg-parchment-dark disabled:opacity-30 transition-colors flex items-center justify-center"
+        title={`Increase ${label.toLowerCase()} spacing`}
+      >
+        +
+      </button>
+    </div>
+  );
+}
+
 export default function CanvasToolbar({
   onImportTree,
   onFitToGrid,
   onResize,
+  onHorizontalSpacingChange,
+  onVerticalSpacingChange,
   resizeMode,
   onPrint,
 }: CanvasToolbarProps) {
@@ -80,7 +137,11 @@ export default function CanvasToolbar({
   const gridRows = useCanvasStore((s) => s.gridRows);
   const setGridRows = useCanvasStore((s) => s.setGridRows);
   const orientation = useCanvasStore((s) => s.orientation);
+  const pageSize = useCanvasStore((s) => s.pageSize);
+  const setPageSize = useCanvasStore((s) => s.setPageSize);
   const setOrientation = useCanvasStore((s) => s.setOrientation);
+  const horizontalSpacingFactor = useCanvasStore((s) => s.horizontalSpacingFactor);
+  const verticalSpacingFactor = useCanvasStore((s) => s.verticalSpacingFactor);
   const snapToGrid = useCanvasStore((s) => s.snapToGrid);
   const setSnapToGrid = useCanvasStore((s) => s.setSnapToGrid);
   const selectAll = useCanvasStore((s) => s.selectAll);
@@ -158,6 +219,21 @@ export default function CanvasToolbar({
       <div className="w-px h-6 bg-ledger-line mx-1" />
 
       {/* Page grid controls */}
+      <label className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-ink-light">
+        <span>Paper</span>
+        <select
+          value={pageSize}
+          onChange={(e) => setPageSize(e.target.value as typeof pageSize)}
+          className="rounded-lg border border-ledger-line bg-parchment px-2 py-1 text-[11px] font-medium text-ink outline-none"
+          title="Canvas paper size"
+        >
+          {PAGE_SIZE_DEFINITIONS.map((definition) => (
+            <option key={definition.id} value={definition.id}>
+              {getPageSizeOptionLabel(definition.id)}
+            </option>
+          ))}
+        </select>
+      </label>
       <StepperButton
         label="Col"
         value={gridCols}
@@ -186,6 +262,22 @@ export default function CanvasToolbar({
       <div className="w-px h-6 bg-ledger-line mx-1" />
 
       {/* Tree positioning */}
+      <FactorStepperButton
+        label="H"
+        value={horizontalSpacingFactor}
+        min={MIN_TREE_SPACING_FACTOR}
+        max={MAX_TREE_SPACING_FACTOR}
+        step={TREE_SPACING_STEP}
+        onChange={onHorizontalSpacingChange}
+      />
+      <FactorStepperButton
+        label="V"
+        value={verticalSpacingFactor}
+        min={MIN_TREE_SPACING_FACTOR}
+        max={MAX_TREE_SPACING_FACTOR}
+        step={TREE_SPACING_STEP}
+        onChange={onVerticalSpacingChange}
+      />
       <button
         onClick={onFitToGrid}
         className="px-3 py-1.5 rounded-lg text-xs font-semibold text-leather hover:bg-leather/10 transition-colors"

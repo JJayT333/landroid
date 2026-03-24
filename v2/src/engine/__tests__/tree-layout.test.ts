@@ -6,7 +6,7 @@
  * on a single canvas — no pages, no sheets.
  */
 import { describe, it, expect } from 'vitest';
-import { layoutOwnershipTree } from '../tree-layout';
+import { layoutOwnershipTree, layoutOwnershipTreeWithElk } from '../tree-layout';
 import { createBlankNode } from '../../types/node';
 import type { OwnershipNode } from '../../types/node';
 
@@ -260,5 +260,235 @@ describe('layoutOwnershipTree', () => {
 
     expect(result.flowNodes.length).toBe(1000);
     expect(elapsed).toBeLessThan(2000);
+  });
+
+  it('applies independent horizontal and vertical spacing factors', () => {
+    const nodes = [
+      makeNode('root', null, '1.0', '0.5'),
+      makeNode('a', 'root', '0.25', '0.25'),
+      makeNode('b', 'root', '0.25', '0.25'),
+    ];
+
+    const defaultLayout = layoutOwnershipTree(nodes);
+    const spacedLayout = layoutOwnershipTree(nodes, {
+      horizontalSpacingFactor: 2,
+      verticalSpacingFactor: 1.5,
+    });
+
+    const defaultA = defaultLayout.flowNodes.find((node) => node.id === 'a')!;
+    const defaultB = defaultLayout.flowNodes.find((node) => node.id === 'b')!;
+    const spacedRoot = spacedLayout.flowNodes.find((node) => node.id === 'root')!;
+    const spacedA = spacedLayout.flowNodes.find((node) => node.id === 'a')!;
+    const spacedB = spacedLayout.flowNodes.find((node) => node.id === 'b')!;
+
+    expect(spacedRoot.position.y).toBe(0);
+    expect(spacedB.position.x - spacedA.position.x).toBeGreaterThan(
+      defaultB.position.x - defaultA.position.x
+    );
+    expect(spacedA.position.y).toBeGreaterThan(defaultA.position.y);
+  });
+
+  it('scales layout geometry with node scale', () => {
+    const nodes = [
+      makeNode('root', null, '1.0', '0.5'),
+      makeNode('a', 'root', '0.25', '0.25'),
+      makeNode('b', 'root', '0.25', '0.25'),
+    ];
+
+    const defaultLayout = layoutOwnershipTree(nodes);
+    const scaledLayout = layoutOwnershipTree(nodes, { nodeScale: 0.5 });
+
+    const defaultA = defaultLayout.flowNodes.find((node) => node.id === 'a')!;
+    const defaultB = defaultLayout.flowNodes.find((node) => node.id === 'b')!;
+    const scaledRoot = scaledLayout.flowNodes.find((node) => node.id === 'root')!;
+    const scaledA = scaledLayout.flowNodes.find((node) => node.id === 'a')!;
+    const scaledB = scaledLayout.flowNodes.find((node) => node.id === 'b')!;
+
+    expect(scaledRoot.data.nodeScale).toBe(0.5);
+    expect(scaledB.position.x - scaledA.position.x).toBeLessThan(
+      defaultB.position.x - defaultA.position.x
+    );
+    expect(scaledA.position.y).toBeLessThan(defaultA.position.y);
+  });
+
+  it('still applies spacing changes after the chart is scaled down', () => {
+    const nodes = [
+      makeNode('root', null, '1.0', '0.5'),
+      makeNode('a', 'root', '0.25', '0.25'),
+      makeNode('b', 'root', '0.25', '0.25'),
+    ];
+
+    const compactLayout = layoutOwnershipTree(nodes, {
+      nodeScale: 0.35,
+      horizontalSpacingFactor: 1,
+      verticalSpacingFactor: 1,
+    });
+    const spacedLayout = layoutOwnershipTree(nodes, {
+      nodeScale: 0.35,
+      horizontalSpacingFactor: 1.75,
+      verticalSpacingFactor: 1.75,
+    });
+
+    const compactA = compactLayout.flowNodes.find((node) => node.id === 'a')!;
+    const compactB = compactLayout.flowNodes.find((node) => node.id === 'b')!;
+    const spacedA = spacedLayout.flowNodes.find((node) => node.id === 'a')!;
+    const spacedB = spacedLayout.flowNodes.find((node) => node.id === 'b')!;
+
+    expect(spacedB.position.x - spacedA.position.x).toBeGreaterThan(
+      compactB.position.x - compactA.position.x
+    );
+    expect(spacedA.position.y).toBeGreaterThan(compactA.position.y);
+  });
+});
+
+describe('layoutOwnershipTreeWithElk', () => {
+  it('empty array returns empty result', async () => {
+    const result = await layoutOwnershipTreeWithElk([]);
+    expect(result.flowNodes).toHaveLength(0);
+    expect(result.flowEdges).toHaveLength(0);
+  });
+
+  it('lays out parent-child hierarchy with children below parent', async () => {
+    const nodes = [
+      makeNode('root', null, '1.0', '0.5'),
+      makeNode('a', 'root', '0.25', '0.25'),
+      makeNode('b', 'root', '0.25', '0.25'),
+    ];
+
+    const result = await layoutOwnershipTreeWithElk(nodes);
+    const root = result.flowNodes.find((n) => n.id === 'root');
+    const a = result.flowNodes.find((n) => n.id === 'a');
+    const b = result.flowNodes.find((n) => n.id === 'b');
+
+    expect(root).toBeTruthy();
+    expect(a).toBeTruthy();
+    expect(b).toBeTruthy();
+    expect(a!.position.y).toBeGreaterThan(root!.position.y);
+    expect(b!.position.y).toBeGreaterThan(root!.position.y);
+    expect(a!.data.relativeShare).toBe('0.250000000');
+    expect(b!.data.relativeShare).toBe('0.250000000');
+  });
+
+  it('keeps related documents beside their parent', async () => {
+    const nodes = [
+      makeNode('root', null, '1.0', '0.5'),
+      { ...makeNode('rel1', 'root', '0', '0'), type: 'related' as const, instrument: 'Affidavit' },
+    ];
+
+    const result = await layoutOwnershipTreeWithElk(nodes);
+    const root = result.flowNodes.find((n) => n.id === 'root');
+    const rel = result.flowNodes.find((n) => n.id === 'rel1');
+
+    expect(root).toBeTruthy();
+    expect(rel).toBeTruthy();
+    expect(rel!.position.x).toBeGreaterThan(root!.position.x);
+    expect(Math.abs(rel!.position.y - root!.position.y)).toBeLessThan(200);
+  });
+
+  it('respects independent spacing factors', async () => {
+    const nodes = [
+      makeNode('root', null, '1.0', '0.5'),
+      makeNode('a', 'root', '0.25', '0.25'),
+      makeNode('b', 'root', '0.25', '0.25'),
+    ];
+
+    const defaultLayout = await layoutOwnershipTreeWithElk(nodes);
+    const spacedLayout = await layoutOwnershipTreeWithElk(nodes, {
+      horizontalSpacingFactor: 2,
+      verticalSpacingFactor: 1.5,
+    });
+
+    const defaultRoot = defaultLayout.flowNodes.find((node) => node.id === 'root')!;
+    const defaultA = defaultLayout.flowNodes.find((node) => node.id === 'a')!;
+    const defaultB = defaultLayout.flowNodes.find((node) => node.id === 'b')!;
+    const spacedRoot = spacedLayout.flowNodes.find((node) => node.id === 'root')!;
+    const spacedA = spacedLayout.flowNodes.find((node) => node.id === 'a')!;
+    const spacedB = spacedLayout.flowNodes.find((node) => node.id === 'b')!;
+
+    expect(spacedRoot.position.y).toBe(defaultRoot.position.y);
+    expect(spacedB.position.x - spacedA.position.x).toBeGreaterThan(
+      defaultB.position.x - defaultA.position.x
+    );
+    expect(spacedA.position.y - spacedRoot.position.y).toBeGreaterThan(
+      defaultA.position.y - defaultRoot.position.y
+    );
+  });
+
+  it('preserves smaller node scale in elk layout', async () => {
+    const nodes = [
+      makeNode('root', null, '1.0', '0.5'),
+      makeNode('a', 'root', '0.25', '0.25'),
+      makeNode('b', 'root', '0.25', '0.25'),
+    ];
+
+    const defaultLayout = await layoutOwnershipTreeWithElk(nodes);
+    const scaledLayout = await layoutOwnershipTreeWithElk(nodes, { nodeScale: 0.5 });
+
+    const defaultRoot = defaultLayout.flowNodes.find((node) => node.id === 'root')!;
+    const defaultA = defaultLayout.flowNodes.find((node) => node.id === 'a')!;
+    const defaultB = defaultLayout.flowNodes.find((node) => node.id === 'b')!;
+    const scaledRoot = scaledLayout.flowNodes.find((node) => node.id === 'root')!;
+    const scaledA = scaledLayout.flowNodes.find((node) => node.id === 'a')!;
+    const scaledB = scaledLayout.flowNodes.find((node) => node.id === 'b')!;
+
+    expect(scaledRoot.data.nodeScale).toBe(0.5);
+    expect(scaledB.position.x - scaledA.position.x).toBeLessThan(
+      defaultB.position.x - defaultA.position.x
+    );
+    expect(scaledA.position.y - scaledRoot.position.y).toBeLessThan(
+      defaultA.position.y - defaultRoot.position.y
+    );
+  });
+
+  it('keeps elk spacing adjustments visible after node scale shrinks', async () => {
+    const nodes = [
+      makeNode('root', null, '1.0', '0.5'),
+      makeNode('a', 'root', '0.25', '0.25'),
+      makeNode('b', 'root', '0.25', '0.25'),
+    ];
+
+    const compactLayout = await layoutOwnershipTreeWithElk(nodes, {
+      nodeScale: 0.35,
+      horizontalSpacingFactor: 1,
+      verticalSpacingFactor: 1,
+    });
+    const spacedLayout = await layoutOwnershipTreeWithElk(nodes, {
+      nodeScale: 0.35,
+      horizontalSpacingFactor: 1.75,
+      verticalSpacingFactor: 1.75,
+    });
+
+    const compactRoot = compactLayout.flowNodes.find((node) => node.id === 'root')!;
+    const compactA = compactLayout.flowNodes.find((node) => node.id === 'a')!;
+    const compactB = compactLayout.flowNodes.find((node) => node.id === 'b')!;
+    const spacedRoot = spacedLayout.flowNodes.find((node) => node.id === 'root')!;
+    const spacedA = spacedLayout.flowNodes.find((node) => node.id === 'a')!;
+    const spacedB = spacedLayout.flowNodes.find((node) => node.id === 'b')!;
+
+    expect(spacedB.position.x - spacedA.position.x).toBeGreaterThan(
+      compactB.position.x - compactA.position.x
+    );
+    expect(spacedA.position.y - spacedRoot.position.y).toBeGreaterThan(
+      compactA.position.y - compactRoot.position.y
+    );
+  });
+
+  it('uses centered horizontal placement for elk layout import positions', async () => {
+    const nodes = [
+      makeNode('root', null, '1.0', '0.5'),
+      makeNode('a', 'root', '0.25', '0.25'),
+      makeNode('b', 'root', '0.25', '0.25'),
+      makeNode('c', 'a', '0.125', '0.125'),
+      makeNode('d', 'a', '0.125', '0.125'),
+    ];
+
+    const fallbackLayout = layoutOwnershipTree(nodes);
+    const elkLayout = await layoutOwnershipTreeWithElk(nodes);
+
+    for (const node of fallbackLayout.flowNodes) {
+      const elkNode = elkLayout.flowNodes.find((candidate) => candidate.id === node.id);
+      expect(elkNode).toBeTruthy();
+      expect(elkNode!.position.x).toBe(node.position.x);
+    }
   });
 });
