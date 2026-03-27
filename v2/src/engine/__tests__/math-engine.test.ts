@@ -7,11 +7,13 @@
  */
 import { describe, it, expect } from 'vitest';
 import { d } from '../decimal';
+import { formatAsFraction } from '../fraction-display';
 import {
   executeConveyance,
   executeRebalance,
   executePredecessorInsert,
   executeAttachConveyance,
+  executeDeleteBranch,
   calculateShare,
   validateOwnershipGraph,
   rootOwnershipTotal,
@@ -762,5 +764,82 @@ describe('User scenario: grant + remaining through tree', () => {
 
     // Graph valid
     expect(validateOwnershipGraph(current).valid).toBe(true);
+  });
+});
+
+describe('executeDeleteBranch', () => {
+  it('restores a deleted conveyance amount to its parent', () => {
+    const nodes: OwnershipNode[] = [
+      makeNode('grantor', null, '1.000000000', '0.500000000'),
+      makeNode('child', 'grantor', '0.500000000', '0.500000000'),
+    ];
+
+    const result = executeDeleteBranch({
+      allNodes: nodes,
+      nodeId: 'child',
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.data).toHaveLength(1);
+    const grantor = findNode(result.data, 'grantor');
+    expect(d(grantor.fraction).toString()).toBe('1');
+    expect(result.audit.action).toBe('delete_branch');
+    expect(result.audit.affectedCount).toBe(1);
+  });
+
+  it('removes an entire descendant branch and restores the original conveyed amount', () => {
+    const nodes: OwnershipNode[] = [
+      makeNode('grantor', null, '1.000000000', '0.500000000'),
+      makeNode('child', 'grantor', '0.500000000', '0.250000000'),
+      makeNode('grandchild', 'child', '0.250000000', '0.250000000'),
+    ];
+
+    const result = executeDeleteBranch({
+      allNodes: nodes,
+      nodeId: 'child',
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.data.map((node) => node.id)).toEqual(['grantor']);
+    expect(d(findNode(result.data, 'grantor').fraction).toString()).toBe('1');
+    expect(result.audit.affectedCount).toBe(2);
+  });
+});
+
+describe('high precision chained conveyances', () => {
+  it('preserves exact binary fractions through repeated half conveyances', () => {
+    let nodes: OwnershipNode[] = [
+      makeNode('root', null, '1', '1'),
+    ];
+
+    const chain = [
+      ['root', 'lease', '0.015625'],
+      ['lease', 'assignment1', '0.0078125'],
+      ['assignment1', 'assignment2', '0.00390625'],
+      ['assignment2', 'assignment3', '0.001953125'],
+      ['assignment3', 'assignment4', '0.0009765625'],
+    ] as const;
+
+    for (const [parentId, childId, share] of chain) {
+      const result = executeConveyance({
+        allNodes: nodes,
+        parentId,
+        newNodeId: childId,
+        share,
+        form: createBlankNode(childId, parentId),
+      });
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      nodes = result.data;
+    }
+
+    const deepest = findNode(nodes, 'assignment4');
+    expect(deepest.initialFraction).toBe('0.0009765625');
+    expect(formatAsFraction(deepest.initialFraction)).toBe('1/1024');
+    expect(validateOwnershipGraph(nodes).valid).toBe(true);
   });
 });

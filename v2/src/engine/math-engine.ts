@@ -1,7 +1,7 @@
 /**
  * LANDroid Math Engine v2
  *
- * All ownership calculations use Decimal.js for exact 9-decimal precision.
+ * All ownership calculations use Decimal.js with high internal precision.
  * Ported from v1 mathEngine.js — same algorithms, no float arithmetic.
  *
  * Four core operations:
@@ -9,6 +9,7 @@
  *   2. executeRebalance   — scale a branch by changing its initialFraction
  *   3. executePredecessorInsert — insert a node between parent and child
  *   4. executeAttachConveyance  — move subtree to a new parent
+ *   5. executeDeleteBranch — remove a branch and restore the parent's conveyed amount
  */
 import { Decimal } from 'decimal.js';
 import { d, clamp, serialize } from './decimal';
@@ -418,6 +419,64 @@ export function executeAttachConveyance(params: AttachConveyanceParams): Result<
     newRootFraction: serialize(newRootFraction),
     scaleFactor: scaleFactor.toFixed(12),
     affectedCount: descendants.size + 1,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Operation 5: Delete Branch
+// ---------------------------------------------------------------------------
+
+export interface DeleteBranchParams {
+  allNodes: OwnershipNode[];
+  nodeId: string;
+}
+
+export function executeDeleteBranch(params: DeleteBranchParams): Result<OwnershipNode[]> {
+  const { nodeId } = params;
+  const nodes = params.allNodes.map(toCalc);
+
+  if (!nodeId) return err('invalid_input', 'nodeId is required');
+  const target = nodes.find((n) => n.id === nodeId);
+  if (!target) return err('missing_node', `nodeId ${nodeId} was not found`);
+
+  const descendants = collectDescendantIds(nodes, nodeId);
+  const removedIds = new Set([nodeId, ...descendants]);
+
+  const updatedNodes = nodes
+    .filter((n) => !removedIds.has(n.id))
+    .map((n) => {
+      if (
+        target.type !== 'related' &&
+        target.parentId &&
+        target.parentId !== 'unlinked' &&
+        n.id === target.parentId
+      ) {
+        return {
+          ...n,
+          fraction: clamp(n.fraction.plus(target.initialFraction)),
+        };
+      }
+      return n;
+    });
+
+  const validation = validateCalcGraph(updatedNodes);
+  if (!validation.valid) {
+    return err(
+      'invalid_graph',
+      'Delete would produce invalid ownership graph',
+      validation.issues
+    );
+  }
+
+  return ok(updatedNodes, {
+    action: 'delete_branch',
+    affectedCount: removedIds.size,
+    restoredParentId:
+      target.type !== 'related' && target.parentId && target.parentId !== 'unlinked'
+        ? target.parentId
+        : null,
+    restoredFraction:
+      target.type !== 'related' ? serialize(target.initialFraction) : '0',
   });
 }
 

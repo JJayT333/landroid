@@ -37,6 +37,7 @@ export default function DeskMapCard({
 }: DeskMapCardProps) {
   const initial = d(node.initialFraction);
   const remaining = d(node.fraction);
+  const holdsInterest = node.type !== 'related' && remaining.greaterThan(0);
   const hasConveyedSome = initial.greaterThan(0) && remaining.lessThan(initial);
   const isFullyConveyed = initial.greaterThan(0) && remaining.isZero();
 
@@ -59,18 +60,34 @@ export default function DeskMapCard({
         className={`
           group w-72 rounded-lg border-2 shadow-md cursor-pointer transition-all
           hover:shadow-lg hover:border-leather
-          ${isActive ? 'border-leather ring-2 ring-gold/50' : 'border-ledger-line'}
+          ${isActive
+            ? 'border-leather ring-2 ring-gold/50'
+            : holdsInterest
+              ? 'border-leather/60 shadow-[0_8px_18px_rgba(92,61,46,0.12)]'
+              : 'border-ledger-line'}
           ${isFullyConveyed ? 'opacity-75' : ''}
           bg-parchment text-ink
         `}
         onClick={() => onEdit(node.id)}
       >
         {/* Header */}
-        <div className="px-3 py-1.5 border-b border-ledger-line bg-parchment-dark rounded-t-lg">
+        <div
+          className={`px-3 py-1.5 border-b border-ledger-line rounded-t-lg ${
+            holdsInterest ? 'bg-gold/10' : 'bg-parchment-dark'
+          }`}
+        >
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-semibold text-ink-light uppercase tracking-wide truncate">
-              {node.instrument || 'Document'}
-            </span>
+            <div className="flex items-center gap-1.5 min-w-0">
+              {holdsInterest && (
+                <span
+                  className="h-2 w-2 shrink-0 rounded-full bg-gold shadow-[0_0_0_2px_rgba(212,197,169,0.9)]"
+                  title="Retains interest"
+                />
+              )}
+              <span className="text-[10px] font-semibold text-ink-light uppercase tracking-wide truncate">
+                {node.instrument || 'Document'}
+              </span>
+            </div>
             {(node.date || node.fileDate) && (
               <span className="text-[10px] text-ink-light font-mono ml-2 shrink-0">
                 {node.date || node.fileDate}

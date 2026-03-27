@@ -26,6 +26,10 @@ describe('formatAsFraction', () => {
   it('1/7', () => expect(formatAsFraction('0.142857143')).toBe('1/7'));
   it('5/8', () => expect(formatAsFraction('0.625')).toBe('5/8'));
   it('3/16', () => expect(formatAsFraction('0.1875')).toBe('3/16'));
+  it('1/1024 from an exact finite decimal', () =>
+    expect(formatAsFraction('0.0009765625')).toBe('1/1024'));
+  it('1/65536 from an exact finite decimal', () =>
+    expect(formatAsFraction('0.0000152587890625')).toBe('1/65536'));
 });
 
 describe('dualDisplay', () => {

@@ -8,6 +8,8 @@ export interface Audit {
   newInitialFraction?: string;
   oldRootFraction?: string;
   newRootFraction?: string;
+  restoredParentId?: string | null;
+  restoredFraction?: string;
 }
 
 export interface ResultOk<T> {

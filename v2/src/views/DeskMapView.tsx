@@ -302,7 +302,11 @@ export default function DeskMapView() {
   }, []);
 
   const handleDelete = useCallback((id: string) => {
-    if (confirm(`Delete this node? Any children will become orphaned.`)) {
+    if (
+      confirm(
+        'Delete this node? Its branch will be removed, and any conveyed amount will be restored to the grantor.'
+      )
+    ) {
       removeNode(id);
     }
   }, [removeNode]);

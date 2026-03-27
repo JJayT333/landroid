@@ -11,6 +11,7 @@ import {
   executeRebalance,
   executePredecessorInsert,
   executeAttachConveyance,
+  executeDeleteBranch,
 } from '../engine/math-engine';
 import type { Audit } from '../types/result';
 
@@ -198,16 +199,29 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
       nodes: state.nodes.map((n) => (n.id === id ? { ...n, ...fields } : n)),
     })),
 
-  removeNode: (id) =>
-    set((state) => ({
-      nodes: state.nodes.filter((n) => n.id !== id),
-      deskMaps: state.deskMaps.map((dm) =>
-        dm.nodeIds.includes(id)
-          ? { ...dm, nodeIds: dm.nodeIds.filter((nid) => nid !== id) }
-          : dm
-      ),
-      activeNodeId: state.activeNodeId === id ? null : state.activeNodeId,
-    })),
+  removeNode: (id) => {
+    const state = get();
+    const result = executeDeleteBranch({ allNodes: state.nodes, nodeId: id });
+    if (!result.ok) {
+      set({ lastError: result.error.message });
+      return;
+    }
+
+    const remainingIds = new Set(result.data.map((node) => node.id));
+    set({
+      nodes: result.data,
+      deskMaps: state.deskMaps.map((dm) => ({
+        ...dm,
+        nodeIds: dm.nodeIds.filter((nodeId) => remainingIds.has(nodeId)),
+      })),
+      activeNodeId:
+        state.activeNodeId && remainingIds.has(state.activeNodeId)
+          ? state.activeNodeId
+          : null,
+      lastAudit: result.audit,
+      lastError: null,
+    });
+  },
 
   addNodeToActiveDeskMap: (nodeId) =>
     set((state) => {

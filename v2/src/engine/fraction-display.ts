@@ -7,6 +7,46 @@
 import { Decimal } from 'decimal.js';
 import { d, DISPLAY_PRECISION } from './decimal';
 
+function gcdBigInt(a: bigint, b: bigint): bigint {
+  let x = a < 0n ? -a : a;
+  let y = b < 0n ? -b : b;
+
+  while (y !== 0n) {
+    const next = x % y;
+    x = y;
+    y = next;
+  }
+
+  return x;
+}
+
+function exactFiniteFraction(
+  value: Decimal,
+  maxDenominator: number
+): [bigint, bigint] | null {
+  if (!value.isFinite() || value.lessThanOrEqualTo(0)) return null;
+
+  const decimalPlaces = value.decimalPlaces();
+  const normalized = value.toFixed(decimalPlaces);
+  const [wholePart, fractionalPart = ''] = normalized.split('.');
+
+  if (fractionalPart.length === 0) {
+    return [BigInt(wholePart), 1n];
+  }
+
+  const numerator = BigInt(`${wholePart}${fractionalPart}`);
+  const denominator = 10n ** BigInt(fractionalPart.length);
+  const divisor = gcdBigInt(numerator, denominator);
+  const reducedNumerator = numerator / divisor;
+  const reducedDenominator = denominator / divisor;
+
+  if (reducedDenominator > BigInt(maxDenominator)) {
+    return null;
+  }
+
+  return [reducedNumerator, reducedDenominator];
+}
+
 /**
  * Find the best rational approximation p/q using continued fractions.
  *
@@ -86,6 +126,11 @@ export function formatAsFraction(
 ): string {
   const dec = d(value);
   if (dec.isNaN() || !dec.isFinite() || dec.lessThanOrEqualTo(0)) return '0/1';
+
+  const exact = exactFiniteFraction(dec, maxDenominator);
+  if (exact) {
+    return `${exact[0].toString()}/${exact[1].toString()}`;
+  }
 
   const num = dec.toNumber();
   const whole = Math.floor(num);

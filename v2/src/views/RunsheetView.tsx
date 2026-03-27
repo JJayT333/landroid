@@ -8,6 +8,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useWorkspaceStore } from '../store/workspace-store';
 import { formatAsFraction } from '../engine/fraction-display';
 import { d } from '../engine/decimal';
+import { downloadRunsheetWorkbook } from '../storage/runsheet-export';
 import type { OwnershipNode } from '../types/node';
 
 type SortField = 'date' | 'fileDate' | 'instrument' | 'grantor' | 'grantee';
@@ -33,9 +34,14 @@ function sortNodes(nodes: OwnershipNode[], field: SortField, dir: SortDir): Owne
   return sorted;
 }
 
+function formatVolPage(node: OwnershipNode) {
+  return node.vol || node.page ? `${node.vol || ''}/${node.page || ''}` : '\u2014';
+}
+
 export default function RunsheetView() {
   const nodes = useWorkspaceStore((s) => s.nodes);
   const deskMaps = useWorkspaceStore((s) => s.deskMaps);
+  const projectName = useWorkspaceStore((s) => s.projectName);
   const [sortField, setSortField] = useState<SortField>('date');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
   const [tractFilter, setTractFilter] = useState<TractFilter>('all');
@@ -71,6 +77,11 @@ export default function RunsheetView() {
     [filteredNodes, sortField, sortDir]
   );
 
+  const activeTractLabel =
+    tractFilter === 'all'
+      ? null
+      : tractOptions.find((option) => option.id === tractFilter)?.label ?? null;
+
   const handleSort = (field: SortField) => {
     if (sortField === field) {
       setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
@@ -82,6 +93,13 @@ export default function RunsheetView() {
 
   const arrow = (field: SortField) =>
     sortField === field ? (sortDir === 'asc' ? ' \u25b2' : ' \u25bc') : '';
+
+  const handleExport = () => {
+    void downloadRunsheetWorkbook(sorted, {
+      projectName,
+      tractLabel: activeTractLabel,
+    });
+  };
 
   if (nodes.length === 0) {
     return (
@@ -123,22 +141,30 @@ export default function RunsheetView() {
             {tract.label}
           </button>
         ))}
-        <span className="ml-auto text-xs font-mono text-ink-light shrink-0">
-          {sorted.length} entries
-        </span>
+        <div className="ml-auto flex items-center gap-2 shrink-0">
+          <span className="text-xs font-mono text-ink-light">
+            {sorted.length} entries
+          </span>
+          <button
+            onClick={handleExport}
+            className="px-3 py-1.5 rounded-lg text-xs font-semibold text-leather hover:bg-leather/10 border border-ledger-line transition-colors"
+          >
+            Export Runsheet
+          </button>
+        </div>
       </div>
 
       <table className="w-full border-collapse text-sm">
         <thead>
           <tr className="bg-parchment-dark border-b-2 border-leather">
-            <SortHeader label="Inst. Date" field="date" current={sortField} dir={sortDir} onClick={handleSort} arrow={arrow} />
-            <SortHeader label="File Date" field="fileDate" current={sortField} dir={sortDir} onClick={handleSort} arrow={arrow} />
             <SortHeader label="Instrument" field="instrument" current={sortField} dir={sortDir} onClick={handleSort} arrow={arrow} />
+            <SortHeader label="File Date" field="fileDate" current={sortField} dir={sortDir} onClick={handleSort} arrow={arrow} />
+            <SortHeader label="Inst. Date" field="date" current={sortField} dir={sortDir} onClick={handleSort} arrow={arrow} />
             <th className="px-3 py-2 text-left text-[10px] font-semibold text-ink-light uppercase tracking-wider">Vol/Pg</th>
-            <th className="px-3 py-2 text-left text-[10px] font-semibold text-ink-light uppercase tracking-wider">Doc#</th>
             <SortHeader label="Grantor" field="grantor" current={sortField} dir={sortDir} onClick={handleSort} arrow={arrow} />
             <SortHeader label="Grantee" field="grantee" current={sortField} dir={sortDir} onClick={handleSort} arrow={arrow} />
             <th className="px-3 py-2 text-left text-[10px] font-semibold text-ink-light uppercase tracking-wider">Interest</th>
+            <th className="px-3 py-2 text-left text-[10px] font-semibold text-ink-light uppercase tracking-wider">Land Desc.</th>
             <th className="px-3 py-2 text-left text-[10px] font-semibold text-ink-light uppercase tracking-wider">Remarks</th>
           </tr>
         </thead>
@@ -153,22 +179,23 @@ export default function RunsheetView() {
                   isRelated ? 'italic text-ink-light bg-gold/5' : ''
                 }`}
               >
-                <td className="px-3 py-2 font-mono text-xs">{node.date || '\u2014'}</td>
-                <td className="px-3 py-2 font-mono text-xs">{node.fileDate || '\u2014'}</td>
                 <td className="px-3 py-2">
                   {node.instrument || '\u2014'}
                   {isRelated && <span className="ml-1 text-[9px] text-gold font-semibold">(RELATED)</span>}
                 </td>
-                <td className="px-3 py-2 font-mono text-xs">
-                  {node.vol || node.page
-                    ? `${node.vol || ''}/${node.page || ''}`
-                    : '\u2014'}
-                </td>
-                <td className="px-3 py-2 font-mono text-xs">{node.docNo || '\u2014'}</td>
+                <td className="px-3 py-2 font-mono text-xs">{node.fileDate || '\u2014'}</td>
+                <td className="px-3 py-2 font-mono text-xs">{node.date || '\u2014'}</td>
+                <td className="px-3 py-2 font-mono text-xs">{formatVolPage(node)}</td>
                 <td className="px-3 py-2">{node.grantor || '\u2014'}</td>
                 <td className="px-3 py-2 font-semibold">{node.grantee || '\u2014'}</td>
                 <td className="px-3 py-2 font-mono text-xs">
                   {isRelated ? '\u2014' : formatAsFraction(interest)}
+                </td>
+                <td
+                  className="px-3 py-2 text-xs text-ink-light truncate max-w-56"
+                  title={node.landDesc || ''}
+                >
+                  {node.landDesc || ''}
                 </td>
                 <td className="px-3 py-2 text-xs text-ink-light truncate max-w-48">
                   {node.remarks || ''}

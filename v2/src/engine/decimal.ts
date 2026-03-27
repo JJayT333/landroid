@@ -1,19 +1,21 @@
 /**
  * Decimal.js configuration for LANDroid.
  *
- * All ownership fractions use exactly 9 decimal places.
+ * Ownership math uses higher internal precision than the UI displays.
  * This module is the single source of truth for precision config.
  */
 import Decimal from 'decimal.js';
 
-// Configure globally: 20 significant digits, ROUND_HALF_UP, 9 decimal display
+// Configure globally for chained conveyances and tiny retained interests.
 Decimal.set({
-  precision: 20,
+  precision: 40,
   rounding: Decimal.ROUND_HALF_UP,
 });
 
 /** Standard display precision for ownership fractions. */
 export const DISPLAY_PRECISION = 9;
+/** Persist enough decimal detail to avoid cumulative rounding drift. */
+export const STORAGE_PRECISION = 24;
 
 /** Parse any value into a Decimal, defaulting to zero on bad input. */
 export function d(value: string | number | Decimal | undefined | null): Decimal {
@@ -41,9 +43,13 @@ export function clampUnit(value: Decimal): Decimal {
   return value;
 }
 
-/** Serialize a Decimal to a fixed 9-decimal string for storage. */
+/** Serialize a Decimal for storage without stripping meaningful precision. */
 export function serialize(value: Decimal): string {
-  return clamp(value).toFixed(DISPLAY_PRECISION);
+  const normalized = clamp(value);
+  if (normalized.decimalPlaces() <= DISPLAY_PRECISION) {
+    return normalized.toFixed(DISPLAY_PRECISION);
+  }
+  return normalized.toSignificantDigits(STORAGE_PRECISION).toString();
 }
 
 /** Format for display: "0.500000000" */
