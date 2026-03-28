@@ -8,22 +8,25 @@ The system prioritizes:
 - predictable workflows for non-technical users
 
 Performance and maintainability are prioritized over rapid feature expansion.
+The active application surface currently lives at the repository root.
 
 ## Repository structure (current)
-The codebase is currently centered around:
+The active codebase is currently centered around:
 
 - `/src`
-  - Core application runtime modules and UI/business behavior.
-- `/scripts`
-  - Standalone validation and data-processing helpers.
-- `/docs`
-  - Architecture notes, process docs, and phase-gate references.
-- `/testdata`
-  - Deterministic stress fixtures and supporting artifacts.
+  - Active LANDroid runtime modules, UI, business logic, storage, and tests.
 - `/dist`
-  - Built/distributed outputs.
+  - Generated browser-ready build output from `npm run build`; it is not the source of truth.
+- `/dist-node`
+  - Generated TypeScript config build output from the composite build.
+- `/TORS_Documents`
+  - Local PDF companions used by the current runsheet workflow.
+- `/docs`
+  - Active architecture notes, process docs, and phase-gate references.
+- `/PROJECT_CONTEXT.md` and `/AGENTS.md`
+  - Repository-level operating rules and architectural context.
 
-Optional structures such as `/backend`, `/frontend`, or `/tests` may be introduced later if explicitly needed.
+The repository root now serves as both the active app root and the coordination layer for repo-wide docs, launchers, and validation commands.
 
 ## Core domain concepts
 Important domain concepts include:
@@ -66,7 +69,7 @@ Tests should verify:
 - correct recalculation behavior
 - handling of edge cases
 
-Primary pipeline uses local Node script checks via `npm test`.
+Primary validation should run through local `npm test` from the repository root against the active root app.
 Avoid unnecessarily bloating test runtime.
 
 ## Development priorities

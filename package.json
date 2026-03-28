@@ -1,22 +1,39 @@
 {
   "name": "landroid",
   "private": true,
-  "version": "1.0.0",
-  "type": "commonjs",
+  "version": "2.0.0",
+  "type": "module",
   "scripts": {
-    "test": "npm run test:smoke && npm run test:math-engine && npm run test:storage && npm run test:math-regression && npm run test:title-scenarios && npm run test:cross-surface && npm run test:csv-fixtures && npm run test:stress-tiers && npm run test:perf",
-    "test:smoke": "node scripts/smoke-checks.js",
-    "test:storage": "node scripts/workspace-storage-checks.js",
-    "test:math-regression": "node scripts/math-regression-checks.js",
-    "test:title-scenarios": "node scripts/title-scenario-checks.js",
-    "test:cross-surface": "node scripts/cross-surface-parity-checks.js",
-    "test:perf": "node scripts/perf-benchmark-5x200.js",
-    "test:csv-fixtures": "node scripts/csv-fixture-checks.js",
-    "test:math-engine": "node scripts/math-engine-checks.js",
-    "test:stress-tiers": "node scripts/stress-tier-checks.js",
-    "build": "esbuild src/app.jsx --jsx=transform --jsx-factory=React.createElement --jsx-fragment=React.Fragment --minify --sourcemap --outfile=dist/app.js && cp src/mathEngine.js dist/mathEngine.js && cp src/workspaceDomain.js dist/workspaceDomain.js && cp src/workspaceStorage.js dist/workspaceStorage.js && cp src/storageProvider.js dist/storageProvider.js && cp src/auditLog.js dist/auditLog.js && cp src/syncEngine.js dist/syncEngine.js && cp src/dropboxIntegration.js dist/dropboxIntegration.js"
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:engine": "vitest run src/engine",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@xyflow/react": "^12.4.0",
+    "decimal.js": "^10.4.3",
+    "dexie": "^4.0.11",
+    "elkjs": "^0.11.1",
+    "papaparse": "^5.4.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "xlsx": "^0.18.5",
+    "zustand": "^5.0.3"
   },
   "devDependencies": {
-    "esbuild": "^0.27.4"
+    "@tailwindcss/vite": "^4.0.0",
+    "@types/papaparse": "^5.3.15",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "@vitejs/plugin-react": "^4.3.4",
+    "autoprefixer": "^10.4.20",
+    "tailwindcss": "^4.0.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.7.3",
+    "vite": "^6.0.7",
+    "vitest": "^3.0.4"
   }
 }

@@ -4,6 +4,7 @@ Always read PROJECT_CONTEXT.md before making architectural decisions.
 You are my implementation partner for this codebase.
 
 Work only inside this repository. Do not modify files outside the project folder unless explicitly requested.
+The active application surface is the repository root (`/`).
 
 ## Core operating principles
 - Be methodical, phased, and incremental.
@@ -25,6 +26,7 @@ Work only inside this repository. Do not modify files outside the project folder
 - Do not add dependencies unless clearly justified.
 - Never hardcode secrets, tokens, credentials, or sensitive data.
 - Do not expose or move sensitive data outside the repository unless explicitly requested.
+- Do not hand-edit generated build artifacts under `/dist` or `/dist-node` unless explicitly requested.
 
 ## Instruction precedence
 - If instructions conflict, follow this order:
@@ -45,6 +47,7 @@ Restate the current phase in 1 to 3 bullets:
 - Reuse existing helpers and utilities where possible.
 - Keep functions and modules focused and readable.
 - Add comments only when they clarify non-obvious logic.
+- After user-facing changes, keep `/README.md`, `/USER_MANUAL.md`, `/CONTINUATION-PROMPT.md`, and launcher entry points aligned.
 
 ### 3) Validation
 Validation is required for every phase.
