@@ -29,12 +29,13 @@ Then open `http://localhost:5173/`.
 - `Flowchart` for presentation and print layout
 - `Runsheet` for chronology review and export
 - `Owners` for workspace-scoped owner, lease, contact, and document records
-- `Research` for workspace-scoped map/reference assets such as PDF maps, images, and GeoJSON
+- `Maps` for the featured-map workspace with supporting PDF/image/GeoJSON assets, linked regions, and outside references
+- `Research` for workspace-scoped RRC dataset cataloging, imported research files, and the first structured decoder path for pending drilling permits
 
 ## Persistence notes
 - Browser autosave keeps the active workspace and flowchart canvas locally.
-- `.landroid` exports now capture workspace data, flowchart canvas state, owner records, owner documents, and research map assets in one self-contained backup.
-- CSV imports create a fresh workspace and intentionally start with empty owner and research records.
+- `.landroid` exports now capture workspace data, flowchart canvas state, owner records, owner documents, map assets, and research imports in one self-contained backup.
+- CSV imports create a fresh workspace and intentionally start with empty owner, map, and research side records.
 
 ## Repo notes
 - `dist/` is generated browser-ready output from `npm run build`.

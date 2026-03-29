@@ -24,11 +24,12 @@ Then open `http://localhost:5173/`.
 
 ## 2) Main navigation
 
-The top bar has five view buttons:
+The top bar has six view buttons:
 - `Desk Map`
 - `Flowchart`
 - `Runsheet`
 - `Owners`
+- `Maps`
 - `Research`
 
 The top bar also has:
@@ -36,7 +37,7 @@ The top bar also has:
 - `Load` to import a `.landroid` or `.csv` file
 - `Stress (100/150/200)` to load sample tract data for testing
 
-The current project name appears in the top bar. Local autosave still uses browser storage, but `Save` now captures workspace data, flowchart canvas state, owner records, owner documents, and research map assets in the exported `.landroid` file.
+The current project name appears in the top bar. Local autosave still uses browser storage, but `Save` now captures workspace data, flowchart canvas state, owner records, owner documents, map assets, and research imports in the exported `.landroid` file.
 
 ## 3) Desk Map view
 
@@ -128,27 +129,59 @@ Useful notes:
 - Loading a `.landroid` file restores owner records and owner docs from that file.
 - Loading a `.csv` creates a fresh workspace and clears owner records for that imported workspace unless you later add them.
 
-## 6) Research view
+## 6) Maps view
 
-`Research` is the first map/reference asset library for the current workspace.
+`Maps` is now the map-first workspace for the current project.
 
 ### What it supports today
 - PDF map files
 - PNG / JPG images
 - GeoJSON files for exported GIS artifacts
+- saved rectangular presentation regions on image assets
+- saved outside reference links for maps or regions
 
 ### How to use it
-- Upload a file into `Research`.
+- Upload one or more files into `Maps`.
+- Mark the main prospect map as the featured map. `Maps` opens to that map first.
+- Use `Present` mode for a cleaner map/story view.
+- Use `Edit` mode to update metadata, place image-based regions, and save outside reference links.
 - Add metadata such as county, prospect, effective date, and source.
-- Optionally link the asset to a desk map, title node, owner record, or lease.
+- Optionally link the map or a region to a desk map, title node, owner record, or lease.
 - Preview supported file types inline, or download them back out.
 
 ### Current scope
-- This is a structured reference library, not a live GIS viewer.
+- PDF maps can be featured and previewed inline, but clickable region overlays currently start with PNG / JPG exports.
+- Region placement in this phase uses saved rectangular overlays rather than freeform GIS drawing.
+- This is still a lightweight map/presentation workflow, not a live GIS viewer.
 - ArcGIS Pro is not embedded in the app.
 - The practical short-term path is to bring ArcGIS outputs into LANDroid as exported PDF, image, or GeoJSON artifacts.
 
-## 7) Flowchart view
+## 7) Research view
+
+`Research` is now the RRC-oriented workspace for official dataset families, imported downloads, and decoder triage.
+
+### What it supports today
+- an in-app catalog of major official RRC downloadable dataset families
+- direct links back to the official RRC downloads page
+- workspace-scoped imports of downloaded files, including CSV, JSON, PDF, images, ZIPs, shapefile parts, ASCII, and EBCDIC files
+- inline preview for browser-friendly formats, with raw-file staging for harder legacy formats
+- a structured decoder for `Drilling Permits Pending Approval` core files:
+  `dp_drilling_permit_pending`, `dp_wellbore_pending`, and `dp_latlongs_pending`
+
+### How to use it
+- Pick a dataset family from the left side.
+- Import the files you downloaded from the official RRC site.
+- Use the decoder status badges to see what is preview-ready now versus what still needs parser/manual work.
+- Keep notes with the raw imported file so LANDroid becomes the place where the file and your understanding stay together.
+- For `Drilling Permits Pending Approval`, import the permit, wellbore, and lat/long TXT files together to unlock the joined permit preview.
+
+### Current scope
+- LANDroid can stage all of these files now, but it does not fully decode every RRC legacy format yet.
+- The pending-permit decoder currently focuses on the core permit/wellbore/lat-long files. Other files in that family are still staged and previewed, but not yet joined into the structured summary.
+- EBCDIC-heavy families are stored/imported first and decoded later.
+- This phase favors safe cataloging, file organization, and triage over pretending every format is already solved.
+
+## 8) Flowchart view
 
 `Flowchart` is the presentation and print surface.
 
@@ -193,7 +226,7 @@ These settings are now included when you save a `.landroid` file.
 - Use horizontal and vertical spacing controls when the tree feels too cramped or too loose
 - Use browser print preview before final printing
 
-## 8) Files and persistence
+## 9) Files and persistence
 
 ### `.landroid` files
 These are the main workspace snapshot files. They now include:
@@ -203,14 +236,15 @@ These are the main workspace snapshot files. They now include:
 - instrument types
 - workspace owner records
 - workspace owner documents
-- workspace research map assets
+- workspace map assets
+- workspace research imports
 - flowchart nodes and edges
 - flowchart viewport
 - page/grid/orientation settings
 - flowchart spacing settings
 
 ### `.csv` import
-CSV import loads workspace data, resets the flowchart canvas, and starts a fresh empty owner/research workspace so you can re-import and relink cleanly.
+CSV import loads workspace data, resets the flowchart canvas, and starts a fresh empty owner/maps/research side workspace so you can re-import and relink cleanly.
 
 ### Local browser storage
 The app also uses browser storage for local autosave. This is convenient, but it is not a substitute for named backups.
@@ -220,7 +254,7 @@ The app also uses browser storage for local autosave. This is convenient, but it
 - Save another `.landroid` file before printing or exporting deliverables
 - Keep dated backup copies when testing risky changes
 
-## 9) Precision and ownership math
+## 10) Precision and ownership math
 
 Recent ownership work improved how fractions are stored and displayed.
 
@@ -236,26 +270,27 @@ Recent ownership work improved how fractions are stored and displayed.
 - Parent/child relationships matter for recalculation
 - If something looks wrong, review the branch in Desk Map first, then confirm the chronology in Runsheet
 
-## 10) Recommended workflow
+## 11) Recommended workflow
 
 1. Launch the app from `LANDroid.command` or `LANDroid.bat`.
 2. Load an existing `.landroid` file or import a `.csv`.
 3. Organize work by tract tabs in `Desk Map`.
 4. Build or correct the title chain in `Desk Map`.
 5. Create or open linked owner records where you need follow-up tracking.
-6. Add supporting maps and exhibits in `Research`.
-7. Review chronology and field quality in `Runsheet`.
-8. Export the runsheet if you need workbook output.
-9. Import the active tract into `Flowchart`.
-10. Adjust paper size, spacing, and fit settings.
-11. Print or save final backups.
+6. Add supporting prospect maps and exhibits in `Maps`.
+7. Bring in any official RRC downloads you want to stage in `Research`.
+8. Review chronology and field quality in `Runsheet`.
+9. Export the runsheet if you need workbook output.
+10. Import the active tract into `Flowchart`.
+11. Adjust paper size, spacing, and fit settings.
+12. Print or save final backups.
 
-## 11) Troubleshooting
+## 12) Troubleshooting
 
 ### "The app opened, but I still see old work"
 - Load the correct `.landroid` file.
 - If you just imported a `.csv`, re-import the active tract into `Flowchart`.
-- If you just imported a `.csv`, remember that owner records and research assets start empty for that imported workspace.
+- If you just imported a `.csv`, remember that owner records, map assets, and research imports start empty for that imported workspace.
 
 ### "The flowchart is empty"
 - Make sure the active tract has title cards.
@@ -277,12 +312,13 @@ Recent ownership work improved how fractions are stored and displayed.
 - Use the `Stress (100/150/200)` button to load sample tract data.
 - Save a separate `.landroid` snapshot before going back to real data.
 
-## 12) Practical habits for a new user
+## 13) Practical habits for a new user
 
 - Keep one tract tab per tract unless you have a strong reason not to.
 - Rename tabs early so the runsheet and flowchart stay easy to follow.
 - Link owner records from the node edit modal when you need follow-up work tied to a title holder.
-- Use `Research` for exported map/reference artifacts instead of burying those notes in freeform remarks.
+- Use `Maps` for presentation-facing prospect maps and region storytelling.
+- Use `Research` for official RRC downloads, decoder notes, and research staging.
 - Use `Runsheet` as your QA pass, not just `Desk Map`.
 - Save often, and keep milestone `.landroid` files.
 - Before deleting a branch, pause and confirm you really want the interest restored to the parent.

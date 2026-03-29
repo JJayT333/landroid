@@ -65,6 +65,13 @@ Provide:
 5. Risks, assumptions, or follow-up items
 6. What’s next, as a checkbox list
 
+### 5) Chat handoff / switching chats
+Before ending or switching chats after meaningful work:
+- Update `/CONTINUATION-PROMPT.md` with the current branch, meaningful completed work, validation status, open risks, and likely next steps.
+- If the user asks for a GitHub checkpoint, create or use a non-`main` branch, commit the relevant source/docs changes, and push that branch.
+- Call out intentionally uncommitted local noise separately so it is not confused with the active handoff snapshot.
+- Provide a short paste-ready prompt for the next chat that points back to `/AGENTS.md`, `/PROJECT_CONTEXT.md`, and `/CONTINUATION-PROMPT.md`.
+
 ## Quality gates
 - No unresolved failing tests
 - No known regressions in existing workflows

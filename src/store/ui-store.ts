@@ -3,7 +3,13 @@
  */
 import { create } from 'zustand';
 
-export type ViewMode = 'chart' | 'master' | 'flowchart' | 'owners' | 'research';
+export type ViewMode =
+  | 'chart'
+  | 'master'
+  | 'flowchart'
+  | 'owners'
+  | 'maps'
+  | 'research';
 export type ModalMode =
   | null
   | 'edit'

@@ -1,8 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import type { CanvasSaveData } from '../../store/canvas-store';
-import { createBlankMapAsset } from '../../types/map';
+import {
+  createBlankMapAsset,
+  createBlankMapExternalReference,
+  createBlankMapRegion,
+} from '../../types/map';
 import { createBlankOwner, createBlankOwnerDoc } from '../../types/owner';
 import { createBlankNode } from '../../types/node';
+import { createBlankResearchImport } from '../../types/research';
 import {
   exportLandroidFile,
   importLandroidFile,
@@ -59,6 +64,32 @@ function buildWorkspace(canvas: CanvasSaveData | null): LandroidFileData {
         title: 'Tract Map',
         linkedOwnerId: owner.id,
         county: 'Elmore',
+        isFeatured: true,
+      },
+    }
+  );
+  const mapRegion = createBlankMapRegion('ws-1', mapAsset.id, {
+    id: 'region-1',
+    title: 'North Tract',
+    linkedOwnerId: owner.id,
+  });
+  const mapReference = createBlankMapExternalReference('ws-1', {
+    id: 'ref-1',
+    assetId: mapAsset.id,
+    regionId: mapRegion.id,
+    label: 'RRC GIS',
+    url: 'https://example.com/rrc',
+  });
+  const researchImport = createBlankResearchImport(
+    'ws-1',
+    new Blob(['api,data'], { type: 'text/csv' }),
+    {
+      fileName: 'production-dump.csv',
+      mimeType: 'text/csv',
+      datasetId: 'production-data-query-dump',
+      overrides: {
+        id: 'rrc-1',
+        title: 'Production Dump',
       },
     }
   );
@@ -87,6 +118,11 @@ function buildWorkspace(canvas: CanvasSaveData | null): LandroidFileData {
     },
     mapData: {
       mapAssets: [mapAsset],
+      mapRegions: [mapRegion],
+      mapReferences: [mapReference],
+    },
+    researchData: {
+      imports: [researchImport],
     },
   };
 }
@@ -110,6 +146,14 @@ describe('workspace-persistence', () => {
     expect(imported.ownerData?.docs[0]?.fileName).toBe('owner-notes.txt');
     expect(await imported.ownerData?.docs[0]?.blob.text()).toBe('owner-doc-body');
     expect(imported.mapData?.mapAssets[0]?.title).toBe('Tract Map');
+    expect(imported.mapData?.mapAssets[0]?.isFeatured).toBe(true);
+    expect(imported.mapData?.mapRegions[0]?.title).toBe('North Tract');
+    expect(imported.mapData?.mapRegions[0]?.linkedOwnerId).toBe('owner-1');
+    expect(imported.mapData?.mapReferences[0]?.label).toBe('RRC GIS');
+    expect(imported.researchData?.imports[0]?.datasetId).toBe(
+      'production-data-query-dump'
+    );
+    expect(await imported.researchData?.imports[0]?.blob.text()).toBe('api,data');
     expect(await imported.mapData?.mapAssets[0]?.blob.text()).toContain('FeatureCollection');
   });
 
@@ -137,7 +181,56 @@ describe('workspace-persistence', () => {
       contacts: [],
       docs: [],
     });
-    expect(imported.mapData).toEqual({ mapAssets: [] });
+    expect(imported.mapData).toEqual({
+      mapAssets: [],
+      mapRegions: [],
+      mapReferences: [],
+    });
+    expect(imported.researchData).toEqual({ imports: [] });
     expect(imported.nodes[0]?.linkedOwnerId).toBeNull();
+  });
+
+  it('keeps version 2 map files compatible when regions/references are missing', async () => {
+    const v2Payload = {
+      version: 2,
+      workspaceId: 'ws-v2',
+      projectName: 'Map Upgrade',
+      nodes: [createBlankNode('node-2')],
+      deskMaps: [],
+      activeDeskMapId: null,
+      instrumentTypes: [],
+      mapData: {
+        mapAssets: [
+          {
+            ...createBlankMapAsset(
+              'ws-v2',
+              new Blob(['legacy map'], { type: 'application/pdf' }),
+              {
+                fileName: 'legacy.pdf',
+                mimeType: 'application/pdf',
+                overrides: {
+                  id: 'legacy-map',
+                  title: 'Legacy Map',
+                },
+              }
+            ),
+            blob: {
+              base64: 'bGVnYWN5IG1hcA==',
+              mimeType: 'application/pdf',
+            },
+          },
+        ],
+      },
+    };
+    const file = new File([JSON.stringify(v2Payload)], 'legacy-map.landroid', {
+      type: 'application/json',
+    });
+
+    const imported = await importLandroidFile(file);
+
+    expect(imported.mapData?.mapAssets[0]?.title).toBe('Legacy Map');
+    expect(imported.mapData?.mapRegions).toEqual([]);
+    expect(imported.mapData?.mapReferences).toEqual([]);
+    expect(await imported.mapData?.mapAssets[0]?.blob.text()).toBe('legacy map');
   });
 });

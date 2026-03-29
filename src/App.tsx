@@ -9,6 +9,7 @@ import OwnerDatabaseView from './views/OwnerDatabaseView';
 import RunsheetView from './views/RunsheetView';
 
 const FlowchartView = lazy(() => import('./views/FlowchartView'));
+const MapsView = lazy(() => import('./views/MapsView'));
 const ResearchView = lazy(() => import('./views/ResearchView'));
 
 function PlaceholderView({
@@ -50,12 +51,24 @@ export default function App() {
         {view === 'chart' && <DeskMapView />}
         {view === 'master' && <RunsheetView />}
         {view === 'owners' && <OwnerDatabaseView />}
+        {view === 'maps' && (
+          <Suspense
+            fallback={
+              <PlaceholderView
+                name="Loading Maps"
+                description="Preparing the map workspace."
+              />
+            }
+          >
+            <MapsView />
+          </Suspense>
+        )}
         {view === 'research' && (
           <Suspense
             fallback={
               <PlaceholderView
                 name="Loading Research"
-                description="Preparing map and reference assets."
+                description="Preparing RRC datasets and imported research files."
               />
             }
           >

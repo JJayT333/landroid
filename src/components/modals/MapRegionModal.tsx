@@ -3,109 +3,112 @@ import Modal from '../shared/Modal';
 import FormField from '../shared/FormField';
 import type { DeskMap, OwnershipNode } from '../../types/node';
 import type { Lease, Owner } from '../../types/owner';
-import type { MapAsset, MapAssetKind } from '../../types/map';
-import { MAP_ASSET_KIND_OPTIONS } from '../../types/map';
+import type { MapRegion, MapRegionStatus } from '../../types/map';
+import { MAP_REGION_STATUS_OPTIONS, clampPercent } from '../../types/map';
 
-interface MapAssetModalProps {
-  asset: MapAsset;
+interface MapRegionModalProps {
+  region: MapRegion;
   deskMaps: DeskMap[];
   nodes: OwnershipNode[];
   owners: Owner[];
   leases: Lease[];
   onClose: () => void;
-  onPreview: () => void;
-  onSave: (fields: Partial<MapAsset>) => Promise<void>;
+  onSave: (fields: Partial<MapRegion>) => Promise<void>;
 }
 
-export default function MapAssetModal({
-  asset,
+export default function MapRegionModal({
+  region,
   deskMaps,
   nodes,
   owners,
   leases,
   onClose,
-  onPreview,
   onSave,
-}: MapAssetModalProps) {
+}: MapRegionModalProps) {
   const [form, setForm] = useState({
-    title: asset.title,
-    kind: asset.kind,
-    notes: asset.notes,
-    presentationSummary: asset.presentationSummary,
-    isFeatured: asset.isFeatured,
-    deskMapId: asset.deskMapId ?? '',
-    nodeId: asset.nodeId ?? '',
-    linkedOwnerId: asset.linkedOwnerId ?? '',
-    leaseId: asset.leaseId ?? '',
-    county: asset.county,
-    prospect: asset.prospect,
-    effectiveDate: asset.effectiveDate,
-    source: asset.source,
+    title: region.title,
+    shortLabel: region.shortLabel,
+    status: region.status,
+    summary: region.summary,
+    notes: region.notes,
+    acreage: region.acreage,
+    color: region.color,
+    deskMapId: region.deskMapId ?? '',
+    nodeId: region.nodeId ?? '',
+    linkedOwnerId: region.linkedOwnerId ?? '',
+    leaseId: region.leaseId ?? '',
+    x: region.rect.x.toString(),
+    y: region.rect.y.toString(),
+    width: region.rect.width.toString(),
+    height: region.rect.height.toString(),
   });
   const [saving, setSaving] = useState(false);
 
-  const set = (
-    field: keyof typeof form,
-    value: string | MapAssetKind
-  ) => setForm((current) => ({ ...current, [field]: value }));
+  const set = (field: keyof typeof form, value: string) =>
+    setForm((current) => ({ ...current, [field]: value }));
 
   return (
-    <Modal open onClose={onClose} title="Map Asset Details" wide>
+    <Modal open onClose={onClose} title="Map Region" wide>
       <div className="space-y-4">
-        <div className="rounded-lg border border-ledger-line bg-ledger px-3 py-2">
-          <div className="text-xs font-semibold text-ink">{asset.fileName}</div>
-          <div className="text-[11px] text-ink-light">{asset.mimeType || 'Unknown type'}</div>
-        </div>
-
         <div className="grid grid-cols-2 gap-3">
-          <FormField label="Title" value={form.title} onChange={(value) => set('title', value)} />
+          <FormField label="Region Title" value={form.title} onChange={(value) => set('title', value)} />
+          <FormField
+            label="Short Label"
+            value={form.shortLabel}
+            onChange={(value) => set('shortLabel', value)}
+          />
 
           <div>
             <label className="text-[10px] text-ink-light uppercase tracking-wider block mb-1">
-              Kind
+              Status
             </label>
             <select
-              value={form.kind}
-              onChange={(event) => set('kind', event.target.value as MapAssetKind)}
+              value={form.status}
+              onChange={(event) => set('status', event.target.value)}
               className="w-full px-3 py-2 rounded-lg border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none"
             >
-              {MAP_ASSET_KIND_OPTIONS.map((option) => (
-                <option key={option} value={option}>
-                  {option}
+              {MAP_REGION_STATUS_OPTIONS.map((status) => (
+                <option key={status} value={status}>
+                  {status}
                 </option>
               ))}
             </select>
           </div>
 
-          <FormField label="County" value={form.county} onChange={(value) => set('county', value)} />
-          <FormField
-            label="Prospect"
-            value={form.prospect}
-            onChange={(value) => set('prospect', value)}
-          />
-          <FormField
-            label="Effective Date"
-            type="date"
-            value={form.effectiveDate}
-            onChange={(value) => set('effectiveDate', value)}
-          />
-          <FormField label="Source" value={form.source} onChange={(value) => set('source', value)} />
+          <FormField label="Acreage" value={form.acreage} onChange={(value) => set('acreage', value)} />
         </div>
 
-        <label className="flex items-center gap-2 rounded-lg border border-ledger-line bg-ledger px-3 py-2 text-sm text-ink">
-          <input
-            type="checkbox"
-            checked={form.isFeatured}
-            onChange={(event) =>
-              setForm((current) => ({
-                ...current,
-                isFeatured: event.target.checked,
-              }))
-            }
-            className="h-4 w-4 rounded border-ledger-line text-leather focus:ring-leather"
+        <div className="grid grid-cols-4 gap-3">
+          <FormField label="Left" value={form.x} onChange={(value) => set('x', value)} />
+          <FormField label="Top" value={form.y} onChange={(value) => set('y', value)} />
+          <FormField
+            label="Width"
+            value={form.width}
+            onChange={(value) => set('width', value)}
           />
-          Open this as the featured map when the Maps page loads
-        </label>
+          <FormField
+            label="Height"
+            value={form.height}
+            onChange={(value) => set('height', value)}
+          />
+        </div>
+
+        <div>
+          <label className="text-[10px] text-ink-light uppercase tracking-wider block mb-1">
+            Color
+          </label>
+          <div className="flex items-center gap-3">
+            <input
+              type="color"
+              value={form.color}
+              onChange={(event) => set('color', event.target.value)}
+              className="h-10 w-16 rounded border border-ledger-line bg-parchment"
+            />
+            <span className="text-sm text-ink-light">
+              Used for the presentation overlay.
+            </span>
+          </div>
+        </div>
 
         <div className="grid grid-cols-2 gap-3">
           <div>
@@ -183,14 +186,13 @@ export default function MapAssetModal({
 
         <div>
           <label className="text-[10px] text-ink-light uppercase tracking-wider block mb-1">
-            Presentation Summary
+            Summary
           </label>
           <textarea
-            value={form.presentationSummary}
-            onChange={(event) => set('presentationSummary', event.target.value)}
+            value={form.summary}
+            onChange={(event) => set('summary', event.target.value)}
             rows={3}
             className="w-full px-3 py-2 rounded-lg border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none resize-y"
-            placeholder="Plain-English context for presentations or quick handoffs"
           />
         </div>
 
@@ -206,50 +208,46 @@ export default function MapAssetModal({
           />
         </div>
 
-        <div className="flex items-center justify-between pt-2 border-t border-ledger-line">
+        <div className="flex justify-end gap-2 pt-2 border-t border-ledger-line">
           <button
             type="button"
-            onClick={onPreview}
-            className="px-3 py-2 rounded-lg text-xs font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors"
+            onClick={onClose}
+            className="px-3 py-2 rounded-lg text-sm text-ink-light hover:bg-parchment-dark transition-colors"
           >
-            Preview
+            Cancel
           </button>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-3 py-2 rounded-lg text-sm text-ink-light hover:bg-parchment-dark transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              disabled={saving}
-              onClick={async () => {
-                setSaving(true);
-                await onSave({
-                  title: form.title,
-                  kind: form.kind,
-                  notes: form.notes,
-                  presentationSummary: form.presentationSummary,
-                  isFeatured: form.isFeatured,
-                  deskMapId: form.deskMapId || null,
-                  nodeId: form.nodeId || null,
-                  linkedOwnerId: form.linkedOwnerId || null,
-                  leaseId: form.leaseId || null,
-                  county: form.county,
-                  prospect: form.prospect,
-                  effectiveDate: form.effectiveDate,
-                  source: form.source,
-                });
-                setSaving(false);
-                onClose();
-              }}
-              className="px-4 py-2 rounded-lg bg-leather text-parchment text-sm font-semibold hover:bg-leather-light transition-colors disabled:opacity-60"
-            >
-              Save
-            </button>
-          </div>
+          <button
+            type="button"
+            disabled={saving}
+            onClick={async () => {
+              setSaving(true);
+              await onSave({
+                title: form.title,
+                shortLabel: form.shortLabel,
+                status: form.status as MapRegionStatus,
+                acreage: form.acreage,
+                summary: form.summary,
+                notes: form.notes,
+                color: form.color,
+                deskMapId: form.deskMapId || null,
+                nodeId: form.nodeId || null,
+                linkedOwnerId: form.linkedOwnerId || null,
+                leaseId: form.leaseId || null,
+                rect: {
+                  x: clampPercent(Number(form.x)),
+                  y: clampPercent(Number(form.y)),
+                  width: clampPercent(Number(form.width)),
+                  height: clampPercent(Number(form.height)),
+                  page: region.rect.page,
+                },
+              });
+              setSaving(false);
+              onClose();
+            }}
+            className="px-4 py-2 rounded-lg bg-leather text-parchment text-sm font-semibold hover:bg-leather-light transition-colors disabled:opacity-60"
+          >
+            Save Region
+          </button>
         </div>
       </div>
     </Modal>

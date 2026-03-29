@@ -4,6 +4,7 @@ import App from './App';
 import './theme/index.css';
 import { useMapStore } from './store/map-store';
 import { useOwnerStore } from './store/owner-store';
+import { useResearchStore } from './store/research-store';
 import { useWorkspaceStore } from './store/workspace-store';
 import { useCanvasStore } from './store/canvas-store';
 import { saveWorkspaceToDb, loadWorkspaceFromDb } from './storage/workspace-persistence';
@@ -17,6 +18,7 @@ async function bootstrapWorkspace() {
     await Promise.all([
       useOwnerStore.getState().setWorkspace(data.workspaceId),
       useMapStore.getState().setWorkspace(data.workspaceId),
+      useResearchStore.getState().setWorkspace(data.workspaceId),
     ]);
     return;
   }
@@ -26,6 +28,7 @@ async function bootstrapWorkspace() {
   await Promise.all([
     useOwnerStore.getState().setWorkspace(workspaceId),
     useMapStore.getState().setWorkspace(workspaceId),
+    useResearchStore.getState().setWorkspace(workspaceId),
   ]);
 }
 

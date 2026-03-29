@@ -7,7 +7,8 @@
  */
 import Dexie, { type EntityTable } from 'dexie';
 import type { ContactLog, Lease, Owner, OwnerDoc } from '../types/owner';
-import type { MapAsset } from '../types/map';
+import type { MapAsset, MapExternalReference, MapRegion } from '../types/map';
+import type { ResearchImport } from '../types/research';
 
 export interface PdfAttachment {
   nodeId: string;
@@ -39,6 +40,9 @@ const db = new Dexie('landroid-v2') as Dexie & {
   contactLogs: EntityTable<ContactLog, 'id'>;
   ownerDocs: EntityTable<OwnerDoc, 'id'>;
   mapAssets: EntityTable<MapAsset, 'id'>;
+  mapRegions: EntityTable<MapRegion, 'id'>;
+  mapExternalReferences: EntityTable<MapExternalReference, 'id'>;
+  researchImports: EntityTable<ResearchImport, 'id'>;
 };
 
 db.version(1).stores({
@@ -62,6 +66,41 @@ db.version(3).stores({
   ownerDocs: 'id, workspaceId, ownerId, leaseId, [workspaceId+ownerId], [workspaceId+leaseId]',
   mapAssets:
     'id, workspaceId, deskMapId, nodeId, linkedOwnerId, leaseId, [workspaceId+deskMapId], [workspaceId+nodeId], [workspaceId+linkedOwnerId], [workspaceId+leaseId]',
+});
+
+db.version(4).stores({
+  pdfs: 'nodeId',
+  workspaces: 'id',
+  canvases: 'id',
+  owners: 'id, workspaceId, name',
+  leases: 'id, workspaceId, ownerId, [workspaceId+ownerId]',
+  contactLogs: 'id, workspaceId, ownerId, [workspaceId+ownerId]',
+  ownerDocs: 'id, workspaceId, ownerId, leaseId, [workspaceId+ownerId], [workspaceId+leaseId]',
+  mapAssets:
+    'id, workspaceId, isFeatured, deskMapId, nodeId, linkedOwnerId, leaseId, [workspaceId+isFeatured], [workspaceId+deskMapId], [workspaceId+nodeId], [workspaceId+linkedOwnerId], [workspaceId+leaseId]',
+  mapRegions:
+    'id, workspaceId, assetId, deskMapId, nodeId, linkedOwnerId, leaseId, [workspaceId+assetId], [workspaceId+deskMapId], [workspaceId+nodeId], [workspaceId+linkedOwnerId], [workspaceId+leaseId]',
+  mapExternalReferences:
+    'id, workspaceId, assetId, regionId, source, [workspaceId+assetId], [workspaceId+regionId]',
+});
+
+db.version(5).stores({
+  pdfs: 'nodeId',
+  workspaces: 'id',
+  canvases: 'id',
+  owners: 'id, workspaceId, name',
+  leases: 'id, workspaceId, ownerId, [workspaceId+ownerId]',
+  contactLogs: 'id, workspaceId, ownerId, [workspaceId+ownerId]',
+  ownerDocs:
+    'id, workspaceId, ownerId, leaseId, [workspaceId+ownerId], [workspaceId+leaseId]',
+  mapAssets:
+    'id, workspaceId, isFeatured, deskMapId, nodeId, linkedOwnerId, leaseId, [workspaceId+isFeatured], [workspaceId+deskMapId], [workspaceId+nodeId], [workspaceId+linkedOwnerId], [workspaceId+leaseId]',
+  mapRegions:
+    'id, workspaceId, assetId, deskMapId, nodeId, linkedOwnerId, leaseId, [workspaceId+assetId], [workspaceId+deskMapId], [workspaceId+nodeId], [workspaceId+linkedOwnerId], [workspaceId+leaseId]',
+  mapExternalReferences:
+    'id, workspaceId, assetId, regionId, source, [workspaceId+assetId], [workspaceId+regionId]',
+  researchImports:
+    'id, workspaceId, datasetId, detectedFormat, [workspaceId+datasetId], [workspaceId+detectedFormat]',
 });
 
 export default db;

@@ -11,9 +11,11 @@ import {
 } from '../types/node';
 import type { CanvasSaveData } from '../store/canvas-store';
 import type { OwnerDoc } from '../types/owner';
-import type { MapAsset } from '../types/map';
+import type { MapAsset, MapExternalReference, MapRegion } from '../types/map';
+import type { ResearchImport } from '../types/research';
 import type { OwnerWorkspaceData } from './owner-persistence';
 import type { MapWorkspaceData } from './map-persistence';
+import type { ResearchWorkspaceData } from './research-persistence';
 
 const WORKSPACE_ID = 'default';
 
@@ -30,6 +32,7 @@ export interface LandroidFileData extends WorkspaceData {
   canvas?: CanvasSaveData | null;
   ownerData?: OwnerWorkspaceData;
   mapData?: MapWorkspaceData;
+  researchData?: ResearchWorkspaceData;
 }
 
 interface SerializedOwnerDoc extends Omit<OwnerDoc, 'blob'> {
@@ -37,6 +40,14 @@ interface SerializedOwnerDoc extends Omit<OwnerDoc, 'blob'> {
 }
 
 interface SerializedMapAsset extends Omit<MapAsset, 'blob'> {
+  blob: SerializedBlob;
+}
+
+interface SerializedMapRegion extends MapRegion {}
+
+interface SerializedMapExternalReference extends MapExternalReference {}
+
+interface SerializedResearchImport extends Omit<ResearchImport, 'blob'> {
   blob: SerializedBlob;
 }
 
@@ -107,6 +118,8 @@ async function serializeMapData(
   | undefined
   | {
       mapAssets: SerializedMapAsset[];
+      mapRegions: SerializedMapRegion[];
+      mapReferences: SerializedMapExternalReference[];
     }
 > {
   if (!mapData) return undefined;
@@ -118,16 +131,39 @@ async function serializeMapData(
         blob: await serializeBlob(asset.blob),
       }))
     ),
+    mapRegions: mapData.mapRegions,
+    mapReferences: mapData.mapReferences,
+  };
+}
+
+async function serializeResearchData(
+  researchData: ResearchWorkspaceData | undefined
+): Promise<
+  | undefined
+  | {
+      imports: SerializedResearchImport[];
+    }
+> {
+  if (!researchData) return undefined;
+
+  return {
+    imports: await Promise.all(
+      researchData.imports.map(async (researchImport) => ({
+        ...researchImport,
+        blob: await serializeBlob(researchImport.blob),
+      }))
+    ),
   };
 }
 
 export async function exportLandroidFile(data: LandroidFileData): Promise<Blob> {
   const payload = {
-    version: 3,
+    version: 4,
     exportedAt: new Date().toISOString(),
     ...data,
     ownerData: await serializeOwnerData(data.ownerData),
     mapData: await serializeMapData(data.mapData),
+    researchData: await serializeResearchData(data.researchData),
   };
   const json = JSON.stringify(payload, null, 2);
   return new Blob([json], { type: 'application/json' });
@@ -180,8 +216,39 @@ export async function importLandroidFile(file: File): Promise<LandroidFileData> 
                 blob: deserializeBlob(asset.blob),
               }))
             : [],
+          mapRegions: Array.isArray(parsed.mapData.mapRegions)
+            ? parsed.mapData.mapRegions.map(
+                (region: SerializedMapRegion) => ({
+                  ...region,
+                  workspaceId: region.workspaceId ?? workspaceId,
+                })
+              )
+            : [],
+          mapReferences: Array.isArray(parsed.mapData.mapReferences)
+            ? parsed.mapData.mapReferences.map(
+                (reference: SerializedMapExternalReference) => ({
+                  ...reference,
+                  workspaceId: reference.workspaceId ?? workspaceId,
+                })
+              )
+            : [],
         }
-      : { mapAssets: [] };
+      : { mapAssets: [], mapRegions: [], mapReferences: [] };
+
+  const researchData =
+    parsed.researchData && typeof parsed.researchData === 'object'
+      ? {
+          imports: Array.isArray(parsed.researchData.imports)
+            ? parsed.researchData.imports.map(
+                (researchImport: SerializedResearchImport) => ({
+                  ...researchImport,
+                  workspaceId: researchImport.workspaceId ?? workspaceId,
+                  blob: deserializeBlob(researchImport.blob),
+                })
+              )
+            : [],
+        }
+      : { imports: [] };
 
   return {
     workspaceId,
@@ -193,5 +260,6 @@ export async function importLandroidFile(file: File): Promise<LandroidFileData> 
     canvas: parsed.canvas ?? null,
     ownerData,
     mapData,
+    researchData,
   };
 }

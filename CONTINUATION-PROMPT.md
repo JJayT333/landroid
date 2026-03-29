@@ -12,13 +12,14 @@ Before making architectural decisions, read:
 - `/Users/abstractmapping/projects/landroid/CONTINUATION-PROMPT.md`
 
 Current repo state:
-- Active branch: `codex/ownership-map-foundations`
+- Active branch: `codex/maps-research-rrc-handoff`
 - Latest pushed baseline behind this branch: `a148dcc` (`chore: promote active app to repository root`)
 - `main` is the trusted baseline and points to commit `afbdb93`
 - Safety branches kept on purpose: `baseline-afbdb93`, `v2-desk-map-interactions-and-resize`
 - Active app is the repository root
 - The repository root is both the app surface and the repo-level coordination layer
-- The branch is currently synced with `origin/codex/current-foundation`
+- The active branch for current work is `codex/maps-research-rrc-handoff`
+- This branch is intended to carry the current source/docs handoff snapshot for the `Maps` / `Research` split, pending-permit decoder, and chat-transition checklist
 
 User preferences and working style:
 - The user is fairly new and wants careful, reversible changes
@@ -58,7 +59,10 @@ Recent completed work:
 - The branch was committed and pushed to GitHub as `24be137`
 - Added a new `Owners` workspace surface for owner, lease, contact, and owner-document tracking
 - Owner data is now workspace-scoped and included in `.landroid` exports/imports
-- Added a structured `Research` map library for PDF/image/GeoJSON reference assets with metadata and links to desk maps, nodes, owners, and leases
+- Added a structured `Maps` workspace for PDF/image/GeoJSON reference assets with metadata and links to desk maps, nodes, owners, and leases
+- Refactored the map workspace into a featured-map `Maps` surface with `Present` and `Edit` modes
+- Added workspace-scoped map regions and external reference links so image-based prospect maps can carry clickable story areas and saved outside links
+- Added a separate `Research` workspace for RRC dataset cataloging and imported research files
 - Added node-to-owner linking through the `Owner Record` section in the Desk Map node edit modal
 
 Important files involved in the recent work:
@@ -75,9 +79,12 @@ Important files involved in the recent work:
 - `/Users/abstractmapping/projects/landroid/src/store/workspace-store.ts`
 - `/Users/abstractmapping/projects/landroid/src/store/owner-store.ts`
 - `/Users/abstractmapping/projects/landroid/src/store/map-store.ts`
+- `/Users/abstractmapping/projects/landroid/src/store/research-store.ts`
 - `/Users/abstractmapping/projects/landroid/src/views/DeskMapView.tsx`
 - `/Users/abstractmapping/projects/landroid/src/views/OwnerDatabaseView.tsx`
+- `/Users/abstractmapping/projects/landroid/src/views/MapsView.tsx`
 - `/Users/abstractmapping/projects/landroid/src/views/ResearchView.tsx`
+- `/Users/abstractmapping/projects/landroid/docs/architecture/rrc-import-readability.md`
 - `/Users/abstractmapping/projects/landroid/src/components/deskmap/DeskMapCard.tsx`
 
 Intentional local items to keep:
@@ -96,10 +103,36 @@ Current status:
 - Manual cleanup after import is acceptable; the layout does not need to “read their mind”
 - The current runsheet export is in a good place for now; copy/paste into the external sheet is acceptable
 - The user thinks the desk-map math is good for now after the delete-restore and precision work
-- The next phase should be a full audit of the pushed snapshot before more feature work
 - Do not disturb the current flowchart behavior unless the audit finds a concrete issue that requires it
-- Owner and research data now ride along with `.landroid` saves; CSV imports intentionally reset those sidecar records for the new workspace
-- Research is currently a structured attachment library, not direct ArcGIS Pro functionality or a live GIS renderer
+- Owner, map, and research data now ride along with `.landroid` saves; CSV imports intentionally reset those sidecar records for the new workspace
+- `Maps` is now the map-first presentation surface: PDFs can be featured and previewed, while clickable region overlays currently start with PNG/JPG exports
+- `Research` is now the RRC-oriented staging surface for official dataset families and imported files
+- `Research` now includes a first structured decoder path for `Drilling Permits Pending Approval`, joining the core permit, wellbore, and lat/long TXT files into a readable preview
+- Neither `Maps` nor `Research` is direct ArcGIS Pro functionality or a live GIS renderer
+- The user wants the selected map to dominate the page, with supporting controls staying secondary
+- The user wants to keep pushing deeper on RRC imports and decoding, especially for difficult legacy formats like EBCDIC
+- There is now a repo note at `/Users/abstractmapping/projects/landroid/docs/architecture/rrc-import-readability.md` summarizing which RRC families are readable now, which need fixed-width parsers, which need EBCDIC conversion first, and which are GIS/archive-heavy
+- The user has now installed the recommended Mac-side toolchain for PDF/GIS/OCR/data work, including Poppler, GDAL/OGR, ExifTool, ImageMagick, Tesseract, Ghostscript, `uv`, `duckdb`, QGIS, DB Browser for SQLite, LibreOffice, and Inkscape
+- Latest validation on this handoff branch passed with:
+  - `npm test`
+  - `npm run lint`
+  - `npm run build`
+
+Chat-switch checklist:
+1. Make sure the current work is on a non-`main` branch.
+2. If the user wants a checkpoint, commit the relevant source/docs changes and push that branch.
+3. Update this file with:
+   - current branch
+   - meaningful completed work
+   - validation status
+   - open risks / local noise
+   - likely next steps
+4. Leave generated build artifacts and unrelated local noise out of the checkpoint unless the user explicitly wants them.
+5. Start the next chat by pointing the assistant to:
+   - `/Users/abstractmapping/projects/landroid/AGENTS.md`
+   - `/Users/abstractmapping/projects/landroid/PROJECT_CONTEXT.md`
+   - `/Users/abstractmapping/projects/landroid/CONTINUATION-PROMPT.md`
+6. Paste a short task-focused prompt instead of trying to reconstruct everything from memory.
 
 Strategic product direction:
 - The user wants the map/research surface to grow from a small, polished demo into a much more capable long-term product without needing a rewrite later.
@@ -137,9 +170,9 @@ RRC integration direction:
 - The user wants to explore RRC integration because it could make the product much more compelling for demos, but the first releases should stay lightweight and dependable.
 
 Likely next steps to choose from:
-1. Manually click through the new `Owners` and `Research` workflows in the browser
-2. Design the next map-first UX in a way that stays simple for demos but grows cleanly later
-3. Propose a durable data model for map assets, regions, annotations, links, and presentation views
+1. Manually click through the new `Maps` and `Research` workflows in the browser
+2. Improve the region editing UX beyond rectangular starter boxes and numeric coordinate cleanup
+3. Extend the RRC decoder pattern to the next highest-value ASCII family after pending permits
 4. Evaluate a phased RRC integration plan using official datasets / links instead of fragile live-query scraping
 
 Good starting commands:
@@ -176,7 +209,7 @@ Important constraints:
 Suggested first message in the new chat:
 
 ```text
-I am working in `/Users/abstractmapping/projects/landroid` on branch `codex/ownership-map-foundations`.
+I am working in `/Users/abstractmapping/projects/landroid` on branch `codex/maps-research-rrc-handoff`.
 
 Before making architectural decisions, read:
 - `/Users/abstractmapping/projects/landroid/AGENTS.md`
@@ -184,16 +217,17 @@ Before making architectural decisions, read:
 - `/Users/abstractmapping/projects/landroid/CONTINUATION-PROMPT.md`
 
 Current focus:
-- ownership + research foundations have been implemented on top of the root-app layout
-- the next phase is likely map-first UX and presentation workflow design
+- ownership + maps + research foundations have been implemented on top of the root-app layout
+- `Research` now has a first structured decoder path for `Drilling Permits Pending Approval`
+- the next phase is likely either better map-first UX or the next RRC decoder family
 - the user wants room for a much more capable long-term engine, but with a simple UX for a small 2-3 person team
 - RRC integration should be explored through realistic, low-risk paths
 
 Start by:
 1. Inspecting the current branch/worktree state
 2. Re-reading the strategic product direction in `CONTINUATION-PROMPT.md`
-3. Proposing a phased map-first UX and data-model plan
-4. Evaluating the most realistic near-term RRC integration options
+3. Checking the current handoff branch and validation status
+4. Proposing the next phased plan before implementing
 
 Do not start broad implementation until the next phase plan is approved.
 ```
