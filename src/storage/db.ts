@@ -45,4 +45,14 @@ db.version(2).stores({
   canvases: 'id',
 });
 
+db.version(3).stores({
+  pdfs: 'nodeId',
+  workspaces: 'id',
+  canvases: 'id',
+  owners: 'id, name, status, county',
+  leases: 'id, ownerId, tractNo',
+  contactLogs: 'id, ownerId, date',
+  ownerDocs: 'id, ownerId, leaseId',
+});
+
 export default db;

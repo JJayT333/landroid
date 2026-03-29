@@ -6,6 +6,7 @@ import { useWorkspaceStore } from './store/workspace-store';
 import { useCanvasStore } from './store/canvas-store';
 import { saveWorkspaceToDb, loadWorkspaceFromDb } from './storage/workspace-persistence';
 import { saveCanvasToDb, loadCanvasFromDb } from './storage/canvas-persistence';
+import { useOwnerStore } from './store/owner-store';
 
 // ── Auto-load saved workspace on startup ─────────────────
 loadWorkspaceFromDb().then((data) => {
@@ -92,6 +93,9 @@ useCanvasStore.subscribe((state) => {
     });
   }, 2000);
 });
+
+// ── Auto-load owner database on startup ───────────────────
+useOwnerStore.getState().hydrate();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

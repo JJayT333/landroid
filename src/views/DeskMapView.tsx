@@ -16,6 +16,9 @@ import AttachDocModal from '../components/modals/AttachDocModal';
 import PdfViewerModal from '../components/modals/PdfViewerModal';
 import type { OwnershipNode } from '../types/node';
 import { createBlankNode } from '../types/node';
+import { useOwnerStore } from '../store/owner-store';
+import { createBlankOwner } from '../types/owner';
+import { useUIStore } from '../store/ui-store';
 
 // ── Tree building ───────────────────────────────────────
 
@@ -77,6 +80,7 @@ function TreeBranch({
   onAttachDoc,
   onDelete,
   onViewPdf,
+  onAddOwner,
 }: {
   tree: TreeNode;
   parentInitialFraction: string | null;
@@ -87,6 +91,7 @@ function TreeBranch({
   onAttachDoc: (id: string) => void;
   onDelete: (id: string) => void;
   onViewPdf: (id: string) => void;
+  onAddOwner: (id: string) => void;
 }) {
   return (
     <div className="tree-branch">
@@ -100,6 +105,7 @@ function TreeBranch({
         onAttachDoc={onAttachDoc}
         onDelete={onDelete}
         onViewPdf={onViewPdf}
+        onAddOwner={onAddOwner}
         isActive={activeNodeId === tree.node.id}
       />
 
@@ -117,6 +123,7 @@ function TreeBranch({
               onAttachDoc={onAttachDoc}
               onDelete={onDelete}
               onViewPdf={onViewPdf}
+              onAddOwner={onAddOwner}
             />
           ))}
         </div>
@@ -315,6 +322,29 @@ export default function DeskMapView() {
     setPdfViewNodeId(id);
   }, []);
 
+  const addOwner = useOwnerStore((s) => s.addOwner);
+  const setView = useUIStore((s) => s.setView);
+  const selectOwner = useOwnerStore((s) => s.selectOwner);
+
+  const handleAddOwner = useCallback(async (id: string) => {
+    const node = nodes.find((n) => n.id === id);
+    if (!node) return;
+    const owner = createBlankOwner({
+      name: node.grantee || 'Unknown Owner',
+      county: '', // could be derived from landDesc
+      notes: [
+        node.instrument && `Source: ${node.instrument}`,
+        node.landDesc && `Land: ${node.landDesc}`,
+        node.remarks && `Remarks: ${node.remarks}`,
+        node.grantor && `Grantor: ${node.grantor}`,
+        node.fraction && `Interest: ${node.fraction}`,
+      ].filter(Boolean).join('\n'),
+    });
+    await addOwner(owner);
+    await selectOwner(owner.id);
+    setView('owners');
+  }, [nodes, addOwner, selectOwner, setView]);
+
   const handleAddRoot = useCallback(() => {
     const id = `node-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
     const root = {
@@ -380,6 +410,7 @@ export default function DeskMapView() {
                   onAttachDoc={handleAttachDoc}
                   onDelete={handleDelete}
                   onViewPdf={handleViewPdf}
+                  onAddOwner={handleAddOwner}
                 />
               ))}
             </div>

@@ -20,6 +20,7 @@ interface DeskMapCardProps {
   onAttachDoc: (nodeId: string) => void;
   onDelete: (nodeId: string) => void;
   onViewPdf: (nodeId: string) => void;
+  onAddOwner: (nodeId: string) => void;
   isActive: boolean;
 }
 
@@ -33,6 +34,7 @@ export default function DeskMapCard({
   onAttachDoc,
   onDelete,
   onViewPdf,
+  onAddOwner,
   isActive,
 }: DeskMapCardProps) {
   const initial = d(node.initialFraction);
@@ -173,6 +175,7 @@ export default function DeskMapCard({
           <ActionBtn label="PRECEDE" variant="muted" onClick={() => onPrecede(node.id)} />
           <ActionBtn label="CONVEY" variant="primary" onClick={() => onConvey(node.id)} />
           <ActionBtn label="ATTACH" variant="accent" onClick={() => onAttachDoc(node.id)} />
+          <ActionBtn label="OWNER" variant="accent" onClick={() => onAddOwner(node.id)} />
           <ActionBtn label="DELETE" variant="danger" onClick={() => onDelete(node.id)} />
         </div>
       </div>

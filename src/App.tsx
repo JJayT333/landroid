@@ -8,6 +8,7 @@ import DeskMapView from './views/DeskMapView';
 import RunsheetView from './views/RunsheetView';
 
 const FlowchartView = lazy(() => import('./views/FlowchartView'));
+const OwnerDatabaseView = lazy(() => import('./views/OwnerDatabaseView'));
 
 function PlaceholderView({
   name,
@@ -47,6 +48,18 @@ export default function App() {
         )}
         {view === 'chart' && <DeskMapView />}
         {view === 'master' && <RunsheetView />}
+        {view === 'owners' && (
+          <Suspense
+            fallback={
+              <PlaceholderView
+                name="Loading Owners"
+                description="Preparing the owner database."
+              />
+            }
+          >
+            <OwnerDatabaseView />
+          </Suspense>
+        )}
         {view === 'research' && <PlaceholderView name="Research Hub" />}
       </main>
     </div>
