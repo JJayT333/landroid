@@ -5,9 +5,11 @@ import { Suspense, lazy } from 'react';
 import { useUIStore } from './store/ui-store';
 import Navbar from './components/shared/Navbar';
 import DeskMapView from './views/DeskMapView';
+import OwnerDatabaseView from './views/OwnerDatabaseView';
 import RunsheetView from './views/RunsheetView';
 
 const FlowchartView = lazy(() => import('./views/FlowchartView'));
+const ResearchView = lazy(() => import('./views/ResearchView'));
 
 function PlaceholderView({
   name,
@@ -47,7 +49,19 @@ export default function App() {
         )}
         {view === 'chart' && <DeskMapView />}
         {view === 'master' && <RunsheetView />}
-        {view === 'research' && <PlaceholderView name="Research Hub" />}
+        {view === 'owners' && <OwnerDatabaseView />}
+        {view === 'research' && (
+          <Suspense
+            fallback={
+              <PlaceholderView
+                name="Loading Research"
+                description="Preparing map and reference assets."
+              />
+            }
+          >
+            <ResearchView />
+          </Suspense>
+        )}
       </main>
     </div>
   );

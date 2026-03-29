@@ -3,6 +3,8 @@
  */
 import { useRef, useState } from 'react';
 import { useUIStore, type ViewMode } from '../../store/ui-store';
+import { useMapStore } from '../../store/map-store';
+import { useOwnerStore } from '../../store/owner-store';
 import { useWorkspaceStore } from '../../store/workspace-store';
 import { useCanvasStore } from '../../store/canvas-store';
 import { downloadLandroidFile, importLandroidFile } from '../../storage/workspace-persistence';
@@ -13,6 +15,7 @@ const views: { id: ViewMode; label: string }[] = [
   { id: 'chart', label: 'Desk Map' },
   { id: 'flowchart', label: 'Flowchart' },
   { id: 'master', label: 'Runsheet' },
+  { id: 'owners', label: 'Owners' },
   { id: 'research', label: 'Research' },
 ];
 
@@ -35,15 +38,18 @@ export default function Navbar() {
     setSeeding(false);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const state = useWorkspaceStore.getState();
     const canvasState = useCanvasStore.getState();
-    downloadLandroidFile({
+    await downloadLandroidFile({
+      workspaceId: state.workspaceId,
       projectName: state.projectName,
       nodes: state.nodes,
       deskMaps: state.deskMaps,
       activeDeskMapId: state.activeDeskMapId,
       instrumentTypes: state.instrumentTypes,
+      ownerData: await useOwnerStore.getState().exportWorkspaceData(),
+      mapData: await useMapStore.getState().exportWorkspaceData(),
       canvas: {
         nodes: canvasState.nodes,
         edges: canvasState.edges,
@@ -73,11 +79,25 @@ export default function Navbar() {
         const data = await importLandroidFile(file);
         loadWorkspace(data);
         useCanvasStore.getState().loadCanvas(data.canvas ?? { nodes: [], edges: [] });
+        await Promise.all([
+          useOwnerStore.getState().replaceWorkspaceData(
+            data.workspaceId,
+            data.ownerData ?? { owners: [], leases: [], contacts: [], docs: [] }
+          ),
+          useMapStore.getState().replaceWorkspaceData(
+            data.workspaceId,
+            data.mapData ?? { mapAssets: [] }
+          ),
+        ]);
       } else if (file.name.endsWith('.csv')) {
         const text = await file.text();
         const result = importCSV(text);
         loadWorkspace(result);
         useCanvasStore.getState().loadCanvas({ nodes: [], edges: [] });
+        await Promise.all([
+          useOwnerStore.getState().setWorkspace(result.workspaceId),
+          useMapStore.getState().setWorkspace(result.workspaceId),
+        ]);
       } else {
         alert('Unsupported file type. Use .landroid or .csv files.');
       }

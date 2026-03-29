@@ -2,19 +2,34 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
 import './theme/index.css';
+import { useMapStore } from './store/map-store';
+import { useOwnerStore } from './store/owner-store';
 import { useWorkspaceStore } from './store/workspace-store';
 import { useCanvasStore } from './store/canvas-store';
 import { saveWorkspaceToDb, loadWorkspaceFromDb } from './storage/workspace-persistence';
 import { saveCanvasToDb, loadCanvasFromDb } from './storage/canvas-persistence';
 
 // ── Auto-load saved workspace on startup ─────────────────
-loadWorkspaceFromDb().then((data) => {
+async function bootstrapWorkspace() {
+  const data = await loadWorkspaceFromDb();
   if (data) {
     useWorkspaceStore.getState().loadWorkspace(data);
-  } else {
-    useWorkspaceStore.getState().setHydrated();
+    await Promise.all([
+      useOwnerStore.getState().setWorkspace(data.workspaceId),
+      useMapStore.getState().setWorkspace(data.workspaceId),
+    ]);
+    return;
   }
-});
+
+  useWorkspaceStore.getState().setHydrated();
+  const workspaceId = useWorkspaceStore.getState().workspaceId;
+  await Promise.all([
+    useOwnerStore.getState().setWorkspace(workspaceId),
+    useMapStore.getState().setWorkspace(workspaceId),
+  ]);
+}
+
+void bootstrapWorkspace();
 
 // ── Auto-load saved canvas on startup ────────────────────
 loadCanvasFromDb().then((data) => {
@@ -32,6 +47,7 @@ let prevSnapshot: string | null = null;
 useWorkspaceStore.subscribe((state) => {
   if (!state._hydrated) return;
   const snapshot = JSON.stringify({
+    workspaceId: state.workspaceId,
     projectName: state.projectName,
     nodes: state.nodes,
     deskMaps: state.deskMaps,
@@ -44,6 +60,7 @@ useWorkspaceStore.subscribe((state) => {
   if (saveTimer) clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
     saveWorkspaceToDb({
+      workspaceId: state.workspaceId,
       projectName: state.projectName,
       nodes: state.nodes,
       deskMaps: state.deskMaps,

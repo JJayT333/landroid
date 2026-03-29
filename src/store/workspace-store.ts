@@ -5,7 +5,9 @@
  * All math operations go through the engine and produce immutable updates.
  */
 import { create } from 'zustand';
+import { useMapStore } from './map-store';
 import type { OwnershipNode, DeskMap } from '../types/node';
+import { normalizeOwnershipNode } from '../types/node';
 import {
   executeConveyance,
   executeRebalance,
@@ -14,6 +16,7 @@ import {
   executeDeleteBranch,
 } from '../engine/math-engine';
 import type { Audit } from '../types/result';
+import { createWorkspaceId } from '../utils/workspace-id';
 
 const DEFAULT_INSTRUMENT_TYPES = [
   'Deed',
@@ -34,6 +37,7 @@ const DEFAULT_INSTRUMENT_TYPES = [
 
 interface WorkspaceState {
   // Data
+  workspaceId: string;
   projectName: string;
   nodes: OwnershipNode[];
   deskMaps: DeskMap[];
@@ -70,9 +74,17 @@ interface WorkspaceState {
   addNode: (node: OwnershipNode) => void;
   updateNode: (id: string, fields: Partial<OwnershipNode>) => void;
   removeNode: (id: string) => void;
+  clearLinkedOwner: (ownerId: string) => void;
   addNodeToActiveDeskMap: (nodeId: string) => void;
   setHydrated: () => void;
-  loadWorkspace: (data: { projectName: string; nodes: OwnershipNode[]; deskMaps: DeskMap[]; activeDeskMapId: string | null; instrumentTypes?: string[] }) => void;
+  loadWorkspace: (data: {
+    workspaceId: string;
+    projectName: string;
+    nodes: OwnershipNode[];
+    deskMaps: DeskMap[];
+    activeDeskMapId: string | null;
+    instrumentTypes?: string[];
+  }) => void;
 }
 
 function findParentId(nodes: OwnershipNode[], nodeId: string): string | null {
@@ -81,6 +93,7 @@ function findParentId(nodes: OwnershipNode[], nodeId: string): string | null {
 }
 
 export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
+  workspaceId: createWorkspaceId(),
   projectName: 'Untitled Workspace',
   nodes: [],
   deskMaps: [],
@@ -116,12 +129,15 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
     })),
 
   deleteDeskMap: (id) =>
-    set((state) => ({
-      deskMaps: state.deskMaps.filter((dm) => dm.id !== id),
-      activeDeskMapId: state.activeDeskMapId === id
-        ? (state.deskMaps.find((dm) => dm.id !== id)?.id ?? null)
-        : state.activeDeskMapId,
-    })),
+    set((state) => {
+      void useMapStore.getState().unlinkDeskMap(id);
+      return {
+        deskMaps: state.deskMaps.filter((dm) => dm.id !== id),
+        activeDeskMapId: state.activeDeskMapId === id
+          ? (state.deskMaps.find((dm) => dm.id !== id)?.id ?? null)
+          : state.activeDeskMapId,
+      };
+    }),
 
   getActiveDeskMapNodes: () => {
     const { nodes, deskMaps, activeDeskMapId } = get();
@@ -208,6 +224,9 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
     }
 
     const remainingIds = new Set(result.data.map((node) => node.id));
+    const removedIds = state.nodes
+      .filter((node) => !remainingIds.has(node.id))
+      .map((node) => node.id);
     set({
       nodes: result.data,
       deskMaps: state.deskMaps.map((dm) => ({
@@ -221,7 +240,17 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
       lastAudit: result.audit,
       lastError: null,
     });
+    for (const removedId of removedIds) {
+      void useMapStore.getState().unlinkNode(removedId);
+    }
   },
+
+  clearLinkedOwner: (ownerId) =>
+    set((state) => ({
+      nodes: state.nodes.map((node) =>
+        node.linkedOwnerId === ownerId ? { ...node, linkedOwnerId: null } : node
+      ),
+    })),
 
   addNodeToActiveDeskMap: (nodeId) =>
     set((state) => {
@@ -239,8 +268,9 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
 
   loadWorkspace: (data) =>
     set({
+      workspaceId: data.workspaceId,
       projectName: data.projectName,
-      nodes: data.nodes,
+      nodes: data.nodes.map((node) => normalizeOwnershipNode(node)),
       deskMaps: data.deskMaps,
       activeDeskMapId: data.activeDeskMapId ?? data.deskMaps[0]?.id ?? null,
       instrumentTypes: data.instrumentTypes?.length ? data.instrumentTypes : [...DEFAULT_INSTRUMENT_TYPES],

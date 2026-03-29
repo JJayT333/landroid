@@ -41,6 +41,7 @@ export interface OwnershipNode {
 
   // Attachment
   hasDoc: boolean;
+  linkedOwnerId: string | null;
 
   // UI state
   isCollapsed: boolean;
@@ -81,6 +82,17 @@ export function createBlankNode(id: string, parentId: string | null = null): Own
     obituary: '',
     graveyardLink: '',
     hasDoc: false,
+    linkedOwnerId: null,
     isCollapsed: false,
+  };
+}
+
+export function normalizeOwnershipNode(
+  node: Pick<OwnershipNode, 'id'> & Partial<OwnershipNode>
+): OwnershipNode {
+  return {
+    ...createBlankNode(node.id, node.parentId ?? null),
+    ...node,
+    linkedOwnerId: node.linkedOwnerId ?? null,
   };
 }

@@ -28,11 +28,27 @@ cleanup() {
 
 trap cleanup EXIT
 
-# Give Vite a moment to start before opening the browser.
-sleep 2
+wait_for_server() {
+  if ! command -v curl >/dev/null 2>&1; then
+    sleep 2
+    return
+  fi
+
+  for _ in $(seq 1 60); do
+    if curl -fsS "$URL" >/dev/null 2>&1; then
+      return
+    fi
+    if ! kill -0 "$SERVER_PID" 2>/dev/null; then
+      return
+    fi
+    sleep 0.5
+  done
+}
+
+wait_for_server
 
 if command -v open >/dev/null 2>&1; then
-  open -a "Google Chrome" "$URL" || open "$URL" || true
+  open "$URL" || true
 fi
 
 wait "$SERVER_PID"

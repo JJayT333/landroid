@@ -7,6 +7,7 @@
 import Papa from 'papaparse';
 import type { OwnershipNode, DeskMap } from '../types/node';
 import { createBlankNode } from '../types/node';
+import { createWorkspaceId } from '../utils/workspace-id';
 
 // ── CSV column names ────────────────────────────────────────
 
@@ -50,10 +51,12 @@ interface RawNode {
 }
 
 export interface ImportResult {
+  workspaceId: string;
   nodes: OwnershipNode[];
   deskMaps: DeskMap[];
   activeDeskMapId: string | null;
   projectName: string;
+  instrumentTypes?: string[];
 }
 
 // ── Parse CSV ───────────────────────────────────────────────
@@ -161,6 +164,7 @@ export function importCSV(csvText: string): ImportResult {
   });
 
   return {
+    workspaceId: createWorkspaceId(),
     nodes: uniqueNodes,
     deskMaps,
     activeDeskMapId: activeMapId,

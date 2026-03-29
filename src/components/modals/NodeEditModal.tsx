@@ -18,10 +18,18 @@ import type { OwnershipNode } from '../../types/node';
 interface NodeEditModalProps {
   node: OwnershipNode;
   onViewPdf?: (nodeId: string) => void;
+  linkedOwnerName?: string | null;
+  onManageOwner?: (nodeId: string) => void;
   onClose: () => void;
 }
 
-export default function NodeEditModal({ node, onClose, onViewPdf }: NodeEditModalProps) {
+export default function NodeEditModal({
+  node,
+  onClose,
+  onViewPdf,
+  linkedOwnerName,
+  onManageOwner,
+}: NodeEditModalProps) {
   const updateNode = useWorkspaceStore((s) => s.updateNode);
   const rebalance = useWorkspaceStore((s) => s.rebalance);
   const pdfInputRef = useRef<HTMLInputElement>(null);
@@ -245,6 +253,31 @@ export default function NodeEditModal({ node, onClose, onViewPdf }: NodeEditModa
             )}
           </div>
         </fieldset>
+
+        {node.type !== 'related' && (
+          <fieldset className="space-y-2">
+            <legend className="text-xs font-semibold text-ink-light uppercase tracking-wider mb-2">
+              Owner Record
+            </legend>
+            <div className="rounded-lg border border-ledger-line bg-ledger px-3 py-3 flex items-center justify-between gap-3">
+              <div>
+                <div className="text-sm font-semibold text-ink">
+                  {linkedOwnerName || 'No owner record linked yet'}
+                </div>
+                <div className="text-xs text-ink-light">
+                  Open the linked owner record or create one from this node.
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => onManageOwner?.(node.id)}
+                className="px-3 py-2 rounded-lg text-xs font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors"
+              >
+                {linkedOwnerName ? 'Open Owner' : 'Create Owner'}
+              </button>
+            </div>
+          </fieldset>
+        )}
 
         {/* Error display */}
         {error && (

@@ -6,6 +6,8 @@
  * Click a card to edit, hover for action buttons (convey, precede, delete).
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useUIStore } from '../store/ui-store';
+import { useOwnerStore } from '../store/owner-store';
 import { useWorkspaceStore } from '../store/workspace-store';
 import DeskMapCard from '../components/deskmap/DeskMapCard';
 import DeskMapTabs from '../components/deskmap/DeskMapTabs';
@@ -16,6 +18,7 @@ import AttachDocModal from '../components/modals/AttachDocModal';
 import PdfViewerModal from '../components/modals/PdfViewerModal';
 import type { OwnershipNode } from '../types/node';
 import { createBlankNode } from '../types/node';
+import { createBlankOwner } from '../types/owner';
 
 // ── Tree building ───────────────────────────────────────
 
@@ -241,15 +244,27 @@ function PanZoomContainer({ children }: { children: React.ReactNode }) {
   );
 }
 
+function deriveCounty(landDesc: string) {
+  const match = landDesc.match(/([A-Za-z .'-]+?)\s+County\b/i);
+  return match?.[1]?.trim() ?? '';
+}
+
 // ── Main view ───────────────────────────────────────────
 
 export default function DeskMapView() {
+  const setView = useUIStore((state) => state.setView);
+  const owners = useOwnerStore((state) => state.owners);
+  const ownerWorkspaceId = useOwnerStore((state) => state.workspaceId);
+  const addOwnerRecord = useOwnerStore((state) => state.addOwner);
+  const selectOwner = useOwnerStore((state) => state.selectOwner);
+  const workspaceId = useWorkspaceStore((state) => state.workspaceId);
   const nodes = useWorkspaceStore((s) => s.nodes);
   const deskMaps = useWorkspaceStore((s) => s.deskMaps);
   const activeNodeId = useWorkspaceStore((s) => s.activeNodeId);
   const setActiveNode = useWorkspaceStore((s) => s.setActiveNode);
   const removeNode = useWorkspaceStore((s) => s.removeNode);
   const addNode = useWorkspaceStore((s) => s.addNode);
+  const updateNode = useWorkspaceStore((s) => s.updateNode);
   const createDeskMap = useWorkspaceStore((s) => s.createDeskMap);
   const addNodeToActiveDeskMap = useWorkspaceStore((s) => s.addNodeToActiveDeskMap);
   const getActiveDeskMapNodes = useWorkspaceStore((s) => s.getActiveDeskMapNodes);
@@ -280,6 +295,7 @@ export default function DeskMapView() {
   const visibleNodes = getActiveDeskMapNodes();
   const visibleCardCount = visibleNodes.filter((node) => node.type !== 'related').length;
   const trees = buildTree(visibleNodes);
+  const activeDeskMap = deskMaps.find((deskMap) => deskMap.id === activeDeskMapId) ?? null;
   const editNode = editNodeId ? nodes.find((n) => n.id === editNodeId) : null;
   const conveyParent = conveyParentId ? nodes.find((n) => n.id === conveyParentId) : null;
   const precedeNode = precedeNodeId ? nodes.find((n) => n.id === precedeNodeId) : null;
@@ -314,6 +330,55 @@ export default function DeskMapView() {
   const handleViewPdf = useCallback((id: string) => {
     setPdfViewNodeId(id);
   }, []);
+
+  const handleManageOwner = useCallback(
+    async (nodeId: string) => {
+      const node = nodes.find((candidate) => candidate.id === nodeId);
+      if (!node || node.type === 'related') return;
+
+      const linkedOwner = node.linkedOwnerId
+        ? owners.find((owner) => owner.id === node.linkedOwnerId) ?? null
+        : null;
+
+      if (linkedOwner) {
+        selectOwner(linkedOwner.id);
+        setView('owners');
+        setEditNodeId(null);
+        return;
+      }
+
+      const nextOwner = createBlankOwner(ownerWorkspaceId ?? workspaceId, {
+        name: node.grantee || 'New Owner',
+        county: deriveCounty(node.landDesc),
+        prospect: activeDeskMap?.name ?? '',
+        notes: [
+          node.instrument ? `Source Instrument: ${node.instrument}` : '',
+          node.docNo ? `Doc #: ${node.docNo}` : '',
+          node.landDesc ? `Land: ${node.landDesc}` : '',
+          node.remarks ? `Remarks: ${node.remarks}` : '',
+        ]
+          .filter(Boolean)
+          .join('\n'),
+      });
+
+      await addOwnerRecord(nextOwner);
+      updateNode(node.id, { linkedOwnerId: nextOwner.id });
+      selectOwner(nextOwner.id);
+      setView('owners');
+      setEditNodeId(null);
+    },
+    [
+      activeDeskMap?.name,
+      addOwnerRecord,
+      nodes,
+      ownerWorkspaceId,
+      owners,
+      selectOwner,
+      setView,
+      updateNode,
+      workspaceId,
+    ]
+  );
 
   const handleAddRoot = useCallback(() => {
     const id = `node-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
@@ -390,6 +455,12 @@ export default function DeskMapView() {
         {editNode && (
           <NodeEditModal
             node={editNode}
+            linkedOwnerName={
+              editNode.linkedOwnerId
+                ? owners.find((owner) => owner.id === editNode.linkedOwnerId)?.name ?? null
+                : null
+            }
+            onManageOwner={handleManageOwner}
             onClose={() => setEditNodeId(null)}
             onViewPdf={(id) => {
               setEditNodeId(null);

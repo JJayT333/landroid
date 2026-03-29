@@ -12,13 +12,13 @@ Before making architectural decisions, read:
 - `/Users/abstractmapping/projects/landroid/CONTINUATION-PROMPT.md`
 
 Current repo state:
-- Active branch: `codex-v2-flowchart-stress-handoff`
-- Latest pushed commit on this branch: `24be137` (`feat: export runsheets and harden desk map ownership math`)
+- Active branch: `codex/ownership-map-foundations`
+- Latest pushed baseline behind this branch: `a148dcc` (`chore: promote active app to repository root`)
 - `main` is the trusted baseline and points to commit `afbdb93`
 - Safety branches kept on purpose: `baseline-afbdb93`, `v2-desk-map-interactions-and-resize`
 - Active app is the repository root
 - The repository root is both the app surface and the repo-level coordination layer
-- The branch is currently synced with `origin/codex-v2-flowchart-stress-handoff`
+- The branch is currently synced with `origin/codex/current-foundation`
 
 User preferences and working style:
 - The user is fairly new and wants careful, reversible changes
@@ -29,6 +29,7 @@ User preferences and working style:
 - Keep the UX readable and low-clutter for non-technical use
 - The user is happy with the current flowchart paper-size and centered-import behavior for now
 - The user thinks the current desk-map math is good for now and wants the next phase to focus on audit/review
+- The user wants desk-map owner actions kept inside the node detail flow rather than crowding the card buttons
 
 Recent completed work:
 - Verified the active app is now rooted directly in `/Users/abstractmapping/projects/landroid`
@@ -55,6 +56,10 @@ Recent completed work:
 - Added subtle visual emphasis for desk-map nodes that still retain interest
 - Final validation was run with `npm test`, `npm run lint`, and `npm run build`
 - The branch was committed and pushed to GitHub as `24be137`
+- Added a new `Owners` workspace surface for owner, lease, contact, and owner-document tracking
+- Owner data is now workspace-scoped and included in `.landroid` exports/imports
+- Added a structured `Research` map library for PDF/image/GeoJSON reference assets with metadata and links to desk maps, nodes, owners, and leases
+- Added node-to-owner linking through the `Owner Record` section in the Desk Map node edit modal
 
 Important files involved in the recent work:
 - `/Users/abstractmapping/projects/landroid/src/views/FlowchartView.tsx`
@@ -68,7 +73,11 @@ Important files involved in the recent work:
 - `/Users/abstractmapping/projects/landroid/src/engine/__tests__/fraction-display.test.ts`
 - `/Users/abstractmapping/projects/landroid/src/engine/__tests__/math-engine.test.ts`
 - `/Users/abstractmapping/projects/landroid/src/store/workspace-store.ts`
+- `/Users/abstractmapping/projects/landroid/src/store/owner-store.ts`
+- `/Users/abstractmapping/projects/landroid/src/store/map-store.ts`
 - `/Users/abstractmapping/projects/landroid/src/views/DeskMapView.tsx`
+- `/Users/abstractmapping/projects/landroid/src/views/OwnerDatabaseView.tsx`
+- `/Users/abstractmapping/projects/landroid/src/views/ResearchView.tsx`
 - `/Users/abstractmapping/projects/landroid/src/components/deskmap/DeskMapCard.tsx`
 
 Intentional local items to keep:
@@ -89,13 +98,49 @@ Current status:
 - The user thinks the desk-map math is good for now after the delete-restore and precision work
 - The next phase should be a full audit of the pushed snapshot before more feature work
 - Do not disturb the current flowchart behavior unless the audit finds a concrete issue that requires it
+- Owner and research data now ride along with `.landroid` saves; CSV imports intentionally reset those sidecar records for the new workspace
+- Research is currently a structured attachment library, not direct ArcGIS Pro functionality or a live GIS renderer
+
+Strategic product direction:
+- The user wants the map/research surface to grow from a small, polished demo into a much more capable long-term product without needing a rewrite later.
+- Build a strong engine with a simple UI: “Ferrari engine, easy dashboard.”
+- The first versions should stay presentation-friendly for non-landmen while leaving room for deeper analyst workflows later.
+- Prefer a general map/presentation foundation over a one-off PDF hack:
+  - asset layer
+  - overlay / annotation layer
+  - link layer to tracts, owners, leases, docs, and runsheet records
+  - interaction layer for click / hover / filters / drawers
+  - view layer for presentation mode vs edit mode vs analyst mode
+- The likely long-term direction is a map-first workspace where the main prospect map opens first, users can click a region/section, and a simple side panel explains that area in plain language.
+- Short-term map support can start with PDF/image display plus manually drawn regions.
+- Geometry and links should be stored in a way that can later support richer overlays, GeoJSON, georeferencing, and more advanced spatial workflows.
+- The product should favor role-oriented views:
+  - presentation / executive
+  - land / analyst
+  - edit / builder
+- Inspiration patterns worth reusing:
+  - Enverus map + title context
+  - LandmanAssistant tract / ownership / document workflow
+  - Airtable-style role-specific interfaces
+  - Mappedin-style map-first discovery
+  - Bluebeam-style PDF markup discipline
+  - ArcGIS Experience Builder-style click-to-panel interactions
+
+RRC integration direction:
+- This is a small internal product for a team of roughly 2-3 people, not a marketed enterprise platform right now.
+- Favor realistic, low-ops, low-risk RRC integration.
+- Do not depend on scraping the live RRC query UI as a core product behavior.
+- Prefer a staged RRC approach:
+  1. safe deep links and manual lookup helpers
+  2. import/caching of official downloadable RRC datasets
+  3. later overlays and linked RRC context inside LANDroid
+- The user wants to explore RRC integration because it could make the product much more compelling for demos, but the first releases should stay lightweight and dependable.
 
 Likely next steps to choose from:
-1. Audit commit `24be137` in review-only mode first, without making fixes during the first pass
-2. Re-run baseline validation on that snapshot with `npm test`, `npm run lint`, and `npm run build`
-3. Review math/invariants, persistence/import-export, desk-map + flowchart + runsheet UX/safety, performance/bundle size, and repo hygiene
-4. Deliver a findings-first report grouped into `must fix before merge`, `should fix soon`, and `later hardening`
-5. Only after the audit, decide whether the next implementation task should be safety UX, audit visibility, or another desk-map/flowchart improvement
+1. Manually click through the new `Owners` and `Research` workflows in the browser
+2. Design the next map-first UX in a way that stays simple for demos but grows cleanly later
+3. Propose a durable data model for map assets, regions, annotations, links, and presentation views
+4. Evaluate a phased RRC integration plan using official datasets / links instead of fragile live-query scraping
 
 Good starting commands:
 
@@ -131,24 +176,24 @@ Important constraints:
 Suggested first message in the new chat:
 
 ```text
-I am working in `/Users/abstractmapping/projects/landroid` on branch `codex-v2-flowchart-stress-handoff`.
+I am working in `/Users/abstractmapping/projects/landroid` on branch `codex/ownership-map-foundations`.
 
 Before making architectural decisions, read:
 - `/Users/abstractmapping/projects/landroid/AGENTS.md`
 - `/Users/abstractmapping/projects/landroid/PROJECT_CONTEXT.md`
 - `/Users/abstractmapping/projects/landroid/CONTINUATION-PROMPT.md`
 
-Current pushed snapshot to audit:
-- commit `24be137` on `origin/codex-v2-flowchart-stress-handoff`
-- the user is happy with the current flowchart paper-size / centered-import behavior
-- the current runsheet export is fine for now
-- the current desk-map math is good for now
+Current focus:
+- ownership + research foundations have been implemented on top of the root-app layout
+- the next phase is likely map-first UX and presentation workflow design
+- the user wants room for a much more capable long-term engine, but with a simple UX for a small 2-3 person team
+- RRC integration should be explored through realistic, low-risk paths
 
 Start by:
 1. Inspecting the current branch/worktree state
-2. Re-running baseline validation from the repository root
-3. Proposing a full audit plan against commit `24be137`
-4. Then conducting the audit in review-first mode, with findings prioritized by severity and grouped into `must fix before merge`, `should fix soon`, and `later hardening`
+2. Re-reading the strategic product direction in `CONTINUATION-PROMPT.md`
+3. Proposing a phased map-first UX and data-model plan
+4. Evaluating the most realistic near-term RRC integration options
 
-Do not start implementing fixes during the first audit pass unless the user explicitly asks.
+Do not start broad implementation until the next phase plan is approved.
 ```

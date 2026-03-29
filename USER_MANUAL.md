@@ -1,7 +1,7 @@
 # LANDroid User Manual
 
 This manual describes the active LANDroid app in the repository root.
-It focuses on the features that exist today, the safest day-to-day workflow, and the recent additions around tract tabs, flowchart printing, runsheet export, and precision-safe ownership math.
+It focuses on the features that exist today, the safest day-to-day workflow, and the recent additions around tract tabs, owner records, research map assets, flowchart printing, runsheet export, and precision-safe ownership math.
 
 ## 1) Quick start
 
@@ -9,7 +9,7 @@ It focuses on the features that exist today, the safest day-to-day workflow, and
 - macOS: `LANDroid.command`
 - Windows: `LANDroid.bat`
 
-Both launchers start the local Vite dev server on port `5173`, open the app in your browser, and reuse the same project folder as the working directory.
+Both launchers start the local Vite dev server on port `5173`, open the app in your default browser, and reuse the same project folder as the working directory.
 
 ### Manual start
 If you prefer the terminal:
@@ -24,10 +24,11 @@ Then open `http://localhost:5173/`.
 
 ## 2) Main navigation
 
-The top bar has four view buttons:
+The top bar has five view buttons:
 - `Desk Map`
 - `Flowchart`
 - `Runsheet`
+- `Owners`
 - `Research`
 
 The top bar also has:
@@ -35,7 +36,7 @@ The top bar also has:
 - `Load` to import a `.landroid` or `.csv` file
 - `Stress (100/150/200)` to load sample tract data for testing
 
-The current project name appears in the top bar. Local autosave still uses browser storage, but `Save` now captures both workspace data and flowchart canvas state in the exported `.landroid` file.
+The current project name appears in the top bar. Local autosave still uses browser storage, but `Save` now captures workspace data, flowchart canvas state, owner records, owner documents, and research map assets in the exported `.landroid` file.
 
 ## 3) Desk Map view
 
@@ -56,6 +57,7 @@ Deleting a tract tab does not delete the underlying nodes from the workspace. It
 - Hover a card to reveal actions such as `PRECEDE`, `CONVEY`, `ATTACH`, and `DELETE`.
 - Related documents stay attached to a title card and do not change ownership math.
 - Cards that still retain interest are visually emphasized so they are easier to spot.
+- The node edit modal includes an `Owner Record` section so you can create or open a linked owner record without crowding the card footer.
 
 ### Important delete behavior
 Deleting a conveyance branch removes that branch and restores the deleted conveyed amount back to the original grantor or parent. This is safer than simply dropping the branch and losing the fraction.
@@ -105,7 +107,48 @@ Useful notes:
 - The workbook includes the `TORS_Documents\{docNo}.pdf` path formula structure.
 - If you want those links to resolve outside LANDroid, keep the `TORS_Documents` folder alongside the workbook.
 
-## 5) Flowchart view
+## 5) Owners view
+
+`Owners` keeps workspace-scoped owner records separate from the title-chain math while still letting you link one primary owner record to a title node.
+
+### What it stores
+- owner records
+- lease records tied to an owner
+- contact log entries
+- owner documents with optional lease links
+
+### Typical workflow
+- Create a new owner from the `Owners` tab, or open `Owner Record` from a node edit modal in `Desk Map`.
+- Use the `Info` tab for mailing/contact/prospect notes.
+- Use `Leases` and `Contacts` for working notes tied to that owner.
+- Use `Docs` to upload and preview supporting files.
+
+### Persistence behavior
+- Owner data is scoped to the current workspace.
+- Loading a `.landroid` file restores owner records and owner docs from that file.
+- Loading a `.csv` creates a fresh workspace and clears owner records for that imported workspace unless you later add them.
+
+## 6) Research view
+
+`Research` is the first map/reference asset library for the current workspace.
+
+### What it supports today
+- PDF map files
+- PNG / JPG images
+- GeoJSON files for exported GIS artifacts
+
+### How to use it
+- Upload a file into `Research`.
+- Add metadata such as county, prospect, effective date, and source.
+- Optionally link the asset to a desk map, title node, owner record, or lease.
+- Preview supported file types inline, or download them back out.
+
+### Current scope
+- This is a structured reference library, not a live GIS viewer.
+- ArcGIS Pro is not embedded in the app.
+- The practical short-term path is to bring ArcGIS outputs into LANDroid as exported PDF, image, or GeoJSON artifacts.
+
+## 7) Flowchart view
 
 `Flowchart` is the presentation and print surface.
 
@@ -150,7 +193,7 @@ These settings are now included when you save a `.landroid` file.
 - Use horizontal and vertical spacing controls when the tree feels too cramped or too loose
 - Use browser print preview before final printing
 
-## 6) Files and persistence
+## 8) Files and persistence
 
 ### `.landroid` files
 These are the main workspace snapshot files. They now include:
@@ -158,13 +201,16 @@ These are the main workspace snapshot files. They now include:
 - tract tabs
 - active tract selection
 - instrument types
+- workspace owner records
+- workspace owner documents
+- workspace research map assets
 - flowchart nodes and edges
 - flowchart viewport
 - page/grid/orientation settings
 - flowchart spacing settings
 
 ### `.csv` import
-CSV import loads workspace data and resets the flowchart canvas so you can re-import the active tract cleanly.
+CSV import loads workspace data, resets the flowchart canvas, and starts a fresh empty owner/research workspace so you can re-import and relink cleanly.
 
 ### Local browser storage
 The app also uses browser storage for local autosave. This is convenient, but it is not a substitute for named backups.
@@ -174,7 +220,7 @@ The app also uses browser storage for local autosave. This is convenient, but it
 - Save another `.landroid` file before printing or exporting deliverables
 - Keep dated backup copies when testing risky changes
 
-## 7) Precision and ownership math
+## 9) Precision and ownership math
 
 Recent ownership work improved how fractions are stored and displayed.
 
@@ -190,23 +236,26 @@ Recent ownership work improved how fractions are stored and displayed.
 - Parent/child relationships matter for recalculation
 - If something looks wrong, review the branch in Desk Map first, then confirm the chronology in Runsheet
 
-## 8) Recommended workflow
+## 10) Recommended workflow
 
 1. Launch the app from `LANDroid.command` or `LANDroid.bat`.
 2. Load an existing `.landroid` file or import a `.csv`.
 3. Organize work by tract tabs in `Desk Map`.
 4. Build or correct the title chain in `Desk Map`.
-5. Review chronology and field quality in `Runsheet`.
-6. Export the runsheet if you need workbook output.
-7. Import the active tract into `Flowchart`.
-8. Adjust paper size, spacing, and fit settings.
-9. Print or save final backups.
+5. Create or open linked owner records where you need follow-up tracking.
+6. Add supporting maps and exhibits in `Research`.
+7. Review chronology and field quality in `Runsheet`.
+8. Export the runsheet if you need workbook output.
+9. Import the active tract into `Flowchart`.
+10. Adjust paper size, spacing, and fit settings.
+11. Print or save final backups.
 
-## 9) Troubleshooting
+## 11) Troubleshooting
 
 ### "The app opened, but I still see old work"
 - Load the correct `.landroid` file.
 - If you just imported a `.csv`, re-import the active tract into `Flowchart`.
+- If you just imported a `.csv`, remember that owner records and research assets start empty for that imported workspace.
 
 ### "The flowchart is empty"
 - Make sure the active tract has title cards.
@@ -228,10 +277,12 @@ Recent ownership work improved how fractions are stored and displayed.
 - Use the `Stress (100/150/200)` button to load sample tract data.
 - Save a separate `.landroid` snapshot before going back to real data.
 
-## 10) Practical habits for a new user
+## 12) Practical habits for a new user
 
 - Keep one tract tab per tract unless you have a strong reason not to.
 - Rename tabs early so the runsheet and flowchart stay easy to follow.
+- Link owner records from the node edit modal when you need follow-up work tied to a title holder.
+- Use `Research` for exported map/reference artifacts instead of burying those notes in freeform remarks.
 - Use `Runsheet` as your QA pass, not just `Desk Map`.
 - Save often, and keep milestone `.landroid` files.
 - Before deleting a branch, pause and confirm you really want the interest restored to the parent.

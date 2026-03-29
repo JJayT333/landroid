@@ -9,9 +9,12 @@
  * and stores them in IndexedDB alongside the workspace data.
  */
 import { useWorkspaceStore } from '../store/workspace-store';
+import { useMapStore } from '../store/map-store';
+import { useOwnerStore } from '../store/owner-store';
 import { savePdf } from './pdf-store';
 import type { DeskMap, OwnershipNode } from '../types/node';
 import { createBlankNode } from '../types/node';
+import { createWorkspaceId } from '../utils/workspace-id';
 
 // ── Node factory ────────────────────────────────────────
 
@@ -339,6 +342,7 @@ async function attachPdf(nodeId: string, fileName: string): Promise<boolean> {
 
 export async function seedTestData(): Promise<{ nodeCount: number; pdfCount: number }> {
   const { nodes, pdfMappings } = buildTestNodes();
+  const workspaceId = createWorkspaceId();
 
   // Mark nodes that will have PDFs
   for (const mapping of pdfMappings) {
@@ -358,6 +362,7 @@ export async function seedTestData(): Promise<{ nodeCount: number; pdfCount: num
 
   // Load into store
   useWorkspaceStore.getState().loadWorkspace({
+    workspaceId,
     projectName: 'Elmore Title Examination',
     nodes,
     deskMaps: [deskMap],
@@ -369,6 +374,10 @@ export async function seedTestData(): Promise<{ nodeCount: number; pdfCount: num
       'Will', 'Order',
     ],
   });
+  await Promise.all([
+    useOwnerStore.getState().setWorkspace(workspaceId),
+    useMapStore.getState().setWorkspace(workspaceId),
+  ]);
 
   // Attach PDFs
   let pdfCount = 0;
@@ -758,6 +767,7 @@ function addSupplementalStressCards(builder: StressBuilder, config: StressConfig
 }
 
 export function buildStressWorkspaceData(): {
+  workspaceId: string;
   projectName: string;
   nodes: OwnershipNode[];
   deskMaps: DeskMap[];
@@ -765,6 +775,7 @@ export function buildStressWorkspaceData(): {
   instrumentTypes: string[];
   pdfMappings: PdfMapping[];
 } {
+  const workspaceId = createWorkspaceId();
   const builder = new StressBuilder();
 
   // Build 3 independent tract-sized title chains
@@ -801,6 +812,7 @@ export function buildStressWorkspaceData(): {
   }));
 
   return {
+    workspaceId,
     projectName: `Stress Test — ${deskMaps.length} Tracts`,
     nodes,
     deskMaps,
@@ -817,12 +829,17 @@ export async function seedStressTestData(): Promise<{ nodeCount: number; pdfCoun
 
   // Load into store
   useWorkspaceStore.getState().loadWorkspace({
+    workspaceId: workspace.workspaceId,
     projectName: workspace.projectName,
     nodes: workspace.nodes,
     deskMaps: workspace.deskMaps,
     activeDeskMapId: workspace.activeDeskMapId,
     instrumentTypes: workspace.instrumentTypes,
   });
+  await Promise.all([
+    useOwnerStore.getState().setWorkspace(workspace.workspaceId),
+    useMapStore.getState().setWorkspace(workspace.workspaceId),
+  ]);
 
   // Attach PDFs from TORS_Documents/
   let pdfCount = 0;
