@@ -5,6 +5,7 @@ import { create } from 'zustand';
 
 export type ViewMode =
   | 'chart'
+  | 'leasehold'
   | 'master'
   | 'flowchart'
   | 'owners'

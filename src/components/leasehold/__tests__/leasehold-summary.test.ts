@@ -1,0 +1,203 @@
+import { describe, expect, it } from 'vitest';
+import { d } from '../../../engine/decimal';
+import { createBlankNode, type OwnershipNode } from '../../../types/node';
+import { createBlankLease, createBlankOwner } from '../../../types/owner';
+import { buildLeaseholdUnitSummary } from '../leasehold-summary';
+
+describe('leasehold-summary', () => {
+  it('derives tract participation, owner acres, and weighted unit royalty', () => {
+    const deskMaps = [
+      {
+        id: 'dm-1',
+        name: 'Tract 1',
+        code: 'T1',
+        tractId: 'T1',
+        grossAcres: '100',
+        pooledAcres: '80',
+        description: 'North tract',
+        nodeIds: ['n1', 'n2', 'l1', 'l2'],
+      },
+      {
+        id: 'dm-2',
+        name: 'Tract 2',
+        code: 'T2',
+        tractId: 'T2',
+        grossAcres: '200',
+        pooledAcres: '120',
+        description: 'South tract',
+        nodeIds: ['n3', 'n4', 'l3', 'l4'],
+      },
+    ];
+    const owners = [
+      createBlankOwner('ws-1', { id: 'owner-1', name: 'A Owner' }),
+      createBlankOwner('ws-1', { id: 'owner-2', name: 'B Owner' }),
+      createBlankOwner('ws-1', { id: 'owner-3', name: 'C Owner' }),
+      createBlankOwner('ws-1', { id: 'owner-4', name: 'D Owner' }),
+    ];
+    const nodes: OwnershipNode[] = [
+      {
+        ...createBlankNode('n1', null),
+        grantee: 'A Owner',
+        linkedOwnerId: 'owner-1',
+        fraction: '0.5',
+        initialFraction: '0.5',
+      },
+      {
+        ...createBlankNode('n2', null),
+        grantee: 'B Owner',
+        linkedOwnerId: 'owner-2',
+        fraction: '0.5',
+        initialFraction: '0.5',
+      },
+      {
+        ...createBlankNode('n3', null),
+        grantee: 'C Owner',
+        linkedOwnerId: 'owner-3',
+        fraction: '0.25',
+        initialFraction: '0.25',
+      },
+      {
+        ...createBlankNode('n4', null),
+        grantee: 'D Owner',
+        linkedOwnerId: 'owner-4',
+        fraction: '0.75',
+        initialFraction: '0.75',
+      },
+      {
+        ...createBlankNode('l1', 'n1'),
+        type: 'related' as const,
+        relatedKind: 'lease' as const,
+      },
+      {
+        ...createBlankNode('l2', 'n2'),
+        type: 'related' as const,
+        relatedKind: 'lease' as const,
+      },
+      {
+        ...createBlankNode('l3', 'n3'),
+        type: 'related' as const,
+        relatedKind: 'lease' as const,
+      },
+      {
+        ...createBlankNode('l4', 'n4'),
+        type: 'related' as const,
+        relatedKind: 'lease' as const,
+      },
+    ];
+    const leases = [
+      createBlankLease('ws-1', 'owner-1', {
+        id: 'lease-1',
+        leaseName: 'A Lease',
+        lessee: 'Operator A',
+        royaltyRate: '1/8',
+        leasedInterest: '0.5',
+      }),
+      createBlankLease('ws-1', 'owner-2', {
+        id: 'lease-2',
+        leaseName: 'B Lease',
+        lessee: 'Operator A',
+        royaltyRate: '1/8',
+        leasedInterest: '0.5',
+      }),
+      createBlankLease('ws-1', 'owner-3', {
+        id: 'lease-3',
+        leaseName: 'C Lease',
+        lessee: 'Operator A',
+        royaltyRate: '1/8',
+        leasedInterest: '0.25',
+      }),
+      createBlankLease('ws-1', 'owner-4', {
+        id: 'lease-4',
+        leaseName: 'D Lease',
+        lessee: 'Operator A',
+        royaltyRate: '1/8',
+        leasedInterest: '0.75',
+      }),
+    ];
+
+    const summary = buildLeaseholdUnitSummary({
+      deskMaps,
+      nodes,
+      owners,
+      leases,
+      leaseholdOrris: [
+        {
+          id: 'orri-unit',
+          payee: 'Unit Override',
+          scope: 'unit',
+          deskMapId: null,
+          burdenFraction: '1/16',
+          burdenBasis: 'gross_8_8',
+          effectiveDate: '2024-01-01',
+          sourceDocNo: 'ORRI-1',
+          notes: '',
+        },
+        {
+          id: 'orri-tract',
+          payee: 'Tract Override',
+          scope: 'tract',
+          deskMapId: 'dm-2',
+          burdenFraction: '1/32',
+          burdenBasis: 'gross_8_8',
+          effectiveDate: '2024-01-02',
+          sourceDocNo: 'ORRI-2',
+          notes: '',
+        },
+        {
+          id: 'orri-tracked-only',
+          payee: 'Tracked Only Override',
+          scope: 'tract',
+          deskMapId: 'dm-1',
+          burdenFraction: '1/64',
+          burdenBasis: 'net_revenue_interest',
+          effectiveDate: '2024-01-03',
+          sourceDocNo: 'ORRI-3',
+          notes: '',
+        },
+      ],
+    });
+
+    expect(summary.totalGrossAcres).toBe('300');
+    expect(summary.totalPooledAcres).toBe('200');
+    expect(summary.tractCount).toBe(2);
+    expect(summary.fullyLeasedTractCount).toBe(2);
+    expect(summary.totalRoyaltyDecimal).toBe('0.125');
+    expect(summary.totalOrriDecimal).toBe('0.08125');
+    expect(summary.preWorkingInterestDecimal).toBe('0.79375');
+    expect(summary.includedOrriCount).toBe(2);
+    expect(summary.excludedOrriCount).toBe(1);
+    expect(summary.tracts[0]?.weightedRoyaltyRate).toBe('0.125');
+    expect(summary.tracts[1]?.weightedRoyaltyRate).toBe('0.125');
+    expect(summary.tracts[0]?.grossOrriRate).toBe('0.0625');
+    expect(summary.tracts[1]?.grossOrriRate).toBe('0.09375');
+    expect(Number(summary.tracts[0]?.unitParticipation)).toBeCloseTo(0.4, 12);
+    expect(Number(summary.tracts[1]?.unitParticipation)).toBeCloseTo(0.6, 12);
+    expect(Number(summary.tracts[0]?.unitRoyaltyDecimal)).toBeCloseTo(0.05, 12);
+    expect(Number(summary.tracts[1]?.unitRoyaltyDecimal)).toBeCloseTo(0.075, 12);
+    expect(Number(summary.tracts[0]?.unitOrriDecimal)).toBeCloseTo(0.025, 12);
+    expect(Number(summary.tracts[1]?.unitOrriDecimal)).toBeCloseTo(0.05625, 12);
+    expect(Number(summary.tracts[0]?.preWorkingInterestDecimal)).toBeCloseTo(0.325, 12);
+    expect(Number(summary.tracts[1]?.preWorkingInterestDecimal)).toBeCloseTo(0.46875, 12);
+    expect(summary.tracts[0]?.owners[0]).toEqual(
+      expect.objectContaining({
+        ownerName: 'A Owner',
+        netMineralAcres: '40',
+      })
+    );
+    expect(d(summary.tracts[0]?.owners[0]?.unitRoyaltyDecimal ?? '0').toNumber()).toBeCloseTo(0.025, 12);
+    expect(summary.orris).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'orri-unit',
+          includedInMath: true,
+          unitDecimal: '0.0625',
+        }),
+        expect.objectContaining({
+          id: 'orri-tracked-only',
+          includedInMath: false,
+          unitDecimal: '0',
+        }),
+      ])
+    );
+  });
+});

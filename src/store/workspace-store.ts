@@ -7,9 +7,18 @@
 import { create } from 'zustand';
 import { useMapStore } from './map-store';
 import type { OwnershipNode, DeskMap } from '../types/node';
-import { normalizeOwnershipNode } from '../types/node';
+import { normalizeDeskMap, normalizeOwnershipNode } from '../types/node';
+import {
+  createBlankLeaseholdUnit,
+  normalizeLeaseholdOrri,
+  normalizeLeaseholdOrris,
+  normalizeLeaseholdUnit,
+  type LeaseholdOrri,
+  type LeaseholdUnit,
+} from '../types/leasehold';
 import {
   executeConveyance,
+  executeCreateNpri,
   executeRebalance,
   executePredecessorInsert,
   executeAttachConveyance,
@@ -22,10 +31,11 @@ const DEFAULT_INSTRUMENT_TYPES = [
   'Deed',
   'Mineral Deed',
   'Royalty Deed',
+  'Special Warranty Deed',
   'Warranty Deed',
   'Quitclaim Deed',
-  'Assignment',
   'Oil & Gas Lease',
+  'Surface Use Agreement',
   'Order',
   'Probate',
   'Will',
@@ -41,6 +51,8 @@ interface WorkspaceState {
   projectName: string;
   nodes: OwnershipNode[];
   deskMaps: DeskMap[];
+  leaseholdUnit: LeaseholdUnit;
+  leaseholdOrris: LeaseholdOrri[];
   activeDeskMapId: string | null;
   instrumentTypes: string[];
 
@@ -54,6 +66,10 @@ interface WorkspaceState {
 
   // Actions
   setProjectName: (name: string) => void;
+  updateLeaseholdUnit: (fields: Partial<LeaseholdUnit>) => void;
+  addLeaseholdOrri: (orri?: Partial<LeaseholdOrri>) => string;
+  updateLeaseholdOrri: (id: string, fields: Partial<LeaseholdOrri>) => void;
+  removeLeaseholdOrri: (id: string) => void;
   setActiveNode: (id: string | null) => void;
   setActiveDeskMap: (id: string) => void;
   addInstrumentType: (type: string) => void;
@@ -61,11 +77,16 @@ interface WorkspaceState {
   // Desk map management
   createDeskMap: (name: string, code: string, initialNodeIds?: string[]) => string;
   renameDeskMap: (id: string, name: string) => void;
+  updateDeskMapDetails: (
+    id: string,
+    fields: Partial<Pick<DeskMap, 'grossAcres' | 'pooledAcres' | 'description'>>
+  ) => void;
   deleteDeskMap: (id: string) => void;
   getActiveDeskMapNodes: () => OwnershipNode[];
 
   // Math operations (delegate to engine, replace nodes on success)
   convey: (parentId: string, newNodeId: string, share: string, form: Partial<OwnershipNode>) => boolean;
+  createNpri: (parentId: string, newNodeId: string, share: string, form: Partial<OwnershipNode>) => boolean;
   rebalance: (nodeId: string, newInitialFraction: string, formFields?: Partial<OwnershipNode>) => boolean;
   insertPredecessor: (activeNodeId: string, newPredecessorId: string, newInitialFraction: string, form: Partial<OwnershipNode>) => boolean;
   attachConveyance: (activeNodeId: string, attachParentId: string, calcShare: string, form: Partial<OwnershipNode>) => boolean;
@@ -75,6 +96,7 @@ interface WorkspaceState {
   updateNode: (id: string, fields: Partial<OwnershipNode>) => void;
   removeNode: (id: string) => void;
   clearLinkedOwner: (ownerId: string) => void;
+  clearLinkedLease: (leaseId: string) => void;
   addNodeToActiveDeskMap: (nodeId: string) => void;
   setHydrated: () => void;
   loadWorkspace: (data: {
@@ -82,6 +104,8 @@ interface WorkspaceState {
     projectName: string;
     nodes: OwnershipNode[];
     deskMaps: DeskMap[];
+    leaseholdUnit?: LeaseholdUnit;
+    leaseholdOrris?: LeaseholdOrri[];
     activeDeskMapId: string | null;
     instrumentTypes?: string[];
   }) => void;
@@ -97,6 +121,8 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
   projectName: 'Untitled Workspace',
   nodes: [],
   deskMaps: [],
+  leaseholdUnit: createBlankLeaseholdUnit(),
+  leaseholdOrris: [],
   activeDeskMapId: null,
   instrumentTypes: [...DEFAULT_INSTRUMENT_TYPES],
   _hydrated: false,
@@ -105,6 +131,41 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
   lastError: null,
 
   setProjectName: (name) => set({ projectName: name }),
+  updateLeaseholdUnit: (fields) =>
+    set((state) => ({
+      leaseholdUnit: normalizeLeaseholdUnit({
+        ...state.leaseholdUnit,
+        ...fields,
+      }),
+    })),
+  addLeaseholdOrri: (orri = {}) => {
+    const next = normalizeLeaseholdOrri(orri);
+    set((state) => ({
+      leaseholdOrris: [...state.leaseholdOrris, next],
+    }));
+    return next.id;
+  },
+  updateLeaseholdOrri: (id, fields) =>
+    set((state) => {
+      const validDeskMapIds = new Set(state.deskMaps.map((deskMap) => deskMap.id));
+      return {
+        leaseholdOrris: state.leaseholdOrris.map((orri) =>
+          orri.id === id
+            ? normalizeLeaseholdOrri(
+                {
+                  ...orri,
+                  ...fields,
+                },
+                { validDeskMapIds }
+              )
+            : orri
+        ),
+      };
+    }),
+  removeLeaseholdOrri: (id) =>
+    set((state) => ({
+      leaseholdOrris: state.leaseholdOrris.filter((orri) => orri.id !== id),
+    })),
   setActiveNode: (id) => set({ activeNodeId: id }),
   setActiveDeskMap: (id) => set({ activeDeskMapId: id }),
   addInstrumentType: (type) =>
@@ -117,7 +178,22 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
   createDeskMap: (name, code, initialNodeIds) => {
     const id = `dm-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
     set((state) => ({
-      deskMaps: [...state.deskMaps, { id, name, code, tractId: null, nodeIds: initialNodeIds ?? [] }],
+      deskMaps: [
+        ...state.deskMaps,
+        normalizeDeskMap(
+          {
+            id,
+            name,
+            code,
+            tractId: null,
+            grossAcres: '',
+            pooledAcres: '',
+            description: '',
+            nodeIds: initialNodeIds ?? [],
+          },
+          name
+        ),
+      ],
       activeDeskMapId: id,
     }));
     return id;
@@ -128,13 +204,30 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
       deskMaps: state.deskMaps.map((dm) => (dm.id === id ? { ...dm, name } : dm)),
     })),
 
+  updateDeskMapDetails: (id, fields) =>
+    set((state) => ({
+      deskMaps: state.deskMaps.map((deskMap) =>
+        deskMap.id === id
+          ? normalizeDeskMap(
+              {
+                ...deskMap,
+                ...fields,
+              },
+              deskMap.name
+            )
+          : deskMap
+      ),
+    })),
+
   deleteDeskMap: (id) =>
     set((state) => {
       void useMapStore.getState().unlinkDeskMap(id);
+      const remainingDeskMaps = state.deskMaps.filter((dm) => dm.id !== id);
       return {
-        deskMaps: state.deskMaps.filter((dm) => dm.id !== id),
+        deskMaps: remainingDeskMaps,
+        leaseholdOrris: state.leaseholdOrris.filter((orri) => orri.deskMapId !== id),
         activeDeskMapId: state.activeDeskMapId === id
-          ? (state.deskMaps.find((dm) => dm.id !== id)?.id ?? null)
+          ? (remainingDeskMaps[0]?.id ?? null)
           : state.activeDeskMapId,
       };
     }),
@@ -156,7 +249,43 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
       const dmUpdate = state.activeDeskMapId
         ? { deskMaps: state.deskMaps.map((dm) => dm.id === state.activeDeskMapId ? { ...dm, nodeIds: [...dm.nodeIds, newNodeId] } : dm) }
         : {};
-      set({ nodes: result.data, lastAudit: result.audit, lastError: null, ...dmUpdate });
+      set({
+        nodes: result.data.map((node) => normalizeOwnershipNode(node)),
+        lastAudit: result.audit,
+        lastError: null,
+        ...dmUpdate,
+      });
+      return true;
+    }
+    set({ lastError: result.error.message });
+    return false;
+  },
+
+  createNpri: (parentId, newNodeId, share, form) => {
+    const state = get();
+    const result = executeCreateNpri({
+      allNodes: state.nodes,
+      parentId,
+      newNodeId,
+      share,
+      form,
+    });
+    if (result.ok) {
+      const dmUpdate = state.activeDeskMapId
+        ? {
+            deskMaps: state.deskMaps.map((dm) =>
+              dm.id === state.activeDeskMapId
+                ? { ...dm, nodeIds: [...dm.nodeIds, newNodeId] }
+                : dm
+            ),
+          }
+        : {};
+      set({
+        nodes: result.data.map((node) => normalizeOwnershipNode(node)),
+        lastAudit: result.audit,
+        lastError: null,
+        ...dmUpdate,
+      });
       return true;
     }
     set({ lastError: result.error.message });
@@ -168,7 +297,11 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
     const parentId = findParentId(nodes, nodeId);
     const result = executeRebalance({ allNodes: nodes, nodeId, newInitialFraction, parentId: parentId ?? undefined, formFields });
     if (result.ok) {
-      set({ nodes: result.data, lastAudit: result.audit, lastError: null });
+      set({
+        nodes: result.data.map((node) => normalizeOwnershipNode(node)),
+        lastAudit: result.audit,
+        lastError: null,
+      });
       return true;
     }
     set({ lastError: result.error.message });
@@ -190,7 +323,12 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
       const dmUpdate = state.activeDeskMapId
         ? { deskMaps: state.deskMaps.map((dm) => dm.id === state.activeDeskMapId ? { ...dm, nodeIds: [...dm.nodeIds, newPredecessorId] } : dm) }
         : {};
-      set({ nodes: result.data, lastAudit: result.audit, lastError: null, ...dmUpdate });
+      set({
+        nodes: result.data.map((node) => normalizeOwnershipNode(node)),
+        lastAudit: result.audit,
+        lastError: null,
+        ...dmUpdate,
+      });
       return true;
     }
     set({ lastError: result.error.message });
@@ -201,7 +339,11 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
     const { nodes } = get();
     const result = executeAttachConveyance({ allNodes: nodes, activeNodeId, attachParentId, calcShare, form });
     if (result.ok) {
-      set({ nodes: result.data, lastAudit: result.audit, lastError: null });
+      set({
+        nodes: result.data.map((node) => normalizeOwnershipNode(node)),
+        lastAudit: result.audit,
+        lastError: null,
+      });
       return true;
     }
     set({ lastError: result.error.message });
@@ -228,7 +370,7 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
       .filter((node) => !remainingIds.has(node.id))
       .map((node) => node.id);
     set({
-      nodes: result.data,
+      nodes: result.data.map((node) => normalizeOwnershipNode(node)),
       deskMaps: state.deskMaps.map((dm) => ({
         ...dm,
         nodeIds: dm.nodeIds.filter((nodeId) => remainingIds.has(nodeId)),
@@ -252,6 +394,13 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
       ),
     })),
 
+  clearLinkedLease: (leaseId) =>
+    set((state) => ({
+      nodes: state.nodes.map((node) =>
+        node.linkedLeaseId === leaseId ? { ...node, linkedLeaseId: null } : node
+      ),
+    })),
+
   addNodeToActiveDeskMap: (nodeId) =>
     set((state) => {
       if (!state.activeDeskMapId) return {};
@@ -267,16 +416,35 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
   setHydrated: () => set({ _hydrated: true }),
 
   loadWorkspace: (data) =>
-    set({
-      workspaceId: data.workspaceId,
-      projectName: data.projectName,
-      nodes: data.nodes.map((node) => normalizeOwnershipNode(node)),
-      deskMaps: data.deskMaps,
-      activeDeskMapId: data.activeDeskMapId ?? data.deskMaps[0]?.id ?? null,
-      instrumentTypes: data.instrumentTypes?.length ? data.instrumentTypes : [...DEFAULT_INSTRUMENT_TYPES],
-      _hydrated: true,
-      activeNodeId: null,
-      lastAudit: null,
-      lastError: null,
+    set(() => {
+      const normalizedNodes = data.nodes.map((node) => normalizeOwnershipNode(node));
+      const nodeIdSet = new Set(normalizedNodes.map((node) => node.id));
+      const normalizedDeskMaps = data.deskMaps.map((deskMap, index) =>
+        normalizeDeskMap(
+          {
+            ...deskMap,
+            nodeIds: deskMap.nodeIds.filter((nodeId) => nodeIdSet.has(nodeId)),
+          },
+          `Tract ${index + 1}`
+        )
+      );
+      const validDeskMapIds = new Set(normalizedDeskMaps.map((deskMap) => deskMap.id));
+
+      return {
+        workspaceId: data.workspaceId,
+        projectName: data.projectName,
+        nodes: normalizedNodes,
+        deskMaps: normalizedDeskMaps,
+        leaseholdUnit: normalizeLeaseholdUnit(data.leaseholdUnit),
+        leaseholdOrris: normalizeLeaseholdOrris(data.leaseholdOrris, { validDeskMapIds }),
+        activeDeskMapId: data.activeDeskMapId ?? normalizedDeskMaps[0]?.id ?? null,
+        instrumentTypes: data.instrumentTypes?.length
+          ? data.instrumentTypes
+          : [...DEFAULT_INSTRUMENT_TYPES],
+        _hydrated: true,
+        activeNodeId: null,
+        lastAudit: null,
+        lastError: null,
+      };
     }),
 }));

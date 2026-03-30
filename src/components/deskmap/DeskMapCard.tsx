@@ -6,35 +6,39 @@
  * Click opens the edit modal.
  * Related docs render as compact rectangles beneath the card.
  */
+import { memo } from 'react';
 import { formatAsFraction } from '../../engine/fraction-display';
 import { d, serialize } from '../../engine/decimal';
+import { useWorkspaceStore } from '../../store/workspace-store';
 import type { OwnershipNode } from '../../types/node';
+import type { DeskMapPrimaryLeaseSummary } from './deskmap-coverage';
 
 interface DeskMapCardProps {
   node: OwnershipNode;
   parentInitialFraction: string | null;
   relatedDocs: OwnershipNode[];
+  leaseSummary: DeskMapPrimaryLeaseSummary | null;
   onEdit: (nodeId: string) => void;
   onConvey: (nodeId: string) => void;
   onPrecede: (nodeId: string) => void;
   onAttachDoc: (nodeId: string) => void;
   onDelete: (nodeId: string) => void;
   onViewPdf: (nodeId: string) => void;
-  isActive: boolean;
 }
 
-export default function DeskMapCard({
+function DeskMapCard({
   node,
   parentInitialFraction,
   relatedDocs,
+  leaseSummary,
   onEdit,
   onConvey,
   onPrecede,
   onAttachDoc,
   onDelete,
   onViewPdf,
-  isActive,
 }: DeskMapCardProps) {
+  const isActive = useWorkspaceStore((state) => state.activeNodeId === node.id);
   const initial = d(node.initialFraction);
   const remaining = d(node.fraction);
   const holdsInterest = node.type !== 'related' && remaining.greaterThan(0);
@@ -88,11 +92,23 @@ export default function DeskMapCard({
                 {node.instrument || 'Document'}
               </span>
             </div>
-            {(node.date || node.fileDate) && (
-              <span className="text-[10px] text-ink-light font-mono ml-2 shrink-0">
-                {node.date || node.fileDate}
-              </span>
-            )}
+            <div className="flex items-center gap-1.5 ml-2 shrink-0">
+              {holdsInterest && (
+                <span className="rounded-full border border-sky-200 bg-sky-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-sky-800">
+                  Present Owner
+                </span>
+              )}
+              {leaseSummary && holdsInterest && (
+                <span className="rounded-full border border-emerald-200 bg-emerald-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-emerald-800">
+                  Leased
+                </span>
+              )}
+              {(node.date || node.fileDate) && (
+                <span className="text-[10px] text-ink-light font-mono">
+                  {node.date || node.fileDate}
+                </span>
+              )}
+            </div>
           </div>
           {(node.vol || node.page || node.docNo) && (
             <div className="text-[9px] text-ink-light/70 font-mono mt-0.5">
@@ -180,6 +196,26 @@ export default function DeskMapCard({
   );
 }
 
+function deskMapCardPropsAreEqual(
+  previous: DeskMapCardProps,
+  next: DeskMapCardProps
+): boolean {
+  return (
+    previous.node === next.node &&
+    previous.parentInitialFraction === next.parentInitialFraction &&
+    previous.relatedDocs === next.relatedDocs &&
+    previous.leaseSummary === next.leaseSummary &&
+    previous.onEdit === next.onEdit &&
+    previous.onConvey === next.onConvey &&
+    previous.onPrecede === next.onPrecede &&
+    previous.onAttachDoc === next.onAttachDoc &&
+    previous.onDelete === next.onDelete &&
+    previous.onViewPdf === next.onViewPdf
+  );
+}
+
+export default memo(DeskMapCard, deskMapCardPropsAreEqual);
+
 // ── Related document chip ───────────────────────────────
 
 function RelatedDocChip({
@@ -195,14 +231,14 @@ function RelatedDocChip({
 }) {
   return (
     <div
-      className="flex items-center gap-1.5 px-2 py-1 rounded border border-gold/30 bg-gold/5 cursor-pointer hover:bg-gold/10 transition-colors"
+      className="flex items-center gap-1.5 px-2 py-1 rounded border cursor-pointer transition-colors border-gold/30 bg-gold/5 hover:bg-gold/10"
       onClick={(e) => {
         e.stopPropagation();
         onEdit(doc.id);
       }}
     >
       <div className="flex-1 min-w-0">
-        <div className="text-[9px] font-semibold text-gold uppercase tracking-wider truncate">
+        <div className="text-[9px] font-semibold uppercase tracking-wider truncate text-gold">
           {doc.instrument || 'Related Doc'}
         </div>
         {(doc.date || doc.fileDate) && (
@@ -246,6 +282,7 @@ function RelatedDocChip({
 const ACTION_VARIANTS = {
   muted: 'text-ink-light hover:bg-ink-light/10',
   primary: 'text-leather hover:bg-leather/10',
+  lease: 'text-emerald-700 hover:bg-emerald-100',
   accent: 'text-gold hover:bg-gold/10',
   danger: 'text-seal hover:bg-seal/10',
 } as const;

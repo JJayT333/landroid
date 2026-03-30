@@ -12,7 +12,14 @@ import {
   saveOwnerDoc,
   type OwnerWorkspaceData,
 } from '../storage/owner-persistence';
-import type { ContactLog, Lease, Owner, OwnerDoc } from '../types/owner';
+import type {
+  ContactLog,
+  Lease,
+  Owner,
+  OwnerDoc,
+  OwnerPanelTab,
+} from '../types/owner';
+import { normalizeLease } from '../types/owner';
 import { useMapStore } from './map-store';
 import { useWorkspaceStore } from './workspace-store';
 
@@ -23,6 +30,12 @@ function touch<T extends { updatedAt: string }>(record: T): T {
   };
 }
 
+function normalizeLeases(leases: Lease[], workspaceId: string) {
+  return leases.map((lease) =>
+    normalizeLease(lease, { workspaceId, ownerId: lease.ownerId })
+  );
+}
+
 interface OwnerState {
   workspaceId: string | null;
   owners: Owner[];
@@ -30,6 +43,7 @@ interface OwnerState {
   contacts: ContactLog[];
   docs: OwnerDoc[];
   selectedOwnerId: string | null;
+  selectedOwnerTab: OwnerPanelTab;
   _hydrated: boolean;
   setWorkspace: (workspaceId: string) => Promise<void>;
   replaceWorkspaceData: (
@@ -38,6 +52,7 @@ interface OwnerState {
   ) => Promise<void>;
   exportWorkspaceData: () => Promise<OwnerWorkspaceData>;
   selectOwner: (ownerId: string | null) => void;
+  selectOwnerTab: (tab: OwnerPanelTab) => void;
   addOwner: (owner: Owner) => Promise<void>;
   updateOwner: (id: string, fields: Partial<Owner>) => Promise<void>;
   removeOwner: (id: string) => Promise<void>;
@@ -59,6 +74,7 @@ export const useOwnerStore = create<OwnerState>()((set, get) => ({
   contacts: [],
   docs: [],
   selectedOwnerId: null,
+  selectedOwnerTab: 'info',
   _hydrated: false,
 
   setWorkspace: async (workspaceId) => {
@@ -66,23 +82,29 @@ export const useOwnerStore = create<OwnerState>()((set, get) => ({
     set({
       workspaceId,
       owners: data.owners,
-      leases: data.leases,
+      leases: normalizeLeases(data.leases, workspaceId),
       contacts: data.contacts,
       docs: data.docs,
       selectedOwnerId: null,
+      selectedOwnerTab: 'info',
       _hydrated: true,
     });
   },
 
   replaceWorkspaceData: async (workspaceId, data) => {
-    await replaceOwnerWorkspaceData(workspaceId, data);
+    const normalizedLeases = normalizeLeases(data.leases, workspaceId);
+    await replaceOwnerWorkspaceData(workspaceId, {
+      ...data,
+      leases: normalizedLeases,
+    });
     set({
       workspaceId,
       owners: data.owners.map((owner) => ({ ...owner, workspaceId })),
-      leases: data.leases.map((lease) => ({ ...lease, workspaceId })),
+      leases: normalizedLeases,
       contacts: data.contacts.map((contact) => ({ ...contact, workspaceId })),
       docs: data.docs.map((doc) => ({ ...doc, workspaceId })),
       selectedOwnerId: null,
+      selectedOwnerTab: 'info',
       _hydrated: true,
     });
   },
@@ -93,6 +115,7 @@ export const useOwnerStore = create<OwnerState>()((set, get) => ({
   },
 
   selectOwner: (selectedOwnerId) => set({ selectedOwnerId }),
+  selectOwnerTab: (selectedOwnerTab) => set({ selectedOwnerTab }),
 
   addOwner: async (owner) => {
     const workspaceId = get().workspaceId ?? owner.workspaceId;
@@ -103,6 +126,7 @@ export const useOwnerStore = create<OwnerState>()((set, get) => ({
         left.name.localeCompare(right.name)
       ),
       selectedOwnerId: next.id,
+      selectedOwnerTab: 'info',
     }));
   },
 
@@ -128,12 +152,17 @@ export const useOwnerStore = create<OwnerState>()((set, get) => ({
       contacts: state.contacts.filter((contact) => contact.ownerId !== id),
       docs: state.docs.filter((doc) => doc.ownerId !== id),
       selectedOwnerId: state.selectedOwnerId === id ? null : state.selectedOwnerId,
+      selectedOwnerTab:
+        state.selectedOwnerId === id ? 'info' : state.selectedOwnerTab,
     }));
   },
 
   addLease: async (lease) => {
     const workspaceId = get().workspaceId ?? lease.workspaceId;
-    const next = { ...lease, workspaceId };
+    const next = normalizeLease(lease, {
+      workspaceId,
+      ownerId: lease.ownerId,
+    });
     await saveLease(next);
     set((state) => ({ leases: [...state.leases, next] }));
   },
@@ -141,7 +170,13 @@ export const useOwnerStore = create<OwnerState>()((set, get) => ({
   updateLease: async (id, fields) => {
     const current = get().leases.find((lease) => lease.id === id);
     if (!current) return;
-    const next = touch({ ...current, ...fields, workspaceId: current.workspaceId });
+    const next = normalizeLease(
+      touch({ ...current, ...fields, workspaceId: current.workspaceId }),
+      {
+        workspaceId: current.workspaceId,
+        ownerId: current.ownerId,
+      }
+    );
     await saveLease(next);
     set((state) => ({
       leases: state.leases.map((lease) => (lease.id === id ? next : lease)),
@@ -150,6 +185,7 @@ export const useOwnerStore = create<OwnerState>()((set, get) => ({
 
   removeLease: async (id) => {
     await deleteLease(id);
+    useWorkspaceStore.getState().clearLinkedLease(id);
     await useMapStore.getState().unlinkLease(id);
     set((state) => ({
       leases: state.leases.filter((lease) => lease.id !== id),

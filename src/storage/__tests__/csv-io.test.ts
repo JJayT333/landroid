@@ -8,6 +8,9 @@ function buildCsv() {
       name: 'Imported Tract',
       code: 'T1',
       tractId: 'T1',
+      grossAcres: '160',
+      pooledAcres: '120',
+      description: 'Imported tract description',
       nodes: [
         {
           id: 'root-1',
@@ -39,5 +42,7 @@ describe('csv-io', () => {
     expect(second.workspaceId).toBeTruthy();
     expect(first.workspaceId).not.toBe(second.workspaceId);
     expect(first.nodes[0]?.linkedOwnerId).toBeNull();
+    expect(first.deskMaps[0]?.pooledAcres).toBe('120');
+    expect(first.leaseholdOrris).toEqual([]);
   });
 });

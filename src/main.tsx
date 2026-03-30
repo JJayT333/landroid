@@ -9,6 +9,14 @@ import { useWorkspaceStore } from './store/workspace-store';
 import { useCanvasStore } from './store/canvas-store';
 import { saveWorkspaceToDb, loadWorkspaceFromDb } from './storage/workspace-persistence';
 import { saveCanvasToDb, loadCanvasFromDb } from './storage/canvas-persistence';
+import {
+  buildCanvasAutosavePayload,
+  buildWorkspaceAutosavePayload,
+  canvasAutosaveStateChanged,
+  captureCanvasAutosaveSnapshot,
+  captureWorkspaceAutosaveSnapshot,
+  workspaceAutosaveStateChanged,
+} from './storage/autosave-change-detection';
 
 // ── Auto-load saved workspace on startup ─────────────────
 async function bootstrapWorkspace() {
@@ -45,71 +53,39 @@ loadCanvasFromDb().then((data) => {
 
 // ── Auto-save workspace on changes (debounced 2s) ────────
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
-let prevSnapshot: string | null = null;
+let prevWorkspaceSnapshot: ReturnType<typeof captureWorkspaceAutosaveSnapshot> | null = null;
 
 useWorkspaceStore.subscribe((state) => {
   if (!state._hydrated) return;
-  const snapshot = JSON.stringify({
-    workspaceId: state.workspaceId,
-    projectName: state.projectName,
-    nodes: state.nodes,
-    deskMaps: state.deskMaps,
-    activeDeskMapId: state.activeDeskMapId,
-    instrumentTypes: state.instrumentTypes,
-  });
-  if (snapshot === prevSnapshot) return;
-  prevSnapshot = snapshot;
+  if (!prevWorkspaceSnapshot) {
+    prevWorkspaceSnapshot = captureWorkspaceAutosaveSnapshot(state);
+    return;
+  }
+  if (!workspaceAutosaveStateChanged(prevWorkspaceSnapshot, state)) return;
+  prevWorkspaceSnapshot = captureWorkspaceAutosaveSnapshot(state);
 
   if (saveTimer) clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
-    saveWorkspaceToDb({
-      workspaceId: state.workspaceId,
-      projectName: state.projectName,
-      nodes: state.nodes,
-      deskMaps: state.deskMaps,
-      activeDeskMapId: state.activeDeskMapId,
-      instrumentTypes: state.instrumentTypes,
-    });
+    saveWorkspaceToDb(buildWorkspaceAutosavePayload(state));
   }, 2000);
 });
 
 // ── Auto-save canvas on changes (debounced 2s) ───────────
 let canvasSaveTimer: ReturnType<typeof setTimeout> | null = null;
-let prevCanvasSnapshot: string | null = null;
+let prevCanvasSnapshot: ReturnType<typeof captureCanvasAutosaveSnapshot> | null = null;
 
 useCanvasStore.subscribe((state) => {
   if (!state._hydrated) return;
-  const snapshot = JSON.stringify({
-    nodes: state.nodes,
-    edges: state.edges,
-    viewport: state.viewport,
-    gridCols: state.gridCols,
-    gridRows: state.gridRows,
-    orientation: state.orientation,
-    pageSize: state.pageSize,
-    horizontalSpacingFactor: state.horizontalSpacingFactor,
-    verticalSpacingFactor: state.verticalSpacingFactor,
-    snapToGrid: state.snapToGrid,
-    gridSize: state.gridSize,
-  });
-  if (snapshot === prevCanvasSnapshot) return;
-  prevCanvasSnapshot = snapshot;
+  if (!prevCanvasSnapshot) {
+    prevCanvasSnapshot = captureCanvasAutosaveSnapshot(state);
+    return;
+  }
+  if (!canvasAutosaveStateChanged(prevCanvasSnapshot, state)) return;
+  prevCanvasSnapshot = captureCanvasAutosaveSnapshot(state);
 
   if (canvasSaveTimer) clearTimeout(canvasSaveTimer);
   canvasSaveTimer = setTimeout(() => {
-    saveCanvasToDb({
-      nodes: state.nodes,
-      edges: state.edges,
-      viewport: state.viewport,
-      gridCols: state.gridCols,
-      gridRows: state.gridRows,
-      orientation: state.orientation,
-      pageSize: state.pageSize,
-      horizontalSpacingFactor: state.horizontalSpacingFactor,
-      verticalSpacingFactor: state.verticalSpacingFactor,
-      snapToGrid: state.snapToGrid,
-      gridSize: state.gridSize,
-    });
+    saveCanvasToDb(buildCanvasAutosavePayload(state));
   }, 2000);
 });
 

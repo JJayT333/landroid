@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import FormField from '../shared/FormField';
-import type { Lease } from '../../types/owner';
-import { createBlankLease } from '../../types/owner';
+import { createBlankLease, normalizeLease, type Lease } from '../../types/owner';
+import { d } from '../../engine/decimal';
+import { formatAsFraction } from '../../engine/fraction-display';
+import { normalizeInterestString, parseInterestString } from '../../utils/interest-string';
 
 interface OwnerLeasesTabProps {
   workspaceId: string;
@@ -28,11 +30,20 @@ export default function OwnerLeasesTab({
   };
 
   const beginEdit = (lease: Lease) => {
-    setDraft({ ...lease });
+    setDraft(normalizeLease(lease, { workspaceId, ownerId }));
   };
 
   const set = (field: keyof Lease, value: string) => {
     setDraft((current) => (current ? { ...current, [field]: value } : current));
+  };
+
+  const formatLeasedInterest = (value: string) => {
+    const normalized = normalizeInterestString(value);
+    if (!normalized) {
+      return null;
+    }
+
+    return formatAsFraction(d(parseInterestString(normalized)));
   };
 
   return (
@@ -49,6 +60,16 @@ export default function OwnerLeasesTab({
               label="Lessee"
               value={draft.lessee}
               onChange={(value) => set('lessee', value)}
+            />
+            <FormField
+              label="Royalty"
+              value={draft.royaltyRate}
+              onChange={(value) => set('royaltyRate', value)}
+            />
+            <FormField
+              label="Leased Interest"
+              value={draft.leasedInterest}
+              onChange={(value) => set('leasedInterest', value)}
             />
             <FormField
               label="Effective Date"
@@ -99,10 +120,15 @@ export default function OwnerLeasesTab({
               disabled={saving}
               onClick={async () => {
                 setSaving(true);
+                const normalizedDraft = {
+                  ...draft,
+                  royaltyRate: draft.royaltyRate.trim(),
+                  leasedInterest: normalizeInterestString(draft.leasedInterest),
+                };
                 if (leases.some((lease) => lease.id === draft.id)) {
-                  await onUpdate(draft.id, draft);
+                  await onUpdate(draft.id, normalizedDraft);
                 } else {
-                  await onAdd(draft);
+                  await onAdd(normalizedDraft);
                 }
                 setSaving(false);
                 setDraft(null);
@@ -143,6 +169,18 @@ export default function OwnerLeasesTab({
                 <div className="text-xs text-ink-light">
                   {lease.lessee ? `Lessee: ${lease.lessee}` : 'Lessee not recorded'}
                 </div>
+                {(lease.royaltyRate || lease.leasedInterest) && (
+                  <div className="text-xs text-ink-light">
+                    {[
+                      lease.royaltyRate ? `Royalty ${lease.royaltyRate}` : '',
+                      lease.leasedInterest
+                        ? `Leased ${formatLeasedInterest(lease.leasedInterest)}`
+                        : '',
+                    ]
+                      .filter(Boolean)
+                      .join(' • ')}
+                  </div>
+                )}
                 <div className="text-xs text-ink-light">
                   {lease.effectiveDate || 'No effective date'}
                   {lease.expirationDate ? ` to ${lease.expirationDate}` : ''}

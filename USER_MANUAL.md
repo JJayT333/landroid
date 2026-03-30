@@ -24,8 +24,9 @@ Then open `http://localhost:5173/`.
 
 ## 2) Main navigation
 
-The top bar has six view buttons:
+The top bar has seven view buttons:
 - `Desk Map`
+- `Leasehold`
 - `Flowchart`
 - `Runsheet`
 - `Owners`
@@ -35,9 +36,11 @@ The top bar has six view buttons:
 The top bar also has:
 - `Save` to export a `.landroid` workspace snapshot
 - `Load` to import a `.landroid` or `.csv` file
-- `Stress (100/150/200)` to load sample tract data for testing
+- `Stress (100/150/500)` to load sample tract data for testing
+- `Leasehold (5 Tracts)` to load a five-tract unit demo with acreage and lease data
 
 The current project name appears in the top bar. Local autosave still uses browser storage, but `Save` now captures workspace data, flowchart canvas state, owner records, owner documents, map assets, and research imports in the exported `.landroid` file.
+The top-left brand area can also carry a custom logo for demo or prospect-specific presentation.
 
 ## 3) Desk Map view
 
@@ -51,6 +54,7 @@ The current project name appears in the top bar. Local autosave still uses brows
 - `+ Add Tract` creates a new tract tab.
 
 Deleting a tract tab does not delete the underlying nodes from the workspace. It only removes that tab container.
+Gross acres and tract descriptions now live on the tract record itself, but you edit those values from the `Leasehold` view instead of the Desk Map tab strip.
 
 ### Working with title cards
 - `+ Add Root` starts a new title chain in the active tract.
@@ -59,12 +63,65 @@ Deleting a tract tab does not delete the underlying nodes from the workspace. It
 - Related documents stay attached to a title card and do not change ownership math.
 - Cards that still retain interest are visually emphasized so they are easier to spot.
 - The node edit modal includes an `Owner Record` section so you can create or open a linked owner record without crowding the card footer.
+- The node edit modal also includes a `Lease / Lessee Node` section for present-interest mineral owners. Use that button to create or reopen the terminal lessee node.
+- The node edit modal also includes an `Add NPRI` action for present-interest mineral owners. Use it to create a separate fixed or floating NPRI branch without reducing the mineral ownership total.
+- Current-owner cards now distinguish ownership from leasing:
+  - blue `Present Owner` status for the mineral owner who still holds the interest
+  - green `Leased` status when that owner has an active lease on file
+- The mineral-owner card stays part of the main title tree and does not turn into a separate lessor card.
+- The attached green lessee node is the lease-side view. It is terminal in Desk Map, holds the lease terms and metadata, and stays linked back to the same owner record so Desk Map and `Owners` use the same lease data.
+- NPRI nodes render as their own amber royalty cards. They can convey within the NPRI branch, but they stay separate from the mineral-owner coverage totals.
+
+### Coverage totals
+The floating summary panel in the top-left now separates three coverage checks:
+- `Found in Chain` shows how much of the tract is currently accounted for in the active ownership chain.
+- `Linked Owners` shows how much of the tract is tied to structured owner records.
+- `Leased` shows how much of the tract is covered by active leases on those linked owners.
+
+These totals are mineral totals only. NPRI branches are tracked separately on Desk Map and are not deducted from `Found in Chain`, because the actual royalty-payment math is deferred to later lessee-side workflows.
+
+These are intentionally different numbers. A tract can be fully found before it is fully linked to owner records, and fully linked before it is fully leased.
 
 ### Important delete behavior
 Deleting a conveyance branch removes that branch and restores the deleted conveyed amount back to the original grantor or parent. This is safer than simply dropping the branch and losing the fraction.
 
 ### Empty-state behavior
 If a tract has no cards yet, start with `+ Add Root` or load a `.landroid` or `.csv` file.
+
+### Presentation watermark
+LANDroid can display a small full-color prospect mark in the top navigation next to the `Desk Map` button so it stays visible across pages. This is visual context only and does not affect node behavior, math, or printing.
+
+## Leasehold view
+
+`Leasehold` is the acreage-first review surface for the same tract records you see in `Desk Map`.
+
+### What it does today
+- Treats the current workspace's Desk Maps as one provisional unit
+- Lets you set unit name, operator / lessee, effective date, and a short unit description
+- Lets you set `gross acres`, `pooled acres`, and a short tract description for each Desk Map
+- Derives tract participation from pooled acres
+- Derives each present owner's net tract acres from the current mineral fraction on Desk Map
+- Pulls active lease data from `Owners` so the tract summary and owner rows stay tied to the same lease record
+- Calculates weighted tract royalty and total unit royalty from the active lease rates now on file
+- Tracks leasehold-side ORRIs at either unit or tract scope, with an explicit burden-basis field
+- Calculates ORRI and pre-WI NRI totals only for gross `8/8` ORRIs in this first pass
+
+### Current assumptions
+- Desk Map remains the title source of truth
+- `Owners` remains the lease-record source of truth
+- Pooled acres drive participation and payout decimals
+- The starter demo begins with pooled acres equal to gross acres on every tract for easier audit checks
+- Only gross `8/8` ORRIs are included in the current math; NRI- and WI-based ORRIs are tracked but excluded for now
+- Working-interest splits, division-order rows, and payout math are intentionally not modeled in this slice yet
+- Assignments remain outside Desk Map and outside this first Leasehold tab pass
+
+### Leasehold demo workspace
+- `Leasehold (5 Tracts)` loads a dedicated five-tract unit demo
+- The tract gross acres are `100`, `200`, `300`, `400`, and `500`
+- The tract pooled acres match those same `100`, `200`, `300`, `400`, and `500` values
+- Every present owner in that demo is leased to the same lessee at `1/8` royalty so the first royalty totals are easier to inspect
+- The demo also starts with one unit-wide gross `1/16` ORRI so the burden summary has a clean check number
+- The tract descriptions are prefilled so you can see how the tab is meant to be used before entering your own data
 
 ## 4) Runsheet view
 
@@ -145,6 +202,7 @@ Useful notes:
 - Mark the main prospect map as the featured map. `Maps` opens to that map first.
 - Use `Present` mode for a cleaner map/story view.
 - Use `Edit` mode to update metadata, place image-based regions, and save outside reference links.
+- Map reference links accept `http://` and `https://` URLs; plain domains are normalized to `https://`, and unsupported schemes are blocked.
 - Add metadata such as county, prospect, effective date, and source.
 - Optionally link the map or a region to a desk map, title node, owner record, or lease.
 - Preview supported file types inline, or download them back out.
@@ -165,19 +223,28 @@ Useful notes:
 - direct links back to the official RRC downloads page
 - workspace-scoped imports of downloaded files, including CSV, JSON, PDF, images, ZIPs, shapefile parts, ASCII, and EBCDIC files
 - inline preview for browser-friendly formats, with raw-file staging for harder legacy formats
+- readable table preview for `}`-delimited RRC TXT files when LANDroid can recognize a header row or known column layout
 - a structured decoder for `Drilling Permits Pending Approval` core files:
   `dp_drilling_permit_pending`, `dp_wellbore_pending`, and `dp_latlongs_pending`
+- a fixed-width structured decoder for `Drilling Permit Master` and `Drilling Permit Master and Trailer`, including core permit rows and lat/long companion records when present
+- a fixed-width structured decoder for `Horizontal Drilling Permits`, turning the row-based ASCII file into a readable permit preview
 
 ### How to use it
 - Pick a dataset family from the left side.
 - Import the files you downloaded from the official RRC site.
 - Use the decoder status badges to see what is preview-ready now versus what still needs parser/manual work.
-- Keep notes with the raw imported file so LANDroid becomes the place where the file and your understanding stay together.
+- Edit title, dataset family, and notes in the detail panel, then use `Save Details` to commit those metadata changes.
+- Use `Reset` if you want to discard local note/title changes before saving.
 - For `Drilling Permits Pending Approval`, import the permit, wellbore, and lat/long TXT files together to unlock the joined permit preview.
+- For `Drilling Permit Master` and `Drilling Permit Master and Trailer`, import the ASCII master files to unlock the fixed-width permit preview. If the lat/long records are present, LANDroid will attach surface and bottom-hole coordinates to the same permit summary.
+- For `Horizontal Drilling Permits`, import the ASCII file to unlock the row-by-row fixed-width permit preview with API, operator, validated-field, and schedule status details.
+- Even supplemental pending-permit TXT files that are not yet part of the joined decoder can now render as an easier-to-read table instead of raw delimiter text.
 
 ### Current scope
 - LANDroid can stage all of these files now, but it does not fully decode every RRC legacy format yet.
 - The pending-permit decoder currently focuses on the core permit/wellbore/lat-long files. Other files in that family are still staged and previewed, but not yet joined into the structured summary.
+- The permit-master decoder currently focuses on the core status and permit records, plus the surface and bottom-hole coordinate records when present. Other companion segment types are still staged and called out honestly instead of being treated as fully decoded.
+- The horizontal-permit decoder currently focuses on the published 360-character row layout for that family. It does not yet cross-link those rows to other RRC families inside LANDroid.
 - EBCDIC-heavy families are stored/imported first and decoded later.
 - This phase favors safe cataloging, file organization, and triage over pretending every format is already solved.
 
@@ -232,6 +299,7 @@ These settings are now included when you save a `.landroid` file.
 These are the main workspace snapshot files. They now include:
 - workspace nodes
 - tract tabs
+- tract gross acres and tract descriptions
 - active tract selection
 - instrument types
 - workspace owner records
@@ -309,7 +377,7 @@ Recent ownership work improved how fractions are stored and displayed.
 - Confirm the affected records have a document number.
 
 ### "I want to test without touching real work"
-- Use the `Stress (100/150/200)` button to load sample tract data.
+- Use the `Stress (100/150/500)` button to load sample tract data.
 - Save a separate `.landroid` snapshot before going back to real data.
 
 ## 13) Practical habits for a new user

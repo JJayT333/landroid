@@ -6,19 +6,21 @@
  * drawing/layout state.
  */
 import { create } from 'zustand';
-import {
-  applyNodeChanges,
-  applyEdgeChanges,
-  addEdge,
-  type Node,
-  type Edge,
-  type NodeChange,
-  type EdgeChange,
-  type Connection,
-  type Viewport,
+import type {
+  Node,
+  Edge,
+  NodeChange,
+  EdgeChange,
+  Connection,
+  Viewport,
 } from '@xyflow/react';
 import { DEFAULT_PAGE_SIZE } from '../engine/flowchart-pages';
 import type { FlowTool, PageOrientation, PageSizeId } from '../types/flowchart';
+import {
+  addCanvasEdge,
+  applyCanvasEdgeChanges,
+  applyCanvasNodeChanges,
+} from './canvas-change-utils';
 
 // ── History ──────────────────────────────────────────────
 
@@ -172,15 +174,15 @@ export const useCanvasStore = create<CanvasState>()((set, get) => ({
   // at the right moments (e.g., onNodeDragStart).
 
   onNodesChange: (changes) =>
-    set((s) => ({ nodes: applyNodeChanges(changes, s.nodes) })),
+    set((s) => ({ nodes: applyCanvasNodeChanges(changes, s.nodes) })),
 
   onEdgesChange: (changes) =>
-    set((s) => ({ edges: applyEdgeChanges(changes, s.edges) })),
+    set((s) => ({ edges: applyCanvasEdgeChanges(changes, s.edges) })),
 
   onConnect: (connection) => {
     const s = get();
     set({
-      edges: addEdge(connection, s.edges),
+      edges: addCanvasEdge(connection, s.edges),
       _past: pushToPast(s._past, captureSnapshot(s)),
       _future: [],
     });

@@ -19,6 +19,8 @@ export interface Lease {
   ownerId: string;
   leaseName: string;
   lessee: string;
+  royaltyRate: string;
+  leasedInterest: string;
   effectiveDate: string;
   expirationDate: string;
   status: string;
@@ -40,6 +42,9 @@ export interface ContactLog {
   createdAt: string;
   updatedAt: string;
 }
+
+export const OWNER_PANEL_TABS = ['info', 'leases', 'contacts', 'docs'] as const;
+export type OwnerPanelTab = (typeof OWNER_PANEL_TABS)[number];
 
 export const DOC_CATEGORY_OPTIONS = [
   'Title',
@@ -68,6 +73,10 @@ export interface OwnerDoc {
 
 function nowIso() {
   return new Date().toISOString();
+}
+
+function asString(value: unknown): string {
+  return typeof value === 'string' ? value : '';
 }
 
 export function createBlankOwner(
@@ -106,6 +115,8 @@ export function createBlankLease(
     ownerId,
     leaseName: '',
     lessee: '',
+    royaltyRate: '',
+    leasedInterest: '',
     effectiveDate: '',
     expirationDate: '',
     status: 'Active',
@@ -118,6 +129,33 @@ export function createBlankLease(
   lease.workspaceId = workspaceId;
   lease.ownerId = ownerId;
   return lease;
+}
+
+export function normalizeLease(
+  lease: Pick<Lease, 'id'> & Partial<Lease>,
+  fallback: { workspaceId?: string; ownerId?: string } = {}
+): Lease {
+  const workspaceId = asString(lease.workspaceId) || fallback.workspaceId || '';
+  const ownerId = asString(lease.ownerId) || fallback.ownerId || '';
+  const normalized = createBlankLease(workspaceId, ownerId);
+
+  return {
+    ...normalized,
+    ...lease,
+    workspaceId,
+    ownerId,
+    leaseName: asString(lease.leaseName),
+    lessee: asString(lease.lessee),
+    royaltyRate: asString(lease.royaltyRate),
+    leasedInterest: asString(lease.leasedInterest),
+    effectiveDate: asString(lease.effectiveDate),
+    expirationDate: asString(lease.expirationDate),
+    status: asString(lease.status) || normalized.status,
+    docNo: asString(lease.docNo),
+    notes: asString(lease.notes),
+    createdAt: asString(lease.createdAt) || normalized.createdAt,
+    updatedAt: asString(lease.updatedAt) || normalized.updatedAt,
+  };
 }
 
 export function createBlankContact(

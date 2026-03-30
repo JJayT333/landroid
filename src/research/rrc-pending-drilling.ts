@@ -1,3 +1,5 @@
+import { parseKnownRrcDelimitedRecords } from './rrc-delimited-text';
+
 export const PENDING_DRILLING_DATASET_ID = 'drilling-permits-pending';
 
 export type PendingDrillingSupportedFileKind =
@@ -209,14 +211,6 @@ function locationRank(value: string) {
   return 2;
 }
 
-function trimTrailingDelimiterArtifacts(values: string[], expectedCount: number) {
-  const next = [...values];
-  while (next.length > expectedCount && next[next.length - 1] === '') {
-    next.pop();
-  }
-  return next;
-}
-
 function parseDelimitedRecords<const TColumns extends readonly string[]>(
   text: string,
   columns: TColumns,
@@ -225,39 +219,11 @@ function parseDelimitedRecords<const TColumns extends readonly string[]>(
   rows: Array<PendingDrillingRow<TColumns>>;
   warnings: string[];
 } {
-  const rows: Array<PendingDrillingRow<TColumns>> = [];
-  const warnings: string[] = [];
-  const expectedCount = columns.length;
-  const lines = text.replace(/^\uFEFF/, '').split(/\n/);
-
-  lines.forEach((rawLine, lineIndex) => {
-    const line = rawLine.replace(/\r$/, '');
-    if (line.trim().length === 0) {
-      return;
-    }
-
-    let values = trimTrailingDelimiterArtifacts(line.split('}'), expectedCount);
-
-    if (values.length < expectedCount) {
-      warnings.push(
-        `${fileName} line ${lineIndex + 1} had ${values.length} fields; expected ${expectedCount}. Missing fields were padded as blank.`
-      );
-      values = [...values, ...Array(expectedCount - values.length).fill('')];
-    } else if (values.length > expectedCount) {
-      warnings.push(
-        `${fileName} line ${lineIndex + 1} had ${values.length} fields; expected ${expectedCount}. Extra fields were ignored.`
-      );
-      values = values.slice(0, expectedCount);
-    }
-
-    const row = {} as PendingDrillingRow<TColumns>;
-    (columns as readonly TColumns[number][]).forEach((column, columnIndex) => {
-      row[column] = (values[columnIndex] ?? '').trim();
-    });
-    rows.push(row);
-  });
-
-  return { rows, warnings };
+  const parsed = parseKnownRrcDelimitedRecords(text, columns, fileName);
+  return {
+    rows: parsed.rows as Array<PendingDrillingRow<TColumns>>,
+    warnings: parsed.warnings,
+  };
 }
 
 export function detectPendingDrillingFileKind(

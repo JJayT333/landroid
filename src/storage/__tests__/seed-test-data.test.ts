@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { buildStressWorkspaceData } from '../seed-test-data';
+import { isLeaseNode } from '../../components/deskmap/deskmap-lease-node';
+import {
+  buildLeaseholdDemoWorkspaceData,
+  buildStressWorkspaceData,
+} from '../seed-test-data';
 
 describe('buildStressWorkspaceData', () => {
   it('builds separate tract desk maps sized for stress testing', () => {
@@ -18,14 +22,118 @@ describe('buildStressWorkspaceData', () => {
       'Tract 2',
       'Tract 3',
     ]);
-    expect(cardCounts).toEqual([100, 150, 200]);
+    expect(cardCounts).toEqual([100, 150, 500]);
     expect(workspace.activeDeskMapId).toBe(workspace.deskMaps[0].id);
 
     const nodeIds = new Set(workspace.nodes.map((node) => node.id));
     const deskMapIds = workspace.deskMaps.flatMap((deskMap) => deskMap.nodeIds);
-    expect(cardCounts.reduce((sum, count) => sum + count, 0)).toBe(450);
+    expect(cardCounts.reduce((sum, count) => sum + count, 0)).toBe(750);
     expect(deskMapIds).toHaveLength(workspace.nodes.length);
     expect(new Set(deskMapIds)).toEqual(nodeIds);
     expect(workspace.pdfMappings.length).toBeGreaterThan(0);
+    expect(
+      workspace.nodes.some(
+        (node) => node.type !== 'related' && node.instrument === 'Assignment'
+      )
+    ).toBe(false);
+  });
+
+  it('keeps lease overlays separate from present ownership in the stress fixtures', () => {
+    const workspace = buildStressWorkspaceData();
+    const leasedOwners = workspace.nodes.filter(
+      (node) => node.type !== 'related' && Number(node.fraction) > 0 && node.linkedOwnerId
+    );
+    const leaseNodes = workspace.nodes.filter((node) => isLeaseNode(node));
+
+    expect(
+      workspace.nodes.some(
+        (node) => node.type !== 'related' && node.instrument === 'Oil & Gas Lease'
+      )
+    ).toBe(false);
+    expect(leasedOwners.length).toBeGreaterThan(0);
+    expect(leasedOwners.every((node) => node.linkedOwnerId)).toBe(true);
+    expect(leaseNodes.length).toBeGreaterThan(0);
+    expect(leaseNodes.every((node) => node.linkedLeaseId)).toBe(true);
+    expect(workspace.ownerData.leases).toHaveLength(leaseNodes.length);
+  });
+
+  it('fills the generated desk-map nodes with complete metadata', () => {
+    const workspace = buildStressWorkspaceData();
+
+    for (const node of workspace.nodes) {
+      expect(node.instrument).not.toBe('');
+      expect(node.vol).not.toBe('');
+      expect(node.page).not.toBe('');
+      expect(node.docNo).not.toBe('');
+      expect(node.fileDate).not.toBe('');
+      expect(node.date).not.toBe('');
+      expect(node.grantor).not.toBe('');
+      expect(node.grantee).not.toBe('');
+      expect(node.landDesc).not.toBe('');
+      expect(node.remarks).not.toBe('');
+      expect(node.manualAmount).not.toBe('');
+
+      if (node.type !== 'related') {
+        expect(node.numerator).not.toBe('0');
+        expect(node.denominator).not.toBe('');
+      }
+
+      if (node.isDeceased) {
+        expect(node.obituary).not.toBe('');
+        expect(node.graveyardLink).not.toBe('');
+      }
+    }
+  });
+
+  it('builds a dedicated 5-tract leasehold demo with acreage and lease coverage', () => {
+    const workspace = buildLeaseholdDemoWorkspaceData();
+    const currentOwners = workspace.nodes.filter(
+      (node) => node.type !== 'related' && Number(node.fraction) > 0
+    );
+    const currentOwnerIds = new Set(currentOwners.map((node) => node.id));
+    const leaseParents = new Set(
+      workspace.nodes.flatMap((node) =>
+        isLeaseNode(node) && node.parentId ? [node.parentId] : []
+      )
+    );
+
+    expect(workspace.projectName).toBe('Leasehold Demo — 5 Tracts');
+    expect(workspace.deskMaps).toHaveLength(5);
+    expect(workspace.deskMaps.map((deskMap) => deskMap.grossAcres)).toEqual([
+      '100',
+      '200',
+      '300',
+      '400',
+      '500',
+    ]);
+    expect(workspace.deskMaps.map((deskMap) => deskMap.pooledAcres)).toEqual([
+      '100',
+      '200',
+      '300',
+      '400',
+      '500',
+    ]);
+    expect(workspace.deskMaps.every((deskMap) => deskMap.description.length > 0)).toBe(true);
+    expect(workspace.leaseholdUnit).toEqual({
+      name: 'Raven Bend Unit',
+      description:
+        'Five-tract pooled unit template with clean acreage and full lease coverage for early leasehold framework work.',
+      operator: 'Permian Basin Operating, LLC',
+      effectiveDate: '2024-01-01',
+    });
+    expect(workspace.leaseholdOrris).toEqual([
+      expect.objectContaining({
+        payee: 'Raven Bend Override, LP',
+        scope: 'unit',
+        burdenFraction: '1/16',
+        burdenBasis: 'gross_8_8',
+      }),
+    ]);
+    expect(leaseParents).toEqual(currentOwnerIds);
+    expect(workspace.ownerData.leases).toHaveLength(currentOwners.length);
+    expect(new Set(workspace.ownerData.leases.map((lease) => lease.royaltyRate))).toEqual(
+      new Set(['1/8'])
+    );
+    expect(workspace.ownerData.leases.every((lease) => lease.leasedInterest !== '')).toBe(true);
   });
 });

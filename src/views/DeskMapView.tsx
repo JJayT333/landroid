@@ -5,106 +5,100 @@
  * Pan/zoom via mouse drag and scroll wheel.
  * Click a card to edit, hover for action buttons (convey, precede, delete).
  */
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useUIStore } from '../store/ui-store';
 import { useOwnerStore } from '../store/owner-store';
 import { useWorkspaceStore } from '../store/workspace-store';
+import { d } from '../engine/decimal';
+import { formatAsFraction } from '../engine/fraction-display';
 import DeskMapCard from '../components/deskmap/DeskMapCard';
+import DeskMapLeaseCard from '../components/deskmap/DeskMapLeaseCard';
+import DeskMapNpriCard from '../components/deskmap/DeskMapNpriCard';
+import { isLeaseNode } from '../components/deskmap/deskmap-lease-node';
+import {
+  buildDeskMapTree,
+  type DeskMapTreeNode,
+} from '../components/deskmap/deskmap-tree';
 import DeskMapTabs from '../components/deskmap/DeskMapTabs';
+import {
+  calculateDeskMapCoverageSummary,
+  pickPrimaryLease,
+  toDeskMapPrimaryLeaseSummary,
+  type DeskMapPrimaryLeaseSummary,
+} from '../components/deskmap/deskmap-coverage';
 import NodeEditModal from '../components/modals/NodeEditModal';
 import ConveyModal from '../components/modals/ConveyModal';
+import CreateNpriModal from '../components/modals/CreateNpriModal';
 import PredecessorModal from '../components/modals/PredecessorModal';
 import AttachDocModal from '../components/modals/AttachDocModal';
+import AttachLeaseModal from '../components/modals/AttachLeaseModal';
 import PdfViewerModal from '../components/modals/PdfViewerModal';
-import type { OwnershipNode } from '../types/node';
-import { createBlankNode } from '../types/node';
+import { createBlankNode, isNpriNode } from '../types/node';
 import { createBlankOwner } from '../types/owner';
-
-// ── Tree building ───────────────────────────────────────
-
-interface TreeNode {
-  node: OwnershipNode;
-  children: TreeNode[];
-  relatedDocs: TreeNode[];
-}
-
-function buildTree(nodes: OwnershipNode[]): TreeNode[] {
-  const nodeIds = new Set(nodes.map((n) => n.id));
-  const childrenOf = new Map<string, OwnershipNode[]>();
-  const relatedOf = new Map<string, OwnershipNode[]>();
-
-  for (const n of nodes) {
-    if (!n.parentId || n.parentId === 'unlinked') continue;
-    if (n.type === 'related') {
-      if (!relatedOf.has(n.parentId)) relatedOf.set(n.parentId, []);
-      relatedOf.get(n.parentId)!.push(n);
-    } else {
-      if (!childrenOf.has(n.parentId)) childrenOf.set(n.parentId, []);
-      childrenOf.get(n.parentId)!.push(n);
-    }
-  }
-
-  function build(node: OwnershipNode): TreeNode {
-    return {
-      node,
-      children: (childrenOf.get(node.id) ?? []).map(build),
-      relatedDocs: (relatedOf.get(node.id) ?? []).map((r) => ({
-        node: r,
-        children: [],
-        relatedDocs: [],
-      })),
-    };
-  }
-
-  // Root detection: nodes with no parentId (null, undefined, or empty string)
-  // OR nodes whose parentId points to a node not in the current visible set.
-  // This handles CSV imports where root parentId might be "" instead of null,
-  // and desk map filtering where a parent exists but isn't in this desk map.
-  const roots = nodes.filter(
-    (n) =>
-      n.type !== 'related' &&
-      (!n.parentId || n.parentId === 'unlinked' || !nodeIds.has(n.parentId))
-  );
-  return roots.map(build);
-}
 
 // ── Tree branch renderer ────────────────────────────────
 
-function TreeBranch({
-  tree,
-  parentInitialFraction,
-  activeNodeId,
-  onEdit,
-  onConvey,
-  onPrecede,
-  onAttachDoc,
-  onDelete,
-  onViewPdf,
-}: {
-  tree: TreeNode;
+interface TreeBranchProps {
+  tree: DeskMapTreeNode;
   parentInitialFraction: string | null;
-  activeNodeId: string | null;
+  leaseSummaryByNodeId: Map<string, DeskMapPrimaryLeaseSummary>;
   onEdit: (id: string) => void;
   onConvey: (id: string) => void;
   onPrecede: (id: string) => void;
   onAttachDoc: (id: string) => void;
   onDelete: (id: string) => void;
   onViewPdf: (id: string) => void;
-}) {
+}
+
+function TreeBranchComponent({
+  tree,
+  parentInitialFraction,
+  leaseSummaryByNodeId,
+  onEdit,
+  onConvey,
+  onPrecede,
+  onAttachDoc,
+  onDelete,
+  onViewPdf,
+}: TreeBranchProps) {
+  const leaseNode = isLeaseNode(tree.node);
+  const npriNode = isNpriNode(tree.node);
+
   return (
     <div className="tree-branch">
-      <DeskMapCard
-        node={tree.node}
-        parentInitialFraction={parentInitialFraction}
-        relatedDocs={tree.relatedDocs.map((r) => r.node)}
-        onEdit={onEdit}
-        onConvey={onConvey}
-        onPrecede={onPrecede}
-        onAttachDoc={onAttachDoc}
-        onDelete={onDelete}
-        onViewPdf={onViewPdf}
-        isActive={activeNodeId === tree.node.id}
-      />
+      {leaseNode ? (
+        <DeskMapLeaseCard
+          node={tree.node}
+          onEdit={onEdit}
+          onAttachDoc={onAttachDoc}
+          onDelete={onDelete}
+          onViewPdf={onViewPdf}
+        />
+      ) : npriNode ? (
+        <DeskMapNpriCard
+          node={tree.node}
+          relatedDocs={tree.relatedDocs}
+          onEdit={onEdit}
+          onConvey={onConvey}
+          onPrecede={onPrecede}
+          onAttachDoc={onAttachDoc}
+          onDelete={onDelete}
+          onViewPdf={onViewPdf}
+        />
+      ) : (
+        <DeskMapCard
+          node={tree.node}
+          parentInitialFraction={parentInitialFraction}
+          relatedDocs={tree.relatedDocs}
+          leaseSummary={leaseSummaryByNodeId.get(tree.node.id) ?? null}
+          onEdit={onEdit}
+          onConvey={onConvey}
+          onPrecede={onPrecede}
+          onAttachDoc={onAttachDoc}
+          onDelete={onDelete}
+          onViewPdf={onViewPdf}
+        />
+      )}
 
       {tree.children.length > 0 && (
         <div className="tree-children">
@@ -113,7 +107,7 @@ function TreeBranch({
               key={child.node.id}
               tree={child}
               parentInitialFraction={tree.node.initialFraction}
-              activeNodeId={activeNodeId}
+              leaseSummaryByNodeId={leaseSummaryByNodeId}
               onEdit={onEdit}
               onConvey={onConvey}
               onPrecede={onPrecede}
@@ -127,6 +121,25 @@ function TreeBranch({
     </div>
   );
 }
+
+function treeBranchPropsAreEqual(
+  previous: TreeBranchProps,
+  next: TreeBranchProps
+): boolean {
+  return (
+    previous.tree === next.tree &&
+    previous.parentInitialFraction === next.parentInitialFraction &&
+    previous.leaseSummaryByNodeId === next.leaseSummaryByNodeId &&
+    previous.onEdit === next.onEdit &&
+    previous.onConvey === next.onConvey &&
+    previous.onPrecede === next.onPrecede &&
+    previous.onAttachDoc === next.onAttachDoc &&
+    previous.onDelete === next.onDelete &&
+    previous.onViewPdf === next.onViewPdf
+  );
+}
+
+const TreeBranch = memo(TreeBranchComponent, treeBranchPropsAreEqual);
 
 // ── Pan/zoom container ──────────────────────────────────
 // Uses Pointer Events with setPointerCapture for reliable drag tracking.
@@ -223,7 +236,7 @@ function PanZoomContainer({ children }: { children: React.ReactNode }) {
   return (
     <div
       ref={containerRef}
-      className="w-full h-full overflow-hidden bg-canvas-bg cursor-grab active:cursor-grabbing select-none touch-none"
+      className="relative z-10 w-full h-full overflow-hidden cursor-grab active:cursor-grabbing select-none touch-none"
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
@@ -249,34 +262,95 @@ function deriveCounty(landDesc: string) {
   return match?.[1]?.trim() ?? '';
 }
 
+function formatCoveragePercent(value: string) {
+  return `${d(value).times(100).toFixed(2)}%`;
+}
+
+function describeCoverageDelta(
+  value: string,
+  {
+    positiveLabel,
+    negativeLabel,
+    balancedLabel,
+  }: {
+    positiveLabel: string;
+    negativeLabel: string;
+    balancedLabel: string;
+  }
+) {
+  const delta = d(value);
+  if (delta.greaterThan(0)) {
+    return `${positiveLabel} ${formatAsFraction(delta)}`;
+  }
+  if (delta.lessThan(0)) {
+    return `${negativeLabel} ${formatAsFraction(delta.abs())}`;
+  }
+  return balancedLabel;
+}
+
+function coverageTone(value: string) {
+  const delta = d(value);
+  if (delta.lessThanOrEqualTo(0)) {
+    return 'border-emerald-200 bg-emerald-50 text-emerald-900';
+  }
+  return 'border-amber-200 bg-amber-50 text-amber-900';
+}
+
+function CoverageCard({
+  label,
+  fraction,
+  detail,
+  toneClassName,
+}: {
+  label: string;
+  fraction: string;
+  detail: string;
+  toneClassName: string;
+}) {
+  return (
+    <div className={`rounded-md border px-2 py-1.5 ${toneClassName}`}>
+      <div className="text-[9px] font-semibold uppercase tracking-wider leading-tight">
+        {label}
+      </div>
+      <div className="mt-1 text-xs font-semibold font-mono">
+        {formatAsFraction(d(fraction))}
+      </div>
+      <div className="text-[9px] mt-0.5 opacity-80">
+        {formatCoveragePercent(fraction)}
+      </div>
+      <div className="text-[9px] mt-1 opacity-80 leading-tight">
+        {detail}
+      </div>
+    </div>
+  );
+}
+
 // ── Main view ───────────────────────────────────────────
 
 export default function DeskMapView() {
   const setView = useUIStore((state) => state.setView);
   const owners = useOwnerStore((state) => state.owners);
+  const leases = useOwnerStore((state) => state.leases);
   const ownerWorkspaceId = useOwnerStore((state) => state.workspaceId);
   const addOwnerRecord = useOwnerStore((state) => state.addOwner);
   const selectOwner = useOwnerStore((state) => state.selectOwner);
   const workspaceId = useWorkspaceStore((state) => state.workspaceId);
   const nodes = useWorkspaceStore((s) => s.nodes);
   const deskMaps = useWorkspaceStore((s) => s.deskMaps);
-  const activeNodeId = useWorkspaceStore((s) => s.activeNodeId);
   const setActiveNode = useWorkspaceStore((s) => s.setActiveNode);
   const removeNode = useWorkspaceStore((s) => s.removeNode);
   const addNode = useWorkspaceStore((s) => s.addNode);
   const updateNode = useWorkspaceStore((s) => s.updateNode);
   const createDeskMap = useWorkspaceStore((s) => s.createDeskMap);
   const addNodeToActiveDeskMap = useWorkspaceStore((s) => s.addNodeToActiveDeskMap);
-  const getActiveDeskMapNodes = useWorkspaceStore((s) => s.getActiveDeskMapNodes);
-  // Subscribe to activeDeskMapId so the view re-renders when tabs switch.
-  // Used below in the effect dependency and referenced by getActiveDeskMapNodes.
   const activeDeskMapId = useWorkspaceStore((s) => s.activeDeskMapId);
-  void activeDeskMapId;
 
   const [editNodeId, setEditNodeId] = useState<string | null>(null);
   const [conveyParentId, setConveyParentId] = useState<string | null>(null);
   const [precedeNodeId, setPrecedeNodeId] = useState<string | null>(null);
   const [attachDocParentId, setAttachDocParentId] = useState<string | null>(null);
+  const [leaseParentId, setLeaseParentId] = useState<string | null>(null);
+  const [npriParentId, setNpriParentId] = useState<string | null>(null);
   const [pdfViewNodeId, setPdfViewNodeId] = useState<string | null>(null);
 
   const hydrated = useWorkspaceStore((s) => s._hydrated);
@@ -291,19 +365,86 @@ export default function DeskMapView() {
     }
   }, [hydrated, deskMaps.length, createDeskMap]);
 
-  // Show nodes for active desk map (or all if none selected)
-  const visibleNodes = getActiveDeskMapNodes();
-  const visibleCardCount = visibleNodes.filter((node) => node.type !== 'related').length;
-  const trees = buildTree(visibleNodes);
-  const activeDeskMap = deskMaps.find((deskMap) => deskMap.id === activeDeskMapId) ?? null;
-  const editNode = editNodeId ? nodes.find((n) => n.id === editNodeId) : null;
-  const conveyParent = conveyParentId ? nodes.find((n) => n.id === conveyParentId) : null;
-  const precedeNode = precedeNodeId ? nodes.find((n) => n.id === precedeNodeId) : null;
+  const nodeById = useMemo(
+    () => new Map(nodes.map((node) => [node.id, node])),
+    [nodes]
+  );
+  const ownerById = useMemo(
+    () => new Map(owners.map((owner) => [owner.id, owner])),
+    [owners]
+  );
+  const primaryLeaseByOwnerId = useMemo(() => {
+    const groupedLeases = new Map<string, typeof leases>();
+    leases.forEach((lease) => {
+      const existing = groupedLeases.get(lease.ownerId) ?? [];
+      existing.push(lease);
+      groupedLeases.set(lease.ownerId, existing);
+    });
+
+    return new Map(
+      [...groupedLeases.entries()]
+        .map(([ownerId, ownerLeases]) => [
+          ownerId,
+          toDeskMapPrimaryLeaseSummary(pickPrimaryLease(ownerLeases)),
+        ] as const)
+        .filter((entry): entry is [string, DeskMapPrimaryLeaseSummary] => entry[1] !== null)
+    );
+  }, [leases]);
+  const activeDeskMap = useMemo(
+    () => deskMaps.find((deskMap) => deskMap.id === activeDeskMapId) ?? null,
+    [activeDeskMapId, deskMaps]
+  );
+  const visibleNodes = useMemo(() => {
+    if (!activeDeskMap || activeDeskMap.nodeIds.length === 0) {
+      return [];
+    }
+    const idSet = new Set(activeDeskMap.nodeIds);
+    return nodes.filter((node) => idSet.has(node.id));
+  }, [activeDeskMap, nodes]);
+  const visibleCardCount = useMemo(
+    () =>
+      visibleNodes.reduce(
+        (count, node) => count + (node.type === 'related' && !isLeaseNode(node) ? 0 : 1),
+        0
+      ),
+    [visibleNodes]
+  );
+  const leaseSummaryByNodeId = useMemo(
+    () =>
+      new Map(
+        visibleNodes.flatMap((node) => {
+          if (node.type === 'related' || !node.linkedOwnerId || isNpriNode(node)) {
+            return [];
+          }
+          const leaseSummary = primaryLeaseByOwnerId.get(node.linkedOwnerId);
+          return leaseSummary ? ([[node.id, leaseSummary]] as Array<[string, DeskMapPrimaryLeaseSummary]>) : [];
+        })
+      ),
+    [primaryLeaseByOwnerId, visibleNodes]
+  );
+  const coverageSummary = useMemo(
+    () => calculateDeskMapCoverageSummary(visibleNodes, primaryLeaseByOwnerId),
+    [primaryLeaseByOwnerId, visibleNodes]
+  );
+  const trees = useMemo(() => buildDeskMapTree(visibleNodes), [visibleNodes]);
+  const editNode = editNodeId ? nodeById.get(editNodeId) ?? null : null;
+  const conveyParent = conveyParentId ? nodeById.get(conveyParentId) ?? null : null;
+  const precedeNode = precedeNodeId ? nodeById.get(precedeNodeId) ?? null : null;
+  const leaseParent = leaseParentId ? nodeById.get(leaseParentId) ?? null : null;
+  const npriParent = npriParentId ? nodeById.get(npriParentId) ?? null : null;
+  const pdfViewNode = pdfViewNodeId ? nodeById.get(pdfViewNodeId) ?? null : null;
 
   const handleEdit = useCallback((id: string) => {
+    const node = nodeById.get(id) ?? null;
+    if (node && isLeaseNode(node) && node.parentId) {
+      setActiveNode(node.id);
+      setLeaseParentId(node.parentId);
+      return;
+    }
+
     setActiveNode(id);
     setEditNodeId(id);
-  }, [setActiveNode]);
+  }, [nodeById, setActiveNode]);
 
   const handleConvey = useCallback((id: string) => {
     setConveyParentId(id);
@@ -318,26 +459,44 @@ export default function DeskMapView() {
   }, []);
 
   const handleDelete = useCallback((id: string) => {
-    if (
-      confirm(
-        'Delete this node? Its branch will be removed, and any conveyed amount will be restored to the grantor.'
-      )
-    ) {
+    const node = nodeById.get(id) ?? null;
+    const message = node?.type === 'related'
+      ? 'Delete this related node? Any attached related records beneath it will also be removed.'
+      : 'Delete this node? Its branch will be removed, and any conveyed amount will be restored to the grantor.';
+
+    if (confirm(message)) {
       removeNode(id);
     }
-  }, [removeNode]);
+  }, [nodeById, removeNode]);
 
   const handleViewPdf = useCallback((id: string) => {
     setPdfViewNodeId(id);
   }, []);
 
+  const handleManageLease = useCallback(
+    (nodeId: string) => {
+      setEditNodeId(null);
+      setLeaseParentId(nodeId);
+    },
+    []
+  );
+
+  const handleManageNpri = useCallback(
+    (nodeId: string) => {
+      setEditNodeId(null);
+      setNpriParentId(nodeId);
+    },
+    []
+  );
+
   const handleManageOwner = useCallback(
     async (nodeId: string) => {
-      const node = nodes.find((candidate) => candidate.id === nodeId);
-      if (!node || node.type === 'related') return;
+      const node = nodeById.get(nodeId) ?? null;
+      if (!node) return;
+      if (node.type === 'related' && !node.linkedOwnerId) return;
 
       const linkedOwner = node.linkedOwnerId
-        ? owners.find((owner) => owner.id === node.linkedOwnerId) ?? null
+        ? ownerById.get(node.linkedOwnerId) ?? null
         : null;
 
       if (linkedOwner) {
@@ -370,9 +529,9 @@ export default function DeskMapView() {
     [
       activeDeskMap?.name,
       addOwnerRecord,
-      nodes,
+      nodeById,
       ownerWorkspaceId,
-      owners,
+      ownerById,
       selectOwner,
       setView,
       updateNode,
@@ -399,22 +558,67 @@ export default function DeskMapView() {
       {/* Desk map tabs */}
       <DeskMapTabs />
 
-      <div className="flex-1 relative">
+      <div className="flex-1 relative overflow-hidden bg-canvas-bg">
         {/* Toolbar */}
-        <div className="absolute top-3 left-3 z-10 flex items-center gap-2 rounded-xl bg-parchment/95 backdrop-blur border border-ledger-line shadow-lg px-3 py-2">
-          <button
-            onClick={handleAddRoot}
-            className="px-3 py-1.5 rounded-lg text-xs font-semibold text-leather hover:bg-leather/10 transition-colors"
-          >
-            + Add Root
-          </button>
-          <span className="text-[10px] text-ink-light font-mono">
-            {visibleCardCount} cards
-          </span>
+        <div className="absolute top-3 left-3 z-10 w-[19.5rem] max-w-[calc(100%-1.5rem)] space-y-2.5 rounded-xl bg-parchment/92 backdrop-blur border border-ledger-line shadow-md p-2.5">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleAddRoot}
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold text-leather hover:bg-leather/10 transition-colors"
+            >
+              + Add Root
+            </button>
+            <span className="text-[10px] text-ink-light font-mono">
+              {visibleCardCount} cards
+            </span>
+          </div>
+
+          <div className="space-y-1.5">
+            <div className="text-[9px] font-semibold uppercase tracking-wider text-ink-light">
+              Mineral Coverage
+            </div>
+            <div className="grid grid-cols-3 gap-1.5">
+              <CoverageCard
+                label="Found In Chain"
+                fraction={coverageSummary.currentOwnership}
+                detail={describeCoverageDelta(coverageSummary.missingOwnership, {
+                  positiveLabel: 'Missing',
+                  negativeLabel: 'Over by',
+                  balancedLabel: 'Balanced at 100%',
+                })}
+                toneClassName={coverageTone(coverageSummary.missingOwnership)}
+              />
+              <CoverageCard
+                label="Linked Owners"
+                fraction={coverageSummary.linkedOwnership}
+                detail={describeCoverageDelta(coverageSummary.unlinkedOwnership, {
+                  positiveLabel: 'Unlinked',
+                  negativeLabel: 'Over by',
+                  balancedLabel: 'All current owners linked',
+                })}
+                toneClassName={coverageTone(coverageSummary.unlinkedOwnership)}
+              />
+              <CoverageCard
+                label="Leased"
+                fraction={coverageSummary.leasedOwnership}
+                detail={describeCoverageDelta(coverageSummary.unleasedOwnership, {
+                  positiveLabel: 'Open to lease',
+                  negativeLabel: 'Over by',
+                  balancedLabel: 'Fully leased',
+                })}
+                toneClassName={coverageTone(coverageSummary.unleasedOwnership)}
+              />
+            </div>
+            <div className="flex flex-wrap gap-x-2 gap-y-1 text-[9px] text-ink-light font-mono">
+              <span>{coverageSummary.currentOwnerCount} present owners</span>
+              <span>{coverageSummary.linkedOwnerCount} linked</span>
+              <span>{coverageSummary.leasedOwnerCount} leased</span>
+            </div>
+          </div>
         </div>
 
         {visibleNodes.length === 0 ? (
-          <div className="flex items-center justify-center h-full">
+          <div className="relative z-10 flex items-center justify-center h-full">
             <div className="text-center space-y-3">
               <h2 className="text-xl font-display font-bold text-ink">
                 No title chain yet
@@ -438,7 +642,7 @@ export default function DeskMapView() {
                   key={tree.node.id}
                   tree={tree}
                   parentInitialFraction={null}
-                  activeNodeId={activeNodeId}
+                  leaseSummaryByNodeId={leaseSummaryByNodeId}
                   onEdit={handleEdit}
                   onConvey={handleConvey}
                   onPrecede={handlePrecede}
@@ -457,10 +661,23 @@ export default function DeskMapView() {
             node={editNode}
             linkedOwnerName={
               editNode.linkedOwnerId
-                ? owners.find((owner) => owner.id === editNode.linkedOwnerId)?.name ?? null
+                ? ownerById.get(editNode.linkedOwnerId)?.name ?? null
+                : null
+            }
+            leaseStatusText={
+              editNode.type !== 'related'
+                ? (() => {
+                    const leaseSummary = leaseSummaryByNodeId.get(editNode.id) ?? null;
+                    if (!leaseSummary) return null;
+                    return leaseSummary.lessee
+                      ? `Leased to ${leaseSummary.lessee}`
+                      : 'Lease node on file';
+                  })()
                 : null
             }
             onManageOwner={handleManageOwner}
+            onManageLease={handleManageLease}
+            onManageNpri={handleManageNpri}
             onClose={() => setEditNodeId(null)}
             onViewPdf={(id) => {
               setEditNodeId(null);
@@ -493,10 +710,29 @@ export default function DeskMapView() {
           />
         )}
 
+        {leaseParent && (
+          <AttachLeaseModal
+            parentNode={leaseParent}
+            onClose={() => setLeaseParentId(null)}
+            onSaved={(nodeId) => {
+              setLeaseParentId(null);
+              setActiveNode(nodeId);
+            }}
+          />
+        )}
+
+        {npriParent && (
+          <CreateNpriModal
+            parentNode={npriParent}
+            onClose={() => setNpriParentId(null)}
+          />
+        )}
+
         {/* PDF viewer modal */}
         {pdfViewNodeId && (
           <PdfViewerModal
             nodeId={pdfViewNodeId}
+            fileNameHint={pdfViewNode?.docNo ? `${pdfViewNode.docNo}.pdf` : null}
             onClose={() => setPdfViewNodeId(null)}
           />
         )}

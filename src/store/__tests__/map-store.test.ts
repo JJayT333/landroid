@@ -183,4 +183,38 @@ describe('map-store', () => {
     expect(useMapStore.getState().mapRegions[0]?.nodeId).toBeNull();
     expect(useMapStore.getState().mapRegions[0]?.leaseId).toBeNull();
   });
+
+  it('normalizes reference URLs before persisting them', async () => {
+    const reference = createBlankMapExternalReference('ws-a', {
+      id: 'ref-unsafe',
+      url: 'rrc.texas.gov/resource-center',
+    });
+
+    mocks.saveMapReference.mockResolvedValue(undefined);
+    useMapStore.setState({
+      workspaceId: 'ws-a',
+      mapAssets: [],
+      mapRegions: [],
+      mapReferences: [],
+      _hydrated: true,
+    });
+
+    await useMapStore.getState().addReference(reference);
+
+    expect(mocks.saveMapReference).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'ref-unsafe',
+        url: 'https://rrc.texas.gov/resource-center',
+      })
+    );
+    expect(useMapStore.getState().mapReferences[0]?.url).toBe(
+      'https://rrc.texas.gov/resource-center'
+    );
+
+    await useMapStore.getState().updateReference('ref-unsafe', {
+      url: 'javascript:alert(1)',
+    });
+
+    expect(useMapStore.getState().mapReferences[0]?.url).toBe('');
+  });
 });

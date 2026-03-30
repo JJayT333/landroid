@@ -1,13 +1,16 @@
-import { useState } from 'react';
-import type { ContactLog, Lease, Owner, OwnerDoc } from '../../types/owner';
+import type {
+  ContactLog,
+  Lease,
+  Owner,
+  OwnerDoc,
+  OwnerPanelTab,
+} from '../../types/owner';
 import OwnerContactsTab from './OwnerContactsTab';
 import OwnerDocsTab from './OwnerDocsTab';
 import OwnerInfoTab from './OwnerInfoTab';
 import OwnerLeasesTab from './OwnerLeasesTab';
 
-type TabId = 'info' | 'leases' | 'contacts' | 'docs';
-
-const tabs: { id: TabId; label: string }[] = [
+const tabs: { id: OwnerPanelTab; label: string }[] = [
   { id: 'info', label: 'Info' },
   { id: 'leases', label: 'Leases' },
   { id: 'contacts', label: 'Contacts' },
@@ -20,6 +23,8 @@ interface OwnerDetailPanelProps {
   leases: Lease[];
   contacts: ContactLog[];
   docs: OwnerDoc[];
+  tab: OwnerPanelTab;
+  onChangeTab: (tab: OwnerPanelTab) => void;
   onSaveOwner: (fields: Partial<Owner>) => Promise<void>;
   onDeleteOwner: () => Promise<void>;
   onAddLease: (lease: Lease) => Promise<void>;
@@ -39,6 +44,8 @@ export default function OwnerDetailPanel({
   leases,
   contacts,
   docs,
+  tab,
+  onChangeTab,
   onSaveOwner,
   onDeleteOwner,
   onAddLease,
@@ -51,8 +58,6 @@ export default function OwnerDetailPanel({
   onUpdateDoc,
   onRemoveDoc,
 }: OwnerDetailPanelProps) {
-  const [tab, setTab] = useState<TabId>('info');
-
   return (
     <div className="h-full flex flex-col rounded-xl border border-ledger-line bg-parchment shadow-sm overflow-hidden">
       <div className="px-5 py-4 border-b border-ledger-line bg-ledger">
@@ -69,7 +74,7 @@ export default function OwnerDetailPanel({
           <button
             key={item.id}
             type="button"
-            onClick={() => setTab(item.id)}
+            onClick={() => onChangeTab(item.id)}
             className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
               tab === item.id
                 ? 'bg-leather text-parchment'

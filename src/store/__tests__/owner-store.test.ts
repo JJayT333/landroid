@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { createBlankOwner } from '../../types/owner';
+import { createBlankOwner, type Lease } from '../../types/owner';
 
 const mocks = vi.hoisted(() => ({
   loadOwnerWorkspaceData: vi.fn(),
@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   deleteContact: vi.fn(),
   deleteOwnerDoc: vi.fn(),
   clearLinkedOwner: vi.fn(),
+  clearLinkedLease: vi.fn(),
   unlinkOwner: vi.fn(),
   unlinkLease: vi.fn(),
 }));
@@ -34,6 +35,7 @@ vi.mock('../workspace-store', () => ({
   useWorkspaceStore: {
     getState: () => ({
       clearLinkedOwner: mocks.clearLinkedOwner,
+      clearLinkedLease: mocks.clearLinkedLease,
     }),
   },
 }));
@@ -59,6 +61,7 @@ describe('owner-store', () => {
       contacts: [],
       docs: [],
       selectedOwnerId: null,
+      selectedOwnerTab: 'info',
       _hydrated: false,
     });
   });
@@ -86,6 +89,7 @@ describe('owner-store', () => {
     const state = useOwnerStore.getState();
     expect(state.workspaceId).toBe('ws-b');
     expect(state.selectedOwnerId).toBeNull();
+    expect(state.selectedOwnerTab).toBe('info');
     expect(state.owners).toEqual([]);
   });
 
@@ -106,7 +110,47 @@ describe('owner-store', () => {
       })
     );
     expect(useOwnerStore.getState().selectedOwnerId).toBe('owner-1');
+    expect(useOwnerStore.getState().selectedOwnerTab).toBe('info');
     expect(useOwnerStore.getState().owners[0]?.workspaceId).toBe('ws-active');
+  });
+
+  it('tracks which owner detail tab should open', () => {
+    useOwnerStore.getState().selectOwnerTab('leases');
+    expect(useOwnerStore.getState().selectedOwnerTab).toBe('leases');
+  });
+
+  it('normalizes legacy leases that are missing newer text fields', async () => {
+    mocks.loadOwnerWorkspaceData.mockResolvedValue({
+      owners: [],
+      leases: [
+        {
+          id: 'legacy-lease',
+          workspaceId: 'ws-a',
+          ownerId: 'owner-1',
+          leaseName: 'Legacy Lease',
+          lessee: 'Acme Energy',
+          effectiveDate: '',
+          expirationDate: '',
+          docNo: '',
+          notes: '',
+          createdAt: '',
+          updatedAt: '',
+        } as Lease,
+      ],
+      contacts: [],
+      docs: [],
+    });
+
+    await useOwnerStore.getState().setWorkspace('ws-a');
+
+    expect(useOwnerStore.getState().leases).toEqual([
+      expect.objectContaining({
+        id: 'legacy-lease',
+        royaltyRate: '',
+        leasedInterest: '',
+        status: 'Active',
+      }),
+    ]);
   });
 
   it('removes dependent owner records and clears linked references', async () => {
@@ -123,6 +167,8 @@ describe('owner-store', () => {
           ownerId: owner.id,
           leaseName: 'Lease 1',
           lessee: '',
+          royaltyRate: '',
+          leasedInterest: '',
           effectiveDate: '',
           expirationDate: '',
           status: 'Active',
@@ -162,6 +208,7 @@ describe('owner-store', () => {
         },
       ],
       selectedOwnerId: owner.id,
+      selectedOwnerTab: 'leases',
     });
 
     await useOwnerStore.getState().removeOwner(owner.id);
@@ -174,5 +221,44 @@ describe('owner-store', () => {
     expect(useOwnerStore.getState().contacts).toEqual([]);
     expect(useOwnerStore.getState().docs).toEqual([]);
     expect(useOwnerStore.getState().selectedOwnerId).toBeNull();
+    expect(useOwnerStore.getState().selectedOwnerTab).toBe('info');
+  });
+
+  it('clears linked lease references when a lease is removed', async () => {
+    mocks.deleteLease.mockResolvedValue(undefined);
+    mocks.unlinkLease.mockResolvedValue(undefined);
+    useOwnerStore.setState({
+      workspaceId: 'ws-a',
+      owners: [],
+      leases: [
+        {
+          id: 'lease-1',
+          workspaceId: 'ws-a',
+          ownerId: 'owner-1',
+          leaseName: 'Lease 1',
+          lessee: 'Acme Energy',
+          royaltyRate: '1/4',
+          leasedInterest: '0.125',
+          effectiveDate: '',
+          expirationDate: '',
+          status: 'Active',
+          docNo: '',
+          notes: '',
+          createdAt: '',
+          updatedAt: '',
+        },
+      ],
+      contacts: [],
+      docs: [],
+      selectedOwnerId: null,
+      selectedOwnerTab: 'info',
+    });
+
+    await useOwnerStore.getState().removeLease('lease-1');
+
+    expect(mocks.deleteLease).toHaveBeenCalledWith('lease-1');
+    expect(mocks.clearLinkedLease).toHaveBeenCalledWith('lease-1');
+    expect(mocks.unlinkLease).toHaveBeenCalledWith('lease-1');
+    expect(useOwnerStore.getState().leases).toEqual([]);
   });
 });

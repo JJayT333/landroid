@@ -23,11 +23,11 @@ export const RRC_DATASET_CATALOG: RrcDatasetCatalogItem[] = [
     category: 'Well / Permit',
     cadence: 'Monthly',
     formats: ['ASCII'],
-    decoderStatus: 'Structured Later',
+    decoderStatus: 'Preview Ready',
     summary:
       'Permit information on drilling applications since 1976, including permit dates, lease names, and spacing/density exceptions.',
     notes:
-      'The official page also lists trailer and latitude/longitude variants.',
+      'LANDroid now decodes the core fixed-width status and permit records, with richer coordinate context available from the lat/long variants.',
     officialUrl: RRC_DATASETS_PAGE_URL,
   },
   {
@@ -36,11 +36,11 @@ export const RRC_DATASET_CATALOG: RrcDatasetCatalogItem[] = [
     category: 'Well / Permit',
     cadence: 'Monthly / Daily variants',
     formats: ['ASCII'],
-    decoderStatus: 'Structured Later',
+    decoderStatus: 'Preview Ready',
     summary:
       'Expanded drilling permit data, including monthly and daily files with latitude/longitude variants.',
     notes:
-      'Daily and cumulative monthly lat/long versions are especially promising for later map overlays.',
+      'LANDroid now decodes the core fixed-width permit records and joins in surface/bottom-hole coordinates when the lat/long records are present.',
     officialUrl: RRC_DATASETS_PAGE_URL,
   },
   {
@@ -75,11 +75,11 @@ export const RRC_DATASET_CATALOG: RrcDatasetCatalogItem[] = [
     category: 'Well / Permit',
     cadence: 'Current downloads',
     formats: ['ASCII'],
-    decoderStatus: 'Structured Later',
+    decoderStatus: 'Preview Ready',
     summary:
       'Horizontal well permit sequences including permit number, API number, and permitted fields.',
     notes:
-      'Good candidate for later permit-driven map overlays once structured parsing exists.',
+      'LANDroid now decodes the fixed-width row layout into a readable permit preview.',
     officialUrl: RRC_DATASETS_PAGE_URL,
   },
   {

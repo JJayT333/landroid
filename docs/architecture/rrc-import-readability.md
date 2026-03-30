@@ -150,6 +150,24 @@ These are the easiest to make useful quickly:
   - readable now: core permit/wellbore/lat-long files yes
   - structured parse: first decoder path now live; remaining companion files still staged-only
 
+- `Drilling Permit Master`
+  - format: ASCII
+  - import now: yes
+  - readable now: core fixed-width status/permit records yes
+  - structured parse: first fixed-width decoder path now live; deeper companion segments still staged-only
+
+- `Drilling Permit Master and Trailer`
+  - format: ASCII
+  - import now: yes
+  - readable now: core fixed-width permit records yes; lat/long companion records yes when present
+  - structured parse: first fixed-width decoder path now live; deeper trailer segments still staged-only
+
+- `Horizontal Drilling Permits`
+  - format: ASCII
+  - import now: yes
+  - readable now: core fixed-width row layout yes
+  - structured parse: first row-based fixed-width decoder path now live
+
 - `W-1 Imaged Files`
   - format: PDF/TIFF/ZIP family
   - import now: yes
@@ -168,12 +186,8 @@ These are the easiest to make useful quickly:
 
 ### Strong next-wave imports
 
-These are worth doing after the first-class readable files:
+These are worth doing after the current first-class readable files:
 
-- `Drilling Permit Master`
-- `Drilling Permit Master and Trailer`
-- `Drilling Permit Master and Trailer - Daily / End of Month with Lat/Long`
-- `Horizontal Drilling Permits`
 - `Completion Information in Data Format`
 - `Wellbore Query Data`
 - `High Cost Gas`

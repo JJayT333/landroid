@@ -1,5 +1,5 @@
 import db from './db';
-import type { ContactLog, Lease, Owner, OwnerDoc } from '../types/owner';
+import { normalizeLease, type ContactLog, type Lease, type Owner, type OwnerDoc } from '../types/owner';
 
 export interface OwnerWorkspaceData {
   owners: Owner[];
@@ -18,7 +18,12 @@ export async function loadOwnerWorkspaceData(
     db.ownerDocs.where('workspaceId').equals(workspaceId).toArray(),
   ]);
 
-  return { owners, leases, contacts, docs };
+  return {
+    owners,
+    leases: leases.map((lease) => normalizeLease(lease, { workspaceId })),
+    contacts,
+    docs,
+  };
 }
 
 export async function replaceOwnerWorkspaceData(
@@ -46,7 +51,9 @@ export async function replaceOwnerWorkspaceData(
       }
       if (data.leases.length > 0) {
         await db.leases.bulkPut(
-          data.leases.map((lease) => ({ ...lease, workspaceId }))
+          data.leases.map((lease) =>
+            normalizeLease(lease, { workspaceId, ownerId: lease.ownerId })
+          )
         );
       }
       if (data.contacts.length > 0) {
@@ -68,7 +75,12 @@ export function saveOwner(owner: Owner) {
 }
 
 export function saveLease(lease: Lease) {
-  return db.leases.put(lease);
+  return db.leases.put(
+    normalizeLease(lease, {
+      workspaceId: lease.workspaceId,
+      ownerId: lease.ownerId,
+    })
+  );
 }
 
 export function saveContact(contact: ContactLog) {

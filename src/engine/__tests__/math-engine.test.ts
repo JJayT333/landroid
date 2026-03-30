@@ -10,6 +10,7 @@ import { d } from '../decimal';
 import { formatAsFraction } from '../fraction-display';
 import {
   executeConveyance,
+  executeCreateNpri,
   executeRebalance,
   executePredecessorInsert,
   executeAttachConveyance,
@@ -764,6 +765,89 @@ describe('User scenario: grant + remaining through tree', () => {
 
     // Graph valid
     expect(validateOwnershipGraph(current).valid).toBe(true);
+  });
+});
+
+describe('NPRI branch handling', () => {
+  it('creates an NPRI branch without reducing the mineral parent', () => {
+    const nodes: OwnershipNode[] = [
+      makeNode('grantor', null, '1.000000000', '1.000000000'),
+    ];
+
+    const result = executeCreateNpri({
+      allNodes: nodes,
+      parentId: 'grantor',
+      newNodeId: 'npri-1',
+      share: '0.500000000',
+      form: {
+        ...createBlankNode('npri-1', 'grantor'),
+        instrument: 'Royalty Deed',
+        grantee: 'NPRI Holder',
+        interestClass: 'npri',
+        royaltyKind: 'floating',
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(findNode(result.data, 'grantor').fraction).toBe('1.000000000');
+    expect(findNode(result.data, 'npri-1')).toMatchObject({
+      interestClass: 'npri',
+      royaltyKind: 'floating',
+      initialFraction: '0.500000000',
+      fraction: '0.500000000',
+    });
+    expect(rootOwnershipTotal(result.data).toFixed(9)).toBe('1.000000000');
+    expect(validateOwnershipGraph(result.data).valid).toBe(true);
+  });
+
+  it('keeps NPRI branches out of mineral rebalances and delete restores', () => {
+    const nodes: OwnershipNode[] = [
+      makeNode('grantor', null, '1.000000000', '0.500000000'),
+      {
+        ...createBlankNode('mineral-child', 'grantor'),
+        grantee: 'Mineral Child',
+        initialFraction: '0.500000000',
+        fraction: '0.500000000',
+      },
+      {
+        ...createBlankNode('npri-1', 'grantor'),
+        instrument: 'Royalty Deed',
+        grantee: 'NPRI Holder',
+        initialFraction: '0.500000000',
+        fraction: '0.500000000',
+        interestClass: 'npri',
+        royaltyKind: 'floating',
+      },
+    ];
+
+    const rebalance = executeRebalance({
+      allNodes: nodes,
+      nodeId: 'grantor',
+      newInitialFraction: '0.750000000',
+    });
+
+    expect(rebalance.ok).toBe(true);
+    if (!rebalance.ok) return;
+
+    expect(findNode(rebalance.data, 'grantor').fraction).toBe('0.375000000');
+    expect(findNode(rebalance.data, 'mineral-child').initialFraction).toBe('0.375000000');
+    expect(findNode(rebalance.data, 'npri-1')).toMatchObject({
+      initialFraction: '0.500000000',
+      fraction: '0.500000000',
+    });
+
+    const deleteNpri = executeDeleteBranch({
+      allNodes: rebalance.data,
+      nodeId: 'npri-1',
+    });
+
+    expect(deleteNpri.ok).toBe(true);
+    if (!deleteNpri.ok) return;
+
+    expect(findNode(deleteNpri.data, 'grantor').fraction).toBe('0.375000000');
+    expect(validateOwnershipGraph(deleteNpri.data).valid).toBe(true);
   });
 });
 

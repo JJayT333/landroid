@@ -13,13 +13,16 @@ import { useWorkspaceStore } from '../../store/workspace-store';
 import { formatAsFraction } from '../../engine/fraction-display';
 import { d } from '../../engine/decimal';
 import { savePdf, deletePdf } from '../../storage/pdf-store';
-import type { OwnershipNode } from '../../types/node';
+import { getInterestClass, type OwnershipNode } from '../../types/node';
 
 interface NodeEditModalProps {
   node: OwnershipNode;
   onViewPdf?: (nodeId: string) => void;
   linkedOwnerName?: string | null;
+  leaseStatusText?: string | null;
   onManageOwner?: (nodeId: string) => void;
+  onManageLease?: (nodeId: string) => void;
+  onManageNpri?: (nodeId: string) => void;
   onClose: () => void;
 }
 
@@ -28,7 +31,10 @@ export default function NodeEditModal({
   onClose,
   onViewPdf,
   linkedOwnerName,
+  leaseStatusText,
   onManageOwner,
+  onManageLease,
+  onManageNpri,
 }: NodeEditModalProps) {
   const updateNode = useWorkspaceStore((s) => s.updateNode);
   const rebalance = useWorkspaceStore((s) => s.rebalance);
@@ -56,6 +62,24 @@ export default function NodeEditModal({
   const initialChanged = form.initialFraction !== node.initialFraction;
   const previewFrac = formatAsFraction(d(form.initialFraction));
   const oldFrac = formatAsFraction(d(node.initialFraction));
+  const canManageOwner = node.type !== 'related' || Boolean(node.linkedOwnerId);
+  const interestClass = getInterestClass(node);
+  const canManageLease =
+    node.type !== 'related' &&
+    interestClass === 'mineral' &&
+    d(node.fraction).greaterThan(0);
+  const canManageNpri =
+    node.type !== 'related' &&
+    interestClass === 'mineral' &&
+    d(node.fraction).greaterThan(0);
+  const trackedShareLabel =
+    interestClass === 'npri'
+      ? node.royaltyKind === 'floating'
+        ? 'Share of Lease Royalty'
+        : 'Fixed Royalty Share'
+      : 'Interest of Whole Tract';
+  const remainingLabel =
+    interestClass === 'npri' ? 'Unconveyed Balance' : 'Remaining';
 
   const set = (field: string, value: string | boolean) =>
     setForm((f) => ({ ...f, [field]: value }));
@@ -110,13 +134,13 @@ export default function NodeEditModal({
         {/* Ownership — THE KEY FIELD */}
         <fieldset className="space-y-2">
           <legend className="text-xs font-semibold text-ink-light uppercase tracking-wider mb-2">
-            Ownership Interest
+            {interestClass === 'npri' ? 'Royalty Interest' : 'Ownership Interest'}
           </legend>
 
           <div className="bg-ledger rounded-lg p-3 space-y-2">
             <div>
               <label className="text-[10px] text-ink-light uppercase tracking-wider block mb-1">
-                Interest of Whole Tract
+                {trackedShareLabel}
               </label>
               <input
                 type="text"
@@ -143,11 +167,15 @@ export default function NodeEditModal({
             )}
 
             <div className="text-[10px] text-ink-light">
-              <span className="uppercase tracking-wider">Remaining: </span>
+              <span className="uppercase tracking-wider">{remainingLabel}: </span>
               <span className="font-mono font-semibold">
                 {formatAsFraction(d(node.fraction))}
               </span>
-              <span className="ml-2 text-ink-light/60">(calculated, not editable)</span>
+              <span className="ml-2 text-ink-light/60">
+                {interestClass === 'npri'
+                  ? '(calculated from NPRI branch conveyances)'
+                  : '(calculated, not editable)'}
+              </span>
             </div>
           </div>
         </fieldset>
@@ -254,7 +282,7 @@ export default function NodeEditModal({
           </div>
         </fieldset>
 
-        {node.type !== 'related' && (
+        {canManageOwner && (
           <fieldset className="space-y-2">
             <legend className="text-xs font-semibold text-ink-light uppercase tracking-wider mb-2">
               Owner Record
@@ -265,7 +293,9 @@ export default function NodeEditModal({
                   {linkedOwnerName || 'No owner record linked yet'}
                 </div>
                 <div className="text-xs text-ink-light">
-                  Open the linked owner record or create one from this node.
+                  {node.type === 'related'
+                    ? 'Open the linked owner record for this lease-related node.'
+                    : 'Open the linked owner record or create one from this node.'}
                 </div>
               </div>
               <button
@@ -274,6 +304,56 @@ export default function NodeEditModal({
                 className="px-3 py-2 rounded-lg text-xs font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors"
               >
                 {linkedOwnerName ? 'Open Owner' : 'Create Owner'}
+              </button>
+            </div>
+          </fieldset>
+        )}
+
+        {canManageLease && (
+          <fieldset className="space-y-2">
+            <legend className="text-xs font-semibold text-ink-light uppercase tracking-wider mb-2">
+              Lease / Lessee Node
+            </legend>
+            <div className="rounded-lg border border-emerald-200 bg-emerald-50/70 px-3 py-3 flex items-center justify-between gap-3">
+              <div>
+                <div className="text-sm font-semibold text-emerald-950">
+                  {leaseStatusText || 'No lease node linked yet'}
+                </div>
+                <div className="text-xs text-emerald-900/75">
+                  Create or open the terminal lessee node without changing mineral ownership.
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => onManageLease?.(node.id)}
+                className="px-3 py-2 rounded-lg text-xs font-semibold text-emerald-900 hover:bg-emerald-100 border border-emerald-300 transition-colors"
+              >
+                {leaseStatusText ? 'Open Lease' : 'Create Lease'}
+              </button>
+            </div>
+          </fieldset>
+        )}
+
+        {canManageNpri && (
+          <fieldset className="space-y-2">
+            <legend className="text-xs font-semibold text-ink-light uppercase tracking-wider mb-2">
+              Royalty Burdens
+            </legend>
+            <div className="rounded-lg border border-amber-200 bg-amber-50/70 px-3 py-3 flex items-center justify-between gap-3">
+              <div>
+                <div className="text-sm font-semibold text-amber-950">
+                  Add a fixed or floating NPRI without reducing the mineral total.
+                </div>
+                <div className="text-xs text-amber-900/75">
+                  Desk Map tracks the NPRI branch separately. Royalty payout math can come later on the lessee side.
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => onManageNpri?.(node.id)}
+                className="px-3 py-2 rounded-lg text-xs font-semibold text-amber-900 hover:bg-amber-100 border border-amber-300 transition-colors"
+              >
+                Add NPRI
               </button>
             </div>
           </fieldset>

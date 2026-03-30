@@ -29,6 +29,9 @@ export const MAP_REFERENCE_SOURCE_OPTIONS = [
 
 export type MapReferenceSource = (typeof MAP_REFERENCE_SOURCE_OPTIONS)[number];
 
+const MAP_REFERENCE_SOURCE_SET = new Set<string>(MAP_REFERENCE_SOURCE_OPTIONS);
+const ALLOWED_MAP_REFERENCE_PROTOCOLS = new Set(['http:', 'https:']);
+
 export interface MapAsset {
   id: string;
   workspaceId: string;
@@ -96,6 +99,47 @@ export interface MapExternalReference {
 
 function nowIso() {
   return new Date().toISOString();
+}
+
+function normalizeMapReferenceText(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function coerceNullableId(value: unknown): string | null {
+  return typeof value === 'string' && value ? value : null;
+}
+
+function normalizeMapReferenceSource(value: unknown): MapReferenceSource {
+  return MAP_REFERENCE_SOURCE_SET.has(String(value))
+    ? (value as MapReferenceSource)
+    : 'Manual';
+}
+
+export function normalizeMapReferenceUrl(value: unknown): string {
+  const trimmed = normalizeMapReferenceText(value);
+  if (!trimmed) return '';
+
+  const candidate = /^[a-z][a-z0-9+.-]*:/i.test(trimmed)
+    ? trimmed
+    : `https://${trimmed}`;
+
+  try {
+    const parsed = new URL(candidate);
+    if (!ALLOWED_MAP_REFERENCE_PROTOCOLS.has(parsed.protocol)) {
+      return '';
+    }
+    return parsed.toString();
+  } catch {
+    return '';
+  }
+}
+
+export function getMapReferenceUrlValidationMessage(value: string): string | null {
+  const trimmed = normalizeMapReferenceText(value);
+  if (!trimmed) return null;
+  return normalizeMapReferenceUrl(trimmed)
+    ? null
+    : 'Use a valid http:// or https:// link. Unsupported schemes are blocked.';
 }
 
 export function inferMapKind(fileName: string, mimeType: string): MapAssetKind {
@@ -268,7 +312,24 @@ export function normalizeMapRegion(
 export function normalizeMapExternalReference(
   reference: Pick<MapExternalReference, 'id'> & Partial<MapExternalReference>
 ): MapExternalReference {
-  return createBlankMapExternalReference(reference.workspaceId ?? '', reference);
+  return createBlankMapExternalReference(
+    typeof reference.workspaceId === 'string' ? reference.workspaceId : '',
+    {
+      id: reference.id,
+      workspaceId:
+        typeof reference.workspaceId === 'string' ? reference.workspaceId : '',
+      assetId: coerceNullableId(reference.assetId),
+      regionId: coerceNullableId(reference.regionId),
+      source: normalizeMapReferenceSource(reference.source),
+      label: normalizeMapReferenceText(reference.label),
+      url: normalizeMapReferenceUrl(reference.url),
+      notes: typeof reference.notes === 'string' ? reference.notes : '',
+      createdAt:
+        typeof reference.createdAt === 'string' ? reference.createdAt : undefined,
+      updatedAt:
+        typeof reference.updatedAt === 'string' ? reference.updatedAt : undefined,
+    }
+  );
 }
 
 export function clampPercent(value: number) {

@@ -2,7 +2,11 @@ import { useState } from 'react';
 import Modal from '../shared/Modal';
 import FormField from '../shared/FormField';
 import type { MapExternalReference, MapReferenceSource } from '../../types/map';
-import { MAP_REFERENCE_SOURCE_OPTIONS } from '../../types/map';
+import {
+  getMapReferenceUrlValidationMessage,
+  MAP_REFERENCE_SOURCE_OPTIONS,
+  normalizeMapReferenceUrl,
+} from '../../types/map';
 
 interface MapReferenceModalProps {
   reference: MapExternalReference;
@@ -22,9 +26,14 @@ export default function MapReferenceModal({
     notes: reference.notes,
   });
   const [saving, setSaving] = useState(false);
+  const [urlError, setUrlError] = useState<string | null>(null);
 
-  const set = (field: keyof typeof form, value: string) =>
+  const set = (field: keyof typeof form, value: string) => {
+    if (field === 'url') {
+      setUrlError(null);
+    }
     setForm((current) => ({ ...current, [field]: value }));
+  };
 
   return (
     <Modal open onClose={onClose} title="Reference Link">
@@ -47,7 +56,15 @@ export default function MapReferenceModal({
         </div>
 
         <FormField label="Label" value={form.label} onChange={(value) => set('label', value)} />
-        <FormField label="URL" value={form.url} onChange={(value) => set('url', value)} />
+        <div className="space-y-1">
+          <FormField label="URL" value={form.url} onChange={(value) => set('url', value)} />
+          <div className="text-[11px] text-ink-light">
+            HTTP/HTTPS links only. Plain domains are saved as `https://...`.
+          </div>
+          {urlError && (
+            <div className="text-[11px] font-medium text-seal">{urlError}</div>
+          )}
+        </div>
 
         <div>
           <label className="text-[10px] text-ink-light uppercase tracking-wider block mb-1">
@@ -73,15 +90,25 @@ export default function MapReferenceModal({
             type="button"
             disabled={saving}
             onClick={async () => {
+              const normalizedUrl = normalizeMapReferenceUrl(form.url);
+              const nextUrlError = getMapReferenceUrlValidationMessage(form.url);
+              if (nextUrlError) {
+                setUrlError(nextUrlError);
+                return;
+              }
+
               setSaving(true);
-              await onSave({
-                source: form.source as MapReferenceSource,
-                label: form.label,
-                url: form.url,
-                notes: form.notes,
-              });
-              setSaving(false);
-              onClose();
+              try {
+                await onSave({
+                  source: form.source as MapReferenceSource,
+                  label: form.label,
+                  url: normalizedUrl,
+                  notes: form.notes,
+                });
+                onClose();
+              } finally {
+                setSaving(false);
+              }
             }}
             className="px-4 py-2 rounded-lg bg-leather text-parchment text-sm font-semibold hover:bg-leather-light transition-colors disabled:opacity-60"
           >

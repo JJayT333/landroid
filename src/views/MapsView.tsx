@@ -10,6 +10,7 @@ import {
   createBlankMapAsset,
   createBlankMapExternalReference,
   createBlankMapRegion,
+  normalizeMapReferenceUrl,
   type MapAsset,
   type MapExternalReference,
   type MapRegion,
@@ -431,8 +432,8 @@ export default function MapsView() {
           </div>
         </div>
       ) : selectedAsset ? (
-        <div className="grid flex-1 min-h-0 gap-4 xl:grid-cols-[minmax(0,1.8fr),380px]">
-            <section className="min-h-0 rounded-xl border border-ledger-line bg-parchment shadow-sm overflow-hidden grid grid-rows-[auto,1fr,auto]">
+        <div className="grid flex-1 min-h-0 gap-4 lg:grid-cols-[minmax(0,2.35fr)_340px]">
+            <section className="min-h-0 rounded-xl border border-ledger-line bg-parchment shadow-sm overflow-hidden grid grid-rows-[auto_minmax(0,1fr)_auto]">
               <div className="px-4 py-3 border-b border-ledger-line bg-ledger flex items-center justify-between gap-3">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
@@ -794,59 +795,69 @@ export default function MapsView() {
                   ) : (
                     <div className="space-y-2">
                       {(selectedRegion ? regionReferences : assetReferences).map((reference) => (
-                        <div
-                          key={reference.id}
-                          className="rounded-xl border border-ledger-line bg-parchment-dark/30 p-3 space-y-2"
-                        >
-                          <div className="flex items-center justify-between gap-3">
-                            <div>
-                              <div className="text-sm font-semibold text-ink">
-                                {reference.label || 'Untitled reference'}
-                              </div>
-                              <div className="text-[11px] text-ink-light">
-                                {reference.source}
-                              </div>
-                            </div>
-                            {mode === 'edit' && (
-                              <div className="flex items-center gap-2">
-                                <button
-                                  type="button"
-                                  onClick={() => setEditingReferenceId(reference.id)}
-                                  className="px-2 py-1 rounded text-xs font-semibold text-ink hover:bg-ledger transition-colors"
-                                >
-                                  Edit
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={async () => {
-                                    if (!confirm('Delete this reference link?')) {
-                                      return;
-                                    }
-                                    await removeReference(reference.id);
-                                  }}
-                                  className="px-2 py-1 rounded text-xs font-semibold text-seal hover:bg-seal/10 transition-colors"
-                                >
-                                  Delete
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                          {reference.url && (
-                            <a
-                              href={reference.url}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="block text-xs text-leather break-all hover:underline"
+                        (() => {
+                          const safeUrl = normalizeMapReferenceUrl(reference.url);
+
+                          return (
+                            <div
+                              key={reference.id}
+                              className="rounded-xl border border-ledger-line bg-parchment-dark/30 p-3 space-y-2"
                             >
-                              {reference.url}
-                            </a>
-                          )}
-                          {reference.notes && (
-                            <div className="text-xs text-ink whitespace-pre-wrap">
-                              {reference.notes}
+                              <div className="flex items-center justify-between gap-3">
+                                <div>
+                                  <div className="text-sm font-semibold text-ink">
+                                    {reference.label || 'Untitled reference'}
+                                  </div>
+                                  <div className="text-[11px] text-ink-light">
+                                    {reference.source}
+                                  </div>
+                                </div>
+                                {mode === 'edit' && (
+                                  <div className="flex items-center gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => setEditingReferenceId(reference.id)}
+                                      className="px-2 py-1 rounded text-xs font-semibold text-ink hover:bg-ledger transition-colors"
+                                    >
+                                      Edit
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={async () => {
+                                        if (!confirm('Delete this reference link?')) {
+                                          return;
+                                        }
+                                        await removeReference(reference.id);
+                                      }}
+                                      className="px-2 py-1 rounded text-xs font-semibold text-seal hover:bg-seal/10 transition-colors"
+                                    >
+                                      Delete
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                              {safeUrl ? (
+                                <a
+                                  href={safeUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="block text-xs text-leather break-all hover:underline"
+                                >
+                                  {safeUrl}
+                                </a>
+                              ) : reference.url ? (
+                                <div className="text-xs font-medium text-seal break-all">
+                                  Blocked unsupported link: {reference.url}
+                                </div>
+                              ) : null}
+                              {reference.notes && (
+                                <div className="text-xs text-ink whitespace-pre-wrap">
+                                  {reference.notes}
+                                </div>
+                              )}
                             </div>
-                          )}
-                        </div>
+                          );
+                        })()
                       ))}
                     </div>
                   )}

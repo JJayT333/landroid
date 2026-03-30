@@ -31,6 +31,7 @@ User preferences and working style:
 - The user is happy with the current flowchart paper-size and centered-import behavior for now
 - The user thinks the current desk-map math is good for now and wants the next phase to focus on audit/review
 - The user wants desk-map owner actions kept inside the node detail flow rather than crowding the card buttons
+- The user is actively testing prospect branding, including a top-left logo and a small full-color prospect mark in the top nav next to `Desk Map`
 
 Recent completed work:
 - Verified the active app is now rooted directly in `/Users/abstractmapping/projects/landroid`
@@ -46,7 +47,7 @@ Recent completed work:
 - Centered flowchart import/root placement so the top node lands centered and the tree branches more evenly
 - Added saved ANSI and Arch paper sizes for the flowchart canvas and print path
 - `Fit to Grid` now resizes within the current paper/grid instead of auto-adding pages
-- Stress test now builds separate tract desk maps with larger samples (`100`, `150`, `200` visible cards)
+- Stress test now builds separate tract desk maps with larger samples (`100`, `150`, `500` visible cards)
 - Title Ledger / Runsheet now supports tract filtering while still showing all tracts by default
 - Stress tabs were restyled closer to the production look and the `Demo` button was removed
 - Runsheet display order was changed to: Instrument, File Date, Instrument Date, Vol./Pg., Grantor, Grantee, Interest, Land Desc., Remarks
@@ -64,6 +65,46 @@ Recent completed work:
 - Added workspace-scoped map regions and external reference links so image-based prospect maps can carry clickable story areas and saved outside links
 - Added a separate `Research` workspace for RRC dataset cataloging and imported research files
 - Added node-to-owner linking through the `Owner Record` section in the Desk Map node edit modal
+- Fixed the broken split layouts in `Owners`, `Maps`, and `Research` so those workspaces render as intended again
+- Made Desk Map PDF viewing self-heal when a node attachment is missing by storing a bundled fallback PDF before opening it
+- Switched Desk Map seed PDFs to bundled in-repo assets sourced from `TORS_Documents/` instead of brittle direct browser fetch paths
+- Filled out stress Desk Map nodes with more consistent metadata, doc numbers, conveyance fields, and obituary fields
+- Tightened Desk Map render scope by memoizing tree branches/cards, localizing active-card subscriptions, and replacing repeated node/owner scans with lookup maps
+- Pushed the stress fixture names, operators, assignment grantees, and obituary flavor further into intentionally absurd territory for easier visual QA
+- Added prospect branding assets under `src/assets/branding/`, restored the LANDroid logo in the top-left header, and added a very faded raven backdrop to Desk Map for the Raven Forest demo test
+- Added a readable table preview path for `}`-delimited RRC TXT imports so pending-permit text files no longer have to be read as raw delimiter jumble
+- Hardened the pending-permit parser so matching header rows are skipped instead of being treated like data rows
+- Hardened `Research` metadata editing so import title/family/notes changes stay local until `Save Details`
+- Narrowed pending-permit decode reruns so ordinary note/title edits no longer reread and re-decode the same file set
+- Swapped `Research` dataset reassignment from free-text live edits to a safer saved dataset-family picker
+- Replaced the main workspace/canvas autosave hot path with cheap reference/primitive change detection instead of full `JSON.stringify` snapshots on every store update
+- Hardened `Maps` reference links so plain domains normalize to `https://...`, unsupported schemes are blocked, and rendered external links use safer new-tab attributes
+- Hardened `.landroid` import parsing so malformed top-level payloads fail clearly and imported desk-map/map-reference/canvas data is normalized instead of trusted wholesale
+- Reduced the eager startup bundle by moving tiny React Flow array helpers out of the always-loaded canvas store, pushing that weight back into the already-lazy Flowchart chunk where it belongs
+- Converted the Raven Forest Desk Map art from a full background wash into a subtle bottom-right watermark and lazy-loaded `Runsheet` / `Owners` so they no longer ride in the startup bundle
+- Moved the Raven Forest prospect mark out of the Desk Map canvas and into the shared top navigation next to `Desk Map` so it stays visible across pages
+- Added a reusable fixed-width RRC parser seam under `src/research/`
+- Added a structured `Research` decoder for `Drilling Permit Master` / `Drilling Permit Master and Trailer`, including core fixed-width status/permit rows plus surface and bottom-hole coordinate attachment when present
+- Promoted the `Drilling Permit Master` families to preview-ready in the dataset catalog and updated docs to match
+- Added a structured `Research` decoder for `Horizontal Drilling Permits`, using the published 360-character fixed-width row layout
+- Added top-left Desk Map coverage totals for `Found in Chain`, `Linked Owners`, and `Leased`
+- Added clearer Desk Map owner-versus-lessee presentation so the current mineral owner stays distinct from the lessee
+- Added a first Desk Map lease action that creates or reopens a distinct lease node without changing mineral ownership math
+- Corrected the seed and stress fixtures so `Oil & Gas Lease` records are separate lease overlays instead of final ownership conveyances, while keeping a leased subset for UI testing
+- Added a Texas-first leasing/title-model note to `PROJECT_CONTEXT.md`, clarifying that assignments and ORRIs belong primarily on the lessee/leasehold side while NPRIs belong primarily on the mineral-fee/lessor side
+- Added explicit `royalty` and `leased interest` lease fields so the Desk Map lessee node and the `Owners` lease tab all read from the same lease record
+- Fixed a blank-screen regression caused by legacy saved lease records that predated the new `royalty` / `leased interest` fields, by normalizing lease data on load/import and hardening the Desk Map lease render path
+- Moved Desk Map lease access out of the owner-card hover actions and into the mineral-owner edit modal, removed inline lessor terms from the mineral-owner card, and promoted the lessee lease record from an inline related chip into its own terminal Desk Map node card
+- Added a first Desk Map NPRI workflow: present-interest mineral owners can now create fixed or floating NPRI branches from the node edit modal
+- Added dedicated NPRI node metadata so royalty branches stay visible and conveyable on Desk Map without reducing the mineral ownership totals
+- Kept the top-left Desk Map coverage cards mineral-only, so NPRIs do not change `Found in Chain`, `Linked Owners`, or `Leased`
+- Cleaned up the stress/sample fixtures by removing assignment-heavy Desk Map cards, replacing them with broader deed variation plus supplemental lease variation
+- Tightened math/store normalization so new NPRI nodes, rebalances, deletes, and subsequent conveyances stay compatible with the existing branch invariants
+- Added a first `Leasehold` workspace surface that derives pooled participation, owner net acres, and total royalty from the current Desk Maps plus active lease records
+- Added tract-level `gross acres`, `pooled acres`, and `description` fields to Desk Maps, plus persisted unit metadata, with normalization across autosave, `.landroid`, and CSV import paths
+- Added a dedicated `Leasehold (5 Tracts)` demo seed with five tracts at `100`, `200`, `300`, `400`, and `500` acres, assorted conveyances, shared unit metadata, and 100% lease coverage for every present owner at `1/8`
+- Added pure leasehold summary math coverage so the new Leasehold tab can stay derived from Desk Map title plus `Owners` lease data instead of introducing duplicate persisted calculations
+- Added leasehold-side ORRI records with explicit burden-basis capture, gross `8/8` ORRI burden math, and pre-WI NRI summary totals
 
 Important files involved in the recent work:
 - `/Users/abstractmapping/projects/landroid/src/views/FlowchartView.tsx`
@@ -81,9 +122,53 @@ Important files involved in the recent work:
 - `/Users/abstractmapping/projects/landroid/src/store/map-store.ts`
 - `/Users/abstractmapping/projects/landroid/src/store/research-store.ts`
 - `/Users/abstractmapping/projects/landroid/src/views/DeskMapView.tsx`
+- `/Users/abstractmapping/projects/landroid/src/views/LeaseholdView.tsx`
+- `/Users/abstractmapping/projects/landroid/src/components/leasehold/leasehold-summary.ts`
+- `/Users/abstractmapping/projects/landroid/src/components/leasehold/__tests__/leasehold-summary.test.ts`
+- `/Users/abstractmapping/projects/landroid/src/components/deskmap/DeskMapNpriCard.tsx`
 - `/Users/abstractmapping/projects/landroid/src/views/OwnerDatabaseView.tsx`
+- `/Users/abstractmapping/projects/landroid/src/components/owners/OwnerDetailPanel.tsx`
 - `/Users/abstractmapping/projects/landroid/src/views/MapsView.tsx`
 - `/Users/abstractmapping/projects/landroid/src/views/ResearchView.tsx`
+- `/Users/abstractmapping/projects/landroid/src/components/deskmap/DeskMapCard.tsx`
+- `/Users/abstractmapping/projects/landroid/src/components/deskmap/deskmap-coverage.ts`
+- `/Users/abstractmapping/projects/landroid/src/components/modals/CreateNpriModal.tsx`
+- `/Users/abstractmapping/projects/landroid/src/components/modals/NodeEditModal.tsx`
+- `/Users/abstractmapping/projects/landroid/src/components/modals/ConveyModal.tsx`
+- `/Users/abstractmapping/projects/landroid/src/storage/seed-test-data.ts`
+- `/Users/abstractmapping/projects/landroid/src/types/node.ts`
+- `/Users/abstractmapping/projects/landroid/src/components/deskmap/deskmap-lease-node.ts`
+- `/Users/abstractmapping/projects/landroid/src/components/deskmap/__tests__/deskmap-coverage.test.ts`
+- `/Users/abstractmapping/projects/landroid/src/components/modals/AttachLeaseModal.tsx`
+- `/Users/abstractmapping/projects/landroid/src/components/shared/Navbar.tsx`
+- `/Users/abstractmapping/projects/landroid/src/components/modals/MapReferenceModal.tsx`
+- `/Users/abstractmapping/projects/landroid/src/theme/index.css`
+- `/Users/abstractmapping/projects/landroid/src/types/map.ts`
+- `/Users/abstractmapping/projects/landroid/src/App.tsx`
+- `/Users/abstractmapping/projects/landroid/src/storage/seed-test-data.ts`
+- `/Users/abstractmapping/projects/landroid/src/storage/bundled-deskmap-pdfs.ts`
+- `/Users/abstractmapping/projects/landroid/src/storage/workspace-persistence.ts`
+- `/Users/abstractmapping/projects/landroid/src/store/owner-store.ts`
+- `/Users/abstractmapping/projects/landroid/src/types/node.ts`
+- `/Users/abstractmapping/projects/landroid/src/store/canvas-change-utils.ts`
+- `/Users/abstractmapping/projects/landroid/src/store/__tests__/map-store.test.ts`
+- `/Users/abstractmapping/projects/landroid/src/store/__tests__/canvas-change-utils.test.ts`
+- `/Users/abstractmapping/projects/landroid/src/storage/__tests__/workspace-persistence.test.ts`
+- `/Users/abstractmapping/projects/landroid/src/storage/__tests__/seed-test-data.test.ts`
+- `/Users/abstractmapping/projects/landroid/src/assets/branding/landroid-logo.png`
+- `/Users/abstractmapping/projects/landroid/src/assets/branding/raven-forest-backdrop.png`
+- `/Users/abstractmapping/projects/landroid/src/research/rrc-fixed-width.ts`
+- `/Users/abstractmapping/projects/landroid/src/research/rrc-drilling-permit-master.ts`
+- `/Users/abstractmapping/projects/landroid/src/research/rrc-horizontal-drilling.ts`
+- `/Users/abstractmapping/projects/landroid/src/research/rrc-delimited-text.ts`
+- `/Users/abstractmapping/projects/landroid/src/research/__tests__/rrc-fixed-width.test.ts`
+- `/Users/abstractmapping/projects/landroid/src/research/__tests__/rrc-drilling-permit-master.test.ts`
+- `/Users/abstractmapping/projects/landroid/src/research/__tests__/rrc-horizontal-drilling.test.ts`
+- `/Users/abstractmapping/projects/landroid/src/research/__tests__/rrc-delimited-text.test.ts`
+- `/Users/abstractmapping/projects/landroid/src/components/research/DrillingPermitMasterDecoderPanel.tsx`
+- `/Users/abstractmapping/projects/landroid/src/components/research/HorizontalDrillingDecoderPanel.tsx`
+- `/Users/abstractmapping/projects/landroid/src/components/research/RrcDelimitedPreviewTable.tsx`
+- `/Users/abstractmapping/projects/landroid/src/components/modals/AssetPreviewModal.tsx`
 - `/Users/abstractmapping/projects/landroid/docs/architecture/rrc-import-readability.md`
 - `/Users/abstractmapping/projects/landroid/src/components/deskmap/DeskMapCard.tsx`
 
@@ -108,8 +193,33 @@ Current status:
 - `Maps` is now the map-first presentation surface: PDFs can be featured and previewed, while clickable region overlays currently start with PNG/JPG exports
 - `Research` is now the RRC-oriented staging surface for official dataset families and imported files
 - `Research` now includes a first structured decoder path for `Drilling Permits Pending Approval`, joining the core permit, wellbore, and lat/long TXT files into a readable preview
+- `Research` now also includes a first fixed-width decoder path for `Drilling Permit Master` / `Drilling Permit Master and Trailer`, joining core status/permit records and attaching lat/long records when present
+- `Research` now also includes a fixed-width decoder for `Horizontal Drilling Permits`, turning that ASCII row layout into a readable permit preview
+- `Research` now also renders `}`-delimited RRC TXT files as readable tables when possible, including staged supplemental pending-permit text files
+- `Research` import metadata now uses an explicit save flow, and pending-permit decoding no longer reruns on ordinary note/title edits
+- Workspace and canvas autosave still debounce and save the same payloads, but they now detect changes without serializing the full state tree on every update
+- Desk Map now has a true 500-card stress tract for the current performance target, with render work scoped more narrowly during ordinary interaction
+- Desk Map now surfaces separate running totals for ownership found in the chain, ownership linked to owner records, and ownership currently leased
+- Desk Map current-owner cards now keep the present mineral owner visually distinct from the lessee, and the node edit modal now owns the lease-node access path
+- `Leasehold` now exists as the first acreage-aware unit template, with editable pooled acres, unit metadata, leasehold-side ORRI tracking, and pre-WI NRI math; WI / division-order / payout layers still come later
+- Desk Map tract records now carry `gross acres`, `pooled acres`, and `description`, and those fields are edited from the Leasehold tab rather than from the Desk Map title-chain surface
+- The dedicated five-tract leasehold demo is now the cleanest starting point for the next phase of lessee-side calculations
+- Seed and stress data now keep lease overlays separate from present ownership, while still seeding linked owners and some active leased interest for testing
+- Desk Map now also supports separate NPRI branches from mineral-owner edit modals, with explicit fixed-vs-floating capture and separate amber NPRI cards
+- NPRI branches do not reduce the mineral coverage totals; Desk Map is now explicitly treating those coverage cards as mineral-only
+- `PROJECT_CONTEXT.md` now includes Texas-first guidance for lessor vs. lessee, assignments, NPRIs, ORRIs, pooling, and recording so future architecture work starts from the same title model
+- Desk Map leased owners now stay visually close to ordinary mineral-owner cards, with a leased badge on the owner card and a separate terminal lessee node carrying the lease terms
+- Legacy saved workspaces with older lease records should now open cleanly again; missing newer lease text fields are normalized instead of crashing the Desk Map render
+- The user clarified the Desk Map leasing model: the present mineral owner stays in the main title tree, the owner card should only show leased status, the lease button belongs in the node edit modal, and the separate Desk Map lease node should represent the terminal lessee
+- The user does not want assignments on Desk Map at all; assignments belong only to the later lessee-side workflow
+- The user wants future lessee-side calculation work to handle assignments, ORRIs, working interest, division orders, and royalty-payment math rather than pushing those into Desk Map
+- `Maps` reference links now normalize to `http(s)` URLs only, blocking unsupported schemes before they become clickable
+- `.landroid` imports now reject malformed JSON/root payloads clearly and normalize optional desk-map/map-reference/canvas content on the way in
+- The eager main bundle is now materially smaller again; after the canvas-helper extraction plus lazy `Runsheet` / `Owners`, startup is down to roughly `415 kB`, and the remaining large warning is concentrated in the lazy `FlowchartView` chunk instead of the startup path
 - Neither `Maps` nor `Research` is direct ArcGIS Pro functionality or a live GIS renderer
 - The user wants the selected map to dominate the page, with supporting controls staying secondary
+- `Owners` is back to the sidebar-plus-detail layout, and `Maps` is back to a map-dominant split layout
+- LANDroid now shows a small full-color prospect mark in the shared top navigation next to `Desk Map`, instead of inside the Desk Map canvas
 - The user wants to keep pushing deeper on RRC imports and decoding, especially for difficult legacy formats like EBCDIC
 - There is now a repo note at `/Users/abstractmapping/projects/landroid/docs/architecture/rrc-import-readability.md` summarizing which RRC families are readable now, which need fixed-width parsers, which need EBCDIC conversion first, and which are GIS/archive-heavy
 - The user has now installed the recommended Mac-side toolchain for PDF/GIS/OCR/data work, including Poppler, GDAL/OGR, ExifTool, ImageMagick, Tesseract, Ghostscript, `uv`, `duckdb`, QGIS, DB Browser for SQLite, LibreOffice, and Inkscape
@@ -170,10 +280,12 @@ RRC integration direction:
 - The user wants to explore RRC integration because it could make the product much more compelling for demos, but the first releases should stay lightweight and dependable.
 
 Likely next steps to choose from:
-1. Manually click through the new `Maps` and `Research` workflows in the browser
-2. Improve the region editing UX beyond rectangular starter boxes and numeric coordinate cleanup
-3. Extend the RRC decoder pattern to the next highest-value ASCII family after pending permits
-4. Evaluate a phased RRC integration plan using official datasets / links instead of fragile live-query scraping
+1. Extend the same fixed-width decoder seam to the next high-value ASCII family after horizontal permits, likely `Wellbore Query Data` or `Completion Information in Data Format`
+2. Do a manual browser pass on the 500-card stress tract to confirm the new NPRI cards and lease-node interaction path feel acceptable in practice
+3. Decide how much NPRI summary, if any, should be surfaced on Desk Map beyond the separate branch cards
+4. Keep assignments entirely out of Desk Map and plan the later lessee-side assignment / ORRI / division-order / royalty workflow
+5. Decide whether the lazy `FlowchartView` chunk still feels heavy enough to justify a deeper flowchart-only split
+6. Extend the future lessee-side calculations only after the Desk Map mineral-vs-royalty boundary still feels right in practice
 
 Good starting commands:
 
@@ -219,7 +331,7 @@ Before making architectural decisions, read:
 Current focus:
 - ownership + maps + research foundations have been implemented on top of the root-app layout
 - `Research` now has a first structured decoder path for `Drilling Permits Pending Approval`
-- the next phase is likely either better map-first UX or the next RRC decoder family
+- the likely next implementation phase is the next high-value ASCII RRC decoder family, with fixed-width parsing as the main strategic direction
 - the user wants room for a much more capable long-term engine, but with a simple UX for a small 2-3 person team
 - RRC integration should be explored through realistic, low-risk paths
 
@@ -227,7 +339,7 @@ Start by:
 1. Inspecting the current branch/worktree state
 2. Re-reading the strategic product direction in `CONTINUATION-PROMPT.md`
 3. Checking the current handoff branch and validation status
-4. Proposing the next phased plan before implementing
+4. Proposing the next phased plan before implementing, with the next RRC decoder family as the likely focus
 
 Do not start broad implementation until the next phase plan is approved.
 ```

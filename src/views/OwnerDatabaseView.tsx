@@ -10,7 +10,9 @@ export default function OwnerDatabaseView() {
   const contacts = useOwnerStore((state) => state.contacts);
   const docs = useOwnerStore((state) => state.docs);
   const selectedOwnerId = useOwnerStore((state) => state.selectedOwnerId);
+  const selectedOwnerTab = useOwnerStore((state) => state.selectedOwnerTab);
   const selectOwner = useOwnerStore((state) => state.selectOwner);
+  const selectOwnerTab = useOwnerStore((state) => state.selectOwnerTab);
   const addOwner = useOwnerStore((state) => state.addOwner);
   const updateOwner = useOwnerStore((state) => state.updateOwner);
   const removeOwner = useOwnerStore((state) => state.removeOwner);
@@ -33,8 +35,8 @@ export default function OwnerDatabaseView() {
   }, [owners, selectOwner, selectedOwnerId]);
 
   return (
-    <div className="h-full grid grid-cols-[320px,1fr] gap-4 p-4 bg-parchment-dark/30">
-      <aside className="rounded-xl border border-ledger-line bg-parchment shadow-sm overflow-hidden">
+    <div className="h-full grid gap-4 p-4 bg-parchment-dark/30 lg:grid-cols-[320px_minmax(0,1fr)]">
+      <aside className="min-h-0 rounded-xl border border-ledger-line bg-parchment shadow-sm overflow-hidden">
         <div className="px-4 py-4 border-b border-ledger-line bg-ledger flex items-center justify-between gap-3">
           <div>
             <div className="text-lg font-display font-bold text-ink">Owners</div>
@@ -91,6 +93,8 @@ export default function OwnerDatabaseView() {
             leases={leases.filter((lease) => lease.ownerId === selectedOwner.id)}
             contacts={contacts.filter((contact) => contact.ownerId === selectedOwner.id)}
             docs={docs.filter((doc) => doc.ownerId === selectedOwner.id)}
+            tab={selectedOwnerTab}
+            onChangeTab={selectOwnerTab}
             onSaveOwner={(fields) => updateOwner(selectedOwner.id, fields)}
             onDeleteOwner={() => removeOwner(selectedOwner.id)}
             onAddLease={addLease}

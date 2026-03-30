@@ -34,7 +34,10 @@ describe('rrc-pending-drilling', () => {
   });
 
   it('joins permit, wellbore, and lat/long rows into a readable preview', () => {
-    const permitText = buildDelimitedRow('drillingPermit', {
+    const permitHeader = PENDING_DRILLING_FILE_SPECS.drillingPermit.columns.join('}');
+    const wellboreHeader = PENDING_DRILLING_FILE_SPECS.wellbore.columns.join('}');
+    const latlongHeader = PENDING_DRILLING_FILE_SPECS.latlong.columns.join('}');
+    const permitRow = buildDelimitedRow('drillingPermit', {
       UNIVERSAL_DOC_NO: 'DOC-100',
       STATUS_NUMBER: '2026-0001',
       SUBMIT_DATE: '20260329',
@@ -50,7 +53,7 @@ describe('rrc-pending-drilling', () => {
       FILING_PURPOSE_CODE: 'D',
       STATUS_CODE: 'PEND',
     });
-    const wellboreText = buildDelimitedRow('wellbore', {
+    const wellboreRow = buildDelimitedRow('wellbore', {
       UNIVERSAL_DOC_NO: 'DOC-100',
       WELLBORE_ID: 'WB-1',
       DISTRICT_NO: '08',
@@ -63,13 +66,13 @@ describe('rrc-pending-drilling', () => {
       WB_NEAREST_TOWN_DISTANCE: '12.5',
       WB_TOTAL_DEPTH: '11200',
     });
-    const surfaceText = buildDelimitedRow('latlong', {
+    const surfaceRow = buildDelimitedRow('latlong', {
       API_SEQUENCE_NUMBER: '4212301234',
       LATITUDE: '31.123456',
       LONGITUDE: '-102.123456',
       LOCATION_TYPE: 'Surface',
     });
-    const bottomText = buildDelimitedRow('latlong', {
+    const bottomRow = buildDelimitedRow('latlong', {
       API_SEQUENCE_NUMBER: '4212301234',
       LATITUDE: '31.223456',
       LONGITUDE: '-102.223456',
@@ -80,17 +83,17 @@ describe('rrc-pending-drilling', () => {
       {
         importId: 'permit-1',
         fileName: 'dp_drilling_permit_pending_20260329110000.txt',
-        text: permitText,
+        text: [permitHeader, permitRow].join('\n'),
       },
       {
         importId: 'wellbore-1',
         fileName: 'dp_wellbore_pending_20260329110000.txt',
-        text: wellboreText,
+        text: [wellboreHeader, wellboreRow].join('\n'),
       },
       {
         importId: 'lat-1',
         fileName: 'dp_latlongs_pending_20260329110000.txt',
-        text: [surfaceText, bottomText].join('\n'),
+        text: [latlongHeader, surfaceRow, bottomRow].join('\n'),
       },
     ]);
 

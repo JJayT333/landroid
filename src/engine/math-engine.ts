@@ -13,7 +13,12 @@
  */
 import { Decimal } from 'decimal.js';
 import { d, clamp, serialize } from './decimal';
-import type { OwnershipNode, ConveyanceMode, SplitBasis } from '../types/node';
+import type {
+  OwnershipNode,
+  ConveyanceMode,
+  InterestClass,
+  SplitBasis,
+} from '../types/node';
 import type { Result, Audit } from '../types/result';
 
 // ---------------------------------------------------------------------------
@@ -27,6 +32,18 @@ interface CalcNode {
   initialFraction: Decimal;
   /** Pass-through all other fields unchanged. */
   rest: Record<string, unknown>;
+}
+
+function getCalcInterestClass(node: CalcNode): InterestClass {
+  return (node.rest.interestClass as InterestClass | undefined) ?? 'mineral';
+}
+
+function getCalcRoyaltyKind(node: CalcNode): OwnershipNode['royaltyKind'] {
+  return (node.rest.royaltyKind as OwnershipNode['royaltyKind'] | undefined) ?? null;
+}
+
+function allocatesAgainstParent(parent: CalcNode, child: CalcNode): boolean {
+  return getCalcInterestClass(parent) === getCalcInterestClass(child);
 }
 
 function toCalc(node: OwnershipNode): CalcNode {
@@ -76,10 +93,41 @@ export function collectDescendantIds(nodes: CalcNode[], rootId: string): Set<str
   return desc;
 }
 
+function collectAllocatingDescendantIds(nodes: CalcNode[], rootId: string): Set<string> {
+  const root = nodes.find((node) => node.id === rootId);
+  if (!root) return new Set();
+
+  const targetInterestClass = getCalcInterestClass(root);
+  const childrenOf = new Map<string, CalcNode[]>();
+  for (const node of nodes) {
+    if (node.parentId == null || node.parentId === 'unlinked') continue;
+    if (!childrenOf.has(node.parentId)) childrenOf.set(node.parentId, []);
+    childrenOf.get(node.parentId)!.push(node);
+  }
+
+  const descendants = new Set<string>();
+  const stack = (childrenOf.get(rootId) ?? [])
+    .filter((node) => node.type !== 'related' && getCalcInterestClass(node) === targetInterestClass);
+
+  while (stack.length) {
+    const node = stack.pop()!;
+    if (descendants.has(node.id)) continue;
+    descendants.add(node.id);
+    const children = childrenOf.get(node.id) ?? [];
+    children.forEach((child) => {
+      if (child.type !== 'related' && getCalcInterestClass(child) === targetInterestClass) {
+        stack.push(child);
+      }
+    });
+  }
+
+  return descendants;
+}
+
 /** Scale fraction and initialFraction for a node and all its descendants. */
 function applyBranchScale(nodes: CalcNode[], rootId: string, scaleFactor: Decimal): CalcNode[] {
   if (!scaleFactor.isFinite()) return nodes;
-  const descendants = collectDescendantIds(nodes, rootId);
+  const descendants = collectAllocatingDescendantIds(nodes, rootId);
   return nodes.map((n) => {
     if (n.id !== rootId && !descendants.has(n.id)) return n;
     return {
@@ -165,6 +213,16 @@ export function executeConveyance(params: ConveyanceParams): Result<OwnershipNod
   const parent = nodes.find((n) => n.id === parentId);
   if (!parent) return err('missing_node', `parentId ${parentId} was not found`);
 
+  const parentInterestClass = getCalcInterestClass(parent);
+  const childInterestClass =
+    (form.interestClass as InterestClass | undefined) ?? parentInterestClass;
+  if (childInterestClass !== parentInterestClass) {
+    return err(
+      'interest_class_mismatch',
+      'Use the NPRI workflow to create royalty burdens from a mineral node'
+    );
+  }
+
   const shareAmt = clamp(d(share));
   if (!shareAmt.isFinite()) return err('invalid_input', 'share must be a finite number');
   if (shareAmt.greaterThan(clamp(parent.fraction).plus('0.000000001'))) {
@@ -187,7 +245,13 @@ export function executeConveyance(params: ConveyanceParams): Result<OwnershipNod
     parentId,
     fraction: shareAmt,
     initialFraction: shareAmt,
-    rest: { ...(form ?? {}) } as Record<string, unknown>,
+    rest: {
+      ...(form ?? {}),
+      interestClass: childInterestClass,
+      royaltyKind: childInterestClass === 'npri'
+        ? ((form.royaltyKind as OwnershipNode['royaltyKind'] | undefined) ?? getCalcRoyaltyKind(parent))
+        : null,
+    } as Record<string, unknown>,
   };
   // Remove fraction/initialFraction from rest since they're on CalcNode directly
   delete newNode.rest.fraction;
@@ -202,6 +266,73 @@ export function executeConveyance(params: ConveyanceParams): Result<OwnershipNod
   if (!validation.valid) return err('invalid_graph', 'Conveyance would produce invalid ownership graph', validation.issues);
 
   return ok(updatedNodes, { action: 'convey', affectedCount: 2 });
+}
+
+export interface CreateNpriParams {
+  allNodes: OwnershipNode[];
+  parentId: string;
+  newNodeId: string;
+  share: string;
+  form: Partial<OwnershipNode>;
+}
+
+export function executeCreateNpri(params: CreateNpriParams): Result<OwnershipNode[]> {
+  const { parentId, newNodeId, share, form } = params;
+  const nodes = params.allNodes.map(toCalc);
+
+  if (!parentId || !newNodeId) return err('invalid_input', 'parentId and newNodeId are required');
+  if (nodes.find((n) => n.id === newNodeId)) {
+    return err('conflicting_structure', `newNodeId ${newNodeId} already exists`);
+  }
+
+  const parent = nodes.find((n) => n.id === parentId);
+  if (!parent) return err('missing_node', `parentId ${parentId} was not found`);
+  if (parent.type === 'related') {
+    return err('invalid_input', 'NPRI branches must originate from a conveyance node');
+  }
+  if (getCalcInterestClass(parent) !== 'mineral') {
+    return err(
+      'interest_class_mismatch',
+      'Use a regular conveyance to split an existing NPRI branch'
+    );
+  }
+
+  const shareAmt = clamp(d(share));
+  if (!shareAmt.isFinite()) return err('invalid_input', 'share must be a finite number');
+  if (shareAmt.lessThanOrEqualTo(0)) return err('invalid_input', 'share must be greater than zero');
+  if (shareAmt.greaterThan('1.000000001')) {
+    return err('invalid_input', 'NPRI share cannot exceed the full royalty interest');
+  }
+
+  const newNode: CalcNode = {
+    id: newNodeId,
+    type: 'conveyance',
+    parentId,
+    fraction: shareAmt,
+    initialFraction: shareAmt,
+    rest: {
+      ...(form ?? {}),
+      interestClass: 'npri',
+      royaltyKind:
+        (form.royaltyKind as OwnershipNode['royaltyKind'] | undefined) ?? 'fixed',
+    } as Record<string, unknown>,
+  };
+  delete newNode.rest.fraction;
+  delete newNode.rest.initialFraction;
+  delete newNode.rest.id;
+  delete newNode.rest.type;
+  delete newNode.rest.parentId;
+
+  const updatedNodes = [...nodes, newNode];
+  const validation = validateCalcGraph(updatedNodes);
+  if (!validation.valid) {
+    return err('invalid_graph', 'NPRI creation would produce invalid ownership graph', validation.issues);
+  }
+
+  return ok(updatedNodes, {
+    action: 'create_npri',
+    affectedCount: 1,
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -231,7 +362,7 @@ export function executeRebalance(params: RebalanceParams): Result<OwnershipNode[
 
   const newInitial = clamp(d(newInitialFraction));
   const scaleFactor = newInitial.div(oldInitial);
-  const descendants = collectDescendantIds(nodes, nodeId);
+  const descendants = collectAllocatingDescendantIds(nodes, nodeId);
   const affectedCount = descendants.size + 1;
 
   // Scale the branch
@@ -248,7 +379,11 @@ export function executeRebalance(params: RebalanceParams): Result<OwnershipNode[
       }
       return updated;
     }
-    if (resolvedParentId && n.id === resolvedParentId) {
+    if (
+      resolvedParentId &&
+      n.id === resolvedParentId &&
+      allocatesAgainstParent(n, node)
+    ) {
       return { ...n, fraction: clamp(n.fraction.plus(oldInitial).minus(newInitial)) };
     }
     return n;
@@ -296,7 +431,7 @@ export function executePredecessorInsert(params: PredecessorInsertParams): Resul
 
   const newInitial = clamp(d(newInitialFraction));
   const scaleFactor = newInitial.div(oldInitial);
-  const descendants = collectDescendantIds(nodes, activeNodeId);
+  const descendants = collectAllocatingDescendantIds(nodes, activeNodeId);
   const affectedCount = descendants.size + 1;
 
   // Scale the active branch
@@ -305,7 +440,11 @@ export function executePredecessorInsert(params: PredecessorInsertParams): Resul
   // Reparent active node to new predecessor, adjust old parent fraction
   nodes = nodes.map((n) => {
     if (n.id === activeNodeId) return { ...n, parentId: newPredecessorId };
-    if (activeNodeParentId && n.id === activeNodeParentId) {
+    if (
+      activeNodeParentId &&
+      n.id === activeNodeParentId &&
+      allocatesAgainstParent(n, activeNode)
+    ) {
       return { ...n, fraction: clamp(n.fraction.plus(oldInitial).minus(newInitial)) };
     }
     return n;
@@ -318,7 +457,13 @@ export function executePredecessorInsert(params: PredecessorInsertParams): Resul
     parentId: activeNodeParentId,
     initialFraction: newInitial,
     fraction: new Decimal(0),
-    rest: { ...(form ?? {}) } as Record<string, unknown>,
+    rest: {
+      ...(form ?? {}),
+      interestClass:
+        (form.interestClass as InterestClass | undefined) ?? getCalcInterestClass(activeNode),
+      royaltyKind:
+        (form.royaltyKind as OwnershipNode['royaltyKind'] | undefined) ?? getCalcRoyaltyKind(activeNode),
+    } as Record<string, unknown>,
   };
   delete predNode.rest.fraction;
   delete predNode.rest.initialFraction;
@@ -361,8 +506,11 @@ export function executeAttachConveyance(params: AttachConveyanceParams): Result<
   if (!sourceRoot) return err('missing_node', `activeNodeId ${activeNodeId} was not found`);
   const destination = nodes.find((n) => n.id === attachParentId);
   if (!destination) return err('missing_node', `attachParentId ${attachParentId} was not found`);
+  if (getCalcInterestClass(sourceRoot) !== getCalcInterestClass(destination)) {
+    return err('interest_class_mismatch', 'Cannot attach across mineral and NPRI branches');
+  }
 
-  const descendants = collectDescendantIds(nodes, activeNodeId);
+  const descendants = collectAllocatingDescendantIds(nodes, activeNodeId);
   if (attachParentId === activeNodeId || descendants.has(attachParentId)) {
     return err('conflicting_structure', 'Cannot attach to self or descendant');
   }
@@ -391,7 +539,13 @@ export function executeAttachConveyance(params: AttachConveyanceParams): Result<
         type: 'conveyance',
         fraction: clamp(n.fraction.mul(scaleFactor)),
         initialFraction: newRootFraction,
-        rest: { ...n.rest, ...(form ?? {}) } as Record<string, unknown>,
+        rest: {
+          ...n.rest,
+          ...(form ?? {}),
+          interestClass: getCalcInterestClass(sourceRoot),
+          royaltyKind:
+            (form.royaltyKind as OwnershipNode['royaltyKind'] | undefined) ?? getCalcRoyaltyKind(sourceRoot),
+        } as Record<string, unknown>,
       };
       delete updated.rest.fraction;
       delete updated.rest.initialFraction;
@@ -446,10 +600,11 @@ export function executeDeleteBranch(params: DeleteBranchParams): Result<Ownershi
     .filter((n) => !removedIds.has(n.id))
     .map((n) => {
       if (
-        target.type !== 'related' &&
-        target.parentId &&
-        target.parentId !== 'unlinked' &&
-        n.id === target.parentId
+      target.type !== 'related' &&
+      target.parentId &&
+      target.parentId !== 'unlinked' &&
+      n.id === target.parentId &&
+      allocatesAgainstParent(n, target)
       ) {
         return {
           ...n,
@@ -561,7 +716,11 @@ function validateCalcGraph(nodes: CalcNode[]): ValidationResult {
     const remaining = clamp(node.fraction);
     let childInitialTotal = new Decimal(0);
     for (const child of nodes) {
-      if (child.type === 'related' || child.parentId !== node.id) continue;
+      if (
+        child.type === 'related' ||
+        child.parentId !== node.id ||
+        !allocatesAgainstParent(node, child)
+      ) continue;
       childInitialTotal = childInitialTotal.plus(clamp(child.initialFraction));
     }
     const allocated = remaining.plus(childInitialTotal);
@@ -599,7 +758,11 @@ export function validateOwnershipGraph(nodes: OwnershipNode[]): ValidationResult
 export function rootOwnershipTotal(nodes: OwnershipNode[]): Decimal {
   let total = new Decimal(0);
   for (const node of nodes) {
-    if (node.type === 'related' || node.parentId === 'unlinked') continue;
+    if (
+      node.type === 'related' ||
+      node.parentId === 'unlinked' ||
+      ((node.interestClass ?? 'mineral') !== 'mineral')
+    ) continue;
     if (node.parentId == null) {
       total = total.plus(d(node.fraction));
     }

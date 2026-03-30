@@ -10,10 +10,14 @@ import { useWorkspaceStore } from '../../store/workspace-store';
 import { useCanvasStore } from '../../store/canvas-store';
 import { downloadLandroidFile, importLandroidFile } from '../../storage/workspace-persistence';
 import { importCSV } from '../../storage/csv-io';
-import { seedStressTestData } from '../../storage/seed-test-data';
+import { seedLeaseholdDemoData, seedStressTestData } from '../../storage/seed-test-data';
+
+const landroidLogoUrl = new URL('../../assets/branding/landroid-logo.png', import.meta.url).href;
+const ravenForestBackdropUrl = new URL('../../assets/branding/raven-forest-backdrop.png', import.meta.url).href;
 
 const views: { id: ViewMode; label: string }[] = [
   { id: 'chart', label: 'Desk Map' },
+  { id: 'leasehold', label: 'Leasehold' },
   { id: 'flowchart', label: 'Flowchart' },
   { id: 'master', label: 'Runsheet' },
   { id: 'owners', label: 'Owners' },
@@ -25,19 +29,32 @@ export default function Navbar() {
   const view = useUIStore((s) => s.view);
   const setView = useUIStore((s) => s.setView);
   const projectName = useWorkspaceStore((s) => s.projectName);
+  const leaseholdUnit = useWorkspaceStore((s) => s.leaseholdUnit);
+  const leaseholdOrris = useWorkspaceStore((s) => s.leaseholdOrris);
   const loadWorkspace = useWorkspaceStore((s) => s.loadWorkspace);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [seeding, setSeeding] = useState(false);
+  const [seedMode, setSeedMode] = useState<'stress' | 'leasehold' | null>(null);
 
   const handleStressTest = async () => {
-    setSeeding(true);
+    setSeedMode('stress');
     try {
       const { nodeCount, pdfCount } = await seedStressTestData();
       console.log(`[stress] Loaded ${nodeCount} nodes, attached ${pdfCount} PDFs`);
     } catch (err) {
       console.error('[stress] Failed:', err);
     }
-    setSeeding(false);
+    setSeedMode(null);
+  };
+
+  const handleLeaseholdDemo = async () => {
+    setSeedMode('leasehold');
+    try {
+      const { nodeCount, pdfCount } = await seedLeaseholdDemoData();
+      console.log(`[leasehold] Loaded ${nodeCount} nodes, attached ${pdfCount} PDFs`);
+    } catch (err) {
+      console.error('[leasehold] Failed:', err);
+    }
+    setSeedMode(null);
   };
 
   const handleSave = async () => {
@@ -48,6 +65,8 @@ export default function Navbar() {
       projectName: state.projectName,
       nodes: state.nodes,
       deskMaps: state.deskMaps,
+      leaseholdUnit,
+      leaseholdOrris,
       activeDeskMapId: state.activeDeskMapId,
       instrumentTypes: state.instrumentTypes,
       ownerData: await useOwnerStore.getState().exportWorkspaceData(),
@@ -118,13 +137,33 @@ export default function Navbar() {
 
   return (
     <nav className="no-print flex items-center justify-between px-4 py-2 bg-ink text-parchment border-b border-leather">
-      <div className="flex items-center gap-3">
-        <h1 className="text-lg font-display font-bold tracking-wide">LANDroid</h1>
-        <span className="text-sm text-parchment/60 font-mono">{projectName}</span>
+      <div className="flex min-w-0 items-center gap-3">
+        <div className="flex h-11 w-[4.25rem] shrink-0 items-center justify-center overflow-hidden rounded-xl border border-parchment/15 bg-parchment/5 px-1.5 shadow-lg">
+          <img
+            src={landroidLogoUrl}
+            alt="LANDroid logo"
+            className="h-full w-full object-contain"
+          />
+        </div>
+        <div className="min-w-0">
+          <h1 className="text-lg font-display font-bold tracking-wide">LANDroid</h1>
+          <span className="block truncate text-xs text-parchment/60 font-mono">
+            {projectName}
+          </span>
+        </div>
       </div>
 
       <div className="flex items-center gap-4">
         <div className="flex gap-1">
+          <div className="flex items-center pr-2">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-parchment/15 bg-parchment/10 p-1 shadow-md">
+              <img
+                src={ravenForestBackdropUrl}
+                alt="Prospect mark"
+                className="h-full w-full object-contain"
+              />
+            </div>
+          </div>
           {views.map((v) => (
             <button
               key={v.id}
@@ -156,10 +195,17 @@ export default function Navbar() {
           </button>
           <button
             onClick={handleStressTest}
-            disabled={seeding}
+            disabled={seedMode !== null}
             className="px-3 py-1.5 rounded-lg text-xs font-medium text-seal/70 hover:text-seal hover:bg-seal/10 transition-colors disabled:opacity-50"
           >
-            {seeding ? 'Loading...' : 'Stress (100/150/200)'}
+            {seedMode === 'stress' ? 'Loading...' : 'Stress (100/150/500)'}
+          </button>
+          <button
+            onClick={handleLeaseholdDemo}
+            disabled={seedMode !== null}
+            className="px-3 py-1.5 rounded-lg text-xs font-medium text-gold/80 hover:text-gold hover:bg-gold/10 transition-colors disabled:opacity-50"
+          >
+            {seedMode === 'leasehold' ? 'Loading...' : 'Leasehold (5 Tracts)'}
           </button>
         </div>
       </div>

@@ -5,10 +5,11 @@ import { Suspense, lazy } from 'react';
 import { useUIStore } from './store/ui-store';
 import Navbar from './components/shared/Navbar';
 import DeskMapView from './views/DeskMapView';
-import OwnerDatabaseView from './views/OwnerDatabaseView';
-import RunsheetView from './views/RunsheetView';
 
 const FlowchartView = lazy(() => import('./views/FlowchartView'));
+const LeaseholdView = lazy(() => import('./views/LeaseholdView'));
+const RunsheetView = lazy(() => import('./views/RunsheetView'));
+const OwnerDatabaseView = lazy(() => import('./views/OwnerDatabaseView'));
 const MapsView = lazy(() => import('./views/MapsView'));
 const ResearchView = lazy(() => import('./views/ResearchView'));
 
@@ -49,8 +50,42 @@ export default function App() {
           </Suspense>
         )}
         {view === 'chart' && <DeskMapView />}
-        {view === 'master' && <RunsheetView />}
-        {view === 'owners' && <OwnerDatabaseView />}
+        {view === 'leasehold' && (
+          <Suspense
+            fallback={
+              <PlaceholderView
+                name="Loading Leasehold"
+                description="Preparing acreage and leasehold calculations."
+              />
+            }
+          >
+            <LeaseholdView />
+          </Suspense>
+        )}
+        {view === 'master' && (
+          <Suspense
+            fallback={
+              <PlaceholderView
+                name="Loading Runsheet"
+                description="Preparing the runsheet workspace."
+              />
+            }
+          >
+            <RunsheetView />
+          </Suspense>
+        )}
+        {view === 'owners' && (
+          <Suspense
+            fallback={
+              <PlaceholderView
+                name="Loading Owners"
+                description="Preparing the owner workspace."
+              />
+            }
+          >
+            <OwnerDatabaseView />
+          </Suspense>
+        )}
         {view === 'maps' && (
           <Suspense
             fallback={

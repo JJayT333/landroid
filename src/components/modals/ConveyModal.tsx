@@ -12,7 +12,12 @@ import { useWorkspaceStore } from '../../store/workspace-store';
 import { calculateShare } from '../../engine/math-engine';
 import { formatAsFraction } from '../../engine/fraction-display';
 import { d, serialize } from '../../engine/decimal';
-import type { OwnershipNode, ConveyanceMode, SplitBasis } from '../../types/node';
+import {
+  getInterestClass,
+  type OwnershipNode,
+  type ConveyanceMode,
+  type SplitBasis,
+} from '../../types/node';
 
 interface ConveyModalProps {
   parentNode: OwnershipNode;
@@ -21,9 +26,11 @@ interface ConveyModalProps {
 
 export default function ConveyModal({ parentNode, onClose }: ConveyModalProps) {
   const convey = useWorkspaceStore((s) => s.convey);
+  const interestClass = getInterestClass(parentNode);
+  const isNpriParent = interestClass === 'npri';
 
   const [form, setForm] = useState({
-    instrument: '',
+    instrument: isNpriParent ? 'Royalty Deed' : '',
     date: '',
     fileDate: '',
     grantor: parentNode.grantee,
@@ -56,6 +63,11 @@ export default function ConveyModal({ parentNode, onClose }: ConveyModalProps) {
   });
   const previewFrac = formatAsFraction(previewShare);
   const parentRemaining = formatAsFraction(d(parentNode.fraction));
+  const parentRemainingLabel = isNpriParent
+    ? parentNode.royaltyKind === 'floating'
+      ? 'Grantor remaining lease royalty'
+      : 'Grantor remaining fixed royalty'
+    : 'Grantor remaining';
 
   const handleSave = () => {
     setError(null);
@@ -95,11 +107,16 @@ export default function ConveyModal({ parentNode, onClose }: ConveyModalProps) {
   };
 
   return (
-    <Modal open onClose={onClose} title={`Convey from ${parentNode.grantee || 'Unknown'}`} wide>
+    <Modal
+      open
+      onClose={onClose}
+      title={`${isNpriParent ? 'Convey NPRI from' : 'Convey from'} ${parentNode.grantee || 'Unknown'}`}
+      wide
+    >
       <div className="space-y-4">
         {/* Parent info */}
         <div className="bg-ledger rounded-lg p-3 text-xs text-ink-light">
-          <span className="uppercase tracking-wider">Grantor remaining: </span>
+          <span className="uppercase tracking-wider">{parentRemainingLabel}: </span>
           <span className="font-mono font-semibold text-ink">{parentRemaining}</span>
         </div>
 
@@ -194,7 +211,7 @@ export default function ConveyModal({ parentNode, onClose }: ConveyModalProps) {
           <div className="bg-ledger rounded-lg p-3">
             <div className="flex items-center justify-between">
               <span className="text-[10px] text-ink-light uppercase tracking-wider">
-                Amount to convey
+                {isNpriParent ? 'Royalty share to convey' : 'Amount to convey'}
               </span>
               <span className="font-mono font-semibold text-leather text-sm">
                 {previewFrac}
@@ -220,7 +237,7 @@ export default function ConveyModal({ parentNode, onClose }: ConveyModalProps) {
             onClick={handleSave}
             className="px-4 py-2 rounded-lg text-sm font-semibold bg-leather text-parchment hover:bg-leather-light transition-colors"
           >
-            Convey
+            {isNpriParent ? 'Convey NPRI' : 'Convey'}
           </button>
         </div>
       </div>

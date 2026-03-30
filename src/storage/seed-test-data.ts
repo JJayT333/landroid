@@ -2,18 +2,23 @@
  * Seed test data — creates a realistic mineral title chain with PDF attachments.
  *
  * Builds ~18 nodes representing a Texas mineral title:
- *   Patent → Warranty Deeds → Mineral Deeds → Oil & Gas Leases
+ *   Patent → Warranty Deeds → Mineral Deeds → lease overlays
  *   with related docs (Death Certificates, Probate, Affidavits)
  *
- * Fetches PDFs from TORS_Documents/ (served by Vite dev server)
- * and stores them in IndexedDB alongside the workspace data.
+ * Reuses a small bundled sample pulled from TORS_Documents/
+ * and stores those PDFs in IndexedDB alongside the workspace data.
  */
 import { useWorkspaceStore } from '../store/workspace-store';
 import { useMapStore } from '../store/map-store';
 import { useOwnerStore } from '../store/owner-store';
+import { buildLeaseNode, isLeaseNode } from '../components/deskmap/deskmap-lease-node';
+import type { OwnerWorkspaceData } from './owner-persistence';
+import { createBundledDeskMapPdfFile } from './bundled-deskmap-pdfs';
 import { savePdf } from './pdf-store';
 import type { DeskMap, OwnershipNode } from '../types/node';
 import { createBlankNode } from '../types/node';
+import { createBlankLease, createBlankOwner } from '../types/owner';
+import type { LeaseholdOrri } from '../types/leasehold';
 import { createWorkspaceId } from '../utils/workspace-id';
 
 // ── Node factory ────────────────────────────────────────
@@ -41,6 +46,399 @@ function makeNode(
 interface PdfMapping {
   nodeId: string;
   fileName: string;
+}
+
+function countyFromLandDesc(landDesc: string): string {
+  const match = landDesc.match(/([A-Za-z .'-]+?)\s+County\b/i);
+  return match?.[1]?.trim() ?? 'Unknown';
+}
+
+function addDaysToIso(dateValue: string, days: number): string {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateValue)) {
+    return dateValue || '1900-01-01';
+  }
+  const date = new Date(`${dateValue}T12:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+function inferFractionPair(value: string): { numerator: string; denominator: string } {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric <= 0) {
+    return { numerator: '0', denominator: '1' };
+  }
+
+  for (let denominator = 1; denominator <= 1024; denominator *= 2) {
+    const numerator = Math.round(numeric * denominator);
+    if (Math.abs(numerator / denominator - numeric) < 1e-9) {
+      return {
+        numerator: String(numerator),
+        denominator: String(denominator),
+      };
+    }
+  }
+
+  return {
+    numerator: String(Math.round(numeric * 1_000_000)),
+    denominator: '1000000',
+  };
+}
+
+function slugify(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 48);
+}
+
+function toIsoTimestamp(dateValue: string): string {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateValue)) {
+    return '2026-01-01T12:00:00.000Z';
+  }
+
+  return `${dateValue}T12:00:00.000Z`;
+}
+
+function hasPositiveFraction(node: OwnershipNode): boolean {
+  return node.type !== 'related' && Number(node.fraction) > 0;
+}
+
+function buildSeedOwnerWorkspaceData(
+  workspaceId: string,
+  nodes: OwnershipNode[],
+  projectName: string,
+  options: {
+    leaseOverridesByNodeId?: Map<string, Partial<OwnerWorkspaceData['leases'][number]>>;
+  } = {}
+): {
+  nodes: OwnershipNode[];
+  ownerData: OwnerWorkspaceData;
+} {
+  const nodesWithOwners = nodes.map((node, index) => {
+    if (!hasPositiveFraction(node)) {
+      return node;
+    }
+
+    const ownerId = `owner-${slugify(node.grantee || node.id)}-${index + 1}`;
+    return {
+      ...node,
+      linkedOwnerId: ownerId,
+    };
+  });
+
+  const owners = nodesWithOwners.flatMap((node, index) => {
+    if (!hasPositiveFraction(node) || !node.linkedOwnerId) {
+      return [];
+    }
+
+    return [
+      createBlankOwner(workspaceId, {
+        id: node.linkedOwnerId,
+        name: node.grantee || `Owner ${index + 1}`,
+        county: countyFromLandDesc(node.landDesc),
+        prospect: projectName,
+        notes: [
+          node.instrument ? `Source Instrument: ${node.instrument}` : '',
+          node.docNo ? `Doc #: ${node.docNo}` : '',
+          node.landDesc ? `Land: ${node.landDesc}` : '',
+        ]
+          .filter(Boolean)
+          .join('\n'),
+        createdAt: toIsoTimestamp(node.fileDate || node.date),
+        updatedAt: toIsoTimestamp(node.fileDate || node.date),
+      }),
+    ];
+  });
+
+  const nodeById = new Map(nodesWithOwners.map((node) => [node.id, node]));
+  const leases = [] as OwnerWorkspaceData['leases'];
+  const nodesWithLeases = nodesWithOwners.map((node) => {
+    if (!isLeaseNode(node) || !node.parentId) {
+      return node;
+    }
+
+    const parentNode = nodeById.get(node.parentId) ?? null;
+    if (!parentNode?.linkedOwnerId) {
+      return node;
+    }
+
+    const leaseId = `lease-${node.id}`;
+    const leaseOverrides = options.leaseOverridesByNodeId?.get(node.id) ?? {};
+    const lease = createBlankLease(workspaceId, parentNode.linkedOwnerId, {
+      id: leaseId,
+      leaseName: `${parentNode.grantee || 'Unnamed Owner'} Lease`,
+      lessee: node.grantee || PRIMARY_TEST_LESSEE,
+      royaltyRate: '1/4',
+      leasedInterest: parentNode.fraction,
+      effectiveDate: node.date,
+      expirationDate: addDaysToIso(node.date, 1095),
+      status: 'Active',
+      docNo: node.docNo,
+      notes: node.remarks,
+      createdAt: toIsoTimestamp(node.fileDate || node.date),
+      updatedAt: toIsoTimestamp(node.fileDate || node.date),
+      ...leaseOverrides,
+    });
+    leases.push(lease);
+
+    return buildLeaseNode({
+      id: node.id,
+      parentNode,
+      lease,
+      existingNode: node,
+    });
+  });
+
+  return {
+    nodes: nodesWithLeases,
+    ownerData: {
+      owners,
+      leases,
+      contacts: [],
+      docs: [],
+    },
+  };
+}
+
+const HUMOROUS_CAUSES_OF_DEATH = [
+  'lost a dispute with a runaway pie wagon at the county fair',
+  'was bucked into legend by a horse named Pancake',
+  'challenged a windmill during a dust storm and lost on points',
+  'took a fatal tumble while retrieving a hat from a pecan tree',
+  'was flattened by a church potluck table collapse of unusual enthusiasm',
+  'never recovered from a fireworks-and-jackrabbit misunderstanding',
+  'was outmaneuvered by a hay bale rolling downhill with purpose',
+  'met an untimely end in a feed-store parrot incident that was avoidable in hindsight',
+  'was launched off a sorghum wagon during an argument about proper biscuit thickness',
+  'mistook a rattlesnake in a boot for a prank and committed too hard to the bit',
+  'tried to lasso a weather vane to prove a point to cousins and physics',
+  'suffered catastrophic consequences in a goat-cart exhibition race behind the VFW hall',
+  'entered a ceremonial leaf-blower duel at Founders Day and was betrayed by traction',
+  'attempted to ride a parade float shaped like a brisket directly into a drainage ditch',
+  'accepted an ill-advised challenge to out-yodel a tornado siren from the courthouse roof',
+  'got too ambitious during a moonlight crawfish-boil trebuchet demonstration',
+  'was defeated by an overcaffeinated emu at the county livestock annex',
+  'misjudged the stopping distance of a lawn-chair pulled by a prize hog named Democracy',
+  'attempted to inaugurate a fog machine inside a deer blind and immediately learned about oxygen',
+  'was dragged into folklore after testing a homemade catfish hoverboard on an irrigation ditch',
+  'sustained terminal consequences during a ceremonial gravy-cannon salute behind the volunteer fire hall',
+  'insisted on racing a solar-powered donkey cart called The Gospel Missile and sadly set a personal record',
+] as const;
+
+const HUMOROUS_EPITAPHS = [
+  'Witnesses agreed the hat survived.',
+  'The mule was acquitted for lack of motive.',
+  'The accordion player kept going for another two songs.',
+  'County gossip remained active for three fiscal quarters.',
+  'The casserole was declared innocent.',
+  'The preacher called it memorable and moved on.',
+  'Nobody could explain the rooster.',
+  'A commemorative pie social followed shortly thereafter.',
+  'The sheriff wrote "honestly kind of impressive" in the margin.',
+  'Three eyewitnesses disagreed on the color of the goat but not the outcome.',
+  'The town band reused the story for years without improving the rhythm section.',
+  'A cousin swore this had been predictable since 1938.',
+  'The mayor briefly considered banning pageantry, then remembered tourism.',
+  'Someone sold commemorative koozies before sunset.',
+  'A bass boat was named in their honor by people who misunderstood the event entirely.',
+  'The local paper called it "regrettable, but visually committed."',
+] as const;
+
+const HUMOROUS_OBITUARY_OPENERS = [
+  'According to local memory,',
+  'As recounted by two cousins, a barber, and one unreliable deputy,',
+  'The official version, which improves with every retelling, says',
+  'Courthouse lore maintains that',
+] as const;
+
+const HUMOROUS_WITNESSES = [
+  'a justice of the peace',
+  'three church ladies',
+  'the man who sold boiled peanuts outside the stock show',
+  'one highly opinionated feed-store clerk',
+  'two nephews and a suspiciously calm mule',
+  'the accordion player from the VFW dance',
+  'a woman selling rhinestone Bible covers from the trunk of a Cadillac',
+  'one teenager live-commenting from the Sonic parking lot',
+  'the assistant manager of a fireworks tent shaped like Texas',
+  'a retired rodeo announcer who refused to lower his voice',
+  'a beekeeper dressed as Davy Crockett for reasons never fully explained',
+  'one substitute teacher who should have left thirty minutes earlier',
+] as const;
+
+const PRIMARY_TEST_LESSEE = 'Permian Basin Operating, LLC';
+
+function buildHumorousObituary(
+  grantee: string,
+  dateValue: string,
+  landDesc: string,
+  index: number
+): string {
+  const county = countyFromLandDesc(landDesc);
+  const opener = HUMOROUS_OBITUARY_OPENERS[index % HUMOROUS_OBITUARY_OPENERS.length];
+  const cause = HUMOROUS_CAUSES_OF_DEATH[index % HUMOROUS_CAUSES_OF_DEATH.length];
+  const epitaph = HUMOROUS_EPITAPHS[index % HUMOROUS_EPITAPHS.length];
+  const witness = HUMOROUS_WITNESSES[index % HUMOROUS_WITNESSES.length];
+  const when = /^\d{4}-\d{2}-\d{2}$/.test(dateValue) ? dateValue : 'an uncertain Tuesday';
+  const variant = index % 4;
+
+  if (variant === 0) {
+    return `${opener} ${grantee} departed this mortal leasehold on ${when} in ${county} County after ${cause}. ${epitaph}`;
+  }
+
+  if (variant === 1) {
+    return `${grantee} met their final curtain call on ${when} in ${county} County after ${cause}. ${witness} later insisted it was "more educational than tragic." ${epitaph}`;
+  }
+
+  if (variant === 2) {
+    return `On ${when}, ${county} County lost ${grantee} to an incident in which they ${cause}. ${witness} provided testimony nobody asked for. ${epitaph}`;
+  }
+
+  return `${opener} on ${when}, ${grantee} left the chain of title behind after ${cause}. ${witness} claimed the whole thing happened "faster than a deed correction." ${epitaph}`;
+}
+
+function buildGeneratedRemark(
+  node: OwnershipNode,
+  parent: OwnershipNode | null,
+  index: number
+): string {
+  const county = countyFromLandDesc(node.landDesc);
+
+  if (node.type === 'related') {
+    if (isLeaseNode(node) || node.instrument === 'Oil & Gas Lease') {
+      return `${node.grantor || parent?.grantee || 'Lessor'} leased to ${node.grantee || PRIMARY_TEST_LESSEE} in ${county} County.`;
+    }
+    if (node.instrument === 'Death Certificate') {
+      return `Filed in ${county} County to explain why ${parent?.grantee || node.grantee} stopped signing things.`;
+    }
+    if (node.instrument === 'Affidavit of Heirship') {
+      return `Neighbors, cousins, and at least one confident barber swore this is who inherited ${parent?.grantee || 'the interest'}.`;
+    }
+    return `Related filing for ${parent?.grantee || node.grantee} recorded in ${county} County after a long morning at the clerk's office.`;
+  }
+
+  if (!node.parentId) {
+    return 'Original patent covering the whole tract before anybody sliced it into courthouse spaghetti.';
+  }
+
+  if (node.instrument === 'Oil & Gas Lease') {
+    return `${node.grantee} picked up a lease on ${node.initialFraction} of the whole tract in ${county} County after a negotiation fueled by coffee and stubbornness.`;
+  }
+
+  if (node.instrument === 'Probate') {
+    return `Estate papers moved ${node.initialFraction} of the tract from ${node.grantor} to ${node.grantee} without anyone flipping a folding table.`;
+  }
+
+  if (node.instrument === 'Royalty Deed') {
+    return `${node.grantor} carved out a royalty burden in ${county} County and sent it to ${node.grantee} after everybody pretended the fractions were obvious.`;
+  }
+
+  const punchline = index % 2 === 0
+    ? 'The ink dried faster than the family drama.'
+    : 'Everybody left convinced they got the better end of the bargain.';
+  return `${node.grantor} conveyed ${node.initialFraction} of the whole tract to ${node.grantee} in ${county} County. ${punchline}`;
+}
+
+function finalizeGeneratedNodes(
+  nodes: OwnershipNode[],
+  { humorousDeaths }: { humorousDeaths: boolean }
+): OwnershipNode[] {
+  const byId = new Map(nodes.map((node) => [node.id, node]));
+
+  return nodes.map((node, index) => {
+    const parent = node.parentId ? byId.get(node.parentId) ?? null : null;
+    const date = node.date || parent?.fileDate || '1900-01-01';
+    const fileDate = node.fileDate || addDaysToIso(date, 5);
+    const landDesc = node.landDesc || parent?.landDesc || 'Unspecified tract, Texas';
+    const county = countyFromLandDesc(landDesc);
+    const instrument =
+      node.instrument || (node.type === 'related' ? 'Related Document' : 'Mineral Deed');
+    const grantor =
+      node.grantor ||
+      (node.type === 'related'
+        ? `County Clerk of ${county} County`
+        : parent?.grantee || 'State of Texas');
+    const grantee =
+      node.grantee ||
+      (node.type === 'related'
+        ? `${instrument} concerning ${parent?.grantee || 'Unknown Party'}`
+        : `Mystery Mineral Buyer ${index + 1}`);
+    const docNo = node.docNo || `SEED-${String(index + 1).padStart(5, '0')}`;
+    const vol = node.vol || String(100 + Math.floor(index / 3));
+    const page = node.page || String(10 + ((index * 17) % 290));
+    const remarks =
+      node.remarks ||
+      buildGeneratedRemark(
+        { ...node, instrument, grantor, grantee, landDesc, date, fileDate, docNo, vol, page },
+        parent,
+        index
+      );
+
+    let numerator = node.numerator;
+    let denominator = node.denominator;
+    let conveyanceMode = node.conveyanceMode;
+    let splitBasis = node.splitBasis;
+
+    if (node.type === 'related') {
+      conveyanceMode = 'all';
+      splitBasis = 'whole';
+      numerator = '0';
+      denominator = '1';
+    } else if (!node.parentId) {
+      conveyanceMode = 'all';
+      splitBasis = 'whole';
+      numerator = '1';
+      denominator = '1';
+    } else if (numerator === '0' || !numerator) {
+      const inferred = inferFractionPair(node.initialFraction);
+      numerator = inferred.numerator;
+      denominator = inferred.denominator;
+    }
+
+    const manualAmount =
+      node.manualAmount && node.manualAmount !== '0'
+        ? node.manualAmount
+        : node.type === 'related'
+          ? '0.000000000'
+          : node.initialFraction;
+
+    const obituary =
+      node.isDeceased && humorousDeaths
+        ? buildHumorousObituary(
+            grantee,
+            addDaysToIso(fileDate, 3200 + index),
+            landDesc,
+            index
+          )
+        : node.obituary;
+    const graveyardLink =
+      node.isDeceased
+        ? node.graveyardLink ||
+          `https://example.com/memorials/${slugify(grantee)}-${String(index + 1).padStart(3, '0')}`
+        : node.graveyardLink;
+
+    return {
+      ...node,
+      instrument,
+      vol,
+      page,
+      docNo,
+      fileDate,
+      date,
+      grantor,
+      grantee,
+      landDesc,
+      remarks,
+      conveyanceMode,
+      splitBasis,
+      numerator,
+      denominator,
+      manualAmount,
+      obituary,
+      graveyardLink,
+    };
+  });
 }
 
 // ── Build the title chain ───────────────────────────────
@@ -98,7 +496,7 @@ function buildTestNodes(): { nodes: OwnershipNode[]; pdfMappings: PdfMapping[] }
     grantee: 'Robert C. Elmore',
     landDesc,
     initialFraction: '0.250000000',
-    fraction: '0.250000000',
+    fraction: '0.000000000',
     vol: '45',
     page: '118',
     docNo: '09-3821',
@@ -192,6 +590,7 @@ function buildTestNodes(): { nodes: OwnershipNode[]; pdfMappings: PdfMapping[] }
   const dc1 = nodeId();
   nodes.push(makeNode(dc1, wd2, {
     type: 'related',
+    relatedKind: 'document',
     instrument: 'Death Certificate',
     date: '1998-11-03',
     fileDate: '1999-01-12',
@@ -256,14 +655,16 @@ function buildTestNodes(): { nodes: OwnershipNode[]; pdfMappings: PdfMapping[] }
   // ─── OIL & GAS LEASES ────────────────────────────────
   const lease1 = nodeId(); // Patricia leases
   nodes.push(makeNode(lease1, prob, {
+    type: 'related',
+    relatedKind: 'lease',
     instrument: 'Oil & Gas Lease',
     date: '2020-06-01',
     fileDate: '2020-06-15',
     grantor: 'Patricia Elmore Powell',
-    grantee: 'Permian Basin Operating, LLC',
+    grantee: PRIMARY_TEST_LESSEE,
     landDesc,
-    initialFraction: '0.125000000',
-    fraction: '0.125000000',
+    initialFraction: '0',
+    fraction: '0',
     docNo: '20200790',
     remarks: '3-year primary term, 1/4 royalty',
   }));
@@ -271,14 +672,16 @@ function buildTestNodes(): { nodes: OwnershipNode[]; pdfMappings: PdfMapping[] }
 
   const lease2 = nodeId(); // Elmore Family Partners leases
   nodes.push(makeNode(lease2, md3, {
+    type: 'related',
+    relatedKind: 'lease',
     instrument: 'Oil & Gas Lease',
     date: '2021-01-15',
     fileDate: '2021-02-01',
     grantor: 'Elmore Family Partners, LLC',
-    grantee: 'Permian Basin Operating, LLC',
+    grantee: PRIMARY_TEST_LESSEE,
     landDesc,
-    initialFraction: '0.125000000',
-    fraction: '0.125000000',
+    initialFraction: '0',
+    fraction: '0',
     docNo: '20210747',
     remarks: '3-year primary term, 1/4 royalty',
   }));
@@ -288,6 +691,7 @@ function buildTestNodes(): { nodes: OwnershipNode[]; pdfMappings: PdfMapping[] }
   const aoh = nodeId();
   nodes.push(makeNode(aoh, wd2, {
     type: 'related',
+    relatedKind: 'document',
     instrument: 'Affidavit of Heirship',
     date: '1999-02-10',
     fileDate: '1999-02-15',
@@ -302,9 +706,10 @@ function buildTestNodes(): { nodes: OwnershipNode[]; pdfMappings: PdfMapping[] }
 
   // ─── RELATED: Surface agreement ───────────────────────
   const surfAgmt = nodeId();
-  nodes.push(makeNode(surfAgmt, lease2, {
+  nodes.push(makeNode(surfAgmt, md3, {
     type: 'related',
-    instrument: 'Assignment',
+    relatedKind: 'document',
+    instrument: 'Surface Use Agreement',
     date: '2021-03-01',
     fileDate: '2021-03-10',
     grantor: '',
@@ -319,17 +724,16 @@ function buildTestNodes(): { nodes: OwnershipNode[]; pdfMappings: PdfMapping[] }
   return { nodes, pdfMappings };
 }
 
-// ── Fetch a PDF from the dev server and store in IDB ────
+// ── Store a bundled PDF sample in IDB ───────────────────
 
 async function attachPdf(nodeId: string, fileName: string): Promise<boolean> {
   try {
-    const resp = await fetch(`/TORS_Documents/${fileName}`);
-    if (!resp.ok) {
-      console.warn(`[seed] Could not fetch ${fileName}: ${resp.status}`);
-      return false;
-    }
-    const blob = await resp.blob();
-    const file = new File([blob], fileName, { type: 'application/pdf' });
+    const node = useWorkspaceStore.getState().nodes.find((candidate) => candidate.id === nodeId);
+    const fileNameHint = node?.docNo ? `${node.docNo}.pdf` : fileName;
+    const file = await createBundledDeskMapPdfFile(
+      `${nodeId}:${fileName}`,
+      fileNameHint
+    );
     await savePdf(nodeId, file);
     return true;
   } catch (err) {
@@ -341,8 +745,14 @@ async function attachPdf(nodeId: string, fileName: string): Promise<boolean> {
 // ── Main entry point ────────────────────────────────────
 
 export async function seedTestData(): Promise<{ nodeCount: number; pdfCount: number }> {
-  const { nodes, pdfMappings } = buildTestNodes();
+  const { nodes: rawNodes, pdfMappings } = buildTestNodes();
   const workspaceId = createWorkspaceId();
+  const finalizedNodes = finalizeGeneratedNodes(rawNodes, { humorousDeaths: false });
+  const { nodes, ownerData } = buildSeedOwnerWorkspaceData(
+    workspaceId,
+    finalizedNodes,
+    'Elmore Title Examination'
+  );
 
   // Mark nodes that will have PDFs
   for (const mapping of pdfMappings) {
@@ -357,6 +767,9 @@ export async function seedTestData(): Promise<{ nodeCount: number; pdfCount: num
     name: 'Elmore — Sec. 12, Blk A',
     code: 'SEC12',
     tractId: null,
+    grossAcres: '',
+    pooledAcres: '',
+    description: '',
     nodeIds: nodes.map((n) => n.id),
   };
 
@@ -369,39 +782,32 @@ export async function seedTestData(): Promise<{ nodeCount: number; pdfCount: num
     activeDeskMapId: dmId,
     instrumentTypes: [
       'Patent', 'Warranty Deed', 'Mineral Deed', 'Royalty Deed',
-      'Oil & Gas Lease', 'Assignment', 'Probate', 'Affidavit of Heirship',
+      'Special Warranty Deed', 'Oil & Gas Lease', 'Probate', 'Affidavit of Heirship',
+      'Surface Use Agreement',
       'Death Certificate', 'Quitclaim Deed', 'Correction Deed', 'Release',
       'Will', 'Order',
     ],
   });
   await Promise.all([
-    useOwnerStore.getState().setWorkspace(workspaceId),
+    useOwnerStore.getState().replaceWorkspaceData(workspaceId, ownerData),
     useMapStore.getState().setWorkspace(workspaceId),
   ]);
 
   // Attach PDFs
   let pdfCount = 0;
+  const failedPdfNodeIds: string[] = [];
   for (const mapping of pdfMappings) {
     const ok = await attachPdf(mapping.nodeId, mapping.fileName);
-    if (ok) pdfCount++;
+    if (ok) {
+      pdfCount++;
+    } else {
+      failedPdfNodeIds.push(mapping.nodeId);
+    }
   }
 
-  // If any PDFs failed, update hasDoc flags
-  if (pdfCount < pdfMappings.length) {
-    const state = useWorkspaceStore.getState();
-    for (const mapping of pdfMappings) {
-      const node = state.nodes.find((n) => n.id === mapping.nodeId);
-      if (node?.hasDoc) {
-        // Verify the PDF was actually stored
-        try {
-          const resp = await fetch(`/TORS_Documents/${mapping.fileName}`, { method: 'HEAD' });
-          if (!resp.ok) {
-            useWorkspaceStore.getState().updateNode(mapping.nodeId, { hasDoc: false });
-          }
-        } catch {
-          useWorkspaceStore.getState().updateNode(mapping.nodeId, { hasDoc: false });
-        }
-      }
+  if (failedPdfNodeIds.length > 0) {
+    for (const failedNodeId of failedPdfNodeIds) {
+      useWorkspaceStore.getState().updateNode(failedNodeId, { hasDoc: false });
     }
   }
 
@@ -409,7 +815,7 @@ export async function seedTestData(): Promise<{ nodeCount: number; pdfCount: num
 }
 
 // ═══════════════════════════════════════════════════════════
-// Stress Test — ~200 nodes across 4 title chains
+// Stress Test — tract-sized desk maps including a true 500-card workload
 // ═══════════════════════════════════════════════════════════
 
 const STRESS_PDFS = [
@@ -452,28 +858,32 @@ const STRESS_PDFS = [
 
 const STRESS_INSTRUMENT_TYPES = [
   'Patent', 'Warranty Deed', 'Mineral Deed', 'Royalty Deed',
-  'Oil & Gas Lease', 'Assignment', 'Probate', 'Affidavit of Heirship',
+  'Special Warranty Deed', 'Oil & Gas Lease', 'Probate', 'Affidavit of Heirship',
+  'Surface Use Agreement',
   'Death Certificate', 'Quitclaim Deed', 'Correction Deed', 'Release',
   'Will', 'Order',
 ];
 
 const FIRST = [
-  'James', 'Mary', 'Robert', 'Patricia', 'William', 'Elizabeth', 'John', 'Linda',
-  'Thomas', 'Barbara', 'Charles', 'Susan', 'Daniel', 'Margaret', 'Michael', 'Dorothy',
-  'Richard', 'Ruth', 'Joseph', 'Betty', 'George', 'Helen', 'Kenneth', 'Sandra',
-  'Edward', 'Virginia', 'Frank', 'Katherine', 'Harold', 'Lucille',
-  'Walter', 'Alice', 'Henry', 'Florence', 'Arthur', 'Ethel',
+  'Buckshot Jubilee', 'Dottie Sputnik', 'Skeeter Deluxe', 'Mavis Moonpie',
+  'Buford Possum', 'Peaches Carburetor', 'Cactus Karaoke', 'Loretta Cinderblock',
+  'Otis Banjo', 'Velma Chainsaw', 'Bubba Meteor', 'Opal Barbecue',
+  'Waylon Turnip', 'Birdie Pickle', 'Tex Spackle', 'Tallulah Rattlesnake',
+  'Earlene Thunderpocket', 'Rufus Sidewinder', 'June Bug Jetpack', 'Bonnie Sue Moonshine',
+  'Clem Cornbread', 'Myrtle Gizmo', 'Zeke Pepperjack', 'Darla Mae Tornado',
+  'Hank Whistlepig', 'Trixie Casserole', 'Gomer Firecracker', 'Lula Belle Gravel',
+  'Moxie Hoedown', 'Pearl Pogo', 'Jedediah DuctTape', 'Nellie Loophole',
+  'Roy Dean Catfish', 'Wanda June Lasso', 'Leroy Pickax', 'Bitsy Comet',
+  'Biscuit Ray', 'Cricket Static', 'Minnie Pearl Turbo', 'Tumbleweed Annie',
+  'Jasper Lee Sidequest', 'Soda Pop Avalanche', 'Coy LaserPossum', 'Reba Faye Moonwhistle',
+  'Dusty Mae Chains', 'Banjo Earl', 'Clovis Firefly', 'Puddin Catastrophe',
+  'Fern Pocketknife', 'Stubby Telescope', 'Queenie Jo Greasepaint', 'Velcro June',
+  'Moonbeam Taxidermy', 'Panhandle Disco', 'Cicada Biscuit', 'Gravy Rocket',
+  'Marmalade Ruckus', 'Bocephus Airhorn', 'Luanne Tumbletron', 'Jericho Moonboots',
+  'Tater Astronaut', 'Nebula Jean Bucket', 'Grits Houdini', 'Dixie Wobblecopter',
 ];
 
-const DEEDS = ['Warranty Deed', 'Mineral Deed', 'Royalty Deed', 'Quitclaim Deed', 'Assignment'];
-
-const OPERATORS = [
-  'Permian Basin Operating, LLC',
-  'West Texas Energy Corp.',
-  'Desert Drilling Partners',
-  'Lone Star Resources, LLC',
-  'Eagle Ford Production Co.',
-];
+const DEEDS = ['Warranty Deed', 'Mineral Deed', 'Royalty Deed', 'Quitclaim Deed', 'Special Warranty Deed'];
 
 interface StressConfig {
   name: string;
@@ -487,15 +897,29 @@ interface StressConfig {
   rootSplit: 2 | 3;
 }
 
+interface LeaseholdDemoTractPlan {
+  name: string;
+  code: string;
+  grossAcres: string;
+  pooledAcres: string;
+  description: string;
+  landDesc: string;
+  patentYear: number;
+  patentGrantee: string;
+  pattern: 'half-quarter-quarter' | 'forty-thirty-twenty-ten';
+  currentOwners: string[];
+  branchHolders: string[];
+}
+
 const STRESS_CHAINS: StressConfig[] = [
   {
     name: 'Tract 1',
     code: 'T1',
     targetCardCount: 100,
     landDesc: 'Section 14, Block B, T&P RR Co. Survey, Henderson County, Texas',
-    surnames: ['Henderson', 'Shaw', 'Pearson', 'Whitfield', 'Langley', 'Underwood', 'Calloway', 'Ashworth'],
+    surnames: ['Moonwhistle', 'Picklebarrel', 'Crowbait', 'Fizzlewick', 'Mopbucket', 'Velvetanvil', 'Brisketstorm', 'Tumblegizzard'],
     patentYear: 1895,
-    patentGrantee: 'Thomas J. Henderson',
+    patentGrantee: 'Buckshot Jubilee Henderson',
     maxDepth: 5,
     rootSplit: 2,
   },
@@ -504,21 +928,21 @@ const STRESS_CHAINS: StressConfig[] = [
     code: 'T2',
     targetCardCount: 150,
     landDesc: 'Section 20, Block C, H&TC RR Co. Survey, Crockett County, Texas',
-    surnames: ['Morales', 'Garza', 'Vega', 'Salazar', 'Fuentes', 'Cardenas', 'Delgado', 'Rios'],
+    surnames: ['Peppermill', 'Goosefiddle', 'Taterpatch', 'Sodbuster', 'Thunderplume', 'Crankshaft', 'Wobbletax', 'Snackthunder'],
     patentYear: 1901,
-    patentGrantee: 'Alejandro Morales',
+    patentGrantee: 'Marfa Moonbeam Peppermill',
     maxDepth: 5,
     rootSplit: 3,
   },
   {
     name: 'Tract 3',
     code: 'T3',
-    targetCardCount: 200,
+    targetCardCount: 500,
     landDesc: 'Section 8, Block A, SP RR Co. Survey, Pecos County, Texas',
-    surnames: ['Thompson', 'Mitchell', 'Crawford', 'Barnett', 'Hayes', 'Coleman', 'Weaver', 'Foster'],
+    surnames: ['Moonquilt', 'Dustbucket', 'Turnipseed', 'Whistlegrit', 'Spurpickle', 'Hucklepenny', 'Cactusholler', 'Brakecheck', 'Goatstatic', 'Marshmallowfax'],
     patentYear: 1898,
-    patentGrantee: 'Samuel W. Thompson',
-    maxDepth: 6,
+    patentGrantee: 'Cicada Biscuit Moonquilt',
+    maxDepth: 7,
     rootSplit: 2,
   },
 ];
@@ -592,6 +1016,7 @@ class StressBuilder {
     this.nodes.push({
       ...createBlankNode(id, parentId),
       type: 'related',
+      relatedKind: 'document',
       landDesc: parent.landDesc,
       initialFraction: '0',
       fraction: '0',
@@ -617,6 +1042,9 @@ function expandStressBranch(
   depth: number,
   idx: number,
   config: StressConfig,
+  options: {
+    includeLeafLeases?: boolean;
+  } = {}
 ): void {
   if (depth <= 0 || parentFrac < 0.002) return;
 
@@ -686,30 +1114,58 @@ function expandStressBranch(
 
     // Leaf level: add oil & gas lease; otherwise recurse deeper
     if (depth === 1) {
-      const leaseId = b.addChild(childId, shares[i], {
-        instrument: 'Oil & Gas Lease',
-        date: `${2018 + (idx % 6)}-${String(((i * 4 + 1) % 12) + 1).padStart(2, '0')}-01`,
-        fileDate: `${2018 + (idx % 6)}-${String(((i * 4 + 1) % 12) + 1).padStart(2, '0')}-15`,
-        grantor: grantee,
-        grantee: OPERATORS[idx % OPERATORS.length],
-        remarks: '3-year primary term, 1/4 royalty',
-        conveyanceMode: 'all',
-        splitBasis: 'initial',
-        numerator: '1',
-        denominator: '1',
-      });
-      if (idx % 2 === 0) b.assignPdf(leaseId);
+      const shouldLease =
+        (options.includeLeafLeases ?? true) && (idx + i + config.maxDepth) % 6 === 0;
+      if (shouldLease) {
+        const leaseYear = 2018 + (idx % 6);
+        const leaseMonth = String(((i * 4 + 1) % 12) + 1).padStart(2, '0');
+        const leaseId = b.addRelated(childId, {
+          relatedKind: 'lease',
+          instrument: 'Oil & Gas Lease',
+          date: `${leaseYear}-${leaseMonth}-01`,
+          fileDate: `${leaseYear}-${leaseMonth}-15`,
+          grantor: grantee,
+          grantee: PRIMARY_TEST_LESSEE,
+          remarks: `3-year primary term, 1/4 royalty for ${config.name}`,
+        });
+        if (idx % 2 === 0) b.assignPdf(leaseId);
+      }
     } else {
-      expandStressBranch(b, childId, shares[i], depth - 1, idx * numChildren + i, config);
+      expandStressBranch(
+        b,
+        childId,
+        shares[i],
+        depth - 1,
+        idx * numChildren + i,
+        config,
+        options
+      );
     }
   }
 }
 
-const EXTRA_STRESS_ASSIGNMENT_GRANTEES = [
-  'Blue Mesa Energy, LLC',
-  'High Plains Operating Co.',
-  'Lariat Minerals, LP',
-  'Cimarron Royalty Partners',
+const EXTRA_STRESS_SUPPLEMENTAL_GRANTEES = [
+  'Blue Mesa Moon Unit, LLC',
+  'High Plains Goose Patrol Minerals',
+  'Lariat & Leftovers Royalty, LP',
+  'Cimarron Unscheduled Operating Partners',
+  'Prairie Biscuit Acquisition Co.',
+  'Dusty Boots Override Holdings',
+  'Department of Unfinished Minerals, Ltd.',
+  'Moonpie Catastrophe Override Co.',
+  'Velcro Cattle Royalty Syndicate',
+  'Panhandle Hovercraft Acquisition Group',
+  'Galactic Pecan Override Authority, LP',
+  'Southeast Rattlesnack Participation Trust',
+  'Brisket Eclipse Acquisition Cabinet, LLC',
+  'Committee for Strategic Turnips and Minerals',
+] as const;
+
+const SUPPLEMENTAL_STRESS_INSTRUMENTS = [
+  'Mineral Deed',
+  'Royalty Deed',
+  'Quitclaim Deed',
+  'Special Warranty Deed',
 ] as const;
 
 function getTractNodes(nodes: OwnershipNode[], landDesc: string): OwnershipNode[] {
@@ -720,7 +1176,13 @@ function getTractCardNodes(nodes: OwnershipNode[], landDesc: string): OwnershipN
   return getTractNodes(nodes, landDesc).filter((node) => node.type !== 'related');
 }
 
-function addSupplementalStressCards(builder: StressBuilder, config: StressConfig): void {
+function addSupplementalStressCards(
+  builder: StressBuilder,
+  config: StressConfig,
+  options: {
+    includeLeaseVariation?: boolean;
+  } = {}
+): void {
   const existingCards = getTractCardNodes(builder.nodes, config.landDesc);
   const extraNeeded = config.targetCardCount - existingCards.length;
   if (extraNeeded < 0) {
@@ -734,14 +1196,22 @@ function addSupplementalStressCards(builder: StressBuilder, config: StressConfig
       .filter((node) => node.type !== 'related' && node.parentId && tractNodeIds.has(node.parentId))
       .map((node) => node.parentId as string)
   );
-  const leafTargets = existingCards.filter((node) => !parentIds.has(node.id));
-
-  if (leafTargets.length < extraNeeded) {
-    throw new Error(`Stress tract ${config.name} does not have enough leaf cards to reach ${config.targetCardCount}`);
-  }
+  const leasedParentIds = new Set(
+    builder.nodes.flatMap((node) =>
+      isLeaseNode(node) && node.parentId ? [node.parentId] : []
+    )
+  );
+  const leafTargets = existingCards.filter(
+    (node) => !parentIds.has(node.id) && !leasedParentIds.has(node.id)
+  );
 
   for (let index = 0; index < extraNeeded; index += 1) {
     const target = leafTargets[index];
+    if (!target) {
+      throw new Error(
+        `Stress tract ${config.name} could not reach target card count of ${config.targetCardCount}`
+      );
+    }
     const share = Number(target.fraction || target.initialFraction || '0');
     if (!Number.isFinite(share) || share <= 0) {
       throw new Error(`Stress tract ${config.name} has invalid supplemental share on ${target.id}`);
@@ -750,19 +1220,41 @@ function addSupplementalStressCards(builder: StressBuilder, config: StressConfig
     const year = config.patentYear + 120 + index;
     const month = ((index * 3) % 12) + 1;
     const day = ((index * 5) % 28) + 1;
-    const assignmentId = builder.addChild(target.id, share, {
-      instrument: 'Assignment',
+    const instrument =
+      SUPPLEMENTAL_STRESS_INSTRUMENTS[index % SUPPLEMENTAL_STRESS_INSTRUMENTS.length];
+    const conveyanceId = builder.addChild(target.id, share, {
+      instrument,
       date: `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`,
       fileDate: `${year}-${String(month).padStart(2, '0')}-${String(Math.min(day + 7, 28)).padStart(2, '0')}`,
       grantor: target.grantee,
-      grantee: EXTRA_STRESS_ASSIGNMENT_GRANTEES[index % EXTRA_STRESS_ASSIGNMENT_GRANTEES.length],
-      remarks: `Supplemental assignment added for ${config.name} desk map stress coverage.`,
+      grantee: EXTRA_STRESS_SUPPLEMENTAL_GRANTEES[index % EXTRA_STRESS_SUPPLEMENTAL_GRANTEES.length],
+      remarks: `Supplemental ${instrument.toLowerCase()} added for ${config.name} desk map stress coverage after a conference-room prophet in mirrored sunglasses said "cowards stop at normal."`,
       conveyanceMode: 'all',
       splitBasis: 'initial',
       numerator: '1',
       denominator: '1',
     });
-    if (index % 2 === 0) builder.assignPdf(assignmentId);
+    if (index % 2 === 0) builder.assignPdf(conveyanceId);
+
+    let createdLease = false;
+    if ((options.includeLeaseVariation ?? true) && index % 4 === 1) {
+      const leaseId = builder.addRelated(conveyanceId, {
+        relatedKind: 'lease',
+        instrument: 'Oil & Gas Lease',
+        date: `${year + 1}-${String(month).padStart(2, '0')}-01`,
+        fileDate: `${year + 1}-${String(month).padStart(2, '0')}-15`,
+        grantor: EXTRA_STRESS_SUPPLEMENTAL_GRANTEES[index % EXTRA_STRESS_SUPPLEMENTAL_GRANTEES.length],
+        grantee: PRIMARY_TEST_LESSEE,
+        remarks: `Supplemental lease variation for ${config.name} with 1/4 royalty and a stubborn landman.`,
+      });
+      if (index % 8 === 1) builder.assignPdf(leaseId);
+      createdLease = true;
+    }
+
+    const conveyanceNode = builder.nodes.find((node) => node.id === conveyanceId);
+    if (conveyanceNode && !createdLease) {
+      leafTargets.push(conveyanceNode);
+    }
   }
 }
 
@@ -774,6 +1266,7 @@ export function buildStressWorkspaceData(): {
   activeDeskMapId: string | null;
   instrumentTypes: string[];
   pdfMappings: PdfMapping[];
+  ownerData: OwnerWorkspaceData;
 } {
   const workspaceId = createWorkspaceId();
   const builder = new StressBuilder();
@@ -781,7 +1274,9 @@ export function buildStressWorkspaceData(): {
   // Build 3 independent tract-sized title chains
   for (const chain of STRESS_CHAINS) {
     const rootId = builder.addRoot(chain.landDesc, chain.patentGrantee, chain.patentYear);
-    expandStressBranch(builder, rootId, 1.0, chain.maxDepth, 0, chain);
+    expandStressBranch(builder, rootId, 1.0, chain.maxDepth, 0, chain, {
+      includeLeafLeases: true,
+    });
   }
 
   // Post-process: children of deceased nodes get Probate instrument
@@ -797,10 +1292,16 @@ export function buildStressWorkspaceData(): {
   }
 
   for (const chain of STRESS_CHAINS) {
-    addSupplementalStressCards(builder, chain);
+    addSupplementalStressCards(builder, chain, { includeLeaseVariation: true });
   }
 
-  const { nodes, pdfMappings } = builder;
+  const finalizedNodes = finalizeGeneratedNodes(builder.nodes, { humorousDeaths: true });
+  const { nodes, ownerData } = buildSeedOwnerWorkspaceData(
+    workspaceId,
+    finalizedNodes,
+    `Stress Test - ${STRESS_CHAINS.length} Tracts`
+  );
+  const pdfMappings = builder.pdfMappings;
   const ts = Date.now();
 
   const deskMaps = STRESS_CHAINS.map((chain, index) => ({
@@ -808,6 +1309,9 @@ export function buildStressWorkspaceData(): {
     name: chain.name,
     code: chain.code,
     tractId: chain.code,
+    grossAcres: '',
+    pooledAcres: '',
+    description: '',
     nodeIds: getTractNodes(nodes, chain.landDesc).map((node) => node.id),
   }));
 
@@ -819,6 +1323,514 @@ export function buildStressWorkspaceData(): {
     activeDeskMapId: deskMaps[0]?.id ?? null,
     instrumentTypes: [...STRESS_INSTRUMENT_TYPES],
     pdfMappings,
+    ownerData,
+  };
+}
+
+const LEASEHOLD_DEMO_UNIT = {
+  name: 'Raven Bend Unit',
+  description:
+    'Five-tract pooled unit template with clean acreage and full lease coverage for early leasehold framework work.',
+  operator: PRIMARY_TEST_LESSEE,
+  effectiveDate: '2024-01-01',
+} as const;
+
+const LEASEHOLD_DEMO_ORRIS = [
+  {
+    id: 'leasehold-demo-orri-1',
+    payee: 'Raven Bend Override, LP',
+    scope: 'unit',
+    deskMapId: null,
+    burdenFraction: '1/16',
+    burdenBasis: 'gross_8_8',
+    effectiveDate: '2024-02-01',
+    sourceDocNo: 'LHD-ORRI-1',
+    notes: 'Starter unit-wide ORRI for gross-burden review.',
+  },
+] as const;
+
+const LEASEHOLD_DEMO_TRACTS: LeaseholdDemoTractPlan[] = [
+  {
+    name: 'Tract 1',
+    code: 'T1',
+    grossAcres: '100',
+    pooledAcres: '100',
+    description: '100-acre north tract with present owners split 50 / 25 / 25 net mineral acres.',
+    landDesc: 'North Half of Section 6, Block 12, H&GN RR Co. Survey, Reagan County, Texas',
+    patentYear: 1902,
+    patentGrantee: 'Della June Moonwhistle',
+    pattern: 'half-quarter-quarter',
+    currentOwners: ['Ava Moonwhistle', 'Barton Sodbuster', 'Clara Goosefiddle'],
+    branchHolders: ['Moonwhistle Family Holdings, LLC'],
+  },
+  {
+    name: 'Tract 2',
+    code: 'T2',
+    grossAcres: '200',
+    pooledAcres: '200',
+    description: '200-acre east tract with present owners split 100 / 50 / 50 net mineral acres.',
+    landDesc: 'East Half of Section 11, Block 44, T-5-S, T&P RR Co. Survey, Upton County, Texas',
+    patentYear: 1897,
+    patentGrantee: 'Otis Ray Peppermill',
+    pattern: 'half-quarter-quarter',
+    currentOwners: ['Eli Peppermill', 'Flora Thunderplume', 'Gus Crankshaft'],
+    branchHolders: ['Peppermill Family Trust'],
+  },
+  {
+    name: 'Tract 3',
+    code: 'T3',
+    grossAcres: '300',
+    pooledAcres: '300',
+    description: '300-acre central tract with present owners split 120 / 90 / 60 / 30 net mineral acres.',
+    landDesc: 'Section 3, Block 7, GC&SF RR Co. Survey, Midland County, Texas',
+    patentYear: 1905,
+    patentGrantee: 'Velma Jean Dustbucket',
+    pattern: 'forty-thirty-twenty-ten',
+    currentOwners: ['Hattie Dustbucket', 'Ike Turnipseed', 'June Brakecheck', 'Kirk Goatstatic'],
+    branchHolders: ['Dustbucket Mineral Partners, LP', 'Brakecheck Legacy Minerals, LLC'],
+  },
+  {
+    name: 'Tract 4',
+    code: 'T4',
+    grossAcres: '400',
+    pooledAcres: '400',
+    description: '400-acre west tract with present owners split 200 / 100 / 100 net mineral acres.',
+    landDesc: 'West Half of Section 19, Block 32, T-2-S, T&P RR Co. Survey, Reeves County, Texas',
+    patentYear: 1899,
+    patentGrantee: 'Buckshot Ray Velvetanvil',
+    pattern: 'half-quarter-quarter',
+    currentOwners: ['Lena Velvetanvil', 'Morris Crowbait', 'Nora Picklebarrel'],
+    branchHolders: ['Velvetanvil Mineral Management, LLC'],
+  },
+  {
+    name: 'Tract 5',
+    code: 'T5',
+    grossAcres: '500',
+    pooledAcres: '500',
+    description: '500-acre south tract with present owners split 200 / 150 / 100 / 50 net mineral acres.',
+    landDesc: 'South Half of Section 27, Block C-23, PSL Survey, Loving County, Texas',
+    patentYear: 1908,
+    patentGrantee: 'Cicada Belle Moonquilt',
+    pattern: 'forty-thirty-twenty-ten',
+    currentOwners: ['Opal Moonquilt', 'Perry Spurpickle', 'Quinn Whistlegrit', 'Ruth Biscuit'],
+    branchHolders: ['Moonquilt Ranch Minerals, LP', 'Whistlegrit Legacy Holdings, LLC'],
+  },
+];
+
+interface LeaseholdDemoBuilderState {
+  nodes: OwnershipNode[];
+  pdfMappings: PdfMapping[];
+  leaseOverridesByNodeId: Map<string, Partial<OwnerWorkspaceData['leases'][number]>>;
+  seq: number;
+  docSeq: number;
+}
+
+function nextLeaseholdDemoNodeId(state: LeaseholdDemoBuilderState) {
+  state.seq += 1;
+  return `leasehold-demo-${state.seq}`;
+}
+
+function nextLeaseholdDemoDocNo(state: LeaseholdDemoBuilderState) {
+  state.docSeq += 1;
+  return `LHD-${state.docSeq}`;
+}
+
+function markLeaseholdDemoPdf(
+  state: LeaseholdDemoBuilderState,
+  nodeId: string,
+  fileName: string
+) {
+  const node = state.nodes.find((candidate) => candidate.id === nodeId);
+  if (!node) return;
+  node.hasDoc = true;
+  state.pdfMappings.push({ nodeId, fileName });
+}
+
+function addLeaseholdDemoConveyance(
+  state: LeaseholdDemoBuilderState,
+  {
+    parentId,
+    instrument,
+    date,
+    fileDate,
+    grantor,
+    grantee,
+    landDesc,
+    initialFraction,
+    remainingFraction,
+    remarks,
+  }: {
+    parentId: string | null;
+    instrument: string;
+    date: string;
+    fileDate: string;
+    grantor: string;
+    grantee: string;
+    landDesc: string;
+    initialFraction: string;
+    remainingFraction: string;
+    remarks: string;
+  }
+) {
+  const id = nextLeaseholdDemoNodeId(state);
+  const inferred = inferFractionPair(initialFraction);
+  state.nodes.push(
+    makeNode(id, parentId, {
+      instrument,
+      date,
+      fileDate,
+      grantor,
+      grantee,
+      landDesc,
+      initialFraction,
+      fraction: remainingFraction,
+      docNo: nextLeaseholdDemoDocNo(state),
+      remarks,
+      numerator: inferred.numerator,
+      denominator: inferred.denominator,
+      conveyanceMode: 'fraction',
+      splitBasis: parentId ? 'initial' : 'whole',
+    })
+  );
+  return id;
+}
+
+function addLeaseholdDemoDocument(
+  state: LeaseholdDemoBuilderState,
+  {
+    parentId,
+    instrument,
+    date,
+    fileDate,
+    grantee,
+    landDesc,
+    remarks,
+  }: {
+    parentId: string;
+    instrument: string;
+    date: string;
+    fileDate: string;
+    grantee: string;
+    landDesc: string;
+    remarks: string;
+  }
+) {
+  const id = nextLeaseholdDemoNodeId(state);
+  state.nodes.push(
+    makeNode(id, parentId, {
+      type: 'related',
+      relatedKind: 'document',
+      instrument,
+      date,
+      fileDate,
+      grantor: '',
+      grantee,
+      landDesc,
+      initialFraction: '0',
+      fraction: '0',
+      docNo: nextLeaseholdDemoDocNo(state),
+      remarks,
+    })
+  );
+  return id;
+}
+
+function addLeaseholdDemoLease(
+  state: LeaseholdDemoBuilderState,
+  tract: LeaseholdDemoTractPlan,
+  currentOwnerNodeId: string,
+  currentOwnerName: string,
+  currentOwnerFraction: string,
+  leaseIndex: number
+) {
+  const id = nextLeaseholdDemoNodeId(state);
+  const leaseMonth = String(((leaseIndex * 2) % 12) + 1).padStart(2, '0');
+  state.nodes.push(
+    makeNode(id, currentOwnerNodeId, {
+      type: 'related',
+      relatedKind: 'lease',
+      instrument: 'Oil & Gas Lease',
+      date: `2024-${leaseMonth}-01`,
+      fileDate: `2024-${leaseMonth}-12`,
+      grantor: currentOwnerName,
+      grantee: PRIMARY_TEST_LESSEE,
+      landDesc: tract.landDesc,
+      initialFraction: '0',
+      fraction: '0',
+      docNo: nextLeaseholdDemoDocNo(state),
+      remarks: `${tract.name} lease covering 100% of ${currentOwnerName}'s present mineral interest at 1/8 royalty.`,
+    })
+  );
+  state.leaseOverridesByNodeId.set(id, {
+    royaltyRate: '1/8',
+    leasedInterest: currentOwnerFraction,
+    leaseName: `${tract.name} — ${currentOwnerName} Lease`,
+    notes: `${tract.description} Same lessee across the unit for the initial framework.`,
+  });
+  if (leaseIndex === 0) {
+    markLeaseholdDemoPdf(state, id, `${tract.code}-lease.pdf`);
+  }
+}
+
+function buildLeaseholdDemoTract(
+  state: LeaseholdDemoBuilderState,
+  tract: LeaseholdDemoTractPlan
+) {
+  const patentId = addLeaseholdDemoConveyance(state, {
+    parentId: null,
+    instrument: 'Patent',
+    date: `${tract.patentYear}-03-15`,
+    fileDate: `${tract.patentYear}-04-01`,
+    grantor: 'State of Texas',
+    grantee: tract.patentGrantee,
+    landDesc: tract.landDesc,
+    initialFraction: '1.000000000',
+    remainingFraction: '0.000000000',
+    remarks: `${tract.name} patent for the full tract mineral estate.`,
+  });
+  markLeaseholdDemoPdf(state, patentId, `${tract.code}-patent.pdf`);
+
+  if (tract.pattern === 'half-quarter-quarter') {
+    const [ownerA, ownerB, ownerC] = tract.currentOwners;
+    const [branchHolder] = tract.branchHolders;
+
+    const ownerAId = addLeaseholdDemoConveyance(state, {
+      parentId: patentId,
+      instrument: 'Warranty Deed',
+      date: `${tract.patentYear + 35}-05-10`,
+      fileDate: `${tract.patentYear + 35}-05-20`,
+      grantor: tract.patentGrantee,
+      grantee: ownerA,
+      landDesc: tract.landDesc,
+      initialFraction: '0.500000000',
+      remainingFraction: '0.500000000',
+      remarks: `${tract.name} conveyance creating the first 50% present owner block.`,
+    });
+    const branchId = addLeaseholdDemoConveyance(state, {
+      parentId: patentId,
+      instrument: 'Mineral Deed',
+      date: `${tract.patentYear + 35}-05-10`,
+      fileDate: `${tract.patentYear + 35}-05-20`,
+      grantor: tract.patentGrantee,
+      grantee: branchHolder,
+      landDesc: tract.landDesc,
+      initialFraction: '0.500000000',
+      remainingFraction: '0.000000000',
+      remarks: `${tract.name} branch holder set up for the remaining 50%.`,
+    });
+    addLeaseholdDemoDocument(state, {
+      parentId: branchId,
+      instrument: 'Affidavit of Heirship',
+      date: `${tract.patentYear + 36}-01-15`,
+      fileDate: `${tract.patentYear + 36}-01-22`,
+      grantee: branchHolder,
+      landDesc: tract.landDesc,
+      remarks: `${tract.name} heirship affidavit confirming the split to two equal successors.`,
+    });
+    const ownerBId = addLeaseholdDemoConveyance(state, {
+      parentId: branchId,
+      instrument: 'Special Warranty Deed',
+      date: `${tract.patentYear + 52}-08-01`,
+      fileDate: `${tract.patentYear + 52}-08-12`,
+      grantor: branchHolder,
+      grantee: ownerB,
+      landDesc: tract.landDesc,
+      initialFraction: '0.250000000',
+      remainingFraction: '0.250000000',
+      remarks: `${tract.name} present owner block yielding 25 net mineral acres for each quarter owner.`,
+    });
+    const ownerCId = addLeaseholdDemoConveyance(state, {
+      parentId: branchId,
+      instrument: 'Quitclaim Deed',
+      date: `${tract.patentYear + 52}-08-01`,
+      fileDate: `${tract.patentYear + 52}-08-12`,
+      grantor: branchHolder,
+      grantee: ownerC,
+      landDesc: tract.landDesc,
+      initialFraction: '0.250000000',
+      remainingFraction: '0.250000000',
+      remarks: `${tract.name} final quarter-owner conveyance completing the 100% leased setup.`,
+    });
+
+    const currentOwnerNodeIds = [
+      ownerAId,
+      ownerBId,
+      ownerCId,
+    ].filter((nodeId): nodeId is string => Boolean(nodeId));
+    const currentOwnerFractions = ['0.500000000', '0.250000000', '0.250000000'];
+    currentOwnerNodeIds.forEach((nodeId, index) => {
+      addLeaseholdDemoLease(
+        state,
+        tract,
+        nodeId,
+        tract.currentOwners[index] ?? `Owner ${index + 1}`,
+        currentOwnerFractions[index] ?? '0',
+        index
+      );
+    });
+    return;
+  }
+
+  const [ownerA, ownerB, ownerC, ownerD] = tract.currentOwners;
+  const [branchA, branchB] = tract.branchHolders;
+  addLeaseholdDemoConveyance(state, {
+    parentId: patentId,
+    instrument: 'Warranty Deed',
+    date: `${tract.patentYear + 30}-04-05`,
+    fileDate: `${tract.patentYear + 30}-04-15`,
+    grantor: tract.patentGrantee,
+    grantee: ownerA,
+    landDesc: tract.landDesc,
+    initialFraction: '0.400000000',
+    remainingFraction: '0.400000000',
+    remarks: `${tract.name} first present owner block yielding 40% of the tract.`,
+  });
+  const firstBranchId = addLeaseholdDemoConveyance(state, {
+    parentId: patentId,
+    instrument: 'Mineral Deed',
+    date: `${tract.patentYear + 30}-04-05`,
+    fileDate: `${tract.patentYear + 30}-04-15`,
+    grantor: tract.patentGrantee,
+    grantee: branchA,
+    landDesc: tract.landDesc,
+    initialFraction: '0.600000000',
+    remainingFraction: '0.000000000',
+    remarks: `${tract.name} branch holder for the remaining 60% mineral block.`,
+  });
+  addLeaseholdDemoDocument(state, {
+    parentId: firstBranchId,
+    instrument: 'Probate',
+    date: `${tract.patentYear + 31}-01-09`,
+    fileDate: `${tract.patentYear + 31}-01-21`,
+    grantee: branchA,
+    landDesc: tract.landDesc,
+    remarks: `${tract.name} probate record confirming the 30 / 30 split of the remaining branch.`,
+  });
+  const ownerBId = addLeaseholdDemoConveyance(state, {
+    parentId: firstBranchId,
+    instrument: 'Special Warranty Deed',
+    date: `${tract.patentYear + 46}-07-14`,
+    fileDate: `${tract.patentYear + 46}-07-25`,
+    grantor: branchA,
+    grantee: ownerB,
+    landDesc: tract.landDesc,
+    initialFraction: '0.300000000',
+    remainingFraction: '0.300000000',
+    remarks: `${tract.name} second present owner block yielding 30% of the tract.`,
+  });
+  const secondBranchId = addLeaseholdDemoConveyance(state, {
+    parentId: firstBranchId,
+    instrument: 'Correction Deed',
+    date: `${tract.patentYear + 46}-07-14`,
+    fileDate: `${tract.patentYear + 46}-07-25`,
+    grantor: branchA,
+    grantee: branchB,
+    landDesc: tract.landDesc,
+    initialFraction: '0.300000000',
+    remainingFraction: '0.000000000',
+    remarks: `${tract.name} branch correction setting up the final 20% and 10% owner blocks.`,
+  });
+  const ownerCId = addLeaseholdDemoConveyance(state, {
+    parentId: secondBranchId,
+    instrument: 'Mineral Deed',
+    date: `${tract.patentYear + 60}-11-03`,
+    fileDate: `${tract.patentYear + 60}-11-12`,
+    grantor: branchB,
+    grantee: ownerC,
+    landDesc: tract.landDesc,
+    initialFraction: '0.200000000',
+    remainingFraction: '0.200000000',
+    remarks: `${tract.name} third present owner block yielding 20% of the tract.`,
+  });
+  const ownerDId = addLeaseholdDemoConveyance(state, {
+    parentId: secondBranchId,
+    instrument: 'Quitclaim Deed',
+    date: `${tract.patentYear + 60}-11-03`,
+    fileDate: `${tract.patentYear + 60}-11-12`,
+    grantor: branchB,
+    grantee: ownerD,
+    landDesc: tract.landDesc,
+    initialFraction: '0.100000000',
+    remainingFraction: '0.100000000',
+    remarks: `${tract.name} final present owner block yielding 10% of the tract.`,
+  });
+
+  const currentOwnerNodeIds = [
+    state.nodes.find((node) => node.parentId === patentId && node.grantee === ownerA)?.id,
+    ownerBId,
+    ownerCId,
+    ownerDId,
+  ].filter((nodeId): nodeId is string => Boolean(nodeId));
+  const currentOwnerFractions = ['0.400000000', '0.300000000', '0.200000000', '0.100000000'];
+
+  currentOwnerNodeIds.forEach((nodeId, index) => {
+    addLeaseholdDemoLease(
+      state,
+      tract,
+      nodeId,
+      tract.currentOwners[index] ?? `Owner ${index + 1}`,
+      currentOwnerFractions[index] ?? '0',
+      index
+    );
+  });
+}
+
+export function buildLeaseholdDemoWorkspaceData(): {
+  workspaceId: string;
+  projectName: string;
+  nodes: OwnershipNode[];
+  deskMaps: DeskMap[];
+  leaseholdUnit: typeof LEASEHOLD_DEMO_UNIT;
+  leaseholdOrris: LeaseholdOrri[];
+  activeDeskMapId: string | null;
+  instrumentTypes: string[];
+  pdfMappings: PdfMapping[];
+  ownerData: OwnerWorkspaceData;
+} {
+  const workspaceId = createWorkspaceId();
+  const builder: LeaseholdDemoBuilderState = {
+    nodes: [],
+    pdfMappings: [],
+    leaseOverridesByNodeId: new Map(),
+    seq: 0,
+    docSeq: 20000,
+  };
+
+  LEASEHOLD_DEMO_TRACTS.forEach((tract) => {
+    buildLeaseholdDemoTract(builder, tract);
+  });
+
+  const finalizedNodes = finalizeGeneratedNodes(builder.nodes, { humorousDeaths: false });
+  const { nodes, ownerData } = buildSeedOwnerWorkspaceData(
+    workspaceId,
+    finalizedNodes,
+    `Leasehold Demo - ${LEASEHOLD_DEMO_TRACTS.length} Tracts`,
+    { leaseOverridesByNodeId: builder.leaseOverridesByNodeId }
+  );
+  const ts = Date.now();
+
+  const deskMaps = LEASEHOLD_DEMO_TRACTS.map((tract, index) => ({
+    id: `dm-leasehold-${index + 1}-${ts}`,
+    name: tract.name,
+    code: tract.code,
+    tractId: tract.code,
+    grossAcres: tract.grossAcres,
+    pooledAcres: tract.pooledAcres,
+    description: tract.description,
+    nodeIds: getTractNodes(nodes, tract.landDesc).map((node) => node.id),
+  }));
+
+  return {
+    workspaceId,
+    projectName: `Leasehold Demo — ${deskMaps.length} Tracts`,
+    nodes,
+    deskMaps,
+    leaseholdUnit: LEASEHOLD_DEMO_UNIT,
+    leaseholdOrris: LEASEHOLD_DEMO_ORRIS.map((orri) => ({ ...orri })),
+    activeDeskMapId: deskMaps[0]?.id ?? null,
+    instrumentTypes: [...STRESS_INSTRUMENT_TYPES],
+    pdfMappings: builder.pdfMappings,
+    ownerData,
   };
 }
 
@@ -837,19 +1849,80 @@ export async function seedStressTestData(): Promise<{ nodeCount: number; pdfCoun
     instrumentTypes: workspace.instrumentTypes,
   });
   await Promise.all([
-    useOwnerStore.getState().setWorkspace(workspace.workspaceId),
+    useOwnerStore.getState().replaceWorkspaceData(
+      workspace.workspaceId,
+      workspace.ownerData
+    ),
     useMapStore.getState().setWorkspace(workspace.workspaceId),
   ]);
 
-  // Attach PDFs from TORS_Documents/
+  // Attach bundled PDFs sourced from TORS_Documents/
   let pdfCount = 0;
+  const failedPdfNodeIds: string[] = [];
   for (const mapping of workspace.pdfMappings) {
     const ok = await attachPdf(mapping.nodeId, mapping.fileName);
-    if (ok) pdfCount++;
+    if (ok) {
+      pdfCount++;
+    } else {
+      failedPdfNodeIds.push(mapping.nodeId);
+    }
+  }
+
+  if (failedPdfNodeIds.length > 0) {
+    for (const failedNodeId of failedPdfNodeIds) {
+      useWorkspaceStore.getState().updateNode(failedNodeId, { hasDoc: false });
+    }
   }
 
   console.log(
     `[stress] Built ${workspace.nodes.length} nodes, attached ${pdfCount} PDFs, ${workspace.deskMaps.length} desk maps`
+  );
+  return { nodeCount: workspace.nodes.length, pdfCount };
+}
+
+export async function seedLeaseholdDemoData(): Promise<{
+  nodeCount: number;
+  pdfCount: number;
+}> {
+  const workspace = buildLeaseholdDemoWorkspaceData();
+
+  useWorkspaceStore.getState().loadWorkspace({
+    workspaceId: workspace.workspaceId,
+    projectName: workspace.projectName,
+    nodes: workspace.nodes,
+    deskMaps: workspace.deskMaps,
+    leaseholdUnit: workspace.leaseholdUnit,
+    leaseholdOrris: workspace.leaseholdOrris,
+    activeDeskMapId: workspace.activeDeskMapId,
+    instrumentTypes: workspace.instrumentTypes,
+  });
+  await Promise.all([
+    useOwnerStore.getState().replaceWorkspaceData(
+      workspace.workspaceId,
+      workspace.ownerData
+    ),
+    useMapStore.getState().setWorkspace(workspace.workspaceId),
+  ]);
+
+  let pdfCount = 0;
+  const failedPdfNodeIds: string[] = [];
+  for (const mapping of workspace.pdfMappings) {
+    const ok = await attachPdf(mapping.nodeId, mapping.fileName);
+    if (ok) {
+      pdfCount++;
+    } else {
+      failedPdfNodeIds.push(mapping.nodeId);
+    }
+  }
+
+  if (failedPdfNodeIds.length > 0) {
+    for (const failedNodeId of failedPdfNodeIds) {
+      useWorkspaceStore.getState().updateNode(failedNodeId, { hasDoc: false });
+    }
+  }
+
+  console.log(
+    `[leasehold] Built ${workspace.nodes.length} nodes, attached ${pdfCount} PDFs, ${workspace.deskMaps.length} desk maps`
   );
   return { nodeCount: workspace.nodes.length, pdfCount };
 }

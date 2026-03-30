@@ -6,7 +6,12 @@
  */
 import Papa from 'papaparse';
 import type { OwnershipNode, DeskMap } from '../types/node';
-import { createBlankNode } from '../types/node';
+import { createBlankNode, normalizeDeskMap } from '../types/node';
+import {
+  createBlankLeaseholdUnit,
+  type LeaseholdOrri,
+  type LeaseholdUnit,
+} from '../types/leasehold';
 import { createWorkspaceId } from '../utils/workspace-id';
 
 // ── CSV column names ────────────────────────────────────────
@@ -24,6 +29,9 @@ interface RawDeskMap {
   name: string;
   code: string;
   tractId?: string;
+  grossAcres?: string | number;
+  pooledAcres?: string | number;
+  description?: string;
   nodes: RawNode[];
   pz?: { x: number; y: number; scale: number };
 }
@@ -54,6 +62,8 @@ export interface ImportResult {
   workspaceId: string;
   nodes: OwnershipNode[];
   deskMaps: DeskMap[];
+  leaseholdUnit?: LeaseholdUnit;
+  leaseholdOrris?: LeaseholdOrri[];
   activeDeskMapId: string | null;
   projectName: string;
   instrumentTypes?: string[];
@@ -146,13 +156,21 @@ export function importCSV(csvText: string): ImportResult {
     const mapNodes = (rawMap.nodes ?? []).map(rawNodeToOwnership);
     allNodes.push(...mapNodes);
 
-    deskMaps.push({
-      id: rawMap.id,
-      name: rawMap.name ?? 'Imported Map',
-      code: rawMap.code ?? '',
-      tractId: rawMap.tractId ?? null,
-      nodeIds: mapNodes.map(n => n.id),
-    });
+    deskMaps.push(
+      normalizeDeskMap(
+        {
+          id: rawMap.id,
+          name: rawMap.name ?? 'Imported Map',
+          code: rawMap.code ?? '',
+          tractId: rawMap.tractId ?? null,
+          grossAcres: rawMap.grossAcres,
+          pooledAcres: rawMap.pooledAcres ?? rawMap.grossAcres,
+          description: rawMap.description,
+          nodeIds: mapNodes.map((node) => node.id),
+        },
+        rawMap.name ?? 'Imported Map'
+      )
+    );
   }
 
   // Deduplicate node IDs (shouldn't happen, but safety)
@@ -167,6 +185,8 @@ export function importCSV(csvText: string): ImportResult {
     workspaceId: createWorkspaceId(),
     nodes: uniqueNodes,
     deskMaps,
+    leaseholdUnit: createBlankLeaseholdUnit(),
+    leaseholdOrris: [],
     activeDeskMapId: activeMapId,
     projectName: rawDeskmaps[0]?.name ?? 'Imported Workspace',
   };

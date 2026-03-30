@@ -38,6 +38,7 @@ export default function AttachDocModal({ parentNodeId, onClose }: AttachDocModal
     const node = {
       ...createBlankNode(id, parentNodeId),
       type: 'related' as const,
+      relatedKind: 'document' as const,
       instrument: form.instrument,
       date: form.date,
       fileDate: form.fileDate,

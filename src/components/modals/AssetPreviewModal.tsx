@@ -1,4 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
+import { buildRrcDelimitedTextPreview } from '../../research/rrc-delimited-text';
+import {
+  PENDING_DRILLING_FILE_SPECS,
+  detectPendingDrillingFileKind,
+} from '../../research/rrc-pending-drilling';
+import RrcDelimitedPreviewTable from '../research/RrcDelimitedPreviewTable';
 import Modal from '../shared/Modal';
 
 interface AssetPreviewModalProps {
@@ -24,6 +30,7 @@ export default function AssetPreviewModal({
   onClose,
 }: AssetPreviewModalProps) {
   const [textPreview, setTextPreview] = useState<string | null>(null);
+  const [delimitedPreview, setDelimitedPreview] = useState<ReturnType<typeof buildRrcDelimitedTextPreview> | null>(null);
   const objectUrl = useMemo(() => URL.createObjectURL(blob), [blob]);
   const lowerMime = mimeType.toLowerCase();
   const isPdf = lowerMime.includes('pdf');
@@ -37,23 +44,38 @@ export default function AssetPreviewModal({
   useEffect(() => {
     if (!isTextLike) {
       setTextPreview(null);
+      setDelimitedPreview(null);
       return;
     }
 
     let cancelled = false;
-    blob.text().then((text) => {
-      if (cancelled) return;
-      try {
-        setTextPreview(JSON.stringify(JSON.parse(text), null, 2));
-      } catch {
-        setTextPreview(text);
-      }
-    });
+    blob.text()
+      .then((text) => {
+        if (cancelled) return;
+        const pendingFileKind = detectPendingDrillingFileKind(fileName);
+        const preview = buildRrcDelimitedTextPreview(text, {
+          knownColumns: pendingFileKind
+            ? PENDING_DRILLING_FILE_SPECS[pendingFileKind].columns
+            : undefined,
+          maxRows: 50,
+        });
+        setDelimitedPreview(preview);
+        try {
+          setTextPreview(JSON.stringify(JSON.parse(text), null, 2));
+        } catch {
+          setTextPreview(text);
+        }
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setDelimitedPreview(null);
+        setTextPreview('Failed to read this file for inline preview.');
+      });
 
     return () => {
       cancelled = true;
     };
-  }, [blob, isTextLike]);
+  }, [blob, fileName, isTextLike]);
 
   useEffect(() => {
     return () => {
@@ -93,7 +115,15 @@ export default function AssetPreviewModal({
           </div>
         )}
 
-        {!isPdf && !isImage && isTextLike && (
+        {!isPdf && !isImage && isTextLike && delimitedPreview && (
+          <RrcDelimitedPreviewTable
+            title="Readable TXT Preview"
+            preview={delimitedPreview}
+            description="LANDroid parsed the RRC delimiter layout into rows and columns for easier review."
+          />
+        )}
+
+        {!isPdf && !isImage && isTextLike && !delimitedPreview && (
           <pre className="max-h-[70vh] overflow-auto rounded-lg border border-ledger-line bg-ledger p-4 text-xs text-ink whitespace-pre-wrap break-words">
             {textPreview ?? 'Loading preview...'}
           </pre>
