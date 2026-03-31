@@ -290,7 +290,7 @@ function describeCoverageDelta(
 
 function coverageTone(value: string) {
   const delta = d(value);
-  if (delta.lessThanOrEqualTo(0)) {
+  if (delta.isZero()) {
     return 'border-emerald-200 bg-emerald-50 text-emerald-900';
   }
   return 'border-amber-200 bg-amber-50 text-amber-900';
@@ -571,6 +571,10 @@ export default function DeskMapView() {
             <span className="text-[10px] text-ink-light font-mono">
               {visibleCardCount} cards
             </span>
+          </div>
+          <div className="text-[9px] leading-tight text-ink-light">
+            Add more than one root when title starts from separate families. Temporary
+            coverage over 100% is okay until you reconcile farther back in title.
           </div>
 
           <div className="space-y-1.5">

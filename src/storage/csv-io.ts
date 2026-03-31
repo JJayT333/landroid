@@ -8,8 +8,10 @@ import Papa from 'papaparse';
 import type { OwnershipNode, DeskMap } from '../types/node';
 import { createBlankNode, normalizeDeskMap } from '../types/node';
 import {
+  type LeaseholdAssignment,
   createBlankLeaseholdUnit,
   type LeaseholdOrri,
+  type LeaseholdTransferOrderEntry,
   type LeaseholdUnit,
 } from '../types/leasehold';
 import { createWorkspaceId } from '../utils/workspace-id';
@@ -63,7 +65,9 @@ export interface ImportResult {
   nodes: OwnershipNode[];
   deskMaps: DeskMap[];
   leaseholdUnit?: LeaseholdUnit;
+  leaseholdAssignments?: LeaseholdAssignment[];
   leaseholdOrris?: LeaseholdOrri[];
+  leaseholdTransferOrderEntries?: LeaseholdTransferOrderEntry[];
   activeDeskMapId: string | null;
   projectName: string;
   instrumentTypes?: string[];
@@ -186,7 +190,9 @@ export function importCSV(csvText: string): ImportResult {
     nodes: uniqueNodes,
     deskMaps,
     leaseholdUnit: createBlankLeaseholdUnit(),
+    leaseholdAssignments: [],
     leaseholdOrris: [],
+    leaseholdTransferOrderEntries: [],
     activeDeskMapId: activeMapId,
     projectName: rawDeskmaps[0]?.name ?? 'Imported Workspace',
   };

@@ -26,8 +26,8 @@ Then open `http://localhost:5173/`.
 - Local PDF companion folder for runsheet exports: `TORS_Documents/`
 
 ## Current surfaces
-- `Desk Map` for title-chain editing, ownership-versus-leasing coverage checks, leased-status flags on mineral-owner cards, separate terminal lessee nodes, and separate NPRI branches that do not reduce the mineral coverage totals
-- `Leasehold` for acreage-first tract setup, pooled-participation review, unit metadata, derived owner net acres, first-pass total royalty calculations from active lease records, and initial leasehold-side ORRI burden tracking
+- `Desk Map` for title-chain editing, ownership-versus-leasing coverage checks, multiple starting root families when title is still incomplete, leased-status flags on mineral-owner cards, separate terminal lessee nodes, and separate NPRI branches that do not reduce the mineral coverage totals
+- `Leasehold` for acreage-first tract setup, pooled-participation review, unit metadata, derived owner net acres, first-pass total royalty calculations from active lease records, leasehold-side ORRI burden tracking, first WI assignment splits, and a card-based internal `Deck` view with editable unit-level transfer-order rows layered on top of the derived review surface
 - `Flowchart` for presentation and print layout
 - `Runsheet` for chronology review and export
 - `Owners` for workspace-scoped owner, lease, contact, and document records
@@ -36,7 +36,7 @@ Then open `http://localhost:5173/`.
 
 ## Demo loaders
 - `Stress (100/150/500)` loads the Desk Map stress workspace with three tract-sized title trees
-- `Leasehold (5 Tracts)` loads a separate five-tract unit demo with `100`, `200`, `300`, `400`, and `500` gross acres, matching pooled acres, shared unit metadata, 100% lease coverage for every present owner at `1/8` royalty, and a starter unit-wide ORRI burden
+- `Leasehold (5 Tracts)` loads a separate five-tract unit demo with `100`, `200`, `300`, `400`, and `500` gross acres, matching pooled acres, shared unit metadata, 100% lease coverage for every present owner at `1/8` royalty, a starter unit-wide ORRI burden, and starter WI assignments
 
 ## Persistence notes
 - Browser autosave keeps the active workspace and flowchart canvas locally.

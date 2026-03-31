@@ -43,6 +43,8 @@ describe('csv-io', () => {
     expect(first.workspaceId).not.toBe(second.workspaceId);
     expect(first.nodes[0]?.linkedOwnerId).toBeNull();
     expect(first.deskMaps[0]?.pooledAcres).toBe('120');
+    expect(first.leaseholdAssignments).toEqual([]);
     expect(first.leaseholdOrris).toEqual([]);
+    expect(first.leaseholdTransferOrderEntries).toEqual([]);
   });
 });

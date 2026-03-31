@@ -14,9 +14,13 @@ import {
 import type { CanvasSaveData } from '../store/canvas-store';
 import type { PageSizeId } from '../types/flowchart';
 import {
+  normalizeLeaseholdAssignments,
   normalizeLeaseholdOrris,
+  normalizeLeaseholdTransferOrderEntries,
   normalizeLeaseholdUnit,
+  type LeaseholdAssignment,
   type LeaseholdOrri,
+  type LeaseholdTransferOrderEntry,
   type LeaseholdUnit,
 } from '../types/leasehold';
 import { normalizeLease, type OwnerDoc } from '../types/owner';
@@ -42,7 +46,9 @@ export interface WorkspaceData {
   nodes: OwnershipNode[];
   deskMaps: DeskMap[];
   leaseholdUnit?: LeaseholdUnit;
+  leaseholdAssignments?: LeaseholdAssignment[];
   leaseholdOrris?: LeaseholdOrri[];
+  leaseholdTransferOrderEntries?: LeaseholdTransferOrderEntry[];
   activeDeskMapId: string | null;
   instrumentTypes: string[];
 }
@@ -218,7 +224,13 @@ export async function loadWorkspaceFromDb(): Promise<WorkspaceData | null> {
       nodes,
       deskMaps,
       leaseholdUnit: normalizeLeaseholdUnit(parsed.leaseholdUnit),
+      leaseholdAssignments: normalizeLeaseholdAssignments(parsed.leaseholdAssignments, {
+        validDeskMapIds,
+      }),
       leaseholdOrris: normalizeLeaseholdOrris(parsed.leaseholdOrris, { validDeskMapIds }),
+      leaseholdTransferOrderEntries: normalizeLeaseholdTransferOrderEntries(
+        parsed.leaseholdTransferOrderEntries
+      ),
       activeDeskMapId: parsed.activeDeskMapId ?? null,
       instrumentTypes: Array.isArray(parsed.instrumentTypes)
         ? parsed.instrumentTypes
@@ -303,7 +315,7 @@ async function serializeResearchData(
 
 export async function exportLandroidFile(data: LandroidFileData): Promise<Blob> {
   const payload = {
-    version: 4,
+    version: 5,
     exportedAt: new Date().toISOString(),
     ...data,
     ownerData: await serializeOwnerData(data.ownerData),
@@ -477,7 +489,13 @@ export async function importLandroidFile(file: File): Promise<LandroidFileData> 
     nodes,
     deskMaps,
     leaseholdUnit: normalizeLeaseholdUnit(parsed.leaseholdUnit),
+    leaseholdAssignments: normalizeLeaseholdAssignments(parsed.leaseholdAssignments, {
+      validDeskMapIds,
+    }),
     leaseholdOrris: normalizeLeaseholdOrris(parsed.leaseholdOrris, { validDeskMapIds }),
+    leaseholdTransferOrderEntries: normalizeLeaseholdTransferOrderEntries(
+      parsed.leaseholdTransferOrderEntries
+    ),
     activeDeskMapId:
       typeof parsed.activeDeskMapId === 'string' ? parsed.activeDeskMapId : null,
     instrumentTypes: readStringArray(parsed.instrumentTypes),

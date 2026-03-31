@@ -2,17 +2,27 @@ import { useEffect, useMemo, useState, type KeyboardEvent } from 'react';
 import { d } from '../engine/decimal';
 import { formatAsFraction } from '../engine/fraction-display';
 import {
+  LEASEHOLD_ASSIGNMENT_SCOPE_OPTIONS,
   LEASEHOLD_ORRI_BURDEN_BASIS_OPTIONS,
   LEASEHOLD_ORRI_SCOPE_OPTIONS,
+  LEASEHOLD_TRANSFER_ORDER_STATUS_OPTIONS,
+  type LeaseholdAssignment,
   type LeaseholdOrri,
+  type LeaseholdTransferOrderEntry,
+  type LeaseholdTransferOrderStatus,
   type LeaseholdUnit,
 } from '../types/leasehold';
 import { useOwnerStore } from '../store/owner-store';
 import { useWorkspaceStore } from '../store/workspace-store';
+import { parseInterestString } from '../utils/interest-string';
 import {
+  buildLeaseholdTransferOrderReview,
   buildLeaseholdUnitSummary,
+  type LeaseholdAssignmentSummary,
+  type LeaseholdDecimalRow,
   type LeaseholdOrriSummary,
   type LeaseholdTractSummary,
+  type LeaseholdTransferOrderReview,
 } from '../components/leasehold/leasehold-summary';
 
 function formatAcres(value: string) {
@@ -25,6 +35,10 @@ function formatAcres(value: string) {
 
 function formatPercent(value: string) {
   return `${d(value).times(100).toFixed(2)}%`;
+}
+
+function formatDecimalValue(value: string) {
+  return d(value).toFixed(8);
 }
 
 function normalizeGrossAcreInput(value: string) {
@@ -66,6 +80,8 @@ function SummaryCard({
     </div>
   );
 }
+
+type LeaseholdMode = 'overview' | 'deck';
 
 function LeaseholdTractCard({
   tract,
@@ -233,6 +249,8 @@ function LeaseholdTractCard({
         <span>Gross ORRI rate {formatPercent(tract.grossOrriRate)}</span>
         <span>Unit ORRI contribution {formatPercent(tract.unitOrriDecimal)}</span>
         <span>Pre-WI unit NRI {formatPercent(tract.preWorkingInterestDecimal)}</span>
+        <span>Assigned WI {formatPercent(tract.assignedWorkingInterestDecimal)}</span>
+        <span>Retained WI {formatPercent(tract.retainedWorkingInterestDecimal)}</span>
         <span>
           Lessee{tract.uniqueLessees.length === 1 ? '' : 's'}{' '}
           {tract.uniqueLessees.length > 0 ? tract.uniqueLessees.join(', ') : 'not set'}
@@ -423,7 +441,116 @@ function LeaseholdUnitEditor({
   );
 }
 
-function LeaseholdOrriRow({
+function LeaseholdDeckModeToggle({
+  mode,
+  onChange,
+}: {
+  mode: LeaseholdMode;
+  onChange: (mode: LeaseholdMode) => void;
+}) {
+  return (
+    <div className="inline-flex rounded-2xl border border-ledger-line bg-parchment-dark p-1 shadow-sm">
+      {(['overview', 'deck'] as const).map((option) => (
+        <button
+          key={option}
+          type="button"
+          onClick={() => onChange(option)}
+          className={`rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
+            mode === option
+              ? 'bg-parchment text-ink shadow-sm'
+              : 'text-ink-light hover:text-ink'
+          }`}
+        >
+          {option === 'overview' ? 'Overview' : 'Deck'}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function LeaseholdDeckLesseeCard({
+  title,
+  lessees,
+  note,
+  royaltyDecimal,
+  orriDecimal,
+  preWorkingInterestDecimal,
+}: {
+  title: string;
+  lessees: string[];
+  note: string;
+  royaltyDecimal: string;
+  orriDecimal: string;
+  preWorkingInterestDecimal: string;
+}) {
+  return (
+    <div className="w-80 rounded-lg border-2 border-emerald-200 bg-emerald-50 text-ink shadow-[0_8px_18px_rgba(5,150,105,0.14)]">
+      <div className="rounded-t-lg border-b border-emerald-200 bg-emerald-100/80 px-3 py-1.5">
+        <div className="flex items-center justify-between gap-2">
+          <span className="truncate text-[10px] font-semibold uppercase tracking-wide text-emerald-900">
+            Leasehold Estate
+          </span>
+          <span className="rounded-full border border-emerald-300 bg-emerald-200/70 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-emerald-950">
+            Lessee
+          </span>
+        </div>
+      </div>
+      <div className="space-y-2 px-3 py-3">
+        <div className="text-[10px] uppercase tracking-wider text-emerald-900/75">{title}</div>
+        <div className="text-sm font-bold font-display text-emerald-950">
+          {lessees.length > 0 ? lessees.join(', ') : 'Lessee not set'}
+        </div>
+        <div className="text-[10px] leading-5 text-emerald-900/75">{note}</div>
+        <div className="flex flex-wrap gap-1.5 pt-1">
+          <span className="rounded-full border border-emerald-200 bg-white/80 px-2 py-0.5 text-[9px] text-emerald-900/85">
+            Royalty {formatPercent(royaltyDecimal)}
+          </span>
+          <span className="rounded-full border border-emerald-200 bg-white/80 px-2 py-0.5 text-[9px] text-emerald-900/85">
+            ORRI {formatPercent(orriDecimal)}
+          </span>
+          <span className="rounded-full border border-emerald-200 bg-white/80 px-2 py-0.5 text-[9px] text-emerald-900/85">
+            Pre-WI NRI {formatPercent(preWorkingInterestDecimal)}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function LeaseholdDeckPlaceholderCard({
+  title,
+  tone,
+  body,
+}: {
+  title: string;
+  tone: 'amber' | 'leather';
+  body: string;
+}) {
+  const toneClasses = tone === 'amber'
+    ? {
+        border: 'border-amber-200',
+        bg: 'bg-amber-50',
+        header: 'bg-amber-100/80 border-amber-200 text-amber-900',
+        body: 'text-amber-900/75',
+      }
+    : {
+        border: 'border-ledger-line',
+        bg: 'bg-parchment',
+        header: 'bg-parchment-dark border-ledger-line text-ink-light',
+        body: 'text-ink-light',
+      };
+
+  return (
+    <div className={`w-80 rounded-lg border-2 ${toneClasses.border} ${toneClasses.bg} shadow-sm`}>
+      <div className={`rounded-t-lg border-b px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide ${toneClasses.header}`}>
+        {title}
+      </div>
+      <div className={`px-3 py-3 text-sm leading-6 ${toneClasses.body}`}>{body}</div>
+    </div>
+  );
+}
+
+function LeaseholdOrriDeckCard({
   orri,
   summary,
   deskMaps,
@@ -439,6 +566,7 @@ function LeaseholdOrriRow({
   const [payeeDraft, setPayeeDraft] = useState(orri.payee);
   const [burdenFractionDraft, setBurdenFractionDraft] = useState(orri.burdenFraction);
   const [sourceDocNoDraft, setSourceDocNoDraft] = useState(orri.sourceDocNo);
+  const [notesDraft, setNotesDraft] = useState(orri.notes);
 
   useEffect(() => {
     setPayeeDraft(orri.payee);
@@ -452,11 +580,36 @@ function LeaseholdOrriRow({
     setSourceDocNoDraft(orri.sourceDocNo);
   }, [orri.sourceDocNo]);
 
+  useEffect(() => {
+    setNotesDraft(orri.notes);
+  }, [orri.notes]);
+
   return (
-    <div className="rounded-2xl border border-ledger-line bg-parchment p-4">
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_10rem_13rem_10rem_11rem_11rem_auto]">
+    <div className="w-80 rounded-lg border-2 border-amber-200 bg-amber-50 text-ink shadow-[0_8px_18px_rgba(217,119,6,0.14)]">
+      <div className="rounded-t-lg border-b border-amber-200 bg-amber-100/80 px-3 py-1.5">
+        <div className="flex items-center justify-between gap-2">
+          <span className="truncate text-[10px] font-semibold uppercase tracking-wide text-amber-900">
+            ORRI
+          </span>
+          <div className="flex items-center gap-1.5">
+            <span className="rounded-full border border-amber-300 bg-amber-200/70 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-amber-950">
+              {orri.scope === 'unit' ? 'Unit' : 'Tract'}
+            </span>
+            <span className="rounded-full border border-amber-300 bg-white/80 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-amber-900">
+              {formatOrriBasisLabel(orri.burdenBasis)}
+            </span>
+          </div>
+        </div>
+        <div className="mt-0.5 text-[9px] font-mono text-amber-900/75">
+          {[orri.effectiveDate || '', sourceDocNoDraft.trim() ? `Doc# ${sourceDocNoDraft.trim()}` : '']
+            .filter(Boolean)
+            .join(' • ')}
+        </div>
+      </div>
+
+      <div className="space-y-3 px-3 py-3">
         <label className="block">
-          <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-light">
+          <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-900/75">
             Payee
           </div>
           <input
@@ -470,154 +623,223 @@ function LeaseholdOrriRow({
               }
             }}
             placeholder="Override payee"
-            className="w-full rounded-xl border border-ledger-line bg-white px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-leather"
+            className="w-full rounded-xl border border-amber-200 bg-white/90 px-3 py-2 text-sm text-amber-950 outline-none transition-colors focus:border-amber-400"
           />
         </label>
 
-        <label className="block">
-          <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-light">
-            Scope
-          </div>
-          <select
-            value={orri.scope}
-            onChange={(event) =>
-              onUpdate(orri.id, {
-                scope: event.target.value as LeaseholdOrri['scope'],
-                deskMapId: event.target.value === 'tract' ? orri.deskMapId : null,
-              })
-            }
-            className="w-full rounded-xl border border-ledger-line bg-white px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-leather"
-          >
-            {LEASEHOLD_ORRI_SCOPE_OPTIONS.map((option) => (
-              <option key={option} value={option}>
-                {option === 'unit' ? 'Unit-wide' : 'Single tract'}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="block">
+            <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-900/75">
+              Burden
+            </div>
+            <input
+              value={burdenFractionDraft}
+              onChange={(event) => setBurdenFractionDraft(event.target.value)}
+              onBlur={() => {
+                const next = burdenFractionDraft.trim();
+                setBurdenFractionDraft(next);
+                if (next !== orri.burdenFraction) {
+                  onUpdate(orri.id, { burdenFraction: next });
+                }
+              }}
+              placeholder="1/64"
+              className="w-full rounded-xl border border-amber-200 bg-white/90 px-3 py-2 text-sm text-amber-950 outline-none transition-colors focus:border-amber-400"
+            />
+          </label>
+
+          <label className="block">
+            <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-900/75">
+              Effective Date
+            </div>
+            <input
+              type="date"
+              value={orri.effectiveDate}
+              onChange={(event) =>
+                onUpdate(orri.id, { effectiveDate: event.target.value })
+              }
+              className="w-full rounded-xl border border-amber-200 bg-white/90 px-3 py-2 text-sm text-amber-950 outline-none transition-colors focus:border-amber-400"
+            />
+          </label>
+
+          <label className="block">
+            <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-900/75">
+              Scope
+            </div>
+            <select
+              value={orri.scope}
+              onChange={(event) =>
+                onUpdate(orri.id, {
+                  scope: event.target.value as LeaseholdOrri['scope'],
+                  deskMapId: event.target.value === 'tract' ? orri.deskMapId : null,
+                })
+              }
+              className="w-full rounded-xl border border-amber-200 bg-white/90 px-3 py-2 text-sm text-amber-950 outline-none transition-colors focus:border-amber-400"
+            >
+              {LEASEHOLD_ORRI_SCOPE_OPTIONS.map((option) => (
+                <option key={option} value={option}>
+                  {option === 'unit' ? 'Unit-wide' : 'Single tract'}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="block">
+            <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-900/75">
+              Burden Basis
+            </div>
+            <select
+              value={orri.burdenBasis}
+              onChange={(event) =>
+                onUpdate(orri.id, {
+                  burdenBasis: event.target.value as LeaseholdOrri['burdenBasis'],
+                })
+              }
+              className="w-full rounded-xl border border-amber-200 bg-white/90 px-3 py-2 text-sm text-amber-950 outline-none transition-colors focus:border-amber-400"
+            >
+              {LEASEHOLD_ORRI_BURDEN_BASIS_OPTIONS.map((option) => (
+                <option key={option} value={option}>
+                  {formatOrriBasisLabel(option)}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="block">
+            <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-900/75">
+              Tract
+            </div>
+            <select
+              value={orri.deskMapId ?? ''}
+              disabled={orri.scope !== 'tract'}
+              onChange={(event) =>
+                onUpdate(orri.id, {
+                  deskMapId: event.target.value || null,
+                })
+              }
+              className="w-full rounded-xl border border-amber-200 bg-white/90 px-3 py-2 text-sm text-amber-950 outline-none transition-colors focus:border-amber-400 disabled:bg-amber-50/60 disabled:text-amber-900/50"
+            >
+              <option value="">{orri.scope === 'tract' ? 'Select tract' : 'Not used'}</option>
+              {deskMaps.map((deskMap) => (
+                <option key={deskMap.deskMapId} value={deskMap.deskMapId}>
+                  {deskMap.name} ({deskMap.code})
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="block">
+            <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-900/75">
+              Source Doc No.
+            </div>
+            <input
+              value={sourceDocNoDraft}
+              onChange={(event) => setSourceDocNoDraft(event.target.value)}
+              onBlur={() => {
+                const next = sourceDocNoDraft.trim();
+                setSourceDocNoDraft(next);
+                if (next !== orri.sourceDocNo) {
+                  onUpdate(orri.id, { sourceDocNo: next });
+                }
+              }}
+              placeholder="Book / file / doc no."
+              className="w-full rounded-xl border border-amber-200 bg-white/90 px-3 py-2 text-sm text-amber-950 outline-none transition-colors focus:border-amber-400"
+            />
+          </label>
+        </div>
 
         <label className="block">
-          <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-light">
-            Tract
+          <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-900/75">
+            Notes
           </div>
-          <select
-            value={orri.deskMapId ?? ''}
-            disabled={orri.scope !== 'tract'}
-            onChange={(event) =>
-              onUpdate(orri.id, {
-                deskMapId: event.target.value || null,
-              })
-            }
-            className="w-full rounded-xl border border-ledger-line bg-white px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-leather disabled:bg-parchment-dark/60 disabled:text-ink-light"
-          >
-            <option value="">{orri.scope === 'tract' ? 'Select tract' : 'Not used'}</option>
-            {deskMaps.map((deskMap) => (
-              <option key={deskMap.deskMapId} value={deskMap.deskMapId}>
-                {deskMap.name} ({deskMap.code})
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="block">
-          <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-light">
-            Burden
-          </div>
-          <input
-            value={burdenFractionDraft}
-            onChange={(event) => setBurdenFractionDraft(event.target.value)}
+          <textarea
+            value={notesDraft}
+            onChange={(event) => setNotesDraft(event.target.value)}
             onBlur={() => {
-              const next = burdenFractionDraft.trim();
-              setBurdenFractionDraft(next);
-              if (next !== orri.burdenFraction) {
-                onUpdate(orri.id, { burdenFraction: next });
+              const next = notesDraft.trim();
+              setNotesDraft(next);
+              if (next !== orri.notes) {
+                onUpdate(orri.id, { notes: next });
               }
             }}
-            placeholder="1/64"
-            className="w-full rounded-xl border border-ledger-line bg-white px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-leather"
+            rows={3}
+            placeholder="Optional remarks about this burden"
+            className="w-full rounded-xl border border-amber-200 bg-white/90 px-3 py-2 text-sm text-amber-950 outline-none transition-colors focus:border-amber-400"
           />
         </label>
+      </div>
 
-        <label className="block">
-          <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-light">
-            Burden Basis
-          </div>
-          <select
-            value={orri.burdenBasis}
-            onChange={(event) =>
-              onUpdate(orri.id, {
-                burdenBasis: event.target.value as LeaseholdOrri['burdenBasis'],
-              })
-            }
-            className="w-full rounded-xl border border-ledger-line bg-white px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-leather"
-          >
-            {LEASEHOLD_ORRI_BURDEN_BASIS_OPTIONS.map((option) => (
-              <option key={option} value={option}>
-                {formatOrriBasisLabel(option)}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="block">
-          <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-light">
-            Effective Date
-          </div>
-          <input
-            type="date"
-            value={orri.effectiveDate}
-            onChange={(event) =>
-              onUpdate(orri.id, { effectiveDate: event.target.value })
-            }
-            className="w-full rounded-xl border border-ledger-line bg-white px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-leather"
-          />
-        </label>
-
-        <div className="flex items-end">
+      <div className="rounded-b-lg border-t border-amber-200 bg-amber-100/40 px-3 py-2">
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          <span className="rounded-full border border-amber-300 bg-white/80 px-2 py-0.5 text-amber-900">
+            {orri.scope === 'unit' ? 'Unit-wide burden' : summary?.tractName ?? 'Single tract burden'}
+          </span>
+          {summary?.includedInMath ? (
+            <span className="rounded-full border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-emerald-800">
+              Unit decimal {formatPercent(summary.unitDecimal)}
+            </span>
+          ) : (
+            <span className="rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-gold-900">
+              Tracked only until gross 8/8 math applies
+            </span>
+          )}
           <button
             type="button"
             onClick={() => onRemove(orri.id)}
-            className="w-full rounded-xl border border-seal/20 bg-seal/10 px-3 py-2 text-sm font-medium text-seal transition-colors hover:bg-seal/15"
+            className="ml-auto rounded px-2 py-1 text-[10px] font-semibold text-seal transition-colors hover:bg-seal/10"
           >
             Remove
           </button>
         </div>
       </div>
+    </div>
+  );
+}
 
-      <div className="mt-4 grid gap-4 lg:grid-cols-[14rem_minmax(0,1fr)]">
-        <label className="block">
-          <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-light">
-            Source Doc No.
-          </div>
-          <input
-            value={sourceDocNoDraft}
-            onChange={(event) => setSourceDocNoDraft(event.target.value)}
-            onBlur={() => {
-              const next = sourceDocNoDraft.trim();
-              setSourceDocNoDraft(next);
-              if (next !== orri.sourceDocNo) {
-                onUpdate(orri.id, { sourceDocNo: next });
-              }
-            }}
-            placeholder="Book / file / doc no."
-            className="w-full rounded-xl border border-ledger-line bg-white px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-leather"
-          />
-        </label>
-
-        <div className="flex flex-wrap items-end gap-2 text-xs">
-          <span className="rounded-full bg-ink/5 px-3 py-1.5 font-medium text-ink-light">
-            {orri.scope === 'unit' ? 'Unit-wide burden' : summary?.tractName ?? 'Single tract burden'}
+function LeaseholdDeckRetainedCard({
+  title,
+  holder,
+  note,
+  retainedDecimal,
+  assignedDecimal,
+  overAssigned,
+}: {
+  title: string;
+  holder: string;
+  note: string;
+  retainedDecimal: string;
+  assignedDecimal: string;
+  overAssigned: boolean;
+}) {
+  return (
+    <div className="w-80 rounded-lg border-2 border-ledger-line bg-parchment text-ink shadow-sm">
+      <div className="rounded-t-lg border-b border-ledger-line bg-parchment-dark px-3 py-1.5">
+        <div className="flex items-center justify-between gap-2">
+          <span className="truncate text-[10px] font-semibold uppercase tracking-wide text-ink-light">
+            Working Interest
           </span>
-          <span className="rounded-full bg-leather/10 px-3 py-1.5 font-medium text-leather">
-            {formatOrriBasisLabel(orri.burdenBasis)}
+          <span className="rounded-full border border-ledger-line bg-white/80 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-ink">
+            Retained WI
           </span>
-          {summary?.includedInMath ? (
-            <span className="rounded-full bg-emerald-50 px-3 py-1.5 font-medium text-emerald-800">
-              Unit decimal {formatPercent(summary.unitDecimal)}
-            </span>
-          ) : (
-            <span className="rounded-full bg-gold/10 px-3 py-1.5 font-medium text-gold-900">
-              Tracked only until gross 8/8 math applies
+        </div>
+      </div>
+      <div className="space-y-2 px-3 py-3">
+        <div className="text-[10px] uppercase tracking-wider text-ink-light">{title}</div>
+        <div className="text-sm font-bold font-display text-ink">
+          {holder || 'Operator / lessee not set'}
+        </div>
+        <div className="text-[10px] leading-5 text-ink-light">{note}</div>
+        <div className="flex flex-wrap gap-1.5 pt-1">
+          <span className="rounded-full border border-ledger-line bg-white/80 px-2 py-0.5 text-[9px] text-ink">
+            Retained {formatPercent(retainedDecimal)}
+          </span>
+          <span className="rounded-full border border-ledger-line bg-white/80 px-2 py-0.5 text-[9px] text-ink">
+            Assigned {formatPercent(assignedDecimal)}
+          </span>
+          {overAssigned && (
+            <span className="rounded-full border border-seal/30 bg-seal/10 px-2 py-0.5 text-[9px] text-seal">
+              Over-assigned
             </span>
           )}
         </div>
@@ -626,112 +848,1127 @@ function LeaseholdOrriRow({
   );
 }
 
-function LeaseholdOrriEditor({
+function LeaseholdAssignmentDeckCard({
+  assignment,
+  summary,
   deskMaps,
-  orris,
-  orriSummaries,
-  totalOrriDecimal,
-  preWorkingInterestDecimal,
-  includedOrriCount,
-  excludedOrriCount,
-  onAdd,
+  focusDetail,
   onUpdate,
   onRemove,
 }: {
+  assignment: LeaseholdAssignment;
+  summary: LeaseholdAssignmentSummary | null;
   deskMaps: Array<Pick<LeaseholdTractSummary, 'deskMapId' | 'name' | 'code'>>;
-  orris: LeaseholdOrri[];
-  orriSummaries: LeaseholdOrriSummary[];
-  totalOrriDecimal: string;
-  preWorkingInterestDecimal: string;
-  includedOrriCount: number;
-  excludedOrriCount: number;
-  onAdd: () => void;
-  onUpdate: (id: string, fields: Partial<LeaseholdOrri>) => void;
+  focusDetail: { label: string; decimal: string } | null;
+  onUpdate: (id: string, fields: Partial<LeaseholdAssignment>) => void;
   onRemove: (id: string) => void;
 }) {
-  const summaryById = new Map(orriSummaries.map((summary) => [summary.id, summary]));
+  const [assignorDraft, setAssignorDraft] = useState(assignment.assignor);
+  const [assigneeDraft, setAssigneeDraft] = useState(assignment.assignee);
+  const [workingInterestDraft, setWorkingInterestDraft] = useState(
+    assignment.workingInterestFraction
+  );
+  const [sourceDocNoDraft, setSourceDocNoDraft] = useState(assignment.sourceDocNo);
+  const [notesDraft, setNotesDraft] = useState(assignment.notes);
+
+  useEffect(() => {
+    setAssignorDraft(assignment.assignor);
+  }, [assignment.assignor]);
+
+  useEffect(() => {
+    setAssigneeDraft(assignment.assignee);
+  }, [assignment.assignee]);
+
+  useEffect(() => {
+    setWorkingInterestDraft(assignment.workingInterestFraction);
+  }, [assignment.workingInterestFraction]);
+
+  useEffect(() => {
+    setSourceDocNoDraft(assignment.sourceDocNo);
+  }, [assignment.sourceDocNo]);
+
+  useEffect(() => {
+    setNotesDraft(assignment.notes);
+  }, [assignment.notes]);
+
+  return (
+    <div className="w-80 rounded-lg border-2 border-leather/25 bg-leather/5 text-ink shadow-[0_8px_18px_rgba(120,53,15,0.14)]">
+      <div className="rounded-t-lg border-b border-leather/20 bg-leather/10 px-3 py-1.5">
+        <div className="flex items-center justify-between gap-2">
+          <span className="truncate text-[10px] font-semibold uppercase tracking-wide text-leather">
+            Assignment
+          </span>
+          <div className="flex items-center gap-1.5">
+            <span className="rounded-full border border-leather/30 bg-white/80 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-leather">
+              {assignment.scope === 'unit' ? 'Unit' : 'Tract'}
+            </span>
+            <span className="rounded-full border border-leather/30 bg-leather/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-leather">
+              WI
+            </span>
+          </div>
+        </div>
+        <div className="mt-0.5 text-[9px] font-mono text-leather/75">
+          {[
+            assignment.effectiveDate || '',
+            sourceDocNoDraft.trim() ? `Doc# ${sourceDocNoDraft.trim()}` : '',
+          ]
+            .filter(Boolean)
+            .join(' • ')}
+        </div>
+      </div>
+
+      <div className="space-y-3 px-3 py-3">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="block">
+            <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-leather">
+              Assignor
+            </div>
+            <input
+              value={assignorDraft}
+              onChange={(event) => setAssignorDraft(event.target.value)}
+              onBlur={() => {
+                const next = assignorDraft.trim();
+                setAssignorDraft(next);
+                if (next !== assignment.assignor) {
+                  onUpdate(assignment.id, { assignor: next });
+                }
+              }}
+              placeholder="Assignor"
+              className="w-full rounded-xl border border-leather/20 bg-white/90 px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-leather"
+            />
+          </label>
+
+          <label className="block">
+            <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-leather">
+              Assignee
+            </div>
+            <input
+              value={assigneeDraft}
+              onChange={(event) => setAssigneeDraft(event.target.value)}
+              onBlur={() => {
+                const next = assigneeDraft.trim();
+                setAssigneeDraft(next);
+                if (next !== assignment.assignee) {
+                  onUpdate(assignment.id, { assignee: next });
+                }
+              }}
+              placeholder="Assignee"
+              className="w-full rounded-xl border border-leather/20 bg-white/90 px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-leather"
+            />
+          </label>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="block">
+            <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-leather">
+              WI Share
+            </div>
+            <input
+              value={workingInterestDraft}
+              onChange={(event) => setWorkingInterestDraft(event.target.value)}
+              onBlur={() => {
+                const next = workingInterestDraft.trim();
+                setWorkingInterestDraft(next);
+                if (next !== assignment.workingInterestFraction) {
+                  onUpdate(assignment.id, { workingInterestFraction: next });
+                }
+              }}
+              placeholder="1/2"
+              className="w-full rounded-xl border border-leather/20 bg-white/90 px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-leather"
+            />
+          </label>
+
+          <label className="block">
+            <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-leather">
+              Effective Date
+            </div>
+            <input
+              type="date"
+              value={assignment.effectiveDate}
+              onChange={(event) =>
+                onUpdate(assignment.id, { effectiveDate: event.target.value })
+              }
+              className="w-full rounded-xl border border-leather/20 bg-white/90 px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-leather"
+            />
+          </label>
+
+          <label className="block">
+            <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-leather">
+              Scope
+            </div>
+            <select
+              value={assignment.scope}
+              onChange={(event) =>
+                onUpdate(assignment.id, {
+                  scope: event.target.value as LeaseholdAssignment['scope'],
+                  deskMapId:
+                    event.target.value === 'tract' ? assignment.deskMapId : null,
+                })
+              }
+              className="w-full rounded-xl border border-leather/20 bg-white/90 px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-leather"
+            >
+              {LEASEHOLD_ASSIGNMENT_SCOPE_OPTIONS.map((option) => (
+                <option key={option} value={option}>
+                  {option === 'unit' ? 'Unit-wide' : 'Single tract'}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="block">
+            <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-leather">
+              Tract
+            </div>
+            <select
+              value={assignment.deskMapId ?? ''}
+              disabled={assignment.scope !== 'tract'}
+              onChange={(event) =>
+                onUpdate(assignment.id, {
+                  deskMapId: event.target.value || null,
+                })
+              }
+              className="w-full rounded-xl border border-leather/20 bg-white/90 px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-leather disabled:bg-parchment-dark/70 disabled:text-ink-light"
+            >
+              <option value="">
+                {assignment.scope === 'tract' ? 'Select tract' : 'Not used'}
+              </option>
+              {deskMaps.map((deskMap) => (
+                <option key={deskMap.deskMapId} value={deskMap.deskMapId}>
+                  {deskMap.name} ({deskMap.code})
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="block">
+            <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-leather">
+              Source Doc No.
+            </div>
+            <input
+              value={sourceDocNoDraft}
+              onChange={(event) => setSourceDocNoDraft(event.target.value)}
+              onBlur={() => {
+                const next = sourceDocNoDraft.trim();
+                setSourceDocNoDraft(next);
+                if (next !== assignment.sourceDocNo) {
+                  onUpdate(assignment.id, { sourceDocNo: next });
+                }
+              }}
+              placeholder="Book / file / doc no."
+              className="w-full rounded-xl border border-leather/20 bg-white/90 px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-leather"
+            />
+          </label>
+        </div>
+
+        <label className="block">
+          <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-leather">
+            Notes
+          </div>
+          <textarea
+            value={notesDraft}
+            onChange={(event) => setNotesDraft(event.target.value)}
+            onBlur={() => {
+              const next = notesDraft.trim();
+              setNotesDraft(next);
+              if (next !== assignment.notes) {
+                onUpdate(assignment.id, { notes: next });
+              }
+            }}
+            rows={3}
+            placeholder="Optional remarks about this assignment"
+            className="w-full rounded-xl border border-leather/20 bg-white/90 px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-leather"
+          />
+        </label>
+      </div>
+
+      <div className="rounded-b-lg border-t border-leather/20 bg-leather/5 px-3 py-2">
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          <span className="rounded-full border border-leather/30 bg-white/80 px-2 py-0.5 text-leather">
+            {assignment.scope === 'unit'
+              ? 'Unit-wide split'
+              : summary?.tractName ?? 'Single tract split'}
+          </span>
+          {summary?.includedInMath ? (
+            <>
+              <span className="rounded-full border border-leather/30 bg-white/80 px-2 py-0.5 text-leather">
+                Unit decimal {formatPercent(summary.unitDecimal)}
+              </span>
+              {focusDetail && (
+                <span className="rounded-full border border-leather/30 bg-white/80 px-2 py-0.5 text-leather">
+                  {focusDetail.label} {formatPercent(focusDetail.decimal)}
+                </span>
+              )}
+            </>
+          ) : (
+            <span className="rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-gold-900">
+              Tracked only until a valid tract is linked
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={() => onRemove(assignment.id)}
+            className="ml-auto rounded px-2 py-1 text-[10px] font-semibold text-seal transition-colors hover:bg-seal/10"
+          >
+            Remove
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function formatDecimalCategoryLabel(category: LeaseholdDecimalRow['category']) {
+  switch (category) {
+    case 'royalty':
+      return 'Royalty';
+    case 'orri':
+      return 'ORRI';
+    case 'retained_wi':
+      return 'Retained WI';
+    case 'assigned_wi':
+      return 'Assigned WI';
+    default:
+      return 'Decimal';
+  }
+}
+
+function decimalCategoryClasses(category: LeaseholdDecimalRow['category']) {
+  switch (category) {
+    case 'royalty':
+      return 'border-emerald-200 bg-emerald-50 text-emerald-900';
+    case 'orri':
+      return 'border-amber-200 bg-amber-50 text-amber-900';
+    case 'retained_wi':
+      return 'border-ledger-line bg-parchment-dark text-ink';
+    case 'assigned_wi':
+      return 'border-leather/30 bg-leather/10 text-leather';
+    default:
+      return 'border-ledger-line bg-parchment text-ink';
+  }
+}
+
+function TransferOrderMetricCard({
+  label,
+  value,
+  detail,
+  tone = 'default',
+}: {
+  label: string;
+  value: string;
+  detail: string;
+  tone?: 'default' | 'success' | 'alert';
+}) {
+  const toneClasses = tone === 'success'
+    ? 'border-emerald-200 bg-emerald-50'
+    : tone === 'alert'
+      ? 'border-seal/25 bg-seal/5'
+      : 'border-ledger-line bg-parchment';
+
+  return (
+    <div className={`rounded-2xl border px-4 py-3 shadow-sm ${toneClasses}`}>
+      <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-light">
+        {label}
+      </div>
+      <div className="mt-2 text-2xl font-display font-bold text-ink">{value}</div>
+      <div className="mt-1 text-xs text-ink-light">{detail}</div>
+    </div>
+  );
+}
+
+function transferOrderRowStatus(row: LeaseholdDecimalRow) {
+  if (row.category === 'retained_wi') {
+    return {
+      label: 'Derived remainder',
+      classes: 'border-ledger-line bg-parchment-dark/80 text-ink',
+    };
+  }
+
+  const missingEffectiveDate = row.effectiveDate.trim().length === 0;
+  const missingSourceDocNo = row.sourceDocNo.trim().length === 0;
+
+  if (!missingEffectiveDate && !missingSourceDocNo) {
+    return {
+      label: 'Source ready',
+      classes: 'border-emerald-300 bg-emerald-50 text-emerald-800',
+    };
+  }
+
+  if (missingEffectiveDate && missingSourceDocNo) {
+    return {
+      label: 'Need date + doc',
+      classes: 'border-seal/30 bg-seal/10 text-seal',
+    };
+  }
+
+  if (missingEffectiveDate) {
+    return {
+      label: 'Need date',
+      classes: 'border-gold/40 bg-gold/10 text-gold-900',
+    };
+  }
+
+  return {
+    label: 'Need doc no',
+    classes: 'border-gold/40 bg-gold/10 text-gold-900',
+  };
+}
+
+function formatTransferOrderEntryStatusLabel(status: LeaseholdTransferOrderStatus) {
+  switch (status) {
+    case 'ready':
+      return 'Ready';
+    case 'hold':
+      return 'Hold';
+    default:
+      return 'Draft';
+  }
+}
+
+function LeaseholdTransferOrderEntryEditor({
+  row,
+  entry,
+  editable,
+  onUpsert,
+  onRemove,
+}: {
+  row: LeaseholdDecimalRow;
+  entry: LeaseholdTransferOrderEntry | null;
+  editable: boolean;
+  onUpsert: (
+    entry: Pick<LeaseholdTransferOrderEntry, 'sourceRowId'>
+      & Partial<Omit<LeaseholdTransferOrderEntry, 'sourceRowId'>>
+  ) => void;
+  onRemove: (sourceRowId: string) => void;
+}) {
+  const [ownerNumberDraft, setOwnerNumberDraft] = useState(entry?.ownerNumber ?? '');
+  const [statusDraft, setStatusDraft] = useState<LeaseholdTransferOrderStatus>(
+    entry?.status ?? 'draft'
+  );
+  const [notesDraft, setNotesDraft] = useState(entry?.notes ?? '');
+
+  useEffect(() => {
+    setOwnerNumberDraft(entry?.ownerNumber ?? '');
+  }, [entry?.ownerNumber]);
+
+  useEffect(() => {
+    setStatusDraft(entry?.status ?? 'draft');
+  }, [entry?.status]);
+
+  useEffect(() => {
+    setNotesDraft(entry?.notes ?? '');
+  }, [entry?.notes]);
+
+  if (!editable) {
+    return (
+      <div className="rounded-xl border border-ledger-line bg-parchment-dark/60 px-2.5 py-2 text-[11px] text-ink-light">
+        Edit in unit focus.
+      </div>
+    );
+  }
+
+  const commit = (overrides: Partial<Omit<LeaseholdTransferOrderEntry, 'id' | 'sourceRowId'>>) => {
+    const nextOwnerNumber = (overrides.ownerNumber ?? ownerNumberDraft).trim();
+    const nextNotes = (overrides.notes ?? notesDraft).trim();
+    const nextStatus = overrides.status ?? statusDraft;
+
+    setOwnerNumberDraft(nextOwnerNumber);
+    setNotesDraft(nextNotes);
+    setStatusDraft(nextStatus);
+    onUpsert({
+      sourceRowId: row.id,
+      ownerNumber: nextOwnerNumber,
+      status: nextStatus,
+      notes: nextNotes,
+    });
+  };
+
+  return (
+    <div className="min-w-[15rem] space-y-2">
+      <input
+        value={ownerNumberDraft}
+        onChange={(event) => setOwnerNumberDraft(event.target.value)}
+        onBlur={() => commit({ ownerNumber: ownerNumberDraft })}
+        placeholder="Owner no. / pay code"
+        className="w-full rounded-lg border border-ledger-line bg-white px-2.5 py-1.5 text-xs text-ink outline-none transition-colors focus:border-leather"
+      />
+      <div className="flex items-center gap-2">
+        <select
+          value={statusDraft}
+          onChange={(event) =>
+            commit({ status: event.target.value as LeaseholdTransferOrderStatus })
+          }
+          className="min-w-0 flex-1 rounded-lg border border-ledger-line bg-white px-2.5 py-1.5 text-xs text-ink outline-none transition-colors focus:border-leather"
+        >
+          {LEASEHOLD_TRANSFER_ORDER_STATUS_OPTIONS.map((status) => (
+            <option key={status} value={status}>
+              {formatTransferOrderEntryStatusLabel(status)}
+            </option>
+          ))}
+        </select>
+        {entry && (
+          <button
+            type="button"
+            onClick={() => {
+              setOwnerNumberDraft('');
+              setStatusDraft('draft');
+              setNotesDraft('');
+              onRemove(row.id);
+            }}
+            className="rounded px-2 py-1 text-[10px] font-semibold text-seal transition-colors hover:bg-seal/10"
+          >
+            Clear
+          </button>
+        )}
+      </div>
+      <textarea
+        value={notesDraft}
+        onChange={(event) => setNotesDraft(event.target.value)}
+        onBlur={() => commit({ notes: notesDraft })}
+        rows={2}
+        placeholder="Transfer-order note"
+        className="w-full rounded-lg border border-ledger-line bg-white px-2.5 py-1.5 text-xs text-ink outline-none transition-colors focus:border-leather resize-y"
+      />
+    </div>
+  );
+}
+
+function LeaseholdDecimalLedger({
+  title,
+  review,
+  focusCoverageDetail,
+  overAssignedFocus,
+  editable,
+  entriesBySourceRowId,
+  onUpsertEntry,
+  onRemoveEntry,
+}: {
+  title: string;
+  review: LeaseholdTransferOrderReview;
+  focusCoverageDetail: string;
+  overAssignedFocus: boolean;
+  editable: boolean;
+  entriesBySourceRowId: Map<string, LeaseholdTransferOrderEntry>;
+  onUpsertEntry: (
+    entry: Pick<LeaseholdTransferOrderEntry, 'sourceRowId'>
+      & Partial<Omit<LeaseholdTransferOrderEntry, 'sourceRowId'>>
+  ) => void;
+  onRemoveEntry: (sourceRowId: string) => void;
+}) {
+  const varianceTone = d(review.varianceDecimal).greaterThan(0) ? 'alert' : 'success';
+  const missingDateTone = review.rowsMissingEffectiveDate > 0 ? 'alert' : 'success';
+  const missingDocTone = review.rowsMissingSourceDocNo > 0 ? 'alert' : 'success';
+  const sourceReadyTone =
+    review.reviewableRowCount > 0
+    && review.rowsWithCompleteSource === review.reviewableRowCount
+      ? 'success'
+      : 'default';
+  const visibleEntries = editable
+    ? review.rows.flatMap((row) => {
+        const entry = entriesBySourceRowId.get(row.id);
+        return entry ? [entry] : [];
+      })
+    : [];
+  const readyCount = visibleEntries.filter((entry) => entry.status === 'ready').length;
+  const holdCount = visibleEntries.filter((entry) => entry.status === 'hold').length;
 
   return (
     <section className="rounded-3xl border border-ledger-line bg-parchment/95 p-5 shadow-md">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <div className="text-[10px] font-semibold uppercase tracking-[0.2em] text-ink-light">
-            Leasehold Burdens
+            Decimals / Transfer Order
           </div>
-          <h2 className="mt-1 text-2xl font-display font-bold text-ink">ORRI</h2>
-          <p className="mt-1 max-w-3xl text-sm text-ink-light">
-            ORRIs stay on the leasehold side. This first pass includes only gross `8/8`
-            burdens in the math; NRI- and WI-based burdens are tracked here but excluded
-            from totals until the later WI layer exists.
+          <h3 className="mt-1 text-xl font-display font-bold text-ink">
+            Transfer Order Review
+          </h3>
+          <p className="mt-1 text-sm text-ink-light">
+            {editable
+              ? `Editable unit-level payout-entry rows for ${title}. Decimals stay derived; owner number, row status, and notes now save on top of the review rows below.`
+              : `Read-only review surface for ${title}. This tract view shows partial slices only, so editable transfer-order rows stay in unit focus.`}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={onAdd}
-          className="rounded-xl border border-leather/20 bg-leather px-4 py-2 text-sm font-semibold text-parchment shadow-sm transition-colors hover:bg-leather/90"
-        >
-          + Add ORRI
-        </button>
+        <div className="flex flex-wrap gap-2 text-xs">
+          <span className="rounded-full bg-ink/5 px-3 py-1.5 font-medium text-ink-light">
+            {review.rows.length} row{review.rows.length === 1 ? '' : 's'}
+          </span>
+          <span className="rounded-full bg-leather/10 px-3 py-1.5 font-medium text-leather">
+            Visible total {formatDecimalValue(review.totalDecimal)}
+          </span>
+          {editable && (
+            <>
+              <span className="rounded-full bg-emerald-50 px-3 py-1.5 font-medium text-emerald-800">
+                Saved rows {visibleEntries.length}/{review.rows.length}
+              </span>
+              <span className="rounded-full bg-gold/10 px-3 py-1.5 font-medium text-gold-900">
+                Ready {readyCount}
+              </span>
+              <span className="rounded-full bg-seal/10 px-3 py-1.5 font-medium text-seal">
+                Hold {holdCount}
+              </span>
+            </>
+          )}
+        </div>
       </div>
 
-      <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <SummaryCard
-          label="Tracked ORRIs"
-          value={orris.length.toString()}
-          detail={`${includedOrriCount} included in current math`}
+      <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+        <TransferOrderMetricCard
+          label="Focus Total"
+          value={formatDecimalValue(review.totalDecimal)}
+          detail="Sum of the visible decimal rows in this focus."
         />
-        <SummaryCard
-          label="Excluded"
-          value={excludedOrriCount.toString()}
-          detail="Tracked only because the burden basis is not gross 8/8"
+        <TransferOrderMetricCard
+          label="Expected Coverage"
+          value={formatDecimalValue(review.expectedDecimal)}
+          detail={focusCoverageDetail}
         />
-        <SummaryCard
-          label="Total ORRI"
-          value={formatPercent(totalOrriDecimal)}
-          detail="Current unit burden from included ORRIs"
+        <TransferOrderMetricCard
+          label="Variance"
+          value={formatDecimalValue(review.varianceDecimal)}
+          detail={
+            d(review.varianceDecimal).greaterThan(0)
+              ? 'Review this mismatch before payout entry.'
+              : 'Balanced against the expected leased coverage.'
+          }
+          tone={varianceTone}
         />
-        <SummaryCard
-          label="Pre-WI NRI"
-          value={formatPercent(preWorkingInterestDecimal)}
-          detail="Unit net revenue before any WI splits"
+        <TransferOrderMetricCard
+          label="Recorded Source"
+          value={
+            review.reviewableRowCount > 0
+              ? `${review.rowsWithCompleteSource}/${review.reviewableRowCount}`
+              : '—'
+          }
+          detail="Rows with both effective date and doc no."
+          tone={sourceReadyTone}
+        />
+        <TransferOrderMetricCard
+          label="Source Gaps"
+          value={review.rowsWithSourceGap.toString()}
+          detail={`Missing dates: ${review.rowsMissingEffectiveDate}. Missing doc nos: ${review.rowsMissingSourceDocNo}.`}
+          tone={missingDateTone === 'alert' || missingDocTone === 'alert' ? 'alert' : 'success'}
         />
       </div>
 
-      <div className="mt-4 space-y-3">
-        {orris.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-ledger-line bg-parchment-dark/40 px-4 py-5 text-sm text-ink-light">
-            No ORRIs recorded yet. Add a unit-wide or tract-specific burden to start checking the
-            leasehold side before WI splits.
+      {overAssignedFocus && (
+        <div className="mt-4 rounded-2xl border border-seal/25 bg-seal/5 px-4 py-3 text-sm text-seal">
+          <div className="font-semibold">Warning-only over-assignment in v1</div>
+          <div className="mt-1">
+            Assignment rows stay visible for review even when they exceed 100% of the available
+            WI in this focus. Retained WI is clamped at zero, and the variance above shows the
+            overage until the split is corrected.
           </div>
-        ) : (
-          orris.map((orri) => (
-            <LeaseholdOrriRow
-              key={orri.id}
-              orri={orri}
-              summary={summaryById.get(orri.id) ?? null}
-              deskMaps={deskMaps}
-              onUpdate={onUpdate}
-              onRemove={onRemove}
-            />
-          ))
-        )}
-      </div>
+        </div>
+      )}
+
+      {!editable && (
+        <div className="mt-4 rounded-2xl border border-ledger-line bg-parchment-dark/70 px-4 py-3 text-sm text-ink-light">
+          Unit focus is the editable payout-entry surface. Tract focus stays review-only because
+          those decimals are partial tract contributions, not final unit payout rows.
+        </div>
+      )}
+
+      {review.categorySummaries.length > 0 && (
+        <div className="mt-4 flex flex-wrap gap-2 text-xs">
+          {review.categorySummaries.map((summary) => (
+            <span
+              key={summary.category}
+              className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 ${decimalCategoryClasses(summary.category)}`}
+            >
+              <span className="font-semibold uppercase tracking-wide">
+                {formatDecimalCategoryLabel(summary.category)}
+              </span>
+              <span>
+                {summary.rowCount} row{summary.rowCount === 1 ? '' : 's'}
+              </span>
+              <span className="font-mono">{formatDecimalValue(summary.totalDecimal)}</span>
+            </span>
+          ))}
+        </div>
+      )}
+
+      {review.rows.length > 0 ? (
+        <div className="mt-4 overflow-x-auto rounded-2xl border border-ledger-line">
+          <table className="min-w-full border-collapse text-sm">
+            <thead className="bg-parchment-dark/80">
+              <tr>
+                <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-ink-light">
+                  Type
+                </th>
+                <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-ink-light">
+                  Payee
+                </th>
+                <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-ink-light">
+                  Source
+                </th>
+                <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-ink-light">
+                  Tract
+                </th>
+                <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-ink-light">
+                  Review
+                </th>
+                <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-ink-light">
+                  Payout Entry
+                </th>
+                <th className="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-ink-light">
+                  Decimal
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {review.rows.map((row) => {
+                const status = transferOrderRowStatus(row);
+                return (
+                  <tr key={row.id} className="border-t border-ledger-line bg-parchment">
+                    <td className="px-3 py-2 align-top">
+                      <span
+                        className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${decimalCategoryClasses(row.category)}`}
+                      >
+                        {formatDecimalCategoryLabel(row.category)}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 align-top font-semibold text-ink">{row.payee}</td>
+                    <td className="px-3 py-2 align-top text-xs text-ink">
+                      <div>{row.sourceLabel}</div>
+                      {(row.effectiveDate || row.sourceDocNo) && (
+                        <div className="mt-1 text-[11px] text-ink-light">
+                          {[row.effectiveDate, row.sourceDocNo ? `Doc# ${row.sourceDocNo}` : '']
+                            .filter(Boolean)
+                            .join(' • ')}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-3 py-2 align-top text-xs text-ink-light">
+                      {row.tractCode ? `${row.tractCode} • ${row.tractName}` : row.tractName}
+                    </td>
+                    <td className="px-3 py-2 align-top">
+                      <span
+                        className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${status.classes}`}
+                      >
+                        {status.label}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 align-top">
+                      <LeaseholdTransferOrderEntryEditor
+                        row={row}
+                        entry={editable ? entriesBySourceRowId.get(row.id) ?? null : null}
+                        editable={editable}
+                        onUpsert={onUpsertEntry}
+                        onRemove={onRemoveEntry}
+                      />
+                    </td>
+                    <td className="px-3 py-2 text-right font-mono text-xs text-ink">
+                      {formatDecimalValue(row.decimal)}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="mt-4 rounded-2xl border border-ledger-line bg-parchment-dark/70 px-4 py-6 text-sm text-ink-light">
+          No decimal rows are available for this focus yet.
+        </div>
+      )}
     </section>
+  );
+}
+
+function LeaseholdDeck({
+  deskMaps,
+  unit,
+  unitSummary,
+  unitUniqueLessees,
+  assignments,
+  assignmentSummaries,
+  orris,
+  orriSummaries,
+  totalRoyaltyDecimal,
+  totalOrriDecimal,
+  preWorkingInterestDecimal,
+  totalAssignedWorkingInterestDecimal,
+  retainedWorkingInterestDecimal,
+  overAssignedTractCount,
+  transferOrderEntries,
+  onAddAssignment,
+  onUpdateAssignment,
+  onRemoveAssignment,
+  onAddOrri,
+  onUpdateOrri,
+  onRemoveOrri,
+  onUpsertTransferOrderEntry,
+  onRemoveTransferOrderEntry,
+}: {
+  deskMaps: LeaseholdTractSummary[];
+  unit: LeaseholdUnit;
+  unitSummary: ReturnType<typeof buildLeaseholdUnitSummary>;
+  unitUniqueLessees: string[];
+  assignments: LeaseholdAssignment[];
+  assignmentSummaries: LeaseholdAssignmentSummary[];
+  orris: LeaseholdOrri[];
+  orriSummaries: LeaseholdOrriSummary[];
+  totalRoyaltyDecimal: string;
+  totalOrriDecimal: string;
+  preWorkingInterestDecimal: string;
+  totalAssignedWorkingInterestDecimal: string;
+  retainedWorkingInterestDecimal: string;
+  overAssignedTractCount: number;
+  transferOrderEntries: LeaseholdTransferOrderEntry[];
+  onAddAssignment: (assignment?: Partial<LeaseholdAssignment>) => void;
+  onUpdateAssignment: (id: string, fields: Partial<LeaseholdAssignment>) => void;
+  onRemoveAssignment: (id: string) => void;
+  onAddOrri: (focusDeskMapId: string | null) => void;
+  onUpdateOrri: (id: string, fields: Partial<LeaseholdOrri>) => void;
+  onRemoveOrri: (id: string) => void;
+  onUpsertTransferOrderEntry: (
+    entry: Pick<LeaseholdTransferOrderEntry, 'sourceRowId'>
+      & Partial<Omit<LeaseholdTransferOrderEntry, 'sourceRowId'>>
+  ) => void;
+  onRemoveTransferOrderEntry: (sourceRowId: string) => void;
+}) {
+  const [focusedDeskMapId, setFocusedDeskMapId] = useState<string | null>(deskMaps[0]?.deskMapId ?? null);
+  const transferOrderReview = useMemo(
+    () =>
+      buildLeaseholdTransferOrderReview({
+        unit,
+        unitSummary,
+        focusedDeskMapId,
+      }),
+    [focusedDeskMapId, unit, unitSummary]
+  );
+
+  useEffect(() => {
+    if (!focusedDeskMapId) {
+      return;
+    }
+    if (!deskMaps.some((tract) => tract.deskMapId === focusedDeskMapId)) {
+      setFocusedDeskMapId(deskMaps[0]?.deskMapId ?? null);
+    }
+  }, [deskMaps, focusedDeskMapId]);
+
+  const focusedTract = focusedDeskMapId
+    ? deskMaps.find((tract) => tract.deskMapId === focusedDeskMapId) ?? null
+    : null;
+
+  const relevantAssignments = assignments.filter((assignment) =>
+    focusedDeskMapId
+      ? assignment.scope === 'unit' || assignment.deskMapId === focusedDeskMapId
+      : assignment.scope === 'unit'
+  );
+  const relevantAssignmentSummaries = assignmentSummaries.filter((summary) =>
+    focusedDeskMapId
+      ? summary.scope === 'unit' || summary.deskMapId === focusedDeskMapId
+      : summary.scope === 'unit'
+  );
+  const relevantOrris = orris.filter((orri) =>
+    focusedDeskMapId
+      ? orri.scope === 'unit' || orri.deskMapId === focusedDeskMapId
+      : orri.scope === 'unit'
+  );
+  const relevantOrriSummaries = orriSummaries.filter((summary) =>
+    focusedDeskMapId
+      ? summary.scope === 'unit' || summary.deskMapId === focusedDeskMapId
+      : summary.scope === 'unit'
+  );
+  const assignmentSummaryById = new Map(
+    relevantAssignmentSummaries.map((summary) => [summary.id, summary])
+  );
+  const summaryById = new Map(relevantOrriSummaries.map((summary) => [summary.id, summary]));
+  const activeLessees = focusedTract?.uniqueLessees.length
+    ? focusedTract.uniqueLessees
+    : unitUniqueLessees;
+  const activeTitle = focusedTract
+    ? `${focusedTract.name} (${focusedTract.code})`
+    : unit.name || 'Unit-wide Leasehold';
+  const activeNote = focusedTract
+    ? `${focusedTract.description || 'No tract note yet.'} ${formatAcres(focusedTract.pooledAcres)} pooled acres with ${focusedTract.currentOwnerCount} present owners feeding this leasehold deck.`
+    : `${unit.description || 'No unit note yet.'} Switch to a tract to focus the burdens that sit under that leasehold estate.`;
+  const activeRoyaltyDecimal = focusedTract?.unitRoyaltyDecimal ?? totalRoyaltyDecimal;
+  const activeOrriDecimal = focusedTract?.unitOrriDecimal ?? totalOrriDecimal;
+  const activePreWorkingInterestDecimal =
+    focusedTract?.preWorkingInterestDecimal ?? preWorkingInterestDecimal;
+  const activeAssignedWorkingInterestDecimal = focusedTract?.assignedWorkingInterestDecimal
+    ?? totalAssignedWorkingInterestDecimal;
+  const activeRetainedWorkingInterestDecimal = focusedTract?.retainedWorkingInterestDecimal
+    ?? retainedWorkingInterestDecimal;
+  const activeTrackedAssignmentCount = focusedTract?.trackedAssignmentCount
+    ?? relevantAssignments.length;
+  const activeTrackedOrriCount = focusedTract?.trackedOrriCount ?? relevantOrris.length;
+  const activeOverAssigned = focusedTract?.overAssigned ?? overAssignedTractCount > 0;
+  const activeRetainedHolder = activeLessees[0] || unit.operator;
+  const focusCoverageDetail = focusedTract
+    ? `${formatPercent(focusedTract.unitParticipation)} participation x ${formatPercent(focusedTract.leasedOwnership)} leased ownership for ${focusedTract.code}.`
+    : 'Sum of each tract participation multiplied by current leased ownership.';
+  const transferOrderEntriesBySourceRowId = useMemo(
+    () => new Map(transferOrderEntries.map((entry) => [entry.sourceRowId, entry])),
+    [transferOrderEntries]
+  );
+
+  return (
+    <div className="space-y-5">
+      <section className="rounded-3xl border border-ledger-line bg-parchment/95 p-5 shadow-md">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <div className="text-[10px] font-semibold uppercase tracking-[0.2em] text-ink-light">
+              Leasehold Deck
+            </div>
+            <h2 className="mt-1 text-2xl font-display font-bold text-ink">
+              Card-Based Leasehold
+            </h2>
+            <p className="mt-1 max-w-3xl text-sm text-ink-light">
+              This keeps Desk Map clean while giving the leasehold side its own visual board.
+              The selected tract stays front and center, and unit-wide burdens follow it down.
+            </p>
+          </div>
+          <div className="rounded-2xl border border-gold/30 bg-gold/10 px-4 py-3 text-sm text-gold-950">
+            Title stays in Desk Map. Leasehold burdens, WI, and assignments live here.
+          </div>
+        </div>
+
+        <div className="mt-4 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setFocusedDeskMapId(null)}
+            className={`rounded-full px-3 py-1.5 text-xs font-semibold uppercase tracking-wide transition-colors ${
+              focusedDeskMapId === null
+                ? 'bg-ink text-parchment'
+                : 'bg-ink/5 text-ink-light hover:text-ink'
+            }`}
+          >
+            Unit
+          </button>
+          {deskMaps.map((tract) => (
+            <button
+              key={tract.deskMapId}
+              type="button"
+              onClick={() => setFocusedDeskMapId(tract.deskMapId)}
+              className={`rounded-full px-3 py-1.5 text-xs font-semibold uppercase tracking-wide transition-colors ${
+                focusedDeskMapId === tract.deskMapId
+                  ? 'bg-leather text-parchment'
+                  : 'bg-leather/10 text-leather hover:bg-leather/15'
+              }`}
+            >
+              {tract.code}
+            </button>
+          ))}
+        </div>
+
+        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+          <SummaryCard
+            label="Active Focus"
+            value={focusedTract ? focusedTract.code : 'UNIT'}
+            detail={activeTitle}
+          />
+          <SummaryCard
+            label="Royalty"
+            value={formatPercent(activeRoyaltyDecimal)}
+            detail="Current payout burden from active leases"
+          />
+          <SummaryCard
+            label="ORRI"
+            value={formatPercent(activeOrriDecimal)}
+            detail={`${activeTrackedOrriCount} ORRI card${activeTrackedOrriCount === 1 ? '' : 's'} in focus`}
+          />
+          <SummaryCard
+            label="Pre-WI NRI"
+            value={formatPercent(activePreWorkingInterestDecimal)}
+            detail="What remains before WI splits and assignments"
+          />
+          <SummaryCard
+            label="Assigned WI"
+            value={formatPercent(activeAssignedWorkingInterestDecimal)}
+            detail={`${activeTrackedAssignmentCount} assignment card${activeTrackedAssignmentCount === 1 ? '' : 's'} in focus`}
+          />
+          <SummaryCard
+            label="Retained WI"
+            value={formatPercent(activeRetainedWorkingInterestDecimal)}
+            detail={activeOverAssigned ? 'At least one focused tract is over-assigned' : 'Remaining WI after assignments'}
+          />
+        </div>
+      </section>
+
+      <section className="rounded-3xl border border-ledger-line bg-parchment/95 p-5 shadow-md">
+        <div className="text-[10px] font-semibold uppercase tracking-[0.2em] text-ink-light">
+          Leasehold Estate
+        </div>
+        <div className="mt-3 flex flex-wrap gap-4">
+          <LeaseholdDeckLesseeCard
+            title={activeTitle}
+            lessees={activeLessees}
+            note={activeNote}
+            royaltyDecimal={activeRoyaltyDecimal}
+            orriDecimal={activeOrriDecimal}
+            preWorkingInterestDecimal={activePreWorkingInterestDecimal}
+          />
+        </div>
+      </section>
+
+      <section className="rounded-3xl border border-ledger-line bg-parchment/95 p-5 shadow-md">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <div className="text-[10px] font-semibold uppercase tracking-[0.2em] text-ink-light">
+              Burdens
+            </div>
+            <h3 className="mt-1 text-xl font-display font-bold text-ink">ORRI Lane</h3>
+            <p className="mt-1 text-sm text-ink-light">
+              Unit ORRIs always stay visible in tract focus. Tract ORRIs join them only when they
+              burden the selected tract.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => onAddOrri(focusedDeskMapId)}
+            className="rounded-xl border border-amber-300 bg-amber-100 px-4 py-2 text-sm font-semibold text-amber-950 transition-colors hover:bg-amber-200/80"
+          >
+            + Add ORRI
+          </button>
+        </div>
+
+        <div className="mt-4 flex flex-wrap gap-4">
+          {relevantOrris.length > 0 ? (
+            relevantOrris.map((orri) => (
+              <LeaseholdOrriDeckCard
+                key={orri.id}
+                orri={orri}
+                summary={summaryById.get(orri.id) ?? null}
+                deskMaps={deskMaps}
+                onUpdate={onUpdateOrri}
+                onRemove={onRemoveOrri}
+              />
+            ))
+          ) : (
+            <LeaseholdDeckPlaceholderCard
+              title="ORRI"
+              tone="amber"
+              body="No ORRIs are attached to this focus yet. Add one here and it will stay on the leasehold side instead of cluttering the Desk Map title tree."
+            />
+          )}
+        </div>
+      </section>
+
+      <section className="rounded-3xl border border-ledger-line bg-parchment/95 p-5 shadow-md">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <div className="text-[10px] font-semibold uppercase tracking-[0.2em] text-ink-light">
+              Working Interest
+            </div>
+            <h3 className="mt-1 text-xl font-display font-bold text-ink">Assignments / WI Lane</h3>
+            <p className="mt-1 text-sm text-ink-light">
+              Unit assignments stay visible in tract focus. Tract assignments join them only when
+              they split the selected tract.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() =>
+              onAddAssignment({
+                scope: focusedDeskMapId ? 'tract' : 'unit',
+                deskMapId: focusedDeskMapId,
+                assignor: activeRetainedHolder,
+              })
+            }
+            className="rounded-xl border border-leather/30 bg-leather/10 px-4 py-2 text-sm font-semibold text-leather transition-colors hover:bg-leather/15"
+          >
+            + Add Assignment
+          </button>
+        </div>
+
+        <div className="mt-4 flex flex-wrap gap-4">
+          <LeaseholdDeckRetainedCard
+            title={activeTitle}
+            holder={activeRetainedHolder}
+            note={
+              activeOverAssigned
+                ? 'Assignments in this focus exceed 100% of the available WI. Retained WI is clamped at zero until the split is corrected.'
+                : 'This is the remaining WI still held by the lessee/operator after the visible assignments below.'
+            }
+            retainedDecimal={activeRetainedWorkingInterestDecimal}
+            assignedDecimal={activeAssignedWorkingInterestDecimal}
+            overAssigned={activeOverAssigned}
+          />
+
+          {relevantAssignments.length > 0 ? (
+            relevantAssignments.map((assignment) => {
+              const summary = assignmentSummaryById.get(assignment.id) ?? null;
+              return (
+                <LeaseholdAssignmentDeckCard
+                  key={assignment.id}
+                  assignment={assignment}
+                  summary={summary}
+                  deskMaps={deskMaps}
+                  focusDetail={
+                    focusedTract && assignment.scope === 'unit'
+                      ? {
+                          label: 'This tract',
+                          decimal: d(focusedTract.preWorkingInterestDecimal)
+                            .times(parseInterestString(assignment.workingInterestFraction))
+                            .toString(),
+                        }
+                      : null
+                  }
+                  onUpdate={onUpdateAssignment}
+                  onRemove={onRemoveAssignment}
+                />
+              );
+            })
+          ) : (
+            <LeaseholdDeckPlaceholderCard
+              title="Assignments / WI"
+              tone="leather"
+              body="No WI assignments are attached to this focus yet. Add one here to start splitting the leasehold side without pushing those records back into Desk Map."
+            />
+          )}
+        </div>
+      </section>
+
+      <LeaseholdDecimalLedger
+        title={activeTitle}
+        review={transferOrderReview}
+        focusCoverageDetail={focusCoverageDetail}
+        overAssignedFocus={activeOverAssigned}
+        editable={focusedDeskMapId === null}
+        entriesBySourceRowId={transferOrderEntriesBySourceRowId}
+        onUpsertEntry={onUpsertTransferOrderEntry}
+        onRemoveEntry={onRemoveTransferOrderEntry}
+      />
+    </div>
   );
 }
 
 export default function LeaseholdView() {
   const deskMaps = useWorkspaceStore((state) => state.deskMaps);
   const leaseholdUnit = useWorkspaceStore((state) => state.leaseholdUnit);
+  const leaseholdAssignments = useWorkspaceStore((state) => state.leaseholdAssignments);
   const leaseholdOrris = useWorkspaceStore((state) => state.leaseholdOrris);
+  const leaseholdTransferOrderEntries = useWorkspaceStore(
+    (state) => state.leaseholdTransferOrderEntries
+  );
   const nodes = useWorkspaceStore((state) => state.nodes);
   const updateLeaseholdUnit = useWorkspaceStore((state) => state.updateLeaseholdUnit);
+  const addLeaseholdAssignment = useWorkspaceStore(
+    (state) => state.addLeaseholdAssignment
+  );
+  const updateLeaseholdAssignment = useWorkspaceStore(
+    (state) => state.updateLeaseholdAssignment
+  );
+  const removeLeaseholdAssignment = useWorkspaceStore(
+    (state) => state.removeLeaseholdAssignment
+  );
   const addLeaseholdOrri = useWorkspaceStore((state) => state.addLeaseholdOrri);
   const updateLeaseholdOrri = useWorkspaceStore((state) => state.updateLeaseholdOrri);
   const removeLeaseholdOrri = useWorkspaceStore((state) => state.removeLeaseholdOrri);
+  const upsertLeaseholdTransferOrderEntry = useWorkspaceStore(
+    (state) => state.upsertLeaseholdTransferOrderEntry
+  );
+  const removeLeaseholdTransferOrderEntry = useWorkspaceStore(
+    (state) => state.removeLeaseholdTransferOrderEntry
+  );
   const updateDeskMapDetails = useWorkspaceStore((state) => state.updateDeskMapDetails);
   const owners = useOwnerStore((state) => state.owners);
   const leases = useOwnerStore((state) => state.leases);
+  const [mode, setMode] = useState<LeaseholdMode>('overview');
 
   const summary = useMemo(
     () =>
@@ -740,9 +1977,10 @@ export default function LeaseholdView() {
         nodes,
         owners,
         leases,
+        leaseholdAssignments,
         leaseholdOrris,
       }),
-    [deskMaps, leaseholdOrris, leases, nodes, owners]
+    [deskMaps, leaseholdAssignments, leaseholdOrris, leases, nodes, owners]
   );
 
   if (deskMaps.length === 0) {
@@ -771,15 +2009,19 @@ export default function LeaseholdView() {
               <p className="mt-2 text-sm leading-6 text-ink-light">
                 Pooled acres now drive participation here. This first framework slice derives tract
                 participation, owner net mineral acres, total royalty, and gross-basis ORRI burden
-                from the current Desk Map title chain plus active lease records. WI,
-                division-order rows, and payout math stay for the next phase.
+                from the current Desk Map title chain plus active lease records. Use `Overview`
+                for setup and numeric review, and `Deck` for the card-based leasehold side with
+                ORRIs, retained WI, and assignments.
               </p>
             </div>
-            <div className="rounded-2xl border border-gold/30 bg-gold/10 px-4 py-3 text-sm text-gold-950">
-              <div className="font-semibold">Current v1 assumption</div>
-              <div className="mt-1">
-                Royalty and gross-basis ORRI burdens are acreage-weighted by pooled acres, and the
-                5-tract demo is fully leased at 1/8 for easy audit checks.
+            <div className="flex flex-col items-start gap-3">
+              <LeaseholdDeckModeToggle mode={mode} onChange={setMode} />
+              <div className="rounded-2xl border border-gold/30 bg-gold/10 px-4 py-3 text-sm text-gold-950">
+                <div className="font-semibold">Current v1 assumption</div>
+                <div className="mt-1">
+                  Royalty and gross-basis ORRI burdens are acreage-weighted by pooled acres, and the
+                  5-tract demo is fully leased at 1/8 for easy audit checks.
+                </div>
               </div>
             </div>
           </div>
@@ -822,36 +2064,53 @@ export default function LeaseholdView() {
           </div>
         </header>
 
-        <LeaseholdUnitEditor unit={leaseholdUnit} onUpdate={updateLeaseholdUnit} />
+        {mode === 'overview' ? (
+          <>
+            <LeaseholdUnitEditor unit={leaseholdUnit} onUpdate={updateLeaseholdUnit} />
 
-        <LeaseholdOrriEditor
-          deskMaps={summary.tracts}
-          orris={leaseholdOrris}
-          orriSummaries={summary.orris}
-          totalOrriDecimal={summary.totalOrriDecimal}
-          preWorkingInterestDecimal={summary.preWorkingInterestDecimal}
-          includedOrriCount={summary.includedOrriCount}
-          excludedOrriCount={summary.excludedOrriCount}
-          onAdd={() => {
-            const defaultDeskMapId = summary.tracts[0]?.deskMapId ?? null;
-            addLeaseholdOrri({
-              scope: defaultDeskMapId ? 'tract' : 'unit',
-              deskMapId: defaultDeskMapId,
-            });
-          }}
-          onUpdate={updateLeaseholdOrri}
-          onRemove={removeLeaseholdOrri}
-        />
-
-        <div className="space-y-4">
-          {summary.tracts.map((tract) => (
-            <LeaseholdTractCard
-              key={tract.deskMapId}
-              tract={tract}
-              onUpdate={updateDeskMapDetails}
-            />
-          ))}
-        </div>
+            <div className="space-y-4">
+              {summary.tracts.map((tract) => (
+                <LeaseholdTractCard
+                  key={tract.deskMapId}
+                  tract={tract}
+                  onUpdate={updateDeskMapDetails}
+                />
+              ))}
+            </div>
+          </>
+        ) : (
+          <LeaseholdDeck
+            deskMaps={summary.tracts}
+            unit={leaseholdUnit}
+            unitSummary={summary}
+            unitUniqueLessees={summary.uniqueLessees}
+            assignments={leaseholdAssignments}
+            assignmentSummaries={summary.assignments}
+            orris={leaseholdOrris}
+            orriSummaries={summary.orris}
+            totalRoyaltyDecimal={summary.totalRoyaltyDecimal}
+            totalOrriDecimal={summary.totalOrriDecimal}
+            preWorkingInterestDecimal={summary.preWorkingInterestDecimal}
+            totalAssignedWorkingInterestDecimal={summary.totalAssignedWorkingInterestDecimal}
+            retainedWorkingInterestDecimal={summary.retainedWorkingInterestDecimal}
+            overAssignedTractCount={summary.overAssignedTractCount}
+            transferOrderEntries={leaseholdTransferOrderEntries}
+            onAddAssignment={addLeaseholdAssignment}
+            onUpdateAssignment={updateLeaseholdAssignment}
+            onRemoveAssignment={removeLeaseholdAssignment}
+            onAddOrri={(focusDeskMapId) =>
+              addLeaseholdOrri(
+                focusDeskMapId
+                  ? { scope: 'tract', deskMapId: focusDeskMapId }
+                  : { scope: 'unit', deskMapId: null }
+              )
+            }
+            onUpdateOrri={updateLeaseholdOrri}
+            onRemoveOrri={removeLeaseholdOrri}
+            onUpsertTransferOrderEntry={upsertLeaseholdTransferOrderEntry}
+            onRemoveTransferOrderEntry={removeLeaseholdTransferOrderEntry}
+          />
+        )}
       </div>
     </div>
   );

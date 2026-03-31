@@ -18,7 +18,8 @@ import { savePdf } from './pdf-store';
 import type { DeskMap, OwnershipNode } from '../types/node';
 import { createBlankNode } from '../types/node';
 import { createBlankLease, createBlankOwner } from '../types/owner';
-import type { LeaseholdOrri } from '../types/leasehold';
+import type { LeaseholdAssignment, LeaseholdOrri } from '../types/leasehold';
+import type { LeaseholdTransferOrderEntry } from '../types/leasehold';
 import { createWorkspaceId } from '../utils/workspace-id';
 
 // ── Node factory ────────────────────────────────────────
@@ -1349,6 +1350,31 @@ const LEASEHOLD_DEMO_ORRIS = [
   },
 ] as const;
 
+const LEASEHOLD_DEMO_ASSIGNMENT_TEMPLATES = [
+  {
+    id: 'leasehold-demo-assignment-1',
+    assignor: PRIMARY_TEST_LESSEE,
+    assignee: 'Raven Bend Partners, LLC',
+    scope: 'unit',
+    deskMapCode: null,
+    workingInterestFraction: '1/2',
+    effectiveDate: '2024-03-01',
+    sourceDocNo: 'LHD-ASG-1',
+    notes: 'Starter unit-wide half-WI assignment for easy leasehold deck math.',
+  },
+  {
+    id: 'leasehold-demo-assignment-2',
+    assignor: PRIMARY_TEST_LESSEE,
+    assignee: 'Cedar Draw Operating, LLC',
+    scope: 'tract',
+    deskMapCode: 'T4',
+    workingInterestFraction: '1/4',
+    effectiveDate: '2024-03-15',
+    sourceDocNo: 'LHD-ASG-2',
+    notes: 'Starter tract-specific quarter-WI assignment on Tract 4.',
+  },
+] as const;
+
 const LEASEHOLD_DEMO_TRACTS: LeaseholdDemoTractPlan[] = [
   {
     name: 'Tract 1',
@@ -1781,7 +1807,9 @@ export function buildLeaseholdDemoWorkspaceData(): {
   nodes: OwnershipNode[];
   deskMaps: DeskMap[];
   leaseholdUnit: typeof LEASEHOLD_DEMO_UNIT;
+  leaseholdAssignments: LeaseholdAssignment[];
   leaseholdOrris: LeaseholdOrri[];
+  leaseholdTransferOrderEntries: LeaseholdTransferOrderEntry[];
   activeDeskMapId: string | null;
   instrumentTypes: string[];
   pdfMappings: PdfMapping[];
@@ -1819,6 +1847,21 @@ export function buildLeaseholdDemoWorkspaceData(): {
     description: tract.description,
     nodeIds: getTractNodes(nodes, tract.landDesc).map((node) => node.id),
   }));
+  const deskMapIdByCode = new Map(deskMaps.map((deskMap) => [deskMap.code, deskMap.id]));
+  const leaseholdAssignments = LEASEHOLD_DEMO_ASSIGNMENT_TEMPLATES.map((assignment) => ({
+    id: assignment.id,
+    assignor: assignment.assignor,
+    assignee: assignment.assignee,
+    scope: assignment.scope,
+    deskMapId:
+      assignment.scope === 'tract'
+        ? deskMapIdByCode.get(assignment.deskMapCode ?? '') ?? null
+        : null,
+    workingInterestFraction: assignment.workingInterestFraction,
+    effectiveDate: assignment.effectiveDate,
+    sourceDocNo: assignment.sourceDocNo,
+    notes: assignment.notes,
+  }));
 
   return {
     workspaceId,
@@ -1826,7 +1869,9 @@ export function buildLeaseholdDemoWorkspaceData(): {
     nodes,
     deskMaps,
     leaseholdUnit: LEASEHOLD_DEMO_UNIT,
+    leaseholdAssignments,
     leaseholdOrris: LEASEHOLD_DEMO_ORRIS.map((orri) => ({ ...orri })),
+    leaseholdTransferOrderEntries: [],
     activeDeskMapId: deskMaps[0]?.id ?? null,
     instrumentTypes: [...STRESS_INSTRUMENT_TYPES],
     pdfMappings: builder.pdfMappings,
@@ -1892,7 +1937,9 @@ export async function seedLeaseholdDemoData(): Promise<{
     nodes: workspace.nodes,
     deskMaps: workspace.deskMaps,
     leaseholdUnit: workspace.leaseholdUnit,
+    leaseholdAssignments: workspace.leaseholdAssignments,
     leaseholdOrris: workspace.leaseholdOrris,
+    leaseholdTransferOrderEntries: workspace.leaseholdTransferOrderEntries,
     activeDeskMapId: workspace.activeDeskMapId,
     instrumentTypes: workspace.instrumentTypes,
   });

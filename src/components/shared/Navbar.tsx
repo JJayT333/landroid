@@ -30,7 +30,11 @@ export default function Navbar() {
   const setView = useUIStore((s) => s.setView);
   const projectName = useWorkspaceStore((s) => s.projectName);
   const leaseholdUnit = useWorkspaceStore((s) => s.leaseholdUnit);
+  const leaseholdAssignments = useWorkspaceStore((s) => s.leaseholdAssignments);
   const leaseholdOrris = useWorkspaceStore((s) => s.leaseholdOrris);
+  const leaseholdTransferOrderEntries = useWorkspaceStore(
+    (s) => s.leaseholdTransferOrderEntries
+  );
   const loadWorkspace = useWorkspaceStore((s) => s.loadWorkspace);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [seedMode, setSeedMode] = useState<'stress' | 'leasehold' | null>(null);
@@ -66,7 +70,9 @@ export default function Navbar() {
       nodes: state.nodes,
       deskMaps: state.deskMaps,
       leaseholdUnit,
+      leaseholdAssignments,
       leaseholdOrris,
+      leaseholdTransferOrderEntries,
       activeDeskMapId: state.activeDeskMapId,
       instrumentTypes: state.instrumentTypes,
       ownerData: await useOwnerStore.getState().exportWorkspaceData(),

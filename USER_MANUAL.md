@@ -58,6 +58,8 @@ Gross acres and tract descriptions now live on the tract record itself, but you 
 
 ### Working with title cards
 - `+ Add Root` starts a new title chain in the active tract.
+- Use `+ Add Root` more than once when a tract starts from separate families or competing starting points.
+- Temporary totals over `100%` are acceptable while you work farther back in title and reconcile the chain later.
 - Click a card to edit it.
 - Hover a card to reveal actions such as `PRECEDE`, `CONVEY`, `ATTACH`, and `DELETE`.
 - Related documents stay attached to a title card and do not change ownership math.
@@ -81,6 +83,7 @@ The floating summary panel in the top-left now separates three coverage checks:
 These totals are mineral totals only. NPRI branches are tracked separately on Desk Map and are not deducted from `Found in Chain`, because the actual royalty-payment math is deferred to later lessee-side workflows.
 
 These are intentionally different numbers. A tract can be fully found before it is fully linked to owner records, and fully linked before it is fully leased.
+If `Found in Chain` is temporarily over `100%`, LANDroid keeps that state visible instead of blocking it so you can keep tracing separate families and reconcile them later.
 
 ### Important delete behavior
 Deleting a conveyance branch removes that branch and restores the deleted conveyed amount back to the original grantor or parent. This is safer than simply dropping the branch and losing the fraction.
@@ -95,6 +98,10 @@ LANDroid can display a small full-color prospect mark in the top navigation next
 
 `Leasehold` is the acreage-first review surface for the same tract records you see in `Desk Map`.
 
+It now has two internal modes:
+- `Overview` for acreage, unit setup, and numeric tract review
+- `Deck` for a card-based leasehold board that keeps ORRIs, WI / assignments, and transfer-order review off the Desk Map title tree
+
 ### What it does today
 - Treats the current workspace's Desk Maps as one provisional unit
 - Lets you set unit name, operator / lessee, effective date, and a short unit description
@@ -105,6 +112,13 @@ LANDroid can display a small full-color prospect mark in the top navigation next
 - Calculates weighted tract royalty and total unit royalty from the active lease rates now on file
 - Tracks leasehold-side ORRIs at either unit or tract scope, with an explicit burden-basis field
 - Calculates ORRI and pre-WI NRI totals only for gross `8/8` ORRIs in this first pass
+- Tracks leasehold-side WI assignments at either unit or tract scope
+- Includes a `Deck` mode that focuses on one tract at a time and shows the lessee-side cards beneath that leasehold estate, including retained WI and assignment cards
+- Includes a read-only transfer-order review surface in `Deck` that rolls up lease royalty, ORRI, retained WI, and assigned WI for the current focus
+- Lets unit-focus transfer-order rows carry saved `owner number`, `status`, and `notes` without changing the derived decimal math underneath
+- Pulls lease effective dates and doc numbers into royalty review rows when those details are present on the linked lease record
+- Flags review rows that are still missing an effective date or doc number so source cleanup is visible before payout entry exists
+- Keeps WI over-assignment as a warning-only review state in this v1 pass so the entered split can stay visible while you correct it
 
 ### Current assumptions
 - Desk Map remains the title source of truth
@@ -112,8 +126,11 @@ LANDroid can display a small full-color prospect mark in the top navigation next
 - Pooled acres drive participation and payout decimals
 - The starter demo begins with pooled acres equal to gross acres on every tract for easier audit checks
 - Only gross `8/8` ORRIs are included in the current math; NRI- and WI-based ORRIs are tracked but excluded for now
-- Working-interest splits, division-order rows, and payout math are intentionally not modeled in this slice yet
+- The first WI slice tracks retained and assigned WI and now shows the resulting transfer-order review decimals; the first saved payout-entry layer is unit-focus metadata only, not an editable decimal engine
+- WI over-assignment is currently warning-only instead of hard-blocked; retained WI is clamped at zero until the split is corrected
 - Assignments remain outside Desk Map and outside this first Leasehold tab pass
+- Unit focus is the editable payout-entry surface; tract focus stays read-only because those rows are partial tract slices rather than final unit payout rows
+- The `Deck` mode is the intended visual home for WI, assignments, transfer-order review, and later deeper payout workflows
 
 ### Leasehold demo workspace
 - `Leasehold (5 Tracts)` loads a dedicated five-tract unit demo
@@ -121,6 +138,8 @@ LANDroid can display a small full-color prospect mark in the top navigation next
 - The tract pooled acres match those same `100`, `200`, `300`, `400`, and `500` values
 - Every present owner in that demo is leased to the same lessee at `1/8` royalty so the first royalty totals are easier to inspect
 - The demo also starts with one unit-wide gross `1/16` ORRI so the burden summary has a clean check number
+- The demo also starts with a unit-wide `1/2` WI assignment and a tract-specific `1/4` WI assignment on `Tract 4` so the deck has clean starter splits
+- The demo starts with no saved transfer-order row metadata, so you can test the first editable row layer from a clean slate
 - The tract descriptions are prefilled so you can see how the tab is meant to be used before entering your own data
 
 ## 4) Runsheet view

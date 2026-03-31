@@ -39,4 +39,34 @@ describe('deskmap-tree', () => {
     expect(trees[0]?.children[1]?.children).toEqual([]);
     expect(trees[0]?.children[1]?.relatedDocs).toEqual([]);
   });
+
+  it('returns multiple top-level roots when a tract starts from separate families', () => {
+    const familyOneRoot = {
+      ...createBlankNode('family-1-root'),
+      grantee: 'Family One',
+      fraction: '1',
+      initialFraction: '1',
+    };
+    const familyTwoRoot = {
+      ...createBlankNode('family-2-root'),
+      grantee: 'Family Two',
+      fraction: '1',
+      initialFraction: '1',
+    };
+    const familyTwoChild = {
+      ...createBlankNode('family-2-child', 'family-2-root'),
+      grantee: 'Family Two Child',
+      fraction: '0.5',
+      initialFraction: '0.5',
+    };
+
+    const trees = buildDeskMapTree([familyOneRoot, familyTwoRoot, familyTwoChild]);
+
+    expect(trees.map((entry) => entry.node.id)).toEqual([
+      'family-1-root',
+      'family-2-root',
+    ]);
+    expect(trees[0]?.children).toEqual([]);
+    expect(trees[1]?.children.map((entry) => entry.node.id)).toEqual(['family-2-child']);
+  });
 });

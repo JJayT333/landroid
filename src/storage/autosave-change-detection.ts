@@ -1,7 +1,12 @@
 import type { Edge, Node, Viewport } from '@xyflow/react';
 import type { DeskMap, OwnershipNode } from '../types/node';
 import type { CanvasSaveData } from '../store/canvas-store';
-import type { LeaseholdOrri, LeaseholdUnit } from '../types/leasehold';
+import type {
+  LeaseholdAssignment,
+  LeaseholdOrri,
+  LeaseholdTransferOrderEntry,
+  LeaseholdUnit,
+} from '../types/leasehold';
 
 export interface WorkspaceAutosaveState {
   workspaceId: string;
@@ -9,7 +14,9 @@ export interface WorkspaceAutosaveState {
   nodes: OwnershipNode[];
   deskMaps: DeskMap[];
   leaseholdUnit?: LeaseholdUnit;
+  leaseholdAssignments?: LeaseholdAssignment[];
   leaseholdOrris?: LeaseholdOrri[];
+  leaseholdTransferOrderEntries?: LeaseholdTransferOrderEntry[];
   activeDeskMapId: string | null;
   instrumentTypes: string[];
 }
@@ -34,7 +41,9 @@ interface WorkspaceAutosaveSnapshot {
   nodes: OwnershipNode[];
   deskMaps: DeskMap[];
   leaseholdUnit?: LeaseholdUnit;
+  leaseholdAssignments?: LeaseholdAssignment[];
   leaseholdOrris?: LeaseholdOrri[];
+  leaseholdTransferOrderEntries?: LeaseholdTransferOrderEntry[];
   activeDeskMapId: string | null;
   instrumentTypes: string[];
 }
@@ -62,7 +71,9 @@ export function captureWorkspaceAutosaveSnapshot(
     nodes: state.nodes,
     deskMaps: state.deskMaps,
     leaseholdUnit: state.leaseholdUnit,
+    leaseholdAssignments: state.leaseholdAssignments,
     leaseholdOrris: state.leaseholdOrris,
+    leaseholdTransferOrderEntries: state.leaseholdTransferOrderEntries,
     activeDeskMapId: state.activeDeskMapId,
     instrumentTypes: state.instrumentTypes,
   };
@@ -79,7 +90,9 @@ export function workspaceAutosaveStateChanged(
     previous.nodes !== state.nodes ||
     previous.deskMaps !== state.deskMaps ||
     previous.leaseholdUnit !== state.leaseholdUnit ||
+    previous.leaseholdAssignments !== state.leaseholdAssignments ||
     previous.leaseholdOrris !== state.leaseholdOrris ||
+    previous.leaseholdTransferOrderEntries !== state.leaseholdTransferOrderEntries ||
     previous.activeDeskMapId !== state.activeDeskMapId ||
     previous.instrumentTypes !== state.instrumentTypes
   );
@@ -94,7 +107,9 @@ export function buildWorkspaceAutosavePayload(
     nodes: state.nodes,
     deskMaps: state.deskMaps,
     leaseholdUnit: state.leaseholdUnit,
+    leaseholdAssignments: state.leaseholdAssignments,
     leaseholdOrris: state.leaseholdOrris,
+    leaseholdTransferOrderEntries: state.leaseholdTransferOrderEntries,
     activeDeskMapId: state.activeDeskMapId,
     instrumentTypes: state.instrumentTypes,
   };

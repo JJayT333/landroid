@@ -121,6 +121,20 @@ describe('buildStressWorkspaceData', () => {
       operator: 'Permian Basin Operating, LLC',
       effectiveDate: '2024-01-01',
     });
+    expect(workspace.leaseholdAssignments).toEqual([
+      expect.objectContaining({
+        assignor: 'Permian Basin Operating, LLC',
+        assignee: 'Raven Bend Partners, LLC',
+        scope: 'unit',
+        workingInterestFraction: '1/2',
+      }),
+      expect.objectContaining({
+        assignor: 'Permian Basin Operating, LLC',
+        assignee: 'Cedar Draw Operating, LLC',
+        scope: 'tract',
+        workingInterestFraction: '1/4',
+      }),
+    ]);
     expect(workspace.leaseholdOrris).toEqual([
       expect.objectContaining({
         payee: 'Raven Bend Override, LP',
@@ -129,6 +143,7 @@ describe('buildStressWorkspaceData', () => {
         burdenBasis: 'gross_8_8',
       }),
     ]);
+    expect(workspace.leaseholdTransferOrderEntries).toEqual([]);
     expect(leaseParents).toEqual(currentOwnerIds);
     expect(workspace.ownerData.leases).toHaveLength(currentOwners.length);
     expect(new Set(workspace.ownerData.leases.map((lease) => lease.royaltyRate))).toEqual(

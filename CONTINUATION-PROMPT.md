@@ -12,14 +12,14 @@ Before making architectural decisions, read:
 - `/Users/abstractmapping/projects/landroid/CONTINUATION-PROMPT.md`
 
 Current repo state:
-- Active branch: `codex/maps-research-rrc-handoff`
-- Latest pushed baseline behind this branch: `a148dcc` (`chore: promote active app to repository root`)
+- Active branch: `claude_audit`
+- Latest inherited pushed checkpoint before this branch work: `60cf008` (`feat: checkpoint leasehold and research foundations`)
 - `main` is the trusted baseline and points to commit `afbdb93`
 - Safety branches kept on purpose: `baseline-afbdb93`, `v2-desk-map-interactions-and-resize`
 - Active app is the repository root
 - The repository root is both the app surface and the repo-level coordination layer
-- The active branch for current work is `codex/maps-research-rrc-handoff`
-- This branch is intended to carry the current source/docs handoff snapshot for the `Maps` / `Research` split, pending-permit decoder, and chat-transition checklist
+- The active branch for current work is `claude_audit`
+- This branch now carries the safe pre-deck checkpoint plus the ongoing local leasehold-deck experiment worktree
 
 User preferences and working style:
 - The user is fairly new and wants careful, reversible changes
@@ -98,6 +98,7 @@ Recent completed work:
 - Added a first Desk Map NPRI workflow: present-interest mineral owners can now create fixed or floating NPRI branches from the node edit modal
 - Added dedicated NPRI node metadata so royalty branches stay visible and conveyable on Desk Map without reducing the mineral ownership totals
 - Kept the top-left Desk Map coverage cards mineral-only, so NPRIs do not change `Found in Chain`, `Linked Owners`, or `Leased`
+- Made the multi-root Desk Map workflow explicit: separate starting families can now be added in the same tract, temporary over-100 mineral coverage remains allowed, and the coverage panel now keeps overage visible as provisional instead of styling it as balanced
 - Cleaned up the stress/sample fixtures by removing assignment-heavy Desk Map cards, replacing them with broader deed variation plus supplemental lease variation
 - Tightened math/store normalization so new NPRI nodes, rebalances, deletes, and subsequent conveyances stay compatible with the existing branch invariants
 - Added a first `Leasehold` workspace surface that derives pooled participation, owner net acres, and total royalty from the current Desk Maps plus active lease records
@@ -105,6 +106,13 @@ Recent completed work:
 - Added a dedicated `Leasehold (5 Tracts)` demo seed with five tracts at `100`, `200`, `300`, `400`, and `500` acres, assorted conveyances, shared unit metadata, and 100% lease coverage for every present owner at `1/8`
 - Added pure leasehold summary math coverage so the new Leasehold tab can stay derived from Desk Map title plus `Owners` lease data instead of introducing duplicate persisted calculations
 - Added leasehold-side ORRI records with explicit burden-basis capture, gross `8/8` ORRI burden math, and pre-WI NRI summary totals
+- Added an internal `Overview | Deck` split inside `Leasehold`, so the same tab can now host a card-based leasehold board without pushing WI / assignments back into Desk Map or adding another top-level tab
+- Built the first `Leasehold` `Deck` UI locally on top of that split: tract/unit focus pills, a lessee anchor card, ORRI cards using the Desk-Map-style visual language, and placeholder lanes for later WI / decimal work
+- Added the first real leasehold-side WI assignment layer: persisted assignment records, retained-vs-assigned WI summary math, over-assignment protection, editable assignment cards in the `Deck`, and starter demo assignments in the five-tract workspace
+- Replaced the `Decimals / Transfer Orders` placeholder with a derived decimal ledger in `Leasehold` `Deck`, showing lease royalty, ORRI, retained WI, and assigned WI rows for the current unit or tract focus
+- Turned that read-only decimal ledger into a first transfer-order review surface, including focus coverage checks, variance rollups, source-readiness badges, and royalty-row lease effective date / doc number detail when available
+- Decided WI over-assignment stays warning-only for the current v1 deck flow, and made the transfer-order review surface call that out explicitly while retaining the clamped-zero retained-WI math
+- Added the first persisted transfer-order row model: unit-focus payout-entry rows can now save owner number, status, and notes on top of the derived decimal rows, while tract focus stays review-only
 
 Important files involved in the recent work:
 - `/Users/abstractmapping/projects/landroid/src/views/FlowchartView.tsx`
@@ -184,6 +192,11 @@ Known local noise:
 - Do not delete anything destructively unless the user asks
 
 Current status:
+- The active `claude_audit` branch is intended to hold the validated local checkpoint for the `Leasehold` deck work plus the Desk Map multi-root clarification on top of inherited checkpoint `60cf008`
+- Full validation on the current local worktree passed: `npm test`, `npm run lint`, and `npm run build`
+- The current local worktree now also passes targeted leasehold/persistence coverage after the WI assignment slice: `npm test -- --run src/components/leasehold/__tests__/leasehold-summary.test.ts src/storage/__tests__/workspace-persistence.test.ts src/storage/__tests__/seed-test-data.test.ts src/storage/__tests__/autosave-change-detection.test.ts src/storage/__tests__/csv-io.test.ts`
+- The transfer-order review extension also passes targeted leasehold coverage: `npm test -- --run src/components/leasehold/__tests__/leasehold-summary.test.ts`
+- The first editable payout-entry row layer also passes targeted leasehold/persistence coverage: `npm test -- --run src/storage/__tests__/workspace-persistence.test.ts src/storage/__tests__/autosave-change-detection.test.ts src/storage/__tests__/csv-io.test.ts src/storage/__tests__/seed-test-data.test.ts src/components/leasehold/__tests__/leasehold-summary.test.ts`
 - The user is happy with the current flowchart paper-size/import-centering behavior for now
 - Manual cleanup after import is acceptable; the layout does not need to “read their mind”
 - The current runsheet export is in a good place for now; copy/paste into the external sheet is acceptable
@@ -200,8 +213,10 @@ Current status:
 - Workspace and canvas autosave still debounce and save the same payloads, but they now detect changes without serializing the full state tree on every update
 - Desk Map now has a true 500-card stress tract for the current performance target, with render work scoped more narrowly during ordinary interaction
 - Desk Map now surfaces separate running totals for ownership found in the chain, ownership linked to owner records, and ownership currently leased
+- Desk Map now explicitly supports multiple starting root families in the same tract; temporary over-100 `Found in Chain` coverage is allowed while title is still being worked backward, and the coverage panel shows that state as provisional rather than balanced
 - Desk Map current-owner cards now keep the present mineral owner visually distinct from the lessee, and the node edit modal now owns the lease-node access path
-- `Leasehold` now exists as the first acreage-aware unit template, with editable pooled acres, unit metadata, leasehold-side ORRI tracking, and pre-WI NRI math; WI / division-order / payout layers still come later
+- `Leasehold` now exists as the first acreage-aware unit template, with editable pooled acres, unit metadata, leasehold-side ORRI tracking, pre-WI NRI math, and an internal `Deck` mode for card-based leasehold review; WI / division-order / payout layers still come later
+- The current `Leasehold` `Deck` mode now has real retained-WI cards, assignment cards, and a first read-only transfer-order review surface; editable transfer-order / payout rows still come later
 - Desk Map tract records now carry `gross acres`, `pooled acres`, and `description`, and those fields are edited from the Leasehold tab rather than from the Desk Map title-chain surface
 - The dedicated five-tract leasehold demo is now the cleanest starting point for the next phase of lessee-side calculations
 - Seed and stress data now keep lease overlays separate from present ownership, while still seeding linked owners and some active leased interest for testing
@@ -213,6 +228,7 @@ Current status:
 - The user clarified the Desk Map leasing model: the present mineral owner stays in the main title tree, the owner card should only show leased status, the lease button belongs in the node edit modal, and the separate Desk Map lease node should represent the terminal lessee
 - The user does not want assignments on Desk Map at all; assignments belong only to the later lessee-side workflow
 - The user wants future lessee-side calculation work to handle assignments, ORRIs, working interest, division orders, and royalty-payment math rather than pushing those into Desk Map
+- The user prefers not to add more Desk Map clutter or another top-level app tab; the intended path is to keep `Leasehold` as the single leasehold surface and grow the internal `Deck` there instead
 - `Maps` reference links now normalize to `http(s)` URLs only, blocking unsupported schemes before they become clickable
 - `.landroid` imports now reject malformed JSON/root payloads clearly and normalize optional desk-map/map-reference/canvas content on the way in
 - The eager main bundle is now materially smaller again; after the canvas-helper extraction plus lazy `Runsheet` / `Owners`, startup is down to roughly `415 kB`, and the remaining large warning is concentrated in the lazy `FlowchartView` chunk instead of the startup path
@@ -227,6 +243,21 @@ Current status:
   - `npm test`
   - `npm run lint`
   - `npm run build`
+
+Open risks / reminders:
+- The current leasehold deck, WI lane, and transfer-order review / payout-entry surface are code-validated but have not been manually browser-QA’d yet
+- The first payout-entry layer saves only owner number, status, and notes; decimals still remain derived and non-editable
+- Over-assignment is intentionally warning-only for now; if we ever want hard blocking, it should likely arrive with a more explicit draft/save validation flow instead of the current blur-save cards
+- Multi-root Desk Map starts are intentionally allowed even when provisional mineral coverage exceeds `100%`; that state should remain visible for reconciliation, not be hard-blocked
+- Relevant source/docs work should now live on `claude_audit`; keep unrelated local noise separate from future checkpoints
+- `dist/` and `dist-node/` contain generated validation output and should stay out of checkpoints unless explicitly requested
+
+Likely next steps:
+- Do a quick manual browser pass on Desk Map with two or more starting families so the new helper copy and provisional-coverage tone feel clear in practice
+- Do a manual browser pass on `Leasehold (5 Tracts)` now that unit-focus payout-entry rows are editable
+- Decide which additional transfer-order fields should come next after `owner number`, `status`, and `notes`
+- Add the next payout-entry field slice only if it stays metadata-first and does not duplicate the derived decimal math
+- Revisit hard-block validation only if the later payout-entry flow introduces a better draft/save checkpoint for assignment edits
 
 Chat-switch checklist:
 1. Make sure the current work is on a non-`main` branch.

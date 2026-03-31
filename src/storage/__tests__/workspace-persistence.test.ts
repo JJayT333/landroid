@@ -124,6 +124,19 @@ function buildWorkspace(canvas: CanvasSaveData | null): LandroidFileData {
       operator: 'Operator A',
       effectiveDate: '2024-01-01',
     },
+    leaseholdAssignments: [
+      {
+        id: 'assignment-1',
+        assignor: 'Operator A',
+        assignee: 'Unit Partner',
+        scope: 'unit',
+        deskMapId: null,
+        workingInterestFraction: '1/2',
+        effectiveDate: '2024-03-01',
+        sourceDocNo: 'ASG-1',
+        notes: 'Starter WI split',
+      },
+    ],
     leaseholdOrris: [
       {
         id: 'orri-1',
@@ -135,6 +148,15 @@ function buildWorkspace(canvas: CanvasSaveData | null): LandroidFileData {
         effectiveDate: '2024-02-01',
         sourceDocNo: 'ORRI-1',
         notes: 'Starter override',
+      },
+    ],
+    leaseholdTransferOrderEntries: [
+      {
+        id: 'to-1',
+        sourceRowId: 'royalty-dm-1-node-1',
+        ownerNumber: '001',
+        status: 'ready',
+        notes: 'Ready for payout setup',
       },
     ],
     activeDeskMapId: 'dm-1',
@@ -172,7 +194,11 @@ describe('workspace-persistence', () => {
     expect(imported.nodes).toEqual(original.nodes);
     expect(imported.deskMaps).toEqual(original.deskMaps);
     expect(imported.leaseholdUnit).toEqual(original.leaseholdUnit);
+    expect(imported.leaseholdAssignments).toEqual(original.leaseholdAssignments);
     expect(imported.leaseholdOrris).toEqual(original.leaseholdOrris);
+    expect(imported.leaseholdTransferOrderEntries).toEqual(
+      original.leaseholdTransferOrderEntries
+    );
     expect(imported.canvas).toEqual(original.canvas);
     expect(imported.ownerData?.owners).toEqual(original.ownerData?.owners);
     expect(imported.ownerData?.docs[0]?.fileName).toBe('owner-notes.txt');
@@ -225,7 +251,9 @@ describe('workspace-persistence', () => {
       operator: '',
       effectiveDate: '',
     });
+    expect(imported.leaseholdAssignments).toEqual([]);
     expect(imported.leaseholdOrris).toEqual([]);
+    expect(imported.leaseholdTransferOrderEntries).toEqual([]);
     expect(imported.nodes[0]?.linkedOwnerId).toBeNull();
     expect(imported.nodes[0]?.linkedLeaseId).toBeNull();
     expect(imported.nodes[0]?.relatedKind).toBeNull();
@@ -404,7 +432,9 @@ describe('workspace-persistence', () => {
       operator: '',
       effectiveDate: '',
     });
+    expect(imported.leaseholdAssignments).toEqual([]);
     expect(imported.leaseholdOrris).toEqual([]);
+    expect(imported.leaseholdTransferOrderEntries).toEqual([]);
     expect(imported.instrumentTypes).toEqual(['Deed']);
     expect(imported.canvas).toEqual({
       nodes: [],

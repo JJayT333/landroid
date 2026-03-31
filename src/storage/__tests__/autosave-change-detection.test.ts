@@ -44,6 +44,19 @@ describe('autosave-change-detection', () => {
         operator: 'Operator A',
         effectiveDate: '2024-01-01',
       },
+      leaseholdAssignments: [
+        {
+          id: 'assignment-1',
+          assignor: 'Operator A',
+          assignee: 'Unit Partner',
+          scope: 'unit' as const,
+          deskMapId: null,
+          workingInterestFraction: '1/2',
+          effectiveDate: '2024-03-01',
+          sourceDocNo: 'ASG-1',
+          notes: '',
+        },
+      ],
       leaseholdOrris: [
         {
           id: 'orri-1',
@@ -55,6 +68,15 @@ describe('autosave-change-detection', () => {
           effectiveDate: '2024-02-01',
           sourceDocNo: 'ORRI-1',
           notes: '',
+        },
+      ],
+      leaseholdTransferOrderEntries: [
+        {
+          id: 'to-1',
+          sourceRowId: 'royalty-dm-1-node-1',
+          ownerNumber: '001',
+          status: 'ready' as const,
+          notes: 'Ready for payout setup',
         },
       ],
       activeDeskMapId: 'dm-1',
@@ -73,7 +95,19 @@ describe('autosave-change-detection', () => {
     expect(
       workspaceAutosaveStateChanged(snapshot, {
         ...state,
+        leaseholdAssignments: [...state.leaseholdAssignments],
+      })
+    ).toBe(true);
+    expect(
+      workspaceAutosaveStateChanged(snapshot, {
+        ...state,
         leaseholdOrris: [...state.leaseholdOrris],
+      })
+    ).toBe(true);
+    expect(
+      workspaceAutosaveStateChanged(snapshot, {
+        ...state,
+        leaseholdTransferOrderEntries: [...state.leaseholdTransferOrderEntries],
       })
     ).toBe(true);
     expect(buildWorkspaceAutosavePayload(state)).toEqual(state);

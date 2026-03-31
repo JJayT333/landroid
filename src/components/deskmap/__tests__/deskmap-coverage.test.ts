@@ -206,4 +206,25 @@ describe('deskmap-coverage', () => {
     expect(summary.currentOwnerCount).toBe(1);
     expect(summary.missingOwnership).toBe('0');
   });
+
+  it('reports temporary over-100 coverage when multiple root families are still being reconciled', () => {
+    const familyOne = {
+      ...createBlankNode('node-1'),
+      grantee: 'Family One',
+      fraction: '1',
+      initialFraction: '1',
+    };
+    const familyTwo = {
+      ...createBlankNode('node-2'),
+      grantee: 'Family Two',
+      fraction: '0.5',
+      initialFraction: '0.5',
+    };
+
+    const summary = calculateDeskMapCoverageSummary([familyOne, familyTwo], new Map());
+
+    expect(summary.currentOwnership).toBe('1.5');
+    expect(summary.missingOwnership).toBe('-0.5');
+    expect(summary.currentOwnerCount).toBe(2);
+  });
 });

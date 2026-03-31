@@ -9,11 +9,19 @@ import { useMapStore } from './map-store';
 import type { OwnershipNode, DeskMap } from '../types/node';
 import { normalizeDeskMap, normalizeOwnershipNode } from '../types/node';
 import {
+  createBlankLeaseholdAssignment,
+  createBlankLeaseholdTransferOrderEntry,
   createBlankLeaseholdUnit,
+  normalizeLeaseholdAssignment,
+  normalizeLeaseholdAssignments,
   normalizeLeaseholdOrri,
   normalizeLeaseholdOrris,
+  normalizeLeaseholdTransferOrderEntries,
+  normalizeLeaseholdTransferOrderEntry,
+  type LeaseholdAssignment,
   normalizeLeaseholdUnit,
   type LeaseholdOrri,
+  type LeaseholdTransferOrderEntry,
   type LeaseholdUnit,
 } from '../types/leasehold';
 import {
@@ -52,7 +60,9 @@ interface WorkspaceState {
   nodes: OwnershipNode[];
   deskMaps: DeskMap[];
   leaseholdUnit: LeaseholdUnit;
+  leaseholdAssignments: LeaseholdAssignment[];
   leaseholdOrris: LeaseholdOrri[];
+  leaseholdTransferOrderEntries: LeaseholdTransferOrderEntry[];
   activeDeskMapId: string | null;
   instrumentTypes: string[];
 
@@ -67,9 +77,17 @@ interface WorkspaceState {
   // Actions
   setProjectName: (name: string) => void;
   updateLeaseholdUnit: (fields: Partial<LeaseholdUnit>) => void;
+  addLeaseholdAssignment: (assignment?: Partial<LeaseholdAssignment>) => string;
+  updateLeaseholdAssignment: (id: string, fields: Partial<LeaseholdAssignment>) => void;
+  removeLeaseholdAssignment: (id: string) => void;
   addLeaseholdOrri: (orri?: Partial<LeaseholdOrri>) => string;
   updateLeaseholdOrri: (id: string, fields: Partial<LeaseholdOrri>) => void;
   removeLeaseholdOrri: (id: string) => void;
+  upsertLeaseholdTransferOrderEntry: (
+    entry: Pick<LeaseholdTransferOrderEntry, 'sourceRowId'>
+      & Partial<Omit<LeaseholdTransferOrderEntry, 'sourceRowId'>>
+  ) => string | null;
+  removeLeaseholdTransferOrderEntry: (sourceRowId: string) => void;
   setActiveNode: (id: string | null) => void;
   setActiveDeskMap: (id: string) => void;
   addInstrumentType: (type: string) => void;
@@ -105,7 +123,9 @@ interface WorkspaceState {
     nodes: OwnershipNode[];
     deskMaps: DeskMap[];
     leaseholdUnit?: LeaseholdUnit;
+    leaseholdAssignments?: LeaseholdAssignment[];
     leaseholdOrris?: LeaseholdOrri[];
+    leaseholdTransferOrderEntries?: LeaseholdTransferOrderEntry[];
     activeDeskMapId: string | null;
     instrumentTypes?: string[];
   }) => void;
@@ -122,7 +142,9 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
   nodes: [],
   deskMaps: [],
   leaseholdUnit: createBlankLeaseholdUnit(),
+  leaseholdAssignments: [],
   leaseholdOrris: [],
+  leaseholdTransferOrderEntries: [],
   activeDeskMapId: null,
   instrumentTypes: [...DEFAULT_INSTRUMENT_TYPES],
   _hydrated: false,
@@ -137,6 +159,42 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
         ...state.leaseholdUnit,
         ...fields,
       }),
+    })),
+  addLeaseholdAssignment: (assignment = {}) => {
+    const next = normalizeLeaseholdAssignment({
+      ...createBlankLeaseholdAssignment(),
+      ...assignment,
+    });
+    set((state) => ({
+      leaseholdAssignments: [...state.leaseholdAssignments, next],
+    }));
+    return next.id;
+  },
+  updateLeaseholdAssignment: (id, fields) =>
+    set((state) => {
+      const validDeskMapIds = new Set(state.deskMaps.map((deskMap) => deskMap.id));
+      return {
+        leaseholdAssignments: state.leaseholdAssignments.map((assignment) =>
+          assignment.id === id
+            ? normalizeLeaseholdAssignment(
+                {
+                  ...assignment,
+                  ...fields,
+                },
+                { validDeskMapIds }
+              )
+            : assignment
+        ),
+      };
+    }),
+  removeLeaseholdAssignment: (id) =>
+    set((state) => ({
+      leaseholdAssignments: state.leaseholdAssignments.filter(
+        (assignment) => assignment.id !== id
+      ),
+      leaseholdTransferOrderEntries: state.leaseholdTransferOrderEntries.filter(
+        (entry) => entry.sourceRowId !== `assignment-${id}`
+      ),
     })),
   addLeaseholdOrri: (orri = {}) => {
     const next = normalizeLeaseholdOrri(orri);
@@ -165,6 +223,59 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
   removeLeaseholdOrri: (id) =>
     set((state) => ({
       leaseholdOrris: state.leaseholdOrris.filter((orri) => orri.id !== id),
+      leaseholdTransferOrderEntries: state.leaseholdTransferOrderEntries.filter(
+        (entry) => entry.sourceRowId !== `orri-${id}`
+      ),
+    })),
+  upsertLeaseholdTransferOrderEntry: (entry) => {
+    const normalized = normalizeLeaseholdTransferOrderEntry({
+      ...createBlankLeaseholdTransferOrderEntry(),
+      ...entry,
+    });
+    if (!normalized.sourceRowId) {
+      return null;
+    }
+    const shouldRemove =
+      normalized.status === 'draft'
+      && !normalized.ownerNumber
+      && !normalized.notes;
+
+    if (shouldRemove) {
+      set((state) => ({
+        leaseholdTransferOrderEntries: state.leaseholdTransferOrderEntries.filter(
+          (candidate) => candidate.sourceRowId !== normalized.sourceRowId
+        ),
+      }));
+      return null;
+    }
+
+    set((state) => {
+      const existing = state.leaseholdTransferOrderEntries.find(
+        (candidate) => candidate.sourceRowId === normalized.sourceRowId
+      );
+
+      return {
+        leaseholdTransferOrderEntries: existing
+          ? state.leaseholdTransferOrderEntries.map((candidate) =>
+              candidate.sourceRowId === normalized.sourceRowId
+                ? normalizeLeaseholdTransferOrderEntry({
+                    ...candidate,
+                    ...normalized,
+                    id: candidate.id,
+                  })
+                : candidate
+            )
+          : [...state.leaseholdTransferOrderEntries, normalized],
+      };
+    });
+
+    return normalized.id;
+  },
+  removeLeaseholdTransferOrderEntry: (sourceRowId) =>
+    set((state) => ({
+      leaseholdTransferOrderEntries: state.leaseholdTransferOrderEntries.filter(
+        (entry) => entry.sourceRowId !== sourceRowId
+      ),
     })),
   setActiveNode: (id) => set({ activeNodeId: id }),
   setActiveDeskMap: (id) => set({ activeDeskMapId: id }),
@@ -225,7 +336,13 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
       const remainingDeskMaps = state.deskMaps.filter((dm) => dm.id !== id);
       return {
         deskMaps: remainingDeskMaps,
+        leaseholdAssignments: state.leaseholdAssignments.filter(
+          (assignment) => assignment.deskMapId !== id
+        ),
         leaseholdOrris: state.leaseholdOrris.filter((orri) => orri.deskMapId !== id),
+        leaseholdTransferOrderEntries: state.leaseholdTransferOrderEntries.filter(
+          (entry) => !entry.sourceRowId.startsWith(`royalty-${id}-`)
+        ),
         activeDeskMapId: state.activeDeskMapId === id
           ? (remainingDeskMaps[0]?.id ?? null)
           : state.activeDeskMapId,
@@ -436,7 +553,13 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
         nodes: normalizedNodes,
         deskMaps: normalizedDeskMaps,
         leaseholdUnit: normalizeLeaseholdUnit(data.leaseholdUnit),
+        leaseholdAssignments: normalizeLeaseholdAssignments(data.leaseholdAssignments, {
+          validDeskMapIds,
+        }),
         leaseholdOrris: normalizeLeaseholdOrris(data.leaseholdOrris, { validDeskMapIds }),
+        leaseholdTransferOrderEntries: normalizeLeaseholdTransferOrderEntries(
+          data.leaseholdTransferOrderEntries
+        ),
         activeDeskMapId: data.activeDeskMapId ?? normalizedDeskMaps[0]?.id ?? null,
         instrumentTypes: data.instrumentTypes?.length
           ? data.instrumentTypes
