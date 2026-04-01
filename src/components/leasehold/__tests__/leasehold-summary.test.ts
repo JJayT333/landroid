@@ -180,14 +180,25 @@ describe('leasehold-summary', () => {
           notes: '',
         },
         {
-          id: 'orri-tracked-only',
-          payee: 'Tracked Only Override',
+          id: 'orri-unit-wi',
+          payee: 'Unit WI Override',
+          scope: 'unit',
+          deskMapId: null,
+          burdenFraction: '1/80',
+          burdenBasis: 'working_interest',
+          effectiveDate: '2024-01-03',
+          sourceDocNo: 'ORRI-3',
+          notes: '',
+        },
+        {
+          id: 'orri-tract-nri',
+          payee: 'Tracked NRI Override',
           scope: 'tract',
           deskMapId: 'dm-1',
           burdenFraction: '1/64',
           burdenBasis: 'net_revenue_interest',
-          effectiveDate: '2024-01-03',
-          sourceDocNo: 'ORRI-3',
+          effectiveDate: '2024-01-04',
+          sourceDocNo: 'ORRI-4',
           notes: '',
         },
       ],
@@ -198,40 +209,48 @@ describe('leasehold-summary', () => {
     expect(summary.tractCount).toBe(2);
     expect(summary.fullyLeasedTractCount).toBe(2);
     expect(summary.totalRoyaltyDecimal).toBe('0.125');
-    expect(summary.totalOrriDecimal).toBe('0.08125');
-    expect(summary.preWorkingInterestDecimal).toBe('0.79375');
-    expect(summary.totalAssignedWorkingInterestDecimal).toBe('0.5140625');
-    expect(summary.retainedWorkingInterestDecimal).toBe('0.2796875');
+    expect(summary.totalOrriDecimal).toBe('0.097197265625');
+    expect(summary.preWorkingInterestDecimal).toBe('0.777802734375');
+    expect(summary.totalAssignedWorkingInterestDecimal).toBe('0.5044482421875');
+    expect(summary.retainedWorkingInterestDecimal).toBe('0.2733544921875');
     expect(summary.includedAssignmentCount).toBe(2);
     expect(summary.excludedAssignmentCount).toBe(0);
-    expect(summary.includedOrriCount).toBe(2);
-    expect(summary.excludedOrriCount).toBe(1);
+    expect(summary.includedOrriCount).toBe(4);
+    expect(summary.excludedOrriCount).toBe(0);
     expect(summary.tracts[0]?.weightedRoyaltyRate).toBe('0.125');
     expect(summary.tracts[1]?.weightedRoyaltyRate).toBe('0.125');
-    expect(summary.tracts[0]?.grossOrriRate).toBe('0.0625');
-    expect(summary.tracts[1]?.grossOrriRate).toBe('0.09375');
+    expect(summary.tracts[0]?.grossOrriBurdenRate).toBe('0.0625');
+    expect(summary.tracts[1]?.grossOrriBurdenRate).toBe('0.09375');
+    expect(summary.tracts[0]?.workingInterestOrriBurdenRate).toBe('0.0109375');
+    expect(summary.tracts[1]?.workingInterestOrriBurdenRate).toBe('0.0109375');
+    expect(summary.tracts[0]?.netRevenueInterestOrriBurdenRate).toBe('0.0125244140625');
+    expect(summary.tracts[1]?.netRevenueInterestOrriBurdenRate).toBe('0');
+    expect(summary.tracts[0]?.totalOrriBurdenRate).toBe('0.0859619140625');
+    expect(summary.tracts[1]?.totalOrriBurdenRate).toBe('0.1046875');
     expect(Number(summary.tracts[0]?.unitParticipation)).toBeCloseTo(0.4, 12);
     expect(Number(summary.tracts[1]?.unitParticipation)).toBeCloseTo(0.6, 12);
     expect(Number(summary.tracts[0]?.unitRoyaltyDecimal)).toBeCloseTo(0.05, 12);
     expect(Number(summary.tracts[1]?.unitRoyaltyDecimal)).toBeCloseTo(0.075, 12);
-    expect(Number(summary.tracts[0]?.unitOrriDecimal)).toBeCloseTo(0.025, 12);
-    expect(Number(summary.tracts[1]?.unitOrriDecimal)).toBeCloseTo(0.05625, 12);
-    expect(Number(summary.tracts[0]?.preWorkingInterestDecimal)).toBeCloseTo(0.325, 12);
-    expect(Number(summary.tracts[1]?.preWorkingInterestDecimal)).toBeCloseTo(0.46875, 12);
-    expect(Number(summary.tracts[0]?.assignedWorkingInterestDecimal)).toBeCloseTo(0.1625, 12);
-    expect(Number(summary.tracts[0]?.retainedWorkingInterestDecimal)).toBeCloseTo(0.1625, 12);
+    expect(Number(summary.tracts[0]?.unitOrriDecimal)).toBeCloseTo(0.034384765625, 12);
+    expect(Number(summary.tracts[1]?.unitOrriDecimal)).toBeCloseTo(0.0628125, 12);
+    expect(Number(summary.tracts[0]?.preWorkingInterestDecimal)).toBeCloseTo(0.315615234375, 12);
+    expect(Number(summary.tracts[1]?.preWorkingInterestDecimal)).toBeCloseTo(0.4621875, 12);
+    expect(Number(summary.tracts[0]?.assignedWorkingInterestDecimal)).toBeCloseTo(0.1578076171875, 12);
+    expect(Number(summary.tracts[0]?.retainedWorkingInterestDecimal)).toBeCloseTo(0.1578076171875, 12);
     expect(Number(summary.tracts[1]?.assignedWorkingInterestDecimal)).toBeCloseTo(
-      0.3515625,
+      0.346640625,
       12
     );
     expect(Number(summary.tracts[1]?.retainedWorkingInterestDecimal)).toBeCloseTo(
-      0.1171875,
+      0.115546875,
       12
     );
     expect(summary.tracts[0]?.owners[0]).toEqual(
       expect.objectContaining({
         ownerName: 'A Owner',
-        netMineralAcres: '40',
+        netMineralAcres: '50',
+        netPooledAcres: '40',
+        ownerTractRoyalty: '0.0625',
       })
     );
     expect(d(summary.tracts[0]?.owners[0]?.unitRoyaltyDecimal ?? '0').toNumber()).toBeCloseTo(0.025, 12);
@@ -243,9 +262,14 @@ describe('leasehold-summary', () => {
           unitDecimal: '0.0625',
         }),
         expect.objectContaining({
-          id: 'orri-tracked-only',
-          includedInMath: false,
-          unitDecimal: '0',
+          id: 'orri-unit-wi',
+          includedInMath: true,
+          unitDecimal: '0.0109375',
+        }),
+        expect.objectContaining({
+          id: 'orri-tract-nri',
+          includedInMath: true,
+          unitDecimal: '0.005009765625',
         }),
       ])
     );
@@ -254,12 +278,12 @@ describe('leasehold-summary', () => {
         expect.objectContaining({
           id: 'assignment-unit',
           includedInMath: true,
-          unitDecimal: '0.396875',
+          unitDecimal: '0.3889013671875',
         }),
         expect.objectContaining({
           id: 'assignment-tract',
           includedInMath: true,
-          unitDecimal: '0.1171875',
+          unitDecimal: '0.115546875',
         }),
       ])
     );
@@ -308,14 +332,18 @@ describe('leasehold-summary', () => {
           payee: 'Unit Override',
         }),
         expect.objectContaining({
+          category: 'orri',
+          payee: 'Unit WI Override',
+        }),
+        expect.objectContaining({
           category: 'retained_wi',
           payee: 'Operator A',
-          decimal: '0.1171875',
+          decimal: '0.115546875',
         }),
         expect.objectContaining({
           category: 'assigned_wi',
           payee: 'Tract Partner',
-          decimal: '0.1171875',
+          decimal: '0.115546875',
         }),
       ])
     );
@@ -324,12 +352,12 @@ describe('leasehold-summary', () => {
         expect.objectContaining({
           category: 'assigned_wi',
           payee: 'Unit Partner',
-          decimal: '0.396875',
+          decimal: '0.3889013671875',
         }),
         expect.objectContaining({
           category: 'retained_wi',
           payee: 'Operator A',
-          decimal: '0.2796875',
+          decimal: '0.2733544921875',
         }),
       ])
     );
@@ -348,16 +376,90 @@ describe('leasehold-summary', () => {
     expect(tractReview.totalDecimal).toBe('0.6');
     expect(tractReview.expectedDecimal).toBe('0.6');
     expect(tractReview.varianceDecimal).toBe('0');
-    expect(tractReview.reviewableRowCount).toBe(6);
-    expect(tractReview.rowsWithCompleteSource).toBe(6);
+    expect(tractReview.reviewableRowCount).toBe(7);
+    expect(tractReview.rowsWithCompleteSource).toBe(7);
     expect(tractReview.rowsWithSourceGap).toBe(0);
     expect(tractReview.rowsMissingEffectiveDate).toBe(0);
     expect(tractReview.rowsMissingSourceDocNo).toBe(0);
     expect(tractReview.categorySummaries).toEqual([
       { category: 'royalty', rowCount: 2, totalDecimal: '0.075' },
-      { category: 'orri', rowCount: 2, totalDecimal: '0.05625' },
-      { category: 'retained_wi', rowCount: 1, totalDecimal: '0.1171875' },
-      { category: 'assigned_wi', rowCount: 2, totalDecimal: '0.3515625' },
+      { category: 'orri', rowCount: 3, totalDecimal: '0.0628125' },
+      { category: 'retained_wi', rowCount: 1, totalDecimal: '0.115546875' },
+      { category: 'assigned_wi', rowCount: 2, totalDecimal: '0.346640625' },
+    ]);
+  });
+
+  it('aggregates multiple active leases for a single owner into tract and unit royalty totals', () => {
+    const summary = buildLeaseholdUnitSummary({
+      deskMaps: [
+        {
+          id: 'dm-1',
+          name: 'Tract 1',
+          code: 'T1',
+          tractId: 'T1',
+          grossAcres: '100',
+          pooledAcres: '80',
+          description: 'Single tract',
+          nodeIds: ['n1'],
+        },
+      ],
+      nodes: [
+        {
+          ...createBlankNode('n1', null),
+          grantee: 'A Owner',
+          linkedOwnerId: 'owner-1',
+          fraction: '0.5',
+          initialFraction: '0.5',
+        },
+      ],
+      owners: [createBlankOwner('ws-1', { id: 'owner-1', name: 'A Owner' })],
+      leases: [
+        createBlankLease('ws-1', 'owner-1', {
+          id: 'lease-1',
+          leaseName: 'First Lease',
+          lessee: 'Operator A',
+          royaltyRate: '1/8',
+          leasedInterest: '0.25',
+          effectiveDate: '2024-01-01',
+          docNo: 'LEASE-1',
+        }),
+        createBlankLease('ws-1', 'owner-1', {
+          id: 'lease-2',
+          leaseName: 'Second Lease',
+          lessee: 'Operator B',
+          royaltyRate: '1/4',
+          leasedInterest: '0.25',
+          effectiveDate: '2024-02-01',
+          docNo: 'LEASE-2',
+        }),
+      ],
+      leaseholdAssignments: [],
+      leaseholdOrris: [],
+    });
+
+    expect(summary.totalRoyaltyDecimal).toBe('0.09375');
+    expect(summary.fullyLeasedTractCount).toBe(1);
+    expect(summary.tracts[0]?.owners[0]).toEqual(
+      expect.objectContaining({
+        netMineralAcres: '50',
+        netPooledAcres: '40',
+        activeLeaseCount: 2,
+        ownerTractRoyalty: '0.09375',
+        unitRoyaltyDecimal: '0.09375',
+        lesseeNames: ['Operator A', 'Operator B'],
+      })
+    );
+    expect(summary.tracts[0]?.owners[0]?.leaseSlices).toEqual([
+      expect.objectContaining({
+        leaseId: 'lease-1',
+        leasedFraction: '0.25',
+        ownerTractRoyalty: '0.03125',
+      }),
+      expect.objectContaining({
+        leaseId: 'lease-2',
+        leasedFraction: '0.25',
+        ownerTractRoyalty: '0.0625',
+      }),
     ]);
   });
 

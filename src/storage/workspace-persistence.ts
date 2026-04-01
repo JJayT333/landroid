@@ -4,6 +4,11 @@
 import db from './db';
 import { deserializeBlob, serializeBlob, type SerializedBlob } from './blob-serialization';
 import { PAGE_SIZE_DEFINITIONS } from '../engine/flowchart-pages';
+import { Decimal } from '../engine/decimal';
+import {
+  validateOwnershipGraph,
+  type ValidationIssue,
+} from '../engine/math-engine';
 import { createWorkspaceId } from '../utils/workspace-id';
 import {
   normalizeDeskMap,
@@ -58,6 +63,12 @@ export interface LandroidFileData extends WorkspaceData {
   ownerData?: OwnerWorkspaceData;
   mapData?: MapWorkspaceData;
   researchData?: ResearchWorkspaceData;
+}
+
+export interface WorkspaceLoadResult {
+  status: 'missing' | 'loaded' | 'corrupt';
+  data: WorkspaceData | null;
+  error: string | null;
 }
 
 interface SerializedOwnerDoc extends Omit<OwnerDoc, 'blob'> {
@@ -141,7 +152,7 @@ function normalizeDeskMaps(
   });
 }
 
-function normalizeCanvasSaveData(value: unknown): CanvasSaveData | null {
+export function normalizeCanvasSaveData(value: unknown): CanvasSaveData | null {
   if (!isRecord(value)) {
     return null;
   }
@@ -196,6 +207,110 @@ function normalizeCanvasSaveData(value: unknown): CanvasSaveData | null {
   };
 }
 
+function isFiniteDecimalString(value: string): boolean {
+  try {
+    return new Decimal(value).isFinite();
+  } catch {
+    return false;
+  }
+}
+
+function describeValidationIssue(issue: ValidationIssue | undefined): string {
+  if (!issue) {
+    return 'ownership graph failed validation';
+  }
+
+  const nodeLabel = issue.nodeId ? ` at node ${issue.nodeId}` : '';
+  return `${issue.code}${nodeLabel}`;
+}
+
+function assertValidOwnershipGraph(
+  nodes: OwnershipNode[],
+  context: string
+): OwnershipNode[] {
+  nodes.forEach((node) => {
+    if (!isFiniteDecimalString(node.fraction)) {
+      throw new Error(`${context}: invalid fraction for node ${node.id}`);
+    }
+    if (!isFiniteDecimalString(node.initialFraction)) {
+      throw new Error(`${context}: invalid initialFraction for node ${node.id}`);
+    }
+  });
+
+  const validation = validateOwnershipGraph(nodes);
+  if (!validation.valid) {
+    throw new Error(
+      `${context}: invalid ownership graph (${describeValidationIssue(validation.issues[0])})`
+    );
+  }
+
+  return nodes;
+}
+
+function normalizeWorkspaceDataRecord(
+  value: Partial<WorkspaceData>,
+  context: string
+): WorkspaceData {
+  if (!Array.isArray(value.nodes)) {
+    throw new Error(`${context}: missing nodes array`);
+  }
+
+  const rawNodes = value.nodes.filter(
+    (node) => isRecord(node) && typeof node.id === 'string'
+  );
+
+  if (rawNodes.length !== value.nodes.length) {
+    throw new Error(`${context}: nodes array contains invalid entries`);
+  }
+
+  const nodes = assertValidOwnershipGraph(
+    rawNodes.map((node) =>
+      normalizeOwnershipNode(node as Pick<OwnershipNode, 'id'> & Partial<OwnershipNode>)
+    ),
+    context
+  );
+  const nodeIdSet = new Set(nodes.map((node) => node.id));
+  const deskMaps = normalizeDeskMaps(value.deskMaps, nodeIdSet);
+  const validDeskMapIds = new Set(deskMaps.map((deskMap) => deskMap.id));
+  const activeDeskMapId =
+    typeof value.activeDeskMapId === 'string' && validDeskMapIds.has(value.activeDeskMapId)
+      ? value.activeDeskMapId
+      : deskMaps[0]?.id ?? null;
+
+  return {
+    workspaceId: value.workspaceId ?? createWorkspaceId(),
+    projectName: value.projectName ?? 'Untitled Workspace',
+    nodes,
+    deskMaps,
+    leaseholdUnit: normalizeLeaseholdUnit(value.leaseholdUnit),
+    leaseholdAssignments: normalizeLeaseholdAssignments(value.leaseholdAssignments, {
+      validDeskMapIds,
+    }),
+    leaseholdOrris: normalizeLeaseholdOrris(value.leaseholdOrris, { validDeskMapIds }),
+    leaseholdTransferOrderEntries: normalizeLeaseholdTransferOrderEntries(
+      value.leaseholdTransferOrderEntries
+    ),
+    activeDeskMapId,
+    instrumentTypes: readStringArray(value.instrumentTypes),
+  };
+}
+
+export function parsePersistedWorkspaceData(raw: string): WorkspaceData {
+  let parsed: unknown;
+
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new Error('saved workspace is not valid JSON');
+  }
+
+  if (!isRecord(parsed)) {
+    throw new Error('saved workspace payload must be an object');
+  }
+
+  return normalizeWorkspaceDataRecord(parsed as Partial<WorkspaceData>, 'Invalid saved workspace');
+}
+
 // ── Auto-save to IndexedDB ─────────────────────────────
 
 export async function saveWorkspaceToDb(data: WorkspaceData): Promise<void> {
@@ -207,37 +322,29 @@ export async function saveWorkspaceToDb(data: WorkspaceData): Promise<void> {
   });
 }
 
-export async function loadWorkspaceFromDb(): Promise<WorkspaceData | null> {
+export async function loadWorkspaceFromDb(): Promise<WorkspaceLoadResult> {
   const record = await db.workspaces.get(WORKSPACE_ID);
-  if (!record) return null;
-  try {
-    const parsed = JSON.parse(record.data) as Partial<WorkspaceData>;
-    const nodes = Array.isArray(parsed.nodes)
-      ? parsed.nodes.map((node) => normalizeOwnershipNode(node))
-      : [];
-    const nodeIdSet = new Set(nodes.map((node) => node.id));
-    const deskMaps = normalizeDeskMaps(parsed.deskMaps, nodeIdSet);
-    const validDeskMapIds = new Set(deskMaps.map((deskMap) => deskMap.id));
+  if (!record) {
     return {
-      workspaceId: parsed.workspaceId ?? createWorkspaceId(),
-      projectName: parsed.projectName ?? 'Untitled Workspace',
-      nodes,
-      deskMaps,
-      leaseholdUnit: normalizeLeaseholdUnit(parsed.leaseholdUnit),
-      leaseholdAssignments: normalizeLeaseholdAssignments(parsed.leaseholdAssignments, {
-        validDeskMapIds,
-      }),
-      leaseholdOrris: normalizeLeaseholdOrris(parsed.leaseholdOrris, { validDeskMapIds }),
-      leaseholdTransferOrderEntries: normalizeLeaseholdTransferOrderEntries(
-        parsed.leaseholdTransferOrderEntries
-      ),
-      activeDeskMapId: parsed.activeDeskMapId ?? null,
-      instrumentTypes: Array.isArray(parsed.instrumentTypes)
-        ? parsed.instrumentTypes
-        : [],
+      status: 'missing',
+      data: null,
+      error: null,
     };
-  } catch {
-    return null;
+  }
+
+  try {
+    return {
+      status: 'loaded',
+      data: parsePersistedWorkspaceData(record.data),
+      error: null,
+    };
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : 'unknown corruption';
+    return {
+      status: 'corrupt',
+      data: null,
+      error: `Saved workspace could not be restored because ${reason}. LANDroid opened a fresh workspace instead.`,
+    };
   }
 }
 
@@ -355,22 +462,11 @@ export async function importLandroidFile(file: File): Promise<LandroidFileData> 
   if (!parsed.nodes || !Array.isArray(parsed.nodes)) {
     throw new Error('Invalid .landroid file: missing nodes array');
   }
-
-  const rawNodes = parsed.nodes.filter(
-    (node): node is Pick<OwnershipNode, 'id'> & Partial<OwnershipNode> =>
-      isRecord(node) && typeof node.id === 'string'
+  const core = normalizeWorkspaceDataRecord(
+    parsed as Partial<WorkspaceData>,
+    'Invalid .landroid file'
   );
-
-  if (rawNodes.length !== parsed.nodes.length) {
-    throw new Error('Invalid .landroid file: nodes array contains invalid entries');
-  }
-
-  const nodes = rawNodes.map((node) => normalizeOwnershipNode(node));
-  const nodeIdSet = new Set(nodes.map((node) => node.id));
-  const workspaceId =
-    typeof parsed.workspaceId === 'string' && parsed.workspaceId
-      ? parsed.workspaceId
-      : createWorkspaceId();
+  const workspaceId = core.workspaceId;
   const ownerData =
     isRecord(parsed.ownerData)
       ? {
@@ -477,28 +573,8 @@ export async function importLandroidFile(file: File): Promise<LandroidFileData> 
             : [],
         }
       : { imports: [] };
-  const deskMaps = normalizeDeskMaps(parsed.deskMaps, nodeIdSet);
-  const validDeskMapIds = new Set(deskMaps.map((deskMap) => deskMap.id));
-
   return {
-    workspaceId,
-    projectName:
-      typeof parsed.projectName === 'string' && parsed.projectName
-        ? parsed.projectName
-        : 'Imported Workspace',
-    nodes,
-    deskMaps,
-    leaseholdUnit: normalizeLeaseholdUnit(parsed.leaseholdUnit),
-    leaseholdAssignments: normalizeLeaseholdAssignments(parsed.leaseholdAssignments, {
-      validDeskMapIds,
-    }),
-    leaseholdOrris: normalizeLeaseholdOrris(parsed.leaseholdOrris, { validDeskMapIds }),
-    leaseholdTransferOrderEntries: normalizeLeaseholdTransferOrderEntries(
-      parsed.leaseholdTransferOrderEntries
-    ),
-    activeDeskMapId:
-      typeof parsed.activeDeskMapId === 'string' ? parsed.activeDeskMapId : null,
-    instrumentTypes: readStringArray(parsed.instrumentTypes),
+    ...core,
     canvas: normalizeCanvasSaveData(parsed.canvas),
     ownerData,
     mapData,

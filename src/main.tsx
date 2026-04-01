@@ -1,6 +1,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
+import RootErrorBoundary from './components/shared/RootErrorBoundary';
 import './theme/index.css';
 import { useMapStore } from './store/map-store';
 import { useOwnerStore } from './store/owner-store';
@@ -18,38 +19,51 @@ import {
   workspaceAutosaveStateChanged,
 } from './storage/autosave-change-detection';
 
-// ── Auto-load saved workspace on startup ─────────────────
-async function bootstrapWorkspace() {
-  const data = await loadWorkspaceFromDb();
-  if (data) {
-    useWorkspaceStore.getState().loadWorkspace(data);
+// ── Auto-load saved workspace and canvas on startup ─────
+async function bootstrapApp() {
+  const [workspaceResult, canvasResult] = await Promise.all([
+    loadWorkspaceFromDb(),
+    loadCanvasFromDb(),
+  ]);
+  const startupWarnings: string[] = [];
+
+  if (workspaceResult.status === 'loaded' && workspaceResult.data) {
+    useWorkspaceStore.getState().loadWorkspace(workspaceResult.data);
     await Promise.all([
-      useOwnerStore.getState().setWorkspace(data.workspaceId),
-      useMapStore.getState().setWorkspace(data.workspaceId),
-      useResearchStore.getState().setWorkspace(data.workspaceId),
+      useOwnerStore.getState().setWorkspace(workspaceResult.data.workspaceId),
+      useMapStore.getState().setWorkspace(workspaceResult.data.workspaceId),
+      useResearchStore.getState().setWorkspace(workspaceResult.data.workspaceId),
     ]);
-    return;
+  } else {
+    useWorkspaceStore.getState().setHydrated();
+    const workspaceId = useWorkspaceStore.getState().workspaceId;
+    await Promise.all([
+      useOwnerStore.getState().setWorkspace(workspaceId),
+      useMapStore.getState().setWorkspace(workspaceId),
+      useResearchStore.getState().setWorkspace(workspaceId),
+    ]);
   }
 
-  useWorkspaceStore.getState().setHydrated();
-  const workspaceId = useWorkspaceStore.getState().workspaceId;
-  await Promise.all([
-    useOwnerStore.getState().setWorkspace(workspaceId),
-    useMapStore.getState().setWorkspace(workspaceId),
-    useResearchStore.getState().setWorkspace(workspaceId),
-  ]);
-}
+  if (workspaceResult.status === 'corrupt' && workspaceResult.error) {
+    startupWarnings.push(workspaceResult.error);
+  }
 
-void bootstrapWorkspace();
-
-// ── Auto-load saved canvas on startup ────────────────────
-loadCanvasFromDb().then((data) => {
-  if (data) {
-    useCanvasStore.getState().loadCanvas(data);
+  if (canvasResult.status === 'loaded' && canvasResult.data) {
+    useCanvasStore.getState().loadCanvas(canvasResult.data);
   } else {
     useCanvasStore.getState().setHydrated();
   }
-});
+
+  if (canvasResult.status === 'corrupt' && canvasResult.error) {
+    startupWarnings.push(canvasResult.error);
+  }
+
+  useWorkspaceStore.getState().setStartupWarning(
+    startupWarnings.length > 0 ? startupWarnings.join(' ') : null
+  );
+}
+
+void bootstrapApp();
 
 // ── Auto-save workspace on changes (debounced 2s) ────────
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
@@ -91,6 +105,8 @@ useCanvasStore.subscribe((state) => {
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    <RootErrorBoundary>
+      <App />
+    </RootErrorBoundary>
   </StrictMode>
 );

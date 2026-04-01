@@ -37,10 +37,12 @@ The top bar also has:
 - `Save` to export a `.landroid` workspace snapshot
 - `Load` to import a `.landroid` or `.csv` file
 - `Stress (100/150/500)` to load sample tract data for testing
-- `Leasehold (5 Tracts)` to load a five-tract unit demo with acreage and lease data
+- `Leasehold (8 Tracts)` to load an eight-tract unit demo with acreage and lease data
 
 The current project name appears in the top bar. Local autosave still uses browser storage, but `Save` now captures workspace data, flowchart canvas state, owner records, owner documents, map assets, and research imports in the exported `.landroid` file.
 The top-left brand area can also carry a custom logo for demo or prospect-specific presentation.
+If LANDroid detects corrupt autosaved workspace or canvas data during startup, it now opens a safe fresh state and shows a warning banner instead of silently pretending there was no saved data.
+If a render or lazy-load failure occurs, LANDroid now shows a reload screen with the error details instead of dropping to a blank page.
 
 ## 3) Desk Map view
 
@@ -107,11 +109,12 @@ It now has two internal modes:
 - Lets you set unit name, operator / lessee, effective date, and a short unit description
 - Lets you set `gross acres`, `pooled acres`, and a short tract description for each Desk Map
 - Derives tract participation from pooled acres
-- Derives each present owner's net tract acres from the current mineral fraction on Desk Map
+- Derives each present owner's net mineral acres from gross tract acres and also shows the pooled-acre participation equivalent
 - Pulls active lease data from `Owners` so the tract summary and owner rows stay tied to the same lease record
+- Aggregates multiple active leases per owner instead of collapsing to one primary lease for the math
 - Calculates weighted tract royalty and total unit royalty from the active lease rates now on file
 - Tracks leasehold-side ORRIs at either unit or tract scope, with an explicit burden-basis field
-- Calculates ORRI and pre-WI NRI totals only for gross `8/8` ORRIs in this first pass
+- Calculates ORRI and pre-assignment NRI totals for gross `8/8`, working-interest, and net-revenue-interest ORRI burdens
 - Tracks leasehold-side WI assignments at either unit or tract scope
 - Includes a `Deck` mode that focuses on one tract at a time and shows the lessee-side cards beneath that leasehold estate, including retained WI and assignment cards
 - Includes a read-only transfer-order review surface in `Deck` that rolls up lease royalty, ORRI, retained WI, and assigned WI for the current focus
@@ -125,7 +128,8 @@ It now has two internal modes:
 - `Owners` remains the lease-record source of truth
 - Pooled acres drive participation and payout decimals
 - The starter demo begins with pooled acres equal to gross acres on every tract for easier audit checks
-- Only gross `8/8` ORRIs are included in the current math; NRI- and WI-based ORRIs are tracked but excluded for now
+- Leasehold math now aggregates all active owner leases in effective-date order and caps the leased total at the owner's current fraction
+- ORRI math now supports gross `8/8`, working-interest, and net-revenue-interest burden bases
 - The first WI slice tracks retained and assigned WI and now shows the resulting transfer-order review decimals; the first saved payout-entry layer is unit-focus metadata only, not an editable decimal engine
 - WI over-assignment is currently warning-only instead of hard-blocked; retained WI is clamped at zero until the split is corrected
 - Assignments remain outside Desk Map and outside this first Leasehold tab pass
@@ -133,9 +137,10 @@ It now has two internal modes:
 - The `Deck` mode is the intended visual home for WI, assignments, transfer-order review, and later deeper payout workflows
 
 ### Leasehold demo workspace
-- `Leasehold (5 Tracts)` loads a dedicated five-tract unit demo
-- The tract gross acres are `100`, `200`, `300`, `400`, and `500`
-- The tract pooled acres match those same `100`, `200`, `300`, `400`, and `500` values
+- `Leasehold (8 Tracts)` loads a dedicated eight-tract unit demo
+- The tract gross acres are `80`, `160`, `240`, `320`, `400`, `480`, `560`, and `640`
+- The tract pooled acres match those same `80`, `160`, `240`, `320`, `400`, `480`, `560`, and `640` values
+- The present-owner splits stay on clean half / quarter / eighth fractions for easier testing
 - Every present owner in that demo is leased to the same lessee at `1/8` royalty so the first royalty totals are easier to inspect
 - The demo also starts with one unit-wide gross `1/16` ORRI so the burden summary has a clean check number
 - The demo also starts with a unit-wide `1/2` WI assignment and a tract-specific `1/4` WI assignment on `Tract 4` so the deck has clean starter splits
@@ -335,6 +340,7 @@ CSV import loads workspace data, resets the flowchart canvas, and starts a fresh
 
 ### Local browser storage
 The app also uses browser storage for local autosave. This is convenient, but it is not a substitute for named backups.
+Autosaved workspace loads now validate the ownership graph before hydration. If the saved workspace or flowchart canvas is corrupt, LANDroid shows a startup warning and falls back to a safe fresh state instead of quietly loading invalid data.
 
 ### Recommended backup habit
 - Save a `.landroid` file before major edits

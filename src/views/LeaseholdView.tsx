@@ -153,6 +153,21 @@ function LeaseholdTractCard({
     }
   };
 
+  const orriBurdenDetails = [
+    {
+      label: 'Gross 8/8 ORRI burden',
+      value: tract.grossOrriBurdenRate,
+    },
+    {
+      label: 'WI-basis ORRI burden',
+      value: tract.workingInterestOrriBurdenRate,
+    },
+    {
+      label: 'NRI-basis ORRI burden',
+      value: tract.netRevenueInterestOrriBurdenRate,
+    },
+  ].filter((item) => d(item.value).greaterThan(0));
+
   return (
     <section className="rounded-3xl border border-ledger-line bg-parchment/95 p-5 shadow-md">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -165,7 +180,7 @@ function LeaseholdTractCard({
           </div>
           <p className="mt-1 text-sm text-ink-light">
             Participation {formatPercent(tract.unitParticipation)} from{' '}
-            {formatAcres(tract.pooledAcres)} pooled acres. Weighted royalty{' '}
+            {formatAcres(tract.pooledAcres)} pooled acres. Tract royalty total{' '}
             {formatPercent(tract.weightedRoyaltyRate)}. Current mineral coverage{' '}
             {formatPercent(tract.currentOwnership)}.
           </p>
@@ -178,7 +193,7 @@ function LeaseholdTractCard({
             Leased {formatPercent(tract.leasedOwnership)}
           </span>
           <span className="rounded-full bg-gold/10 px-3 py-1.5 font-medium text-gold-900">
-            Unit royalty {formatPercent(tract.unitRoyaltyDecimal)}
+            Unit royalty decimal {formatPercent(tract.unitRoyaltyDecimal)}
           </span>
           <span className="rounded-full bg-seal/10 px-3 py-1.5 font-medium text-seal">
             ORRIs {tract.trackedOrriCount}
@@ -245,10 +260,16 @@ function LeaseholdTractCard({
       <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-xs text-ink-light">
         <span>Gross acres {formatAcres(tract.grossAcres)}</span>
         <span>Pooled acres {formatAcres(tract.pooledAcres)}</span>
-        <span>Unit royalty contribution {formatPercent(tract.unitRoyaltyDecimal)}</span>
-        <span>Gross ORRI rate {formatPercent(tract.grossOrriRate)}</span>
-        <span>Unit ORRI contribution {formatPercent(tract.unitOrriDecimal)}</span>
-        <span>Pre-WI unit NRI {formatPercent(tract.preWorkingInterestDecimal)}</span>
+        <span>Working interest base {formatPercent(tract.workingInterestBaseRate)}</span>
+        <span>Unit royalty decimal {formatPercent(tract.unitRoyaltyDecimal)}</span>
+        {orriBurdenDetails.map((item) => (
+          <span key={item.label}>
+            {item.label} {formatPercent(item.value)}
+          </span>
+        ))}
+        <span>Total ORRI burden {formatPercent(tract.totalOrriBurdenRate)}</span>
+        <span>Unit ORRI decimal {formatPercent(tract.unitOrriDecimal)}</span>
+        <span>Pre-assignment NRI {formatPercent(tract.preWorkingInterestDecimal)}</span>
         <span>Assigned WI {formatPercent(tract.assignedWorkingInterestDecimal)}</span>
         <span>Retained WI {formatPercent(tract.retainedWorkingInterestDecimal)}</span>
         <span>
@@ -268,16 +289,22 @@ function LeaseholdTractCard({
                 Undivided
               </th>
               <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-ink-light">
+                Net Mineral Acres
+              </th>
+              <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-ink-light">
                 Net Pooled Acres
               </th>
               <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-ink-light">
                 Lessee
               </th>
               <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-ink-light">
-                Royalty
+                Lease Royalty
               </th>
               <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-ink-light">
-                Unit Royalty
+                Owner Tract Royalty
+              </th>
+              <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-ink-light">
+                Unit Royalty Decimal
               </th>
             </tr>
           </thead>
@@ -287,7 +314,9 @@ function LeaseholdTractCard({
                 <td className="px-3 py-2">
                   <div className="font-semibold text-ink">{owner.ownerName}</div>
                   <div className="text-xs text-ink-light">
-                    {owner.leaseName || 'Lease record not named'}
+                    {owner.activeLeaseCount > 1
+                      ? `${owner.activeLeaseCount} active leases`
+                      : owner.leaseSlices[0]?.leaseName || 'Lease record not named'}
                   </div>
                 </td>
                 <td className="px-3 py-2 font-mono text-xs text-ink">
@@ -296,11 +325,28 @@ function LeaseholdTractCard({
                 <td className="px-3 py-2 font-mono text-xs text-ink">
                   {formatAcres(owner.netMineralAcres)}
                 </td>
-                <td className="px-3 py-2 text-xs text-ink">
-                  {owner.lessee || 'Open'}
+                <td className="px-3 py-2 font-mono text-xs text-ink">
+                  {formatAcres(owner.netPooledAcres)}
                 </td>
                 <td className="px-3 py-2 text-xs text-ink">
-                  {owner.royaltyRate ? `${owner.royaltyRate} (${formatPercent(owner.royaltyBurden)})` : '—'}
+                  {owner.lesseeNames.length > 0 ? owner.lesseeNames.join(', ') : 'Open'}
+                </td>
+                <td className="px-3 py-2 text-xs text-ink">
+                  {owner.leaseSlices.length > 0 ? (
+                    <div className="space-y-1">
+                      {owner.leaseSlices.map((lease) => (
+                        <div key={lease.leaseId}>
+                          <div>{lease.leaseRoyaltyRate || '—'}</div>
+                          <div className="text-[11px] text-ink-light">
+                            {lease.leaseName || lease.lessee || 'Lease record'}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : '—'}
+                </td>
+                <td className="px-3 py-2 font-mono text-xs text-ink">
+                  {formatPercent(owner.ownerTractRoyalty)}
                 </td>
                 <td className="px-3 py-2 font-mono text-xs text-ink">
                   {formatPercent(owner.unitRoyaltyDecimal)}
@@ -309,7 +355,7 @@ function LeaseholdTractCard({
             ))}
             {tract.owners.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-3 py-4 text-sm text-ink-light">
+                <td colSpan={8} className="px-3 py-4 text-sm text-ink-light">
                   No current mineral owners are present on this tract yet.
                 </td>
               </tr>
@@ -503,13 +549,13 @@ function LeaseholdDeckLesseeCard({
         <div className="text-[10px] leading-5 text-emerald-900/75">{note}</div>
         <div className="flex flex-wrap gap-1.5 pt-1">
           <span className="rounded-full border border-emerald-200 bg-white/80 px-2 py-0.5 text-[9px] text-emerald-900/85">
-            Royalty {formatPercent(royaltyDecimal)}
+            Unit royalty {formatPercent(royaltyDecimal)}
           </span>
           <span className="rounded-full border border-emerald-200 bg-white/80 px-2 py-0.5 text-[9px] text-emerald-900/85">
-            ORRI {formatPercent(orriDecimal)}
+            ORRI decimal {formatPercent(orriDecimal)}
           </span>
           <span className="rounded-full border border-emerald-200 bg-white/80 px-2 py-0.5 text-[9px] text-emerald-900/85">
-            Pre-WI NRI {formatPercent(preWorkingInterestDecimal)}
+            Pre-assignment NRI {formatPercent(preWorkingInterestDecimal)}
           </span>
         </div>
       </div>
@@ -1762,19 +1808,19 @@ function LeaseholdDeck({
             detail={activeTitle}
           />
           <SummaryCard
-            label="Royalty"
+            label="Unit Royalty"
             value={formatPercent(activeRoyaltyDecimal)}
-            detail="Current payout burden from active leases"
+            detail="Current unit royalty decimal from active leases"
           />
           <SummaryCard
-            label="ORRI"
+            label="ORRI Decimal"
             value={formatPercent(activeOrriDecimal)}
             detail={`${activeTrackedOrriCount} ORRI card${activeTrackedOrriCount === 1 ? '' : 's'} in focus`}
           />
           <SummaryCard
-            label="Pre-WI NRI"
+            label="Pre-Assign NRI"
             value={formatPercent(activePreWorkingInterestDecimal)}
-            detail="What remains before WI splits and assignments"
+            detail="Net revenue remaining before WI splits and assignments"
           />
           <SummaryCard
             label="Assigned WI"
@@ -2017,10 +2063,11 @@ export default function LeaseholdView() {
             <div className="flex flex-col items-start gap-3">
               <LeaseholdDeckModeToggle mode={mode} onChange={setMode} />
               <div className="rounded-2xl border border-gold/30 bg-gold/10 px-4 py-3 text-sm text-gold-950">
-                <div className="font-semibold">Current v1 assumption</div>
-                <div className="mt-1">
-                  Royalty and gross-basis ORRI burdens are acreage-weighted by pooled acres, and the
-                  5-tract demo is fully leased at 1/8 for easy audit checks.
+              <div className="font-semibold">Current v1 assumption</div>
+              <div className="mt-1">
+                  Royalty, ORRI burdens, and WI payout decimals are acreage-weighted by pooled acres.
+                  Gross-acre NMA and pooled-acre participation acres are both shown so the tract view
+                  makes the base acreage explicit.
                 </div>
               </div>
             </div>
@@ -2043,9 +2090,9 @@ export default function LeaseholdView() {
               detail={`${summary.configuredPooledAcresCount}/${summary.tractCount} tracts configured`}
             />
             <SummaryCard
-              label="Total Royalty"
+              label="Unit Royalty"
               value={formatPercent(summary.totalRoyaltyDecimal)}
-              detail="Weighted from all active owner lease rates"
+              detail="Total unit royalty decimal from all active owner leases"
             />
             <SummaryCard
               label="Fully Leased"

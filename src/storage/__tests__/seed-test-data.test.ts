@@ -85,7 +85,7 @@ describe('buildStressWorkspaceData', () => {
     }
   });
 
-  it('builds a dedicated 5-tract leasehold demo with acreage and lease coverage', () => {
+  it('builds a dedicated 8-tract leasehold demo with acreage and lease coverage', () => {
     const workspace = buildLeaseholdDemoWorkspaceData();
     const currentOwners = workspace.nodes.filter(
       (node) => node.type !== 'related' && Number(node.fraction) > 0
@@ -97,27 +97,33 @@ describe('buildStressWorkspaceData', () => {
       )
     );
 
-    expect(workspace.projectName).toBe('Leasehold Demo — 5 Tracts');
-    expect(workspace.deskMaps).toHaveLength(5);
+    expect(workspace.projectName).toBe('Leasehold Demo — 8 Tracts');
+    expect(workspace.deskMaps).toHaveLength(8);
     expect(workspace.deskMaps.map((deskMap) => deskMap.grossAcres)).toEqual([
-      '100',
-      '200',
-      '300',
+      '80',
+      '160',
+      '240',
+      '320',
       '400',
-      '500',
+      '480',
+      '560',
+      '640',
     ]);
     expect(workspace.deskMaps.map((deskMap) => deskMap.pooledAcres)).toEqual([
-      '100',
-      '200',
-      '300',
+      '80',
+      '160',
+      '240',
+      '320',
       '400',
-      '500',
+      '480',
+      '560',
+      '640',
     ]);
     expect(workspace.deskMaps.every((deskMap) => deskMap.description.length > 0)).toBe(true);
     expect(workspace.leaseholdUnit).toEqual({
       name: 'Raven Bend Unit',
       description:
-        'Five-tract pooled unit template with clean acreage and full lease coverage for early leasehold framework work.',
+        'Eight-tract pooled unit template with clean acreage, clean fractions, and full lease coverage for leasehold review.',
       operator: 'Permian Basin Operating, LLC',
       effectiveDate: '2024-01-01',
     });

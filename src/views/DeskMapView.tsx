@@ -21,6 +21,7 @@ import {
 } from '../components/deskmap/deskmap-tree';
 import DeskMapTabs from '../components/deskmap/DeskMapTabs';
 import {
+  getActiveLeases,
   calculateDeskMapCoverageSummary,
   pickPrimaryLease,
   toDeskMapPrimaryLeaseSummary,
@@ -373,8 +374,9 @@ export default function DeskMapView() {
     () => new Map(owners.map((owner) => [owner.id, owner])),
     [owners]
   );
-  const primaryLeaseByOwnerId = useMemo(() => {
+  const activeLeasesByOwnerId = useMemo(() => {
     const groupedLeases = new Map<string, typeof leases>();
+
     leases.forEach((lease) => {
       const existing = groupedLeases.get(lease.ownerId) ?? [];
       existing.push(lease);
@@ -383,13 +385,20 @@ export default function DeskMapView() {
 
     return new Map(
       [...groupedLeases.entries()]
+        .map(([ownerId, ownerLeases]) => [ownerId, getActiveLeases(ownerLeases)] as const)
+        .filter((entry) => entry[1].length > 0)
+    );
+  }, [leases]);
+  const primaryLeaseByOwnerId = useMemo(() => {
+    return new Map(
+      [...activeLeasesByOwnerId.entries()]
         .map(([ownerId, ownerLeases]) => [
           ownerId,
           toDeskMapPrimaryLeaseSummary(pickPrimaryLease(ownerLeases)),
         ] as const)
         .filter((entry): entry is [string, DeskMapPrimaryLeaseSummary] => entry[1] !== null)
     );
-  }, [leases]);
+  }, [activeLeasesByOwnerId]);
   const activeDeskMap = useMemo(
     () => deskMaps.find((deskMap) => deskMap.id === activeDeskMapId) ?? null,
     [activeDeskMapId, deskMaps]
@@ -423,8 +432,8 @@ export default function DeskMapView() {
     [primaryLeaseByOwnerId, visibleNodes]
   );
   const coverageSummary = useMemo(
-    () => calculateDeskMapCoverageSummary(visibleNodes, primaryLeaseByOwnerId),
-    [primaryLeaseByOwnerId, visibleNodes]
+    () => calculateDeskMapCoverageSummary(visibleNodes, activeLeasesByOwnerId),
+    [activeLeasesByOwnerId, visibleNodes]
   );
   const trees = useMemo(() => buildDeskMapTree(visibleNodes), [visibleNodes]);
   const editNode = editNodeId ? nodeById.get(editNodeId) ?? null : null;
@@ -549,9 +558,13 @@ export default function DeskMapView() {
       fraction: '1',
     };
     addNode(root);
-    addNodeToActiveDeskMap(id);
+    if (deskMaps.length === 0) {
+      createDeskMap('Tract 1', 'T1', [id]);
+    } else {
+      addNodeToActiveDeskMap(id);
+    }
     setEditNodeId(id);
-  }, [addNode, addNodeToActiveDeskMap]);
+  }, [addNode, addNodeToActiveDeskMap, createDeskMap, deskMaps.length]);
 
   return (
     <div className="w-full h-full relative flex flex-col">
@@ -560,7 +573,7 @@ export default function DeskMapView() {
 
       <div className="flex-1 relative overflow-hidden bg-canvas-bg">
         {/* Toolbar */}
-        <div className="absolute top-3 left-3 z-10 w-[19.5rem] max-w-[calc(100%-1.5rem)] space-y-2.5 rounded-xl bg-parchment/92 backdrop-blur border border-ledger-line shadow-md p-2.5">
+        <div className="absolute top-3 left-3 z-20 w-[19.5rem] max-w-[calc(100%-1.5rem)] space-y-2.5 rounded-xl bg-parchment/92 backdrop-blur border border-ledger-line shadow-md p-2.5">
           <div className="flex items-center gap-2">
             <button
               onClick={handleAddRoot}

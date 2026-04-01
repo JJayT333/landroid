@@ -515,12 +515,26 @@ export function executeAttachConveyance(params: AttachConveyanceParams): Result<
     return err('conflicting_structure', 'Cannot attach to self or descendant');
   }
 
+  const sourceParentId =
+    sourceRoot.parentId && sourceRoot.parentId !== 'unlinked' ? sourceRoot.parentId : null;
+  const sourceParent = sourceParentId
+    ? nodes.find((n) => n.id === sourceParentId) ?? null
+    : null;
+  const refundSourceParent = Boolean(
+    sourceParent
+    && sourceRoot.type !== 'related'
+    && allocatesAgainstParent(sourceParent, sourceRoot)
+  );
+
   const newRootFraction = clamp(d(calcShare));
   if (!newRootFraction.isFinite()) return err('invalid_input', 'calcShare must be a finite number');
-  if (newRootFraction.greaterThan(clamp(destination.fraction).plus('0.000000001'))) {
+  const destinationCapacity = refundSourceParent && sourceParentId === attachParentId
+    ? clamp(destination.fraction.plus(sourceRoot.initialFraction))
+    : clamp(destination.fraction);
+  if (newRootFraction.greaterThan(destinationCapacity.plus('0.000000001'))) {
     return err('invalid_input', 'calcShare exceeds destination remaining fraction', {
       attachParentId,
-      destinationFraction: serialize(destination.fraction),
+      destinationFraction: serialize(destinationCapacity),
       requestedShare: serialize(newRootFraction),
     });
   }
@@ -529,18 +543,28 @@ export function executeAttachConveyance(params: AttachConveyanceParams): Result<
   const scaleFactor = newRootFraction.div(oldRootInitial);
 
   const updatedNodes = nodes.map((n) => {
-    if (n.id === attachParentId) {
-      return { ...n, fraction: clamp(n.fraction.minus(newRootFraction)) };
+    let next = n;
+
+    if (refundSourceParent && sourceParentId && next.id === sourceParentId) {
+      next = {
+        ...next,
+        fraction: clamp(next.fraction.plus(sourceRoot.initialFraction)),
+      };
     }
-    if (n.id === activeNodeId) {
+
+    if (next.id === attachParentId) {
+      next = { ...next, fraction: clamp(next.fraction.minus(newRootFraction)) };
+    }
+
+    if (next.id === activeNodeId) {
       const updated: CalcNode = {
-        ...n,
+        ...next,
         parentId: attachParentId,
         type: 'conveyance',
-        fraction: clamp(n.fraction.mul(scaleFactor)),
+        fraction: clamp(next.fraction.mul(scaleFactor)),
         initialFraction: newRootFraction,
         rest: {
-          ...n.rest,
+          ...next.rest,
           ...(form ?? {}),
           interestClass: getCalcInterestClass(sourceRoot),
           royaltyKind:
@@ -554,14 +578,14 @@ export function executeAttachConveyance(params: AttachConveyanceParams): Result<
       delete updated.rest.parentId;
       return updated;
     }
-    if (descendants.has(n.id)) {
+    if (descendants.has(next.id)) {
       return {
-        ...n,
-        fraction: clamp(n.fraction.mul(scaleFactor)),
-        initialFraction: clamp(n.initialFraction.mul(scaleFactor)),
+        ...next,
+        fraction: clamp(next.fraction.mul(scaleFactor)),
+        initialFraction: clamp(next.initialFraction.mul(scaleFactor)),
       };
     }
-    return n;
+    return next;
   });
 
   const validation = validateCalcGraph(updatedNodes);
@@ -639,14 +663,14 @@ export function executeDeleteBranch(params: DeleteBranchParams): Result<Ownershi
 // Graph validation
 // ---------------------------------------------------------------------------
 
-interface ValidationIssue {
+export interface ValidationIssue {
   code: string;
   nodeId?: string;
   message: string;
   details?: Record<string, unknown>;
 }
 
-interface ValidationResult {
+export interface ValidationResult {
   valid: boolean;
   issues: ValidationIssue[];
 }
@@ -724,11 +748,24 @@ function validateCalcGraph(nodes: CalcNode[]): ValidationResult {
       childInitialTotal = childInitialTotal.plus(clamp(child.initialFraction));
     }
     const allocated = remaining.plus(childInitialTotal);
-    if (allocated.minus(initial).greaterThan(EPSILON)) {
+    const allocationDelta = allocated.minus(initial);
+    if (allocationDelta.greaterThan(EPSILON)) {
       issues.push({
         code: 'over_allocated_branch',
         nodeId: node.id,
         message: `Allocated branch interest exceeds initial grant at ${node.id}`,
+        details: {
+          initial: serialize(initial),
+          remaining: serialize(remaining),
+          childInitialTotal: serialize(childInitialTotal),
+          allocated: serialize(allocated),
+        },
+      });
+    } else if (allocationDelta.lessThan(EPSILON.negated())) {
+      issues.push({
+        code: 'under_allocated_branch',
+        nodeId: node.id,
+        message: `Allocated branch interest is below initial grant at ${node.id}`,
         details: {
           initial: serialize(initial),
           remaining: serialize(remaining),

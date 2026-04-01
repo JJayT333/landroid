@@ -28,6 +28,11 @@ export interface DeskMapCoverageSummary {
   leasedOwnerCount: number;
 }
 
+export interface LeaseCoverageAllocation {
+  lease: Lease;
+  allocatedFraction: string;
+}
+
 const INACTIVE_LEASE_STATUSES = new Set([
   'expired',
   'released',
@@ -46,8 +51,60 @@ export function isLeaseActive(lease: Lease) {
   return !INACTIVE_LEASE_STATUSES.has(normalizedStatus);
 }
 
+function compareLeaseAllocationOrder(left: Lease, right: Lease) {
+  return (
+    `${asLeaseText(left.effectiveDate) || '9999-12-31'}|${left.createdAt}|${left.updatedAt}|${left.id}`
+  ).localeCompare(
+    `${asLeaseText(right.effectiveDate) || '9999-12-31'}|${right.createdAt}|${right.updatedAt}|${right.id}`
+  );
+}
+
+export function getActiveLeases(leases: Lease[]) {
+  return leases.filter(isLeaseActive);
+}
+
+export function allocateLeaseCoverage(
+  leases: Lease[],
+  ownerFractionInput: string
+): LeaseCoverageAllocation[] {
+  const ownerFraction = d(ownerFractionInput);
+  if (!ownerFraction.greaterThan(0)) {
+    return [];
+  }
+
+  const activeLeases = [...getActiveLeases(leases)].sort(compareLeaseAllocationOrder);
+  const allocations: LeaseCoverageAllocation[] = [];
+  let remainingFraction = ownerFraction;
+
+  for (const lease of activeLeases) {
+    if (!remainingFraction.greaterThan(0)) {
+      break;
+    }
+
+    const leasedInterestText = asLeaseText(lease.leasedInterest).trim();
+    const requestedFraction = leasedInterestText.length > 0
+      ? parseInterestString(leasedInterestText)
+      : ownerFraction;
+    const allocatedFraction = requestedFraction.greaterThan(remainingFraction)
+      ? remainingFraction
+      : requestedFraction;
+
+    if (!allocatedFraction.greaterThan(0)) {
+      continue;
+    }
+
+    allocations.push({
+      lease,
+      allocatedFraction: allocatedFraction.toString(),
+    });
+    remainingFraction = remainingFraction.minus(allocatedFraction);
+  }
+
+  return allocations;
+}
+
 export function pickPrimaryLease(leases: Lease[]): Lease | null {
-  const activeLeases = leases.filter(isLeaseActive);
+  const activeLeases = getActiveLeases(leases);
   if (activeLeases.length === 0) return null;
 
   return [...activeLeases].sort((left, right) =>
@@ -77,7 +134,7 @@ export function toDeskMapPrimaryLeaseSummary(
 
 export function calculateDeskMapCoverageSummary(
   nodes: OwnershipNode[],
-  primaryLeaseByOwnerId: Map<string, DeskMapPrimaryLeaseSummary>
+  activeLeasesByOwnerId: Map<string, Lease[]>
 ): DeskMapCoverageSummary {
   let currentOwnership = d(0);
   let linkedOwnership = d(0);
@@ -98,15 +155,16 @@ export function calculateDeskMapCoverageSummary(
       linkedOwnerCount += 1;
       linkedOwnership = linkedOwnership.plus(remaining);
 
-      const primaryLease = primaryLeaseByOwnerId.get(node.linkedOwnerId);
-      if (primaryLease) {
+      const ownerLeases = activeLeasesByOwnerId.get(node.linkedOwnerId) ?? [];
+      const allocations = allocateLeaseCoverage(ownerLeases, remaining.toString());
+
+      if (allocations.length > 0) {
         leasedOwnerCount += 1;
-        const leasedInterestText = asLeaseText(primaryLease.leasedInterest);
-        const leasedInterest = leasedInterestText.trim().length > 0
-          ? parseInterestString(leasedInterestText)
-          : remaining;
         leasedOwnership = leasedOwnership.plus(
-          leasedInterest.greaterThan(remaining) ? remaining : leasedInterest
+          allocations.reduce(
+            (sum, allocation) => sum.plus(d(allocation.allocatedFraction)),
+            d(0)
+          )
         );
       }
     }

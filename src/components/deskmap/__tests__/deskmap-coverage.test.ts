@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { createBlankNode } from '../../../types/node';
 import type { Lease } from '../../../types/owner';
-import type { DeskMapPrimaryLeaseSummary } from '../deskmap-coverage';
 import {
+  allocateLeaseCoverage,
   calculateDeskMapCoverageSummary,
   pickPrimaryLease,
   toDeskMapPrimaryLeaseSummary,
@@ -10,11 +10,13 @@ import {
 
 describe('deskmap-coverage', () => {
   it('calculates current, linked, and leased coverage separately', () => {
-    const linkedLeases = new Map<string, DeskMapPrimaryLeaseSummary>([
+    const linkedLeases = new Map<string, Lease[]>([
       [
         'owner-1',
-        {
+        [{
           id: 'lease-1',
+          workspaceId: 'ws-1',
+          ownerId: 'owner-1',
           leaseName: 'Main Lease',
           lessee: 'Acme Energy',
           royaltyRate: '1/4',
@@ -24,7 +26,9 @@ describe('deskmap-coverage', () => {
           status: 'Active',
           docNo: '1001',
           notes: '',
-        },
+          createdAt: '2026-03-30T00:00:00.000Z',
+          updatedAt: '2026-03-30T00:00:00.000Z',
+        }],
       ],
     ]);
 
@@ -66,6 +70,57 @@ describe('deskmap-coverage', () => {
       linkedOwnerCount: 2,
       leasedOwnerCount: 1,
     });
+  });
+
+  it('allocates multiple active leases in effective-date order and caps them at the owner share', () => {
+    const allocations = allocateLeaseCoverage(
+      [
+        {
+          id: 'lease-1',
+          workspaceId: 'ws-1',
+          ownerId: 'owner-1',
+          leaseName: 'First Lease',
+          lessee: 'Acme Energy',
+          royaltyRate: '1/8',
+          leasedInterest: '0.25',
+          effectiveDate: '2026-03-01',
+          expirationDate: '',
+          status: 'Active',
+          docNo: '1001',
+          notes: '',
+          createdAt: '2026-03-01T00:00:00.000Z',
+          updatedAt: '2026-03-01T00:00:00.000Z',
+        },
+        {
+          id: 'lease-2',
+          workspaceId: 'ws-1',
+          ownerId: 'owner-1',
+          leaseName: 'Second Lease',
+          lessee: 'Bravo Energy',
+          royaltyRate: '1/5',
+          leasedInterest: '0.5',
+          effectiveDate: '2026-04-01',
+          expirationDate: '',
+          status: 'Active',
+          docNo: '1002',
+          notes: '',
+          createdAt: '2026-04-01T00:00:00.000Z',
+          updatedAt: '2026-04-01T00:00:00.000Z',
+        },
+      ],
+      '0.5'
+    );
+
+    expect(allocations).toEqual([
+      expect.objectContaining({
+        lease: expect.objectContaining({ id: 'lease-1' }),
+        allocatedFraction: '0.25',
+      }),
+      expect.objectContaining({
+        lease: expect.objectContaining({ id: 'lease-2' }),
+        allocatedFraction: '0.25',
+      }),
+    ]);
   });
 
   it('prefers the most recently updated active lease', () => {
@@ -151,11 +206,13 @@ describe('deskmap-coverage', () => {
   });
 
   it('uses leased-interest terms instead of assuming the whole owner share is leased', () => {
-    const linkedLeases = new Map<string, DeskMapPrimaryLeaseSummary>([
+    const linkedLeases = new Map<string, Lease[]>([
       [
         'owner-1',
-        {
+        [{
           id: 'lease-1',
+          workspaceId: 'ws-1',
+          ownerId: 'owner-1',
           leaseName: 'Main Lease',
           lessee: 'Acme Energy',
           royaltyRate: '1/4',
@@ -165,7 +222,9 @@ describe('deskmap-coverage', () => {
           status: 'Active',
           docNo: '1001',
           notes: '',
-        },
+          createdAt: '2026-03-30T00:00:00.000Z',
+          updatedAt: '2026-03-30T00:00:00.000Z',
+        }],
       ],
     ]);
 
@@ -181,6 +240,62 @@ describe('deskmap-coverage', () => {
 
     expect(summary.leasedOwnership).toBe('0.125');
     expect(summary.unleasedOwnership).toBe('0.875');
+  });
+
+  it('aggregates multiple active leases for the same owner when calculating leased coverage', () => {
+    const linkedLeases = new Map<string, Lease[]>([
+      [
+        'owner-1',
+        [
+          {
+            id: 'lease-1',
+            workspaceId: 'ws-1',
+            ownerId: 'owner-1',
+            leaseName: 'First Lease',
+            lessee: 'Acme Energy',
+            royaltyRate: '1/8',
+            leasedInterest: '0.25',
+            effectiveDate: '2026-03-01',
+            expirationDate: '',
+            status: 'Active',
+            docNo: '1001',
+            notes: '',
+            createdAt: '2026-03-01T00:00:00.000Z',
+            updatedAt: '2026-03-01T00:00:00.000Z',
+          },
+          {
+            id: 'lease-2',
+            workspaceId: 'ws-1',
+            ownerId: 'owner-1',
+            leaseName: 'Second Lease',
+            lessee: 'Bravo Energy',
+            royaltyRate: '1/4',
+            leasedInterest: '0.25',
+            effectiveDate: '2026-04-01',
+            expirationDate: '',
+            status: 'Active',
+            docNo: '1002',
+            notes: '',
+            createdAt: '2026-04-01T00:00:00.000Z',
+            updatedAt: '2026-04-01T00:00:00.000Z',
+          },
+        ],
+      ],
+    ]);
+
+    const ownerOne = {
+      ...createBlankNode('node-1'),
+      grantee: 'Owner One',
+      fraction: '0.5',
+      initialFraction: '0.5',
+      linkedOwnerId: 'owner-1',
+    };
+
+    const summary = calculateDeskMapCoverageSummary([ownerOne], linkedLeases);
+
+    expect(summary.leasedOwnership).toBe('0.5');
+    expect(summary.unleasedOwnership).toBe('0.5');
+    expect(summary.leasedOwnerCount).toBe(1);
   });
 
   it('ignores NPRI branches when calculating mineral coverage totals', () => {

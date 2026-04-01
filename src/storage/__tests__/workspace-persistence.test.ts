@@ -11,8 +11,10 @@ import { createBlankResearchImport } from '../../types/research';
 import {
   exportLandroidFile,
   importLandroidFile,
+  parsePersistedWorkspaceData,
   type LandroidFileData,
 } from '../workspace-persistence';
+import { parsePersistedCanvasData } from '../canvas-persistence';
 
 function buildCanvas(): CanvasSaveData {
   return {
@@ -455,6 +457,66 @@ describe('workspace-persistence', () => {
 
     await expect(importLandroidFile(file)).rejects.toThrow(
       'Invalid .landroid file: not valid JSON'
+    );
+  });
+
+  it('rejects invalid ownership graphs on import', async () => {
+    const invalidPayload = {
+      version: 5,
+      workspaceId: 'ws-invalid',
+      projectName: 'Invalid Graph',
+      nodes: [
+        {
+          ...createBlankNode('a', 'b'),
+          fraction: '-0.250000000',
+          initialFraction: '-0.250000000',
+        },
+        {
+          ...createBlankNode('b', 'a'),
+          fraction: '0.250000000',
+          initialFraction: '0.250000000',
+        },
+      ],
+      deskMaps: [],
+      activeDeskMapId: null,
+      instrumentTypes: [],
+    };
+    const file = new File([JSON.stringify(invalidPayload)], 'invalid-graph.landroid', {
+      type: 'application/json',
+    });
+
+    await expect(importLandroidFile(file)).rejects.toThrow(
+      'Invalid .landroid file: invalid ownership graph'
+    );
+  });
+
+  it('rejects missing-parent ownership graphs in persisted workspace data', () => {
+    const invalidWorkspace = JSON.stringify({
+      workspaceId: 'ws-invalid',
+      projectName: 'Persisted Invalid',
+      nodes: [
+        {
+          ...createBlankNode('orphan', 'missing-parent'),
+          fraction: '0.250000000',
+          initialFraction: '0.250000000',
+        },
+      ],
+      deskMaps: [],
+      activeDeskMapId: null,
+      instrumentTypes: [],
+    });
+
+    expect(() => parsePersistedWorkspaceData(invalidWorkspace)).toThrow(
+      'Invalid saved workspace: invalid ownership graph'
+    );
+  });
+
+  it('rejects corrupt persisted canvas data', () => {
+    expect(() => parsePersistedCanvasData('{"nodes":')).toThrow(
+      'saved flowchart canvas is not valid JSON'
+    );
+    expect(() => parsePersistedCanvasData('[]')).toThrow(
+      'saved flowchart canvas payload must be an object'
     );
   });
 });

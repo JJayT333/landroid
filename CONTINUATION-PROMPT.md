@@ -34,6 +34,28 @@ User preferences and working style:
 - The user is actively testing prospect branding, including a top-left logo and a small full-color prospect mark in the top nav next to `Desk Map`
 
 Recent completed work:
+- Raised the Desk Map toolbar overlay above the pan/zoom canvas so `+ Add Root` is clickable again instead of being swallowed by the drag surface cursor layer
+- Eliminated the recurring large `FlowchartView` chunk warning by splitting React Flow into its own lazy vendor chunk and switching ELK layout loading to the small API entry plus worker asset instead of bundling the giant ELK runtime into the view chunk
+- `FlowchartView` now builds as a small lazy chunk, with ELK loaded separately through `src/engine/tree-layout.ts` and `vite.config.ts`
+- Excluded Markdown docs from Tailwind v4 source scanning through `src/theme/index.css`, which removed the recurring CSS warning caused by bracketed audit-doc text like `[file:line]`
+- Repaired Desk Map `Add Root` so it now recovers from stale or missing active-tract state instead of silently adding an invisible root node
+- Reworked leasehold math so multiple active leases per owner now aggregate correctly in Desk Map coverage, Leasehold tract rows, and transfer-order royalty rows instead of collapsing to one primary lease
+- Expanded leasehold ORRI support to include gross `8/8`, working-interest, and net-revenue-interest burden bases in the actual tract/unit math
+- Split owner acreage output into gross-acre `Net Mineral Acres` and pooled-acre `Net Pooled Acres`, and renamed the tract royalty labels to better distinguish lease royalty, owner tract royalty, and unit royalty decimal
+- Added a root application error boundary so render or lazy-load failures now land on a recovery screen instead of a blank app shell
+- Expanded the dedicated `Leasehold (8 Tracts)` demo to eight clean-fraction tracts with fully leased present owners, replacing the older mixed-percentage demo fixture
+- Fixed `executeAttachConveyance` so moving a branch now refunds the old parent before debiting the new parent, preserving same-class branch totals during reattachment
+- Hardened `validateOwnershipGraph` so it now flags under-allocation as well as over-allocation, closing the validator blind spot that let leaked branch value pass as valid
+- Hardened persistence and startup recovery:
+  - `.landroid` import now rejects invalid ownership graphs instead of just malformed top-level payloads
+  - saved workspace loads now validate ownership graphs before hydration
+  - saved workspace/canvas load now return `missing` vs `loaded` vs `corrupt`
+  - startup shows a visible warning banner when corrupt autosave data is ignored in favor of a safe fresh state
+- Strengthened ownership-node normalization for persisted/imported payloads so numeric/text/enum fields are normalized more predictably before validation
+- Added regression coverage for attach refund behavior, under-allocation detection, invalid ownership-graph import rejection, and corrupt persisted-canvas parsing
+- Added a canonical ownership math reference at `/Users/abstractmapping/projects/landroid/docs/architecture/ownership-math-reference.md` that separates source-grounded rules, repo math, and known gaps for future tooling/AI use
+- Added a merged audit remediation plan at `/Users/abstractmapping/projects/landroid/docs/architecture/audit-remediation-plan.md` that ranks accepted fixes by severity and calls out which findings from `AUDIT_REPORT.md` should not be adopted as-is
+- Reviewed trusted external sources for the math reference, including Texas statutes, Texas Supreme Court oil-and-gas cases, the Texas Railroad Commission, EIA glossary definitions, Montana State Extension royalty-decimal examples, and the Oklahoma State / Texas AgriLife / National Agricultural Law Center handbook
 - Verified the active app is now rooted directly in `/Users/abstractmapping/projects/landroid`
 - Added launcher scripts at `/Users/abstractmapping/projects/landroid/LANDroid.command` and `/Users/abstractmapping/projects/landroid/LANDroid.bat`
 - Improved flowchart proportional scaling so cards resize as real geometry instead of CSS `zoom`
@@ -103,12 +125,12 @@ Recent completed work:
 - Tightened math/store normalization so new NPRI nodes, rebalances, deletes, and subsequent conveyances stay compatible with the existing branch invariants
 - Added a first `Leasehold` workspace surface that derives pooled participation, owner net acres, and total royalty from the current Desk Maps plus active lease records
 - Added tract-level `gross acres`, `pooled acres`, and `description` fields to Desk Maps, plus persisted unit metadata, with normalization across autosave, `.landroid`, and CSV import paths
-- Added a dedicated `Leasehold (5 Tracts)` demo seed with five tracts at `100`, `200`, `300`, `400`, and `500` acres, assorted conveyances, shared unit metadata, and 100% lease coverage for every present owner at `1/8`
+- Added a dedicated `Leasehold (8 Tracts)` demo seed with eight tracts at `80`, `160`, `240`, `320`, `400`, `480`, `560`, and `640` acres, assorted conveyances, shared unit metadata, and 100% lease coverage for every present owner at `1/8`
 - Added pure leasehold summary math coverage so the new Leasehold tab can stay derived from Desk Map title plus `Owners` lease data instead of introducing duplicate persisted calculations
 - Added leasehold-side ORRI records with explicit burden-basis capture, gross `8/8` ORRI burden math, and pre-WI NRI summary totals
 - Added an internal `Overview | Deck` split inside `Leasehold`, so the same tab can now host a card-based leasehold board without pushing WI / assignments back into Desk Map or adding another top-level tab
 - Built the first `Leasehold` `Deck` UI locally on top of that split: tract/unit focus pills, a lessee anchor card, ORRI cards using the Desk-Map-style visual language, and placeholder lanes for later WI / decimal work
-- Added the first real leasehold-side WI assignment layer: persisted assignment records, retained-vs-assigned WI summary math, over-assignment protection, editable assignment cards in the `Deck`, and starter demo assignments in the five-tract workspace
+- Added the first real leasehold-side WI assignment layer: persisted assignment records, retained-vs-assigned WI summary math, over-assignment protection, editable assignment cards in the `Deck`, and starter demo assignments in the leasehold demo workspace
 - Replaced the `Decimals / Transfer Orders` placeholder with a derived decimal ledger in `Leasehold` `Deck`, showing lease royalty, ORRI, retained WI, and assigned WI rows for the current unit or tract focus
 - Turned that read-only decimal ledger into a first transfer-order review surface, including focus coverage checks, variance rollups, source-readiness badges, and royalty-row lease effective date / doc number detail when available
 - Decided WI over-assignment stays warning-only for the current v1 deck flow, and made the transfer-order review surface call that out explicitly while retaining the clamped-zero retained-WI math
@@ -218,7 +240,7 @@ Current status:
 - `Leasehold` now exists as the first acreage-aware unit template, with editable pooled acres, unit metadata, leasehold-side ORRI tracking, pre-WI NRI math, and an internal `Deck` mode for card-based leasehold review; WI / division-order / payout layers still come later
 - The current `Leasehold` `Deck` mode now has real retained-WI cards, assignment cards, and a first read-only transfer-order review surface; editable transfer-order / payout rows still come later
 - Desk Map tract records now carry `gross acres`, `pooled acres`, and `description`, and those fields are edited from the Leasehold tab rather than from the Desk Map title-chain surface
-- The dedicated five-tract leasehold demo is now the cleanest starting point for the next phase of lessee-side calculations
+- The dedicated eight-tract leasehold demo is now the cleanest starting point for the next phase of lessee-side calculations
 - Seed and stress data now keep lease overlays separate from present ownership, while still seeding linked owners and some active leased interest for testing
 - Desk Map now also supports separate NPRI branches from mineral-owner edit modals, with explicit fixed-vs-floating capture and separate amber NPRI cards
 - NPRI branches do not reduce the mineral coverage totals; Desk Map is now explicitly treating those coverage cards as mineral-only
@@ -231,7 +253,8 @@ Current status:
 - The user prefers not to add more Desk Map clutter or another top-level app tab; the intended path is to keep `Leasehold` as the single leasehold surface and grow the internal `Deck` there instead
 - `Maps` reference links now normalize to `http(s)` URLs only, blocking unsupported schemes before they become clickable
 - `.landroid` imports now reject malformed JSON/root payloads clearly and normalize optional desk-map/map-reference/canvas content on the way in
-- The eager main bundle is now materially smaller again; after the canvas-helper extraction plus lazy `Runsheet` / `Owners`, startup is down to roughly `415 kB`, and the remaining large warning is concentrated in the lazy `FlowchartView` chunk instead of the startup path
+- The eager main bundle is now materially smaller again; the lazy `FlowchartView` warning is gone, the Tailwind Markdown-scan warning is gone, and `npm run build` is currently clean
+- Leasehold math now aggregates multiple active leases per owner, supports all declared ORRI burden bases, shows both gross-acre and pooled-acre owner acreage, and includes a root error boundary around the app shell
 - Neither `Maps` nor `Research` is direct ArcGIS Pro functionality or a live GIS renderer
 - The user wants the selected map to dominate the page, with supporting controls staying secondary
 - `Owners` is back to the sidebar-plus-detail layout, and `Maps` is back to a map-dominant split layout
@@ -241,6 +264,11 @@ Current status:
 - The user has now installed the recommended Mac-side toolchain for PDF/GIS/OCR/data work, including Poppler, GDAL/OGR, ExifTool, ImageMagick, Tesseract, Ghostscript, `uv`, `duckdb`, QGIS, DB Browser for SQLite, LibreOffice, and Inkscape
 - Latest validation on this handoff branch passed with:
   - `npm test`
+  - `npm run lint`
+  - `npm run build`
+- Focused validation for the latest Desk Map/demo-fixture repair also passed with:
+  - `npx vitest run src/store/__tests__/workspace-store.test.ts src/storage/__tests__/seed-test-data.test.ts`
+- Focused validation for the latest Desk Map toolbar click-through fix also passed with:
   - `npm run lint`
   - `npm run build`
 
@@ -253,8 +281,13 @@ Open risks / reminders:
 - `dist/` and `dist-node/` contain generated validation output and should stay out of checkpoints unless explicitly requested
 
 Likely next steps:
+- Harden the next correctness tier from `/Users/abstractmapping/projects/landroid/docs/architecture/audit-remediation-plan.md`:
+  - CSV precision preservation
+- Revisit the deferred import-path decision:
+  - whether CSV / `.landroid` import should reject, quarantine, or interactively repair malformed ownership or leasehold payloads
+- Decide how much lease-overlap warning UX is needed when multiple active leases together request more than an owner's current fraction
 - Do a quick manual browser pass on Desk Map with two or more starting families so the new helper copy and provisional-coverage tone feel clear in practice
-- Do a manual browser pass on `Leasehold (5 Tracts)` now that unit-focus payout-entry rows are editable
+- Do a manual browser pass on `Leasehold (8 Tracts)` now that unit-focus payout-entry rows are editable
 - Decide which additional transfer-order fields should come next after `owner number`, `status`, and `notes`
 - Add the next payout-entry field slice only if it stays metadata-first and does not duplicate the derived decimal math
 - Revisit hard-block validation only if the later payout-entry flow introduces a better draft/save checkpoint for assignment edits
@@ -315,7 +348,7 @@ Likely next steps to choose from:
 2. Do a manual browser pass on the 500-card stress tract to confirm the new NPRI cards and lease-node interaction path feel acceptable in practice
 3. Decide how much NPRI summary, if any, should be surfaced on Desk Map beyond the separate branch cards
 4. Keep assignments entirely out of Desk Map and plan the later lessee-side assignment / ORRI / division-order / royalty workflow
-5. Decide whether the lazy `FlowchartView` chunk still feels heavy enough to justify a deeper flowchart-only split
+5. Decide whether to add a root error boundary and any richer recovery UX now that corrupt autosaves are surfaced cleanly
 6. Extend the future lessee-side calculations only after the Desk Map mineral-vs-royalty boundary still feels right in practice
 
 Good starting commands:

@@ -65,6 +65,65 @@ export interface DeskMap {
   nodeIds: string[];
 }
 
+function normalizeText(value: unknown): string {
+  if (typeof value === 'string') {
+    return value.trim();
+  }
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value.toString();
+  }
+  return '';
+}
+
+function normalizeDecimalInput(value: unknown, fallback: string): string {
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value.toString() : fallback;
+  }
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : fallback;
+  }
+
+  return fallback;
+}
+
+function normalizeNodeType(value: unknown): NodeType {
+  return value === 'related' ? 'related' : 'conveyance';
+}
+
+function normalizeConveyanceMode(value: unknown): ConveyanceMode {
+  if (value === 'fixed' || value === 'all') {
+    return value;
+  }
+  return 'fraction';
+}
+
+function normalizeSplitBasis(value: unknown): SplitBasis {
+  if (value === 'remaining' || value === 'whole') {
+    return value;
+  }
+  return 'initial';
+}
+
+function normalizeRelatedKind(value: unknown): RelatedNodeKind | null {
+  if (value === 'document' || value === 'lease') {
+    return value;
+  }
+  return null;
+}
+
+function normalizeInterestClass(value: unknown): InterestClass {
+  return value === 'npri' ? 'npri' : 'mineral';
+}
+
+function normalizeRoyaltyKind(value: unknown): RoyaltyKind {
+  if (value === 'fixed' || value === 'floating') {
+    return value;
+  }
+  return null;
+}
+
 function normalizeAcreage(value: unknown): string {
   if (typeof value === 'number') {
     return Number.isFinite(value) && value >= 0 ? value.toString() : '';
@@ -152,12 +211,36 @@ export function normalizeOwnershipNode(
 ): OwnershipNode {
   return {
     ...createBlankNode(node.id, node.parentId ?? null),
-    ...node,
+    id: node.id,
+    type: normalizeNodeType(node.type),
+    instrument: normalizeText(node.instrument),
+    vol: normalizeText(node.vol),
+    page: normalizeText(node.page),
+    docNo: normalizeText(node.docNo),
+    fileDate: normalizeText(node.fileDate),
+    date: normalizeText(node.date),
+    grantor: normalizeText(node.grantor),
+    grantee: normalizeText(node.grantee),
+    landDesc: normalizeText(node.landDesc),
+    remarks: normalizeText(node.remarks),
+    fraction: normalizeDecimalInput(node.fraction, '0'),
+    initialFraction: normalizeDecimalInput(node.initialFraction, '0'),
+    parentId: typeof node.parentId === 'string' ? node.parentId : null,
+    conveyanceMode: normalizeConveyanceMode(node.conveyanceMode),
+    splitBasis: normalizeSplitBasis(node.splitBasis),
+    numerator: normalizeDecimalInput(node.numerator, '0'),
+    denominator: normalizeDecimalInput(node.denominator, '1'),
+    manualAmount: normalizeDecimalInput(node.manualAmount, '0'),
+    isDeceased: node.isDeceased === true,
+    obituary: normalizeText(node.obituary),
+    graveyardLink: normalizeText(node.graveyardLink),
+    hasDoc: node.hasDoc === true,
     linkedOwnerId: node.linkedOwnerId ?? null,
     linkedLeaseId: node.linkedLeaseId ?? null,
-    relatedKind: node.relatedKind ?? null,
-    interestClass: node.interestClass ?? 'mineral',
-    royaltyKind: node.royaltyKind ?? null,
+    relatedKind: normalizeRelatedKind(node.relatedKind),
+    interestClass: normalizeInterestClass(node.interestClass),
+    royaltyKind: normalizeRoyaltyKind(node.royaltyKind),
+    isCollapsed: node.isCollapsed === true,
   };
 }
 

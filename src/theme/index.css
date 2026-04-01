@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@source not "../../**/*.md";
 
 /* ── Courthouse Theme Tokens ────────────────────────────── */
 @theme {

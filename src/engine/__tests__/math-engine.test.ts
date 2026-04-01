@@ -442,6 +442,10 @@ describe('executeAttachConveyance', () => {
     const root2 = findNode(result.data, 'root2');
     expect(root2.fraction).toBe('0.750000000');
 
+    // root1 refunded when child branch leaves
+    const root1 = findNode(result.data, 'root1');
+    expect(root1.fraction).toBe('1.000000000');
+
     const validation = validateOwnershipGraph(result.data);
     expect(validation.valid).toBe(true);
   });
@@ -536,6 +540,16 @@ describe('validateOwnershipGraph', () => {
     const result = validateOwnershipGraph(nodes);
     expect(result.valid).toBe(false);
     expect(result.issues.some((i) => i.code === 'over_allocated_branch')).toBe(true);
+  });
+
+  it('detects under-allocation', () => {
+    const nodes: OwnershipNode[] = [
+      makeNode('root', null, '1.000000000', '0.500000000'),
+      makeNode('child', 'root', '0.250000000', '0.250000000'),
+    ];
+    const result = validateOwnershipGraph(nodes);
+    expect(result.valid).toBe(false);
+    expect(result.issues.some((i) => i.code === 'under_allocated_branch')).toBe(true);
   });
 
   it('detects missing parent', () => {

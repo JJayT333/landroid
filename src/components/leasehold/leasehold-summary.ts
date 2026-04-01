@@ -6,8 +6,21 @@ import type {
   LeaseholdOrri,
   LeaseholdUnit,
 } from '../../types/leasehold';
-import { pickPrimaryLease } from '../deskmap/deskmap-coverage';
+import { allocateLeaseCoverage, getActiveLeases } from '../deskmap/deskmap-coverage';
 import { parseInterestString } from '../../utils/interest-string';
+
+export interface LeaseholdOwnerLeaseSummary {
+  leaseId: string;
+  leaseName: string;
+  lessee: string;
+  leaseEffectiveDate: string;
+  leaseDocNo: string;
+  leaseRoyaltyRate: string;
+  leasedFraction: string;
+  leasedPooledAcres: string;
+  ownerTractRoyalty: string;
+  unitRoyaltyDecimal: string;
+}
 
 export interface LeaseholdOwnerSummary {
   nodeId: string;
@@ -15,16 +28,14 @@ export interface LeaseholdOwnerSummary {
   ownerName: string;
   fraction: string;
   netMineralAcres: string;
+  netPooledAcres: string;
   leasedFraction: string;
-  leasedAcres: string;
-  leaseId: string | null;
-  leaseName: string;
-  lessee: string;
-  leaseEffectiveDate: string;
-  leaseDocNo: string;
-  royaltyRate: string;
-  royaltyBurden: string;
+  leasedPooledAcres: string;
+  activeLeaseCount: number;
+  lesseeNames: string[];
+  ownerTractRoyalty: string;
   unitRoyaltyDecimal: string;
+  leaseSlices: LeaseholdOwnerLeaseSummary[];
 }
 
 export interface LeaseholdTractSummary {
@@ -39,7 +50,12 @@ export interface LeaseholdTractSummary {
   leasedOwnership: string;
   unitParticipation: string;
   weightedRoyaltyRate: string;
-  grossOrriRate: string;
+  workingInterestBaseRate: string;
+  grossOrriBurdenRate: string;
+  workingInterestOrriBurdenRate: string;
+  netRevenueInterestBaseRate: string;
+  netRevenueInterestOrriBurdenRate: string;
+  totalOrriBurdenRate: string;
   unitRoyaltyDecimal: string;
   unitOrriDecimal: string;
   preWorkingInterestDecimal: string;
@@ -170,16 +186,131 @@ function currentMineralOwners(nodes: OwnershipNode[]) {
   );
 }
 
-function leaseFractionForOwner(lease: Lease | null, ownerFraction: ReturnType<typeof d>) {
-  if (!lease) {
-    return d(0);
+function buildOwnerLeaseSummaries({
+  leases,
+  ownerFraction,
+  tractPooledAcres,
+  totalPooledAcres,
+}: {
+  leases: Lease[];
+  ownerFraction: ReturnType<typeof d>;
+  tractPooledAcres: ReturnType<typeof d>;
+  totalPooledAcres: ReturnType<typeof d>;
+}): LeaseholdOwnerLeaseSummary[] {
+  return allocateLeaseCoverage(leases, ownerFraction.toString()).map(({ lease, allocatedFraction }) => {
+    const leaseFraction = d(allocatedFraction);
+    const leasedPooledAcres = tractPooledAcres.times(leaseFraction);
+    const leaseRoyaltyRate = parseInterestString(lease.royaltyRate);
+    const ownerTractRoyalty = leaseFraction.times(leaseRoyaltyRate);
+    const unitRoyaltyDecimal = totalPooledAcres.greaterThan(0)
+      ? leasedPooledAcres.div(totalPooledAcres).times(leaseRoyaltyRate)
+      : d(0);
+
+    return {
+      leaseId: lease.id,
+      leaseName: lease.leaseName,
+      lessee: lease.lessee,
+      leaseEffectiveDate: lease.effectiveDate,
+      leaseDocNo: lease.docNo,
+      leaseRoyaltyRate: lease.royaltyRate,
+      leasedFraction: leaseFraction.toString(),
+      leasedPooledAcres: leasedPooledAcres.toString(),
+      ownerTractRoyalty: ownerTractRoyalty.toString(),
+      unitRoyaltyDecimal: unitRoyaltyDecimal.toString(),
+    };
+  });
+}
+
+function sumDecimalStrings(values: string[]) {
+  return values.reduce((sum, value) => sum.plus(d(value)), d(0));
+}
+
+function calculateOrriBasisRates({
+  leasedOwnership,
+  weightedRoyaltyRate,
+  orris,
+}: {
+  leasedOwnership: ReturnType<typeof d>;
+  weightedRoyaltyRate: ReturnType<typeof d>;
+  orris: LeaseholdOrri[];
+}) {
+  const grossBasisShare = orris
+    .filter((orri) => orri.burdenBasis === 'gross_8_8')
+    .reduce((sum, orri) => sum.plus(parseInterestString(orri.burdenFraction)), d(0));
+  const workingInterestBasisShare = orris
+    .filter((orri) => orri.burdenBasis === 'working_interest')
+    .reduce((sum, orri) => sum.plus(parseInterestString(orri.burdenFraction)), d(0));
+  const netRevenueInterestBasisShare = orris
+    .filter((orri) => orri.burdenBasis === 'net_revenue_interest')
+    .reduce((sum, orri) => sum.plus(parseInterestString(orri.burdenFraction)), d(0));
+
+  const workingInterestBaseRate = leasedOwnership.minus(weightedRoyaltyRate);
+  const safeWorkingInterestBaseRate = workingInterestBaseRate.greaterThan(0)
+    ? workingInterestBaseRate
+    : d(0);
+  const grossOrriBurdenRate = leasedOwnership.times(grossBasisShare);
+  const workingInterestOrriBurdenRate = safeWorkingInterestBaseRate.times(
+    workingInterestBasisShare
+  );
+  const netRevenueInterestBaseRate = safeWorkingInterestBaseRate
+    .minus(grossOrriBurdenRate)
+    .minus(workingInterestOrriBurdenRate);
+  const safeNetRevenueInterestBaseRate = netRevenueInterestBaseRate.greaterThan(0)
+    ? netRevenueInterestBaseRate
+    : d(0);
+  const netRevenueInterestOrriBurdenRate = safeNetRevenueInterestBaseRate.times(
+    netRevenueInterestBasisShare
+  );
+  const totalOrriBurdenRate = grossOrriBurdenRate
+    .plus(workingInterestOrriBurdenRate)
+    .plus(netRevenueInterestOrriBurdenRate);
+
+  return {
+    workingInterestBaseRate: safeWorkingInterestBaseRate,
+    grossOrriBurdenRate,
+    workingInterestOrriBurdenRate,
+    netRevenueInterestBaseRate: safeNetRevenueInterestBaseRate,
+    netRevenueInterestOrriBurdenRate,
+    totalOrriBurdenRate,
+  };
+}
+
+function calculateSingleOrriBurdenRate({
+  burdenBasis,
+  burdenFraction,
+  leasedOwnership,
+  workingInterestBaseRate,
+  netRevenueInterestBaseRate,
+}: {
+  burdenBasis: LeaseholdOrri['burdenBasis'];
+  burdenFraction: string;
+  leasedOwnership: ReturnType<typeof d>;
+  workingInterestBaseRate: ReturnType<typeof d>;
+  netRevenueInterestBaseRate: ReturnType<typeof d>;
+}) {
+  const parsedBurden = parseInterestString(burdenFraction);
+
+  switch (burdenBasis) {
+    case 'working_interest':
+      return workingInterestBaseRate.times(parsedBurden);
+    case 'net_revenue_interest':
+      return netRevenueInterestBaseRate.times(parsedBurden);
+    case 'gross_8_8':
+    default:
+      return leasedOwnership.times(parsedBurden);
   }
+}
 
-  const leasedInterest = lease.leasedInterest.trim()
-    ? parseInterestString(lease.leasedInterest)
-    : ownerFraction;
-
-  return leasedInterest.greaterThan(ownerFraction) ? ownerFraction : leasedInterest;
+function formatOrriBasisSourceLabel(burdenBasis: LeaseholdOrri['burdenBasis']) {
+  switch (burdenBasis) {
+    case 'working_interest':
+      return 'WI basis';
+    case 'net_revenue_interest':
+      return 'NRI basis';
+    case 'gross_8_8':
+    default:
+      return 'Gross 8/8';
+  }
 }
 
 export function buildLeaseholdUnitSummary({
@@ -199,19 +330,21 @@ export function buildLeaseholdUnitSummary({
 }): LeaseholdUnitSummary {
   const ownerById = new Map(owners.map((owner) => [owner.id, owner]));
   const deskMapById = new Map(deskMaps.map((deskMap) => [deskMap.id, deskMap]));
-  const primaryLeaseByOwnerId = new Map<string, Lease>();
+  const activeLeasesByOwnerId = new Map<string, Lease[]>();
 
   leases.forEach((lease) => {
-    const existing = primaryLeaseByOwnerId.get(lease.ownerId);
-    if (!existing) {
-      primaryLeaseByOwnerId.set(lease.ownerId, lease);
+    const existing = activeLeasesByOwnerId.get(lease.ownerId) ?? [];
+    existing.push(lease);
+    activeLeasesByOwnerId.set(lease.ownerId, existing);
+  });
+
+  [...activeLeasesByOwnerId.entries()].forEach(([ownerId, ownerLeases]) => {
+    const activeLeases = getActiveLeases(ownerLeases);
+    if (activeLeases.length === 0) {
+      activeLeasesByOwnerId.delete(ownerId);
       return;
     }
-
-    const picked = pickPrimaryLease([existing, lease]);
-    if (picked) {
-      primaryLeaseByOwnerId.set(lease.ownerId, picked);
-    }
+    activeLeasesByOwnerId.set(ownerId, activeLeases);
   });
 
   const totalGrossAcres = deskMaps.reduce(
@@ -220,13 +353,6 @@ export function buildLeaseholdUnitSummary({
   );
   const totalPooledAcres = deskMaps.reduce(
     (sum, deskMap) => sum.plus(d(deskMap.pooledAcres)),
-    d(0)
-  );
-  const unitScopedGrossOrris = leaseholdOrris.filter(
-    (orri) => orri.scope === 'unit' && orri.burdenBasis === 'gross_8_8'
-  );
-  const unitScopedGrossOrriRate = unitScopedGrossOrris.reduce(
-    (sum, orri) => sum.plus(parseInterestString(orri.burdenFraction)),
     d(0)
   );
 
@@ -244,17 +370,32 @@ export function buildLeaseholdUnitSummary({
     const ownersForTract = presentOwners
       .map((node) => {
         const ownerFraction = d(node.fraction);
-        const primaryLease = node.linkedOwnerId
-          ? primaryLeaseByOwnerId.get(node.linkedOwnerId) ?? null
-          : null;
-        const leasedFraction = leaseFractionForOwner(primaryLease, ownerFraction);
-        const netMineralAcres = tractPooledAcres.times(ownerFraction);
-        const leasedAcres = tractPooledAcres.times(leasedFraction);
-        const royaltyRate = primaryLease ? parseInterestString(primaryLease.royaltyRate) : d(0);
-        const royaltyBurden = leasedFraction.times(royaltyRate);
-        const unitRoyaltyDecimal = totalPooledAcres.greaterThan(0)
-          ? leasedAcres.div(totalPooledAcres).times(royaltyRate)
-          : d(0);
+        const ownerLeases = node.linkedOwnerId
+          ? activeLeasesByOwnerId.get(node.linkedOwnerId) ?? []
+          : [];
+        const leaseSlices = buildOwnerLeaseSummaries({
+          leases: ownerLeases,
+          ownerFraction,
+          tractPooledAcres,
+          totalPooledAcres,
+        });
+        const leasedFraction = sumDecimalStrings(leaseSlices.map((lease) => lease.leasedFraction));
+        const netMineralAcres = tractGrossAcres.times(ownerFraction);
+        const netPooledAcres = tractPooledAcres.times(ownerFraction);
+        const leasedPooledAcres = sumDecimalStrings(
+          leaseSlices.map((lease) => lease.leasedPooledAcres)
+        );
+        const ownerTractRoyalty = sumDecimalStrings(
+          leaseSlices.map((lease) => lease.ownerTractRoyalty)
+        );
+        const unitRoyaltyDecimal = sumDecimalStrings(
+          leaseSlices.map((lease) => lease.unitRoyaltyDecimal)
+        );
+        const lesseeNames = [...new Set(
+          leaseSlices
+            .map((lease) => lease.lessee.trim())
+            .filter((lessee) => lessee.length > 0)
+        )];
 
         return {
           nodeId: node.id,
@@ -262,16 +403,14 @@ export function buildLeaseholdUnitSummary({
           ownerName: nameOwner(node, ownerById),
           fraction: ownerFraction.toString(),
           netMineralAcres: netMineralAcres.toString(),
+          netPooledAcres: netPooledAcres.toString(),
           leasedFraction: leasedFraction.toString(),
-          leasedAcres: leasedAcres.toString(),
-          leaseId: primaryLease?.id ?? null,
-          leaseName: primaryLease?.leaseName ?? '',
-          lessee: primaryLease?.lessee ?? '',
-          leaseEffectiveDate: primaryLease?.effectiveDate ?? '',
-          leaseDocNo: primaryLease?.docNo ?? '',
-          royaltyRate: primaryLease?.royaltyRate ?? '',
-          royaltyBurden: royaltyBurden.toString(),
+          leasedPooledAcres: leasedPooledAcres.toString(),
+          activeLeaseCount: leaseSlices.length,
+          lesseeNames,
+          ownerTractRoyalty: ownerTractRoyalty.toString(),
           unitRoyaltyDecimal: unitRoyaltyDecimal.toString(),
+          leaseSlices,
         };
       })
       .sort((left, right) => {
@@ -287,32 +426,33 @@ export function buildLeaseholdUnitSummary({
       d(0)
     );
     const weightedRoyaltyRate = ownersForTract.reduce(
-      (sum, owner) => sum.plus(d(owner.royaltyBurden)),
+      (sum, owner) => sum.plus(d(owner.ownerTractRoyalty)),
       d(0)
     );
     const unitParticipation = totalPooledAcres.greaterThan(0)
       ? tractPooledAcres.div(totalPooledAcres)
       : d(0);
-    const tractScopedGrossOrris = leaseholdOrris.filter(
-      (orri) =>
-        orri.scope === 'tract'
-        && orri.deskMapId === deskMap.id
-        && orri.burdenBasis === 'gross_8_8'
+    const relevantOrris = leaseholdOrris.filter(
+      (orri) => orri.scope === 'unit' || orri.deskMapId === deskMap.id
     );
-    const tractScopedGrossOrriRate = tractScopedGrossOrris.reduce(
-      (sum, orri) => sum.plus(parseInterestString(orri.burdenFraction)),
-      d(0)
-    );
-    const grossOrriRate = unitScopedGrossOrriRate.plus(tractScopedGrossOrriRate);
-    const leasedOrriBurden = leasedOwnership.times(grossOrriRate);
+    const {
+      workingInterestBaseRate,
+      grossOrriBurdenRate,
+      workingInterestOrriBurdenRate,
+      netRevenueInterestBaseRate,
+      netRevenueInterestOrriBurdenRate,
+      totalOrriBurdenRate,
+    } = calculateOrriBasisRates({
+      leasedOwnership,
+      weightedRoyaltyRate,
+      orris: relevantOrris,
+    });
     const unitRoyaltyDecimal = ownersForTract.reduce(
       (sum, owner) => sum.plus(d(owner.unitRoyaltyDecimal)),
       d(0)
     );
-    const unitOrriDecimal = unitParticipation.times(leasedOrriBurden);
-    const preWorkingInterestRate = leasedOwnership
-      .minus(weightedRoyaltyRate)
-      .minus(leasedOrriBurden);
+    const unitOrriDecimal = unitParticipation.times(totalOrriBurdenRate);
+    const preWorkingInterestRate = workingInterestBaseRate.minus(totalOrriBurdenRate);
     const preWorkingInterestDecimal = preWorkingInterestRate.greaterThan(0)
       ? unitParticipation.times(preWorkingInterestRate)
       : d(0);
@@ -330,21 +470,13 @@ export function buildLeaseholdUnitSummary({
     );
     const uniqueLessees = [...new Set(
       ownersForTract
-        .map((owner) => owner.lessee.trim())
+        .flatMap((owner) => owner.lesseeNames)
         .filter((lessee) => lessee.length > 0)
     )];
     const trackedAssignmentCount = relevantAssignments.length;
-    const includedAssignmentCount = relevantAssignments.filter((assignment) =>
-      assignment.scope === 'unit' || assignment.deskMapId === deskMap.id
-    ).length;
-    const trackedOrriCount = leaseholdOrris.filter(
-      (orri) => orri.scope === 'unit' || orri.deskMapId === deskMap.id
-    ).length;
-    const includedOrriCount = leaseholdOrris.filter(
-      (orri) =>
-        orri.burdenBasis === 'gross_8_8'
-        && (orri.scope === 'unit' || orri.deskMapId === deskMap.id)
-    ).length;
+    const includedAssignmentCount = relevantAssignments.length;
+    const trackedOrriCount = relevantOrris.length;
+    const includedOrriCount = relevantOrris.length;
 
     return {
       deskMapId: deskMap.id,
@@ -358,7 +490,12 @@ export function buildLeaseholdUnitSummary({
       leasedOwnership: leasedOwnership.toString(),
       unitParticipation: unitParticipation.toString(),
       weightedRoyaltyRate: weightedRoyaltyRate.toString(),
-      grossOrriRate: grossOrriRate.toString(),
+      workingInterestBaseRate: workingInterestBaseRate.toString(),
+      grossOrriBurdenRate: grossOrriBurdenRate.toString(),
+      workingInterestOrriBurdenRate: workingInterestOrriBurdenRate.toString(),
+      netRevenueInterestBaseRate: netRevenueInterestBaseRate.toString(),
+      netRevenueInterestOrriBurdenRate: netRevenueInterestOrriBurdenRate.toString(),
+      totalOrriBurdenRate: totalOrriBurdenRate.toString(),
       unitRoyaltyDecimal: unitRoyaltyDecimal.toString(),
       unitOrriDecimal: unitOrriDecimal.toString(),
       preWorkingInterestDecimal: preWorkingInterestDecimal.toString(),
@@ -422,27 +559,37 @@ export function buildLeaseholdUnitSummary({
   const orris = leaseholdOrris.map((orri) => {
     const tract = orri.deskMapId ? tractSummaryById.get(orri.deskMapId) ?? null : null;
     const includedInMath =
-      orri.burdenBasis === 'gross_8_8'
-      && (
+      (
         orri.scope === 'unit'
           ? tracts.some((candidate) => d(candidate.unitParticipation).greaterThan(0))
           : Boolean(tract)
       );
-    const grossBurden = includedInMath ? parseInterestString(orri.burdenFraction) : d(0);
     const unitDecimal = includedInMath
       ? orri.scope === 'unit'
         ? tracts.reduce(
             (sum, candidate) =>
               sum.plus(
-                d(candidate.unitParticipation)
-                  .times(d(candidate.leasedOwnership))
-                  .times(grossBurden)
+                d(candidate.unitParticipation).times(
+                  calculateSingleOrriBurdenRate({
+                    burdenBasis: orri.burdenBasis,
+                    burdenFraction: orri.burdenFraction,
+                    leasedOwnership: d(candidate.leasedOwnership),
+                    workingInterestBaseRate: d(candidate.workingInterestBaseRate),
+                    netRevenueInterestBaseRate: d(candidate.netRevenueInterestBaseRate),
+                  })
+                )
               ),
             d(0)
           )
-        : d(tract?.unitParticipation ?? '0')
-            .times(d(tract?.leasedOwnership ?? '0'))
-            .times(grossBurden)
+        : d(tract?.unitParticipation ?? '0').times(
+            calculateSingleOrriBurdenRate({
+              burdenBasis: orri.burdenBasis,
+              burdenFraction: orri.burdenFraction,
+              leasedOwnership: d(tract?.leasedOwnership ?? '0'),
+              workingInterestBaseRate: d(tract?.workingInterestBaseRate ?? '0'),
+              netRevenueInterestBaseRate: d(tract?.netRevenueInterestBaseRate ?? '0'),
+            })
+          )
       : d(0);
 
     return {
@@ -531,19 +678,21 @@ export function buildLeaseholdDecimalRows({
 
   if (focusedTract) {
     focusedTract.owners.forEach((owner) => {
-      pushRow({
-        id: `royalty-${focusedTract.deskMapId}-${owner.nodeId}`,
-        category: 'royalty',
-        payee: owner.ownerName,
-        tractName: focusedTract.name,
-        tractCode: focusedTract.code,
-        sourceLabel:
-          owner.leaseName || owner.lessee
-            ? `${owner.leaseName || owner.lessee}${owner.royaltyRate ? ` • Royalty ${owner.royaltyRate}` : ''}`
-            : 'Lease royalty',
-        effectiveDate: owner.leaseEffectiveDate,
-        sourceDocNo: owner.leaseDocNo,
-        decimal: owner.unitRoyaltyDecimal,
+      owner.leaseSlices.forEach((leaseSlice) => {
+        pushRow({
+          id: `royalty-${focusedTract.deskMapId}-${owner.nodeId}-${leaseSlice.leaseId}`,
+          category: 'royalty',
+          payee: owner.ownerName,
+          tractName: focusedTract.name,
+          tractCode: focusedTract.code,
+          sourceLabel:
+            leaseSlice.leaseName || leaseSlice.lessee
+              ? `${leaseSlice.leaseName || leaseSlice.lessee}${leaseSlice.leaseRoyaltyRate ? ` • Royalty ${leaseSlice.leaseRoyaltyRate}` : ''}`
+              : 'Lease royalty',
+          effectiveDate: leaseSlice.leaseEffectiveDate,
+          sourceDocNo: leaseSlice.leaseDocNo,
+          decimal: leaseSlice.unitRoyaltyDecimal,
+        });
       });
     });
 
@@ -552,10 +701,15 @@ export function buildLeaseholdDecimalRows({
       .forEach((orri) => {
         const decimal =
           orri.scope === 'unit'
-            ? d(focusedTract.unitParticipation)
-                .times(d(focusedTract.leasedOwnership))
-                .times(parseInterestString(orri.burdenFraction))
-                .toString()
+            ? d(focusedTract.unitParticipation).times(
+                calculateSingleOrriBurdenRate({
+                  burdenBasis: orri.burdenBasis,
+                  burdenFraction: orri.burdenFraction,
+                  leasedOwnership: d(focusedTract.leasedOwnership),
+                  workingInterestBaseRate: d(focusedTract.workingInterestBaseRate),
+                  netRevenueInterestBaseRate: d(focusedTract.netRevenueInterestBaseRate),
+                })
+              ).toString()
             : orri.unitDecimal;
         pushRow({
           id: `orri-${focusedTract.deskMapId}-${orri.id}`,
@@ -563,7 +717,10 @@ export function buildLeaseholdDecimalRows({
           payee: orri.payee || 'Unnamed ORRI',
           tractName: focusedTract.name,
           tractCode: focusedTract.code,
-          sourceLabel: orri.scope === 'unit' ? 'Unit ORRI burden' : `${focusedTract.code} ORRI burden`,
+          sourceLabel:
+            orri.scope === 'unit'
+              ? `Unit ORRI • ${formatOrriBasisSourceLabel(orri.burdenBasis)}`
+              : `${focusedTract.code} ORRI • ${formatOrriBasisSourceLabel(orri.burdenBasis)}`,
           effectiveDate: orri.effectiveDate,
           sourceDocNo: orri.sourceDocNo,
           decimal,
@@ -615,19 +772,21 @@ export function buildLeaseholdDecimalRows({
   } else {
     unitSummary.tracts.forEach((tract) => {
       tract.owners.forEach((owner) => {
-        pushRow({
-          id: `royalty-${tract.deskMapId}-${owner.nodeId}`,
-          category: 'royalty',
-          payee: owner.ownerName,
-          tractName: tract.name,
-          tractCode: tract.code,
-          sourceLabel:
-            owner.leaseName || owner.lessee
-              ? `${tract.code} • ${owner.leaseName || owner.lessee}${owner.royaltyRate ? ` • Royalty ${owner.royaltyRate}` : ''}`
-              : `${tract.code} lease royalty`,
-          effectiveDate: owner.leaseEffectiveDate,
-          sourceDocNo: owner.leaseDocNo,
-          decimal: owner.unitRoyaltyDecimal,
+        owner.leaseSlices.forEach((leaseSlice) => {
+          pushRow({
+            id: `royalty-${tract.deskMapId}-${owner.nodeId}-${leaseSlice.leaseId}`,
+            category: 'royalty',
+            payee: owner.ownerName,
+            tractName: tract.name,
+            tractCode: tract.code,
+            sourceLabel:
+              leaseSlice.leaseName || leaseSlice.lessee
+                ? `${tract.code} • ${leaseSlice.leaseName || leaseSlice.lessee}${leaseSlice.leaseRoyaltyRate ? ` • Royalty ${leaseSlice.leaseRoyaltyRate}` : ''}`
+                : `${tract.code} lease royalty`,
+            effectiveDate: leaseSlice.leaseEffectiveDate,
+            sourceDocNo: leaseSlice.leaseDocNo,
+            decimal: leaseSlice.unitRoyaltyDecimal,
+          });
         });
       });
     });
@@ -641,7 +800,10 @@ export function buildLeaseholdDecimalRows({
           payee: orri.payee || 'Unnamed ORRI',
           tractName: orri.tractName,
           tractCode: orri.scope === 'unit' ? 'UNIT' : 'TRACT',
-          sourceLabel: orri.scope === 'unit' ? 'Unit ORRI burden' : `${orri.tractName} ORRI burden`,
+          sourceLabel:
+            orri.scope === 'unit'
+              ? `Unit ORRI • ${formatOrriBasisSourceLabel(orri.burdenBasis)}`
+              : `${orri.tractName} ORRI • ${formatOrriBasisSourceLabel(orri.burdenBasis)}`,
           effectiveDate: orri.effectiveDate,
           sourceDocNo: orri.sourceDocNo,
           decimal: orri.unitDecimal,

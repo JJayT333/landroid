@@ -211,7 +211,7 @@ export default function Navbar() {
             disabled={seedMode !== null}
             className="px-3 py-1.5 rounded-lg text-xs font-medium text-gold/80 hover:text-gold hover:bg-gold/10 transition-colors disabled:opacity-50"
           >
-            {seedMode === 'leasehold' ? 'Loading...' : 'Leasehold (5 Tracts)'}
+            {seedMode === 'leasehold' ? 'Loading...' : 'Leasehold (8 Tracts)'}
           </button>
         </div>
       </div>

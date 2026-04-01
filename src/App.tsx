@@ -3,6 +3,7 @@
  */
 import { Suspense, lazy } from 'react';
 import { useUIStore } from './store/ui-store';
+import { useWorkspaceStore } from './store/workspace-store';
 import Navbar from './components/shared/Navbar';
 import DeskMapView from './views/DeskMapView';
 
@@ -32,10 +33,26 @@ function PlaceholderView({
 
 export default function App() {
   const view = useUIStore((s) => s.view);
+  const startupWarning = useWorkspaceStore((s) => s.startupWarning);
+  const setStartupWarning = useWorkspaceStore((s) => s.setStartupWarning);
 
   return (
     <div className="h-screen flex flex-col bg-parchment">
       <Navbar />
+      {startupWarning && (
+        <div className="border-b border-amber-300 bg-amber-100 px-4 py-3 text-sm text-amber-900">
+          <div className="mx-auto flex max-w-6xl items-start justify-between gap-4">
+            <p className="leading-6">{startupWarning}</p>
+            <button
+              type="button"
+              className="shrink-0 rounded border border-amber-400 px-2 py-1 text-xs font-semibold uppercase tracking-wide hover:bg-amber-200"
+              onClick={() => setStartupWarning(null)}
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
       <main className="flex-1 overflow-hidden">
         {view === 'flowchart' && (
           <Suspense

@@ -73,6 +73,7 @@ interface WorkspaceState {
   activeNodeId: string | null;
   lastAudit: Audit | null;
   lastError: string | null;
+  startupWarning: string | null;
 
   // Actions
   setProjectName: (name: string) => void;
@@ -117,6 +118,7 @@ interface WorkspaceState {
   clearLinkedLease: (leaseId: string) => void;
   addNodeToActiveDeskMap: (nodeId: string) => void;
   setHydrated: () => void;
+  setStartupWarning: (message: string | null) => void;
   loadWorkspace: (data: {
     workspaceId: string;
     projectName: string;
@@ -136,6 +138,20 @@ function findParentId(nodes: OwnershipNode[], nodeId: string): string | null {
   return node?.parentId ?? null;
 }
 
+function resolveActiveDeskMapId(
+  deskMaps: DeskMap[],
+  preferredDeskMapId: string | null | undefined
+): string | null {
+  if (
+    preferredDeskMapId
+    && deskMaps.some((deskMap) => deskMap.id === preferredDeskMapId)
+  ) {
+    return preferredDeskMapId;
+  }
+
+  return deskMaps[0]?.id ?? null;
+}
+
 export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
   workspaceId: createWorkspaceId(),
   projectName: 'Untitled Workspace',
@@ -151,6 +167,7 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
   activeNodeId: null,
   lastAudit: null,
   lastError: null,
+  startupWarning: null,
 
   setProjectName: (name) => set({ projectName: name }),
   updateLeaseholdUnit: (fields) =>
@@ -278,7 +295,10 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
       ),
     })),
   setActiveNode: (id) => set({ activeNodeId: id }),
-  setActiveDeskMap: (id) => set({ activeDeskMapId: id }),
+  setActiveDeskMap: (id) =>
+    set((state) => ({
+      activeDeskMapId: resolveActiveDeskMapId(state.deskMaps, id),
+    })),
   addInstrumentType: (type) =>
     set((state) => ({
       instrumentTypes: state.instrumentTypes.includes(type)
@@ -351,8 +371,9 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
 
   getActiveDeskMapNodes: () => {
     const { nodes, deskMaps, activeDeskMapId } = get();
-    if (!activeDeskMapId) return [];
-    const dm = deskMaps.find((d) => d.id === activeDeskMapId);
+    const resolvedDeskMapId = resolveActiveDeskMapId(deskMaps, activeDeskMapId);
+    if (!resolvedDeskMapId) return [];
+    const dm = deskMaps.find((d) => d.id === resolvedDeskMapId);
     if (!dm) return [];
     if (dm.nodeIds.length === 0) return [];
     const idSet = new Set(dm.nodeIds);
@@ -363,8 +384,16 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
     const state = get();
     const result = executeConveyance({ allNodes: state.nodes, parentId, newNodeId, share, form });
     if (result.ok) {
-      const dmUpdate = state.activeDeskMapId
-        ? { deskMaps: state.deskMaps.map((dm) => dm.id === state.activeDeskMapId ? { ...dm, nodeIds: [...dm.nodeIds, newNodeId] } : dm) }
+      const targetDeskMapId = resolveActiveDeskMapId(state.deskMaps, state.activeDeskMapId);
+      const dmUpdate = targetDeskMapId
+        ? {
+            deskMaps: state.deskMaps.map((dm) =>
+              dm.id === targetDeskMapId
+                ? { ...dm, nodeIds: [...dm.nodeIds, newNodeId] }
+                : dm
+            ),
+            activeDeskMapId: targetDeskMapId,
+          }
         : {};
       set({
         nodes: result.data.map((node) => normalizeOwnershipNode(node)),
@@ -388,13 +417,15 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
       form,
     });
     if (result.ok) {
-      const dmUpdate = state.activeDeskMapId
+      const targetDeskMapId = resolveActiveDeskMapId(state.deskMaps, state.activeDeskMapId);
+      const dmUpdate = targetDeskMapId
         ? {
             deskMaps: state.deskMaps.map((dm) =>
-              dm.id === state.activeDeskMapId
+              dm.id === targetDeskMapId
                 ? { ...dm, nodeIds: [...dm.nodeIds, newNodeId] }
                 : dm
             ),
+            activeDeskMapId: targetDeskMapId,
           }
         : {};
       set({
@@ -437,8 +468,16 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
       form,
     });
     if (result.ok) {
-      const dmUpdate = state.activeDeskMapId
-        ? { deskMaps: state.deskMaps.map((dm) => dm.id === state.activeDeskMapId ? { ...dm, nodeIds: [...dm.nodeIds, newPredecessorId] } : dm) }
+      const targetDeskMapId = resolveActiveDeskMapId(state.deskMaps, state.activeDeskMapId);
+      const dmUpdate = targetDeskMapId
+        ? {
+            deskMaps: state.deskMaps.map((dm) =>
+              dm.id === targetDeskMapId
+                ? { ...dm, nodeIds: [...dm.nodeIds, newPredecessorId] }
+                : dm
+            ),
+            activeDeskMapId: targetDeskMapId,
+          }
         : {};
       set({
         nodes: result.data.map((node) => normalizeOwnershipNode(node)),
@@ -520,10 +559,12 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
 
   addNodeToActiveDeskMap: (nodeId) =>
     set((state) => {
-      if (!state.activeDeskMapId) return {};
+      const targetDeskMapId = resolveActiveDeskMapId(state.deskMaps, state.activeDeskMapId);
+      if (!targetDeskMapId) return {};
       return {
+        activeDeskMapId: targetDeskMapId,
         deskMaps: state.deskMaps.map((dm) =>
-          dm.id === state.activeDeskMapId
+          dm.id === targetDeskMapId
             ? { ...dm, nodeIds: [...dm.nodeIds, nodeId] }
             : dm
         ),
@@ -531,6 +572,7 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
     }),
 
   setHydrated: () => set({ _hydrated: true }),
+  setStartupWarning: (startupWarning) => set({ startupWarning }),
 
   loadWorkspace: (data) =>
     set(() => {
@@ -560,7 +602,10 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
         leaseholdTransferOrderEntries: normalizeLeaseholdTransferOrderEntries(
           data.leaseholdTransferOrderEntries
         ),
-        activeDeskMapId: data.activeDeskMapId ?? normalizedDeskMaps[0]?.id ?? null,
+        activeDeskMapId: resolveActiveDeskMapId(
+          normalizedDeskMaps,
+          data.activeDeskMapId
+        ),
         instrumentTypes: data.instrumentTypes?.length
           ? data.instrumentTypes
           : [...DEFAULT_INSTRUMENT_TYPES],
@@ -568,6 +613,7 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
         activeNodeId: null,
         lastAudit: null,
         lastError: null,
+        startupWarning: null,
       };
     }),
 }));

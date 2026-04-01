@@ -11,7 +11,12 @@
  *
  * Performance: O(n) for n nodes — handles 1000+ nodes.
  */
-import ELK, { type ElkNode, type ElkExtendedEdge } from 'elkjs/lib/elk.bundled.js';
+import type {
+  ELK as ElkEngine,
+  ElkNode,
+  ElkExtendedEdge,
+} from 'elkjs/lib/elk-api.js';
+import elkWorkerUrl from 'elkjs/lib/elk-worker.min.js?url';
 import type { OwnershipNode } from '../types/node';
 import type { FlowEdgeData, OwnershipNodeData } from '../types/flowchart';
 import { d, serialize } from './decimal';
@@ -47,7 +52,22 @@ export interface TreeLayoutOptions {
   nodeScale?: number;
 }
 
-const elk = new ELK();
+let elkPromise: Promise<ElkEngine> | null = null;
+
+async function getElk(): Promise<ElkEngine> {
+  if (!elkPromise) {
+    if (import.meta.env.MODE === 'test' || typeof Worker !== 'function') {
+      const bundledModuleId = 'elkjs/lib/elk.bundled.js';
+      elkPromise = import(/* @vite-ignore */ bundledModuleId).then(({ default: ELK }) => new ELK());
+    } else {
+      elkPromise = import('elkjs/lib/elk-api.js').then(({ default: ELK }) =>
+        new ELK({ workerUrl: elkWorkerUrl })
+      );
+    }
+  }
+
+  return elkPromise;
+}
 
 // ── Internal tree node for layout computation ───────────────
 
@@ -323,6 +343,7 @@ export async function layoutOwnershipTreeWithElk(
       })),
   };
 
+  const elk = await getElk();
   let layout: Awaited<ReturnType<typeof elk.layout<ElkNode>>>;
   try {
     layout = await elk.layout(elkGraph);

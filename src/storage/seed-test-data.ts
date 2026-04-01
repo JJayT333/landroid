@@ -907,7 +907,7 @@ interface LeaseholdDemoTractPlan {
   landDesc: string;
   patentYear: number;
   patentGrantee: string;
-  pattern: 'half-quarter-quarter' | 'forty-thirty-twenty-ten';
+  pattern: 'half-quarter-quarter' | 'half-quarter-eighth-eighth';
   currentOwners: string[];
   branchHolders: string[];
 }
@@ -1331,7 +1331,7 @@ export function buildStressWorkspaceData(): {
 const LEASEHOLD_DEMO_UNIT = {
   name: 'Raven Bend Unit',
   description:
-    'Five-tract pooled unit template with clean acreage and full lease coverage for early leasehold framework work.',
+    'Eight-tract pooled unit template with clean acreage, clean fractions, and full lease coverage for leasehold review.',
   operator: PRIMARY_TEST_LESSEE,
   effectiveDate: '2024-01-01',
 } as const;
@@ -1379,9 +1379,9 @@ const LEASEHOLD_DEMO_TRACTS: LeaseholdDemoTractPlan[] = [
   {
     name: 'Tract 1',
     code: 'T1',
-    grossAcres: '100',
-    pooledAcres: '100',
-    description: '100-acre north tract with present owners split 50 / 25 / 25 net mineral acres.',
+    grossAcres: '80',
+    pooledAcres: '80',
+    description: '80-acre north tract with present owners split 40 / 20 / 20 net mineral acres.',
     landDesc: 'North Half of Section 6, Block 12, H&GN RR Co. Survey, Reagan County, Texas',
     patentYear: 1902,
     patentGrantee: 'Della June Moonwhistle',
@@ -1392,9 +1392,9 @@ const LEASEHOLD_DEMO_TRACTS: LeaseholdDemoTractPlan[] = [
   {
     name: 'Tract 2',
     code: 'T2',
-    grossAcres: '200',
-    pooledAcres: '200',
-    description: '200-acre east tract with present owners split 100 / 50 / 50 net mineral acres.',
+    grossAcres: '160',
+    pooledAcres: '160',
+    description: '160-acre east tract with present owners split 80 / 40 / 40 net mineral acres.',
     landDesc: 'East Half of Section 11, Block 44, T-5-S, T&P RR Co. Survey, Upton County, Texas',
     patentYear: 1897,
     patentGrantee: 'Otis Ray Peppermill',
@@ -1405,22 +1405,22 @@ const LEASEHOLD_DEMO_TRACTS: LeaseholdDemoTractPlan[] = [
   {
     name: 'Tract 3',
     code: 'T3',
-    grossAcres: '300',
-    pooledAcres: '300',
-    description: '300-acre central tract with present owners split 120 / 90 / 60 / 30 net mineral acres.',
+    grossAcres: '240',
+    pooledAcres: '240',
+    description: '240-acre central tract with present owners split 120 / 60 / 30 / 30 net mineral acres.',
     landDesc: 'Section 3, Block 7, GC&SF RR Co. Survey, Midland County, Texas',
     patentYear: 1905,
     patentGrantee: 'Velma Jean Dustbucket',
-    pattern: 'forty-thirty-twenty-ten',
+    pattern: 'half-quarter-eighth-eighth',
     currentOwners: ['Hattie Dustbucket', 'Ike Turnipseed', 'June Brakecheck', 'Kirk Goatstatic'],
     branchHolders: ['Dustbucket Mineral Partners, LP', 'Brakecheck Legacy Minerals, LLC'],
   },
   {
     name: 'Tract 4',
     code: 'T4',
-    grossAcres: '400',
-    pooledAcres: '400',
-    description: '400-acre west tract with present owners split 200 / 100 / 100 net mineral acres.',
+    grossAcres: '320',
+    pooledAcres: '320',
+    description: '320-acre west tract with present owners split 160 / 80 / 80 net mineral acres.',
     landDesc: 'West Half of Section 19, Block 32, T-2-S, T&P RR Co. Survey, Reeves County, Texas',
     patentYear: 1899,
     patentGrantee: 'Buckshot Ray Velvetanvil',
@@ -1431,15 +1431,54 @@ const LEASEHOLD_DEMO_TRACTS: LeaseholdDemoTractPlan[] = [
   {
     name: 'Tract 5',
     code: 'T5',
-    grossAcres: '500',
-    pooledAcres: '500',
-    description: '500-acre south tract with present owners split 200 / 150 / 100 / 50 net mineral acres.',
+    grossAcres: '400',
+    pooledAcres: '400',
+    description: '400-acre south tract with present owners split 200 / 100 / 50 / 50 net mineral acres.',
     landDesc: 'South Half of Section 27, Block C-23, PSL Survey, Loving County, Texas',
     patentYear: 1908,
     patentGrantee: 'Cicada Belle Moonquilt',
-    pattern: 'forty-thirty-twenty-ten',
+    pattern: 'half-quarter-eighth-eighth',
     currentOwners: ['Opal Moonquilt', 'Perry Spurpickle', 'Quinn Whistlegrit', 'Ruth Biscuit'],
     branchHolders: ['Moonquilt Ranch Minerals, LP', 'Whistlegrit Legacy Holdings, LLC'],
+  },
+  {
+    name: 'Tract 6',
+    code: 'T6',
+    grossAcres: '480',
+    pooledAcres: '480',
+    description: '480-acre northwest tract with present owners split 240 / 120 / 60 / 60 net mineral acres.',
+    landDesc: 'Northwest Half of Section 15, Block 6, I&GN RR Co. Survey, Martin County, Texas',
+    patentYear: 1906,
+    patentGrantee: 'Rosie Mae Cactusholler',
+    pattern: 'half-quarter-eighth-eighth',
+    currentOwners: ['Sable Cactusholler', 'Theo Brisketstorm', 'Una Pepperjack', 'Vern Saddlewire'],
+    branchHolders: ['Cactusholler Minerals, LLC', 'Pepperjack Legacy Minerals, LLC'],
+  },
+  {
+    name: 'Tract 7',
+    code: 'T7',
+    grossAcres: '560',
+    pooledAcres: '560',
+    description: '560-acre southeast tract with present owners split 280 / 140 / 140 net mineral acres.',
+    landDesc: 'Southeast Half of Section 21, Block 14, H&TC RR Co. Survey, Glasscock County, Texas',
+    patentYear: 1904,
+    patentGrantee: 'Jericho Moonboots',
+    pattern: 'half-quarter-quarter',
+    currentOwners: ['Willa Moonboots', 'Xavier Chuckwagon', 'Yara Tinstar'],
+    branchHolders: ['Moonboots Title Holdings, LLC'],
+  },
+  {
+    name: 'Tract 8',
+    code: 'T8',
+    grossAcres: '640',
+    pooledAcres: '640',
+    description: '640-acre river tract with present owners split 320 / 160 / 80 / 80 net mineral acres.',
+    landDesc: 'Section 9, Block 2, GH&H RR Co. Survey, Howard County, Texas',
+    patentYear: 1910,
+    patentGrantee: 'Mabel Quicksprocket',
+    pattern: 'half-quarter-eighth-eighth',
+    currentOwners: ['Zane Quicksprocket', 'Ada Lonespur', 'Beau Tumblegizzard', 'Cora Snakeroot'],
+    branchHolders: ['Quicksprocket Minerals, LP', 'Snakeroot River Holdings, LLC'],
   },
 ];
 
@@ -1630,7 +1669,7 @@ function buildLeaseholdDemoTract(
       landDesc: tract.landDesc,
       initialFraction: '0.500000000',
       remainingFraction: '0.500000000',
-      remarks: `${tract.name} conveyance creating the first 50% present owner block.`,
+      remarks: `${tract.name} conveyance creating the first one-half present owner block.`,
     });
     const branchId = addLeaseholdDemoConveyance(state, {
       parentId: patentId,
@@ -1642,7 +1681,7 @@ function buildLeaseholdDemoTract(
       landDesc: tract.landDesc,
       initialFraction: '0.500000000',
       remainingFraction: '0.000000000',
-      remarks: `${tract.name} branch holder set up for the remaining 50%.`,
+      remarks: `${tract.name} branch holder set up for the remaining one-half mineral block.`,
     });
     addLeaseholdDemoDocument(state, {
       parentId: branchId,
@@ -1663,7 +1702,7 @@ function buildLeaseholdDemoTract(
       landDesc: tract.landDesc,
       initialFraction: '0.250000000',
       remainingFraction: '0.250000000',
-      remarks: `${tract.name} present owner block yielding 25 net mineral acres for each quarter owner.`,
+      remarks: `${tract.name} present owner block yielding one quarter of the tract.`,
     });
     const ownerCId = addLeaseholdDemoConveyance(state, {
       parentId: branchId,
@@ -1675,7 +1714,7 @@ function buildLeaseholdDemoTract(
       landDesc: tract.landDesc,
       initialFraction: '0.250000000',
       remainingFraction: '0.250000000',
-      remarks: `${tract.name} final quarter-owner conveyance completing the 100% leased setup.`,
+      remarks: `${tract.name} final quarter-interest conveyance completing the fully leased setup.`,
     });
 
     const currentOwnerNodeIds = [
@@ -1707,9 +1746,9 @@ function buildLeaseholdDemoTract(
     grantor: tract.patentGrantee,
     grantee: ownerA,
     landDesc: tract.landDesc,
-    initialFraction: '0.400000000',
-    remainingFraction: '0.400000000',
-    remarks: `${tract.name} first present owner block yielding 40% of the tract.`,
+    initialFraction: '0.500000000',
+    remainingFraction: '0.500000000',
+    remarks: `${tract.name} first present owner block yielding one half of the tract.`,
   });
   const firstBranchId = addLeaseholdDemoConveyance(state, {
     parentId: patentId,
@@ -1719,9 +1758,9 @@ function buildLeaseholdDemoTract(
     grantor: tract.patentGrantee,
     grantee: branchA,
     landDesc: tract.landDesc,
-    initialFraction: '0.600000000',
+    initialFraction: '0.500000000',
     remainingFraction: '0.000000000',
-    remarks: `${tract.name} branch holder for the remaining 60% mineral block.`,
+    remarks: `${tract.name} branch holder for the remaining one-half mineral block.`,
   });
   addLeaseholdDemoDocument(state, {
     parentId: firstBranchId,
@@ -1730,7 +1769,7 @@ function buildLeaseholdDemoTract(
     fileDate: `${tract.patentYear + 31}-01-21`,
     grantee: branchA,
     landDesc: tract.landDesc,
-    remarks: `${tract.name} probate record confirming the 30 / 30 split of the remaining branch.`,
+    remarks: `${tract.name} probate record confirming the quarter-interest split of the remaining branch.`,
   });
   const ownerBId = addLeaseholdDemoConveyance(state, {
     parentId: firstBranchId,
@@ -1740,9 +1779,9 @@ function buildLeaseholdDemoTract(
     grantor: branchA,
     grantee: ownerB,
     landDesc: tract.landDesc,
-    initialFraction: '0.300000000',
-    remainingFraction: '0.300000000',
-    remarks: `${tract.name} second present owner block yielding 30% of the tract.`,
+    initialFraction: '0.250000000',
+    remainingFraction: '0.250000000',
+    remarks: `${tract.name} second present owner block yielding one quarter of the tract.`,
   });
   const secondBranchId = addLeaseholdDemoConveyance(state, {
     parentId: firstBranchId,
@@ -1752,9 +1791,9 @@ function buildLeaseholdDemoTract(
     grantor: branchA,
     grantee: branchB,
     landDesc: tract.landDesc,
-    initialFraction: '0.300000000',
+    initialFraction: '0.250000000',
     remainingFraction: '0.000000000',
-    remarks: `${tract.name} branch correction setting up the final 20% and 10% owner blocks.`,
+    remarks: `${tract.name} branch correction setting up the final one-eighth owner blocks.`,
   });
   const ownerCId = addLeaseholdDemoConveyance(state, {
     parentId: secondBranchId,
@@ -1764,9 +1803,9 @@ function buildLeaseholdDemoTract(
     grantor: branchB,
     grantee: ownerC,
     landDesc: tract.landDesc,
-    initialFraction: '0.200000000',
-    remainingFraction: '0.200000000',
-    remarks: `${tract.name} third present owner block yielding 20% of the tract.`,
+    initialFraction: '0.125000000',
+    remainingFraction: '0.125000000',
+    remarks: `${tract.name} third present owner block yielding one eighth of the tract.`,
   });
   const ownerDId = addLeaseholdDemoConveyance(state, {
     parentId: secondBranchId,
@@ -1776,9 +1815,9 @@ function buildLeaseholdDemoTract(
     grantor: branchB,
     grantee: ownerD,
     landDesc: tract.landDesc,
-    initialFraction: '0.100000000',
-    remainingFraction: '0.100000000',
-    remarks: `${tract.name} final present owner block yielding 10% of the tract.`,
+    initialFraction: '0.125000000',
+    remainingFraction: '0.125000000',
+    remarks: `${tract.name} final present owner block yielding one eighth of the tract.`,
   });
 
   const currentOwnerNodeIds = [
@@ -1787,7 +1826,7 @@ function buildLeaseholdDemoTract(
     ownerCId,
     ownerDId,
   ].filter((nodeId): nodeId is string => Boolean(nodeId));
-  const currentOwnerFractions = ['0.400000000', '0.300000000', '0.200000000', '0.100000000'];
+  const currentOwnerFractions = ['0.500000000', '0.250000000', '0.125000000', '0.125000000'];
 
   currentOwnerNodeIds.forEach((nodeId, index) => {
     addLeaseholdDemoLease(
