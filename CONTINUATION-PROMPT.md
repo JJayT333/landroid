@@ -12,14 +12,14 @@ Before making architectural decisions, read:
 - `/Users/abstractmapping/projects/landroid/CONTINUATION-PROMPT.md`
 
 Current repo state:
-- Active branch: `claude_audit`
+- Active branch: `main`
 - Latest inherited pushed checkpoint before this branch work: `60cf008` (`feat: checkpoint leasehold and research foundations`)
-- `main` is the trusted baseline and points to commit `afbdb93`
+- `main` is the trusted baseline and now points to commit `a76b367`
 - Safety branches kept on purpose: `baseline-afbdb93`, `v2-desk-map-interactions-and-resize`
 - Active app is the repository root
 - The repository root is both the app surface and the repo-level coordination layer
-- The active branch for current work is `claude_audit`
-- This branch now carries the safe pre-deck checkpoint plus the ongoing local leasehold-deck experiment worktree
+- The active branch for current work is `main`
+- `claude_audit` and `main` currently point at the same validated checkpoint commit
 
 User preferences and working style:
 - The user is fairly new and wants careful, reversible changes
@@ -214,7 +214,7 @@ Known local noise:
 - Do not delete anything destructively unless the user asks
 
 Current status:
-- The active `claude_audit` branch is intended to hold the validated local checkpoint for the `Leasehold` deck work plus the Desk Map multi-root clarification on top of inherited checkpoint `60cf008`
+- The active `main` branch now holds the validated checkpoint for the audit fixes, leasehold hardening, and Desk Map multi-root clarification on top of inherited checkpoint `60cf008`
 - Full validation on the current local worktree passed: `npm test`, `npm run lint`, and `npm run build`
 - The current local worktree now also passes targeted leasehold/persistence coverage after the WI assignment slice: `npm test -- --run src/components/leasehold/__tests__/leasehold-summary.test.ts src/storage/__tests__/workspace-persistence.test.ts src/storage/__tests__/seed-test-data.test.ts src/storage/__tests__/autosave-change-detection.test.ts src/storage/__tests__/csv-io.test.ts`
 - The transfer-order review extension also passes targeted leasehold coverage: `npm test -- --run src/components/leasehold/__tests__/leasehold-summary.test.ts`
@@ -277,7 +277,7 @@ Open risks / reminders:
 - The first payout-entry layer saves only owner number, status, and notes; decimals still remain derived and non-editable
 - Over-assignment is intentionally warning-only for now; if we ever want hard blocking, it should likely arrive with a more explicit draft/save validation flow instead of the current blur-save cards
 - Multi-root Desk Map starts are intentionally allowed even when provisional mineral coverage exceeds `100%`; that state should remain visible for reconciliation, not be hard-blocked
-- Relevant source/docs work should now live on `claude_audit`; keep unrelated local noise separate from future checkpoints
+- Relevant source/docs work should now live on `main`; keep unrelated local noise separate from future checkpoints
 - `dist/` and `dist-node/` contain generated validation output and should stay out of checkpoints unless explicitly requested
 
 Likely next steps:
