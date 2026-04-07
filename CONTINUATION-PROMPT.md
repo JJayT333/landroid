@@ -31,7 +31,7 @@ Audit quickstart:
 
 Current repo state:
 - Active branch: `codex/full-audit-handoff`
-- Current handoff checkpoint commit on this branch: `ad1aa77` (`feat: checkpoint audit handoff and math hardening`)
+- Current handoff checkpoint commit on this branch: `170ee33` (`docs: note handoff branch checkpoint`)
 - Latest inherited pushed checkpoint before this branch work: `60cf008` (`feat: checkpoint leasehold and research foundations`)
 - `main` is the trusted baseline and now points to commit `a76b367`
 - Safety branches kept on purpose: `baseline-afbdb93`, `v2-desk-map-interactions-and-resize`
@@ -250,7 +250,7 @@ Known local noise:
 Current status:
 - The active `main` branch still holds the last validated pushed checkpoint for the audit fixes, leasehold hardening, and Desk Map multi-root clarification on top of inherited checkpoint `60cf008`
 - The active working branch is now `codex/full-audit-handoff`
-- The current checkpoint commit on that branch is `ad1aa77`
+- The current checkpoint commit on that branch is `170ee33`
 - The current local worktree now also includes the first shared Desk Map / Runsheet editor path plus lease-node refresh from canonical owner-side lease edits
 - The current local worktree now also includes owner-side buttons to create or reopen Desk Map lease nodes for saved leases, plus stricter mutation-input rejection in the core math engine
 - `/Users/abstractmapping/projects/landroid/FULL-AUDIT-PROMPT.md` now exists as the paste-ready comprehensive audit brief for the next tool
