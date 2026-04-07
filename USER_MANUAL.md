@@ -155,6 +155,7 @@ It now has two internal modes:
 - Instruments from the current workspace
 - Related documents, visually marked as `(RELATED)`
 - Interest display using fraction formatting
+- An `Edit` action on each row that opens the same node or lease modal used in `Desk Map`
 - Columns in this order:
   - Instrument
   - File Date
@@ -181,6 +182,12 @@ At the top of the runsheet:
 - `All Tracts` shows the full workspace
 - Each tract button filters to that tract only
 
+### Editing from Runsheet
+- Use the `Edit` button on any row to open the same editor flow used in `Desk Map`.
+- Mineral-owner and related-document rows open the node edit modal.
+- Lease rows reopen the linked lease / lessee modal instead of a different form.
+- If you update a lease from `Owners`, linked lease rows in `Runsheet` and the linked Desk Map lease node refresh from that shared lease record.
+
 ### Export Runsheet
 `Export Runsheet` creates an `.xlsx` workbook from the current runsheet view.
 
@@ -204,6 +211,12 @@ Useful notes:
 - Use the `Info` tab for mailing/contact/prospect notes.
 - Use `Leases` and `Contacts` for working notes tied to that owner.
 - Use `Docs` to upload and preview supporting files.
+- Editing an existing lease in `Owners` now refreshes any linked Desk Map lease node and Runsheet lease row text that came from that lease record.
+- Each saved lease card also shows `Desk Map Lease Node` buttons for the linked tract chains, so you can create or reopen the terminal lessee node from `Owners` without hunting for that owner in the tree first.
+
+### Math safety
+- Core title-math mutations now fail fast on zero, blank, or non-numeric share inputs instead of quietly converting them to zero-interest branches.
+- Related nodes such as lease or document attachments are also validated to ensure they do not carry ownership fractions.
 
 ### Persistence behavior
 - Owner data is scoped to the current workspace.

@@ -4,6 +4,7 @@ import { createBlankLease, normalizeLease, type Lease } from '../../types/owner'
 import { d } from '../../engine/decimal';
 import { formatAsFraction } from '../../engine/fraction-display';
 import { normalizeInterestString, parseInterestString } from '../../utils/interest-string';
+import type { OwnerLeaseDeskMapTarget } from './owner-lease-deskmap';
 
 interface OwnerLeasesTabProps {
   workspaceId: string;
@@ -12,6 +13,11 @@ interface OwnerLeasesTabProps {
   onAdd: (lease: Lease) => Promise<void>;
   onUpdate: (id: string, fields: Partial<Lease>) => Promise<void>;
   onRemove: (id: string) => Promise<void>;
+  getDeskMapTargetsForLease: (leaseId: string) => OwnerLeaseDeskMapTarget[];
+  onOpenDeskMapLeaseTarget: (
+    lease: Lease,
+    target: OwnerLeaseDeskMapTarget
+  ) => void;
 }
 
 export default function OwnerLeasesTab({
@@ -21,6 +27,8 @@ export default function OwnerLeasesTab({
   onAdd,
   onUpdate,
   onRemove,
+  getDeskMapTargetsForLease,
+  onOpenDeskMapLeaseTarget,
 }: OwnerLeasesTabProps) {
   const [draft, setDraft] = useState<Lease | null>(null);
   const [saving, setSaving] = useState(false);
@@ -161,6 +169,11 @@ export default function OwnerLeasesTab({
             key={lease.id}
             className="rounded-xl border border-ledger-line bg-parchment px-4 py-3"
           >
+            {(() => {
+              const deskMapTargets = getDeskMapTargetsForLease(lease.id);
+
+              return (
+                <>
             <div className="flex items-start justify-between gap-3">
               <div className="space-y-1">
                 <div className="text-sm font-semibold text-ink">
@@ -218,6 +231,36 @@ export default function OwnerLeasesTab({
                 </button>
               </div>
             </div>
+                  <div className="mt-3 pt-3 border-t border-ledger-line/70">
+                    <div className="text-[10px] font-semibold uppercase tracking-wider text-ink-light">
+                      Desk Map Lease Node
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {deskMapTargets.length > 0 ? (
+                        deskMapTargets.map((target) => (
+                          <button
+                            key={`${lease.id}-${target.parentNodeId}`}
+                            type="button"
+                            onClick={() => onOpenDeskMapLeaseTarget(lease, target)}
+                            className="px-3 py-1.5 rounded-lg text-xs font-semibold text-emerald-900 hover:bg-emerald-100 border border-emerald-300 transition-colors"
+                          >
+                            {target.leaseNodeId ? 'Open' : 'Create'} {target.deskMapName}
+                          </button>
+                        ))
+                      ) : (
+                        <button
+                          type="button"
+                          disabled
+                          className="px-3 py-1.5 rounded-lg text-xs font-semibold text-ink-light border border-ledger-line opacity-70 cursor-not-allowed"
+                        >
+                          Link Owner In Desk Map First
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </>
+              );
+            })()}
           </div>
         ))}
       </div>

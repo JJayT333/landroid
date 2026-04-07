@@ -10,19 +10,16 @@ import {
   normalizeLease,
   type Lease,
 } from '../../types/owner';
+import { deriveCounty } from '../../utils/land';
 import { normalizeInterestString } from '../../utils/interest-string';
 import FormField from '../shared/FormField';
 import Modal from '../shared/Modal';
 
 interface AttachLeaseModalProps {
   parentNode: OwnershipNode;
+  preferredLeaseId?: string | null;
   onClose: () => void;
   onSaved?: (nodeId: string) => void;
-}
-
-function deriveCounty(landDesc: string): string {
-  const match = landDesc.match(/([A-Za-z .'-]+?)\s+County\b/i);
-  return match?.[1]?.trim() ?? '';
 }
 
 function createLeaseDraft(workspaceId: string, ownerId: string, parentNode: OwnershipNode) {
@@ -36,6 +33,7 @@ function createLeaseDraft(workspaceId: string, ownerId: string, parentNode: Owne
 
 export default function AttachLeaseModal({
   parentNode,
+  preferredLeaseId = null,
   onClose,
   onSaved,
 }: AttachLeaseModalProps) {
@@ -67,6 +65,13 @@ export default function AttachLeaseModal({
     [nodes, parentNode.id]
   );
   const existingLease = useMemo(() => {
+    if (preferredLeaseId) {
+      const preferredLease = leases.find((lease) => lease.id === preferredLeaseId) ?? null;
+      if (preferredLease) {
+        return preferredLease;
+      }
+    }
+
     if (existingLeaseNode?.linkedLeaseId) {
       return leases.find((lease) => lease.id === existingLeaseNode.linkedLeaseId) ?? null;
     }
@@ -78,7 +83,7 @@ export default function AttachLeaseModal({
     return pickPrimaryLease(
       leases.filter((lease) => lease.ownerId === parentNode.linkedOwnerId)
     );
-  }, [existingLeaseNode?.linkedLeaseId, leases, parentNode.linkedOwnerId]);
+  }, [existingLeaseNode?.linkedLeaseId, leases, parentNode.linkedOwnerId, preferredLeaseId]);
   const [draft, setDraft] = useState<Lease>(() =>
     existingLease
       ? normalizeLease(existingLease, {

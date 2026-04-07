@@ -1,9 +1,16 @@
-import { useEffect } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 import OwnerDetailPanel from '../components/owners/OwnerDetailPanel';
+import { getOwnerLeaseDeskMapTargets } from '../components/owners/owner-lease-deskmap';
 import { useOwnerStore } from '../store/owner-store';
+import { useUIStore } from '../store/ui-store';
+import { useWorkspaceStore } from '../store/workspace-store';
 import { createBlankOwner } from '../types/owner';
 
 export default function OwnerDatabaseView() {
+  const setView = useUIStore((state) => state.setView);
+  const setPendingNodeEditorRoute = useUIStore(
+    (state) => state.setPendingNodeEditorRoute
+  );
   const workspaceId = useOwnerStore((state) => state.workspaceId);
   const owners = useOwnerStore((state) => state.owners);
   const leases = useOwnerStore((state) => state.leases);
@@ -25,14 +32,56 @@ export default function OwnerDatabaseView() {
   const addDoc = useOwnerStore((state) => state.addDoc);
   const updateDoc = useOwnerStore((state) => state.updateDoc);
   const removeDoc = useOwnerStore((state) => state.removeDoc);
+  const nodes = useWorkspaceStore((state) => state.nodes);
+  const deskMaps = useWorkspaceStore((state) => state.deskMaps);
+  const setActiveDeskMap = useWorkspaceStore((state) => state.setActiveDeskMap);
+  const setActiveNode = useWorkspaceStore((state) => state.setActiveNode);
 
   const selectedOwner = owners.find((owner) => owner.id === selectedOwnerId) ?? null;
+  const selectedOwnerLeases = useMemo(
+    () =>
+      selectedOwner
+        ? leases.filter((lease) => lease.ownerId === selectedOwner.id)
+        : [],
+    [leases, selectedOwner]
+  );
+  const deskMapTargetsByLeaseId = useMemo(() => {
+    if (!selectedOwner) {
+      return new Map();
+    }
+
+    return new Map(
+      selectedOwnerLeases.map((lease) => [
+        lease.id,
+        getOwnerLeaseDeskMapTargets({
+          ownerId: selectedOwner.id,
+          leaseId: lease.id,
+          nodes,
+          deskMaps,
+        }),
+      ])
+    );
+  }, [deskMaps, nodes, selectedOwner, selectedOwnerLeases]);
 
   useEffect(() => {
     if (!selectedOwnerId && owners.length > 0) {
       selectOwner(owners[0].id);
     }
   }, [owners, selectOwner, selectedOwnerId]);
+
+  const handleOpenDeskMapLeaseTarget = useCallback(
+    (leaseId: string, target: { deskMapId: string; leaseNodeId: string | null; parentNodeId: string }) => {
+      setActiveDeskMap(target.deskMapId);
+      setActiveNode(target.leaseNodeId ?? target.parentNodeId);
+      setPendingNodeEditorRoute({
+        kind: 'lease',
+        parentNodeId: target.parentNodeId,
+        leaseId,
+      });
+      setView('chart');
+    },
+    [setActiveDeskMap, setActiveNode, setPendingNodeEditorRoute, setView]
+  );
 
   return (
     <div className="h-full grid gap-4 p-4 bg-parchment-dark/30 lg:grid-cols-[320px_minmax(0,1fr)]">
@@ -90,7 +139,7 @@ export default function OwnerDatabaseView() {
             key={selectedOwner.id}
             workspaceId={workspaceId}
             owner={selectedOwner}
-            leases={leases.filter((lease) => lease.ownerId === selectedOwner.id)}
+            leases={selectedOwnerLeases}
             contacts={contacts.filter((contact) => contact.ownerId === selectedOwner.id)}
             docs={docs.filter((doc) => doc.ownerId === selectedOwner.id)}
             tab={selectedOwnerTab}
@@ -100,6 +149,12 @@ export default function OwnerDatabaseView() {
             onAddLease={addLease}
             onUpdateLease={updateLease}
             onRemoveLease={removeLease}
+            getDeskMapTargetsForLease={(leaseId) =>
+              deskMapTargetsByLeaseId.get(leaseId) ?? []
+            }
+            onOpenDeskMapLeaseTarget={(lease, target) =>
+              handleOpenDeskMapLeaseTarget(lease.id, target)
+            }
             onAddContact={addContact}
             onUpdateContact={updateContact}
             onRemoveContact={removeContact}

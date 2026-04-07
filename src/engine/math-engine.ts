@@ -69,6 +69,31 @@ function fromCalc(cn: CalcNode): OwnershipNode {
   } as OwnershipNode;
 }
 
+function parseStrictDecimal(
+  value: string | number | Decimal | undefined | null
+): Decimal | null {
+  if (value instanceof Decimal) {
+    return value.isFinite() ? value : null;
+  }
+
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? new Decimal(value) : null;
+  }
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    try {
+      const parsed = new Decimal(trimmed);
+      return parsed.isFinite() ? parsed : null;
+    } catch {
+      return null;
+    }
+  }
+
+  return null;
+}
+
 // ---------------------------------------------------------------------------
 // Graph helpers
 // ---------------------------------------------------------------------------
@@ -191,6 +216,8 @@ function err(code: string, message: string, details?: unknown): Result<Ownership
   return { ok: false, error: { code, message, details: details ?? null } };
 }
 
+const EPSILON = new Decimal('0.000000001');
+
 // ---------------------------------------------------------------------------
 // Operation 1: Conveyance
 // ---------------------------------------------------------------------------
@@ -212,6 +239,9 @@ export function executeConveyance(params: ConveyanceParams): Result<OwnershipNod
 
   const parent = nodes.find((n) => n.id === parentId);
   if (!parent) return err('missing_node', `parentId ${parentId} was not found`);
+  if (parent.type === 'related') {
+    return err('invalid_input', 'Conveyances must originate from a title-interest node');
+  }
 
   const parentInterestClass = getCalcInterestClass(parent);
   const childInterestClass =
@@ -223,9 +253,13 @@ export function executeConveyance(params: ConveyanceParams): Result<OwnershipNod
     );
   }
 
-  const shareAmt = clamp(d(share));
-  if (!shareAmt.isFinite()) return err('invalid_input', 'share must be a finite number');
-  if (shareAmt.greaterThan(clamp(parent.fraction).plus('0.000000001'))) {
+  const parsedShare = parseStrictDecimal(share);
+  if (!parsedShare) return err('invalid_input', 'share must be a finite number');
+  if (parsedShare.lessThanOrEqualTo(0)) {
+    return err('invalid_input', 'share must be greater than zero');
+  }
+  const shareAmt = parsedShare;
+  if (shareAmt.greaterThan(clamp(parent.fraction).plus(EPSILON))) {
     return err('invalid_input', 'share exceeds parent remaining fraction', {
       parentId,
       parentFraction: serialize(parent.fraction),
@@ -297,10 +331,11 @@ export function executeCreateNpri(params: CreateNpriParams): Result<OwnershipNod
     );
   }
 
-  const shareAmt = clamp(d(share));
-  if (!shareAmt.isFinite()) return err('invalid_input', 'share must be a finite number');
+  const parsedShare = parseStrictDecimal(share);
+  if (!parsedShare) return err('invalid_input', 'share must be a finite number');
+  const shareAmt = parsedShare;
   if (shareAmt.lessThanOrEqualTo(0)) return err('invalid_input', 'share must be greater than zero');
-  if (shareAmt.greaterThan('1.000000001')) {
+  if (shareAmt.greaterThan(new Decimal(1).plus(EPSILON))) {
     return err('invalid_input', 'NPRI share cannot exceed the full royalty interest');
   }
 
@@ -359,8 +394,18 @@ export function executeRebalance(params: RebalanceParams): Result<OwnershipNode[
   if (oldInitial.lessThanOrEqualTo(0)) {
     return err('invalid_input', 'Cannot rebalance a node with zero or near-zero initial fraction');
   }
+  if (node.type === 'related') {
+    return err('invalid_input', 'Cannot rebalance a related document or lease node');
+  }
 
-  const newInitial = clamp(d(newInitialFraction));
+  const parsedNewInitial = parseStrictDecimal(newInitialFraction);
+  if (!parsedNewInitial) {
+    return err('invalid_input', 'newInitialFraction must be a finite number');
+  }
+  if (parsedNewInitial.lessThanOrEqualTo(0)) {
+    return err('invalid_input', 'newInitialFraction must be greater than zero');
+  }
+  const newInitial = parsedNewInitial;
   const scaleFactor = newInitial.div(oldInitial);
   const descendants = collectAllocatingDescendantIds(nodes, nodeId);
   const affectedCount = descendants.size + 1;
@@ -423,13 +468,23 @@ export function executePredecessorInsert(params: PredecessorInsertParams): Resul
   if (!activeNode) return err('missing_node', 'Unable to insert predecessor for missing node');
   if (nodes.find((n) => n.id === newPredecessorId)) return err('conflicting_structure', `newPredecessorId ${newPredecessorId} already exists`);
   if (newPredecessorId === activeNodeId) return err('conflicting_structure', 'newPredecessorId cannot equal activeNodeId');
+  if (activeNode.type === 'related') {
+    return err('invalid_input', 'Cannot insert a predecessor above a related document or lease node');
+  }
 
   const oldInitial = activeNode.initialFraction;
   if (oldInitial.lessThanOrEqualTo(0)) {
     return err('invalid_input', 'Cannot insert predecessor on a node with zero or near-zero initial fraction');
   }
 
-  const newInitial = clamp(d(newInitialFraction));
+  const parsedNewInitial = parseStrictDecimal(newInitialFraction);
+  if (!parsedNewInitial) {
+    return err('invalid_input', 'newInitialFraction must be a finite number');
+  }
+  if (parsedNewInitial.lessThanOrEqualTo(0)) {
+    return err('invalid_input', 'newInitialFraction must be greater than zero');
+  }
+  const newInitial = parsedNewInitial;
   const scaleFactor = newInitial.div(oldInitial);
   const descendants = collectAllocatingDescendantIds(nodes, activeNodeId);
   const affectedCount = descendants.size + 1;
@@ -506,6 +561,9 @@ export function executeAttachConveyance(params: AttachConveyanceParams): Result<
   if (!sourceRoot) return err('missing_node', `activeNodeId ${activeNodeId} was not found`);
   const destination = nodes.find((n) => n.id === attachParentId);
   if (!destination) return err('missing_node', `attachParentId ${attachParentId} was not found`);
+  if (sourceRoot.type === 'related' || destination.type === 'related') {
+    return err('invalid_input', 'Attach conveyance only works between title-interest nodes');
+  }
   if (getCalcInterestClass(sourceRoot) !== getCalcInterestClass(destination)) {
     return err('interest_class_mismatch', 'Cannot attach across mineral and NPRI branches');
   }
@@ -526,12 +584,16 @@ export function executeAttachConveyance(params: AttachConveyanceParams): Result<
     && allocatesAgainstParent(sourceParent, sourceRoot)
   );
 
-  const newRootFraction = clamp(d(calcShare));
-  if (!newRootFraction.isFinite()) return err('invalid_input', 'calcShare must be a finite number');
+  const parsedCalcShare = parseStrictDecimal(calcShare);
+  if (!parsedCalcShare) return err('invalid_input', 'calcShare must be a finite number');
+  if (parsedCalcShare.lessThanOrEqualTo(0)) {
+    return err('invalid_input', 'calcShare must be greater than zero');
+  }
+  const newRootFraction = parsedCalcShare;
   const destinationCapacity = refundSourceParent && sourceParentId === attachParentId
     ? clamp(destination.fraction.plus(sourceRoot.initialFraction))
     : clamp(destination.fraction);
-  if (newRootFraction.greaterThan(destinationCapacity.plus('0.000000001'))) {
+  if (newRootFraction.greaterThan(destinationCapacity.plus(EPSILON))) {
     return err('invalid_input', 'calcShare exceeds destination remaining fraction', {
       attachParentId,
       destinationFraction: serialize(destinationCapacity),
@@ -733,7 +795,6 @@ function validateCalcGraph(nodes: CalcNode[]): ValidationResult {
   }
 
   // Check branch allocation invariant
-  const EPSILON = new Decimal('0.000000001');
   for (const node of nodes) {
     if (!node.id || node.type === 'related') continue;
     const initial = clamp(node.initialFraction);
@@ -771,6 +832,21 @@ function validateCalcGraph(nodes: CalcNode[]): ValidationResult {
           remaining: serialize(remaining),
           childInitialTotal: serialize(childInitialTotal),
           allocated: serialize(allocated),
+        },
+      });
+    }
+  }
+
+  for (const node of nodes) {
+    if (node.type !== 'related') continue;
+    if (!clamp(node.initialFraction).isZero() || !clamp(node.fraction).isZero()) {
+      issues.push({
+        code: 'related_node_with_fraction',
+        nodeId: node.id,
+        message: `Related node ${node.id} should not carry ownership fractions`,
+        details: {
+          initialFraction: serialize(node.initialFraction),
+          fraction: serialize(node.fraction),
         },
       });
     }

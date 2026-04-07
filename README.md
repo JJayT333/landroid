@@ -29,8 +29,8 @@ Then open `http://localhost:5173/`.
 - `Desk Map` for title-chain editing, ownership-versus-leasing coverage checks, multiple starting root families when title is still incomplete, leased-status flags on mineral-owner cards, separate terminal lessee nodes, and separate NPRI branches that do not reduce the mineral coverage totals
 - `Leasehold` for acreage-first tract setup, pooled-participation review, unit metadata, dual gross-vs-pooled owner acreage outputs, aggregated royalty calculations across active lease records, leasehold-side ORRI burden tracking across gross `8/8`, working-interest, and net-revenue-interest bases, first WI assignment splits, and a card-based internal `Deck` view with editable unit-level transfer-order rows layered on top of the derived review surface
 - `Flowchart` for presentation and print layout
-- `Runsheet` for chronology review and export
-- `Owners` for workspace-scoped owner, lease, contact, and document records
+- `Runsheet` for chronology review, export, and opening the same node or lease editor cards used in `Desk Map`
+- `Owners` for workspace-scoped owner, lease, contact, and document records, with lease edits flowing back into linked Desk Map and Runsheet lease nodes plus direct buttons to create or reopen the linked Desk Map lease node from each saved lease card
 - `Maps` for the featured-map workspace with supporting PDF/image/GeoJSON assets, linked regions, and outside references
 - `Research` for workspace-scoped RRC dataset cataloging, imported research files, explicit-save metadata editing, readable table previews for delimited RRC TXT files, and structured decoder paths for pending drilling permits, drilling-permit master files, and horizontal drilling permits
 

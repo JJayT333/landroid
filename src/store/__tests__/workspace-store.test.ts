@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createBlankLeaseholdUnit } from '../../types/leasehold';
 import { createBlankNode } from '../../types/node';
+import { createBlankLease } from '../../types/owner';
 
 const mocks = vi.hoisted(() => ({
   unlinkDeskMap: vi.fn(),
@@ -120,5 +121,57 @@ describe('workspace-store', () => {
     expect(state.activeDeskMapId).toBe('dm-1');
     expect(state.deskMaps[0]?.nodeIds).toEqual(['node-99']);
     expect(state.deskMaps[1]?.nodeIds).toEqual([]);
+  });
+
+  it('refreshes linked lease node display fields from the canonical lease record', () => {
+    const parentNode = {
+      ...createBlankNode('owner-node', null),
+      grantee: 'Ava Moonwhistle',
+      landDesc: 'Abstract 1, Example County, Texas',
+      linkedOwnerId: 'owner-1',
+      initialFraction: '1',
+      fraction: '1',
+    };
+    const leaseNode = {
+      ...createBlankNode('lease-node', 'owner-node'),
+      type: 'related' as const,
+      relatedKind: 'lease' as const,
+      grantee: 'Old Lessee',
+      remarks: 'stale remarks',
+      linkedOwnerId: 'owner-1',
+      linkedLeaseId: 'lease-1',
+    };
+    const lease = createBlankLease('ws-test', 'owner-1', {
+      id: 'lease-1',
+      leaseName: 'Updated Lease',
+      lessee: 'Bluebonnet Operating',
+      royaltyRate: '1/8',
+      leasedInterest: '1',
+      status: 'Active',
+      docNo: '2026-1001',
+      notes: 'Fresh notes',
+    });
+
+    useWorkspaceStore.setState({
+      nodes: [parentNode, leaseNode],
+    });
+
+    useWorkspaceStore.getState().syncLeaseNodesFromRecord(lease);
+
+    expect(useWorkspaceStore.getState().nodes).toEqual([
+      expect.objectContaining({ id: 'owner-node' }),
+      expect.objectContaining({
+        id: 'lease-node',
+        grantee: 'Bluebonnet Operating',
+        docNo: '2026-1001',
+        linkedLeaseId: 'lease-1',
+      }),
+    ]);
+    expect(useWorkspaceStore.getState().nodes[1]?.remarks).toContain(
+      'Lease: Updated Lease'
+    );
+    expect(useWorkspaceStore.getState().nodes[1]?.remarks).toContain(
+      'Royalty: 1/8'
+    );
   });
 });

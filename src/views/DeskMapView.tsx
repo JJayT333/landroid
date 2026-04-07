@@ -27,15 +27,13 @@ import {
   toDeskMapPrimaryLeaseSummary,
   type DeskMapPrimaryLeaseSummary,
 } from '../components/deskmap/deskmap-coverage';
-import NodeEditModal from '../components/modals/NodeEditModal';
 import ConveyModal from '../components/modals/ConveyModal';
-import CreateNpriModal from '../components/modals/CreateNpriModal';
 import PredecessorModal from '../components/modals/PredecessorModal';
 import AttachDocModal from '../components/modals/AttachDocModal';
-import AttachLeaseModal from '../components/modals/AttachLeaseModal';
-import PdfViewerModal from '../components/modals/PdfViewerModal';
+import OwnershipNodeEditorModals from '../components/shared/OwnershipNodeEditorModals';
 import { createBlankNode, isNpriNode } from '../types/node';
-import { createBlankOwner } from '../types/owner';
+import type { NodeEditorRoute } from '../utils/node-editor-route';
+import { resolveNodeEditorRoute } from '../utils/node-editor-route';
 
 // ── Tree branch renderer ────────────────────────────────
 
@@ -258,11 +256,6 @@ function PanZoomContainer({ children }: { children: React.ReactNode }) {
   );
 }
 
-function deriveCounty(landDesc: string) {
-  const match = landDesc.match(/([A-Za-z .'-]+?)\s+County\b/i);
-  return match?.[1]?.trim() ?? '';
-}
-
 function formatCoveragePercent(value: string) {
   return `${d(value).times(100).toFixed(2)}%`;
 }
@@ -329,28 +322,22 @@ function CoverageCard({
 // ── Main view ───────────────────────────────────────────
 
 export default function DeskMapView() {
-  const setView = useUIStore((state) => state.setView);
-  const owners = useOwnerStore((state) => state.owners);
+  const pendingNodeEditorRoute = useUIStore((state) => state.pendingNodeEditorRoute);
+  const setPendingNodeEditorRoute = useUIStore((state) => state.setPendingNodeEditorRoute);
   const leases = useOwnerStore((state) => state.leases);
-  const ownerWorkspaceId = useOwnerStore((state) => state.workspaceId);
-  const addOwnerRecord = useOwnerStore((state) => state.addOwner);
-  const selectOwner = useOwnerStore((state) => state.selectOwner);
-  const workspaceId = useWorkspaceStore((state) => state.workspaceId);
   const nodes = useWorkspaceStore((s) => s.nodes);
   const deskMaps = useWorkspaceStore((s) => s.deskMaps);
   const setActiveNode = useWorkspaceStore((s) => s.setActiveNode);
   const removeNode = useWorkspaceStore((s) => s.removeNode);
   const addNode = useWorkspaceStore((s) => s.addNode);
-  const updateNode = useWorkspaceStore((s) => s.updateNode);
   const createDeskMap = useWorkspaceStore((s) => s.createDeskMap);
   const addNodeToActiveDeskMap = useWorkspaceStore((s) => s.addNodeToActiveDeskMap);
   const activeDeskMapId = useWorkspaceStore((s) => s.activeDeskMapId);
 
-  const [editNodeId, setEditNodeId] = useState<string | null>(null);
+  const [editorRoute, setEditorRoute] = useState<NodeEditorRoute | null>(null);
   const [conveyParentId, setConveyParentId] = useState<string | null>(null);
   const [precedeNodeId, setPrecedeNodeId] = useState<string | null>(null);
   const [attachDocParentId, setAttachDocParentId] = useState<string | null>(null);
-  const [leaseParentId, setLeaseParentId] = useState<string | null>(null);
   const [npriParentId, setNpriParentId] = useState<string | null>(null);
   const [pdfViewNodeId, setPdfViewNodeId] = useState<string | null>(null);
 
@@ -366,13 +353,15 @@ export default function DeskMapView() {
     }
   }, [hydrated, deskMaps.length, createDeskMap]);
 
+  useEffect(() => {
+    if (!pendingNodeEditorRoute) return;
+    setEditorRoute(pendingNodeEditorRoute);
+    setPendingNodeEditorRoute(null);
+  }, [pendingNodeEditorRoute, setPendingNodeEditorRoute]);
+
   const nodeById = useMemo(
     () => new Map(nodes.map((node) => [node.id, node])),
     [nodes]
-  );
-  const ownerById = useMemo(
-    () => new Map(owners.map((owner) => [owner.id, owner])),
-    [owners]
   );
   const activeLeasesByOwnerId = useMemo(() => {
     const groupedLeases = new Map<string, typeof leases>();
@@ -436,23 +425,19 @@ export default function DeskMapView() {
     [activeLeasesByOwnerId, visibleNodes]
   );
   const trees = useMemo(() => buildDeskMapTree(visibleNodes), [visibleNodes]);
-  const editNode = editNodeId ? nodeById.get(editNodeId) ?? null : null;
   const conveyParent = conveyParentId ? nodeById.get(conveyParentId) ?? null : null;
   const precedeNode = precedeNodeId ? nodeById.get(precedeNodeId) ?? null : null;
-  const leaseParent = leaseParentId ? nodeById.get(leaseParentId) ?? null : null;
-  const npriParent = npriParentId ? nodeById.get(npriParentId) ?? null : null;
-  const pdfViewNode = pdfViewNodeId ? nodeById.get(pdfViewNodeId) ?? null : null;
 
   const handleEdit = useCallback((id: string) => {
     const node = nodeById.get(id) ?? null;
-    if (node && isLeaseNode(node) && node.parentId) {
-      setActiveNode(node.id);
-      setLeaseParentId(node.parentId);
+    const route = resolveNodeEditorRoute(node);
+
+    if (!route) {
       return;
     }
 
     setActiveNode(id);
-    setEditNodeId(id);
+    setEditorRoute(route);
   }, [nodeById, setActiveNode]);
 
   const handleConvey = useCallback((id: string) => {
@@ -482,72 +467,6 @@ export default function DeskMapView() {
     setPdfViewNodeId(id);
   }, []);
 
-  const handleManageLease = useCallback(
-    (nodeId: string) => {
-      setEditNodeId(null);
-      setLeaseParentId(nodeId);
-    },
-    []
-  );
-
-  const handleManageNpri = useCallback(
-    (nodeId: string) => {
-      setEditNodeId(null);
-      setNpriParentId(nodeId);
-    },
-    []
-  );
-
-  const handleManageOwner = useCallback(
-    async (nodeId: string) => {
-      const node = nodeById.get(nodeId) ?? null;
-      if (!node) return;
-      if (node.type === 'related' && !node.linkedOwnerId) return;
-
-      const linkedOwner = node.linkedOwnerId
-        ? ownerById.get(node.linkedOwnerId) ?? null
-        : null;
-
-      if (linkedOwner) {
-        selectOwner(linkedOwner.id);
-        setView('owners');
-        setEditNodeId(null);
-        return;
-      }
-
-      const nextOwner = createBlankOwner(ownerWorkspaceId ?? workspaceId, {
-        name: node.grantee || 'New Owner',
-        county: deriveCounty(node.landDesc),
-        prospect: activeDeskMap?.name ?? '',
-        notes: [
-          node.instrument ? `Source Instrument: ${node.instrument}` : '',
-          node.docNo ? `Doc #: ${node.docNo}` : '',
-          node.landDesc ? `Land: ${node.landDesc}` : '',
-          node.remarks ? `Remarks: ${node.remarks}` : '',
-        ]
-          .filter(Boolean)
-          .join('\n'),
-      });
-
-      await addOwnerRecord(nextOwner);
-      updateNode(node.id, { linkedOwnerId: nextOwner.id });
-      selectOwner(nextOwner.id);
-      setView('owners');
-      setEditNodeId(null);
-    },
-    [
-      activeDeskMap?.name,
-      addOwnerRecord,
-      nodeById,
-      ownerWorkspaceId,
-      ownerById,
-      selectOwner,
-      setView,
-      updateNode,
-      workspaceId,
-    ]
-  );
-
   const handleAddRoot = useCallback(() => {
     const id = `node-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
     const root = {
@@ -563,8 +482,9 @@ export default function DeskMapView() {
     } else {
       addNodeToActiveDeskMap(id);
     }
-    setEditNodeId(id);
-  }, [addNode, addNodeToActiveDeskMap, createDeskMap, deskMaps.length]);
+    setActiveNode(id);
+    setEditorRoute({ kind: 'node', nodeId: id });
+  }, [addNode, addNodeToActiveDeskMap, createDeskMap, deskMaps.length, setActiveNode]);
 
   return (
     <div className="w-full h-full relative flex flex-col">
@@ -672,36 +592,14 @@ export default function DeskMapView() {
           </PanZoomContainer>
         )}
 
-        {/* Edit modal */}
-        {editNode && (
-          <NodeEditModal
-            node={editNode}
-            linkedOwnerName={
-              editNode.linkedOwnerId
-                ? ownerById.get(editNode.linkedOwnerId)?.name ?? null
-                : null
-            }
-            leaseStatusText={
-              editNode.type !== 'related'
-                ? (() => {
-                    const leaseSummary = leaseSummaryByNodeId.get(editNode.id) ?? null;
-                    if (!leaseSummary) return null;
-                    return leaseSummary.lessee
-                      ? `Leased to ${leaseSummary.lessee}`
-                      : 'Lease node on file';
-                  })()
-                : null
-            }
-            onManageOwner={handleManageOwner}
-            onManageLease={handleManageLease}
-            onManageNpri={handleManageNpri}
-            onClose={() => setEditNodeId(null)}
-            onViewPdf={(id) => {
-              setEditNodeId(null);
-              setPdfViewNodeId(id);
-            }}
-          />
-        )}
+        <OwnershipNodeEditorModals
+          route={editorRoute}
+          onSetRoute={setEditorRoute}
+          npriParentId={npriParentId}
+          onSetNpriParentId={setNpriParentId}
+          pdfViewNodeId={pdfViewNodeId}
+          onSetPdfViewNodeId={setPdfViewNodeId}
+        />
 
         {/* Convey modal */}
         {conveyParent && (
@@ -724,33 +622,6 @@ export default function DeskMapView() {
           <AttachDocModal
             parentNodeId={attachDocParentId}
             onClose={() => setAttachDocParentId(null)}
-          />
-        )}
-
-        {leaseParent && (
-          <AttachLeaseModal
-            parentNode={leaseParent}
-            onClose={() => setLeaseParentId(null)}
-            onSaved={(nodeId) => {
-              setLeaseParentId(null);
-              setActiveNode(nodeId);
-            }}
-          />
-        )}
-
-        {npriParent && (
-          <CreateNpriModal
-            parentNode={npriParent}
-            onClose={() => setNpriParentId(null)}
-          />
-        )}
-
-        {/* PDF viewer modal */}
-        {pdfViewNodeId && (
-          <PdfViewerModal
-            nodeId={pdfViewNodeId}
-            fileNameHint={pdfViewNode?.docNo ? `${pdfViewNode.docNo}.pdf` : null}
-            onClose={() => setPdfViewNodeId(null)}
           />
         )}
       </div>

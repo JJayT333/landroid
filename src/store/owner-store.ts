@@ -178,6 +178,7 @@ export const useOwnerStore = create<OwnerState>()((set, get) => ({
       }
     );
     await saveLease(next);
+    useWorkspaceStore.getState().syncLeaseNodesFromRecord(next);
     set((state) => ({
       leases: state.leases.map((lease) => (lease.id === id ? next : lease)),
     }));

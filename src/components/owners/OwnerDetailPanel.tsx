@@ -9,6 +9,7 @@ import OwnerContactsTab from './OwnerContactsTab';
 import OwnerDocsTab from './OwnerDocsTab';
 import OwnerInfoTab from './OwnerInfoTab';
 import OwnerLeasesTab from './OwnerLeasesTab';
+import type { OwnerLeaseDeskMapTarget } from './owner-lease-deskmap';
 
 const tabs: { id: OwnerPanelTab; label: string }[] = [
   { id: 'info', label: 'Info' },
@@ -30,6 +31,11 @@ interface OwnerDetailPanelProps {
   onAddLease: (lease: Lease) => Promise<void>;
   onUpdateLease: (id: string, fields: Partial<Lease>) => Promise<void>;
   onRemoveLease: (id: string) => Promise<void>;
+  getDeskMapTargetsForLease: (leaseId: string) => OwnerLeaseDeskMapTarget[];
+  onOpenDeskMapLeaseTarget: (
+    lease: Lease,
+    target: OwnerLeaseDeskMapTarget
+  ) => void;
   onAddContact: (contact: ContactLog) => Promise<void>;
   onUpdateContact: (id: string, fields: Partial<ContactLog>) => Promise<void>;
   onRemoveContact: (id: string) => Promise<void>;
@@ -51,6 +57,8 @@ export default function OwnerDetailPanel({
   onAddLease,
   onUpdateLease,
   onRemoveLease,
+  getDeskMapTargetsForLease,
+  onOpenDeskMapLeaseTarget,
   onAddContact,
   onUpdateContact,
   onRemoveContact,
@@ -98,6 +106,8 @@ export default function OwnerDetailPanel({
             onAdd={onAddLease}
             onUpdate={onUpdateLease}
             onRemove={onRemoveLease}
+            getDeskMapTargetsForLease={getDeskMapTargetsForLease}
+            onOpenDeskMapLeaseTarget={onOpenDeskMapLeaseTarget}
           />
         )}
         {tab === 'contacts' && (

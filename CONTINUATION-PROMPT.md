@@ -10,16 +10,35 @@ Before making architectural decisions, read:
 - `/Users/abstractmapping/projects/landroid/AGENTS.md`
 - `/Users/abstractmapping/projects/landroid/PROJECT_CONTEXT.md`
 - `/Users/abstractmapping/projects/landroid/CONTINUATION-PROMPT.md`
+- `/Users/abstractmapping/projects/landroid/FULL-AUDIT-PROMPT.md` for the next comprehensive math / architecture audit
+
+Audit quickstart:
+- Verify the repo's actual stack from `/Users/abstractmapping/projects/landroid/package.json`, `/Users/abstractmapping/projects/landroid/vite.config.ts`, `/Users/abstractmapping/projects/landroid/src/main.tsx`, and `/Users/abstractmapping/projects/landroid/src/App.tsx` before accepting any prompt assumptions about React tooling, Tailwind setup, or JS vs TypeScript.
+- For the latest math, lease-sync, and owner-to-desk-map changes, start with:
+  - `/Users/abstractmapping/projects/landroid/src/engine/math-engine.ts`
+  - `/Users/abstractmapping/projects/landroid/src/engine/__tests__/math-engine.test.ts`
+  - `/Users/abstractmapping/projects/landroid/src/components/leasehold/leasehold-summary.ts`
+  - `/Users/abstractmapping/projects/landroid/src/components/deskmap/deskmap-coverage.ts`
+  - `/Users/abstractmapping/projects/landroid/src/components/deskmap/deskmap-lease-node.ts`
+  - `/Users/abstractmapping/projects/landroid/src/store/workspace-store.ts`
+  - `/Users/abstractmapping/projects/landroid/src/store/owner-store.ts`
+  - `/Users/abstractmapping/projects/landroid/src/views/DeskMapView.tsx`
+  - `/Users/abstractmapping/projects/landroid/src/views/RunsheetView.tsx`
+  - `/Users/abstractmapping/projects/landroid/src/views/OwnerDatabaseView.tsx`
+  - `/Users/abstractmapping/projects/landroid/docs/architecture/ownership-math-reference.md`
+  - `/Users/abstractmapping/projects/landroid/docs/architecture/audit-remediation-plan.md`
+  - `/Users/abstractmapping/projects/landroid/FULL-AUDIT-PROMPT.md`
 
 Current repo state:
-- Active branch: `main`
+- Active branch: `codex/full-audit-handoff`
 - Latest inherited pushed checkpoint before this branch work: `60cf008` (`feat: checkpoint leasehold and research foundations`)
 - `main` is the trusted baseline and now points to commit `a76b367`
 - Safety branches kept on purpose: `baseline-afbdb93`, `v2-desk-map-interactions-and-resize`
 - Active app is the repository root
 - The repository root is both the app surface and the repo-level coordination layer
-- The active branch for current work is `main`
+- The active branch for current work is `codex/full-audit-handoff`
 - `claude_audit` and `main` currently point at the same validated checkpoint commit
+- This branch contains the current uncommitted owner-lease-node, shared-editor, and math-hardening work that still needs a checkpoint commit
 
 User preferences and working style:
 - The user is fairly new and wants careful, reversible changes
@@ -34,6 +53,14 @@ User preferences and working style:
 - The user is actively testing prospect branding, including a top-left logo and a small full-color prospect mark in the top nav next to `Desk Map`
 
 Recent completed work:
+- Added direct `Desk Map Lease Node` actions to saved lease cards in `Owners`, so a lease can now create or reopen its linked Desk Map lessee node from the owner record without manually finding the parent owner card first
+- Extended the shared node-editor routing so owner-side lease actions can target a specific lease record when opening the Desk Map lease modal, instead of always falling back to the primary lease for that owner
+- Hardened the math engine to reject zero/blank/non-numeric mutation inputs for convey, rebalance, predecessor insert, and attach operations instead of silently normalizing them to zero-value branches
+- Added an extra validation invariant that related nodes must carry zero ownership fractions, and expanded math regression coverage for root predecessor inserts plus the stricter invalid-input cases
+- Added a shared ownership-node editor layer so `Desk Map` and `Runsheet` now open the same node edit modal, lease modal, NPRI modal, and PDF viewer path instead of maintaining separate edit flows
+- Added explicit `Edit` actions to `Runsheet`, so title rows can now reopen the same info cards used in `Desk Map` directly from the chronology table
+- Added shared node-editor routing so lease rows reopen the lease / lessee modal through the parent mineral-owner node while ordinary title rows still open the node edit modal
+- Hardened lease-record sync so editing a lease in `Owners` now refreshes any linked Desk Map lease node and Runsheet lease row text from the canonical lease record
 - Raised the Desk Map toolbar overlay above the pan/zoom canvas so `+ Add Root` is clickable again instead of being swallowed by the drag surface cursor layer
 - Eliminated the recurring large `FlowchartView` chunk warning by splitting React Flow into its own lazy vendor chunk and switching ELK layout loading to the small API entry plus worker asset instead of bundling the giant ELK runtime into the view chunk
 - `FlowchartView` now builds as a small lazy chunk, with ELK loaded separately through `src/engine/tree-layout.ts` and `vite.config.ts`
@@ -140,6 +167,9 @@ Important files involved in the recent work:
 - `/Users/abstractmapping/projects/landroid/src/views/FlowchartView.tsx`
 - `/Users/abstractmapping/projects/landroid/src/components/canvas/CanvasToolbar.tsx`
 - `/Users/abstractmapping/projects/landroid/src/views/RunsheetView.tsx`
+- `/Users/abstractmapping/projects/landroid/src/components/shared/OwnershipNodeEditorModals.tsx`
+- `/Users/abstractmapping/projects/landroid/src/components/owners/OwnerLeasesTab.tsx`
+- `/Users/abstractmapping/projects/landroid/src/components/owners/owner-lease-deskmap.ts`
 - `/Users/abstractmapping/projects/landroid/src/storage/runsheet-export.ts`
 - `/Users/abstractmapping/projects/landroid/src/storage/__tests__/runsheet-export.test.ts`
 - `/Users/abstractmapping/projects/landroid/src/engine/decimal.ts`
@@ -170,6 +200,9 @@ Important files involved in the recent work:
 - `/Users/abstractmapping/projects/landroid/src/components/deskmap/deskmap-lease-node.ts`
 - `/Users/abstractmapping/projects/landroid/src/components/deskmap/__tests__/deskmap-coverage.test.ts`
 - `/Users/abstractmapping/projects/landroid/src/components/modals/AttachLeaseModal.tsx`
+- `/Users/abstractmapping/projects/landroid/src/utils/node-editor-route.ts`
+- `/Users/abstractmapping/projects/landroid/src/utils/land.ts`
+- `/Users/abstractmapping/projects/landroid/src/store/ui-store.ts`
 - `/Users/abstractmapping/projects/landroid/src/components/shared/Navbar.tsx`
 - `/Users/abstractmapping/projects/landroid/src/components/modals/MapReferenceModal.tsx`
 - `/Users/abstractmapping/projects/landroid/src/theme/index.css`
@@ -214,7 +247,11 @@ Known local noise:
 - Do not delete anything destructively unless the user asks
 
 Current status:
-- The active `main` branch now holds the validated checkpoint for the audit fixes, leasehold hardening, and Desk Map multi-root clarification on top of inherited checkpoint `60cf008`
+- The active `main` branch still holds the last validated pushed checkpoint for the audit fixes, leasehold hardening, and Desk Map multi-root clarification on top of inherited checkpoint `60cf008`
+- The active working branch is now `codex/full-audit-handoff`
+- The current local worktree now also includes the first shared Desk Map / Runsheet editor path plus lease-node refresh from canonical owner-side lease edits
+- The current local worktree now also includes owner-side buttons to create or reopen Desk Map lease nodes for saved leases, plus stricter mutation-input rejection in the core math engine
+- `/Users/abstractmapping/projects/landroid/FULL-AUDIT-PROMPT.md` now exists as the paste-ready comprehensive audit brief for the next tool
 - Full validation on the current local worktree passed: `npm test`, `npm run lint`, and `npm run build`
 - The current local worktree now also passes targeted leasehold/persistence coverage after the WI assignment slice: `npm test -- --run src/components/leasehold/__tests__/leasehold-summary.test.ts src/storage/__tests__/workspace-persistence.test.ts src/storage/__tests__/seed-test-data.test.ts src/storage/__tests__/autosave-change-detection.test.ts src/storage/__tests__/csv-io.test.ts`
 - The transfer-order review extension also passes targeted leasehold coverage: `npm test -- --run src/components/leasehold/__tests__/leasehold-summary.test.ts`
@@ -306,7 +343,8 @@ Chat-switch checklist:
    - `/Users/abstractmapping/projects/landroid/AGENTS.md`
    - `/Users/abstractmapping/projects/landroid/PROJECT_CONTEXT.md`
    - `/Users/abstractmapping/projects/landroid/CONTINUATION-PROMPT.md`
-6. Paste a short task-focused prompt instead of trying to reconstruct everything from memory.
+   - `/Users/abstractmapping/projects/landroid/FULL-AUDIT-PROMPT.md` when the next chat is the full audit pass
+6. Paste a short task-focused prompt or use `FULL-AUDIT-PROMPT.md` instead of trying to reconstruct everything from memory.
 
 Strategic product direction:
 - The user wants the map/research surface to grow from a small, polished demo into a much more capable long-term product without needing a rewrite later.
@@ -385,25 +423,26 @@ Important constraints:
 Suggested first message in the new chat:
 
 ```text
-I am working in `/Users/abstractmapping/projects/landroid` on branch `codex/maps-research-rrc-handoff`.
+I am working in `/Users/abstractmapping/projects/landroid` on branch `codex/full-audit-handoff`.
 
 Before making architectural decisions, read:
 - `/Users/abstractmapping/projects/landroid/AGENTS.md`
 - `/Users/abstractmapping/projects/landroid/PROJECT_CONTEXT.md`
 - `/Users/abstractmapping/projects/landroid/CONTINUATION-PROMPT.md`
+- `/Users/abstractmapping/projects/landroid/FULL-AUDIT-PROMPT.md`
 
 Current focus:
-- ownership + maps + research foundations have been implemented on top of the root-app layout
-- `Research` now has a first structured decoder path for `Drilling Permits Pending Approval`
-- the likely next implementation phase is the next high-value ASCII RRC decoder family, with fixed-width parsing as the main strategic direction
-- the user wants room for a much more capable long-term engine, but with a simple UX for a small 2-3 person team
-- RRC integration should be explored through realistic, low-risk paths
+- perform the next comprehensive production-quality audit of LANDroid math and architecture
+- verify the repo's actual stack first from `package.json`, `vite.config.ts`, `src/main.tsx`, and `src/App.tsx`
+- start with the current math and lease-sync entry points in `math-engine.ts`, `leasehold-summary.ts`, `deskmap-coverage.ts`, `workspace-store.ts`, `owner-store.ts`, `DeskMapView.tsx`, `RunsheetView.tsx`, and `OwnerDatabaseView.tsx`
+- use `docs/architecture/ownership-math-reference.md`, `docs/architecture/audit-remediation-plan.md`, and `FULL-AUDIT-PROMPT.md` as the current audit context
 
 Start by:
 1. Inspecting the current branch/worktree state
-2. Re-reading the strategic product direction in `CONTINUATION-PROMPT.md`
-3. Checking the current handoff branch and validation status
-4. Proposing the next phased plan before implementing, with the next RRC decoder family as the likely focus
-
-Do not start broad implementation until the next phase plan is approved.
+2. Re-reading the audit and math context in `CONTINUATION-PROMPT.md` and `FULL-AUDIT-PROMPT.md`
+3. Producing findings-first audit output with file references, source-grounded math notes, and explicit testing gaps
+4. Keeping Texas fee/state and federal BLM/ONRR regimes separate throughout the audit
 ```
+
+Full audit paste-ready prompt:
+- Use `/Users/abstractmapping/projects/landroid/FULL-AUDIT-PROMPT.md`

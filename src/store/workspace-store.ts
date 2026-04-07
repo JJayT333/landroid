@@ -5,6 +5,7 @@
  * All math operations go through the engine and produce immutable updates.
  */
 import { create } from 'zustand';
+import { buildLeaseNode, isLeaseNode } from '../components/deskmap/deskmap-lease-node';
 import { useMapStore } from './map-store';
 import type { OwnershipNode, DeskMap } from '../types/node';
 import { normalizeDeskMap, normalizeOwnershipNode } from '../types/node';
@@ -24,6 +25,7 @@ import {
   type LeaseholdTransferOrderEntry,
   type LeaseholdUnit,
 } from '../types/leasehold';
+import type { Lease } from '../types/owner';
 import {
   executeConveyance,
   executeCreateNpri,
@@ -116,6 +118,7 @@ interface WorkspaceState {
   removeNode: (id: string) => void;
   clearLinkedOwner: (ownerId: string) => void;
   clearLinkedLease: (leaseId: string) => void;
+  syncLeaseNodesFromRecord: (lease: Lease) => void;
   addNodeToActiveDeskMap: (nodeId: string) => void;
   setHydrated: () => void;
   setStartupWarning: (message: string | null) => void;
@@ -556,6 +559,35 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
         node.linkedLeaseId === leaseId ? { ...node, linkedLeaseId: null } : node
       ),
     })),
+
+  syncLeaseNodesFromRecord: (lease) =>
+    set((state) => {
+      const nodeById = new Map(state.nodes.map((node) => [node.id, node]));
+      let changed = false;
+
+      const nextNodes = state.nodes.map((node) => {
+        if (!isLeaseNode(node) || node.linkedLeaseId !== lease.id) {
+          return node;
+        }
+
+        const parentNode = node.parentId ? nodeById.get(node.parentId) ?? null : null;
+        if (!parentNode) {
+          return node;
+        }
+
+        changed = true;
+        return normalizeOwnershipNode(
+          buildLeaseNode({
+            id: node.id,
+            parentNode,
+            lease,
+            existingNode: node,
+          })
+        );
+      });
+
+      return changed ? { nodes: nextNodes } : {};
+    }),
 
   addNodeToActiveDeskMap: (nodeId) =>
     set((state) => {
