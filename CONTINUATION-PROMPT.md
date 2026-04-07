@@ -12,6 +12,8 @@ Before making architectural decisions, read:
 - `/Users/abstractmapping/projects/landroid/CONTINUATION-PROMPT.md`
 - `/Users/abstractmapping/projects/landroid/FULL-AUDIT-PROMPT.md` for the next comprehensive math / architecture audit
 
+For the next audit pass, use the full user audit brief in `FULL-AUDIT-PROMPT.md` together with this handoff file. Do not substitute a shortened version.
+
 Audit quickstart:
 - Verify the repo's actual stack from `/Users/abstractmapping/projects/landroid/package.json`, `/Users/abstractmapping/projects/landroid/vite.config.ts`, `/Users/abstractmapping/projects/landroid/src/main.tsx`, and `/Users/abstractmapping/projects/landroid/src/App.tsx` before accepting any prompt assumptions about React tooling, Tailwind setup, or JS vs TypeScript.
 - For the latest math, lease-sync, and owner-to-desk-map changes, start with:
@@ -31,7 +33,7 @@ Audit quickstart:
 
 Current repo state:
 - Active branch: `codex/full-audit-handoff`
-- Current handoff checkpoint commit on this branch: `170ee33` (`docs: note handoff branch checkpoint`)
+- Current handoff checkpoint commit on this branch: `7f8ecbb` (`docs: fix handoff checkpoint hash`)
 - Latest inherited pushed checkpoint before this branch work: `60cf008` (`feat: checkpoint leasehold and research foundations`)
 - `main` is the trusted baseline and now points to commit `a76b367`
 - Safety branches kept on purpose: `baseline-afbdb93`, `v2-desk-map-interactions-and-resize`
@@ -250,7 +252,7 @@ Known local noise:
 Current status:
 - The active `main` branch still holds the last validated pushed checkpoint for the audit fixes, leasehold hardening, and Desk Map multi-root clarification on top of inherited checkpoint `60cf008`
 - The active working branch is now `codex/full-audit-handoff`
-- The current checkpoint commit on that branch is `170ee33`
+- The current checkpoint commit on that branch is `7f8ecbb`
 - The current local worktree now also includes the first shared Desk Map / Runsheet editor path plus lease-node refresh from canonical owner-side lease edits
 - The current local worktree now also includes owner-side buttons to create or reopen Desk Map lease nodes for saved leases, plus stricter mutation-input rejection in the core math engine
 - `/Users/abstractmapping/projects/landroid/FULL-AUDIT-PROMPT.md` now exists as the paste-ready comprehensive audit brief for the next tool
@@ -448,3 +450,4 @@ Start by:
 
 Full audit paste-ready prompt:
 - Use `/Users/abstractmapping/projects/landroid/FULL-AUDIT-PROMPT.md`
+- Use it together with `/Users/abstractmapping/projects/landroid/CONTINUATION-PROMPT.md`, not by itself

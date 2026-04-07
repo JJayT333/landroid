@@ -2,6 +2,13 @@
 
 Use this prompt for the next comprehensive audit pass.
 
+This file is the controlling audit brief. Use the exact user audit prompt below together with:
+- `/Users/abstractmapping/projects/landroid/AGENTS.md`
+- `/Users/abstractmapping/projects/landroid/PROJECT_CONTEXT.md`
+- `/Users/abstractmapping/projects/landroid/CONTINUATION-PROMPT.md`
+
+Do not replace this brief with a shortened version. The next tool should use this full audit prompt plus the relevant handoff context.
+
 Important: verify the repository's actual stack and architecture from the codebase before scoring it. Do not assume any stack details in the user brief are correct without checking files like:
 - `/Users/abstractmapping/projects/landroid/package.json`
 - `/Users/abstractmapping/projects/landroid/vite.config.ts`
