@@ -14,7 +14,7 @@ import {
 } from '../types/leasehold';
 import { useOwnerStore } from '../store/owner-store';
 import { useWorkspaceStore } from '../store/workspace-store';
-import { parseInterestString } from '../utils/interest-string';
+import { parseInterestString, parseStrictInterestString } from '../utils/interest-string';
 import {
   buildLeaseholdTransferOrderReview,
   buildLeaseholdUnitSummary,
@@ -24,6 +24,7 @@ import {
   type LeaseholdTractSummary,
   type LeaseholdTransferOrderReview,
 } from '../components/leasehold/leasehold-summary';
+import type { LeaseCoverageOverlap } from '../components/deskmap/deskmap-coverage';
 
 function formatAcres(value: string) {
   const acres = d(value);
@@ -611,6 +612,7 @@ function LeaseholdOrriDeckCard({
 }) {
   const [payeeDraft, setPayeeDraft] = useState(orri.payee);
   const [burdenFractionDraft, setBurdenFractionDraft] = useState(orri.burdenFraction);
+  const [burdenFractionError, setBurdenFractionError] = useState<string | null>(null);
   const [sourceDocNoDraft, setSourceDocNoDraft] = useState(orri.sourceDocNo);
   const [notesDraft, setNotesDraft] = useState(orri.notes);
 
@@ -620,6 +622,7 @@ function LeaseholdOrriDeckCard({
 
   useEffect(() => {
     setBurdenFractionDraft(orri.burdenFraction);
+    setBurdenFractionError(null);
   }, [orri.burdenFraction]);
 
   useEffect(() => {
@@ -680,17 +683,40 @@ function LeaseholdOrriDeckCard({
             </div>
             <input
               value={burdenFractionDraft}
-              onChange={(event) => setBurdenFractionDraft(event.target.value)}
+              onChange={(event) => {
+                setBurdenFractionDraft(event.target.value);
+                if (burdenFractionError) setBurdenFractionError(null);
+              }}
               onBlur={() => {
                 const next = burdenFractionDraft.trim();
+                // Strict-parse the burden fraction before saving. A blank value is a
+                // legal "not entered yet" state; malformed input returns null and is
+                // rejected with an inline error — the previous saved value stays in
+                // the store so the math keeps running on the last good number.
+                const parsed = parseStrictInterestString(next);
+                if (parsed === null) {
+                  setBurdenFractionError(
+                    'Enter a fraction (e.g. 1/64), a decimal (e.g. 0.015625), or leave blank.'
+                  );
+                  setBurdenFractionDraft(orri.burdenFraction);
+                  return;
+                }
+                setBurdenFractionError(null);
                 setBurdenFractionDraft(next);
                 if (next !== orri.burdenFraction) {
                   onUpdate(orri.id, { burdenFraction: next });
                 }
               }}
               placeholder="1/64"
-              className="w-full rounded-xl border border-amber-200 bg-white/90 px-3 py-2 text-sm text-amber-950 outline-none transition-colors focus:border-amber-400"
+              className={`w-full rounded-xl border bg-white/90 px-3 py-2 text-sm text-amber-950 outline-none transition-colors ${
+                burdenFractionError
+                  ? 'border-seal/50 focus:border-seal'
+                  : 'border-amber-200 focus:border-amber-400'
+              }`}
             />
+            {burdenFractionError && (
+              <div className="mt-1 text-[10px] text-seal">{burdenFractionError}</div>
+            )}
           </label>
 
           <label className="block">
@@ -850,6 +876,8 @@ function LeaseholdDeckRetainedCard({
   retainedDecimal,
   assignedDecimal,
   overAssigned,
+  overBurdened,
+  leaseOverlapCount,
 }: {
   title: string;
   holder: string;
@@ -857,6 +885,8 @@ function LeaseholdDeckRetainedCard({
   retainedDecimal: string;
   assignedDecimal: string;
   overAssigned: boolean;
+  overBurdened: boolean;
+  leaseOverlapCount: number;
 }) {
   return (
     <div className="w-80 rounded-lg border-2 border-ledger-line bg-parchment text-ink shadow-sm">
@@ -888,6 +918,16 @@ function LeaseholdDeckRetainedCard({
               Over-assigned
             </span>
           )}
+          {overBurdened && (
+            <span className="rounded-full border border-seal/30 bg-seal/10 px-2 py-0.5 text-[9px] text-seal">
+              Over-burdened
+            </span>
+          )}
+          {leaseOverlapCount > 0 && (
+            <span className="rounded-full border border-seal/30 bg-seal/10 px-2 py-0.5 text-[9px] text-seal">
+              Lease overlap ({leaseOverlapCount})
+            </span>
+          )}
         </div>
       </div>
     </div>
@@ -914,6 +954,7 @@ function LeaseholdAssignmentDeckCard({
   const [workingInterestDraft, setWorkingInterestDraft] = useState(
     assignment.workingInterestFraction
   );
+  const [workingInterestError, setWorkingInterestError] = useState<string | null>(null);
   const [sourceDocNoDraft, setSourceDocNoDraft] = useState(assignment.sourceDocNo);
   const [notesDraft, setNotesDraft] = useState(assignment.notes);
 
@@ -927,6 +968,7 @@ function LeaseholdAssignmentDeckCard({
 
   useEffect(() => {
     setWorkingInterestDraft(assignment.workingInterestFraction);
+    setWorkingInterestError(null);
   }, [assignment.workingInterestFraction]);
 
   useEffect(() => {
@@ -1011,17 +1053,38 @@ function LeaseholdAssignmentDeckCard({
             </div>
             <input
               value={workingInterestDraft}
-              onChange={(event) => setWorkingInterestDraft(event.target.value)}
+              onChange={(event) => {
+                setWorkingInterestDraft(event.target.value);
+                if (workingInterestError) setWorkingInterestError(null);
+              }}
               onBlur={() => {
                 const next = workingInterestDraft.trim();
+                // Strict-parse the WI assignment fraction before saving. Closes the
+                // silent-zero path for audit finding #4 on the assignment deck.
+                const parsed = parseStrictInterestString(next);
+                if (parsed === null) {
+                  setWorkingInterestError(
+                    'Enter a fraction (e.g. 1/2), a decimal (e.g. 0.5), or leave blank.'
+                  );
+                  setWorkingInterestDraft(assignment.workingInterestFraction);
+                  return;
+                }
+                setWorkingInterestError(null);
                 setWorkingInterestDraft(next);
                 if (next !== assignment.workingInterestFraction) {
                   onUpdate(assignment.id, { workingInterestFraction: next });
                 }
               }}
               placeholder="1/2"
-              className="w-full rounded-xl border border-leather/20 bg-white/90 px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-leather"
+              className={`w-full rounded-xl border bg-white/90 px-3 py-2 text-sm text-ink outline-none transition-colors ${
+                workingInterestError
+                  ? 'border-seal/50 focus:border-seal'
+                  : 'border-leather/20 focus:border-leather'
+              }`}
             />
+            {workingInterestError && (
+              <div className="mt-1 text-[10px] text-seal">{workingInterestError}</div>
+            )}
           </label>
 
           <label className="block">
@@ -1385,6 +1448,8 @@ function LeaseholdDecimalLedger({
   review,
   focusCoverageDetail,
   overAssignedFocus,
+  overBurdenedFocus,
+  leaseOverlapsFocus,
   editable,
   entriesBySourceRowId,
   onUpsertEntry,
@@ -1394,6 +1459,8 @@ function LeaseholdDecimalLedger({
   review: LeaseholdTransferOrderReview;
   focusCoverageDetail: string;
   overAssignedFocus: boolean;
+  overBurdenedFocus: boolean;
+  leaseOverlapsFocus: LeaseCoverageOverlap[];
   editable: boolean;
   entriesBySourceRowId: Map<string, LeaseholdTransferOrderEntry>;
   onUpsertEntry: (
@@ -1505,6 +1572,44 @@ function LeaseholdDecimalLedger({
             WI in this focus. Retained WI is clamped at zero, and the variance above shows the
             overage until the split is corrected.
           </div>
+        </div>
+      )}
+
+      {overBurdenedFocus && (
+        <div className="mt-4 rounded-2xl border border-seal/25 bg-seal/5 px-4 py-3 text-sm text-seal">
+          <div className="font-semibold">ORRI burdens exceed available NRI</div>
+          <div className="mt-1">
+            The gross_8_8, working_interest, and net_revenue_interest ORRI stack on this focus
+            exceeds the lessee's NRI before any WI assignment. Pre-WI is clamped at zero, so
+            retained and assigned WI rows read as zero until the burden mix is revised. This is
+            warning-only — the math still runs, it just cannot honor every ORRI as entered.
+          </div>
+        </div>
+      )}
+
+      {leaseOverlapsFocus.length > 0 && (
+        <div className="mt-4 rounded-2xl border border-seal/25 bg-seal/5 px-4 py-3 text-sm text-seal">
+          <div className="font-semibold">
+            Lease overlap ({leaseOverlapsFocus.length}
+            {leaseOverlapsFocus.length === 1 ? ' lease' : ' leases'} clipped)
+          </div>
+          <div className="mt-1">
+            One or more active leases on this focus claim more of the owner's interest than the
+            owner holds. The later-effective lease is silently clipped in the allocation math, so
+            a chain-of-title or top-lease scenario is likely — review the leases below before
+            relying on this focus' decimals.
+          </div>
+          <ul className="mt-2 space-y-1 text-xs">
+            {leaseOverlapsFocus.map((overlap) => (
+              <li key={overlap.leaseId}>
+                <span className="font-semibold">{overlap.leaseName || 'Unnamed lease'}</span>
+                {overlap.lessee ? ` — ${overlap.lessee}` : ''}: requested{' '}
+                {formatDecimalValue(overlap.requestedFraction)}, allocated{' '}
+                {formatDecimalValue(overlap.allocatedFraction)}, clipped{' '}
+                {formatDecimalValue(overlap.clippedFraction)}.
+              </li>
+            ))}
+          </ul>
         </div>
       )}
 
@@ -1637,6 +1742,7 @@ function LeaseholdDeck({
   totalAssignedWorkingInterestDecimal,
   retainedWorkingInterestDecimal,
   overAssignedTractCount,
+  overBurdenedTractCount,
   transferOrderEntries,
   onAddAssignment,
   onUpdateAssignment,
@@ -1661,6 +1767,7 @@ function LeaseholdDeck({
   totalAssignedWorkingInterestDecimal: string;
   retainedWorkingInterestDecimal: string;
   overAssignedTractCount: number;
+  overBurdenedTractCount: number;
   transferOrderEntries: LeaseholdTransferOrderEntry[];
   onAddAssignment: (assignment?: Partial<LeaseholdAssignment>) => void;
   onUpdateAssignment: (id: string, fields: Partial<LeaseholdAssignment>) => void;
@@ -1743,6 +1850,10 @@ function LeaseholdDeck({
     ?? relevantAssignments.length;
   const activeTrackedOrriCount = focusedTract?.trackedOrriCount ?? relevantOrris.length;
   const activeOverAssigned = focusedTract?.overAssigned ?? overAssignedTractCount > 0;
+  const activeOverBurdened = focusedTract?.overBurdened ?? overBurdenedTractCount > 0;
+  const activeLeaseOverlaps: LeaseCoverageOverlap[] = focusedTract
+    ? focusedTract.leaseOverlaps
+    : unitSummary.tracts.flatMap((tract) => tract.leaseOverlaps);
   const activeRetainedHolder = activeLessees[0] || unit.operator;
   const focusCoverageDetail = focusedTract
     ? `${formatPercent(focusedTract.unitParticipation)} participation x ${formatPercent(focusedTract.leasedOwnership)} leased ownership for ${focusedTract.code}.`
@@ -1928,11 +2039,15 @@ function LeaseholdDeck({
             note={
               activeOverAssigned
                 ? 'Assignments in this focus exceed 100% of the available WI. Retained WI is clamped at zero until the split is corrected.'
-                : 'This is the remaining WI still held by the lessee/operator after the visible assignments below.'
+                : activeOverBurdened
+                  ? 'ORRI burdens in this focus exceed the lessee\u2019s NRI, so pre-WI is clamped at zero. Review the ORRI stack below.'
+                  : 'This is the remaining WI still held by the lessee/operator after the visible assignments below.'
             }
             retainedDecimal={activeRetainedWorkingInterestDecimal}
             assignedDecimal={activeAssignedWorkingInterestDecimal}
             overAssigned={activeOverAssigned}
+            overBurdened={activeOverBurdened}
+            leaseOverlapCount={activeLeaseOverlaps.length}
           />
 
           {relevantAssignments.length > 0 ? (
@@ -1974,6 +2089,8 @@ function LeaseholdDeck({
         review={transferOrderReview}
         focusCoverageDetail={focusCoverageDetail}
         overAssignedFocus={activeOverAssigned}
+        overBurdenedFocus={activeOverBurdened}
+        leaseOverlapsFocus={activeLeaseOverlaps}
         editable={focusedDeskMapId === null}
         entriesBySourceRowId={transferOrderEntriesBySourceRowId}
         onUpsertEntry={onUpsertTransferOrderEntry}
@@ -2141,6 +2258,7 @@ export default function LeaseholdView() {
             totalAssignedWorkingInterestDecimal={summary.totalAssignedWorkingInterestDecimal}
             retainedWorkingInterestDecimal={summary.retainedWorkingInterestDecimal}
             overAssignedTractCount={summary.overAssignedTractCount}
+            overBurdenedTractCount={summary.overBurdenedTractCount}
             transferOrderEntries={leaseholdTransferOrderEntries}
             onAddAssignment={addLeaseholdAssignment}
             onUpdateAssignment={updateLeaseholdAssignment}

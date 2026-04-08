@@ -157,6 +157,12 @@ export default function CreateNpriModal({
             {form.royaltyKind === 'floating'
               ? 'Floating NPRI records a fraction of the lease royalty, such as 1/2 of lessor royalty.'
               : 'Fixed NPRI records a fixed share of production, such as 1/16.'}
+            <div className="mt-1 text-ink-light/80">
+              Deed-text preservation only — NPRI nodes are excluded from
+              today&rsquo;s leasehold decimal math, so the fixed/floating
+              choice is recorded on the node but does not yet change any
+              computed royalty.
+            </div>
           </div>
 
           <div className="flex items-center gap-2">

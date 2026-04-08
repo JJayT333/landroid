@@ -10,7 +10,11 @@ import { useWorkspaceStore } from '../../store/workspace-store';
 import { useCanvasStore } from '../../store/canvas-store';
 import { downloadLandroidFile, importLandroidFile } from '../../storage/workspace-persistence';
 import { importCSV } from '../../storage/csv-io';
-import { seedLeaseholdDemoData, seedStressTestData } from '../../storage/seed-test-data';
+import {
+  seedCombinatorialData,
+  seedLeaseholdDemoData,
+  seedStressTestData,
+} from '../../storage/seed-test-data';
 
 const landroidLogoUrl = new URL('../../assets/branding/landroid-logo.png', import.meta.url).href;
 const ravenForestBackdropUrl = new URL('../../assets/branding/raven-forest-backdrop.png', import.meta.url).href;
@@ -37,7 +41,9 @@ export default function Navbar() {
   );
   const loadWorkspace = useWorkspaceStore((s) => s.loadWorkspace);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [seedMode, setSeedMode] = useState<'stress' | 'leasehold' | null>(null);
+  const [seedMode, setSeedMode] = useState<
+    'stress' | 'leasehold' | 'combinatorial' | null
+  >(null);
 
   const handleStressTest = async () => {
     setSeedMode('stress');
@@ -57,6 +63,19 @@ export default function Navbar() {
       console.log(`[leasehold] Loaded ${nodeCount} nodes, attached ${pdfCount} PDFs`);
     } catch (err) {
       console.error('[leasehold] Failed:', err);
+    }
+    setSeedMode(null);
+  };
+
+  const handleCombinatorial = async () => {
+    setSeedMode('combinatorial');
+    try {
+      const { nodeCount, pdfCount } = await seedCombinatorialData();
+      console.log(
+        `[combinatorial] Loaded ${nodeCount} nodes, attached ${pdfCount} PDFs`
+      );
+    } catch (err) {
+      console.error('[combinatorial] Failed:', err);
     }
     setSeedMode(null);
   };
@@ -212,6 +231,13 @@ export default function Navbar() {
             className="px-3 py-1.5 rounded-lg text-xs font-medium text-gold/80 hover:text-gold hover:bg-gold/10 transition-colors disabled:opacity-50"
           >
             {seedMode === 'leasehold' ? 'Loading...' : 'Leasehold (8 Tracts)'}
+          </button>
+          <button
+            onClick={handleCombinatorial}
+            disabled={seedMode !== null}
+            className="px-3 py-1.5 rounded-lg text-xs font-medium text-gold/80 hover:text-gold hover:bg-gold/10 transition-colors disabled:opacity-50"
+          >
+            {seedMode === 'combinatorial' ? 'Loading...' : 'Combinatorial (8×100)'}
           </button>
         </div>
       </div>

@@ -11,7 +11,8 @@ import {
   type Lease,
 } from '../../types/owner';
 import { deriveCounty } from '../../utils/land';
-import { normalizeInterestString } from '../../utils/interest-string';
+import { parseStrictInterestString } from '../../utils/interest-string';
+import { serialize } from '../../engine/decimal';
 import FormField from '../shared/FormField';
 import Modal from '../shared/Modal';
 
@@ -97,13 +98,34 @@ export default function AttachLeaseModal({
         )
   );
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const isEditingExistingLease = Boolean(existingLeaseNode || existingLease);
 
   const set = (field: keyof Lease, value: string) => {
+    setSaveError(null);
     setDraft((current) => ({ ...current, [field]: value }));
   };
 
   const handleSave = async () => {
+    // Strict-parse both interest fields BEFORE any persistence. A blank value is a
+    // legal "not entered yet" state and parses as Decimal(0); malformed input ("abc",
+    // "1/0", multi-slash garbage) returns null and blocks the save with an inline
+    // error. Closes audit finding #4.
+    const parsedRoyalty = parseStrictInterestString(draft.royaltyRate);
+    if (parsedRoyalty === null) {
+      setSaveError(
+        'Royalty must be a fraction (e.g. 1/8), a decimal (e.g. 0.125), or blank.'
+      );
+      return;
+    }
+    const parsedLeasedInterest = parseStrictInterestString(draft.leasedInterest);
+    if (parsedLeasedInterest === null) {
+      setSaveError(
+        'Leased Interest must be a fraction (e.g. 1/2), a decimal (e.g. 0.5), or blank.'
+      );
+      return;
+    }
+    setSaveError(null);
     setSaving(true);
 
     try {
@@ -129,19 +151,26 @@ export default function AttachLeaseModal({
         ownerId = nextOwner.id;
       }
 
+      // Preserve the user's raw royalty text (1/8 stays 1/8, not 0.125). Leased
+      // Interest normalizes to a serialized decimal when entered, or stays blank.
+      const trimmedLeasedInterest = draft.leasedInterest.trim();
+      const normalizedLeasedInterest = trimmedLeasedInterest.length === 0
+        ? ''
+        : serialize(parsedLeasedInterest);
+
       const leaseRecord = existingLease
         ? {
             ...existingLease,
             ...draft,
             royaltyRate: draft.royaltyRate.trim(),
-            leasedInterest: normalizeInterestString(draft.leasedInterest),
+            leasedInterest: normalizedLeasedInterest,
             ownerId,
             workspaceId: resolvedWorkspaceId,
           }
         : createBlankLease(resolvedWorkspaceId, ownerId, {
             ...draft,
             royaltyRate: draft.royaltyRate.trim(),
-            leasedInterest: normalizeInterestString(draft.leasedInterest),
+            leasedInterest: normalizedLeasedInterest,
             ownerId,
           });
 
@@ -250,6 +279,12 @@ export default function AttachLeaseModal({
             className="w-full px-3 py-2 rounded-lg border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none resize-y"
           />
         </div>
+
+        {saveError && (
+          <div className="rounded-lg border border-seal/30 bg-seal/10 px-3 py-2 text-xs text-seal">
+            {saveError}
+          </div>
+        )}
 
         <div className="flex justify-end gap-2 pt-2 border-t border-ledger-line">
           <button

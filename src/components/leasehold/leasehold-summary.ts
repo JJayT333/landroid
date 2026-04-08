@@ -6,7 +6,11 @@ import type {
   LeaseholdOrri,
   LeaseholdUnit,
 } from '../../types/leasehold';
-import { allocateLeaseCoverage, getActiveLeases } from '../deskmap/deskmap-coverage';
+import {
+  allocateLeaseCoverage,
+  getActiveLeases,
+  type LeaseCoverageOverlap,
+} from '../deskmap/deskmap-coverage';
 import { parseInterestString } from '../../utils/interest-string';
 
 export interface LeaseholdOwnerLeaseSummary {
@@ -36,6 +40,8 @@ export interface LeaseholdOwnerSummary {
   ownerTractRoyalty: string;
   unitRoyaltyDecimal: string;
   leaseSlices: LeaseholdOwnerLeaseSummary[];
+  /** Overlap warnings from `allocateLeaseCoverage` for this owner's leases. */
+  leaseOverlaps: LeaseCoverageOverlap[];
 }
 
 export interface LeaseholdTractSummary {
@@ -63,6 +69,21 @@ export interface LeaseholdTractSummary {
   assignedWorkingInterestDecimal: string;
   retainedWorkingInterestDecimal: string;
   overAssigned: boolean;
+  /**
+   * Warning flag: ORRI burdens on this tract exceed the available after-royalty
+   * working interest (`totalOrriBurdenRate > workingInterestBaseRate`). Pre-WI
+   * is already clamped to 0 in that case, but the user should see that the
+   * clamp happened rather than silently interpreting a zero retained WI. This
+   * is warning-only and does not block — it matches the existing `overAssigned`
+   * convention.
+   */
+  overBurdened: boolean;
+  /**
+   * Aggregated lease-overlap warnings surfaced from this tract's owners. Each
+   * entry is a lease that was silently clipped by `allocateLeaseCoverage`
+   * because an earlier lease already claimed the owner's share.
+   */
+  leaseOverlaps: LeaseCoverageOverlap[];
   currentOwnerCount: number;
   includedAssignmentCount: number;
   trackedAssignmentCount: number;
@@ -119,6 +140,16 @@ export interface LeaseholdUnitSummary {
   includedAssignmentCount: number;
   excludedAssignmentCount: number;
   overAssignedTractCount: number;
+  /** Number of tracts whose `overBurdened` flag is set (warning-only). */
+  overBurdenedTractCount: number;
+  /**
+   * Number of tracts that have at least one lease-overlap warning. Warning-only;
+   * affected tracts still roll up their clipped allocations and the leasehold
+   * math still reaches a valid total, but the user should review the overlap.
+   */
+  leaseOverlapTractCount: number;
+  /** Total count of individual overlap warnings across all tracts. */
+  leaseOverlapWarningCount: number;
   trackedOrriCount: number;
   includedOrriCount: number;
   excludedOrriCount: number;
@@ -180,6 +211,18 @@ function nameOwner(node: OwnershipNode, ownerById: Map<string, Owner>): string {
   return ownerById.get(node.linkedOwnerId)?.name || node.grantee || 'Linked Owner';
 }
 
+/**
+ * NPRI exclusion gate for the leasehold decimal pipeline (audit finding #5).
+ *
+ * Every downstream calculation in this file — owner slices, weighted royalty,
+ * lease coverage allocation, ORRI burden base, transfer-order rows — flows
+ * through `currentMineralOwners`. NPRI nodes are intentionally filtered out
+ * here so that `royaltyKind` ("fixed" vs "floating") never reaches the decimal
+ * math. The field is deed-text preservation only; see `src/types/node.ts` →
+ * `RoyaltyKind` and `docs/architecture/ownership-math-reference.md` →
+ * "Fixed vs. floating royalty". Do not relax this filter without wiring both
+ * branches end-to-end at the same time.
+ */
 function currentMineralOwners(nodes: OwnershipNode[]) {
   return nodes.filter(
     (node) => node.type !== 'related' && !isNpriNode(node) && d(node.fraction).greaterThan(0)
@@ -196,8 +239,12 @@ function buildOwnerLeaseSummaries({
   ownerFraction: ReturnType<typeof d>;
   tractPooledAcres: ReturnType<typeof d>;
   totalPooledAcres: ReturnType<typeof d>;
-}): LeaseholdOwnerLeaseSummary[] {
-  return allocateLeaseCoverage(leases, ownerFraction.toString()).map(({ lease, allocatedFraction }) => {
+}): { slices: LeaseholdOwnerLeaseSummary[]; overlaps: LeaseCoverageOverlap[] } {
+  const { allocations, overlaps } = allocateLeaseCoverage(
+    leases,
+    ownerFraction.toString()
+  );
+  const slices = allocations.map(({ lease, allocatedFraction }) => {
     const leaseFraction = d(allocatedFraction);
     const leasedPooledAcres = tractPooledAcres.times(leaseFraction);
     const leaseRoyaltyRate = parseInterestString(lease.royaltyRate);
@@ -219,6 +266,8 @@ function buildOwnerLeaseSummaries({
       unitRoyaltyDecimal: unitRoyaltyDecimal.toString(),
     };
   });
+
+  return { slices, overlaps };
 }
 
 function sumDecimalStrings(values: string[]) {
@@ -249,9 +298,10 @@ function calculateOrriBasisRates({
     ? workingInterestBaseRate
     : d(0);
   const grossOrriBurdenRate = leasedOwnership.times(grossBasisShare);
-  const workingInterestOrriBurdenRate = safeWorkingInterestBaseRate.times(
-    workingInterestBasisShare
-  );
+  // Working-interest ORRIs are carved from the full leased working interest (8/8 of the
+  // leasehold estate), not from the lessee's after-royalty share. A "1/80 of WI" ORRI
+  // therefore produces leasedOwnership × 1/80 regardless of the lease royalty rate.
+  const workingInterestOrriBurdenRate = leasedOwnership.times(workingInterestBasisShare);
   const netRevenueInterestBaseRate = safeWorkingInterestBaseRate
     .minus(grossOrriBurdenRate)
     .minus(workingInterestOrriBurdenRate);
@@ -279,20 +329,20 @@ function calculateSingleOrriBurdenRate({
   burdenBasis,
   burdenFraction,
   leasedOwnership,
-  workingInterestBaseRate,
   netRevenueInterestBaseRate,
 }: {
   burdenBasis: LeaseholdOrri['burdenBasis'];
   burdenFraction: string;
   leasedOwnership: ReturnType<typeof d>;
-  workingInterestBaseRate: ReturnType<typeof d>;
   netRevenueInterestBaseRate: ReturnType<typeof d>;
 }) {
   const parsedBurden = parseInterestString(burdenFraction);
 
   switch (burdenBasis) {
     case 'working_interest':
-      return workingInterestBaseRate.times(parsedBurden);
+      // See calculateOrriBasisRates: WI-basis ORRIs multiply the full leased WI, not the
+      // after-royalty share.
+      return leasedOwnership.times(parsedBurden);
     case 'net_revenue_interest':
       return netRevenueInterestBaseRate.times(parsedBurden);
     case 'gross_8_8':
@@ -373,7 +423,7 @@ export function buildLeaseholdUnitSummary({
         const ownerLeases = node.linkedOwnerId
           ? activeLeasesByOwnerId.get(node.linkedOwnerId) ?? []
           : [];
-        const leaseSlices = buildOwnerLeaseSummaries({
+        const { slices: leaseSlices, overlaps: leaseOverlaps } = buildOwnerLeaseSummaries({
           leases: ownerLeases,
           ownerFraction,
           tractPooledAcres,
@@ -411,6 +461,7 @@ export function buildLeaseholdUnitSummary({
           ownerTractRoyalty: ownerTractRoyalty.toString(),
           unitRoyaltyDecimal: unitRoyaltyDecimal.toString(),
           leaseSlices,
+          leaseOverlaps,
         };
       })
       .sort((left, right) => {
@@ -453,6 +504,11 @@ export function buildLeaseholdUnitSummary({
     );
     const unitOrriDecimal = unitParticipation.times(totalOrriBurdenRate);
     const preWorkingInterestRate = workingInterestBaseRate.minus(totalOrriBurdenRate);
+    // Warning flag: if the ORRI stack consumed more than the available
+    // after-royalty WI, `preWorkingInterestRate` went negative and was clamped
+    // to 0 below. Surface this as `overBurdened` so the UI can render a
+    // warning chip instead of silently displaying a zero retained WI.
+    const overBurdened = preWorkingInterestRate.isNegative();
     const preWorkingInterestDecimal = preWorkingInterestRate.greaterThan(0)
       ? unitParticipation.times(preWorkingInterestRate)
       : d(0);
@@ -473,6 +529,7 @@ export function buildLeaseholdUnitSummary({
         .flatMap((owner) => owner.lesseeNames)
         .filter((lessee) => lessee.length > 0)
     )];
+    const tractLeaseOverlaps = ownersForTract.flatMap((owner) => owner.leaseOverlaps);
     const trackedAssignmentCount = relevantAssignments.length;
     const includedAssignmentCount = relevantAssignments.length;
     const trackedOrriCount = relevantOrris.length;
@@ -505,6 +562,8 @@ export function buildLeaseholdUnitSummary({
         ? retainedWorkingInterestDecimal.toString()
         : '0',
       overAssigned: assignmentShare.greaterThan(1),
+      overBurdened,
+      leaseOverlaps: tractLeaseOverlaps,
       currentOwnerCount: ownersForTract.length,
       includedAssignmentCount,
       trackedAssignmentCount,
@@ -574,7 +633,6 @@ export function buildLeaseholdUnitSummary({
                     burdenBasis: orri.burdenBasis,
                     burdenFraction: orri.burdenFraction,
                     leasedOwnership: d(candidate.leasedOwnership),
-                    workingInterestBaseRate: d(candidate.workingInterestBaseRate),
                     netRevenueInterestBaseRate: d(candidate.netRevenueInterestBaseRate),
                   })
                 )
@@ -586,7 +644,6 @@ export function buildLeaseholdUnitSummary({
               burdenBasis: orri.burdenBasis,
               burdenFraction: orri.burdenFraction,
               leasedOwnership: d(tract?.leasedOwnership ?? '0'),
-              workingInterestBaseRate: d(tract?.workingInterestBaseRate ?? '0'),
               netRevenueInterestBaseRate: d(tract?.netRevenueInterestBaseRate ?? '0'),
             })
           )
@@ -645,6 +702,12 @@ export function buildLeaseholdUnitSummary({
     includedAssignmentCount: assignments.filter((assignment) => assignment.includedInMath).length,
     excludedAssignmentCount: assignments.filter((assignment) => !assignment.includedInMath).length,
     overAssignedTractCount: tracts.filter((tract) => tract.overAssigned).length,
+    overBurdenedTractCount: tracts.filter((tract) => tract.overBurdened).length,
+    leaseOverlapTractCount: tracts.filter((tract) => tract.leaseOverlaps.length > 0).length,
+    leaseOverlapWarningCount: tracts.reduce(
+      (sum, tract) => sum + tract.leaseOverlaps.length,
+      0
+    ),
     trackedOrriCount: orris.length,
     includedOrriCount: orris.filter((orri) => orri.includedInMath).length,
     excludedOrriCount: orris.filter((orri) => !orri.includedInMath).length,
@@ -706,7 +769,6 @@ export function buildLeaseholdDecimalRows({
                   burdenBasis: orri.burdenBasis,
                   burdenFraction: orri.burdenFraction,
                   leasedOwnership: d(focusedTract.leasedOwnership),
-                  workingInterestBaseRate: d(focusedTract.workingInterestBaseRate),
                   netRevenueInterestBaseRate: d(focusedTract.netRevenueInterestBaseRate),
                 })
               ).toString()

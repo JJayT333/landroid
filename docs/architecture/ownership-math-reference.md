@@ -104,9 +104,23 @@ General mineral / royalty / decimal math:
     of production rather than a floating fraction of later lease royalty, so
     the lease royalty does not automatically resize the fixed NPRI.
 - `Repo model`
-  - LANDroid stores `royaltyKind` to preserve the deed-level characterization.
-- `Known gap`
-  - The repo does not yet use instrument-language parsing to derive legal
+  - LANDroid stores `royaltyKind` on each NPRI node to preserve the deed-level
+    characterization and propagates it through conveyances and predecessor
+    inserts. **The field is stored only.** No math layer — neither the
+    ownership engine nor the leasehold decimal summary — reads `royaltyKind`
+    today. NPRIs are excluded from `currentMineralOwners` in
+    `src/components/leasehold/leasehold-summary.ts` and therefore carry no
+    decimal through to transfer-order review.
+- `Known gap` (audit finding #5)
+  - `royaltyKind` is deed-text preservation only. The next slice of math that
+    brings NPRIs into the leasehold decimal **must implement both the fixed
+    branch and the floating branch at the same time** — a floating NPRI scales
+    against the lease royalty rate, a fixed NPRI does not, and consuming the
+    field for only one branch is a silent mis-payment waiting to happen.
+  - Do not consume `royaltyKind` until both branches are wired end-to-end,
+    surfaced in the leasehold deck, and covered by tests that pin the
+    distinction. Until then, treat the value as deed-text metadata.
+  - The repo also does not yet use instrument-language parsing to derive legal
     effect automatically. Human review is still required.
 
 ### Division orders and transfer orders

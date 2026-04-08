@@ -126,6 +126,7 @@ describe('buildStressWorkspaceData', () => {
         'Eight-tract pooled unit template with clean acreage, clean fractions, and full lease coverage for leasehold review.',
       operator: 'Permian Basin Operating, LLC',
       effectiveDate: '2024-01-01',
+      jurisdiction: 'tx_fee',
     });
     expect(workspace.leaseholdAssignments).toEqual([
       expect.objectContaining({

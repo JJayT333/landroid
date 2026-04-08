@@ -33,6 +33,29 @@ export interface LeaseCoverageAllocation {
   allocatedFraction: string;
 }
 
+/**
+ * Warning-only signal emitted when two or more active leases for the same owner
+ * try to claim more of the owner's interest than the owner holds. The later
+ * lease (in effective-date order) is silently clipped by `allocateLeaseCoverage`
+ * today, which is why a separate warning is surfaced here rather than a
+ * blocking error — the user may have a chain-of-title issue or a top-lease
+ * scenario that LANDroid should flag for human review, not quietly resolve.
+ * Matches the existing warning-only over-assignment convention.
+ */
+export interface LeaseCoverageOverlap {
+  leaseId: string;
+  leaseName: string;
+  lessee: string;
+  requestedFraction: string;
+  allocatedFraction: string;
+  clippedFraction: string;
+}
+
+export interface LeaseCoverageResult {
+  allocations: LeaseCoverageAllocation[];
+  overlaps: LeaseCoverageOverlap[];
+}
+
 const INACTIVE_LEASE_STATUSES = new Set([
   'expired',
   'released',
@@ -66,28 +89,58 @@ export function getActiveLeases(leases: Lease[]) {
 export function allocateLeaseCoverage(
   leases: Lease[],
   ownerFractionInput: string
-): LeaseCoverageAllocation[] {
+): LeaseCoverageResult {
   const ownerFraction = d(ownerFractionInput);
   if (!ownerFraction.greaterThan(0)) {
-    return [];
+    return { allocations: [], overlaps: [] };
   }
 
   const activeLeases = [...getActiveLeases(leases)].sort(compareLeaseAllocationOrder);
   const allocations: LeaseCoverageAllocation[] = [];
+  const overlaps: LeaseCoverageOverlap[] = [];
   let remainingFraction = ownerFraction;
 
   for (const lease of activeLeases) {
-    if (!remainingFraction.greaterThan(0)) {
-      break;
-    }
-
     const leasedInterestText = asLeaseText(lease.leasedInterest).trim();
     const requestedFraction = leasedInterestText.length > 0
       ? parseInterestString(leasedInterestText)
       : ownerFraction;
+
+    // If earlier leases already exhausted the owner's share, any subsequent
+    // lease is fully clipped: requested > 0, allocated = 0, clipped = requested.
+    if (!remainingFraction.greaterThan(0)) {
+      if (requestedFraction.greaterThan(0)) {
+        overlaps.push({
+          leaseId: lease.id,
+          leaseName: asLeaseText(lease.leaseName),
+          lessee: asLeaseText(lease.lessee),
+          requestedFraction: requestedFraction.toString(),
+          allocatedFraction: '0',
+          clippedFraction: requestedFraction.toString(),
+        });
+      }
+      continue;
+    }
+
     const allocatedFraction = requestedFraction.greaterThan(remainingFraction)
       ? remainingFraction
       : requestedFraction;
+
+    // Partial clip: the lease wanted more than the owner had remaining.
+    // Record the clipped amount as an overlap warning before writing the
+    // allocation. A lease that requests exactly the remaining fraction is NOT
+    // an overlap.
+    if (requestedFraction.greaterThan(remainingFraction)) {
+      const clipped = requestedFraction.minus(remainingFraction);
+      overlaps.push({
+        leaseId: lease.id,
+        leaseName: asLeaseText(lease.leaseName),
+        lessee: asLeaseText(lease.lessee),
+        requestedFraction: requestedFraction.toString(),
+        allocatedFraction: allocatedFraction.toString(),
+        clippedFraction: clipped.toString(),
+      });
+    }
 
     if (!allocatedFraction.greaterThan(0)) {
       continue;
@@ -100,7 +153,7 @@ export function allocateLeaseCoverage(
     remainingFraction = remainingFraction.minus(allocatedFraction);
   }
 
-  return allocations;
+  return { allocations, overlaps };
 }
 
 export function pickPrimaryLease(leases: Lease[]): Lease | null {
@@ -156,7 +209,11 @@ export function calculateDeskMapCoverageSummary(
       linkedOwnership = linkedOwnership.plus(remaining);
 
       const ownerLeases = activeLeasesByOwnerId.get(node.linkedOwnerId) ?? [];
-      const allocations = allocateLeaseCoverage(ownerLeases, remaining.toString());
+      // Overlap warnings are discarded here — the desk-map coverage summary
+      // does not surface them today. The leasehold summary (`leasehold-summary.ts`)
+      // is the canonical consumer of per-owner overlap warnings and bubbles them
+      // up to the tract and unit level for the leasehold deck UI.
+      const { allocations } = allocateLeaseCoverage(ownerLeases, remaining.toString());
 
       if (allocations.length > 0) {
         leasedOwnerCount += 1;

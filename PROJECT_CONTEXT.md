@@ -10,6 +10,15 @@ The system prioritizes:
 Performance and maintainability are prioritized over rapid feature expansion.
 The active application surface currently lives at the repository root.
 
+## Jurisdictional scope
+LANDroid is **Texas-only for now**. Texas fee and Texas state leases are the only jurisdictions modeled in the math, data, and UI today.
+
+**Federal/BLM and private leases are scheduled as Phase 2** work, anchored on a real Communitization Agreement (~10 federal leases) the user already holds plus additional BLM lands pre-selected for the next BLM leasing window. The strategy is to land a flawless Texas baseline first so that Phase 2 attaches to a clean, well-tested foundation. Until Phase 2 begins:
+
+- Do not add federal-specific math (federal royalty rates, communitization tract participation, ONRR forms, federal minimum royalty, federal lease status enums) to the codebase.
+- One piece of federal-adjacent prep work — a `LeaseJurisdiction` discriminator on `Lease`/`LeaseholdUnit` defaulting to `'tx_fee'` — is the only acceptable cross-jurisdiction code in the Texas baseline. It exists so Phase 2 has a clean attachment point.
+- Phase 2 work begins only when the user explicitly says the Texas baseline is ready.
+
 ## Repository structure (current)
 The active codebase is currently centered around:
 

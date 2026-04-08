@@ -5,6 +5,26 @@ export type SplitBasis = 'initial' | 'remaining' | 'whole';
 export type NodeType = 'conveyance' | 'related';
 export type RelatedNodeKind = 'document' | 'lease';
 export type InterestClass = 'mineral' | 'npri';
+/**
+ * NPRI royalty characterization (audit finding #5).
+ *
+ * `'fixed'` — a fixed share of production; does not scale with the lease royalty.
+ * `'floating'` — a fraction of whatever lease royalty is later negotiated.
+ * `null`   — not an NPRI (mineral nodes always carry `null`).
+ *
+ * **Deed-text preservation only.** LANDroid stores this value on the NPRI node
+ * and propagates it through conveyances and predecessor inserts, but **no math
+ * layer reads it today**. NPRIs are excluded from `currentMineralOwners` in
+ * `src/components/leasehold/leasehold-summary.ts`, so the field does not
+ * influence any decimal that reaches transfer-order review.
+ *
+ * Do NOT start consuming `royaltyKind` in the leasehold decimal until both
+ * branches are wired end-to-end: a floating NPRI must be multiplied against
+ * the lease royalty rate, a fixed NPRI against `gross_8_8`, and the deck UI
+ * must surface the distinction. Implementing only one branch is a silent
+ * mis-payment trap. See `docs/architecture/ownership-math-reference.md` →
+ * "Fixed vs. floating royalty".
+ */
 export type RoyaltyKind = 'fixed' | 'floating' | null;
 
 export interface OwnershipNode {
@@ -48,6 +68,7 @@ export interface OwnershipNode {
   linkedLeaseId: string | null;
   relatedKind: RelatedNodeKind | null;
   interestClass: InterestClass;
+  /** See `RoyaltyKind` — deed-text preservation only, not consumed by math. */
   royaltyKind: RoyaltyKind;
 
   // UI state

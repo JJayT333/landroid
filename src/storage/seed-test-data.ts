@@ -18,8 +18,12 @@ import { savePdf } from './pdf-store';
 import type { DeskMap, OwnershipNode } from '../types/node';
 import { createBlankNode } from '../types/node';
 import { createBlankLease, createBlankOwner } from '../types/owner';
-import type { LeaseholdAssignment, LeaseholdOrri } from '../types/leasehold';
-import type { LeaseholdTransferOrderEntry } from '../types/leasehold';
+import type {
+  LeaseholdAssignment,
+  LeaseholdOrri,
+  LeaseholdTransferOrderEntry,
+  LeaseholdUnit,
+} from '../types/leasehold';
 import { createWorkspaceId } from '../utils/workspace-id';
 
 // ── Node factory ────────────────────────────────────────
@@ -1334,6 +1338,7 @@ const LEASEHOLD_DEMO_UNIT = {
     'Eight-tract pooled unit template with clean acreage, clean fractions, and full lease coverage for leasehold review.',
   operator: PRIMARY_TEST_LESSEE,
   effectiveDate: '2024-01-01',
+  jurisdiction: 'tx_fee',
 } as const;
 
 const LEASEHOLD_DEMO_ORRIS = [
@@ -2009,6 +2014,1099 @@ export async function seedLeaseholdDemoData(): Promise<{
 
   console.log(
     `[leasehold] Built ${workspace.nodes.length} nodes, attached ${pdfCount} PDFs, ${workspace.deskMaps.length} desk maps`
+  );
+  return { nodeCount: workspace.nodes.length, pdfCount };
+}
+
+// ═══════════════════════════════════════════════════════════
+// Combinatorial fixture — 8 tracts × ~100 nodes, every scenario
+// a Texas landman regularly encounters (simple power-of-2 fractions).
+// ═══════════════════════════════════════════════════════════
+
+interface CombinatorialTractPlan {
+  name: string;
+  code: string;
+  grossAcres: string;
+  pooledAcres: string;
+  description: string;
+  landDesc: string;
+  patentYear: number;
+  patentGrantee: string;
+  /** Leading royalty rate used for this tract's primary leases. */
+  primaryRoyalty: string;
+  /** Surname pool used to name branch grantees deterministically. */
+  surnames: string[];
+  /**
+   * The combinatorial flavor — every tract covers the basics, but the
+   * designated flavor is represented more densely so the user can flip
+   * between tracts to audit one scenario family at a time.
+   */
+  flavor:
+    | 'baseline_splits'
+    | 'probate_heirship'
+    | 'fixed_npri'
+    | 'floating_npri'
+    | 'correction_release'
+    | 'royalty_deeds'
+    | 'lease_overlap'
+    | 'kitchen_sink';
+}
+
+const COMBINATORIAL_TRACTS: CombinatorialTractPlan[] = [
+  {
+    name: 'Tract 1 — Baseline Splits',
+    code: 'C1',
+    grossAcres: '160',
+    pooledAcres: '160',
+    description:
+      'Clean 1/2, 1/4, 1/8 warranty-deed chain of title with simple power-of-2 splits and leases at 1/8 royalty.',
+    landDesc: 'Section 4, Block 18, T&P RR Co. Survey, Howard County, Texas',
+    patentYear: 1898,
+    patentGrantee: 'Ezra Turnbuckle',
+    primaryRoyalty: '1/8',
+    surnames: ['Turnbuckle', 'Windmill', 'Hayfork', 'Coldwater'],
+    flavor: 'baseline_splits',
+  },
+  {
+    name: 'Tract 2 — Probate & Heirship',
+    code: 'C2',
+    grossAcres: '240',
+    pooledAcres: '240',
+    description:
+      'Multi-generation death certificate, affidavit of heirship, will, and probate chains feeding the present owners.',
+    landDesc: 'Section 9, Block 22, H&GN RR Co. Survey, Reagan County, Texas',
+    patentYear: 1895,
+    patentGrantee: 'Mercy Blackbird',
+    primaryRoyalty: '3/16',
+    surnames: ['Blackbird', 'Longstone', 'Rivershade', 'Redhawk'],
+    flavor: 'probate_heirship',
+  },
+  {
+    name: 'Tract 3 — Fixed NPRI Carves',
+    code: 'C3',
+    grossAcres: '320',
+    pooledAcres: '320',
+    description:
+      'Fixed NPRIs at 1/16 and 1/32 of the whole, stacked under a clean mineral chain so the deck shows the classic Hahn-style setup.',
+    landDesc: 'Section 15, Block 6, I&GN RR Co. Survey, Upton County, Texas',
+    patentYear: 1901,
+    patentGrantee: 'Clement Brushwick',
+    primaryRoyalty: '1/4',
+    surnames: ['Brushwick', 'Oakridge', 'Tallpine', 'Stonebranch'],
+    flavor: 'fixed_npri',
+  },
+  {
+    name: 'Tract 4 — Floating NPRI Carves',
+    code: 'C4',
+    grossAcres: '400',
+    pooledAcres: '400',
+    description:
+      'Floating NPRIs at 1/2 and 1/4 of lease royalty, with sibling fixed NPRIs for contrast and mixed lease royalty rates.',
+    landDesc: 'Section 21, Block 14, H&TC RR Co. Survey, Reeves County, Texas',
+    patentYear: 1906,
+    patentGrantee: 'Imogene Farrow',
+    primaryRoyalty: '1/5',
+    surnames: ['Farrow', 'Bluelake', 'Pinyon', 'Thornfield'],
+    flavor: 'floating_npri',
+  },
+  {
+    name: 'Tract 5 — Corrections & Releases',
+    code: 'C5',
+    grossAcres: '480',
+    pooledAcres: '480',
+    description:
+      'Quitclaims, correction deeds, and release instruments layered on top of a working warranty-deed chain.',
+    landDesc: 'Section 27, Block C-23, PSL Survey, Loving County, Texas',
+    patentYear: 1904,
+    patentGrantee: 'Royster Quinlan',
+    primaryRoyalty: '1/8',
+    surnames: ['Quinlan', 'Driftwood', 'Smokerose', 'Redfern'],
+    flavor: 'correction_release',
+  },
+  {
+    name: 'Tract 6 — Royalty Deeds + ORRI Deck',
+    code: 'C6',
+    grossAcres: '560',
+    pooledAcres: '560',
+    description:
+      'Royalty-deed carve-outs on the mineral side plus unit-level ORRIs on all three basis types (gross 8/8, NRI, WI).',
+    landDesc: 'Section 3, Block 7, GC&SF RR Co. Survey, Midland County, Texas',
+    patentYear: 1905,
+    patentGrantee: 'Odalys Starnes',
+    primaryRoyalty: '3/16',
+    surnames: ['Starnes', 'Graniteer', 'Whitbranch', 'Coulee'],
+    flavor: 'royalty_deeds',
+  },
+  {
+    name: 'Tract 7 — Lease Overlap / Top-Lease',
+    code: 'C7',
+    grossAcres: '640',
+    pooledAcres: '640',
+    description:
+      'Deliberate two-lease overlap on a present owner: an original lease and a later top-lease at a higher royalty, wired to exercise the overlap warning surface.',
+    landDesc: 'Section 11, Block 2, GH&H RR Co. Survey, Martin County, Texas',
+    patentYear: 1910,
+    patentGrantee: 'Ferris Hollypine',
+    primaryRoyalty: '1/4',
+    surnames: ['Hollypine', 'Bramblewood', 'Sunnyridge', 'Saltmarsh'],
+    flavor: 'lease_overlap',
+  },
+  {
+    name: 'Tract 8 — Kitchen Sink',
+    code: 'C8',
+    grossAcres: '640',
+    pooledAcres: '640',
+    description:
+      'Every scenario in one tract: probate, NPRI (fixed + floating), correction, release, royalty deed, top-lease, and mixed-royalty unit leases.',
+    landDesc: 'Section 19, Block 32, T-2-S, T&P RR Co. Survey, Glasscock County, Texas',
+    patentYear: 1909,
+    patentGrantee: 'Solange Merriwether',
+    primaryRoyalty: '1/8',
+    surnames: ['Merriwether', 'Cascade', 'Ironwood', 'Brackenfell'],
+    flavor: 'kitchen_sink',
+  },
+];
+
+const COMBINATORIAL_FIRST_NAMES = [
+  'Ada', 'Bea', 'Cal', 'Dov', 'Eli', 'Fay', 'Gus', 'Hal',
+  'Ida', 'Jem', 'Kip', 'Lia', 'Mae', 'Ned', 'Ola', 'Pax',
+  'Quill', 'Rex', 'Sal', 'Tia', 'Una', 'Van', 'Wes', 'Xio',
+  'Yael', 'Zeb', 'Alma', 'Bart', 'Cleo', 'Dash', 'Elsa', 'Finn',
+  'Gita', 'Hugo', 'Isla', 'Jace', 'Kera', 'Luna', 'Milo', 'Noor',
+  'Opal', 'Penn', 'Quinn', 'Rona', 'Sage', 'Tess', 'Ulla', 'Vera',
+  'Will', 'Xena', 'Yuna', 'Zora',
+] as const;
+
+const COMBINATORIAL_TARGET_NODES_PER_TRACT = 100;
+
+/**
+ * Short per-tract grantee name generator. Deterministic so reseeding produces
+ * the same project snapshot — important so the user can trust the "combinatorial"
+ * fixture as a known-good baseline for UI screenshots and ad-hoc audits.
+ */
+function combinatorialGrantee(
+  tract: CombinatorialTractPlan,
+  seq: number
+): string {
+  const first = COMBINATORIAL_FIRST_NAMES[seq % COMBINATORIAL_FIRST_NAMES.length];
+  const surname = tract.surnames[seq % tract.surnames.length];
+  return `${first} ${surname}`;
+}
+
+function combinatorialDate(
+  tract: CombinatorialTractPlan,
+  yearOffset: number,
+  seq: number
+): { date: string; fileDate: string } {
+  const year = tract.patentYear + yearOffset;
+  const month = String(((seq * 5) % 12) + 1).padStart(2, '0');
+  const day = String(((seq * 11) % 27) + 1).padStart(2, '0');
+  const fileDay = String(Math.min(Number(day) + 7, 28)).padStart(2, '0');
+  return {
+    date: `${year}-${month}-${day}`,
+    fileDate: `${year}-${month}-${fileDay}`,
+  };
+}
+
+/**
+ * Push an NPRI child onto the builder's node list without deducting from the
+ * mineral parent's remaining fraction — NPRI is carved sibling-style per the
+ * math engine's `allocatesAgainstParent` rule (different interest classes do
+ * not allocate against each other). Mirrors the direct-push pattern that
+ * `StressBuilder.addChild` would otherwise use, minus the `.remaining` update.
+ */
+function pushNpriChild(
+  builder: StressBuilder,
+  parentId: string,
+  {
+    share,
+    royaltyKind,
+    grantor,
+    grantee,
+    instrument,
+    date,
+    fileDate,
+    remarks,
+  }: {
+    share: number;
+    royaltyKind: 'fixed' | 'floating';
+    grantor: string;
+    grantee: string;
+    instrument: string;
+    date: string;
+    fileDate: string;
+    remarks: string;
+  }
+): string {
+  const id = `stress-${builder.nodes.length + 1}-npri-${builder.pdfMappings.length}-${Math.random().toString(36).slice(2, 8)}`;
+  const parent = builder.nodes.find((n) => n.id === parentId);
+  builder.nodes.push(
+    makeNode(id, parentId, {
+      type: 'conveyance',
+      instrument,
+      date,
+      fileDate,
+      grantor,
+      grantee,
+      landDesc: parent?.landDesc ?? '',
+      initialFraction: share.toFixed(9),
+      fraction: share.toFixed(9),
+      docNo: `CB-NPRI-${builder.nodes.length}`,
+      remarks,
+      interestClass: 'npri',
+      royaltyKind,
+      numerator: '1',
+      denominator: String(Math.max(1, Math.round(1 / share))),
+      conveyanceMode: 'fraction',
+      // NPRIs are expressed as a fraction of the 8/8 (whole), not of the
+      // mineral parent's fraction. Use splitBasis='whole' so that re-opening
+      // the node in ConveyModal recomputes the same stored share back.
+      splitBasis: 'whole',
+    })
+  );
+  return id;
+}
+
+/** A cluster that always-generates at a fertile parent in a tract. */
+type ClusterRunner = (
+  builder: StressBuilder,
+  parentId: string,
+  tract: CombinatorialTractPlan,
+  iteration: number
+) => void;
+
+function clusterSplitPair(
+  builder: StressBuilder,
+  parentId: string,
+  tract: CombinatorialTractPlan,
+  iteration: number
+) {
+  const parent = builder.nodes.find((n) => n.id === parentId);
+  if (!parent) return;
+  const parentRem = Number(parent.fraction);
+  if (parentRem < 1 / 32) return;
+  const share = parentRem / 2;
+  const grantee1 = combinatorialGrantee(tract, iteration * 2 + 1);
+  const grantee2 = combinatorialGrantee(tract, iteration * 2 + 2);
+  const { date, fileDate } = combinatorialDate(tract, 30 + iteration, iteration);
+  const childA = builder.addChild(parentId, share, {
+    instrument: 'Warranty Deed',
+    date,
+    fileDate,
+    grantor: parent.grantee,
+    grantee: grantee1,
+    remarks: `${tract.name} one-half split to ${grantee1}.`,
+    numerator: '1',
+    denominator: '2',
+    conveyanceMode: 'fraction',
+    splitBasis: 'initial',
+  });
+  const childB = builder.addChild(parentId, share, {
+    instrument: 'Warranty Deed',
+    date,
+    fileDate,
+    grantor: parent.grantee,
+    grantee: grantee2,
+    remarks: `${tract.name} one-half split to ${grantee2}.`,
+    numerator: '1',
+    denominator: '2',
+    conveyanceMode: 'fraction',
+    splitBasis: 'initial',
+  });
+  if (iteration % 3 === 0) builder.assignPdf(childA);
+  if (iteration % 4 === 0) builder.assignPdf(childB);
+}
+
+function clusterQuarterFan(
+  builder: StressBuilder,
+  parentId: string,
+  tract: CombinatorialTractPlan,
+  iteration: number
+) {
+  const parent = builder.nodes.find((n) => n.id === parentId);
+  if (!parent) return;
+  const parentRem = Number(parent.fraction);
+  if (parentRem < 1 / 16) return;
+  const share = parentRem / 4;
+  for (let i = 0; i < 4; i += 1) {
+    const grantee = combinatorialGrantee(tract, iteration * 4 + i);
+    const { date, fileDate } = combinatorialDate(
+      tract,
+      40 + iteration,
+      iteration + i
+    );
+    const childId = builder.addChild(parentId, share, {
+      instrument: i % 2 === 0 ? 'Warranty Deed' : 'Special Warranty Deed',
+      date,
+      fileDate,
+      grantor: parent.grantee,
+      grantee,
+      remarks: `${tract.name} one-quarter split ${i + 1}/4 to ${grantee}.`,
+      numerator: '1',
+      denominator: '4',
+      conveyanceMode: 'fraction',
+      splitBasis: 'initial',
+    });
+    if ((iteration + i) % 3 === 0) builder.assignPdf(childId);
+  }
+}
+
+function clusterProbate(
+  builder: StressBuilder,
+  parentId: string,
+  tract: CombinatorialTractPlan,
+  iteration: number
+) {
+  const parent = builder.nodes.find((n) => n.id === parentId);
+  if (!parent) return;
+  const parentRem = Number(parent.fraction);
+  if (parentRem < 1 / 16) return;
+  const { date, fileDate } = combinatorialDate(tract, 55 + iteration, iteration);
+  builder.markDeceased(parentId, `Passed away ${date} in a tragic paperwork accident.`);
+  const dcId = builder.addRelated(parentId, {
+    instrument: 'Death Certificate',
+    date,
+    fileDate,
+    grantee: parent.grantee,
+    remarks: `${tract.name} death certificate for ${parent.grantee}.`,
+  });
+  builder.assignPdf(dcId);
+  const aohId = builder.addRelated(parentId, {
+    instrument: 'Affidavit of Heirship',
+    date: addDaysToIso(date, 60),
+    fileDate: addDaysToIso(fileDate, 60),
+    grantee: parent.grantee,
+    remarks: `${tract.name} heirship affidavit identifying two surviving heirs.`,
+  });
+  if (iteration % 2 === 0) builder.assignPdf(aohId);
+  const willId = builder.addRelated(parentId, {
+    instrument: 'Will',
+    date: addDaysToIso(date, 90),
+    fileDate: addDaysToIso(fileDate, 90),
+    grantee: parent.grantee,
+    remarks: `${tract.name} will admitted to probate.`,
+  });
+  if (iteration % 3 === 0) builder.assignPdf(willId);
+  // Heirs inherit via probate, each taking half of the remaining fraction.
+  const share = parentRem / 2;
+  for (let i = 0; i < 2; i += 1) {
+    const heir = combinatorialGrantee(tract, iteration * 2 + 100 + i);
+    const probateId = builder.addChild(parentId, share, {
+      instrument: 'Probate',
+      date: addDaysToIso(date, 180),
+      fileDate: addDaysToIso(fileDate, 180),
+      grantor: `Estate of ${parent.grantee}`,
+      grantee: heir,
+      remarks: `${tract.name} probate distribution of one-half to ${heir}.`,
+      numerator: '1',
+      denominator: '2',
+      conveyanceMode: 'fraction',
+      splitBasis: 'initial',
+    });
+    if ((iteration + i) % 2 === 0) builder.assignPdf(probateId);
+  }
+}
+
+function hasNpriOfKind(
+  builder: StressBuilder,
+  parentId: string,
+  kind: 'fixed' | 'floating'
+): boolean {
+  return builder.nodes.some(
+    (n) =>
+      n.parentId === parentId
+      && n.interestClass === 'npri'
+      && n.royaltyKind === kind
+  );
+}
+
+function clusterFixedNpri(
+  builder: StressBuilder,
+  parentId: string,
+  tract: CombinatorialTractPlan,
+  iteration: number
+) {
+  const parent = builder.nodes.find((n) => n.id === parentId);
+  if (!parent) return;
+  // Cap NPRIs at one fixed cluster per parent. Multiple cluster runs on the
+  // same parent would stack royalty burdens past 100% (physically impossible).
+  // Skipping here lets the while-loop rotate to a fresh parent on the next
+  // iteration so every NPRI landed is economically sound.
+  if (hasNpriOfKind(builder, parentId, 'fixed')) return;
+  // NPRIs don't deduct from the parent; the parent's mineral ownership is unchanged.
+  const shares = [1 / 16, 1 / 32];
+  for (let i = 0; i < shares.length; i += 1) {
+    const grantee = combinatorialGrantee(tract, iteration * 5 + 200 + i);
+    const { date, fileDate } = combinatorialDate(
+      tract,
+      35 + iteration,
+      iteration + i
+    );
+    const npriId = pushNpriChild(builder, parentId, {
+      share: shares[i],
+      royaltyKind: 'fixed',
+      grantor: parent.grantee,
+      grantee,
+      instrument: 'Royalty Deed',
+      date,
+      fileDate,
+      remarks: `${tract.name} fixed NPRI of ${
+        shares[i] === 1 / 16 ? '1/16' : '1/32'
+      } of the whole reserved by ${grantee}.`,
+    });
+    if ((iteration + i) % 2 === 0) builder.assignPdf(npriId);
+  }
+}
+
+function clusterFloatingNpri(
+  builder: StressBuilder,
+  parentId: string,
+  tract: CombinatorialTractPlan,
+  iteration: number
+) {
+  const parent = builder.nodes.find((n) => n.id === parentId);
+  if (!parent) return;
+  // Same cap as fixed NPRI — one floating cluster per parent. 1/2 + 1/4 of
+  // lease royalty already consumes 3/4 of the lessor's royalty stream, so
+  // stacking another cluster on top would over-carve the royalty interest.
+  if (hasNpriOfKind(builder, parentId, 'floating')) return;
+  const shares: Array<[number, string]> = [
+    [1 / 2, '1/2 of lease royalty'],
+    [1 / 4, '1/4 of lease royalty'],
+  ];
+  for (let i = 0; i < shares.length; i += 1) {
+    const [share, label] = shares[i];
+    const grantee = combinatorialGrantee(tract, iteration * 5 + 300 + i);
+    const { date, fileDate } = combinatorialDate(
+      tract,
+      37 + iteration,
+      iteration + i
+    );
+    const npriId = pushNpriChild(builder, parentId, {
+      share,
+      royaltyKind: 'floating',
+      grantor: parent.grantee,
+      grantee,
+      instrument: 'Royalty Deed',
+      date,
+      fileDate,
+      remarks: `${tract.name} floating NPRI (${label}) reserved by ${grantee}.`,
+    });
+    if ((iteration + i) % 3 === 0) builder.assignPdf(npriId);
+  }
+}
+
+function clusterCorrectionAndRelease(
+  builder: StressBuilder,
+  parentId: string,
+  tract: CombinatorialTractPlan,
+  iteration: number
+) {
+  const parent = builder.nodes.find((n) => n.id === parentId);
+  if (!parent) return;
+  const parentRem = Number(parent.fraction);
+  if (parentRem < 1 / 16) return;
+  const { date, fileDate } = combinatorialDate(tract, 60 + iteration, iteration);
+  // A quitclaim transferring the whole remaining fraction to a new grantee...
+  const newGrantee = combinatorialGrantee(tract, iteration * 3 + 400);
+  const quitclaimId = builder.addChild(parentId, parentRem, {
+    instrument: 'Quitclaim Deed',
+    date,
+    fileDate,
+    grantor: parent.grantee,
+    grantee: newGrantee,
+    remarks: `${tract.name} quitclaim deed conveying residual interest of ${parent.grantee} to ${newGrantee}.`,
+    numerator: '1',
+    denominator: '1',
+    conveyanceMode: 'fraction',
+    splitBasis: 'remaining',
+  });
+  if (iteration % 2 === 0) builder.assignPdf(quitclaimId);
+  // ...and a correction deed and release as related documents beneath it.
+  const correctionId = builder.addRelated(quitclaimId, {
+    instrument: 'Correction Deed',
+    date: addDaysToIso(date, 30),
+    fileDate: addDaysToIso(fileDate, 30),
+    grantee: newGrantee,
+    remarks: `${tract.name} correction deed fixing scrivener's error in the quitclaim.`,
+  });
+  if (iteration % 3 === 0) builder.assignPdf(correctionId);
+  const releaseId = builder.addRelated(quitclaimId, {
+    instrument: 'Release',
+    date: addDaysToIso(date, 120),
+    fileDate: addDaysToIso(fileDate, 120),
+    grantee: newGrantee,
+    remarks: `${tract.name} release of prior lien or encumbrance.`,
+  });
+  if (iteration % 4 === 0) builder.assignPdf(releaseId);
+}
+
+function clusterRoyaltyDeed(
+  builder: StressBuilder,
+  parentId: string,
+  tract: CombinatorialTractPlan,
+  iteration: number
+) {
+  const parent = builder.nodes.find((n) => n.id === parentId);
+  if (!parent) return;
+  const parentRem = Number(parent.fraction);
+  if (parentRem < 1 / 16) return;
+  const share = parentRem / 4;
+  const grantee = combinatorialGrantee(tract, iteration * 3 + 500);
+  const { date, fileDate } = combinatorialDate(tract, 45 + iteration, iteration);
+  // Label the stored share honestly. With share = parentRem/4 and parentRem
+  // drawn from a power-of-2 mineral chain, the share lands on 1/4, 1/8, 1/16,
+  // 1/32, etc. Pick the closest 1/N label so the remarks and the stored
+  // fraction agree (this is purely cosmetic — math is driven by `share`).
+  const labeledDenom = Math.max(1, Math.round(1 / share));
+  const shareLabel = `1/${labeledDenom}`;
+  const rdId = builder.addChild(parentId, share, {
+    instrument: 'Royalty Deed',
+    date,
+    fileDate,
+    grantor: parent.grantee,
+    grantee,
+    remarks: `${tract.name} royalty-deed carve-out of ${shareLabel} of the parent's remaining interest (one-quarter of ${parent.grantee}'s share) to ${grantee}.`,
+    numerator: '1',
+    denominator: '4',
+    conveyanceMode: 'fraction',
+    splitBasis: 'initial',
+  });
+  if (iteration % 2 === 0) builder.assignPdf(rdId);
+}
+
+function clusterDeepWarrantyChain(
+  builder: StressBuilder,
+  parentId: string,
+  tract: CombinatorialTractPlan,
+  iteration: number
+) {
+  const parent = builder.nodes.find((n) => n.id === parentId);
+  if (!parent) return;
+  let currentParent = parentId;
+  let currentGrantor = parent.grantee;
+  let currentRem = Number(parent.fraction);
+  for (let i = 0; i < 3; i += 1) {
+    if (currentRem < 1 / 32) break;
+    const share = currentRem / 2;
+    const grantee = combinatorialGrantee(tract, iteration * 7 + 600 + i);
+    const { date, fileDate } = combinatorialDate(
+      tract,
+      50 + iteration + i * 4,
+      iteration + i
+    );
+    const childId = builder.addChild(currentParent, share, {
+      instrument: i % 2 === 0 ? 'Warranty Deed' : 'Mineral Deed',
+      date,
+      fileDate,
+      grantor: currentGrantor,
+      grantee,
+      remarks: `${tract.name} deep chain generation ${i + 1} — half of remaining to ${grantee}.`,
+      numerator: '1',
+      denominator: '2',
+      conveyanceMode: 'fraction',
+      splitBasis: 'initial',
+    });
+    if ((iteration + i) % 3 === 0) builder.assignPdf(childId);
+    currentParent = childId;
+    currentGrantor = grantee;
+    currentRem = share;
+  }
+}
+
+function addCombinatorialLease(
+  builder: StressBuilder,
+  leaseOverrides: Map<string, Partial<OwnerWorkspaceData['leases'][number]>>,
+  {
+    parentId,
+    tract,
+    royalty,
+    lessee,
+    effectiveDate,
+    fileDate,
+    notes,
+    markPdf,
+  }: {
+    parentId: string;
+    tract: CombinatorialTractPlan;
+    royalty: string;
+    lessee: string;
+    effectiveDate: string;
+    fileDate: string;
+    notes: string;
+    markPdf: boolean;
+  }
+): string | null {
+  const parent = builder.nodes.find((n) => n.id === parentId);
+  if (!parent) return null;
+  const parentRem = Number(parent.fraction);
+  if (parentRem <= 0) return null;
+  const leaseId = builder.addRelated(parentId, {
+    relatedKind: 'lease',
+    instrument: 'Oil & Gas Lease',
+    date: effectiveDate,
+    fileDate,
+    grantor: parent.grantee,
+    grantee: lessee,
+    remarks: `${tract.name} lease covering ${parent.grantee}'s remaining fraction at ${royalty} royalty.`,
+  });
+  leaseOverrides.set(leaseId, {
+    royaltyRate: royalty,
+    leasedInterest: parent.fraction,
+    leaseName: `${tract.name} — ${parent.grantee} Lease`,
+    notes,
+  });
+  if (markPdf) builder.assignPdf(leaseId);
+  return leaseId;
+}
+
+/**
+ * Iterate over the fertile present-owner leaves of a tract and add leases at
+ * mixed royalty rates. The first-pass lease uses the tract's primary royalty;
+ * follow-on leases cycle through a small ladder so the unit ends up with a
+ * realistic mix. Also handles the "top-lease" overlap scenario when the tract
+ * flavor requests it.
+ */
+function addCombinatorialLeasesToLeaves(
+  builder: StressBuilder,
+  leaseOverrides: Map<string, Partial<OwnerWorkspaceData['leases'][number]>>,
+  tract: CombinatorialTractPlan,
+  tractNodeIds: Set<string>
+) {
+  const ROYALTY_LADDER = ['1/8', '3/16', '1/4', '1/5'];
+  const fertileLeaves = builder.nodes.filter(
+    (node) =>
+      tractNodeIds.has(node.id)
+      && node.type === 'conveyance'
+      && node.interestClass === 'mineral'
+      && Number(node.fraction) > 0
+  );
+  let leaseIndex = 0;
+  for (const leaf of fertileLeaves) {
+    const hasExistingLease = builder.nodes.some(
+      (node) =>
+        node.parentId === leaf.id
+        && node.type === 'related'
+        && node.relatedKind === 'lease'
+    );
+    if (hasExistingLease) continue;
+    const royalty =
+      leaseIndex === 0 ? tract.primaryRoyalty : ROYALTY_LADDER[leaseIndex % ROYALTY_LADDER.length];
+    const monthSeq = String(((leaseIndex * 3) % 12) + 1).padStart(2, '0');
+    addCombinatorialLease(builder, leaseOverrides, {
+      parentId: leaf.id,
+      tract,
+      royalty,
+      lessee: PRIMARY_TEST_LESSEE,
+      effectiveDate: `2024-${monthSeq}-01`,
+      fileDate: `2024-${monthSeq}-12`,
+      notes: `${tract.description}`,
+      markPdf: leaseIndex % 3 === 0,
+    });
+    leaseIndex += 1;
+  }
+
+  // Top-lease overlap — only for tracts that request it.
+  if (tract.flavor === 'lease_overlap' || tract.flavor === 'kitchen_sink') {
+    const topLeaseTarget = fertileLeaves[0];
+    if (topLeaseTarget) {
+      addCombinatorialLease(builder, leaseOverrides, {
+        parentId: topLeaseTarget.id,
+        tract,
+        royalty: '1/4',
+        lessee: 'Salt Fork Top-Lease Partners, LLC',
+        effectiveDate: '2025-06-01',
+        fileDate: '2025-06-15',
+        notes: `Top-lease intentionally overlapping the original lease on ${topLeaseTarget.grantee}; should trigger the desk-map and leasehold overlap warning surface.`,
+        markPdf: true,
+      });
+    }
+  }
+}
+
+function buildCombinatorialTract(
+  builder: StressBuilder,
+  leaseOverrides: Map<string, Partial<OwnerWorkspaceData['leases'][number]>>,
+  tract: CombinatorialTractPlan
+) {
+  const beforeCount = builder.nodes.length;
+  const patentId = builder.addRoot(tract.landDesc, tract.patentGrantee, tract.patentYear);
+  builder.assignPdf(patentId);
+
+  // First-level: split the patent cleanly into 2 branches at 1/2 each so
+  // every tract has at least two root generation branches to hang clusters off.
+  const rootSplitShare = 0.5;
+  const topBranchIds: string[] = [];
+  for (let i = 0; i < 2; i += 1) {
+    const grantee = combinatorialGrantee(tract, i);
+    const { date, fileDate } = combinatorialDate(tract, 25, i);
+    const id = builder.addChild(patentId, rootSplitShare, {
+      instrument: 'Warranty Deed',
+      date,
+      fileDate,
+      grantor: tract.patentGrantee,
+      grantee,
+      remarks: `${tract.name} root generation branch ${i + 1} of 2 — one-half of the patent.`,
+      numerator: '1',
+      denominator: '2',
+      conveyanceMode: 'fraction',
+      splitBasis: 'initial',
+    });
+    if (i === 0) builder.assignPdf(id);
+    topBranchIds.push(id);
+  }
+
+  // Flavor-weighted cluster round: each tract runs a weighted rotation of
+  // cluster patterns so its designated flavor is represented more densely,
+  // but every tract still touches every pattern at least once.
+  const FLAVOR_CYCLES: Record<CombinatorialTractPlan['flavor'], ClusterRunner[]> = {
+    baseline_splits: [
+      clusterSplitPair,
+      clusterQuarterFan,
+      clusterDeepWarrantyChain,
+      clusterSplitPair,
+      clusterQuarterFan,
+      clusterProbate,
+      clusterFixedNpri,
+      clusterCorrectionAndRelease,
+      clusterRoyaltyDeed,
+      clusterFloatingNpri,
+    ],
+    probate_heirship: [
+      clusterProbate,
+      clusterSplitPair,
+      clusterProbate,
+      clusterDeepWarrantyChain,
+      clusterProbate,
+      clusterQuarterFan,
+      clusterCorrectionAndRelease,
+      clusterFixedNpri,
+      clusterRoyaltyDeed,
+      clusterFloatingNpri,
+    ],
+    fixed_npri: [
+      clusterFixedNpri,
+      clusterSplitPair,
+      clusterFixedNpri,
+      clusterQuarterFan,
+      clusterFixedNpri,
+      clusterRoyaltyDeed,
+      clusterDeepWarrantyChain,
+      clusterProbate,
+      clusterCorrectionAndRelease,
+      clusterFloatingNpri,
+    ],
+    floating_npri: [
+      clusterFloatingNpri,
+      clusterSplitPair,
+      clusterFloatingNpri,
+      clusterDeepWarrantyChain,
+      clusterFloatingNpri,
+      clusterQuarterFan,
+      clusterFixedNpri,
+      clusterProbate,
+      clusterCorrectionAndRelease,
+      clusterRoyaltyDeed,
+    ],
+    correction_release: [
+      clusterCorrectionAndRelease,
+      clusterSplitPair,
+      clusterCorrectionAndRelease,
+      clusterQuarterFan,
+      clusterCorrectionAndRelease,
+      clusterDeepWarrantyChain,
+      clusterProbate,
+      clusterFixedNpri,
+      clusterRoyaltyDeed,
+      clusterFloatingNpri,
+    ],
+    royalty_deeds: [
+      clusterRoyaltyDeed,
+      clusterSplitPair,
+      clusterRoyaltyDeed,
+      clusterQuarterFan,
+      clusterRoyaltyDeed,
+      clusterProbate,
+      clusterDeepWarrantyChain,
+      clusterFixedNpri,
+      clusterCorrectionAndRelease,
+      clusterFloatingNpri,
+    ],
+    lease_overlap: [
+      clusterSplitPair,
+      clusterQuarterFan,
+      clusterDeepWarrantyChain,
+      clusterSplitPair,
+      clusterProbate,
+      clusterCorrectionAndRelease,
+      clusterFixedNpri,
+      clusterRoyaltyDeed,
+      clusterFloatingNpri,
+      clusterQuarterFan,
+    ],
+    kitchen_sink: [
+      clusterSplitPair,
+      clusterProbate,
+      clusterFixedNpri,
+      clusterFloatingNpri,
+      clusterCorrectionAndRelease,
+      clusterRoyaltyDeed,
+      clusterDeepWarrantyChain,
+      clusterQuarterFan,
+      clusterSplitPair,
+      clusterProbate,
+    ],
+  };
+  const cycle = FLAVOR_CYCLES[tract.flavor];
+
+  // Run the cycle until the tract hits its target node count.
+  let iteration = 0;
+  let safetyFuse = 0;
+  const maxIterations = 400;
+  while (
+    builder.nodes.length - beforeCount < COMBINATORIAL_TARGET_NODES_PER_TRACT
+    && safetyFuse < maxIterations
+  ) {
+    // Pick a fertile mineral-class parent inside this tract.
+    const candidates = builder.nodes.filter(
+      (node) =>
+        node.landDesc === tract.landDesc
+        && node.type === 'conveyance'
+        && node.interestClass === 'mineral'
+        && Number(node.fraction) >= 1 / 32
+    );
+    if (candidates.length === 0) break;
+    // Rotate through candidates deterministically so we don't over-split one branch.
+    const parent = candidates[iteration % candidates.length];
+    const cluster = cycle[iteration % cycle.length];
+    cluster(builder, parent.id, tract, iteration);
+    iteration += 1;
+    safetyFuse += 1;
+  }
+
+  // Collect the ids of every node belonging to this tract (by landDesc).
+  const tractNodeIds = new Set(
+    builder.nodes
+      .filter((node) => node.landDesc === tract.landDesc)
+      .map((node) => node.id)
+  );
+
+  // Leases overlay on every fertile leaf.
+  addCombinatorialLeasesToLeaves(builder, leaseOverrides, tract, tractNodeIds);
+}
+
+export function buildCombinatorialWorkspaceData(): {
+  workspaceId: string;
+  projectName: string;
+  nodes: OwnershipNode[];
+  deskMaps: DeskMap[];
+  leaseholdUnit: LeaseholdUnit;
+  leaseholdAssignments: LeaseholdAssignment[];
+  leaseholdOrris: LeaseholdOrri[];
+  leaseholdTransferOrderEntries: LeaseholdTransferOrderEntry[];
+  activeDeskMapId: string | null;
+  instrumentTypes: string[];
+  pdfMappings: PdfMapping[];
+  ownerData: OwnerWorkspaceData;
+} {
+  const workspaceId = createWorkspaceId();
+  const builder = new StressBuilder();
+  const leaseOverrides = new Map<
+    string,
+    Partial<OwnerWorkspaceData['leases'][number]>
+  >();
+
+  for (const tract of COMBINATORIAL_TRACTS) {
+    buildCombinatorialTract(builder, leaseOverrides, tract);
+  }
+
+  const finalizedNodes = finalizeGeneratedNodes(builder.nodes, { humorousDeaths: false });
+  const { nodes, ownerData } = buildSeedOwnerWorkspaceData(
+    workspaceId,
+    finalizedNodes,
+    `Combinatorial Demo — ${COMBINATORIAL_TRACTS.length} Tracts`,
+    { leaseOverridesByNodeId: leaseOverrides }
+  );
+  const ts = Date.now();
+
+  const deskMaps = COMBINATORIAL_TRACTS.map((tract, index) => ({
+    id: `dm-combinatorial-${index + 1}-${ts}`,
+    name: tract.name,
+    code: tract.code,
+    tractId: tract.code,
+    grossAcres: tract.grossAcres,
+    pooledAcres: tract.pooledAcres,
+    description: tract.description,
+    nodeIds: getTractNodes(nodes, tract.landDesc).map((node) => node.id),
+  }));
+  const deskMapIdByCode = new Map(deskMaps.map((deskMap) => [deskMap.code, deskMap.id]));
+
+  // ORRIs — cover every basis and both scope levels.
+  const leaseholdOrris: LeaseholdOrri[] = [
+    {
+      id: 'combinatorial-orri-1',
+      payee: 'Prairie Vista Override, LP',
+      scope: 'unit',
+      deskMapId: null,
+      burdenFraction: '1/32',
+      burdenBasis: 'gross_8_8',
+      effectiveDate: '2024-02-01',
+      sourceDocNo: 'CB-ORRI-1',
+      notes: 'Unit-wide gross 8/8 ORRI covering every tract.',
+    },
+    {
+      id: 'combinatorial-orri-2',
+      payee: 'Salt Fork Royalty Partners',
+      scope: 'unit',
+      deskMapId: null,
+      burdenFraction: '1/64',
+      burdenBasis: 'net_revenue_interest',
+      effectiveDate: '2024-02-15',
+      sourceDocNo: 'CB-ORRI-2',
+      notes: 'Unit-wide NRI-basis ORRI for stacking-order review.',
+    },
+    {
+      id: 'combinatorial-orri-3',
+      payee: 'Llano Working Interest Override LLC',
+      scope: 'unit',
+      deskMapId: null,
+      burdenFraction: '1/80',
+      burdenBasis: 'working_interest',
+      effectiveDate: '2024-03-01',
+      sourceDocNo: 'CB-ORRI-3',
+      notes: 'Unit-wide WI-basis ORRI (note: see audit finding #2 on the WI-basis convention).',
+    },
+    {
+      id: 'combinatorial-orri-4',
+      payee: 'Pecos Override Co.',
+      scope: 'tract',
+      deskMapId: deskMapIdByCode.get('C6') ?? null,
+      burdenFraction: '1/16',
+      burdenBasis: 'gross_8_8',
+      effectiveDate: '2024-04-10',
+      sourceDocNo: 'CB-ORRI-4',
+      notes: 'Tract-scope gross 8/8 ORRI on Tract 6 (royalty-deed flavor).',
+    },
+    {
+      id: 'combinatorial-orri-5',
+      payee: 'Brazos Bend Overrides, LP',
+      scope: 'tract',
+      deskMapId: deskMapIdByCode.get('C8') ?? null,
+      burdenFraction: '1/128',
+      burdenBasis: 'net_revenue_interest',
+      effectiveDate: '2024-05-20',
+      sourceDocNo: 'CB-ORRI-5',
+      notes: 'Tract-scope NRI-basis ORRI on Tract 8 (kitchen sink).',
+    },
+  ];
+
+  // Assignments — cover unit and tract scope, with varying WI fractions.
+  const leaseholdAssignments: LeaseholdAssignment[] = [
+    {
+      id: 'combinatorial-assignment-1',
+      assignor: PRIMARY_TEST_LESSEE,
+      assignee: 'Caprock Resources, LLC',
+      scope: 'unit',
+      deskMapId: null,
+      workingInterestFraction: '1/2',
+      effectiveDate: '2024-03-01',
+      sourceDocNo: 'CB-ASG-1',
+      notes: 'Unit-wide 50% working-interest assignment to Caprock Resources.',
+    },
+    {
+      id: 'combinatorial-assignment-2',
+      assignor: PRIMARY_TEST_LESSEE,
+      assignee: 'Rio Draw Operating Co.',
+      scope: 'tract',
+      deskMapId: deskMapIdByCode.get('C6') ?? null,
+      workingInterestFraction: '1/4',
+      effectiveDate: '2024-04-01',
+      sourceDocNo: 'CB-ASG-2',
+      notes: 'Tract-scope 25% WI assignment on Tract 6.',
+    },
+    {
+      id: 'combinatorial-assignment-3',
+      assignor: PRIMARY_TEST_LESSEE,
+      assignee: 'Staked Plains Minerals',
+      scope: 'tract',
+      deskMapId: deskMapIdByCode.get('C8') ?? null,
+      workingInterestFraction: '1/8',
+      effectiveDate: '2024-05-01',
+      sourceDocNo: 'CB-ASG-3',
+      notes: 'Tract-scope 12.5% WI assignment on Tract 8 (kitchen sink).',
+    },
+  ];
+
+  const leaseholdUnit: LeaseholdUnit = {
+    name: 'Combinatorial Test Unit',
+    description:
+      'Eight-tract combinatorial test unit covering every conveyance scenario a Texas landman regularly encounters.',
+    operator: PRIMARY_TEST_LESSEE,
+    effectiveDate: '2024-01-01',
+    jurisdiction: 'tx_fee',
+  };
+
+  return {
+    workspaceId,
+    projectName: `Combinatorial Demo — ${deskMaps.length} Tracts (${builder.nodes.length} nodes)`,
+    nodes,
+    deskMaps,
+    leaseholdUnit,
+    leaseholdAssignments,
+    leaseholdOrris,
+    leaseholdTransferOrderEntries: [],
+    activeDeskMapId: deskMaps[0]?.id ?? null,
+    instrumentTypes: [...STRESS_INSTRUMENT_TYPES],
+    pdfMappings: builder.pdfMappings,
+    ownerData,
+  };
+}
+
+export async function seedCombinatorialData(): Promise<{
+  nodeCount: number;
+  pdfCount: number;
+}> {
+  const workspace = buildCombinatorialWorkspaceData();
+
+  useWorkspaceStore.getState().loadWorkspace({
+    workspaceId: workspace.workspaceId,
+    projectName: workspace.projectName,
+    nodes: workspace.nodes,
+    deskMaps: workspace.deskMaps,
+    leaseholdUnit: workspace.leaseholdUnit,
+    leaseholdAssignments: workspace.leaseholdAssignments,
+    leaseholdOrris: workspace.leaseholdOrris,
+    leaseholdTransferOrderEntries: workspace.leaseholdTransferOrderEntries,
+    activeDeskMapId: workspace.activeDeskMapId,
+    instrumentTypes: workspace.instrumentTypes,
+  });
+  await Promise.all([
+    useOwnerStore.getState().replaceWorkspaceData(
+      workspace.workspaceId,
+      workspace.ownerData
+    ),
+    useMapStore.getState().setWorkspace(workspace.workspaceId),
+  ]);
+
+  let pdfCount = 0;
+  const failedPdfNodeIds: string[] = [];
+  for (const mapping of workspace.pdfMappings) {
+    const ok = await attachPdf(mapping.nodeId, mapping.fileName);
+    if (ok) {
+      pdfCount++;
+    } else {
+      failedPdfNodeIds.push(mapping.nodeId);
+    }
+  }
+
+  if (failedPdfNodeIds.length > 0) {
+    for (const failedNodeId of failedPdfNodeIds) {
+      useWorkspaceStore.getState().updateNode(failedNodeId, { hasDoc: false });
+    }
+  }
+
+  console.log(
+    `[combinatorial] Built ${workspace.nodes.length} nodes, attached ${pdfCount} PDFs, ${workspace.deskMaps.length} desk maps`
   );
   return { nodeCount: workspace.nodes.length, pdfCount };
 }

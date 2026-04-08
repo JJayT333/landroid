@@ -2,6 +2,10 @@
 
 This repository root is now the active LANDroid application.
 
+## Scope
+
+**Texas-only for now.** LANDroid currently models Texas fee and Texas state leases only. Federal/BLM and private leases are scheduled as **Phase 2** work, anchored on a real ~10-lease Communitization Agreement already in hand plus additional BLM lands pre-selected for the next BLM leasing window. The strategy is to land a flawless Texas baseline first so Phase 2 attaches to a clean foundation. See `PROJECT_CONTEXT.md` for details.
+
 ## Quick start
 
 ### Launchers

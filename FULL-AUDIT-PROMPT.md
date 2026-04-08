@@ -34,9 +34,18 @@ Start the audit by looking at these current high-signal files:
 - `/Users/abstractmapping/projects/landroid/docs/architecture/ownership-math-reference.md`
 - `/Users/abstractmapping/projects/landroid/docs/architecture/audit-remediation-plan.md`
 
-User audit brief:
+## Current scope (set 2026-04-07)
 
-Please perform a comprehensive audit of the LANDroid project. This is a mineral title and oil & gas tool built with React (esbuild, no Babel), Tailwind CDN, and plain JS modules. The project covers both Texas state/fee leases AND federal BLM leases, so all audit phases must evaluate both.
+**LANDroid is Texas-only for now.** Texas fee and Texas state leases are the only jurisdictions in active scope. Federal/BLM and private leases are scheduled as **Phase 2** work, anchored on a real ~10-lease Communitization Agreement plus additional BLM lands pre-selected for the next leasing window. The audit (and any audit-driven implementation work) should:
+
+- Treat the Texas baseline as the **primary** deliverable. All findings, scoring, and roadmap items belong to the Texas baseline unless explicitly tagged Phase 2.
+- Treat the federal sections of the brief below as **Phase 2 reference material**. Do not score the codebase against missing federal scaffolding as if it were a defect — call out federal items as "Phase 2 — deferred but planned" instead.
+- Keep one piece of federal-adjacent prep work in the Texas baseline: a `LeaseJurisdiction` discriminator on `Lease`/`LeaseholdUnit` defaulting to `'tx_fee'`, so Phase 2 has a clean attachment point.
+- Verify the actual stack against the repo (Vite 6 + TypeScript strict + Tailwind v4 plugin + decimal.js + Dexie) before scoring — the brief below predates the current stack.
+
+User audit brief (Texas baseline = active scope; Phase 2 federal sections retained for reference):
+
+Please perform a comprehensive audit of the LANDroid project. This is a mineral title and oil & gas tool. **Texas-only is the active scope as of 2026-04-07**; federal BLM and private leases are scheduled as Phase 2. All current implementation work covers Texas state/fee leases. The federal sections below describe the future Phase 2 scope and remain useful for forward planning, but should not be treated as currently-required functionality.
 
 ## PHASE 1 — MATH AUDIT (Most Critical)
 

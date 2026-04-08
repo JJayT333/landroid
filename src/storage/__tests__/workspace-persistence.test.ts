@@ -125,6 +125,7 @@ function buildWorkspace(canvas: CanvasSaveData | null): LandroidFileData {
       description: 'Five tract unit',
       operator: 'Operator A',
       effectiveDate: '2024-01-01',
+      jurisdiction: 'tx_fee' as const,
     },
     leaseholdAssignments: [
       {
@@ -252,6 +253,7 @@ describe('workspace-persistence', () => {
       description: '',
       operator: '',
       effectiveDate: '',
+      jurisdiction: 'tx_fee',
     });
     expect(imported.leaseholdAssignments).toEqual([]);
     expect(imported.leaseholdOrris).toEqual([]);
@@ -433,6 +435,7 @@ describe('workspace-persistence', () => {
       description: '',
       operator: '',
       effectiveDate: '',
+      jurisdiction: 'tx_fee',
     });
     expect(imported.leaseholdAssignments).toEqual([]);
     expect(imported.leaseholdOrris).toEqual([]);

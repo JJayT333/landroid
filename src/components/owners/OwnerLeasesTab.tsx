@@ -1,9 +1,13 @@
 import { useState } from 'react';
 import FormField from '../shared/FormField';
 import { createBlankLease, normalizeLease, type Lease } from '../../types/owner';
-import { d } from '../../engine/decimal';
+import { d, serialize } from '../../engine/decimal';
 import { formatAsFraction } from '../../engine/fraction-display';
-import { normalizeInterestString, parseInterestString } from '../../utils/interest-string';
+import {
+  normalizeInterestString,
+  parseInterestString,
+  parseStrictInterestString,
+} from '../../utils/interest-string';
 import type { OwnerLeaseDeskMapTarget } from './owner-lease-deskmap';
 
 interface OwnerLeasesTabProps {
@@ -32,16 +36,20 @@ export default function OwnerLeasesTab({
 }: OwnerLeasesTabProps) {
   const [draft, setDraft] = useState<Lease | null>(null);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const beginAdd = () => {
+    setSaveError(null);
     setDraft(createBlankLease(workspaceId, ownerId));
   };
 
   const beginEdit = (lease: Lease) => {
+    setSaveError(null);
     setDraft(normalizeLease(lease, { workspaceId, ownerId }));
   };
 
   const set = (field: keyof Lease, value: string) => {
+    setSaveError(null);
     setDraft((current) => (current ? { ...current, [field]: value } : current));
   };
 
@@ -115,10 +123,19 @@ export default function OwnerLeasesTab({
             />
           </div>
 
+          {saveError && (
+            <div className="rounded-lg border border-seal/30 bg-seal/10 px-3 py-2 text-xs text-seal">
+              {saveError}
+            </div>
+          )}
+
           <div className="flex justify-end gap-2">
             <button
               type="button"
-              onClick={() => setDraft(null)}
+              onClick={() => {
+                setSaveError(null);
+                setDraft(null);
+              }}
               className="px-3 py-2 rounded-lg text-sm text-ink-light hover:bg-parchment-dark transition-colors"
             >
               Cancel
@@ -127,11 +144,37 @@ export default function OwnerLeasesTab({
               type="button"
               disabled={saving}
               onClick={async () => {
+                // Strict-parse both interest fields BEFORE saving. A blank value is a
+                // legal "not entered yet" state and parses as Decimal(0); a typo like
+                // "abc" or "1/0" returns null and blocks the save with an inline error.
+                // This closes audit finding #4 — the silent-zero bug on malformed input.
+                const parsedRoyalty = parseStrictInterestString(draft.royaltyRate);
+                if (parsedRoyalty === null) {
+                  setSaveError(
+                    'Royalty must be a fraction (e.g. 1/8), a decimal (e.g. 0.125), or blank.'
+                  );
+                  return;
+                }
+                const parsedLeasedInterest = parseStrictInterestString(draft.leasedInterest);
+                if (parsedLeasedInterest === null) {
+                  setSaveError(
+                    'Leased Interest must be a fraction (e.g. 1/2), a decimal (e.g. 0.5), or blank.'
+                  );
+                  return;
+                }
+
+                setSaveError(null);
                 setSaving(true);
+                // Preserve the user's raw royalty text (1/8 stays 1/8, not 0.125) — the
+                // parse above is a validator only. Leased Interest normalizes to a
+                // serialized decimal to match existing storage format.
+                const trimmedLeasedInterest = draft.leasedInterest.trim();
                 const normalizedDraft = {
                   ...draft,
                   royaltyRate: draft.royaltyRate.trim(),
-                  leasedInterest: normalizeInterestString(draft.leasedInterest),
+                  leasedInterest: trimmedLeasedInterest.length === 0
+                    ? ''
+                    : serialize(parsedLeasedInterest),
                 };
                 if (leases.some((lease) => lease.id === draft.id)) {
                   await onUpdate(draft.id, normalizedDraft);
