@@ -1,6 +1,6 @@
 import { d } from '../../engine/decimal';
 import { isNpriNode, type OwnershipNode } from '../../types/node';
-import type { Lease } from '../../types/owner';
+import { isInactiveLeaseStatus, type Lease } from '../../types/owner';
 import { parseInterestString } from '../../utils/interest-string';
 
 export interface DeskMapPrimaryLeaseSummary {
@@ -56,22 +56,12 @@ export interface LeaseCoverageResult {
   overlaps: LeaseCoverageOverlap[];
 }
 
-const INACTIVE_LEASE_STATUSES = new Set([
-  'expired',
-  'released',
-  'terminated',
-  'inactive',
-  'dead',
-]);
-
 function asLeaseText(value: string | null | undefined): string {
   return typeof value === 'string' ? value : '';
 }
 
 export function isLeaseActive(lease: Lease) {
-  const normalizedStatus = asLeaseText(lease.status).trim().toLowerCase();
-  if (normalizedStatus.length === 0) return true;
-  return !INACTIVE_LEASE_STATUSES.has(normalizedStatus);
+  return !isInactiveLeaseStatus(lease.status);
 }
 
 function compareLeaseAllocationOrder(left: Lease, right: Lease) {

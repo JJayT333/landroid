@@ -1,6 +1,12 @@
 import { useState } from 'react';
 import FormField from '../shared/FormField';
-import { createBlankLease, normalizeLease, type Lease } from '../../types/owner';
+import {
+  LEASE_STATUS_OPTIONS,
+  createBlankLease,
+  isLeaseStatusOption,
+  normalizeLease,
+  type Lease,
+} from '../../types/owner';
 import { d, serialize } from '../../engine/decimal';
 import { formatAsFraction } from '../../engine/fraction-display';
 import {
@@ -62,6 +68,12 @@ export default function OwnerLeasesTab({
     return formatAsFraction(d(parseInterestString(normalized)));
   };
 
+  const statusOptions = draft
+    ? (isLeaseStatusOption(draft.status)
+      ? [...LEASE_STATUS_OPTIONS]
+      : [draft.status, ...LEASE_STATUS_OPTIONS])
+    : [...LEASE_STATUS_OPTIONS];
+
   return (
     <div className="space-y-4">
       {draft ? (
@@ -99,11 +111,22 @@ export default function OwnerLeasesTab({
               value={draft.expirationDate}
               onChange={(value) => set('expirationDate', value)}
             />
-            <FormField
-              label="Status"
-              value={draft.status}
-              onChange={(value) => set('status', value)}
-            />
+            <div>
+              <label className="text-[10px] text-ink-light uppercase tracking-wider block mb-1">
+                Status
+              </label>
+              <select
+                value={draft.status}
+                onChange={(event) => set('status', event.target.value)}
+                className="w-full px-3 py-2 rounded-lg border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none"
+              >
+                {statusOptions.map((status) => (
+                  <option key={status} value={status}>
+                    {isLeaseStatusOption(status) ? status : `${status} (legacy)`}
+                  </option>
+                ))}
+              </select>
+            </div>
             <FormField
               label="Doc #"
               value={draft.docNo}

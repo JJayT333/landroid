@@ -680,7 +680,7 @@ describe('leasehold-summary', () => {
 
     expect(summary.totalRoyaltyDecimal).toBe('0');
     expect(summary.tracts[0]?.weightedRoyaltyRate).toBe('0');
-    expect(summary.tracts[0]?.workingInterestBaseRate).toBe('1');
+    expect(summary.tracts[0]?.nriBeforeOrriRate).toBe('1');
     expect(summary.tracts[0]?.netRevenueInterestBaseRate).toBe('1');
     expect(summary.tracts[0]?.preWorkingInterestDecimal).toBe('1');
     expect(summary.preWorkingInterestDecimal).toBe('1');
@@ -783,7 +783,7 @@ describe('leasehold-summary', () => {
     // overAssigned is the WI-assignment flag, not an ORRI burden flag — still false here.
     expect(summary.tracts[0]?.overAssigned).toBe(false);
     // overBurdened is the new ORRI-exceeds-NRI flag from finding #9. It's true whenever
-    // (workingInterestBaseRate − totalOrriBurdenRate) would have gone negative before the clamp.
+    // (nriBeforeOrriRate − totalOrriBurdenRate) would have gone negative before the clamp.
     expect(summary.tracts[0]?.overBurdened).toBe(true);
     expect(summary.overBurdenedTractCount).toBe(1);
   });
@@ -871,7 +871,7 @@ describe('leasehold-summary', () => {
       ],
     });
 
-    expect(summary.tracts[0]?.workingInterestBaseRate).toBe('0.875');
+    expect(summary.tracts[0]?.nriBeforeOrriRate).toBe('0.875');
     expect(summary.tracts[0]?.grossOrriBurdenRate).toBe('0.0625');
     expect(summary.tracts[0]?.workingInterestOrriBurdenRate).toBe('0.0125');
     expect(summary.tracts[0]?.netRevenueInterestBaseRate).toBe('0.8');
@@ -881,15 +881,12 @@ describe('leasehold-summary', () => {
     expect(summary.preWorkingInterestDecimal).toBe('0.76');
   });
 
-  it('applies multiple NRI-basis ORRIs against the same pre-ORRI NRI base (flat, not sequential)', () => {
-    // Two NRI-basis ORRIs on the same tract. The code sums NRI burden shares first,
-    // then multiplies once against the netRevenueInterestBaseRate:
-    //   (1/20 + 1/40) × 0.875 = 0.075 × 0.875 = 0.065625
-    // Sequential stacking (second sees first's deduction) would instead produce:
-    //   0.875 × 1/20 = 0.04375; remaining 0.83125 × 1/40 = 0.02078125;
-    //   total 0.06453125 — rejected by this test.
-    // Pinning the flat convention is the safer landman reading: each NRI ORRI is carved
-    // off the lessee's pre-ORRI NRI, not off whatever NRI remains after peer ORRIs.
+  it('stacks multiple NRI-basis ORRIs in effective-date order', () => {
+    // Two NRI-basis ORRIs on the same tract. They now carve one by one in effective-date
+    // order off the NRI base that remains after gross-basis and WI-basis ORRIs.
+    //   first:  0.875 × 1/20 = 0.04375
+    //   second: (0.875 - 0.04375) × 1/40 = 0.02078125
+    //   total:  0.06453125
     const summary = buildLeaseholdUnitSummary({
       deskMaps: [
         {
@@ -955,20 +952,444 @@ describe('leasehold-summary', () => {
     });
 
     expect(summary.tracts[0]?.netRevenueInterestBaseRate).toBe('0.875');
-    expect(summary.tracts[0]?.netRevenueInterestOrriBurdenRate).toBe('0.065625');
-    expect(summary.tracts[0]?.totalOrriBurdenRate).toBe('0.065625');
-    expect(summary.tracts[0]?.preWorkingInterestDecimal).toBe('0.809375');
+    expect(summary.tracts[0]?.netRevenueInterestOrriBurdenRate).toBe('0.06453125');
+    expect(summary.tracts[0]?.totalOrriBurdenRate).toBe('0.06453125');
+    expect(summary.tracts[0]?.preWorkingInterestDecimal).toBe('0.81046875');
 
-    // Per-ORRI unitDecimal reflects the flat carve: each ORRI sees the full pre-ORRI NRI base.
     // Unit participation is 1.0 (single tract), so unitDecimal == burden.
     const orriA = summary.orris.find((orri) => orri.id === 'orri-nri-a');
     const orriB = summary.orris.find((orri) => orri.id === 'orri-nri-b');
-    expect(orriA?.unitDecimal).toBe('0.04375'); // 0.875 × 1/20
-    expect(orriB?.unitDecimal).toBe('0.021875'); // 0.875 × 1/40
-    // Flat sum matches the rolled-up tract NRI ORRI burden.
+    expect(orriA?.unitDecimal).toBe('0.04375');
+    expect(orriB?.unitDecimal).toBe('0.02078125');
     expect(
       d(orriA?.unitDecimal ?? '0').plus(d(orriB?.unitDecimal ?? '0')).toString()
-    ).toBe('0.065625');
+    ).toBe('0.06453125');
+  });
+
+  it('uses the same sequential NRI-basis ORRI carve in focused decimal rows', () => {
+    const unit = {
+      name: 'Audit Unit',
+      description: '',
+      operator: 'Operator A',
+      effectiveDate: '2024-01-01',
+      jurisdiction: 'tx_fee' as const,
+    };
+    const summary = buildLeaseholdUnitSummary({
+      deskMaps: [
+        {
+          id: 'dm-1',
+          name: 'Tract 1',
+          code: 'T1',
+          tractId: 'T1',
+          grossAcres: '100',
+          pooledAcres: '100',
+          description: '',
+          nodeIds: ['n1', 'l1'],
+        },
+      ],
+      nodes: [
+        {
+          ...createBlankNode('n1', null),
+          grantee: 'A Owner',
+          linkedOwnerId: 'owner-1',
+          fraction: '1',
+          initialFraction: '1',
+        },
+        {
+          ...createBlankNode('l1', 'n1'),
+          type: 'related' as const,
+          relatedKind: 'lease' as const,
+        },
+      ],
+      owners: [
+        createBlankOwner('ws-1', { id: 'owner-1', name: 'A Owner' }),
+      ],
+      leases: [
+        createBlankLease('ws-1', 'owner-1', {
+          id: 'lease-1',
+          leaseName: 'Base Lease',
+          lessee: 'Operator A',
+          royaltyRate: '1/8',
+          leasedInterest: '1',
+          effectiveDate: '2024-01-01',
+          docNo: 'LEASE-1',
+        }),
+      ],
+      leaseholdAssignments: [],
+      leaseholdOrris: [
+        {
+          id: 'orri-nri-a',
+          payee: 'NRI A',
+          scope: 'unit',
+          deskMapId: null,
+          burdenFraction: '1/20',
+          burdenBasis: 'net_revenue_interest',
+          effectiveDate: '2024-01-01',
+          sourceDocNo: 'ORRI-NA',
+          notes: '',
+        },
+        {
+          id: 'orri-nri-b',
+          payee: 'NRI B',
+          scope: 'unit',
+          deskMapId: null,
+          burdenFraction: '1/40',
+          burdenBasis: 'net_revenue_interest',
+          effectiveDate: '2024-01-02',
+          sourceDocNo: 'ORRI-NB',
+          notes: '',
+        },
+      ],
+    });
+
+    const rows = buildLeaseholdDecimalRows({
+      unit,
+      unitSummary: summary,
+      focusedDeskMapId: 'dm-1',
+    });
+
+    expect(rows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'orri-dm-1-orri-nri-a',
+          decimal: '0.04375',
+        }),
+        expect.objectContaining({
+          id: 'orri-dm-1-orri-nri-b',
+          decimal: '0.02078125',
+        }),
+      ])
+    );
+  });
+
+  it('splits fixed and floating NPRIs into separate payout rows and keeps total coverage in balance', () => {
+    const unit = {
+      name: 'Audit Unit',
+      description: '',
+      operator: 'Operator A',
+      effectiveDate: '2024-01-01',
+      jurisdiction: 'tx_fee' as const,
+    };
+    const summary = buildLeaseholdUnitSummary({
+      deskMaps: [
+        {
+          id: 'dm-1',
+          name: 'Tract 1',
+          code: 'T1',
+          tractId: 'T1',
+          grossAcres: '320',
+          pooledAcres: '320',
+          description: '',
+          nodeIds: ['n1', 'l1', 'npri-fixed', 'npri-floating'],
+        },
+      ],
+      nodes: [
+        {
+          ...createBlankNode('n1', null),
+          grantee: 'Mineral Owner',
+          linkedOwnerId: 'owner-1',
+          fraction: '1',
+          initialFraction: '1',
+        },
+        {
+          ...createBlankNode('l1', 'n1'),
+          type: 'related' as const,
+          relatedKind: 'lease' as const,
+        },
+        {
+          ...createBlankNode('npri-fixed', 'n1'),
+          grantee: 'Fixed NPRI Owner',
+          linkedOwnerId: 'owner-2',
+          interestClass: 'npri' as const,
+          royaltyKind: 'fixed' as const,
+          fraction: '0.0625',
+          initialFraction: '0.0625',
+          date: '2024-01-02',
+          docNo: 'NPRI-FIXED',
+        },
+        {
+          ...createBlankNode('npri-floating', 'n1'),
+          grantee: 'Floating NPRI Owner',
+          linkedOwnerId: 'owner-3',
+          interestClass: 'npri' as const,
+          royaltyKind: 'floating' as const,
+          fraction: '0.5',
+          initialFraction: '0.5',
+          date: '2024-01-03',
+          docNo: 'NPRI-FLOAT',
+        },
+      ],
+      owners: [
+        createBlankOwner('ws-1', { id: 'owner-1', name: 'Mineral Owner' }),
+        createBlankOwner('ws-1', { id: 'owner-2', name: 'Fixed NPRI Owner' }),
+        createBlankOwner('ws-1', { id: 'owner-3', name: 'Floating NPRI Owner' }),
+      ],
+      leases: [
+        createBlankLease('ws-1', 'owner-1', {
+          id: 'lease-1',
+          leaseName: 'Base Lease',
+          lessee: 'Operator A',
+          royaltyRate: '1/8',
+          leasedInterest: '1',
+          effectiveDate: '2024-01-01',
+          docNo: 'LEASE-1',
+        }),
+      ],
+      leaseholdAssignments: [],
+      leaseholdOrris: [],
+    });
+
+    expect(summary.totalRoyaltyDecimal).toBe('0.125');
+    expect(summary.totalNpriDecimal).toBe('0.125');
+    expect(summary.tracts[0]?.floatingNpriBurdenRate).toBe('0.0625');
+    expect(summary.tracts[0]?.fixedNpriBurdenRate).toBe('0.0625');
+    expect(summary.tracts[0]?.totalNpriBurdenRate).toBe('0.125');
+    expect(summary.tracts[0]?.npriAdjustedNriBeforeOrriRate).toBe('0.8125');
+    expect(summary.tracts[0]?.preWorkingInterestDecimal).toBe('0.8125');
+    expect(summary.tracts[0]?.owners[0]).toEqual(
+      expect.objectContaining({
+        ownerTractRoyalty: '0.125',
+        netOwnerTractRoyalty: '0.0625',
+        unitRoyaltyDecimal: '0.125',
+        netOwnerUnitRoyaltyDecimal: '0.0625',
+      })
+    );
+    expect(summary.npris).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'npri-fixed',
+          royaltyKind: 'fixed',
+          unitDecimal: '0.0625',
+        }),
+        expect.objectContaining({
+          id: 'npri-floating',
+          royaltyKind: 'floating',
+          unitDecimal: '0.0625',
+        }),
+      ])
+    );
+
+    const rows = buildLeaseholdDecimalRows({
+      unit,
+      unitSummary: summary,
+      focusedDeskMapId: 'dm-1',
+    });
+    expect(rows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          category: 'royalty',
+          payee: 'Mineral Owner',
+          decimal: '0.0625',
+        }),
+        expect.objectContaining({
+          category: 'npri',
+          payee: 'Fixed NPRI Owner',
+          decimal: '0.0625',
+        }),
+        expect.objectContaining({
+          category: 'npri',
+          payee: 'Floating NPRI Owner',
+          decimal: '0.0625',
+        }),
+        expect.objectContaining({
+          category: 'retained_wi',
+          decimal: '0.8125',
+        }),
+      ])
+    );
+
+    const review = buildLeaseholdTransferOrderReview({
+      unit,
+      unitSummary: summary,
+      focusedDeskMapId: 'dm-1',
+    });
+    expect(review.totalDecimal).toBe('1');
+    expect(review.expectedDecimal).toBe('1');
+    expect(review.varianceDecimal).toBe('0');
+    expect(review.categorySummaries).toEqual([
+      { category: 'royalty', rowCount: 1, totalDecimal: '0.0625' },
+      { category: 'npri', rowCount: 2, totalDecimal: '0.125' },
+      { category: 'retained_wi', rowCount: 1, totalDecimal: '0.8125' },
+    ]);
+  });
+
+  it('applies an NPRI created on a mineral ancestor across that ancestor branch and current descendants', () => {
+    const summary = buildLeaseholdUnitSummary({
+      deskMaps: [
+        {
+          id: 'dm-1',
+          name: 'Tract 1',
+          code: 'T1',
+          tractId: 'T1',
+          grossAcres: '100',
+          pooledAcres: '100',
+          description: '',
+          nodeIds: ['root', 'child', 'lease-root', 'lease-child', 'npri-root'],
+        },
+      ],
+      nodes: [
+        {
+          ...createBlankNode('root', null),
+          grantee: 'Root Owner',
+          linkedOwnerId: 'owner-1',
+          fraction: '0.5',
+          initialFraction: '1',
+        },
+        {
+          ...createBlankNode('child', 'root'),
+          grantee: 'Child Owner',
+          linkedOwnerId: 'owner-2',
+          fraction: '0.5',
+          initialFraction: '0.5',
+        },
+        {
+          ...createBlankNode('lease-root', 'root'),
+          type: 'related' as const,
+          relatedKind: 'lease' as const,
+        },
+        {
+          ...createBlankNode('lease-child', 'child'),
+          type: 'related' as const,
+          relatedKind: 'lease' as const,
+        },
+        {
+          ...createBlankNode('npri-root', 'root'),
+          grantee: 'Ancestor NPRI Owner',
+          linkedOwnerId: 'owner-3',
+          interestClass: 'npri' as const,
+          royaltyKind: 'fixed' as const,
+          fraction: '0.0625',
+          initialFraction: '0.0625',
+          date: '2024-01-02',
+          docNo: 'NPRI-ROOT',
+        },
+      ],
+      owners: [
+        createBlankOwner('ws-1', { id: 'owner-1', name: 'Root Owner' }),
+        createBlankOwner('ws-1', { id: 'owner-2', name: 'Child Owner' }),
+        createBlankOwner('ws-1', { id: 'owner-3', name: 'Ancestor NPRI Owner' }),
+      ],
+      leases: [
+        createBlankLease('ws-1', 'owner-1', {
+          id: 'lease-1',
+          leaseName: 'Root Lease',
+          lessee: 'Operator A',
+          royaltyRate: '1/8',
+          leasedInterest: '0.5',
+        }),
+        createBlankLease('ws-1', 'owner-2', {
+          id: 'lease-2',
+          leaseName: 'Child Lease',
+          lessee: 'Operator A',
+          royaltyRate: '1/8',
+          leasedInterest: '0.5',
+        }),
+      ],
+      leaseholdAssignments: [],
+      leaseholdOrris: [],
+    });
+
+    expect(summary.totalRoyaltyDecimal).toBe('0.125');
+    expect(summary.totalNpriDecimal).toBe('0.0625');
+    expect(summary.tracts[0]?.fixedNpriBurdenRate).toBe('0.0625');
+    expect(summary.tracts[0]?.preWorkingInterestDecimal).toBe('0.8125');
+
+    const npri = summary.npris.find((record) => record.id === 'npri-root');
+    expect(npri?.unitDecimal).toBe('0.0625');
+
+    const royaltyRows = buildLeaseholdDecimalRows({
+      unit: {
+        name: 'Audit Unit',
+        description: '',
+        operator: 'Operator A',
+        effectiveDate: '2024-01-01',
+        jurisdiction: 'tx_fee',
+      },
+      unitSummary: summary,
+      focusedDeskMapId: 'dm-1',
+    }).filter((row) => row.category === 'royalty');
+
+    expect(royaltyRows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ payee: 'Root Owner', decimal: '0.0625' }),
+        expect.objectContaining({ payee: 'Child Owner', decimal: '0.0625' }),
+      ])
+    );
+  });
+
+  it('subtracts fixed NPRI burdens before applying NRI-basis ORRIs', () => {
+    const summary = buildLeaseholdUnitSummary({
+      deskMaps: [
+        {
+          id: 'dm-1',
+          name: 'Tract 1',
+          code: 'T1',
+          tractId: 'T1',
+          grossAcres: '100',
+          pooledAcres: '100',
+          description: '',
+          nodeIds: ['n1', 'l1', 'npri-fixed'],
+        },
+      ],
+      nodes: [
+        {
+          ...createBlankNode('n1', null),
+          grantee: 'A Owner',
+          linkedOwnerId: 'owner-1',
+          fraction: '1',
+          initialFraction: '1',
+        },
+        {
+          ...createBlankNode('l1', 'n1'),
+          type: 'related' as const,
+          relatedKind: 'lease' as const,
+        },
+        {
+          ...createBlankNode('npri-fixed', 'n1'),
+          grantee: 'Fixed NPRI Owner',
+          linkedOwnerId: 'owner-2',
+          interestClass: 'npri' as const,
+          royaltyKind: 'fixed' as const,
+          fraction: '0.0625',
+          initialFraction: '0.0625',
+        },
+      ],
+      owners: [
+        createBlankOwner('ws-1', { id: 'owner-1', name: 'A Owner' }),
+        createBlankOwner('ws-1', { id: 'owner-2', name: 'Fixed NPRI Owner' }),
+      ],
+      leases: [
+        createBlankLease('ws-1', 'owner-1', {
+          id: 'lease-1',
+          leaseName: 'Base Lease',
+          lessee: 'Operator A',
+          royaltyRate: '1/8',
+          leasedInterest: '1',
+        }),
+      ],
+      leaseholdAssignments: [],
+      leaseholdOrris: [
+        {
+          id: 'orri-nri',
+          payee: 'NRI Payee',
+          scope: 'unit',
+          deskMapId: null,
+          burdenFraction: '1/10',
+          burdenBasis: 'net_revenue_interest',
+          effectiveDate: '2024-01-05',
+          sourceDocNo: 'ORRI-NRI',
+          notes: '',
+        },
+      ],
+    });
+
+    expect(summary.tracts[0]?.nriBeforeOrriRate).toBe('0.875');
+    expect(summary.tracts[0]?.fixedNpriBurdenRate).toBe('0.0625');
+    expect(summary.tracts[0]?.npriAdjustedNriBeforeOrriRate).toBe('0.8125');
+    expect(summary.tracts[0]?.netRevenueInterestBaseRate).toBe('0.8125');
+    expect(summary.tracts[0]?.netRevenueInterestOrriBurdenRate).toBe('0.08125');
+    expect(summary.tracts[0]?.preWorkingInterestDecimal).toBe('0.73125');
+    expect(summary.orris[0]?.unitDecimal).toBe('0.08125');
   });
 
   it('clamps retained WI at zero when assignments exceed 100% of a tract', () => {

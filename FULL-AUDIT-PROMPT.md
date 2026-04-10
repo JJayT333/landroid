@@ -7,6 +7,8 @@ This file is the controlling audit brief. Use the exact user audit prompt below 
 - `/Users/abstractmapping/projects/landroid/PROJECT_CONTEXT.md`
 - `/Users/abstractmapping/projects/landroid/CONTINUATION-PROMPT.md`
 
+It supersedes the archived legacy prompt at `/Users/abstractmapping/projects/landroid/docs/archive/AUDIT_PROMPT.md`.
+
 Do not replace this brief with a shortened version. The next tool should use this full audit prompt plus the relevant handoff context.
 
 Important: verify the repository's actual stack and architecture from the codebase before scoring it. Do not assume any stack details in the user brief are correct without checking files like:
@@ -31,8 +33,7 @@ Start the audit by looking at these current high-signal files:
 - `/Users/abstractmapping/projects/landroid/src/views/DeskMapView.tsx`
 - `/Users/abstractmapping/projects/landroid/src/views/RunsheetView.tsx`
 - `/Users/abstractmapping/projects/landroid/src/views/OwnerDatabaseView.tsx`
-- `/Users/abstractmapping/projects/landroid/docs/architecture/ownership-math-reference.md`
-- `/Users/abstractmapping/projects/landroid/docs/architecture/audit-remediation-plan.md`
+- `/Users/abstractmapping/projects/landroid/LANDMAN-MATH-REFERENCE.md`
 
 ## Current scope (set 2026-04-07)
 
@@ -99,7 +100,7 @@ Most recent commits on the checkpoint branch:
   - Fixed by adding a `hasNpriOfKind()` guard that caps total NPRI per parent at `27/32 = 0.84375`.
   - Confirmed `splitBasis: 'whole'` is the correct semantic for NPRIs (fraction of 8/8), not `'initial'`.
   - Validator now reports the 1119-node seed as clean.
-- **Documentation updates.** `PROJECT_CONTEXT.md`, `README.md`, and `docs/architecture/ownership-math-reference.md` updated to reflect the corrected ORRI formula, the jurisdiction discriminator, and the Texas-only-now scoping.
+- **Documentation updates.** `PROJECT_CONTEXT.md`, `README.md`, and the math-reference docs were updated to reflect the corrected ORRI formula, the jurisdiction discriminator, and the Texas-only-now scoping. The current reviewer-facing source of truth is `LANDMAN-MATH-REFERENCE.md`; the older internal note now lives in `docs/archive/ownership-math-reference.md`.
 - **Navbar wiring.** `src/components/shared/Navbar.tsx` button handlers connected to their views.
 - **Modal hardening.** `src/components/modals/AttachLeaseModal.tsx` and `CreateNpriModal.tsx` and `src/components/owners/OwnerLeasesTab.tsx` and `src/views/LeaseholdView.tsx` had targeted UX edits.
 
@@ -131,12 +132,12 @@ Most recent commits on the checkpoint branch:
 
 The full audit is in `.claude/plans/wiggly-frolicking-tower.md` (see plan-mode file). The findings that apply to the Texas baseline going forward:
 
-- **Audit finding #1 — silent lease-overlap clipping.** `src/components/deskmap/deskmap-coverage.ts:66-104` — `allocateLeaseCoverage` silently truncates the later lease. Should return overlap warnings alongside the allocation. **Not yet fixed.**
-- **Audit finding #3 — implicit NRI-basis ORRI stacking order.** `src/components/leasehold/leasehold-summary.ts:255-263`. **Documented only; not iterated.**
-- **Audit finding #4 — `parseInterestString` and `d()` silently default malformed input to 0.** `src/utils/interest-string.ts`, `src/engine/decimal.ts`. **Not yet wired through a strict variant on lease/ORRI/assignment save paths.**
-- **Audit finding #5 — `royaltyKind` (fixed vs floating NPRI) is stored but never consumed.** `src/types/node.ts`. **Acknowledged in docs as deed-text-preserved, not yet either consumed or removed.**
-- **Audit finding #6 — `Lease.status` is free text + hard-coded inactive set.** `src/components/deskmap/deskmap-coverage.ts:36-52`. Will become Critical when federal lease statuses land in Phase 2; medium for Texas today.
-- **Audit finding #9 — `preWorkingInterestRate` clamps negative residuals to zero with no warning.** `src/components/leasehold/leasehold-summary.ts:455-458`. **Not yet surfaced.**
+- **Audit finding #1 — lease-overlap clipping remains warning-only.** `src/components/deskmap/deskmap-coverage.ts` now returns overlap warnings alongside the clipped allocation, and the leasehold deck surfaces them. The remaining limitation is that later leases are still clipped rather than blocked or escalated for decision.
+- **Audit finding #3 — NRI-basis ORRI stacking now iterates in effective-date order.** `src/components/leasehold/leasehold-summary.ts` now applies each NRI-basis ORRI one by one after gross-basis and WI-basis burdens, using effective date first and then source document / record ID as a stable fallback.
+- **Audit finding #4 — safe-zero coercion still exists at display boundaries.** `src/utils/interest-string.ts`, `src/engine/decimal.ts`. The strict variant is now wired through lease, ORRI, and assignment save paths, but malformed persisted values still coerce to 0 when read through lenient display helpers.
+- **Audit finding #5 — CLOSED in the current working tree.** `royaltyKind` (fixed vs floating NPRI) now drives leasehold payout math end-to-end: floating NPRIs burden lease royalty, fixed NPRIs burden gross leased production, NPRI rows now appear in the deck and transfer-order ledger, and fixed NPRIs reduce the NRI base before NRI-basis ORRIs are calculated.
+- **Audit finding #6 — lease status normalization is now centralized for the Texas baseline.** New lease edits use a canonical status list (`Active`, `Expired`, `Released`, `Terminated`, `Inactive`, `Dead`), coverage math keys off the shared type-layer classifier, and legacy non-canonical text is preserved instead of being silently discarded. Richer jurisdiction-specific status regimes remain a Phase 2 concern.
+- **Audit finding #9 — negative pre-WI residual is warning-only.** `src/components/leasehold/leasehold-summary.ts` now sets `overBurdened`, and `src/views/LeaseholdView.tsx` surfaces it. The remaining convention is still a warning-only clamp to zero.
 
 The other audit findings (#7 lexical date sort, #8 `formatAsFraction` float fallback, #10 sourcemaps off, #11 RootErrorBoundary async gap, #12 cross-store coupling, #15 `dist-node` artifact) are Low/Info and acceptable as-is.
 
@@ -159,15 +160,15 @@ The other audit findings (#7 lexical date sort, #8 `formatAsFraction` float fall
 - `src/utils/interest-string.ts` — fraction/decimal parser, every leasehold input flows through here
 - `src/components/leasehold/leasehold-summary.ts` — lines 247-260 are the corrected ORRI basis math (`nriBeforeOrriRate`, `working_interest` basis now uses `leasedOwnership × share`)
 - `src/components/leasehold/__tests__/leasehold-summary.test.ts` — pinned to corrected ORRI behavior
-- `src/components/deskmap/deskmap-coverage.ts` — lines 66-104 are the still-silent overlap-clip path (audit finding #1, not yet fixed)
+- `src/components/deskmap/deskmap-coverage.ts` — lease allocation ordering, clipping behavior, and overlap-warning emission
 - `src/types/owner.ts` — `Lease`, `LeaseJurisdiction`, `LEASE_JURISDICTION_OPTIONS`, `DEFAULT_LEASE_JURISDICTION`, `normalizeLeaseJurisdiction`
 - `src/types/leasehold.ts` — `LeaseholdUnit.jurisdiction`, `createBlankLeaseholdUnit`, `normalizeLeaseholdUnit`
 - `src/types/__tests__/lease-jurisdiction.test.ts` — full coverage of the discriminator round-trips
-- `src/types/node.ts` — `royaltyKind` (stored, never read by math — finding #5)
+- `src/types/node.ts` — `royaltyKind` (now consumed by leasehold payout math)
 - `src/storage/seed-test-data.ts` — combinatorial seed builder, NPRI over-carve guard via `hasNpriOfKind()`
 - `src/storage/workspace-persistence.ts` — validated import path
-- `docs/architecture/ownership-math-reference.md` — canonical math reference
-- `docs/architecture/audit-remediation-plan.md` — accepted/deferred/rejected fixes from the prior audit pass
+- `LANDMAN-MATH-REFERENCE.md` — canonical reviewer-facing math reference
+- `docs/archive/audit-remediation-plan.md` — historical accepted/deferred/rejected fixes from the prior audit pass
 
 ### 8. What the next auditor should verify (before recommending anything)
 
@@ -188,16 +189,14 @@ The other audit findings (#7 lexical date sort, #8 `formatAsFraction` float fall
 - **Do not** assume federal code exists. It does not. Anything federal-specific is a Phase 2 design question, not a bug fix.
 - **Do not** treat the `tribal` enum value as live scope. It exists for completeness; the user has ruled it out permanently.
 - **Do not** introduce a second decimal library or any float-based math seam.
-- **Do not** delete `royaltyKind` without the user's explicit go-ahead — it's preserved as deed text and may be consumed by Phase 2 floating-NPRI math.
+- **Do not** delete `royaltyKind` without the user's explicit go-ahead — it's preserved as deed text and now drives fixed/floating NPRI payout math.
 
 ### 10. Recommended next steps (in order)
 
 1. **Run the verification list in §8.** Confirm the Texas baseline is actually green before moving on.
-2. **Land audit finding #1 (lease-overlap warnings).** Smallest, most user-visible Texas correctness improvement remaining. Warning-only.
-3. **Land audit finding #9 (negative `preWorkingInterestRate` warning).** Same surfacing pattern, near-trivial.
-4. **Land audit finding #4 (strict-parse leasehold inputs).** Add `parseStrictInterestString` returning `Decimal | null`; wire through lease/ORRI/assignment save paths.
-5. **Document NRI-basis ORRI stacking order (finding #3).** Either document the current behavior in `docs/architecture/ownership-math-reference.md` and the leasehold deck UI, or implement effective-date-ordered iterative carve. User preference: document.
-6. **Then — and only then — begin Phase 2 BLM scaffolding.** Start with `src/types/federal-lease.ts` containing the discriminated `FederalLeaseData` interface (subtype, status, MLRS + legacy serial, surface managing agency, acquiring authority, stipulations array, consent documents array). Use the user's existing ~10-lease CA as the first real fixture. Do **not** introduce IRA 2022 dollar constants until verified against primary sources.
+2. **Verify the new fixed/floating NPRI payout layer against company convention.** Fixed and floating NPRIs now both run end-to-end; the next task is reviewer confirmation, not whether to start.
+3. **Keep historical audit context in `docs/archive/`, but use `LANDMAN-MATH-REFERENCE.md` and this file as current truth.**
+4. **Then — and only then — begin Phase 2 BLM scaffolding.** Start with `src/types/federal-lease.ts` containing the discriminated `FederalLeaseData` interface (subtype, status, MLRS + legacy serial, surface managing agency, acquiring authority, stipulations array, consent documents array). Use the user's existing ~10-lease CA as the first real fixture. Do **not** introduce IRA 2022 dollar constants until verified against primary sources.
 
 
 

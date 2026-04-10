@@ -158,10 +158,10 @@ export default function CreateNpriModal({
               ? 'Floating NPRI records a fraction of the lease royalty, such as 1/2 of lessor royalty.'
               : 'Fixed NPRI records a fixed share of production, such as 1/16.'}
             <div className="mt-1 text-ink-light/80">
-              Deed-text preservation only — NPRI nodes are excluded from
-              today&rsquo;s leasehold decimal math, so the fixed/floating
-              choice is recorded on the node but does not yet change any
-              computed royalty.
+              Leasehold now reads this choice in payout math. Floating NPRIs
+              burden lease royalty; fixed NPRIs burden gross leased production.
+              Desk Map still keeps the NPRI branch separate from mineral
+              coverage totals.
             </div>
           </div>
 

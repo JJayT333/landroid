@@ -1,10 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
+  DEFAULT_LEASE_STATUS,
   DEFAULT_LEASE_JURISDICTION,
   LEASE_JURISDICTION_OPTIONS,
+  LEASE_STATUS_OPTIONS,
   createBlankLease,
+  isInactiveLeaseStatus,
   normalizeLease,
   normalizeLeaseJurisdiction,
+  normalizeLeaseStatus,
 } from '../owner';
 import {
   createBlankLeaseholdUnit,
@@ -12,6 +16,45 @@ import {
 } from '../leasehold';
 
 describe('lease jurisdiction discriminator', () => {
+  describe('lease status normalization', () => {
+    it('accepts every option in LEASE_STATUS_OPTIONS', () => {
+      for (const option of LEASE_STATUS_OPTIONS) {
+        expect(normalizeLeaseStatus(option)).toBe(option);
+      }
+    });
+
+    it('canonicalizes known statuses regardless of whitespace or case', () => {
+      expect(normalizeLeaseStatus('  expired  ')).toBe('Expired');
+      expect(normalizeLeaseStatus('released')).toBe('Released');
+      expect(normalizeLeaseStatus('TERMINATED')).toBe('Terminated');
+    });
+
+    it('preserves non-empty legacy status text instead of discarding it', () => {
+      expect(normalizeLeaseStatus(' Held by Production ')).toBe('Held by Production');
+    });
+
+    it('falls back to Active for nullish, empty, and non-string input', () => {
+      expect(normalizeLeaseStatus(undefined)).toBe('Active');
+      expect(normalizeLeaseStatus(null)).toBe('Active');
+      expect(normalizeLeaseStatus('')).toBe('Active');
+      expect(normalizeLeaseStatus(42)).toBe('Active');
+      expect(normalizeLeaseStatus({})).toBe('Active');
+      expect(normalizeLeaseStatus([])).toBe('Active');
+    });
+
+    it('classifies inactive lease statuses centrally for coverage math', () => {
+      expect(isInactiveLeaseStatus('Expired')).toBe(true);
+      expect(isInactiveLeaseStatus(' released ')).toBe(true);
+      expect(isInactiveLeaseStatus('cancelled')).toBe(true);
+      expect(isInactiveLeaseStatus('Held by Production')).toBe(false);
+      expect(isInactiveLeaseStatus(undefined)).toBe(false);
+    });
+
+    it('exposes Active as the documented default constant', () => {
+      expect(DEFAULT_LEASE_STATUS).toBe('Active');
+    });
+  });
+
   describe('normalizeLeaseJurisdiction', () => {
     it('accepts every option in LEASE_JURISDICTION_OPTIONS', () => {
       for (const option of LEASE_JURISDICTION_OPTIONS) {
@@ -47,6 +90,7 @@ describe('lease jurisdiction discriminator', () => {
     it('defaults a brand-new lease to tx_fee', () => {
       const lease = createBlankLease('ws-1', 'owner-1');
       expect(lease.jurisdiction).toBe('tx_fee');
+      expect(lease.status).toBe('Active');
     });
 
     it('preserves a valid jurisdiction override', () => {
@@ -64,6 +108,13 @@ describe('lease jurisdiction discriminator', () => {
         jurisdiction: 'fee',
       });
       expect(lease.jurisdiction).toBe('tx_fee');
+    });
+
+    it('preserves trimmed legacy status text when supplied by existing data', () => {
+      const lease = createBlankLease('ws-1', 'owner-1', {
+        status: ' Held by Production ',
+      });
+      expect(lease.status).toBe('Held by Production');
     });
   });
 
@@ -87,6 +138,7 @@ describe('lease jurisdiction discriminator', () => {
       };
       const normalized = normalizeLease(legacy);
       expect(normalized.jurisdiction).toBe('tx_fee');
+      expect(normalized.status).toBe('Active');
     });
 
     it('preserves a valid jurisdiction value during normalization', () => {
@@ -108,6 +160,26 @@ describe('lease jurisdiction discriminator', () => {
         jurisdiction: 'BLM',
       });
       expect(normalized.jurisdiction).toBe('tx_fee');
+    });
+
+    it('canonicalizes known status text during normalization', () => {
+      const normalized = normalizeLease({
+        id: 'lease-4',
+        workspaceId: 'ws-1',
+        ownerId: 'owner-1',
+        status: ' expired ',
+      });
+      expect(normalized.status).toBe('Expired');
+    });
+
+    it('preserves non-canonical legacy status text during normalization', () => {
+      const normalized = normalizeLease({
+        id: 'lease-5',
+        workspaceId: 'ws-1',
+        ownerId: 'owner-1',
+        status: ' Held by Production ',
+      });
+      expect(normalized.status).toBe('Held by Production');
     });
   });
 

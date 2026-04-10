@@ -4,6 +4,7 @@ import type { Lease } from '../../../types/owner';
 import {
   allocateLeaseCoverage,
   calculateDeskMapCoverageSummary,
+  isLeaseActive,
   pickPrimaryLease,
   toDeskMapPrimaryLeaseSummary,
 } from '../deskmap-coverage';
@@ -221,6 +222,48 @@ describe('deskmap-coverage', () => {
 
     expect(result.allocations).toHaveLength(1);
     expect(result.overlaps).toEqual([]);
+  });
+
+  it('treats canonical inactive labels as inactive while preserving legacy text as active', () => {
+    expect(
+      isLeaseActive({
+        id: 'lease-active',
+        workspaceId: 'ws-1',
+        ownerId: 'owner-1',
+        leaseName: 'Legacy Active Lease',
+        lessee: 'Acme',
+        royaltyRate: '1/8',
+        leasedInterest: '0.5',
+        effectiveDate: '',
+        expirationDate: '',
+        status: 'Held by Production',
+        docNo: '',
+        notes: '',
+        jurisdiction: 'tx_fee',
+        createdAt: '2026-03-01T00:00:00.000Z',
+        updatedAt: '2026-03-01T00:00:00.000Z',
+      })
+    ).toBe(true);
+
+    expect(
+      isLeaseActive({
+        id: 'lease-inactive',
+        workspaceId: 'ws-1',
+        ownerId: 'owner-1',
+        leaseName: 'Released Lease',
+        lessee: 'Acme',
+        royaltyRate: '1/8',
+        leasedInterest: '0.5',
+        effectiveDate: '',
+        expirationDate: '',
+        status: ' released ',
+        docNo: '',
+        notes: '',
+        jurisdiction: 'tx_fee',
+        createdAt: '2026-03-01T00:00:00.000Z',
+        updatedAt: '2026-03-01T00:00:00.000Z',
+      })
+    ).toBe(false);
   });
 
   it('prefers the most recently updated active lease', () => {

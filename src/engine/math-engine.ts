@@ -46,8 +46,8 @@ function getCalcInterestClass(node: CalcNode): InterestClass {
  * NPRI's `royaltyKind` into the child node's `rest` bag. It is deliberately
  * not called by any decimal-math code path. `royaltyKind` is deed-text
  * preservation only today — see `src/types/node.ts` → `RoyaltyKind` and
- * `docs/architecture/ownership-math-reference.md` → "Fixed vs. floating
- * royalty". Do not start consuming the return value in the math layer until
+ * `LANDMAN-MATH-REFERENCE.md` → "NPRI handling". Do not start consuming the
+ * return value in the math layer until
  * both fixed and floating branches are wired end-to-end.
  */
 function getCalcRoyaltyKind(node: CalcNode): OwnershipNode['royaltyKind'] {

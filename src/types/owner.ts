@@ -55,6 +55,34 @@ export type LeaseJurisdiction = (typeof LEASE_JURISDICTION_OPTIONS)[number];
  */
 export const DEFAULT_LEASE_JURISDICTION: LeaseJurisdiction = 'tx_fee';
 
+export const LEASE_STATUS_OPTIONS = [
+  'Active',
+  'Expired',
+  'Released',
+  'Terminated',
+  'Inactive',
+  'Dead',
+] as const;
+export type LeaseStatus = (typeof LEASE_STATUS_OPTIONS)[number];
+export const DEFAULT_LEASE_STATUS: LeaseStatus = 'Active';
+
+const CANONICAL_LEASE_STATUS_BY_NORMALIZED = new Map<string, LeaseStatus>(
+  LEASE_STATUS_OPTIONS.map((status) => [status.toLowerCase(), status])
+);
+const INACTIVE_LEASE_STATUS_TEXT = new Set<string>([
+  'expired',
+  'released',
+  'terminated',
+  'inactive',
+  'dead',
+  'cancelled',
+  'canceled',
+]);
+
+function toNormalizedLeaseStatusText(value: unknown): string {
+  return typeof value === 'string' ? value.trim().toLowerCase() : '';
+}
+
 export function normalizeLeaseJurisdiction(value: unknown): LeaseJurisdiction {
   if (typeof value === 'string') {
     const candidate = value.trim() as LeaseJurisdiction;
@@ -63,6 +91,32 @@ export function normalizeLeaseJurisdiction(value: unknown): LeaseJurisdiction {
     }
   }
   return DEFAULT_LEASE_JURISDICTION;
+}
+
+export function isLeaseStatusOption(value: string): value is LeaseStatus {
+  return CANONICAL_LEASE_STATUS_BY_NORMALIZED.has(value.trim().toLowerCase());
+}
+
+export function normalizeLeaseStatus(value: unknown): string {
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (trimmed.length === 0) {
+      return DEFAULT_LEASE_STATUS;
+    }
+
+    return CANONICAL_LEASE_STATUS_BY_NORMALIZED.get(trimmed.toLowerCase()) ?? trimmed;
+  }
+
+  return DEFAULT_LEASE_STATUS;
+}
+
+export function isInactiveLeaseStatus(value: unknown): boolean {
+  const normalized = toNormalizedLeaseStatusText(value);
+  if (normalized.length === 0) {
+    return false;
+  }
+
+  return INACTIVE_LEASE_STATUS_TEXT.has(normalized);
 }
 
 export interface Lease {
@@ -176,7 +230,7 @@ export function createBlankLease(
     leasedInterest: '',
     effectiveDate: '',
     expirationDate: '',
-    status: 'Active',
+    status: DEFAULT_LEASE_STATUS,
     docNo: '',
     notes: '',
     jurisdiction: DEFAULT_LEASE_JURISDICTION,
@@ -189,6 +243,7 @@ export function createBlankLease(
   // Coerce jurisdiction even when overrides supplies a junk value, so a stray
   // import that hands us {jurisdiction: 'fee'} or undefined still lands on tx_fee.
   lease.jurisdiction = normalizeLeaseJurisdiction(lease.jurisdiction);
+  lease.status = normalizeLeaseStatus(lease.status);
   return lease;
 }
 
@@ -211,7 +266,7 @@ export function normalizeLease(
     leasedInterest: asString(lease.leasedInterest),
     effectiveDate: asString(lease.effectiveDate),
     expirationDate: asString(lease.expirationDate),
-    status: asString(lease.status) || normalized.status,
+    status: normalizeLeaseStatus(lease.status),
     docNo: asString(lease.docNo),
     notes: asString(lease.notes),
     jurisdiction: normalizeLeaseJurisdiction(lease.jurisdiction),

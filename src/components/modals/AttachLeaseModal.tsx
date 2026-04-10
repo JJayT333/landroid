@@ -5,8 +5,11 @@ import { useOwnerStore } from '../../store/owner-store';
 import { useWorkspaceStore } from '../../store/workspace-store';
 import type { OwnershipNode } from '../../types/node';
 import {
+  DEFAULT_LEASE_STATUS,
+  LEASE_STATUS_OPTIONS,
   createBlankLease,
   createBlankOwner,
+  isLeaseStatusOption,
   normalizeLease,
   type Lease,
 } from '../../types/owner';
@@ -28,7 +31,7 @@ function createLeaseDraft(workspaceId: string, ownerId: string, parentNode: Owne
     leaseName: parentNode.grantee ? `${parentNode.grantee} Lease` : '',
     royaltyRate: '1/4',
     leasedInterest: parentNode.fraction,
-    status: 'Active',
+    status: DEFAULT_LEASE_STATUS,
   });
 }
 
@@ -100,6 +103,9 @@ export default function AttachLeaseModal({
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const isEditingExistingLease = Boolean(existingLeaseNode || existingLease);
+  const statusOptions = isLeaseStatusOption(draft.status)
+    ? [...LEASE_STATUS_OPTIONS]
+    : [draft.status, ...LEASE_STATUS_OPTIONS];
 
   const set = (field: keyof Lease, value: string) => {
     setSaveError(null);
@@ -255,11 +261,22 @@ export default function AttachLeaseModal({
               value={draft.expirationDate}
               onChange={(value) => set('expirationDate', value)}
             />
-            <FormField
-              label="Status"
-              value={draft.status}
-              onChange={(value) => set('status', value)}
-            />
+            <div>
+              <label className="text-[10px] text-ink-light uppercase tracking-wider block mb-1">
+                Status
+              </label>
+              <select
+                value={draft.status}
+                onChange={(event) => set('status', event.target.value)}
+                className="w-full px-3 py-2 rounded-lg border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-emerald-600 focus:border-emerald-600 outline-none"
+              >
+                {statusOptions.map((status) => (
+                  <option key={status} value={status}>
+                    {isLeaseStatusOption(status) ? status : `${status} (legacy)`}
+                  </option>
+                ))}
+              </select>
+            </div>
             <FormField
               label="Doc #"
               value={draft.docNo}

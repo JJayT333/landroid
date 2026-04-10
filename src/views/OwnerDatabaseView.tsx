@@ -1,10 +1,154 @@
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import OwnerDetailPanel from '../components/owners/OwnerDetailPanel';
 import { getOwnerLeaseDeskMapTargets } from '../components/owners/owner-lease-deskmap';
 import { useOwnerStore } from '../store/owner-store';
 import { useUIStore } from '../store/ui-store';
 import { useWorkspaceStore } from '../store/workspace-store';
-import { createBlankOwner } from '../types/owner';
+import {
+  createBlankOwner,
+  isInactiveLeaseStatus,
+  type Lease,
+  type Owner,
+} from '../types/owner';
+
+type OwnerListSortMode =
+  | 'name_asc'
+  | 'name_desc'
+  | 'county'
+  | 'prospect'
+  | 'active_leases'
+  | 'recent';
+
+interface OwnerListRow {
+  owner: Owner;
+  leaseCount: number;
+  activeLeaseCount: number;
+  searchText: string;
+}
+
+const OWNER_LIST_SORT_OPTIONS: Array<{ value: OwnerListSortMode; label: string }> = [
+  { value: 'name_asc', label: 'Name (A-Z)' },
+  { value: 'name_desc', label: 'Name (Z-A)' },
+  { value: 'county', label: 'County' },
+  { value: 'prospect', label: 'Prospect' },
+  { value: 'active_leases', label: 'Active Leases' },
+  { value: 'recent', label: 'Recently Updated' },
+];
+
+function normalizeOwnerListText(value: string) {
+  return value.trim().toLowerCase();
+}
+
+function compareOwnerListText(left: string, right: string) {
+  return left.localeCompare(right, undefined, { sensitivity: 'base' });
+}
+
+function compareOwnerListField(left: string, right: string) {
+  const leftValue = normalizeOwnerListText(left);
+  const rightValue = normalizeOwnerListText(right);
+
+  if (leftValue.length === 0 && rightValue.length > 0) {
+    return 1;
+  }
+  if (leftValue.length > 0 && rightValue.length === 0) {
+    return -1;
+  }
+  return compareOwnerListText(leftValue, rightValue);
+}
+
+export function buildOwnerListRows(owners: Owner[], leases: Lease[]): OwnerListRow[] {
+  const leasesByOwnerId = new Map<string, Lease[]>();
+
+  leases.forEach((lease) => {
+    const current = leasesByOwnerId.get(lease.ownerId) ?? [];
+    current.push(lease);
+    leasesByOwnerId.set(lease.ownerId, current);
+  });
+
+  return owners.map((owner) => {
+    const ownerLeases = leasesByOwnerId.get(owner.id) ?? [];
+    const activeLeaseCount = ownerLeases.filter(
+      (lease) => !isInactiveLeaseStatus(lease.status)
+    ).length;
+
+    return {
+      owner,
+      leaseCount: ownerLeases.length,
+      activeLeaseCount,
+      searchText: normalizeOwnerListText(
+        [
+          owner.name,
+          owner.entityType,
+          owner.county,
+          owner.prospect,
+          owner.email,
+          owner.phone,
+          ...ownerLeases.flatMap((lease) => [
+            lease.leaseName,
+            lease.lessee,
+            lease.docNo,
+            lease.status,
+          ]),
+        ]
+          .filter(Boolean)
+          .join(' ')
+      ),
+    };
+  });
+}
+
+export function sortAndFilterOwnerListRows(
+  rows: OwnerListRow[],
+  searchQuery: string,
+  sortMode: OwnerListSortMode
+) {
+  const normalizedQuery = normalizeOwnerListText(searchQuery);
+  const filteredRows = normalizedQuery.length === 0
+    ? rows
+    : rows.filter((row) => row.searchText.includes(normalizedQuery));
+
+  return [...filteredRows].sort((left, right) => {
+    if (sortMode === 'name_desc') {
+      return compareOwnerListText(right.owner.name, left.owner.name);
+    }
+
+    if (sortMode === 'county') {
+      const countyDiff = compareOwnerListField(left.owner.county, right.owner.county);
+      if (countyDiff !== 0) {
+        return countyDiff;
+      }
+      return compareOwnerListText(left.owner.name, right.owner.name);
+    }
+
+    if (sortMode === 'prospect') {
+      const prospectDiff = compareOwnerListField(left.owner.prospect, right.owner.prospect);
+      if (prospectDiff !== 0) {
+        return prospectDiff;
+      }
+      return compareOwnerListText(left.owner.name, right.owner.name);
+    }
+
+    if (sortMode === 'active_leases') {
+      if (left.activeLeaseCount !== right.activeLeaseCount) {
+        return right.activeLeaseCount - left.activeLeaseCount;
+      }
+      if (left.leaseCount !== right.leaseCount) {
+        return right.leaseCount - left.leaseCount;
+      }
+      return compareOwnerListText(left.owner.name, right.owner.name);
+    }
+
+    if (sortMode === 'recent') {
+      const updatedDiff = right.owner.updatedAt.localeCompare(left.owner.updatedAt);
+      if (updatedDiff !== 0) {
+        return updatedDiff;
+      }
+      return compareOwnerListText(left.owner.name, right.owner.name);
+    }
+
+    return compareOwnerListText(left.owner.name, right.owner.name);
+  });
+}
 
 export default function OwnerDatabaseView() {
   const setView = useUIStore((state) => state.setView);
@@ -36,8 +180,20 @@ export default function OwnerDatabaseView() {
   const deskMaps = useWorkspaceStore((state) => state.deskMaps);
   const setActiveDeskMap = useWorkspaceStore((state) => state.setActiveDeskMap);
   const setActiveNode = useWorkspaceStore((state) => state.setActiveNode);
+  const [ownerSearchQuery, setOwnerSearchQuery] = useState('');
+  const [ownerSortMode, setOwnerSortMode] = useState<OwnerListSortMode>('name_asc');
 
-  const selectedOwner = owners.find((owner) => owner.id === selectedOwnerId) ?? null;
+  const ownerRows = useMemo(() => buildOwnerListRows(owners, leases), [leases, owners]);
+  const visibleOwnerRows = useMemo(
+    () => sortAndFilterOwnerListRows(ownerRows, ownerSearchQuery, ownerSortMode),
+    [ownerRows, ownerSearchQuery, ownerSortMode]
+  );
+  const selectedOwnerVisible = selectedOwnerId
+    ? visibleOwnerRows.some((row) => row.owner.id === selectedOwnerId)
+    : false;
+  const selectedOwner = selectedOwnerVisible
+    ? owners.find((owner) => owner.id === selectedOwnerId) ?? null
+    : null;
   const selectedOwnerLeases = useMemo(
     () =>
       selectedOwner
@@ -64,10 +220,14 @@ export default function OwnerDatabaseView() {
   }, [deskMaps, nodes, selectedOwner, selectedOwnerLeases]);
 
   useEffect(() => {
-    if (!selectedOwnerId && owners.length > 0) {
-      selectOwner(owners[0].id);
+    if (visibleOwnerRows.length === 0) {
+      return;
     }
-  }, [owners, selectOwner, selectedOwnerId]);
+
+    if (!selectedOwnerId || !visibleOwnerRows.some((row) => row.owner.id === selectedOwnerId)) {
+      selectOwner(visibleOwnerRows[0].owner.id);
+    }
+  }, [selectOwner, selectedOwnerId, visibleOwnerRows]);
 
   const handleOpenDeskMapLeaseTarget = useCallback(
     (leaseId: string, target: { deskMapId: string; leaseNodeId: string | null; parentNodeId: string }) => {
@@ -85,7 +245,7 @@ export default function OwnerDatabaseView() {
 
   return (
     <div className="h-full grid gap-4 p-4 bg-parchment-dark/30 lg:grid-cols-[320px_minmax(0,1fr)]">
-      <aside className="min-h-0 rounded-xl border border-ledger-line bg-parchment shadow-sm overflow-hidden">
+      <aside className="min-h-0 rounded-xl border border-ledger-line bg-parchment shadow-sm overflow-hidden flex flex-col">
         <div className="px-4 py-4 border-b border-ledger-line bg-ledger flex items-center justify-between gap-3">
           <div>
             <div className="text-lg font-display font-bold text-ink">Owners</div>
@@ -104,13 +264,67 @@ export default function OwnerDatabaseView() {
           </button>
         </div>
 
-        <div className="overflow-auto max-h-[calc(100vh-10rem)]">
+        <div className="border-b border-ledger-line bg-parchment-dark/40 px-4 py-3">
+          <label className="block">
+            <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-light">
+              Search
+            </span>
+            <div className="mt-1.5 flex items-center gap-2">
+              <input
+                value={ownerSearchQuery}
+                onChange={(event) => setOwnerSearchQuery(event.target.value)}
+                placeholder="Owner, county, prospect, lease..."
+                className="min-w-0 flex-1 rounded-lg border border-ledger-line bg-white px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-leather"
+              />
+              {ownerSearchQuery.trim().length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setOwnerSearchQuery('')}
+                  className="rounded-lg border border-ledger-line px-3 py-2 text-xs font-semibold text-ink-light transition-colors hover:bg-ledger"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+          </label>
+
+          <div className="mt-3 flex items-end gap-2">
+            <label className="min-w-0 flex-1">
+              <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-light">
+                Sort By
+              </span>
+              <select
+                value={ownerSortMode}
+                onChange={(event) => setOwnerSortMode(event.target.value as OwnerListSortMode)}
+                className="mt-1.5 w-full rounded-lg border border-ledger-line bg-white px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-leather"
+              >
+                {OWNER_LIST_SORT_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="rounded-lg border border-ledger-line bg-white px-3 py-2 text-xs text-ink-light">
+              Showing {visibleOwnerRows.length}/{owners.length}
+            </div>
+          </div>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-auto">
           {owners.length === 0 ? (
             <div className="px-4 py-6 text-sm text-ink-light">
               No owner records yet. Create one here or from a desk map node.
             </div>
+          ) : visibleOwnerRows.length === 0 ? (
+            <div className="px-4 py-6 text-sm text-ink-light">
+              <div className="font-semibold text-ink">No owners match this search.</div>
+              <div className="mt-1">
+                Try a different owner name, county, prospect, or lease term.
+              </div>
+            </div>
           ) : (
-            owners.map((owner) => (
+            visibleOwnerRows.map(({ owner, leaseCount, activeLeaseCount }) => (
               <button
                 key={owner.id}
                 type="button"
@@ -119,13 +333,27 @@ export default function OwnerDatabaseView() {
                   selectedOwnerId === owner.id ? 'bg-leather/10' : 'hover:bg-ledger'
                 }`}
               >
-                <div className="text-sm font-semibold text-ink">
-                  {owner.name || 'Unnamed Owner'}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="text-sm font-semibold text-ink">
+                    {owner.name || 'Unnamed Owner'}
+                  </div>
+                  {(activeLeaseCount > 0 || leaseCount > 0) && (
+                    <span className="rounded-full border border-leather/20 bg-leather/10 px-2 py-0.5 text-[10px] font-semibold text-leather">
+                      {activeLeaseCount > 0
+                        ? `${activeLeaseCount} active`
+                        : `${leaseCount} lease${leaseCount === 1 ? '' : 's'}`}
+                    </span>
+                  )}
                 </div>
-                <div className="text-xs text-ink-light">
+                <div className="mt-1 text-xs text-ink-light">
                   {[owner.entityType, owner.county, owner.prospect]
                     .filter(Boolean)
                     .join(' • ') || 'No details yet'}
+                </div>
+                <div className="mt-1 text-[11px] text-ink-light">
+                  {leaseCount > 0
+                    ? `${leaseCount} lease record${leaseCount === 1 ? '' : 's'}${activeLeaseCount > 0 ? ` • ${activeLeaseCount} active` : ''}`
+                    : 'No lease records yet'}
                 </div>
               </button>
             ))
@@ -162,6 +390,17 @@ export default function OwnerDatabaseView() {
             onUpdateDoc={updateDoc}
             onRemoveDoc={removeDoc}
           />
+        ) : owners.length > 0 && visibleOwnerRows.length === 0 ? (
+          <div className="h-full rounded-xl border border-dashed border-ledger-line bg-parchment flex items-center justify-center">
+            <div className="text-center px-6">
+              <div className="text-xl font-display font-bold text-ink">
+                No owners match the current search
+              </div>
+              <div className="text-sm text-ink-light mt-2">
+                Clear the filter or change the search terms to pick an owner from the list.
+              </div>
+            </div>
+          </div>
         ) : (
           <div className="h-full rounded-xl border border-dashed border-ledger-line bg-parchment flex items-center justify-center">
             <div className="text-center px-6">

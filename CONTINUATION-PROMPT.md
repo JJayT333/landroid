@@ -2,6 +2,65 @@
 
 Use this file to resume work in a new chat.
 
+## Latest audit update — 2026-04-10
+
+This section supersedes older branch/status bullets below when they conflict.
+
+- Active branch for the latest audit pass: `claude/texas-baseline-handoff`
+- Deliverable 1 verification completed on this branch:
+  - `npm run lint` passed
+  - `npm test` passed (`261/261`)
+  - `npm run build` passed
+  - direct combinatorial runtime validation passed with `1119` nodes and no ownership-graph issues
+  - repo-wide federal grep in `src/` stayed limited to the allowed jurisdiction discriminator, comments, and tests
+- Actual baseline miss found and fixed:
+  - the ORRI working-interest formula was already correct
+  - but the tract-summary field was still exposed as `workingInterestBaseRate`
+  - this audit pass renamed the app-facing field to `nriBeforeOrriRate` in:
+    - `/Users/abstractmapping/projects/landroid/src/components/leasehold/leasehold-summary.ts`
+    - `/Users/abstractmapping/projects/landroid/src/components/leasehold/__tests__/leasehold-summary.test.ts`
+    - `/Users/abstractmapping/projects/landroid/src/views/LeaseholdView.tsx`
+- New deliverable artifact written:
+  - `/Users/abstractmapping/projects/landroid/LANDMAN-MATH-REFERENCE.md`
+- Approved markdown cleanup completed:
+  - archived `AUDIT_PROMPT.md`, `AUDIT_REPORT.md`, `REWRITE_PLAN.md`, `docs/architecture/audit-remediation-plan.md`, and `docs/architecture/ownership-math-reference.md` under `/Users/abstractmapping/projects/landroid/docs/archive/`
+  - deleted `docs/phase-gate-checklist.md`
+  - refreshed `FULL-AUDIT-PROMPT.md`, `README.md`, and surviving code comments to point at the live doc set
+- User follow-up note:
+  - the user approved the cleanup but has not had time to review it yet; keep a reminder in the next chat to confirm the archive layout and live-doc set before calling the documentation pass fully signed off
+- Next Texas-baseline hardening landed after the audit:
+  - `Lease.status` is no longer a free-text math input
+  - new lease edits now use the canonical Texas-baseline status list: `Active`, `Expired`, `Released`, `Terminated`, `Inactive`, `Dead`
+  - coverage math now keys off the shared status classifier in `/Users/abstractmapping/projects/landroid/src/types/owner.ts`
+  - legacy non-canonical status text is preserved instead of being silently discarded
+  - validation after this status-normalization pass was green: `npm run lint`, `npm test` (`271/271`), and `npm run build`
+- Additional leasehold math correction landed after that:
+  - multiple NRI-basis ORRIs now stack one by one in effective-date order instead of being flattened into one combined carve
+  - Leasehold ORRI cards now tell the user that effective date controls NRI stacking when multiple NRI burdens hit the same tract
+  - Leasehold now consumes fixed and floating NPRIs end-to-end: floating NPRIs burden lease royalty, fixed NPRIs burden gross leased production, NPRI rows now show up in the deck and transfer-order ledger, and fixed NPRIs reduce the NRI base before NRI-basis ORRIs are calculated
+  - Leasehold overview/deck UI now shows NPRI decimals directly, including a read-only NPRI lane, tract-level NPRI burden metrics, and warning surfaces for floating-NPRI over-carves
+  - validation after the full fixed/floating NPRI pass was green: `npx vitest run src/components/leasehold/__tests__/leasehold-summary.test.ts`, `npm run lint`, `npm test` (`275/275`), and `npm run build`
+- Latest follow-up work after the NPRI payout pass:
+  - floating-NPRI over-carves now keep unit-focus payout readiness on `Hold` in the transfer-order review surface while editing and title-building remain warning-only
+  - ready transfer-order rows now display as held while that payout-hold condition exists, and new unit-focus payout rows default into `Hold` instead of `Ready`
+  - the `Owners` left rail now has local `Search` and `Sort By` controls so long owner lists can be filtered by owner/lease text and sorted by name, county, prospect, active lease count, or recent activity without changing store persistence order
+  - added targeted helper coverage in `/Users/abstractmapping/projects/landroid/src/views/__tests__/view-helpers.test.ts`
+  - validation after this pass was green: `npx vitest run src/views/__tests__/view-helpers.test.ts`, `npm run lint`, `npm test` (`277/277`), and `npm run build`
+- Important handoff corrections versus older notes:
+  - `FULL-AUDIT-PROMPT.md` had gone stale about finding `#1` (lease-overlap warnings), finding `#4` (strict leasehold parsing), and finding `#9` (over-burden warning); the cleanup pass refreshed it to match the current code
+  - `FULL-AUDIT-PROMPT.md` also claimed the `workingInterestBaseRate -> nriBeforeOrriRate` rename had already landed; it had not, and this pass finished it
+  - the old internal math note and remediation-plan docs are now archived under `/Users/abstractmapping/projects/landroid/docs/archive/`
+- Open risks / likely next steps:
+  - the chat audit report and cleanup execution are now complete, but the user may still want a checkpoint commit once the intentional file set is confirmed
+  - the user still needs to review the approved markdown cleanup later when time permits
+  - verify the new fixed/floating NPRI payout layer and the new payout-hold convention against the company's preferred reviewer format
+  - if the owners list still feels crowded after search/sort, the next likely follow-up is grouping or saved filters rather than more store-level sorting logic
+- Intentional local noise still present and not part of the audit deliverable:
+  - `.DS_Store`
+  - `.claude/`
+  - `TORS_Documents/`
+  - generated `dist/` and `dist-node/` artifacts from validation
+
 ## Paste This Into A New Chat
 
 I am working in `/Users/abstractmapping/projects/landroid`.
@@ -27,8 +86,7 @@ Audit quickstart:
   - `/Users/abstractmapping/projects/landroid/src/views/DeskMapView.tsx`
   - `/Users/abstractmapping/projects/landroid/src/views/RunsheetView.tsx`
   - `/Users/abstractmapping/projects/landroid/src/views/OwnerDatabaseView.tsx`
-  - `/Users/abstractmapping/projects/landroid/docs/architecture/ownership-math-reference.md`
-  - `/Users/abstractmapping/projects/landroid/docs/architecture/audit-remediation-plan.md`
+  - `/Users/abstractmapping/projects/landroid/LANDMAN-MATH-REFERENCE.md`
   - `/Users/abstractmapping/projects/landroid/FULL-AUDIT-PROMPT.md`
 
 Current repo state:
@@ -83,8 +141,8 @@ Recent completed work:
   - startup shows a visible warning banner when corrupt autosave data is ignored in favor of a safe fresh state
 - Strengthened ownership-node normalization for persisted/imported payloads so numeric/text/enum fields are normalized more predictably before validation
 - Added regression coverage for attach refund behavior, under-allocation detection, invalid ownership-graph import rejection, and corrupt persisted-canvas parsing
-- Added a canonical ownership math reference at `/Users/abstractmapping/projects/landroid/docs/architecture/ownership-math-reference.md` that separates source-grounded rules, repo math, and known gaps for future tooling/AI use
-- Added a merged audit remediation plan at `/Users/abstractmapping/projects/landroid/docs/architecture/audit-remediation-plan.md` that ranks accepted fixes by severity and calls out which findings from `AUDIT_REPORT.md` should not be adopted as-is
+- Added a canonical ownership math reference, now superseded by `/Users/abstractmapping/projects/landroid/LANDMAN-MATH-REFERENCE.md`, that separates source-grounded rules, repo math, and known gaps for future tooling/AI use
+- Added a merged audit remediation plan, now archived at `/Users/abstractmapping/projects/landroid/docs/archive/audit-remediation-plan.md`, that ranks accepted fixes by severity and calls out which findings from `AUDIT_REPORT.md` should not be adopted as-is
 - Reviewed trusted external sources for the math reference, including Texas statutes, Texas Supreme Court oil-and-gas cases, the Texas Railroad Commission, EIA glossary definitions, Montana State Extension royalty-decimal examples, and the Oklahoma State / Texas AgriLife / National Agricultural Law Center handbook
 - Verified the active app is now rooted directly in `/Users/abstractmapping/projects/landroid`
 - Added launcher scripts at `/Users/abstractmapping/projects/landroid/LANDroid.command` and `/Users/abstractmapping/projects/landroid/LANDroid.bat`
@@ -322,7 +380,7 @@ Open risks / reminders:
 - `dist/` and `dist-node/` contain generated validation output and should stay out of checkpoints unless explicitly requested
 
 Likely next steps:
-- Harden the next correctness tier from `/Users/abstractmapping/projects/landroid/docs/architecture/audit-remediation-plan.md`:
+- Harden the next correctness tier from `/Users/abstractmapping/projects/landroid/FULL-AUDIT-PROMPT.md` and `/Users/abstractmapping/projects/landroid/LANDMAN-MATH-REFERENCE.md`:
   - CSV precision preservation
 - Revisit the deferred import-path decision:
   - whether CSV / `.landroid` import should reject, quarantine, or interactively repair malformed ownership or leasehold payloads
@@ -439,7 +497,7 @@ Current focus:
 - perform the next comprehensive production-quality audit of LANDroid math and architecture
 - verify the repo's actual stack first from `package.json`, `vite.config.ts`, `src/main.tsx`, and `src/App.tsx`
 - start with the current math and lease-sync entry points in `math-engine.ts`, `leasehold-summary.ts`, `deskmap-coverage.ts`, `workspace-store.ts`, `owner-store.ts`, `DeskMapView.tsx`, `RunsheetView.tsx`, and `OwnerDatabaseView.tsx`
-- use `docs/architecture/ownership-math-reference.md`, `docs/architecture/audit-remediation-plan.md`, and `FULL-AUDIT-PROMPT.md` as the current audit context
+- use `LANDMAN-MATH-REFERENCE.md` and `FULL-AUDIT-PROMPT.md` as the current audit context
 
 Start by:
 1. Inspecting the current branch/worktree state
