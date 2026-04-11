@@ -1392,6 +1392,110 @@ describe('leasehold-summary', () => {
     expect(summary.orris[0]?.unitDecimal).toBe('0.08125');
   });
 
+  it('distinguishes fixed NPRIs entered as burdened-branch shares versus whole-tract shares', () => {
+    const baseInput = {
+      deskMaps: [
+        {
+          id: 'dm-1',
+          name: 'Tract 1',
+          code: 'T1',
+          tractId: 'T1',
+          grossAcres: '100',
+          pooledAcres: '100',
+          description: '',
+          nodeIds: ['n1', 'l1', 'npri-fixed'],
+        },
+      ],
+      owners: [
+        createBlankOwner('ws-1', { id: 'owner-1', name: 'Branch Owner' }),
+        createBlankOwner('ws-1', { id: 'owner-2', name: 'Fixed NPRI Owner' }),
+      ],
+      leases: [
+        createBlankLease('ws-1', 'owner-1', {
+          id: 'lease-1',
+          leaseName: 'Base Lease',
+          lessee: 'Operator A',
+          royaltyRate: '1/8',
+          leasedInterest: '0.0625',
+        }),
+      ],
+      leaseholdAssignments: [],
+      leaseholdOrris: [],
+    };
+
+    const branchBasisSummary = buildLeaseholdUnitSummary({
+      ...baseInput,
+      nodes: [
+        {
+          ...createBlankNode('n1', null),
+          grantee: 'Branch Owner',
+          linkedOwnerId: 'owner-1',
+          fraction: '0.0625',
+          initialFraction: '0.0625',
+        },
+        {
+          ...createBlankNode('l1', 'n1'),
+          type: 'related' as const,
+          relatedKind: 'lease' as const,
+        },
+        {
+          ...createBlankNode('npri-fixed', 'n1'),
+          grantee: 'Fixed NPRI Owner',
+          linkedOwnerId: 'owner-2',
+          interestClass: 'npri' as const,
+          royaltyKind: 'fixed' as const,
+          fixedRoyaltyBasis: 'burdened_branch' as const,
+          fraction: '0.0625',
+          initialFraction: '0.0625',
+        },
+      ],
+    });
+
+    const wholeTractSummary = buildLeaseholdUnitSummary({
+      ...baseInput,
+      nodes: [
+        {
+          ...createBlankNode('n1', null),
+          grantee: 'Branch Owner',
+          linkedOwnerId: 'owner-1',
+          fraction: '0.0625',
+          initialFraction: '0.0625',
+        },
+        {
+          ...createBlankNode('l1', 'n1'),
+          type: 'related' as const,
+          relatedKind: 'lease' as const,
+        },
+        {
+          ...createBlankNode('npri-fixed', 'n1'),
+          grantee: 'Fixed NPRI Owner',
+          linkedOwnerId: 'owner-2',
+          interestClass: 'npri' as const,
+          royaltyKind: 'fixed' as const,
+          fixedRoyaltyBasis: 'whole_tract' as const,
+          fraction: '0.0625',
+          initialFraction: '0.0625',
+        },
+      ],
+    });
+
+    expect(branchBasisSummary.npris[0]).toEqual(
+      expect.objectContaining({
+        fixedRoyaltyBasis: 'burdened_branch',
+        unitDecimal: '0.00390625',
+      })
+    );
+    expect(branchBasisSummary.tracts[0]?.fixedNpriBurdenRate).toBe('0.00390625');
+
+    expect(wholeTractSummary.npris[0]).toEqual(
+      expect.objectContaining({
+        fixedRoyaltyBasis: 'whole_tract',
+        unitDecimal: '0.0625',
+      })
+    );
+    expect(wholeTractSummary.tracts[0]?.fixedNpriBurdenRate).toBe('0.0625');
+  });
+
   it('clamps retained WI at zero when assignments exceed 100% of a tract', () => {
     const summary = buildLeaseholdUnitSummary({
       deskMaps: [

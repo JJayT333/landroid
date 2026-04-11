@@ -38,6 +38,7 @@ export default function NodeEditModal({
 }: NodeEditModalProps) {
   const updateNode = useWorkspaceStore((s) => s.updateNode);
   const rebalance = useWorkspaceStore((s) => s.rebalance);
+  const nodes = useWorkspaceStore((s) => s.nodes);
   const pdfInputRef = useRef<HTMLInputElement>(null);
 
   const [form, setForm] = useState({
@@ -52,6 +53,9 @@ export default function NodeEditModal({
     landDesc: node.landDesc,
     remarks: node.remarks,
     initialFraction: node.initialFraction,
+    royaltyKind: node.royaltyKind,
+    fixedRoyaltyBasis:
+      node.fixedRoyaltyBasis ?? (node.royaltyKind === 'fixed' ? 'burdened_branch' : null),
     isDeceased: node.isDeceased,
     obituary: node.obituary,
     graveyardLink: node.graveyardLink,
@@ -74,12 +78,25 @@ export default function NodeEditModal({
     d(node.fraction).greaterThan(0);
   const trackedShareLabel =
     interestClass === 'npri'
-      ? node.royaltyKind === 'floating'
+      ? form.royaltyKind === 'floating'
         ? 'Share of Lease Royalty'
-        : 'Fixed Royalty Share'
+        : form.fixedRoyaltyBasis === 'whole_tract'
+          ? 'Fixed Share of Whole Tract'
+          : 'Fixed Share of Burdened Branch'
       : 'Interest of Whole Tract';
   const remainingLabel =
     interestClass === 'npri' ? 'Unconveyed Balance' : 'Remaining';
+  const parentNode = node.parentId
+    ? nodes.find((candidate) => candidate.id === node.parentId) ?? null
+    : null;
+  const editedInitialFraction = d(form.initialFraction);
+  const npriExceedsFullShare =
+    interestClass === 'npri' && editedInitialFraction.greaterThan(1);
+  const fixedWholeTractExceedsBranch =
+    interestClass === 'npri'
+    && form.royaltyKind === 'fixed'
+    && form.fixedRoyaltyBasis === 'whole_tract'
+    && Boolean(parentNode && editedInitialFraction.greaterThan(d(parentNode.initialFraction)));
 
   const set = (field: string, value: string | boolean) =>
     setForm((f) => ({ ...f, [field]: value }));
@@ -87,15 +104,30 @@ export default function NodeEditModal({
   const handleSave = () => {
     setError(null);
 
+    const normalizedNpriFields = interestClass === 'npri'
+      ? {
+          royaltyKind: form.royaltyKind,
+          fixedRoyaltyBasis:
+            form.royaltyKind === 'fixed'
+              ? (form.fixedRoyaltyBasis ?? 'burdened_branch')
+              : null,
+        }
+      : {};
     if (initialChanged) {
       const { initialFraction, ...otherFields } = form;
-      const success = rebalance(node.id, initialFraction, otherFields);
+      const success = rebalance(node.id, initialFraction, {
+        ...otherFields,
+        ...normalizedNpriFields,
+      });
       if (!success) {
         setError(useWorkspaceStore.getState().lastError || 'Rebalance failed');
         return;
       }
     } else {
-      updateNode(node.id, form);
+      updateNode(node.id, {
+        ...form,
+        ...normalizedNpriFields,
+      });
     }
 
     onClose();
@@ -138,6 +170,76 @@ export default function NodeEditModal({
           </legend>
 
           <div className="bg-ledger rounded-lg p-3 space-y-2">
+            {interestClass === 'npri' && (
+              <>
+                <div className="space-y-1.5">
+                  <div className="text-[10px] text-ink-light uppercase tracking-wider">
+                    NPRI Kind
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {([
+                      ['fixed', 'Fixed NPRI'],
+                      ['floating', 'Floating NPRI'],
+                    ] as const).map(([kind, label]) => (
+                      <button
+                        key={kind}
+                        type="button"
+                        onClick={() =>
+                          setForm((current) => ({
+                            ...current,
+                            royaltyKind: kind,
+                            fixedRoyaltyBasis:
+                              kind === 'fixed'
+                                ? (current.fixedRoyaltyBasis ?? 'burdened_branch')
+                                : null,
+                          }))
+                        }
+                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                          form.royaltyKind === kind
+                            ? 'bg-amber-700 text-amber-50'
+                            : 'text-amber-900 hover:bg-amber-100 border border-amber-200'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {form.royaltyKind === 'fixed' && (
+                  <div className="space-y-1.5">
+                    <div className="text-[10px] text-ink-light uppercase tracking-wider">
+                      Fixed Deed Basis
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {([
+                        ['burdened_branch', 'Of burdened branch'],
+                        ['whole_tract', 'Of whole tract'],
+                      ] as const).map(([basis, label]) => (
+                        <button
+                          key={basis}
+                          type="button"
+                          onClick={() => set('fixedRoyaltyBasis', basis)}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                            form.fixedRoyaltyBasis === basis
+                              ? 'bg-leather text-parchment'
+                              : 'text-ink hover:bg-parchment-dark border border-ledger-line'
+                          }`}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="text-[10px] text-ink-light">
+                      Use whole-tract basis when the fixed fraction is already
+                      stated against production from the land, not merely against
+                      the grantor branch.
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+
             <div>
               <label className="text-[10px] text-ink-light uppercase tracking-wider block mb-1">
                 {trackedShareLabel}
@@ -152,6 +254,17 @@ export default function NodeEditModal({
                 = {previewFrac}
               </div>
             </div>
+
+            {(npriExceedsFullShare || fixedWholeTractExceedsBranch) && (
+              <div className="rounded-lg border border-seal/30 bg-seal/10 px-3 py-2 text-xs leading-5 text-seal">
+                <span className="font-semibold">Title discrepancy allowed.</span>{' '}
+                LANDroid will save this NPRI and highlight the affected Desk Map branch in red.
+                {npriExceedsFullShare && ' The entered NPRI is greater than 100%.'}
+                {fixedWholeTractExceedsBranch && parentNode
+                  ? ` The fixed whole-tract burden exceeds the burdened branch share of ${formatAsFraction(d(parentNode.initialFraction))}.`
+                  : ''}
+              </div>
+            )}
 
             {initialChanged && (
               <div className="bg-gold/10 border border-gold/30 rounded-lg p-2 text-xs text-ink">

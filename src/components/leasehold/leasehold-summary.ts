@@ -2,6 +2,7 @@ import { d } from '../../engine/decimal';
 import {
   isNpriNode,
   type DeskMap,
+  type FixedRoyaltyBasis,
   type OwnershipNode,
   type RoyaltyKind,
 } from '../../types/node';
@@ -143,10 +144,12 @@ export interface LeaseholdNpriSummary {
   id: string;
   payee: string;
   royaltyKind: Exclude<RoyaltyKind, null>;
+  fixedRoyaltyBasis: Exclude<FixedRoyaltyBasis, null> | null;
   deskMapId: string;
   tractName: string;
   tractCode: string;
   burdenFraction: string;
+  burdenedBranchNodeId: string | null;
   burdenedBranchOwner: string;
   effectiveDate: string;
   sourceDocNo: string;
@@ -282,6 +285,15 @@ function currentNpriOwners(nodes: OwnershipNode[]) {
 
 function effectiveNpriRoyaltyKind(node: OwnershipNode): Exclude<RoyaltyKind, null> {
   return node.royaltyKind === 'floating' ? 'floating' : 'fixed';
+}
+
+function effectiveFixedNpriBasis(
+  node: OwnershipNode
+): Exclude<FixedRoyaltyBasis, null> | null {
+  if (node.royaltyKind === 'floating') {
+    return null;
+  }
+  return node.fixedRoyaltyBasis === 'whole_tract' ? 'whole_tract' : 'burdened_branch';
 }
 
 function findBurdenedMineralAncestorId(
@@ -477,11 +489,14 @@ function formatOrriBasisSourceLabel(burdenBasis: LeaseholdOrri['burdenBasis']) {
 
 function formatNpriSourceLabel(
   royaltyKind: LeaseholdNpriSummary['royaltyKind'],
-  burdenFraction: string
+  burdenFraction: string,
+  fixedRoyaltyBasis: LeaseholdNpriSummary['fixedRoyaltyBasis']
 ) {
   return royaltyKind === 'floating'
     ? `Floating NPRI • ${burdenFraction || '—'} of lease royalty`
-    : `Fixed NPRI • ${burdenFraction || '—'} of gross`;
+    : `Fixed NPRI • ${burdenFraction || '—'} ${
+        fixedRoyaltyBasis === 'whole_tract' ? 'of whole tract' : 'of burdened branch'
+      }`;
 }
 
 export function buildLeaseholdUnitSummary({
@@ -619,6 +634,7 @@ export function buildLeaseholdUnitSummary({
     );
     const nprisForTract = presentNpriHolders.map((node) => {
       const royaltyKind = effectiveNpriRoyaltyKind(node);
+      const fixedRoyaltyBasis = effectiveFixedNpriBasis(node);
       const burdenedMineralAncestorId = findBurdenedMineralAncestorId(node, nodeById);
       const burdenedBranchOwner =
         burdenedMineralAncestorId && nodeById.get(burdenedMineralAncestorId)
@@ -630,6 +646,10 @@ export function buildLeaseholdUnitSummary({
             ownerMineralAncestorIdsByNodeId.get(owner.nodeId)?.has(burdenedMineralAncestorId)
           )
         : [];
+      const burdenedBranchOwnership = applicableOwners.reduce(
+        (sum, owner) => sum.plus(d(owner.fraction)),
+        d(0)
+      );
       let tractBurdenRate = d(0);
       let unitDecimal = d(0);
 
@@ -643,7 +663,9 @@ export function buildLeaseholdUnitSummary({
           const leaseRoyaltyRate = parseInterestString(leaseSlice.leaseRoyaltyRate);
           const burdenRate = royaltyKind === 'floating'
             ? leasedFraction.times(leaseRoyaltyRate).times(burdenFraction)
-            : leasedFraction.times(burdenFraction);
+            : fixedRoyaltyBasis === 'whole_tract' && burdenedBranchOwnership.greaterThan(0)
+              ? leasedFraction.div(burdenedBranchOwnership).times(burdenFraction)
+              : leasedFraction.times(burdenFraction);
           const burdenUnitDecimal = unitParticipation.times(burdenRate);
 
           tractBurdenRate = tractBurdenRate.plus(burdenRate);
@@ -671,10 +693,12 @@ export function buildLeaseholdUnitSummary({
         id: node.id,
         payee: nameOwner(node, ownerById),
         royaltyKind,
+        fixedRoyaltyBasis,
         deskMapId: deskMap.id,
         tractName: deskMap.name,
         tractCode: deskMap.code,
         burdenFraction: node.fraction,
+        burdenedBranchNodeId: burdenedMineralAncestorId,
         burdenedBranchOwner,
         effectiveDate: node.date || node.fileDate,
         sourceDocNo: node.docNo,
@@ -1072,7 +1096,11 @@ export function buildLeaseholdDecimalRows({
           payee: npri.payee || 'Unnamed NPRI',
           tractName: focusedTract.name,
           tractCode: focusedTract.code,
-          sourceLabel: formatNpriSourceLabel(npri.royaltyKind, npri.burdenFraction),
+          sourceLabel: formatNpriSourceLabel(
+            npri.royaltyKind,
+            npri.burdenFraction,
+            npri.fixedRoyaltyBasis
+          ),
           effectiveDate: npri.effectiveDate,
           sourceDocNo: npri.sourceDocNo,
           decimal: npri.unitDecimal,
@@ -1174,7 +1202,11 @@ export function buildLeaseholdDecimalRows({
           payee: npri.payee || 'Unnamed NPRI',
           tractName: npri.tractName,
           tractCode: npri.tractCode,
-          sourceLabel: formatNpriSourceLabel(npri.royaltyKind, npri.burdenFraction),
+          sourceLabel: formatNpriSourceLabel(
+            npri.royaltyKind,
+            npri.burdenFraction,
+            npri.fixedRoyaltyBasis
+          ),
           effectiveDate: npri.effectiveDate,
           sourceDocNo: npri.sourceDocNo,
           decimal: npri.unitDecimal,

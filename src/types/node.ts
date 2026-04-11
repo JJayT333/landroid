@@ -5,6 +5,7 @@ export type SplitBasis = 'initial' | 'remaining' | 'whole';
 export type NodeType = 'conveyance' | 'related';
 export type RelatedNodeKind = 'document' | 'lease';
 export type InterestClass = 'mineral' | 'npri';
+export type FixedRoyaltyBasis = 'burdened_branch' | 'whole_tract' | null;
 /**
  * NPRI royalty characterization (audit finding #5).
  *
@@ -16,7 +17,9 @@ export type InterestClass = 'mineral' | 'npri';
  * conveyances and predecessor inserts, and now consumes it in leasehold payout
  * math:
  * - floating NPRIs multiply against the burdened branch's lease royalty
- * - fixed NPRIs multiply against the burdened branch's leased gross share
+ * - fixed NPRIs now also carry a deed-basis discriminator so LANDroid can tell
+ *   whether the entered fraction is of the burdened branch or of the whole
+ *   tract share carried by that branch
  *
  * The title-tree math is still mineral-only: NPRIs remain sibling burdens and
  * do not reduce mineral coverage totals on Desk Map. See
@@ -67,6 +70,15 @@ export interface OwnershipNode {
   interestClass: InterestClass;
   /** See `RoyaltyKind` — stored on the node and consumed by leasehold payout math. */
   royaltyKind: RoyaltyKind;
+  /**
+   * Fixed-NPRI deed basis:
+   * - `burdened_branch` means the fixed fraction is read as a share of the
+   *   burdened branch's mineral interest
+   * - `whole_tract` means the fixed fraction is already a share of whole tract
+   *   production carried by that burdened branch
+   * - `null` means not applicable (mineral nodes and floating NPRIs)
+   */
+  fixedRoyaltyBasis: FixedRoyaltyBasis;
 
   // UI state
   isCollapsed: boolean;
@@ -137,6 +149,13 @@ function normalizeInterestClass(value: unknown): InterestClass {
 
 function normalizeRoyaltyKind(value: unknown): RoyaltyKind {
   if (value === 'fixed' || value === 'floating') {
+    return value;
+  }
+  return null;
+}
+
+function normalizeFixedRoyaltyBasis(value: unknown): FixedRoyaltyBasis {
+  if (value === 'whole_tract' || value === 'burdened_branch') {
     return value;
   }
   return null;
@@ -220,6 +239,7 @@ export function createBlankNode(id: string, parentId: string | null = null): Own
     relatedKind: null,
     interestClass: 'mineral',
     royaltyKind: null,
+    fixedRoyaltyBasis: null,
     isCollapsed: false,
   };
 }
@@ -227,6 +247,15 @@ export function createBlankNode(id: string, parentId: string | null = null): Own
 export function normalizeOwnershipNode(
   node: Pick<OwnershipNode, 'id'> & Partial<OwnershipNode>
 ): OwnershipNode {
+  const interestClass = normalizeInterestClass(node.interestClass);
+  const royaltyKind = normalizeRoyaltyKind(node.royaltyKind);
+  const splitBasis = normalizeSplitBasis(node.splitBasis);
+  const explicitFixedRoyaltyBasis = normalizeFixedRoyaltyBasis(node.fixedRoyaltyBasis);
+  const fixedRoyaltyBasis =
+    interestClass === 'npri' && royaltyKind === 'fixed'
+      ? explicitFixedRoyaltyBasis ?? (splitBasis === 'whole' ? 'whole_tract' : 'burdened_branch')
+      : null;
+
   return {
     ...createBlankNode(node.id, node.parentId ?? null),
     id: node.id,
@@ -245,7 +274,7 @@ export function normalizeOwnershipNode(
     initialFraction: normalizeDecimalInput(node.initialFraction, '0'),
     parentId: typeof node.parentId === 'string' ? node.parentId : null,
     conveyanceMode: normalizeConveyanceMode(node.conveyanceMode),
-    splitBasis: normalizeSplitBasis(node.splitBasis),
+    splitBasis,
     numerator: normalizeDecimalInput(node.numerator, '0'),
     denominator: normalizeDecimalInput(node.denominator, '1'),
     manualAmount: normalizeDecimalInput(node.manualAmount, '0'),
@@ -256,8 +285,9 @@ export function normalizeOwnershipNode(
     linkedOwnerId: node.linkedOwnerId ?? null,
     linkedLeaseId: node.linkedLeaseId ?? null,
     relatedKind: normalizeRelatedKind(node.relatedKind),
-    interestClass: normalizeInterestClass(node.interestClass),
-    royaltyKind: normalizeRoyaltyKind(node.royaltyKind),
+    interestClass,
+    royaltyKind,
+    fixedRoyaltyBasis,
     isCollapsed: node.isCollapsed === true,
   };
 }

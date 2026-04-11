@@ -2,11 +2,13 @@
 
 Use this file to resume work in a new chat.
 
-## Latest audit update — 2026-04-10
+## Latest audit update — 2026-04-11
 
 This section supersedes older branch/status bullets below when they conflict.
 
-- Active branch for the latest audit pass: `claude/texas-baseline-handoff`
+- Active branch for the current checkpointed work: `codex/texas-baseline-checkpoint-2026-04-10`
+- Latest GitHub branch to continue from after this push: `codex/texas-baseline-checkpoint-2026-04-10`
+- Previous pushed checkpoint on that branch before the April 11 push: `b811e59` (`feat: checkpoint texas baseline audit and leasehold review`)
 - Deliverable 1 verification completed on this branch:
   - `npm run lint` passed
   - `npm test` passed (`261/261`)
@@ -44,17 +46,35 @@ This section supersedes older branch/status bullets below when they conflict.
   - floating-NPRI over-carves now keep unit-focus payout readiness on `Hold` in the transfer-order review surface while editing and title-building remain warning-only
   - ready transfer-order rows now display as held while that payout-hold condition exists, and new unit-focus payout rows default into `Hold` instead of `Ready`
   - the `Owners` left rail now has local `Search` and `Sort By` controls so long owner lists can be filtered by owner/lease text and sorted by name, county, prospect, active lease count, or recent activity without changing store persistence order
+  - `Leasehold` now has a full-size `Map` mode that keeps the payout picture separate from Desk Map title: unit overview at the root, tracts as the first branches, and a focused tract detail map that expands into owner branches, lease slices, branch-bound NPRIs, plus separate tract-level ORRI and WI branches
+  - the graph helper now links NPRIs to the burdened mineral branch by node ID, so unleased branches can still show tracked NPRIs even when they are not yet included in payout math
   - added targeted helper coverage in `/Users/abstractmapping/projects/landroid/src/views/__tests__/view-helpers.test.ts`
-  - validation after this pass was green: `npx vitest run src/views/__tests__/view-helpers.test.ts`, `npm run lint`, `npm test` (`277/277`), and `npm run build`
+  - validation after the first embedded graph pass was green: `npx vitest run src/views/__tests__/view-helpers.test.ts`, `npm run lint`, `npm test` (`278/278`), and `npm run build`
+  - latest follow-up pivots that smaller graph into a full-page map canvas inside `Leasehold`, matching the scale of `Desk Map` while keeping the title and leasehold stories separate
+  - validation after the full-size map pivot is green: `npm run lint`, `npx vitest run src/views/__tests__/view-helpers.test.ts`, `npm test` (`278/278`), and `npm run build`
+- Latest Desk Map/demo-fixture follow-up after that:
+  - the combinatorial `8 x 100` sample now uses conventional person names with unique owner-card grantee names across the full fixture, making the demo much easier to scan during land/title review
+  - `Desk Map` now has a `Find Mineral Owner` search box in the floating toolbar; typing a name jumps to the matching mineral-owner card, automatically switches tract tabs when the match lives on another desk map, and shows a clickable results list beneath the search box for quick selection
+  - added helper coverage for the new Desk Map search matcher and for combinatorial-name uniqueness
+  - validation after this Desk Map/search pass is green: `npx vitest run src/storage/__tests__/seed-test-data.test.ts src/views/__tests__/view-helpers.test.ts`, `npm run lint`, `npm test` (`280/280`), and `npm run build`
+- Latest NPRI deed-basis follow-up after that:
+  - fixed NPRIs now carry a second discriminator, `fixedRoyaltyBasis`, so LANDroid can distinguish a fixed fraction of the burdened branch from a fixed fraction already stated against whole tract production
+  - Desk Map NPRI create/edit cards now ask for that deed basis, fixed-NPRI leasehold math now applies the matching formula, and fixed whole-tract NPRIs can be entered even when they exceed the grantor's branch share
+  - NPRI branch over-claims are now warning-only: the affected Desk Map mineral branch and NPRI cards turn red, and the toolbar shows an NPRI title-discrepancy warning so the issue is visible until title is reconciled
+  - fixed whole-tract NPRIs now stay whole-tract based through the seeded combinatorial demo as well, so the C3-style “1/16 and 1/32 of the whole” examples still read correctly
+  - the convey modal now labels inherited fixed NPRI branches as branch-based or whole-tract fixed burdens so the user can see what is being split
+  - validation after the red-branch discrepancy pass is green: `npx vitest run src/engine/__tests__/math-engine.test.ts src/components/leasehold/__tests__/leasehold-summary.test.ts src/storage/__tests__/seed-test-data.test.ts src/views/__tests__/view-helpers.test.ts`, `npm run lint`, `npm test` (`283/283`), and `npm run build`
 - Important handoff corrections versus older notes:
   - `FULL-AUDIT-PROMPT.md` had gone stale about finding `#1` (lease-overlap warnings), finding `#4` (strict leasehold parsing), and finding `#9` (over-burden warning); the cleanup pass refreshed it to match the current code
   - `FULL-AUDIT-PROMPT.md` also claimed the `workingInterestBaseRate -> nriBeforeOrriRate` rename had already landed; it had not, and this pass finished it
   - the old internal math note and remediation-plan docs are now archived under `/Users/abstractmapping/projects/landroid/docs/archive/`
 - Open risks / likely next steps:
-  - the chat audit report and cleanup execution are now complete, but the user may still want a checkpoint commit once the intentional file set is confirmed
+  - the April 11 checkpoint push should include the intentional source/docs/test work only; do not confuse it with local generated build output or machine-local folders
   - the user still needs to review the approved markdown cleanup later when time permits
-  - verify the new fixed/floating NPRI payout layer and the new payout-hold convention against the company's preferred reviewer format
+  - verify the new fixed-NPRI deed-basis handling against the company's preferred reviewer format, especially whether “of whole tract” versus “of burdened branch” matches how the company wants deeds abstracted in payout review
+  - browser-QA the red Desk Map NPRI discrepancy highlight by entering an over-branch NPRI and confirming the branch/card warning is obvious enough
   - if the owners list still feels crowded after search/sort, the next likely follow-up is grouping or saved filters rather than more store-level sorting logic
+  - the next likely leasehold-map follow-up is richer expansion controls or saved map focus once the first hierarchy gets browser QA
 - Intentional local noise still present and not part of the audit deliverable:
   - `.DS_Store`
   - `.claude/`
@@ -90,16 +110,11 @@ Audit quickstart:
   - `/Users/abstractmapping/projects/landroid/FULL-AUDIT-PROMPT.md`
 
 Current repo state:
-- Active branch: `codex/full-audit-handoff`
-- Current handoff checkpoint commit on this branch: `7f8ecbb` (`docs: fix handoff checkpoint hash`)
-- Latest inherited pushed checkpoint before this branch work: `60cf008` (`feat: checkpoint leasehold and research foundations`)
-- `main` is the trusted baseline and now points to commit `a76b367`
-- Safety branches kept on purpose: `baseline-afbdb93`, `v2-desk-map-interactions-and-resize`
-- Active app is the repository root
+- Active branch: `codex/texas-baseline-checkpoint-2026-04-10`
+- Active app is the repository root: `/Users/abstractmapping/projects/landroid`
 - The repository root is both the app surface and the repo-level coordination layer
-- The active branch for current work is `codex/full-audit-handoff`
-- `claude_audit` and `main` currently point at the same validated checkpoint commit
-- This branch contains the current uncommitted owner-lease-node, shared-editor, and math-hardening work that still needs a checkpoint commit
+- The April 11 push should already contain the Texas-baseline audit cleanup, leasehold hardening, full-size Leasehold Map, Desk Map owner search/results list, fixed/floating NPRI payout layer, fixed-NPRI deed-basis discriminator, and warning-only red NPRI discrepancy highlights
+- Do not commit local generated/noise paths unless explicitly requested: `.DS_Store`, `.claude/`, `TORS_Documents/`, `dist/`, and `dist-node/`
 
 User preferences and working style:
 - The user is fairly new and wants careful, reversible changes

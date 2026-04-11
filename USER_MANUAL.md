@@ -62,6 +62,7 @@ Gross acres and tract descriptions now live on the tract record itself, but you 
 - `+ Add Root` starts a new title chain in the active tract.
 - Use `+ Add Root` more than once when a tract starts from separate families or competing starting points.
 - Temporary totals over `100%` are acceptable while you work farther back in title and reconcile the chain later.
+- Use the `Find Mineral Owner` box in the top-left toolbar to jump straight to a mineral-owner card by name, even if that owner lives on another tract tab. Matching results now appear as a clickable list beneath the search box.
 - Click a card to edit it.
 - Hover a card to reveal actions such as `PRECEDE`, `CONVEY`, `ATTACH`, and `DELETE`.
 - Related documents stay attached to a title card and do not change ownership math.
@@ -69,6 +70,8 @@ Gross acres and tract descriptions now live on the tract record itself, but you 
 - The node edit modal includes an `Owner Record` section so you can create or open a linked owner record without crowding the card footer.
 - The node edit modal also includes a `Lease / Lessee Node` section for present-interest mineral owners. Use that button to create or reopen the terminal lessee node.
 - The node edit modal also includes an `Add NPRI` action for present-interest mineral owners. Use it to create a separate fixed or floating NPRI branch without reducing the mineral ownership total.
+- Fixed NPRIs now require one extra deed-reading choice: `Of burdened branch` when the deed fraction is tied to the grantor's branch, or `Of whole tract` when the fixed fraction is already stated against production from the land itself.
+- LANDroid allows NPRI title discrepancies to be entered. If fixed or floating NPRIs over-claim the burdened branch or royalty bucket, the affected Desk Map branch and NPRI cards turn red and the toolbar shows an NPRI title-discrepancy warning.
 - Current-owner cards now distinguish ownership from leasing:
   - blue `Present Owner` status for the mineral owner who still holds the interest
   - green `Leased` status when that owner has an active lease on file
@@ -93,6 +96,9 @@ Deleting a conveyance branch removes that branch and restores the deleted convey
 ### Empty-state behavior
 If a tract has no cards yet, start with `+ Add Root` or load a `.landroid` or `.csv` file.
 
+### Sample data readability
+The combinatorial `8 x 100` demo now uses conventional person names with no duplicate owner-card grantee names, so it is easier to scan when you are stress-testing Desk Map or Leasehold behavior.
+
 ### Presentation watermark
 LANDroid can display a small full-color prospect mark in the top navigation next to the `Desk Map` button so it stays visible across pages. This is visual context only and does not affect node behavior, math, or printing.
 
@@ -100,8 +106,9 @@ LANDroid can display a small full-color prospect mark in the top navigation next
 
 `Leasehold` is the acreage-first review surface for the same tract records you see in `Desk Map`.
 
-It now has two internal modes:
+It now has three internal modes:
 - `Overview` for acreage, unit setup, and numeric tract review
+- `Map` for a full-size leasehold hierarchy that starts at the unit, then tracts, then tract-specific owner / ORRI / WI branches
 - `Deck` for a card-based leasehold board that keeps ORRIs, WI / assignments, and transfer-order review off the Desk Map title tree
 
 ### What it does today
@@ -117,6 +124,8 @@ It now has two internal modes:
 - Calculates ORRI and pre-assignment NRI totals for gross `8/8`, working-interest, and net-revenue-interest ORRI burdens
 - Stacks multiple NRI-basis ORRIs one by one in effective-date order instead of flattening them into one combined carve
 - Tracks leasehold-side WI assignments at either unit or tract scope
+- Includes a full-size `Map` mode that keeps the title story and the payout story separate: Desk Map stays mineral/title, while Map shows the leased-side picture for the same tract
+- Uses `Unit -> Tract` as the overview shape, then expands the selected tract into owner branches with lease slices and branch-bound NPRIs, plus separate tract-level ORRI and WI branches
 - Includes a `Deck` mode that focuses on one tract at a time and shows the lessee-side cards beneath that leasehold estate, including retained WI and assignment cards
 - Includes a read-only transfer-order review surface in `Deck` that rolls up lease royalty, ORRI, retained WI, and assigned WI for the current focus
 - Lets unit-focus transfer-order rows carry saved `owner number`, `status`, and `notes` without changing the derived decimal math underneath
@@ -133,12 +142,15 @@ It now has two internal modes:
 - Leasehold math now aggregates all active owner leases in effective-date order and caps the leased total at the owner's current fraction
 - ORRI math now supports gross `8/8`, working-interest, and net-revenue-interest burden bases, with NRI-basis ORRIs stacking in effective-date order
 - If NPRI branches exist, Leasehold now derives separate fixed and floating NPRI payout rows and shows them in both the deck and the transfer-order ledger
+- Fixed NPRIs can now pay two different ways depending on the deed: branch-based fixed burdens scale with the leased slice of the burdened branch, while whole-tract fixed burdens are treated as fixed against tract production and only reduced when less than the full burdened branch is leased
+- NPRI over-claim situations remain warning-only for title-building. Desk Map highlights the affected branch in red; Leasehold still calculates the visible payout rows so the discrepancy can be reviewed and corrected later.
 - The first WI slice tracks retained and assigned WI and now shows the resulting transfer-order review decimals; the first saved payout-entry layer is unit-focus metadata only, not an editable decimal engine
 - WI over-assignment is currently warning-only instead of hard-blocked; retained WI is clamped at zero until the split is corrected
 - Floating-NPRI over-carves do not block editing, but they now keep unit-focus payout review on `Hold` so the payout sheet cannot be treated as ready by mistake
 - Assignments remain outside Desk Map and outside this first Leasehold tab pass
 - Unit focus is the editable payout-entry surface; tract focus stays read-only because those rows are partial tract slices rather than final unit payout rows
-- The `Deck` mode is the intended visual home for WI, assignments, transfer-order review, and later deeper payout workflows
+- `Map` mode is the intended visual home for the leasehold hierarchy itself
+- `Deck` mode is the intended visual home for WI, assignments, transfer-order review, and later deeper payout workflows
 
 ### Leasehold demo workspace
 - `Leasehold (8 Tracts)` loads a dedicated eight-tract unit demo

@@ -18,6 +18,8 @@ interface DeskMapCardProps {
   parentInitialFraction: string | null;
   relatedDocs: OwnershipNode[];
   leaseSummary: DeskMapPrimaryLeaseSummary | null;
+  npriDiscrepancyActive?: boolean;
+  npriDiscrepancyCount?: number;
   onEdit: (nodeId: string) => void;
   onConvey: (nodeId: string) => void;
   onPrecede: (nodeId: string) => void;
@@ -31,6 +33,8 @@ function DeskMapCard({
   parentInitialFraction,
   relatedDocs,
   leaseSummary,
+  npriDiscrepancyActive = false,
+  npriDiscrepancyCount = 0,
   onEdit,
   onConvey,
   onPrecede,
@@ -44,6 +48,7 @@ function DeskMapCard({
   const holdsInterest = node.type !== 'related' && remaining.greaterThan(0);
   const hasConveyedSome = initial.greaterThan(0) && remaining.lessThan(initial);
   const isFullyConveyed = initial.greaterThan(0) && remaining.isZero();
+  const hasNpriDiscrepancy = npriDiscrepancyActive || npriDiscrepancyCount > 0;
 
   const relativeShare = parentInitialFraction
     ? (() => {
@@ -63,21 +68,27 @@ function DeskMapCard({
       <div
         className={`
           group w-72 rounded-lg border-2 shadow-md cursor-pointer transition-all
-          hover:shadow-lg hover:border-leather
-          ${isActive
+          hover:shadow-lg ${hasNpriDiscrepancy ? 'hover:border-seal' : 'hover:border-leather'}
+          ${hasNpriDiscrepancy
+            ? 'border-seal ring-2 ring-seal/20 shadow-[0_10px_24px_rgba(127,29,29,0.20)]'
+            : isActive
             ? 'border-leather ring-2 ring-gold/50'
             : holdsInterest
               ? 'border-leather/60 shadow-[0_8px_18px_rgba(92,61,46,0.12)]'
               : 'border-ledger-line'}
           ${isFullyConveyed ? 'opacity-75' : ''}
-          bg-parchment text-ink
+          ${hasNpriDiscrepancy ? 'bg-seal/5 text-ink' : 'bg-parchment text-ink'}
         `}
         onClick={() => onEdit(node.id)}
       >
         {/* Header */}
         <div
           className={`px-3 py-1.5 border-b border-ledger-line rounded-t-lg ${
-            holdsInterest ? 'bg-gold/10' : 'bg-parchment-dark'
+            hasNpriDiscrepancy
+              ? 'bg-seal/10'
+              : holdsInterest
+                ? 'bg-gold/10'
+                : 'bg-parchment-dark'
           }`}
         >
           <div className="flex items-center justify-between">
@@ -101,6 +112,11 @@ function DeskMapCard({
               {leaseSummary && holdsInterest && (
                 <span className="rounded-full border border-emerald-200 bg-emerald-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-emerald-800">
                   Leased
+                </span>
+              )}
+              {hasNpriDiscrepancy && (
+                <span className="rounded-full border border-seal/25 bg-seal/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-seal">
+                  NPRI Issue
                 </span>
               )}
               {(node.date || node.fileDate) && (
@@ -144,6 +160,12 @@ function DeskMapCard({
             >
               View PDF
             </button>
+          )}
+          {hasNpriDiscrepancy && (
+            <div className="mt-2 rounded-md border border-seal/25 bg-seal/10 px-2 py-1.5 text-[10px] leading-4 text-seal">
+              NPRI burden discrepancy on this branch. Review the red NPRI card
+              {npriDiscrepancyCount > 1 ? `s (${npriDiscrepancyCount})` : ''}.
+            </div>
           )}
         </div>
 
@@ -205,6 +227,8 @@ function deskMapCardPropsAreEqual(
     previous.parentInitialFraction === next.parentInitialFraction &&
     previous.relatedDocs === next.relatedDocs &&
     previous.leaseSummary === next.leaseSummary &&
+    previous.npriDiscrepancyActive === next.npriDiscrepancyActive &&
+    previous.npriDiscrepancyCount === next.npriDiscrepancyCount &&
     previous.onEdit === next.onEdit &&
     previous.onConvey === next.onConvey &&
     previous.onPrecede === next.onPrecede &&

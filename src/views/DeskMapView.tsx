@@ -11,6 +11,10 @@ import { useOwnerStore } from '../store/owner-store';
 import { useWorkspaceStore } from '../store/workspace-store';
 import { d } from '../engine/decimal';
 import { formatAsFraction } from '../engine/fraction-display';
+import {
+  findNpriBranchDiscrepancies,
+  type NpriBranchDiscrepancy,
+} from '../engine/math-engine';
 import DeskMapCard from '../components/deskmap/DeskMapCard';
 import DeskMapLeaseCard from '../components/deskmap/DeskMapLeaseCard';
 import DeskMapNpriCard from '../components/deskmap/DeskMapNpriCard';
@@ -31,7 +35,12 @@ import ConveyModal from '../components/modals/ConveyModal';
 import PredecessorModal from '../components/modals/PredecessorModal';
 import AttachDocModal from '../components/modals/AttachDocModal';
 import OwnershipNodeEditorModals from '../components/shared/OwnershipNodeEditorModals';
-import { createBlankNode, isNpriNode } from '../types/node';
+import {
+  createBlankNode,
+  isNpriNode,
+  type DeskMap,
+  type OwnershipNode,
+} from '../types/node';
 import type { NodeEditorRoute } from '../utils/node-editor-route';
 import { resolveNodeEditorRoute } from '../utils/node-editor-route';
 
@@ -41,6 +50,9 @@ interface TreeBranchProps {
   tree: DeskMapTreeNode;
   parentInitialFraction: string | null;
   leaseSummaryByNodeId: Map<string, DeskMapPrimaryLeaseSummary>;
+  npriDiscrepancyNodeIds: Set<string>;
+  npriDiscrepancyByNpriNodeId: Map<string, NpriBranchDiscrepancy>;
+  npriDiscrepancyCountByBranchNodeId: Map<string, number>;
   onEdit: (id: string) => void;
   onConvey: (id: string) => void;
   onPrecede: (id: string) => void;
@@ -53,6 +65,9 @@ function TreeBranchComponent({
   tree,
   parentInitialFraction,
   leaseSummaryByNodeId,
+  npriDiscrepancyNodeIds,
+  npriDiscrepancyByNpriNodeId,
+  npriDiscrepancyCountByBranchNodeId,
   onEdit,
   onConvey,
   onPrecede,
@@ -77,6 +92,7 @@ function TreeBranchComponent({
         <DeskMapNpriCard
           node={tree.node}
           relatedDocs={tree.relatedDocs}
+          discrepancy={npriDiscrepancyByNpriNodeId.get(tree.node.id) ?? null}
           onEdit={onEdit}
           onConvey={onConvey}
           onPrecede={onPrecede}
@@ -90,6 +106,10 @@ function TreeBranchComponent({
           parentInitialFraction={parentInitialFraction}
           relatedDocs={tree.relatedDocs}
           leaseSummary={leaseSummaryByNodeId.get(tree.node.id) ?? null}
+          npriDiscrepancyActive={npriDiscrepancyNodeIds.has(tree.node.id)}
+          npriDiscrepancyCount={
+            npriDiscrepancyCountByBranchNodeId.get(tree.node.id) ?? 0
+          }
           onEdit={onEdit}
           onConvey={onConvey}
           onPrecede={onPrecede}
@@ -107,6 +127,9 @@ function TreeBranchComponent({
               tree={child}
               parentInitialFraction={tree.node.initialFraction}
               leaseSummaryByNodeId={leaseSummaryByNodeId}
+              npriDiscrepancyNodeIds={npriDiscrepancyNodeIds}
+              npriDiscrepancyByNpriNodeId={npriDiscrepancyByNpriNodeId}
+              npriDiscrepancyCountByBranchNodeId={npriDiscrepancyCountByBranchNodeId}
               onEdit={onEdit}
               onConvey={onConvey}
               onPrecede={onPrecede}
@@ -129,6 +152,10 @@ function treeBranchPropsAreEqual(
     previous.tree === next.tree &&
     previous.parentInitialFraction === next.parentInitialFraction &&
     previous.leaseSummaryByNodeId === next.leaseSummaryByNodeId &&
+    previous.npriDiscrepancyNodeIds === next.npriDiscrepancyNodeIds &&
+    previous.npriDiscrepancyByNpriNodeId === next.npriDiscrepancyByNpriNodeId &&
+    previous.npriDiscrepancyCountByBranchNodeId ===
+      next.npriDiscrepancyCountByBranchNodeId &&
     previous.onEdit === next.onEdit &&
     previous.onConvey === next.onConvey &&
     previous.onPrecede === next.onPrecede &&
@@ -260,6 +287,117 @@ function formatCoveragePercent(value: string) {
   return `${d(value).times(100).toFixed(2)}%`;
 }
 
+export interface DeskMapOwnerSearchMatch {
+  deskMapId: string;
+  deskMapName: string;
+  nodeId: string;
+  ownerName: string;
+}
+
+function isSearchableDeskMapOwnerNode(node: OwnershipNode): boolean {
+  return node.type === 'conveyance' && node.interestClass === 'mineral';
+}
+
+export function buildDeskMapOwnerSearchMatches({
+  deskMaps,
+  nodes,
+  query,
+}: {
+  deskMaps: DeskMap[];
+  nodes: OwnershipNode[];
+  query: string;
+}): DeskMapOwnerSearchMatch[] {
+  const normalizedQuery = query.trim().toLowerCase();
+  if (!normalizedQuery) {
+    return [];
+  }
+
+  const nodeById = new Map(nodes.map((node) => [node.id, node]));
+  const matches: DeskMapOwnerSearchMatch[] = [];
+
+  for (const deskMap of deskMaps) {
+    for (const nodeId of deskMap.nodeIds) {
+      const node = nodeById.get(nodeId);
+      if (!node || !isSearchableDeskMapOwnerNode(node)) {
+        continue;
+      }
+
+      const ownerName = node.grantee.trim();
+      if (!ownerName || !ownerName.toLowerCase().includes(normalizedQuery)) {
+        continue;
+      }
+
+      matches.push({
+        deskMapId: deskMap.id,
+        deskMapName: deskMap.name,
+        nodeId: node.id,
+        ownerName,
+      });
+    }
+  }
+
+  return matches;
+}
+
+interface NpriBranchDiscrepancyHighlightState {
+  discrepancies: NpriBranchDiscrepancy[];
+  affectedNodeIds: Set<string>;
+  discrepancyByNpriNodeId: Map<string, NpriBranchDiscrepancy>;
+  discrepancyCountByBranchNodeId: Map<string, number>;
+}
+
+function buildNpriBranchDiscrepancyHighlightState(
+  nodes: OwnershipNode[]
+): NpriBranchDiscrepancyHighlightState {
+  const discrepancies = findNpriBranchDiscrepancies(nodes);
+  const childrenByParentId = new Map<string, OwnershipNode[]>();
+
+  nodes.forEach((node) => {
+    if (!node.parentId || node.parentId === 'unlinked') {
+      return;
+    }
+    const children = childrenByParentId.get(node.parentId) ?? [];
+    children.push(node);
+    childrenByParentId.set(node.parentId, children);
+  });
+
+  const affectedNodeIds = new Set<string>();
+  const discrepancyByNpriNodeId = new Map<string, NpriBranchDiscrepancy>();
+  const discrepancyCountByBranchNodeId = new Map<string, number>();
+
+  const markBranch = (rootNodeId: string) => {
+    const stack = [rootNodeId];
+
+    while (stack.length > 0) {
+      const nodeId = stack.pop()!;
+      if (affectedNodeIds.has(nodeId)) {
+        continue;
+      }
+      affectedNodeIds.add(nodeId);
+      stack.push(...(childrenByParentId.get(nodeId) ?? []).map((child) => child.id));
+    }
+  };
+
+  discrepancies.forEach((discrepancy) => {
+    markBranch(discrepancy.burdenedBranchNodeId);
+    discrepancyCountByBranchNodeId.set(
+      discrepancy.burdenedBranchNodeId,
+      (discrepancyCountByBranchNodeId.get(discrepancy.burdenedBranchNodeId) ?? 0) + 1
+    );
+    discrepancy.npriNodeIds.forEach((nodeId) => {
+      affectedNodeIds.add(nodeId);
+      discrepancyByNpriNodeId.set(nodeId, discrepancy);
+    });
+  });
+
+  return {
+    discrepancies,
+    affectedNodeIds,
+    discrepancyByNpriNodeId,
+    discrepancyCountByBranchNodeId,
+  };
+}
+
 function describeCoverageDelta(
   value: string,
   {
@@ -327,7 +465,9 @@ export default function DeskMapView() {
   const leases = useOwnerStore((state) => state.leases);
   const nodes = useWorkspaceStore((s) => s.nodes);
   const deskMaps = useWorkspaceStore((s) => s.deskMaps);
+  const activeNodeId = useWorkspaceStore((s) => s.activeNodeId);
   const setActiveNode = useWorkspaceStore((s) => s.setActiveNode);
+  const setActiveDeskMap = useWorkspaceStore((s) => s.setActiveDeskMap);
   const removeNode = useWorkspaceStore((s) => s.removeNode);
   const addNode = useWorkspaceStore((s) => s.addNode);
   const createDeskMap = useWorkspaceStore((s) => s.createDeskMap);
@@ -340,6 +480,8 @@ export default function DeskMapView() {
   const [attachDocParentId, setAttachDocParentId] = useState<string | null>(null);
   const [npriParentId, setNpriParentId] = useState<string | null>(null);
   const [pdfViewNodeId, setPdfViewNodeId] = useState<string | null>(null);
+  const [ownerSearchQuery, setOwnerSearchQuery] = useState('');
+  const [ownerSearchMatchIndex, setOwnerSearchMatchIndex] = useState(0);
 
   const hydrated = useWorkspaceStore((s) => s._hydrated);
 
@@ -424,9 +566,63 @@ export default function DeskMapView() {
     () => calculateDeskMapCoverageSummary(visibleNodes, activeLeasesByOwnerId),
     [activeLeasesByOwnerId, visibleNodes]
   );
+  const npriDiscrepancyState = useMemo(
+    () => buildNpriBranchDiscrepancyHighlightState(nodes),
+    [nodes]
+  );
+  const visibleNpriDiscrepancies = useMemo(() => {
+    if (!activeDeskMap) {
+      return [];
+    }
+    const visibleNodeIds = new Set(activeDeskMap.nodeIds);
+    return npriDiscrepancyState.discrepancies.filter(
+      (discrepancy) =>
+        visibleNodeIds.has(discrepancy.burdenedBranchNodeId)
+        || discrepancy.npriNodeIds.some((nodeId) => visibleNodeIds.has(nodeId))
+    );
+  }, [activeDeskMap, npriDiscrepancyState]);
   const trees = useMemo(() => buildDeskMapTree(visibleNodes), [visibleNodes]);
+  const ownerSearchMatches = useMemo(
+    () => buildDeskMapOwnerSearchMatches({ deskMaps, nodes, query: ownerSearchQuery }),
+    [deskMaps, nodes, ownerSearchQuery]
+  );
+  const activeOwnerSearchMatch =
+    ownerSearchMatches.length > 0
+      ? ownerSearchMatches[
+          Math.min(ownerSearchMatchIndex, ownerSearchMatches.length - 1)
+        ] ?? ownerSearchMatches[0]
+      : null;
   const conveyParent = conveyParentId ? nodeById.get(conveyParentId) ?? null : null;
   const precedeNode = precedeNodeId ? nodeById.get(precedeNodeId) ?? null : null;
+
+  useEffect(() => {
+    setOwnerSearchMatchIndex(0);
+  }, [ownerSearchQuery]);
+
+  useEffect(() => {
+    if (ownerSearchMatchIndex < ownerSearchMatches.length || ownerSearchMatches.length === 0) {
+      return;
+    }
+    setOwnerSearchMatchIndex(0);
+  }, [ownerSearchMatchIndex, ownerSearchMatches.length]);
+
+  useEffect(() => {
+    if (!activeOwnerSearchMatch) {
+      return;
+    }
+    if (activeDeskMapId !== activeOwnerSearchMatch.deskMapId) {
+      setActiveDeskMap(activeOwnerSearchMatch.deskMapId);
+    }
+    if (activeNodeId !== activeOwnerSearchMatch.nodeId) {
+      setActiveNode(activeOwnerSearchMatch.nodeId);
+    }
+  }, [
+    activeDeskMapId,
+    activeNodeId,
+    activeOwnerSearchMatch,
+    setActiveDeskMap,
+    setActiveNode,
+  ]);
 
   const handleEdit = useCallback((id: string) => {
     const node = nodeById.get(id) ?? null;
@@ -486,6 +682,17 @@ export default function DeskMapView() {
     setEditorRoute({ kind: 'node', nodeId: id });
   }, [addNode, addNodeToActiveDeskMap, createDeskMap, deskMaps.length, setActiveNode]);
 
+  const cycleOwnerSearchMatch = useCallback((direction: 1 | -1) => {
+    setOwnerSearchMatchIndex((currentIndex) => {
+      if (ownerSearchMatches.length === 0) {
+        return 0;
+      }
+      return (
+        (currentIndex + direction + ownerSearchMatches.length) % ownerSearchMatches.length
+      );
+    });
+  }, [ownerSearchMatches.length]);
+
   return (
     <div className="w-full h-full relative flex flex-col">
       {/* Desk map tabs */}
@@ -509,6 +716,119 @@ export default function DeskMapView() {
             Add more than one root when title starts from separate families. Temporary
             coverage over 100% is okay until you reconcile farther back in title.
           </div>
+
+          <div className="space-y-1.5">
+            <label className="block">
+              <span className="text-[9px] font-semibold uppercase tracking-wider text-ink-light">
+                Find Mineral Owner
+              </span>
+              <div className="mt-1.5 flex items-center gap-2">
+                <input
+                  value={ownerSearchQuery}
+                  onChange={(event) => setOwnerSearchQuery(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key !== 'Enter') {
+                      return;
+                    }
+                    event.preventDefault();
+                    cycleOwnerSearchMatch(event.shiftKey ? -1 : 1);
+                  }}
+                  placeholder="Type owner name..."
+                  className="min-w-0 flex-1 rounded-lg border border-ledger-line bg-white px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-leather"
+                />
+                {ownerSearchQuery.trim().length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setOwnerSearchQuery('')}
+                    className="rounded-lg border border-ledger-line px-2.5 py-2 text-[10px] font-semibold uppercase tracking-wider text-ink-light transition-colors hover:bg-parchment-dark/70"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+            </label>
+
+            {ownerSearchQuery.trim().length > 0 && (
+              <div className="rounded-lg border border-ledger-line bg-parchment-dark/35 px-2.5 py-2">
+                {activeOwnerSearchMatch ? (
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="text-[10px] font-semibold text-ink">
+                        {ownerSearchMatchIndex + 1} of {ownerSearchMatches.length}
+                      </div>
+                      {ownerSearchMatches.length > 1 && (
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => cycleOwnerSearchMatch(-1)}
+                            className="rounded-md border border-ledger-line px-2 py-1 text-[9px] font-semibold uppercase tracking-wider text-ink-light transition-colors hover:bg-parchment-dark/70"
+                          >
+                            Prev
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => cycleOwnerSearchMatch(1)}
+                            className="rounded-md border border-ledger-line px-2 py-1 text-[9px] font-semibold uppercase tracking-wider text-ink-light transition-colors hover:bg-parchment-dark/70"
+                          >
+                            Next
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    <div className="text-[11px] font-semibold text-ink">
+                      {activeOwnerSearchMatch.ownerName}
+                    </div>
+                    <div className="text-[9px] text-ink-light">
+                      Jumping to {activeOwnerSearchMatch.deskMapName}
+                    </div>
+                    <div className="max-h-44 space-y-1 overflow-y-auto pr-0.5">
+                      {ownerSearchMatches.map((match, index) => {
+                        const isSelected = index === ownerSearchMatchIndex;
+
+                        return (
+                          <button
+                            key={`${match.deskMapId}-${match.nodeId}`}
+                            type="button"
+                            onClick={() => setOwnerSearchMatchIndex(index)}
+                            className={`w-full rounded-md border px-2 py-1.5 text-left transition-colors ${
+                              isSelected
+                                ? 'border-leather bg-leather/10'
+                                : 'border-ledger-line bg-parchment/70 hover:bg-parchment-dark/60'
+                            }`}
+                          >
+                            <div className="text-[10px] font-semibold text-ink">
+                              {match.ownerName}
+                            </div>
+                            <div className="text-[9px] text-ink-light">
+                              {match.deskMapName}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-[10px] text-ink-light">
+                    No mineral owners matched that search.
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {visibleNpriDiscrepancies.length > 0 && (
+            <div className="rounded-lg border border-seal/30 bg-seal/10 px-2.5 py-2 text-[10px] leading-4 text-seal">
+              <div className="font-semibold uppercase tracking-wider">
+                NPRI title discrepancy
+              </div>
+              <div className="mt-1">
+                {visibleNpriDiscrepancies.length} branch issue
+                {visibleNpriDiscrepancies.length === 1 ? '' : 's'} on this tract.
+                Affected branch cards and NPRI cards are highlighted red so the
+                discrepancy can be fixed later without blocking title entry.
+              </div>
+            </div>
+          )}
 
           <div className="space-y-1.5">
             <div className="text-[9px] font-semibold uppercase tracking-wider text-ink-light">
@@ -580,6 +900,13 @@ export default function DeskMapView() {
                   tree={tree}
                   parentInitialFraction={null}
                   leaseSummaryByNodeId={leaseSummaryByNodeId}
+                  npriDiscrepancyNodeIds={npriDiscrepancyState.affectedNodeIds}
+                  npriDiscrepancyByNpriNodeId={
+                    npriDiscrepancyState.discrepancyByNpriNodeId
+                  }
+                  npriDiscrepancyCountByBranchNodeId={
+                    npriDiscrepancyState.discrepancyCountByBranchNodeId
+                  }
                   onEdit={handleEdit}
                   onConvey={handleConvey}
                   onPrecede={handlePrecede}

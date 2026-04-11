@@ -135,7 +135,7 @@ The full audit is in `.claude/plans/wiggly-frolicking-tower.md` (see plan-mode f
 - **Audit finding #1 — lease-overlap clipping remains warning-only.** `src/components/deskmap/deskmap-coverage.ts` now returns overlap warnings alongside the clipped allocation, and the leasehold deck surfaces them. The remaining limitation is that later leases are still clipped rather than blocked or escalated for decision.
 - **Audit finding #3 — NRI-basis ORRI stacking now iterates in effective-date order.** `src/components/leasehold/leasehold-summary.ts` now applies each NRI-basis ORRI one by one after gross-basis and WI-basis burdens, using effective date first and then source document / record ID as a stable fallback.
 - **Audit finding #4 — safe-zero coercion still exists at display boundaries.** `src/utils/interest-string.ts`, `src/engine/decimal.ts`. The strict variant is now wired through lease, ORRI, and assignment save paths, but malformed persisted values still coerce to 0 when read through lenient display helpers.
-- **Audit finding #5 — CLOSED in the current working tree.** `royaltyKind` (fixed vs floating NPRI) now drives leasehold payout math end-to-end: floating NPRIs burden lease royalty, fixed NPRIs burden gross leased production, NPRI rows now appear in the deck and transfer-order ledger, and fixed NPRIs reduce the NRI base before NRI-basis ORRIs are calculated.
+- **Audit finding #5 — CLOSED in the current working tree.** `royaltyKind` (fixed vs floating NPRI) now drives leasehold payout math end-to-end, and fixed NPRIs now carry a second deed-basis discriminator so LANDroid can distinguish branch-based fixed burdens from whole-tract fixed burdens. NPRI rows now appear in the deck and transfer-order ledger, fixed NPRIs reduce the NRI base before NRI-basis ORRIs are calculated, and NPRI branch over-claims are warning-only red Desk Map highlights instead of blocked data entry.
 - **Audit finding #6 — lease status normalization is now centralized for the Texas baseline.** New lease edits use a canonical status list (`Active`, `Expired`, `Released`, `Terminated`, `Inactive`, `Dead`), coverage math keys off the shared type-layer classifier, and legacy non-canonical text is preserved instead of being silently discarded. Richer jurisdiction-specific status regimes remain a Phase 2 concern.
 - **Audit finding #9 — negative pre-WI residual is warning-only.** `src/components/leasehold/leasehold-summary.ts` now sets `overBurdened`, and `src/views/LeaseholdView.tsx` surfaces it. The remaining convention is still a warning-only clamp to zero.
 
@@ -189,12 +189,12 @@ The other audit findings (#7 lexical date sort, #8 `formatAsFraction` float fall
 - **Do not** assume federal code exists. It does not. Anything federal-specific is a Phase 2 design question, not a bug fix.
 - **Do not** treat the `tribal` enum value as live scope. It exists for completeness; the user has ruled it out permanently.
 - **Do not** introduce a second decimal library or any float-based math seam.
-- **Do not** delete `royaltyKind` without the user's explicit go-ahead — it's preserved as deed text and now drives fixed/floating NPRI payout math.
+- **Do not** delete `royaltyKind` or `fixedRoyaltyBasis` without the user's explicit go-ahead — they are preserved as deed-text interpretation fields and now drive NPRI payout math.
 
 ### 10. Recommended next steps (in order)
 
 1. **Run the verification list in §8.** Confirm the Texas baseline is actually green before moving on.
-2. **Verify the new fixed/floating NPRI payout layer against company convention.** Fixed and floating NPRIs now both run end-to-end; the next task is reviewer confirmation, not whether to start.
+2. **Verify the fixed-NPRI deed-basis and red-branch discrepancy convention against company practice.** Fixed NPRIs now distinguish branch-based burdens from whole-tract fixed burdens, and over-claim cases are preserved as warning-only title discrepancies.
 3. **Keep historical audit context in `docs/archive/`, but use `LANDMAN-MATH-REFERENCE.md` and this file as current truth.**
 4. **Then — and only then — begin Phase 2 BLM scaffolding.** Start with `src/types/federal-lease.ts` containing the discriminated `FederalLeaseData` interface (subtype, status, MLRS + legacy serial, surface managing agency, acquiring authority, stipulations array, consent documents array). Use the user's existing ~10-lease CA as the first real fixture. Do **not** introduce IRA 2022 dollar constants until verified against primary sources.
 

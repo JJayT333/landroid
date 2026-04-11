@@ -1,4 +1,12 @@
-import { useEffect, useMemo, useState, type KeyboardEvent } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+} from 'react';
 import { d } from '../engine/decimal';
 import { formatAsFraction } from '../engine/fraction-display';
 import { isNpriNode } from '../types/node';
@@ -23,6 +31,8 @@ import {
   type LeaseholdDecimalRow,
   type LeaseholdNpriSummary,
   type LeaseholdOrriSummary,
+  type LeaseholdOwnerLeaseSummary,
+  type LeaseholdOwnerSummary,
   type LeaseholdTractSummary,
   type LeaseholdTransferOrderReview,
 } from '../components/leasehold/leasehold-summary';
@@ -68,6 +78,158 @@ function formatNpriKindLabel(value: LeaseholdNpriSummary['royaltyKind']) {
   return value === 'floating' ? 'Floating NPRI' : 'Fixed NPRI';
 }
 
+function formatFixedNpriBasisLabel(value: LeaseholdNpriSummary['fixedRoyaltyBasis']) {
+  if (value === 'whole_tract') {
+    return 'Whole tract basis';
+  }
+  return 'Branch basis';
+}
+
+interface LeaseholdGraphOwnerBranch {
+  owner: LeaseholdOwnerSummary;
+  leaseSlices: LeaseholdOwnerLeaseSummary[];
+  npris: LeaseholdNpriSummary[];
+}
+
+interface LeaseholdGraphTractDetail {
+  ownerBranches: LeaseholdGraphOwnerBranch[];
+  orris: LeaseholdOrriSummary[];
+  assignments: LeaseholdAssignmentSummary[];
+}
+
+function compareLeaseholdGraphText(left: string, right: string) {
+  return left.localeCompare(right, undefined, { sensitivity: 'base' });
+}
+
+function compareDecimalStringsDesc(left: string, right: string) {
+  return d(right).comparedTo(d(left));
+}
+
+function sortLeaseholdGraphLeaseSlices(leaseSlices: LeaseholdOwnerLeaseSummary[]) {
+  return [...leaseSlices].sort((left, right) => {
+    const leasedFractionDiff = compareDecimalStringsDesc(
+      left.leasedFraction,
+      right.leasedFraction
+    );
+    if (leasedFractionDiff !== 0) {
+      return leasedFractionDiff;
+    }
+
+    const effectiveDateDiff = right.leaseEffectiveDate.localeCompare(left.leaseEffectiveDate);
+    if (effectiveDateDiff !== 0) {
+      return effectiveDateDiff;
+    }
+
+    return compareLeaseholdGraphText(
+      left.leaseName || left.lessee,
+      right.leaseName || right.lessee
+    );
+  });
+}
+
+export function buildLeaseholdGraphTractDetail({
+  tract,
+  unitSummary,
+}: {
+  tract: LeaseholdTractSummary;
+  unitSummary: ReturnType<typeof buildLeaseholdUnitSummary>;
+}): LeaseholdGraphTractDetail {
+  const nprisByBranchNodeId = new Map<string, LeaseholdNpriSummary[]>();
+
+  unitSummary.npris
+    .filter((npri) => npri.deskMapId === tract.deskMapId)
+    .forEach((npri) => {
+      if (!npri.burdenedBranchNodeId) {
+        return;
+      }
+
+      const current = nprisByBranchNodeId.get(npri.burdenedBranchNodeId) ?? [];
+      current.push(npri);
+      nprisByBranchNodeId.set(npri.burdenedBranchNodeId, current);
+    });
+
+  const ownerBranches = [...tract.owners]
+    .map((owner) => ({
+      owner,
+      leaseSlices: sortLeaseholdGraphLeaseSlices(owner.leaseSlices),
+      npris: [...(nprisByBranchNodeId.get(owner.nodeId) ?? [])].sort((left, right) => {
+        const includedDiff = Number(right.includedInMath) - Number(left.includedInMath);
+        if (includedDiff !== 0) {
+          return includedDiff;
+        }
+
+        const burdenDiff = compareDecimalStringsDesc(
+          left.tractBurdenRate,
+          right.tractBurdenRate
+        );
+        if (burdenDiff !== 0) {
+          return burdenDiff;
+        }
+
+        return compareLeaseholdGraphText(left.payee, right.payee);
+      }),
+    }))
+    .sort((left, right) => {
+      const leasedFractionDiff = compareDecimalStringsDesc(
+        left.owner.leasedFraction,
+        right.owner.leasedFraction
+      );
+      if (leasedFractionDiff !== 0) {
+        return leasedFractionDiff;
+      }
+
+      const fractionDiff = compareDecimalStringsDesc(left.owner.fraction, right.owner.fraction);
+      if (fractionDiff !== 0) {
+        return fractionDiff;
+      }
+
+      return compareLeaseholdGraphText(left.owner.ownerName, right.owner.ownerName);
+    });
+
+  const orris = unitSummary.orris
+    .filter(
+      (orri) =>
+        orri.includedInMath && (orri.scope === 'unit' || orri.deskMapId === tract.deskMapId)
+    )
+    .sort((left, right) => {
+      if (left.scope !== right.scope) {
+        return left.scope === 'tract' ? -1 : 1;
+      }
+
+      const decimalDiff = compareDecimalStringsDesc(left.unitDecimal, right.unitDecimal);
+      if (decimalDiff !== 0) {
+        return decimalDiff;
+      }
+
+      return compareLeaseholdGraphText(left.payee, right.payee);
+    });
+
+  const assignments = unitSummary.assignments
+    .filter(
+      (assignment) =>
+        assignment.includedInMath
+        && (assignment.scope === 'unit' || assignment.deskMapId === tract.deskMapId)
+    )
+    .sort((left, right) => {
+      if (left.scope !== right.scope) {
+        return left.scope === 'tract' ? -1 : 1;
+      }
+
+      const decimalDiff = compareDecimalStringsDesc(left.unitDecimal, right.unitDecimal);
+      if (decimalDiff !== 0) {
+        return decimalDiff;
+      }
+
+      return compareLeaseholdGraphText(left.assignee, right.assignee);
+    });
+
+  return {
+    ownerBranches,
+    orris,
+    assignments,
+  };
+}
+
 export function getTransferOrderEntryDisplayStatus(
   status: LeaseholdTransferOrderStatus | null | undefined,
   payoutHold: boolean
@@ -108,7 +270,7 @@ function SummaryCard({
   );
 }
 
-type LeaseholdMode = 'overview' | 'deck';
+type LeaseholdMode = 'overview' | 'map' | 'deck';
 
 function LeaseholdTractCard({
   tract,
@@ -542,7 +704,7 @@ function LeaseholdDeckModeToggle({
 }) {
   return (
     <div className="inline-flex rounded-2xl border border-ledger-line bg-parchment-dark p-1 shadow-sm">
-      {(['overview', 'deck'] as const).map((option) => (
+      {(['overview', 'map', 'deck'] as const).map((option) => (
         <button
           key={option}
           type="button"
@@ -553,10 +715,1030 @@ function LeaseholdDeckModeToggle({
               : 'text-ink-light hover:text-ink'
           }`}
         >
-          {option === 'overview' ? 'Overview' : 'Deck'}
+          {option === 'overview' ? 'Overview' : option === 'map' ? 'Map' : 'Deck'}
         </button>
       ))}
     </div>
+  );
+}
+
+function LeaseholdMapPanZoomContainer({ children }: { children: ReactNode }) {
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(0.8);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const dragging = useRef(false);
+  const startPos = useRef({ x: 0, y: 0 });
+  const lastPos = useRef({ x: 0, y: 0 });
+  const hasDragged = useRef(false);
+  const pendingPointerId = useRef<number | null>(null);
+
+  const handlePointerDown = useCallback((e: React.PointerEvent) => {
+    if (e.button !== 0 && e.button !== 1) {
+      return;
+    }
+
+    dragging.current = true;
+    hasDragged.current = false;
+    pendingPointerId.current = e.pointerId;
+    startPos.current = { x: e.clientX, y: e.clientY };
+    lastPos.current = { x: e.clientX, y: e.clientY };
+  }, []);
+
+  const handlePointerMove = useCallback((e: React.PointerEvent) => {
+    if (!dragging.current) {
+      return;
+    }
+
+    const dx = e.clientX - startPos.current.x;
+    const dy = e.clientY - startPos.current.y;
+    if (!hasDragged.current && (Math.abs(dx) > 3 || Math.abs(dy) > 3)) {
+      hasDragged.current = true;
+      if (pendingPointerId.current !== null) {
+        const element = containerRef.current;
+        if (element) {
+          element.setPointerCapture(pendingPointerId.current);
+        }
+        pendingPointerId.current = null;
+      }
+    }
+
+    if (!hasDragged.current) {
+      return;
+    }
+
+    const moveX = e.clientX - lastPos.current.x;
+    const moveY = e.clientY - lastPos.current.y;
+    lastPos.current = { x: e.clientX, y: e.clientY };
+    setPan((currentPan) => ({ x: currentPan.x + moveX, y: currentPan.y + moveY }));
+  }, []);
+
+  const handlePointerUp = useCallback(() => {
+    dragging.current = false;
+    pendingPointerId.current = null;
+  }, []);
+
+  useEffect(() => {
+    const element = containerRef.current;
+    if (!element) {
+      return;
+    }
+
+    const handleWheel = (event: WheelEvent) => {
+      event.preventDefault();
+      const rect = element.getBoundingClientRect();
+      const mouseX = event.clientX - rect.left;
+      const mouseY = event.clientY - rect.top;
+
+      setZoom((currentZoom) => {
+        const factor = event.deltaY > 0 ? 0.92 : 1.08;
+        const nextZoom = Math.max(0.1, Math.min(3, currentZoom * factor));
+
+        setPan((currentPan) => ({
+          x: mouseX - ((mouseX - currentPan.x) / currentZoom) * nextZoom,
+          y: mouseY - ((mouseY - currentPan.y) / currentZoom) * nextZoom,
+        }));
+
+        return nextZoom;
+      });
+    };
+
+    element.addEventListener('wheel', handleWheel, { passive: false });
+    return () => element.removeEventListener('wheel', handleWheel);
+  }, []);
+
+  const handleClickCapture = useCallback((e: React.MouseEvent) => {
+    if (hasDragged.current) {
+      e.stopPropagation();
+      e.preventDefault();
+      hasDragged.current = false;
+    }
+  }, []);
+
+  return (
+    <div
+      ref={containerRef}
+      className="relative z-10 h-full w-full cursor-grab overflow-hidden select-none touch-none active:cursor-grabbing"
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerUp}
+      onClickCapture={handleClickCapture}
+      onDragStart={(e) => e.preventDefault()}
+    >
+      <div
+        className="inline-block p-12"
+        style={{
+          transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+          transformOrigin: '0 0',
+        }}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function LeaseholdGraphUnitCard({
+  unit,
+  unitSummary,
+}: {
+  unit: LeaseholdUnit;
+  unitSummary: ReturnType<typeof buildLeaseholdUnitSummary>;
+}) {
+  return (
+    <div className="w-80 rounded-lg border-2 border-emerald-200 bg-emerald-50 text-ink shadow-[0_8px_18px_rgba(5,150,105,0.14)]">
+      <div className="rounded-t-lg border-b border-emerald-200 bg-emerald-100/80 px-4 py-2">
+        <div className="flex items-center justify-between gap-2">
+          <span className="truncate text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-900">
+            Leasehold Unit
+          </span>
+          <span className="rounded-full border border-emerald-300 bg-white/80 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-emerald-900">
+            Root
+          </span>
+        </div>
+        <div className="mt-1 text-lg font-display font-bold text-emerald-950">
+          {unit.name || 'Unit-wide Leasehold'}
+        </div>
+        <div className="mt-1 text-xs text-emerald-900/80">
+          {unit.operator || unitSummary.uniqueLessees[0] || 'Operator / lessee not set'}
+        </div>
+      </div>
+      <div className="space-y-3 px-4 py-4 text-sm">
+        <div className="text-[11px] leading-5 text-emerald-900/85">
+          Unit overview only. Click a tract below to open the owner-branch and lease-slice detail
+          tree.
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          <span className="rounded-full border border-emerald-200 bg-white/80 px-2 py-0.5 text-[10px] text-emerald-900">
+            {unitSummary.tractCount} tract{unitSummary.tractCount === 1 ? '' : 's'}
+          </span>
+          <span className="rounded-full border border-emerald-200 bg-white/80 px-2 py-0.5 text-[10px] text-emerald-900">
+            Pooled {formatAcres(unitSummary.totalPooledAcres)} ac
+          </span>
+          <span className="rounded-full border border-emerald-200 bg-white/80 px-2 py-0.5 text-[10px] text-emerald-900">
+            Royalty {formatPercent(unitSummary.totalRoyaltyDecimal)}
+          </span>
+          <span className="rounded-full border border-emerald-200 bg-white/80 px-2 py-0.5 text-[10px] text-emerald-900">
+            NPRI {formatPercent(unitSummary.totalNpriDecimal)}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function LeaseholdGraphOverviewTractCard({
+  tract,
+  selected,
+  onSelect,
+}: {
+  tract: LeaseholdTractSummary;
+  selected: boolean;
+  onSelect: () => void;
+}) {
+  const hasWarnings =
+    tract.overAssigned || tract.overBurdened || tract.overFloatingNpriBurdened
+    || tract.leaseOverlaps.length > 0;
+
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      className={`w-72 rounded-lg border-2 text-left shadow-sm transition-transform hover:-translate-y-0.5 ${
+        selected
+          ? 'border-leather bg-leather/10'
+          : 'border-ledger-line bg-parchment hover:border-leather/40'
+      }`}
+    >
+      <div className="rounded-t-lg border-b border-ledger-line bg-parchment-dark/60 px-3 py-2">
+        <div className="flex items-center justify-between gap-2">
+          <div>
+            <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-light">
+              {tract.code}
+            </div>
+            <div className="mt-1 text-base font-display font-bold text-ink">
+              {tract.name}
+            </div>
+          </div>
+          <span
+            className={`rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide ${
+              selected
+                ? 'bg-leather text-parchment'
+                : 'border border-ledger-line bg-white/80 text-ink-light'
+            }`}
+          >
+            {selected ? 'Focused' : 'Open'}
+          </span>
+        </div>
+      </div>
+      <div className="space-y-3 px-3 py-3">
+        <div className="grid grid-cols-2 gap-2 text-[11px] text-ink-light">
+          <div>
+            <div className="font-semibold uppercase tracking-wide text-ink/70">Pooled Acres</div>
+            <div className="mt-1 text-sm font-semibold text-ink">{formatAcres(tract.pooledAcres)}</div>
+          </div>
+          <div>
+            <div className="font-semibold uppercase tracking-wide text-ink/70">TPF</div>
+            <div className="mt-1 text-sm font-semibold text-ink">{formatPercent(tract.unitParticipation)}</div>
+          </div>
+          <div>
+            <div className="font-semibold uppercase tracking-wide text-ink/70">Leased</div>
+            <div className="mt-1 text-sm font-semibold text-ink">{formatPercent(tract.leasedOwnership)}</div>
+          </div>
+          <div>
+            <div className="font-semibold uppercase tracking-wide text-ink/70">Royalty</div>
+            <div className="mt-1 text-sm font-semibold text-ink">{formatPercent(tract.unitRoyaltyDecimal)}</div>
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          <span className="rounded-full border border-ledger-line bg-white/80 px-2 py-0.5 text-[10px] text-ink">
+            {tract.currentOwnerCount} owner{tract.currentOwnerCount === 1 ? '' : 's'}
+          </span>
+          <span className="rounded-full border border-ledger-line bg-white/80 px-2 py-0.5 text-[10px] text-ink">
+            {tract.trackedNpriCount} NPRI
+          </span>
+          <span className="rounded-full border border-ledger-line bg-white/80 px-2 py-0.5 text-[10px] text-ink">
+            {tract.trackedOrriCount} ORRI
+          </span>
+          {tract.trackedAssignmentCount > 0 && (
+            <span className="rounded-full border border-ledger-line bg-white/80 px-2 py-0.5 text-[10px] text-ink">
+              {tract.trackedAssignmentCount} WI split
+            </span>
+          )}
+          {hasWarnings && (
+            <span className="rounded-full border border-seal/25 bg-seal/10 px-2 py-0.5 text-[10px] text-seal">
+              Needs review
+            </span>
+          )}
+        </div>
+      </div>
+    </button>
+  );
+}
+
+function LeaseholdGraphTractRootCard({
+  tract,
+}: {
+  tract: LeaseholdTractSummary;
+}) {
+  return (
+    <div className="w-80 rounded-lg border-2 border-leather/30 bg-leather/5 text-ink shadow-[0_8px_18px_rgba(120,53,15,0.12)]">
+      <div className="rounded-t-lg border-b border-leather/20 bg-leather/10 px-4 py-2">
+        <div className="flex items-center justify-between gap-2">
+          <div>
+            <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-leather">
+              Tract Focus
+            </div>
+            <div className="mt-1 text-lg font-display font-bold text-ink">
+              {tract.name} ({tract.code})
+            </div>
+          </div>
+          <span className="rounded-full border border-leather/20 bg-white/80 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-leather">
+            Detail
+          </span>
+        </div>
+      </div>
+      <div className="space-y-3 px-4 py-4">
+        <div className="text-[11px] leading-5 text-ink-light">
+          {tract.description || 'No tract note yet.'}
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          <span className="rounded-full border border-ledger-line bg-white/80 px-2 py-0.5 text-[10px] text-ink">
+            Gross {formatAcres(tract.grossAcres)} ac
+          </span>
+          <span className="rounded-full border border-ledger-line bg-white/80 px-2 py-0.5 text-[10px] text-ink">
+            Pooled {formatAcres(tract.pooledAcres)} ac
+          </span>
+          <span className="rounded-full border border-ledger-line bg-white/80 px-2 py-0.5 text-[10px] text-ink">
+            TPF {formatPercent(tract.unitParticipation)}
+          </span>
+          <span className="rounded-full border border-ledger-line bg-white/80 px-2 py-0.5 text-[10px] text-ink">
+            Leased {formatPercent(tract.leasedOwnership)}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function LeaseholdGraphOwnerBranchCard({
+  branch,
+}: {
+  branch: LeaseholdGraphOwnerBranch;
+}) {
+  const { owner, leaseSlices, npris } = branch;
+
+  return (
+    <div className="w-72 rounded-lg border-2 border-ledger-line bg-parchment text-ink shadow-sm">
+      <div className="rounded-t-lg border-b border-ledger-line bg-parchment-dark/70 px-3 py-2">
+        <div className="flex items-center justify-between gap-2">
+          <span className="truncate text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-light">
+            Owner Branch
+          </span>
+          <span className="rounded-full border border-ledger-line bg-white/80 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-ink-light">
+            {leaseSlices.length > 0 ? `${leaseSlices.length} lease${leaseSlices.length === 1 ? '' : 's'}` : 'Unleased'}
+          </span>
+        </div>
+        <div className="mt-1 text-base font-display font-bold text-ink">
+          {owner.ownerName || 'Unnamed owner'}
+        </div>
+      </div>
+      <div className="space-y-3 px-3 py-3">
+        <div className="flex flex-wrap gap-1.5">
+          <span className="rounded-full border border-ledger-line bg-white/80 px-2 py-0.5 text-[10px] text-ink">
+            Mineral {formatPercent(owner.fraction)}
+          </span>
+          <span className="rounded-full border border-ledger-line bg-white/80 px-2 py-0.5 text-[10px] text-ink">
+            Leased {formatPercent(owner.leasedFraction)}
+          </span>
+          <span className="rounded-full border border-ledger-line bg-white/80 px-2 py-0.5 text-[10px] text-ink">
+            Net royalty {formatPercent(owner.netOwnerUnitRoyaltyDecimal)}
+          </span>
+          {npris.length > 0 && (
+            <span className="rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] text-sky-900">
+              {npris.length} NPRI
+            </span>
+          )}
+          {owner.overFloatingNpriBurdened && (
+            <span className="rounded-full border border-seal/25 bg-seal/10 px-2 py-0.5 text-[10px] text-seal">
+              Floating over-carve
+            </span>
+          )}
+        </div>
+        <div className="text-[11px] leading-5 text-ink-light">
+          {leaseSlices.length > 0
+            ? 'Lease slices show how this branch currently pays under active leases. NPRIs stay attached to the branch they burden.'
+            : 'No active lease slice on this branch yet. NPRIs below stay tracked here until the branch is leased.'}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function LeaseholdGraphLeaseSliceCard({
+  leaseSlice,
+}: {
+  leaseSlice: LeaseholdOwnerLeaseSummary;
+}) {
+  return (
+    <div className="w-64 rounded-lg border-2 border-emerald-200 bg-emerald-50 text-ink shadow-[0_8px_18px_rgba(5,150,105,0.12)]">
+      <div className="rounded-t-lg border-b border-emerald-200 bg-emerald-100/80 px-3 py-1.5">
+        <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-900">
+          Lease Slice
+        </div>
+        <div className="mt-1 text-sm font-display font-bold text-emerald-950">
+          {leaseSlice.leaseName || leaseSlice.lessee || 'Unnamed lease'}
+        </div>
+        <div className="mt-1 text-[10px] text-emerald-900/80">
+          {[leaseSlice.lessee, leaseSlice.leaseEffectiveDate, leaseSlice.leaseDocNo ? `Doc# ${leaseSlice.leaseDocNo}` : '']
+            .filter(Boolean)
+            .join(' • ')}
+        </div>
+      </div>
+      <div className="space-y-2 px-3 py-3">
+        <div className="flex flex-wrap gap-1.5">
+          <span className="rounded-full border border-emerald-200 bg-white/80 px-2 py-0.5 text-[10px] text-emerald-900">
+            Royalty {leaseSlice.leaseRoyaltyRate || '—'}
+          </span>
+          <span className="rounded-full border border-emerald-200 bg-white/80 px-2 py-0.5 text-[10px] text-emerald-900">
+            Leased {formatPercent(leaseSlice.leasedFraction)}
+          </span>
+        </div>
+        <div className="grid grid-cols-2 gap-2 text-[11px] text-emerald-900/85">
+          <div>
+            <div className="font-semibold uppercase tracking-wide">Owner royalty</div>
+            <div className="mt-1 text-sm font-semibold text-emerald-950">
+              {formatPercent(leaseSlice.ownerTractRoyalty)}
+            </div>
+          </div>
+          <div>
+            <div className="font-semibold uppercase tracking-wide">Net after floating NPRI</div>
+            <div className="mt-1 text-sm font-semibold text-emerald-950">
+              {formatPercent(leaseSlice.netOwnerTractRoyalty)}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function LeaseholdGraphUnleasedBranchCard({
+  ownerName,
+}: {
+  ownerName: string;
+}) {
+  return (
+    <div className="w-60 rounded-lg border-2 border-gold/35 bg-gold/10 text-gold-950 shadow-sm">
+      <div className="rounded-t-lg border-b border-gold/30 bg-gold/15 px-3 py-1.5">
+        <div className="text-[10px] font-semibold uppercase tracking-[0.16em]">
+          Unleased Branch
+        </div>
+      </div>
+      <div className="px-3 py-3 text-sm leading-6">
+        {ownerName || 'This branch'} has no active lease slice yet. Any NPRIs below stay tracked
+        on this branch until a lease actually covers it.
+      </div>
+    </div>
+  );
+}
+
+function LeaseholdGraphNpriLeafCard({
+  npri,
+}: {
+  npri: LeaseholdNpriSummary;
+}) {
+  const toneClasses = npri.royaltyKind === 'floating'
+    ? 'border-sky-300 bg-sky-50 text-sky-950'
+    : 'border-amber-300 bg-amber-50 text-amber-950';
+
+  return (
+    <div className={`w-60 rounded-lg border-2 shadow-sm ${toneClasses}`}>
+      <div className="rounded-t-lg border-b border-current/20 bg-white/40 px-3 py-1.5">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-[10px] font-semibold uppercase tracking-[0.16em]">NPRI</span>
+          <span className="rounded-full border border-current/20 bg-white/70 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide">
+            {formatNpriKindLabel(npri.royaltyKind)}
+          </span>
+        </div>
+        <div className="mt-1 text-sm font-display font-bold">
+          {npri.payee || 'Unnamed NPRI'}
+        </div>
+      </div>
+      <div className="space-y-2 px-3 py-3">
+        <div className="text-[11px] leading-5 opacity-85">
+          Burden {npri.burdenFraction || '—'} on the {npri.burdenedBranchOwner} branch.
+        </div>
+        {npri.royaltyKind === 'fixed' && (
+          <div className="text-[10px] uppercase tracking-wide opacity-75">
+            {formatFixedNpriBasisLabel(npri.fixedRoyaltyBasis)}
+          </div>
+        )}
+        <div className="flex flex-wrap gap-1.5">
+          {npri.includedInMath ? (
+            <>
+              <span className="rounded-full border border-current/20 bg-white/70 px-2 py-0.5 text-[10px]">
+                Tract burden {formatPercent(npri.tractBurdenRate)}
+              </span>
+              <span className="rounded-full border border-current/20 bg-white/70 px-2 py-0.5 text-[10px]">
+                Unit dec {formatPercent(npri.unitDecimal)}
+              </span>
+            </>
+          ) : (
+            <span className="rounded-full border border-current/20 bg-white/70 px-2 py-0.5 text-[10px]">
+              Tracked only until this branch is leased
+            </span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function LeaseholdGraphOwnerBranchTree({
+  branch,
+}: {
+  branch: LeaseholdGraphOwnerBranch;
+}) {
+  const childNodes = [
+    ...branch.leaseSlices.map((leaseSlice) => ({
+      key: `lease-${leaseSlice.leaseId}`,
+      element: <LeaseholdGraphLeaseSliceCard leaseSlice={leaseSlice} />,
+    })),
+    ...branch.npris.map((npri) => ({
+      key: `npri-${npri.id}`,
+      element: <LeaseholdGraphNpriLeafCard npri={npri} />,
+    })),
+  ];
+
+  if (childNodes.length === 0) {
+    childNodes.push({
+      key: `unleased-${branch.owner.nodeId}`,
+      element: <LeaseholdGraphUnleasedBranchCard ownerName={branch.owner.ownerName} />,
+    });
+  }
+
+  return (
+    <div className="tree-branch">
+      <LeaseholdGraphOwnerBranchCard branch={branch} />
+      <div className="tree-children">
+        {childNodes.map((child) => (
+          <div key={child.key} className="tree-branch">
+            {child.element}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function LeaseholdGraphEmptyLeafCard({
+  title,
+  note,
+}: {
+  title: string;
+  note: string;
+}) {
+  return (
+    <div className="w-60 rounded-lg border-2 border-ledger-line bg-parchment-dark/70 px-3 py-3 text-sm text-ink-light shadow-sm">
+      <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-light">
+        {title}
+      </div>
+      <div className="mt-2 leading-6">{note}</div>
+    </div>
+  );
+}
+
+function LeaseholdGraphOrriBranchCard({
+  tract,
+  orris,
+}: {
+  tract: LeaseholdTractSummary;
+  orris: LeaseholdOrriSummary[];
+}) {
+  const totalDecimal = orris.reduce((sum, orri) => sum.plus(orri.unitDecimal), d(0));
+
+  return (
+    <div className="w-72 rounded-lg border-2 border-amber-300 bg-amber-50 text-amber-950 shadow-[0_8px_18px_rgba(217,119,6,0.14)]">
+      <div className="rounded-t-lg border-b border-amber-300 bg-amber-100/80 px-3 py-2">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-amber-900">
+            ORRI Branch
+          </span>
+          <span className="rounded-full border border-amber-300 bg-white/80 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-amber-900">
+            {orris.length} burden{orris.length === 1 ? '' : 's'}
+          </span>
+        </div>
+        <div className="mt-1 text-base font-display font-bold text-amber-950">
+          {tract.code} Leasehold Burdens
+        </div>
+      </div>
+      <div className="space-y-3 px-3 py-3">
+        <div className="flex flex-wrap gap-1.5">
+          <span className="rounded-full border border-amber-300 bg-white/80 px-2 py-0.5 text-[10px] text-amber-900">
+            Total {formatPercent(totalDecimal.toString())}
+          </span>
+          <span className="rounded-full border border-amber-300 bg-white/80 px-2 py-0.5 text-[10px] text-amber-900">
+            Pre-WI base {formatPercent(tract.npriAdjustedNriBeforeOrriRate)}
+          </span>
+        </div>
+        <div className="text-[11px] leading-5 text-amber-900/85">
+          ORRIs stay on the leasehold side. Tract-only burdens hit this tract only; unit burdens
+          remain visible here because they still reduce this tract&apos;s pre-WI base.
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function LeaseholdGraphOrriLeafCard({
+  orri,
+  tractCode,
+}: {
+  orri: LeaseholdOrriSummary;
+  tractCode: string;
+}) {
+  return (
+    <div className="w-60 rounded-lg border-2 border-amber-200 bg-amber-50/80 px-3 py-3 text-amber-950 shadow-sm">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-amber-900">
+            ORRI
+          </div>
+          <div className="mt-1 text-sm font-display font-bold text-amber-950">
+            {orri.payee || 'Unnamed ORRI'}
+          </div>
+        </div>
+        <span className="rounded-full border border-amber-200 bg-white/80 px-2 py-0.5 text-[10px] text-amber-900">
+          {formatPercent(orri.unitDecimal)}
+        </span>
+      </div>
+      <div className="mt-3 space-y-2 text-[11px] leading-5 text-amber-900/85">
+        <div>
+          {formatOrriBasisLabel(orri.burdenBasis)} on{' '}
+          {orri.scope === 'unit' ? 'the whole unit' : tractCode}.
+        </div>
+        <div>
+          {[orri.effectiveDate, orri.sourceDocNo ? `Doc# ${orri.sourceDocNo}` : '']
+            .filter(Boolean)
+            .join(' • ') || 'No source date/doc yet'}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function LeaseholdGraphOrriBranchTree({
+  tract,
+  orris,
+}: {
+  tract: LeaseholdTractSummary;
+  orris: LeaseholdOrriSummary[];
+}) {
+  const childNodes = orris.length > 0
+    ? orris.map((orri) => ({
+        key: `orri-${orri.id}`,
+        element: <LeaseholdGraphOrriLeafCard orri={orri} tractCode={tract.code} />,
+      }))
+    : [
+        {
+          key: 'orri-empty',
+          element: (
+            <LeaseholdGraphEmptyLeafCard
+              title="No ORRIs"
+              note="No leasehold overrides currently burden this tract."
+            />
+          ),
+        },
+      ];
+
+  return (
+    <div className="tree-branch">
+      <LeaseholdGraphOrriBranchCard tract={tract} orris={orris} />
+      <div className="tree-children">
+        {childNodes.map((child) => (
+          <div key={child.key} className="tree-branch">
+            {child.element}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function LeaseholdGraphWorkingInterestBranchCard({
+  tract,
+  assignmentCount,
+}: {
+  tract: LeaseholdTractSummary;
+  assignmentCount: number;
+}) {
+  return (
+    <div className="w-72 rounded-lg border-2 border-leather/30 bg-leather/5 text-ink shadow-[0_8px_18px_rgba(120,53,15,0.12)]">
+      <div className="rounded-t-lg border-b border-leather/20 bg-leather/10 px-3 py-2">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-leather">
+            Working Interest
+          </span>
+          <span className="rounded-full border border-leather/20 bg-white/80 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-leather">
+            {assignmentCount} split{assignmentCount === 1 ? '' : 's'}
+          </span>
+        </div>
+        <div className="mt-1 text-base font-display font-bold text-ink">
+          {tract.code} WI Stack
+        </div>
+      </div>
+      <div className="space-y-3 px-3 py-3">
+        <div className="flex flex-wrap gap-1.5">
+          <span className="rounded-full border border-leather/20 bg-white/80 px-2 py-0.5 text-[10px] text-leather">
+            Pre-WI {formatPercent(tract.preWorkingInterestDecimal)}
+          </span>
+          <span className="rounded-full border border-leather/20 bg-white/80 px-2 py-0.5 text-[10px] text-leather">
+            Retained {formatPercent(tract.retainedWorkingInterestDecimal)}
+          </span>
+        </div>
+        <div className="text-[11px] leading-5 text-ink-light">
+          WI stays downstream of royalty, NPRI, and ORRI burdens. Retained WI remains visible even
+          when there are no assignment splits yet.
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function LeaseholdGraphRetainedWorkingInterestLeafCard({
+  tract,
+}: {
+  tract: LeaseholdTractSummary;
+}) {
+  return (
+    <div className="w-60 rounded-lg border-2 border-ledger-line bg-parchment px-3 py-3 text-ink shadow-sm">
+      <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-light">
+        Retained WI
+      </div>
+      <div className="mt-2 text-lg font-display font-bold text-ink">
+        {formatPercent(tract.retainedWorkingInterestDecimal)}
+      </div>
+      <div className="mt-2 text-[11px] leading-5 text-ink-light">
+        Assigned {formatPercent(tract.assignedWorkingInterestDecimal)} from a pre-WI base of{' '}
+        {formatPercent(tract.preWorkingInterestDecimal)}.
+      </div>
+    </div>
+  );
+}
+
+function LeaseholdGraphAssignmentLeafCard({
+  assignment,
+  tractCode,
+}: {
+  assignment: LeaseholdAssignmentSummary;
+  tractCode: string;
+}) {
+  return (
+    <div className="w-60 rounded-lg border-2 border-leather/20 bg-leather/5 px-3 py-3 text-ink shadow-sm">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-leather">
+            WI Assignment
+          </div>
+          <div className="mt-1 text-sm font-display font-bold text-ink">
+            {assignment.assignee || 'Unnamed assignee'}
+          </div>
+        </div>
+        <span className="rounded-full border border-leather/20 bg-white/80 px-2 py-0.5 text-[10px] text-leather">
+          {formatPercent(assignment.unitDecimal)}
+        </span>
+      </div>
+      <div className="mt-3 space-y-2 text-[11px] leading-5 text-ink-light">
+        <div>
+          {assignment.assignor || 'WI assignment'} •{' '}
+          {assignment.scope === 'unit' ? 'Unit-wide' : tractCode}
+        </div>
+        <div>
+          {[assignment.effectiveDate, assignment.sourceDocNo ? `Doc# ${assignment.sourceDocNo}` : '']
+            .filter(Boolean)
+            .join(' • ') || 'No source date/doc yet'}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function LeaseholdGraphWorkingInterestTree({
+  tract,
+  assignments,
+}: {
+  tract: LeaseholdTractSummary;
+  assignments: LeaseholdAssignmentSummary[];
+}) {
+  const childNodes = [
+    {
+      key: 'retained-wi',
+      element: <LeaseholdGraphRetainedWorkingInterestLeafCard tract={tract} />,
+    },
+    ...(
+      assignments.length > 0
+        ? assignments.map((assignment) => ({
+            key: `assignment-${assignment.id}`,
+            element: (
+              <LeaseholdGraphAssignmentLeafCard
+                assignment={assignment}
+                tractCode={tract.code}
+              />
+            ),
+          }))
+        : [
+            {
+              key: 'assignment-empty',
+              element: (
+                <LeaseholdGraphEmptyLeafCard
+                  title="No WI Split"
+                  note="No unit or tract assignments currently split this tract's working interest."
+                />
+              ),
+            },
+          ]
+    ),
+  ];
+
+  return (
+    <div className="tree-branch">
+      <LeaseholdGraphWorkingInterestBranchCard
+        tract={tract}
+        assignmentCount={assignments.length}
+      />
+      <div className="tree-children">
+        {childNodes.map((child) => (
+          <div key={child.key} className="tree-branch">
+            {child.element}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function LeaseholdGraphMode({
+  unit,
+  unitSummary,
+}: {
+  unit: LeaseholdUnit;
+  unitSummary: ReturnType<typeof buildLeaseholdUnitSummary>;
+}) {
+  const [focusedDeskMapId, setFocusedDeskMapId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (focusedDeskMapId && !unitSummary.tracts.some((tract) => tract.deskMapId === focusedDeskMapId)) {
+      setFocusedDeskMapId(null);
+    }
+  }, [focusedDeskMapId, unitSummary.tracts]);
+
+  const focusedTract = focusedDeskMapId
+    ? unitSummary.tracts.find((tract) => tract.deskMapId === focusedDeskMapId) ?? null
+    : null;
+  const tractDetail = useMemo(
+    () =>
+      focusedTract
+        ? buildLeaseholdGraphTractDetail({
+            tract: focusedTract,
+            unitSummary,
+          })
+        : null,
+    [focusedTract, unitSummary]
+  );
+
+  return (
+    <section className="relative h-full min-h-[42rem] overflow-hidden rounded-3xl border border-ledger-line bg-canvas-bg shadow-md">
+      <div className="absolute left-3 top-3 z-20 w-[22rem] max-w-[calc(100%-1.5rem)] space-y-2.5 rounded-xl border border-ledger-line bg-parchment/92 p-3 shadow-md backdrop-blur">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div className="text-[9px] font-semibold uppercase tracking-[0.16em] text-ink-light">
+              Leasehold Map
+            </div>
+            <div className="mt-1 text-lg font-display font-bold text-ink">
+              {focusedTract ? `${focusedTract.name} (${focusedTract.code})` : unit.name || 'Unit Overview'}
+            </div>
+          </div>
+          {focusedTract ? (
+            <button
+              type="button"
+              onClick={() => setFocusedDeskMapId(null)}
+              className="rounded-lg border border-ledger-line bg-white/80 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-ink-light transition-colors hover:border-leather/40 hover:text-ink"
+            >
+              Unit View
+            </button>
+          ) : (
+            <span className="rounded-full border border-ledger-line bg-white/80 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-ink-light">
+              Full Canvas
+            </span>
+          )}
+        </div>
+        <div className="text-[11px] leading-5 text-ink-light">
+          Desk Map stays mineral title. Leasehold Map stays payout-side and uses the same tracts
+          without changing the legal meaning of the title chain.
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {focusedTract ? (
+            <>
+              <span className="rounded-full border border-leather/20 bg-leather/10 px-2 py-0.5 text-[10px] text-leather">
+                Royalty {formatPercent(focusedTract.unitRoyaltyDecimal)}
+              </span>
+              <span className="rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] text-sky-900">
+                NPRI {formatPercent(focusedTract.unitNpriDecimal)}
+              </span>
+              <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] text-amber-900">
+                ORRI {formatPercent(focusedTract.unitOrriDecimal)}
+              </span>
+              <span className="rounded-full border border-ledger-line bg-white/80 px-2 py-0.5 text-[10px] text-ink">
+                WI {formatPercent(focusedTract.retainedWorkingInterestDecimal)}
+              </span>
+            </>
+          ) : (
+            <>
+              <span className="rounded-full border border-ledger-line bg-white/80 px-2 py-0.5 text-[10px] text-ink">
+                {unitSummary.tractCount} tract{unitSummary.tractCount === 1 ? '' : 's'}
+              </span>
+              <span className="rounded-full border border-ledger-line bg-white/80 px-2 py-0.5 text-[10px] text-ink">
+                Pooled {formatAcres(unitSummary.totalPooledAcres)} ac
+              </span>
+              <span className="rounded-full border border-ledger-line bg-white/80 px-2 py-0.5 text-[10px] text-ink">
+                Royalty {formatPercent(unitSummary.totalRoyaltyDecimal)}
+              </span>
+            </>
+          )}
+        </div>
+        <div className="space-y-1.5">
+          <div className="text-[9px] font-semibold uppercase tracking-[0.16em] text-ink-light">
+            {focusedTract ? 'Switch Tract Focus' : 'Open Tract Detail'}
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {unitSummary.tracts.map((tract) => {
+              const isFocused = tract.deskMapId === focusedDeskMapId;
+
+              return (
+                <button
+                  key={tract.deskMapId}
+                  type="button"
+                  onClick={() => setFocusedDeskMapId(tract.deskMapId)}
+                  className={`rounded-full px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide transition-colors ${
+                    isFocused
+                      ? 'bg-leather text-parchment'
+                      : 'bg-leather/10 text-leather hover:bg-leather/15'
+                  }`}
+                >
+                  {tract.code}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      <div className="absolute right-3 top-3 z-20 w-[19rem] max-w-[calc(100%-1.5rem)] rounded-xl border border-ledger-line bg-parchment/92 p-3 shadow-md backdrop-blur">
+        {focusedTract && tractDetail ? (
+          <div className="space-y-2.5">
+            <div>
+              <div className="text-[9px] font-semibold uppercase tracking-[0.16em] text-ink-light">
+                Tract Map Notes
+              </div>
+              <div className="mt-1 text-sm font-semibold text-ink">
+                {tractDetail.ownerBranches.length} owner branch
+                {tractDetail.ownerBranches.length === 1 ? '' : 'es'}
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              <span className="rounded-full border border-ledger-line bg-white/80 px-2 py-0.5 text-[10px] text-ink">
+                Gross {formatAcres(focusedTract.grossAcres)} ac
+              </span>
+              <span className="rounded-full border border-ledger-line bg-white/80 px-2 py-0.5 text-[10px] text-ink">
+                TPF {formatPercent(focusedTract.unitParticipation)}
+              </span>
+              <span className="rounded-full border border-ledger-line bg-white/80 px-2 py-0.5 text-[10px] text-ink">
+                Leased {formatPercent(focusedTract.leasedOwnership)}
+              </span>
+            </div>
+            {focusedTract.overFloatingNpriBurdened && (
+              <div className="rounded-lg border border-seal/25 bg-seal/5 px-3 py-2 text-[11px] leading-5 text-seal">
+                Floating NPRIs exceed available lease royalty on at least one branch. Editing stays
+                open, but payout review remains on hold until the burden mix is corrected.
+              </div>
+            )}
+            {focusedTract.leaseOverlaps.length > 0 && (
+              <div className="rounded-lg border border-seal/25 bg-seal/5 px-3 py-2 text-[11px] leading-5 text-seal">
+                {focusedTract.leaseOverlaps.length} lease overlap warning
+                {focusedTract.leaseOverlaps.length === 1 ? '' : 's'} still need landman review.
+              </div>
+            )}
+            <div className="rounded-lg border border-ledger-line bg-white/80 px-3 py-2 text-[11px] leading-5 text-ink-light">
+              Owner branches stay separate. Lease slices and NPRIs remain attached to the branch
+              they burden, while ORRI and WI stay as tract-level leasehold branches.
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-2.5">
+            <div>
+              <div className="text-[9px] font-semibold uppercase tracking-[0.16em] text-ink-light">
+                Unit Map Notes
+              </div>
+              <div className="mt-1 text-sm font-semibold text-ink">
+                Click a tract card to open its full leasehold branch map.
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              <span className="rounded-full border border-ledger-line bg-white/80 px-2 py-0.5 text-[10px] text-ink">
+                {unitSummary.currentOwnerCount} owners
+              </span>
+              <span className="rounded-full border border-ledger-line bg-white/80 px-2 py-0.5 text-[10px] text-ink">
+                {unitSummary.trackedNpriCount} NPRI
+              </span>
+              <span className="rounded-full border border-ledger-line bg-white/80 px-2 py-0.5 text-[10px] text-ink">
+                {unitSummary.trackedOrriCount} ORRI
+              </span>
+            </div>
+            <div className="rounded-lg border border-ledger-line bg-white/80 px-3 py-2 text-[11px] leading-5 text-ink-light">
+              Map mode is full-size and visual-first. Overview is still the setup surface, and Deck
+              remains the editable payout and transfer-order review surface.
+            </div>
+          </div>
+        )}
+      </div>
+
+      <LeaseholdMapPanZoomContainer>
+        {focusedTract && tractDetail ? (
+          <div className="tree-branch">
+            <LeaseholdGraphTractRootCard tract={focusedTract} />
+            <div className="tree-children">
+              {tractDetail.ownerBranches.map((branch) => (
+                <LeaseholdGraphOwnerBranchTree
+                  key={branch.owner.nodeId}
+                  branch={branch}
+                />
+              ))}
+              <LeaseholdGraphOrriBranchTree tract={focusedTract} orris={tractDetail.orris} />
+              <LeaseholdGraphWorkingInterestTree
+                tract={focusedTract}
+                assignments={tractDetail.assignments}
+              />
+            </div>
+          </div>
+        ) : (
+          <div className="tree-branch">
+            <LeaseholdGraphUnitCard unit={unit} unitSummary={unitSummary} />
+            <div className="tree-children">
+              {unitSummary.tracts.map((tract) => (
+                <div key={tract.deskMapId} className="tree-branch">
+                  <LeaseholdGraphOverviewTractCard
+                    tract={tract}
+                    selected={tract.deskMapId === focusedDeskMapId}
+                    onSelect={() => setFocusedDeskMapId(tract.deskMapId)}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </LeaseholdMapPanZoomContainer>
+    </section>
   );
 }
 
@@ -685,6 +1867,11 @@ function LeaseholdNpriDeckCard({
           <span className="rounded-full border border-sky-200 bg-white/80 px-2 py-0.5 text-[9px] text-sky-900/85">
             Burden {summary.burdenFraction || '—'}
           </span>
+          {summary.royaltyKind === 'fixed' && (
+            <span className="rounded-full border border-sky-200 bg-white/80 px-2 py-0.5 text-[9px] text-sky-900/85">
+              {formatFixedNpriBasisLabel(summary.fixedRoyaltyBasis)}
+            </span>
+          )}
           {summary.includedInMath ? (
             <>
               <span className="rounded-full border border-sky-200 bg-white/80 px-2 py-0.5 text-[9px] text-sky-900/85">
@@ -2156,9 +3343,10 @@ function LeaseholdDeck({
             </div>
             <h3 className="mt-1 text-xl font-display font-bold text-ink">NPRI Lane</h3>
             <p className="mt-1 text-sm text-ink-light">
-              These royalty burdens come from Desk Map title branches. Fixed NPRIs burden gross
-              leased production; floating NPRIs burden lease royalty. Edit the deed terms on Desk
-              Map, then review the payout decimals here.
+              These royalty burdens come from Desk Map title branches. Floating NPRIs burden lease
+              royalty. Fixed NPRIs can now be tracked either as a burdened-branch fraction or as a
+              whole-tract fixed burden, depending on the deed. Edit the deed terms on Desk Map,
+              then review the payout decimals here.
             </p>
           </div>
         </div>
@@ -2379,6 +3567,7 @@ export default function LeaseholdView() {
       fixedCount: trackedNpriNodes.length - floatingCount,
     };
   }, [nodes]);
+  const isMapMode = mode === 'map';
 
   if (deskMaps.length === 0) {
     return (
@@ -2394,9 +3583,17 @@ export default function LeaseholdView() {
   }
 
   return (
-    <div className="h-full overflow-auto bg-canvas-bg px-5 py-5">
-      <div className="mx-auto max-w-7xl space-y-5">
-        <header className="rounded-3xl border border-ledger-line bg-parchment/95 p-6 shadow-md">
+    <div
+      className={`h-full bg-canvas-bg px-5 py-5 ${
+        isMapMode ? 'overflow-hidden' : 'overflow-auto'
+      }`}
+    >
+      <div
+        className={
+          isMapMode ? 'flex h-full flex-col space-y-5' : 'mx-auto max-w-7xl space-y-5'
+        }
+      >
+        <header className="shrink-0 rounded-3xl border border-ledger-line bg-parchment/95 p-6 shadow-md">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div className="max-w-3xl">
               <div className="text-[10px] font-semibold uppercase tracking-[0.2em] text-ink-light">
@@ -2407,8 +3604,9 @@ export default function LeaseholdView() {
                 Pooled acres now drive participation here. Leasehold derives tract participation,
                 owner net mineral acres, lease royalty, fixed and floating NPRI payout burdens,
                 ORRI burdens, and working-interest splits from the current Desk Map title chain
-                plus active lease records. Use `Overview` for setup and numeric review, and `Deck`
-                for the card-based leasehold side with NPRIs, ORRIs, retained WI, and assignments.
+                plus active lease records. Use `Overview` for setup and numeric review, `Map` for
+                the full-size leasehold canvas, and `Deck` for the card-based leasehold side with
+                NPRIs, ORRIs, retained WI, and assignments.
               </p>
             </div>
             <div className="flex flex-col items-start gap-3">
@@ -2424,47 +3622,70 @@ export default function LeaseholdView() {
             </div>
           </div>
 
-          <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-7">
-            <SummaryCard
-              label="Tracts"
-              value={summary.tractCount.toString()}
-              detail={`${summary.currentOwnerCount} present owners across the unit`}
-            />
-            <SummaryCard
-              label="Gross Acres"
-              value={formatAcres(summary.totalGrossAcres)}
-              detail={`${summary.configuredGrossAcresCount}/${summary.tractCount} tracts configured`}
-            />
-            <SummaryCard
-              label="Pooled Acres"
-              value={formatAcres(summary.totalPooledAcres)}
-              detail={`${summary.configuredPooledAcresCount}/${summary.tractCount} tracts configured`}
-            />
-            <SummaryCard
-              label="Unit Royalty"
-              value={formatPercent(summary.totalRoyaltyDecimal)}
-              detail="Total unit royalty decimal from all active owner leases"
-            />
-            <SummaryCard
-              label="Unit NPRI"
-              value={formatPercent(summary.totalNpriDecimal)}
-              detail={`${summary.includedNpriCount}/${summary.trackedNpriCount} NPRI branches currently in payout math`}
-            />
-            <SummaryCard
-              label="Fully Leased"
-              value={`${summary.fullyLeasedTractCount}/${summary.tractCount}`}
-              detail="Based on current owner lease coverage"
-            />
-            <SummaryCard
-              label="Lessee Set"
-              value={summary.uniqueLessees.length.toString()}
-              detail={
-                summary.uniqueLessees.length > 0
-                  ? summary.uniqueLessees.join(', ')
-                  : 'No active lessees linked yet'
-              }
-            />
-          </div>
+          {isMapMode ? (
+            <div className="mt-5 flex flex-wrap gap-2 text-xs">
+              <span className="rounded-full border border-ledger-line bg-white/80 px-3 py-1.5 font-medium text-ink">
+                {summary.tractCount} tract{summary.tractCount === 1 ? '' : 's'}
+              </span>
+              <span className="rounded-full border border-ledger-line bg-white/80 px-3 py-1.5 font-medium text-ink">
+                Gross {formatAcres(summary.totalGrossAcres)} ac
+              </span>
+              <span className="rounded-full border border-ledger-line bg-white/80 px-3 py-1.5 font-medium text-ink">
+                Pooled {formatAcres(summary.totalPooledAcres)} ac
+              </span>
+              <span className="rounded-full border border-leather/20 bg-leather/10 px-3 py-1.5 font-medium text-leather">
+                Royalty {formatPercent(summary.totalRoyaltyDecimal)}
+              </span>
+              <span className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1.5 font-medium text-sky-900">
+                NPRI {formatPercent(summary.totalNpriDecimal)}
+              </span>
+              <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 font-medium text-amber-900">
+                ORRI {formatPercent(summary.totalOrriDecimal)}
+              </span>
+            </div>
+          ) : (
+            <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-7">
+              <SummaryCard
+                label="Tracts"
+                value={summary.tractCount.toString()}
+                detail={`${summary.currentOwnerCount} present owners across the unit`}
+              />
+              <SummaryCard
+                label="Gross Acres"
+                value={formatAcres(summary.totalGrossAcres)}
+                detail={`${summary.configuredGrossAcresCount}/${summary.tractCount} tracts configured`}
+              />
+              <SummaryCard
+                label="Pooled Acres"
+                value={formatAcres(summary.totalPooledAcres)}
+                detail={`${summary.configuredPooledAcresCount}/${summary.tractCount} tracts configured`}
+              />
+              <SummaryCard
+                label="Unit Royalty"
+                value={formatPercent(summary.totalRoyaltyDecimal)}
+                detail="Total unit royalty decimal from all active owner leases"
+              />
+              <SummaryCard
+                label="Unit NPRI"
+                value={formatPercent(summary.totalNpriDecimal)}
+                detail={`${summary.includedNpriCount}/${summary.trackedNpriCount} NPRI branches currently in payout math`}
+              />
+              <SummaryCard
+                label="Fully Leased"
+                value={`${summary.fullyLeasedTractCount}/${summary.tractCount}`}
+                detail="Based on current owner lease coverage"
+              />
+              <SummaryCard
+                label="Lessee Set"
+                value={summary.uniqueLessees.length.toString()}
+                detail={
+                  summary.uniqueLessees.length > 0
+                    ? summary.uniqueLessees.join(', ')
+                    : 'No active lessees linked yet'
+                }
+              />
+            </div>
+          )}
 
           {npriSummary.total > 0 && (
             <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
@@ -2472,7 +3693,8 @@ export default function LeaseholdView() {
               <div className="mt-1 leading-6">
                 {npriSummary.total} NPRI branch{npriSummary.total === 1 ? '' : 'es'} on file
                 ({npriSummary.fixedCount} fixed, {npriSummary.floatingCount} floating). Fixed
-                NPRIs now burden gross leased production; floating NPRIs now burden lease royalty.
+                NPRIs now carry a deed-basis choice, so LANDroid can distinguish whole-tract fixed
+                burdens from branch-based fixed burdens; floating NPRIs still burden lease royalty.
                 Review the NPRI lane and transfer-order ledger before treating the deck as final
                 payout support.
               </div>
@@ -2494,6 +3716,10 @@ export default function LeaseholdView() {
               ))}
             </div>
           </>
+        ) : isMapMode ? (
+          <div className="min-h-0 flex-1">
+            <LeaseholdGraphMode unit={leaseholdUnit} unitSummary={summary} />
+          </div>
         ) : (
           <LeaseholdDeck
             deskMaps={summary.tracts}

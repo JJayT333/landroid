@@ -16,6 +16,7 @@ import {
   executeAttachConveyance,
   executeDeleteBranch,
   calculateShare,
+  findNpriBranchDiscrepancies,
   validateOwnershipGraph,
   rootOwnershipTotal,
 } from '../math-engine';
@@ -924,6 +925,42 @@ describe('NPRI branch handling', () => {
     });
     expect(rootOwnershipTotal(result.data).toFixed(9)).toBe('1.000000000');
     expect(validateOwnershipGraph(result.data).valid).toBe(true);
+  });
+
+  it('allows but reports a fixed whole-tract NPRI that exceeds the burdened branch share', () => {
+    const nodes: OwnershipNode[] = [
+      makeNode('grantor', null, '0.125000000', '0.125000000'),
+    ];
+
+    const result = executeCreateNpri({
+      allNodes: nodes,
+      parentId: 'grantor',
+      newNodeId: 'npri-1',
+      share: '0.250000000',
+      form: {
+        ...createBlankNode('npri-1', 'grantor'),
+        instrument: 'Royalty Deed',
+        grantee: 'NPRI Holder',
+        interestClass: 'npri',
+        royaltyKind: 'fixed',
+        fixedRoyaltyBasis: 'whole_tract',
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(validateOwnershipGraph(result.data).valid).toBe(true);
+    expect(findNpriBranchDiscrepancies(result.data)).toEqual([
+      {
+        kind: 'fixed_whole_tract_over_branch',
+        burdenedBranchNodeId: 'grantor',
+        npriNodeIds: ['npri-1'],
+        totalBurden: '0.250000000',
+        capacity: '0.125000000',
+        excess: '0.125000000',
+      },
+    ]);
   });
 
   it('keeps NPRI branches out of mineral rebalances and delete restores', () => {

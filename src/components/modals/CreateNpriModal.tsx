@@ -5,7 +5,11 @@ import InstrumentSelect from '../shared/InstrumentSelect';
 import { d, serialize } from '../../engine/decimal';
 import { formatAsFraction } from '../../engine/fraction-display';
 import { useWorkspaceStore } from '../../store/workspace-store';
-import type { OwnershipNode, RoyaltyKind } from '../../types/node';
+import type {
+  FixedRoyaltyBasis,
+  OwnershipNode,
+  RoyaltyKind,
+} from '../../types/node';
 
 interface CreateNpriModalProps {
   parentNode: OwnershipNode;
@@ -43,6 +47,7 @@ export default function CreateNpriModal({
     landDesc: parentNode.landDesc,
     remarks: '',
     royaltyKind: 'fixed' as RoyaltyKind,
+    fixedRoyaltyBasis: 'burdened_branch' as FixedRoyaltyBasis,
     numerator: '1',
     denominator: '16',
   });
@@ -52,8 +57,18 @@ export default function CreateNpriModal({
     setForm((current) => ({ ...current, [field]: value }));
 
   const preview = buildPreviewShare(form.numerator, form.denominator);
+  const previewShare = d(preview.share);
+  const exceedsFullShare = previewShare.greaterThan(1);
+  const exceedsGrantorBranch =
+    form.royaltyKind === 'fixed'
+    && form.fixedRoyaltyBasis === 'whole_tract'
+    && previewShare.greaterThan(d(parentNode.initialFraction));
   const previewLabel =
-    form.royaltyKind === 'floating' ? 'of lease royalty' : 'fixed royalty';
+    form.royaltyKind === 'floating'
+      ? 'of lease royalty'
+      : form.fixedRoyaltyBasis === 'whole_tract'
+        ? 'of whole tract production'
+        : 'of the burdened branch';
 
   const handleSave = () => {
     setError(null);
@@ -69,13 +84,8 @@ export default function CreateNpriModal({
       return;
     }
 
-    const share = d(preview.share);
-    if (!share.greaterThan(0)) {
+    if (!previewShare.greaterThan(0)) {
       setError('NPRI share must be greater than zero');
-      return;
-    }
-    if (share.greaterThan(1)) {
-      setError('NPRI share cannot exceed the full royalty interest');
       return;
     }
 
@@ -95,6 +105,8 @@ export default function CreateNpriModal({
       denominator: form.denominator,
       interestClass: 'npri',
       royaltyKind: form.royaltyKind,
+      fixedRoyaltyBasis:
+        form.royaltyKind === 'fixed' ? form.fixedRoyaltyBasis : null,
     });
 
     if (!success) {
@@ -156,14 +168,50 @@ export default function CreateNpriModal({
           <div className="rounded-lg border border-ledger-line bg-ledger px-3 py-2 text-xs text-ink-light">
             {form.royaltyKind === 'floating'
               ? 'Floating NPRI records a fraction of the lease royalty, such as 1/2 of lessor royalty.'
-              : 'Fixed NPRI records a fixed share of production, such as 1/16.'}
+              : form.fixedRoyaltyBasis === 'whole_tract'
+                ? 'Fixed NPRI is being entered as a share of whole tract production carried by this branch, such as 1/16 of production from the land.'
+                : 'Fixed NPRI is being entered as a share of the burdened branch, such as 1/16 of the grantor branch.'}
             <div className="mt-1 text-ink-light/80">
               Leasehold now reads this choice in payout math. Floating NPRIs
-              burden lease royalty; fixed NPRIs burden gross leased production.
-              Desk Map still keeps the NPRI branch separate from mineral
-              coverage totals.
+              burden lease royalty. Fixed NPRIs can now be tracked either as a
+              share of the burdened branch or as a whole-tract fixed burden,
+              depending on the deed. Desk Map still keeps the NPRI branch
+              separate from mineral coverage totals.
             </div>
           </div>
+
+          {form.royaltyKind === 'fixed' && (
+            <div className="space-y-1.5">
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-ink-light">
+                Fixed Deed Basis
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {([
+                  ['burdened_branch', 'Of burdened branch'],
+                  ['whole_tract', 'Of whole tract'],
+                ] as const).map(([basis, label]) => (
+                  <button
+                    key={basis}
+                    type="button"
+                    onClick={() => set('fixedRoyaltyBasis', basis)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                      form.fixedRoyaltyBasis === basis
+                        ? 'bg-leather text-parchment'
+                        : 'text-ink hover:bg-parchment-dark border border-ledger-line'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <div className="text-[10px] text-ink-light">
+                Choose <span className="font-semibold">Of burdened branch</span> when
+                the deed reads like a fraction of the grantor's mineral branch.
+                Choose <span className="font-semibold">Of whole tract</span> when
+                the deed fraction is already stated against production from the land itself.
+              </div>
+            </div>
+          )}
 
           <div className="flex items-center gap-2">
             <input
@@ -193,6 +241,13 @@ export default function CreateNpriModal({
             <div className="mt-1 text-[10px] text-amber-900/80">
               Stored on Desk Map as {preview.formatted} {previewLabel}.
             </div>
+            {(exceedsFullShare || exceedsGrantorBranch) && (
+              <div className="mt-2 rounded-lg border border-seal/30 bg-seal/10 px-2.5 py-2 text-[10px] leading-4 text-seal">
+                LANDroid will allow this discrepancy and highlight the branch in red.
+                {exceedsFullShare && ' The entered NPRI is greater than 100%.'}
+                {exceedsGrantorBranch && ` The entered fixed whole-tract burden exceeds the grantor branch share of ${formatAsFraction(d(parentNode.initialFraction))}.`}
+              </div>
+            )}
           </div>
         </fieldset>
 

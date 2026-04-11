@@ -2062,9 +2062,9 @@ const COMBINATORIAL_TRACTS: CombinatorialTractPlan[] = [
       'Clean 1/2, 1/4, 1/8 warranty-deed chain of title with simple power-of-2 splits and leases at 1/8 royalty.',
     landDesc: 'Section 4, Block 18, T&P RR Co. Survey, Howard County, Texas',
     patentYear: 1898,
-    patentGrantee: 'Ezra Turnbuckle',
+    patentGrantee: 'Harold Whitaker',
     primaryRoyalty: '1/8',
-    surnames: ['Turnbuckle', 'Windmill', 'Hayfork', 'Coldwater'],
+    surnames: ['Whitaker', 'Bennett', 'Parker', 'Collins', 'Hayes', 'Foster', 'Mercer', 'Lawson'],
     flavor: 'baseline_splits',
   },
   {
@@ -2076,9 +2076,9 @@ const COMBINATORIAL_TRACTS: CombinatorialTractPlan[] = [
       'Multi-generation death certificate, affidavit of heirship, will, and probate chains feeding the present owners.',
     landDesc: 'Section 9, Block 22, H&GN RR Co. Survey, Reagan County, Texas',
     patentYear: 1895,
-    patentGrantee: 'Mercy Blackbird',
+    patentGrantee: 'Eleanor Sutton',
     primaryRoyalty: '3/16',
-    surnames: ['Blackbird', 'Longstone', 'Rivershade', 'Redhawk'],
+    surnames: ['Sutton', 'Baker', 'Fletcher', 'Morgan', 'Russell', 'Snyder', 'Keller', 'Preston'],
     flavor: 'probate_heirship',
   },
   {
@@ -2090,9 +2090,9 @@ const COMBINATORIAL_TRACTS: CombinatorialTractPlan[] = [
       'Fixed NPRIs at 1/16 and 1/32 of the whole, stacked under a clean mineral chain so the deck shows the classic Hahn-style setup.',
     landDesc: 'Section 15, Block 6, I&GN RR Co. Survey, Upton County, Texas',
     patentYear: 1901,
-    patentGrantee: 'Clement Brushwick',
+    patentGrantee: 'Leonard Carlisle',
     primaryRoyalty: '1/4',
-    surnames: ['Brushwick', 'Oakridge', 'Tallpine', 'Stonebranch'],
+    surnames: ['Carlisle', 'Bishop', 'Kendall', 'Porter', 'Maddox', 'Dalton', 'Barrett', 'Holland'],
     flavor: 'fixed_npri',
   },
   {
@@ -2104,9 +2104,9 @@ const COMBINATORIAL_TRACTS: CombinatorialTractPlan[] = [
       'Floating NPRIs at 1/2 and 1/4 of lease royalty, with sibling fixed NPRIs for contrast and mixed lease royalty rates.',
     landDesc: 'Section 21, Block 14, H&TC RR Co. Survey, Reeves County, Texas',
     patentYear: 1906,
-    patentGrantee: 'Imogene Farrow',
+    patentGrantee: 'Dorothy Langley',
     primaryRoyalty: '1/5',
-    surnames: ['Farrow', 'Bluelake', 'Pinyon', 'Thornfield'],
+    surnames: ['Langley', 'Whitman', 'Turner', 'Griffin', 'Hawkins', 'Brady', 'Sawyer', 'Monroe'],
     flavor: 'floating_npri',
   },
   {
@@ -2118,9 +2118,9 @@ const COMBINATORIAL_TRACTS: CombinatorialTractPlan[] = [
       'Quitclaims, correction deeds, and release instruments layered on top of a working warranty-deed chain.',
     landDesc: 'Section 27, Block C-23, PSL Survey, Loving County, Texas',
     patentYear: 1904,
-    patentGrantee: 'Royster Quinlan',
+    patentGrantee: 'Stanley Rutledge',
     primaryRoyalty: '1/8',
-    surnames: ['Quinlan', 'Driftwood', 'Smokerose', 'Redfern'],
+    surnames: ['Rutledge', 'Donovan', 'Wheeler', 'Harrison', 'Farley', 'Patterson', 'Granger', 'Baxter'],
     flavor: 'correction_release',
   },
   {
@@ -2132,9 +2132,9 @@ const COMBINATORIAL_TRACTS: CombinatorialTractPlan[] = [
       'Royalty-deed carve-outs on the mineral side plus unit-level ORRIs on all three basis types (gross 8/8, NRI, WI).',
     landDesc: 'Section 3, Block 7, GC&SF RR Co. Survey, Midland County, Texas',
     patentYear: 1905,
-    patentGrantee: 'Odalys Starnes',
+    patentGrantee: 'Marjorie Caldwell',
     primaryRoyalty: '3/16',
-    surnames: ['Starnes', 'Graniteer', 'Whitbranch', 'Coulee'],
+    surnames: ['Caldwell', 'Carver', 'Kirkland', 'Sinclair', 'Atkins', 'Presley', 'Merrill', 'Thornton'],
     flavor: 'royalty_deeds',
   },
   {
@@ -2146,9 +2146,9 @@ const COMBINATORIAL_TRACTS: CombinatorialTractPlan[] = [
       'Deliberate two-lease overlap on a present owner: an original lease and a later top-lease at a higher royalty, wired to exercise the overlap warning surface.',
     landDesc: 'Section 11, Block 2, GH&H RR Co. Survey, Martin County, Texas',
     patentYear: 1910,
-    patentGrantee: 'Ferris Hollypine',
+    patentGrantee: 'Clarence Whitfield',
     primaryRoyalty: '1/4',
-    surnames: ['Hollypine', 'Bramblewood', 'Sunnyridge', 'Saltmarsh'],
+    surnames: ['Whitfield', 'Sherman', 'Ellison', 'McAllister', 'Benson', 'Campbell', 'Atwood', 'Sterling'],
     flavor: 'lease_overlap',
   },
   {
@@ -2160,37 +2160,42 @@ const COMBINATORIAL_TRACTS: CombinatorialTractPlan[] = [
       'Every scenario in one tract: probate, NPRI (fixed + floating), correction, release, royalty deed, top-lease, and mixed-royalty unit leases.',
     landDesc: 'Section 19, Block 32, T-2-S, T&P RR Co. Survey, Glasscock County, Texas',
     patentYear: 1909,
-    patentGrantee: 'Solange Merriwether',
+    patentGrantee: 'Beatrice Hollister',
     primaryRoyalty: '1/8',
-    surnames: ['Merriwether', 'Cascade', 'Ironwood', 'Brackenfell'],
+    surnames: ['Hollister', 'Bradford', 'Remington', 'Winslow', 'Chandler', 'Kensington', 'Stanford', 'Wellington'],
     flavor: 'kitchen_sink',
   },
 ];
 
 const COMBINATORIAL_FIRST_NAMES = [
-  'Ada', 'Bea', 'Cal', 'Dov', 'Eli', 'Fay', 'Gus', 'Hal',
-  'Ida', 'Jem', 'Kip', 'Lia', 'Mae', 'Ned', 'Ola', 'Pax',
-  'Quill', 'Rex', 'Sal', 'Tia', 'Una', 'Van', 'Wes', 'Xio',
-  'Yael', 'Zeb', 'Alma', 'Bart', 'Cleo', 'Dash', 'Elsa', 'Finn',
-  'Gita', 'Hugo', 'Isla', 'Jace', 'Kera', 'Luna', 'Milo', 'Noor',
-  'Opal', 'Penn', 'Quinn', 'Rona', 'Sage', 'Tess', 'Ulla', 'Vera',
-  'Will', 'Xena', 'Yuna', 'Zora',
+  'Alice', 'Andrew', 'Anna', 'Anthony', 'Benjamin', 'Beth', 'Brandon', 'Caroline',
+  'Charles', 'Charlotte', 'Christopher', 'Claire', 'Daniel', 'David', 'Elizabeth', 'Emily',
+  'Ethan', 'Evelyn', 'Frank', 'George', 'Grace', 'Hannah', 'Henry', 'James',
+  'Jane', 'Jason', 'Jeffrey', 'Jennifer', 'John', 'Jonathan', 'Joseph', 'Katherine',
+  'Kevin', 'Laura', 'Luke', 'Margaret', 'Mark', 'Mary', 'Matthew', 'Megan',
+  'Michael', 'Nancy', 'Nicholas', 'Olivia', 'Patrick', 'Paul', 'Peter', 'Rebecca',
+  'Robert', 'Sarah', 'Scott', 'Stephen', 'Susan', 'Thomas', 'Victoria', 'William',
 ] as const;
 
 const COMBINATORIAL_TARGET_NODES_PER_TRACT = 100;
 
 /**
- * Short per-tract grantee name generator. Deterministic so reseeding produces
- * the same project snapshot — important so the user can trust the "combinatorial"
- * fixture as a known-good baseline for UI screenshots and ad-hoc audits.
+ * Per-tract grantee name generator. Deterministic so reseeding produces the
+ * same project snapshot, but unique enough that no two generated owners in the
+ * combinatorial fixture share the same full name.
  */
-function combinatorialGrantee(
-  tract: CombinatorialTractPlan,
-  seq: number
-): string {
-  const first = COMBINATORIAL_FIRST_NAMES[seq % COMBINATORIAL_FIRST_NAMES.length];
-  const surname = tract.surnames[seq % tract.surnames.length];
-  return `${first} ${surname}`;
+function createCombinatorialGranteeGenerator(tract: CombinatorialTractPlan) {
+  let index = 0;
+
+  return function nextCombinatorialGrantee(): string {
+    const first = COMBINATORIAL_FIRST_NAMES[index % COMBINATORIAL_FIRST_NAMES.length];
+    const surname =
+      tract.surnames[
+        Math.floor(index / COMBINATORIAL_FIRST_NAMES.length) % tract.surnames.length
+      ];
+    index += 1;
+    return `${first} ${surname}`;
+  };
 }
 
 function combinatorialDate(
@@ -2221,6 +2226,7 @@ function pushNpriChild(
   {
     share,
     royaltyKind,
+    fixedRoyaltyBasis,
     grantor,
     grantee,
     instrument,
@@ -2230,6 +2236,7 @@ function pushNpriChild(
   }: {
     share: number;
     royaltyKind: 'fixed' | 'floating';
+    fixedRoyaltyBasis?: 'burdened_branch' | 'whole_tract';
     grantor: string;
     grantee: string;
     instrument: string;
@@ -2255,6 +2262,9 @@ function pushNpriChild(
       remarks,
       interestClass: 'npri',
       royaltyKind,
+      fixedRoyaltyBasis: royaltyKind === 'fixed'
+        ? fixedRoyaltyBasis ?? 'burdened_branch'
+        : null,
       numerator: '1',
       denominator: String(Math.max(1, Math.round(1 / share))),
       conveyanceMode: 'fraction',
@@ -2272,22 +2282,24 @@ type ClusterRunner = (
   builder: StressBuilder,
   parentId: string,
   tract: CombinatorialTractPlan,
-  iteration: number
+  iteration: number,
+  nextGrantee: () => string
 ) => void;
 
 function clusterSplitPair(
   builder: StressBuilder,
   parentId: string,
   tract: CombinatorialTractPlan,
-  iteration: number
+  iteration: number,
+  nextGrantee: () => string
 ) {
   const parent = builder.nodes.find((n) => n.id === parentId);
   if (!parent) return;
   const parentRem = Number(parent.fraction);
   if (parentRem < 1 / 32) return;
   const share = parentRem / 2;
-  const grantee1 = combinatorialGrantee(tract, iteration * 2 + 1);
-  const grantee2 = combinatorialGrantee(tract, iteration * 2 + 2);
+  const grantee1 = nextGrantee();
+  const grantee2 = nextGrantee();
   const { date, fileDate } = combinatorialDate(tract, 30 + iteration, iteration);
   const childA = builder.addChild(parentId, share, {
     instrument: 'Warranty Deed',
@@ -2321,7 +2333,8 @@ function clusterQuarterFan(
   builder: StressBuilder,
   parentId: string,
   tract: CombinatorialTractPlan,
-  iteration: number
+  iteration: number,
+  nextGrantee: () => string
 ) {
   const parent = builder.nodes.find((n) => n.id === parentId);
   if (!parent) return;
@@ -2329,7 +2342,7 @@ function clusterQuarterFan(
   if (parentRem < 1 / 16) return;
   const share = parentRem / 4;
   for (let i = 0; i < 4; i += 1) {
-    const grantee = combinatorialGrantee(tract, iteration * 4 + i);
+    const grantee = nextGrantee();
     const { date, fileDate } = combinatorialDate(
       tract,
       40 + iteration,
@@ -2355,7 +2368,8 @@ function clusterProbate(
   builder: StressBuilder,
   parentId: string,
   tract: CombinatorialTractPlan,
-  iteration: number
+  iteration: number,
+  nextGrantee: () => string
 ) {
   const parent = builder.nodes.find((n) => n.id === parentId);
   if (!parent) return;
@@ -2390,7 +2404,7 @@ function clusterProbate(
   // Heirs inherit via probate, each taking half of the remaining fraction.
   const share = parentRem / 2;
   for (let i = 0; i < 2; i += 1) {
-    const heir = combinatorialGrantee(tract, iteration * 2 + 100 + i);
+    const heir = nextGrantee();
     const probateId = builder.addChild(parentId, share, {
       instrument: 'Probate',
       date: addDaysToIso(date, 180),
@@ -2424,7 +2438,8 @@ function clusterFixedNpri(
   builder: StressBuilder,
   parentId: string,
   tract: CombinatorialTractPlan,
-  iteration: number
+  iteration: number,
+  nextGrantee: () => string
 ) {
   const parent = builder.nodes.find((n) => n.id === parentId);
   if (!parent) return;
@@ -2436,7 +2451,7 @@ function clusterFixedNpri(
   // NPRIs don't deduct from the parent; the parent's mineral ownership is unchanged.
   const shares = [1 / 16, 1 / 32];
   for (let i = 0; i < shares.length; i += 1) {
-    const grantee = combinatorialGrantee(tract, iteration * 5 + 200 + i);
+    const grantee = nextGrantee();
     const { date, fileDate } = combinatorialDate(
       tract,
       35 + iteration,
@@ -2445,6 +2460,7 @@ function clusterFixedNpri(
     const npriId = pushNpriChild(builder, parentId, {
       share: shares[i],
       royaltyKind: 'fixed',
+      fixedRoyaltyBasis: 'whole_tract',
       grantor: parent.grantee,
       grantee,
       instrument: 'Royalty Deed',
@@ -2462,7 +2478,8 @@ function clusterFloatingNpri(
   builder: StressBuilder,
   parentId: string,
   tract: CombinatorialTractPlan,
-  iteration: number
+  iteration: number,
+  nextGrantee: () => string
 ) {
   const parent = builder.nodes.find((n) => n.id === parentId);
   if (!parent) return;
@@ -2476,7 +2493,7 @@ function clusterFloatingNpri(
   ];
   for (let i = 0; i < shares.length; i += 1) {
     const [share, label] = shares[i];
-    const grantee = combinatorialGrantee(tract, iteration * 5 + 300 + i);
+    const grantee = nextGrantee();
     const { date, fileDate } = combinatorialDate(
       tract,
       37 + iteration,
@@ -2500,7 +2517,8 @@ function clusterCorrectionAndRelease(
   builder: StressBuilder,
   parentId: string,
   tract: CombinatorialTractPlan,
-  iteration: number
+  iteration: number,
+  nextGrantee: () => string
 ) {
   const parent = builder.nodes.find((n) => n.id === parentId);
   if (!parent) return;
@@ -2508,7 +2526,7 @@ function clusterCorrectionAndRelease(
   if (parentRem < 1 / 16) return;
   const { date, fileDate } = combinatorialDate(tract, 60 + iteration, iteration);
   // A quitclaim transferring the whole remaining fraction to a new grantee...
-  const newGrantee = combinatorialGrantee(tract, iteration * 3 + 400);
+  const newGrantee = nextGrantee();
   const quitclaimId = builder.addChild(parentId, parentRem, {
     instrument: 'Quitclaim Deed',
     date,
@@ -2545,14 +2563,15 @@ function clusterRoyaltyDeed(
   builder: StressBuilder,
   parentId: string,
   tract: CombinatorialTractPlan,
-  iteration: number
+  iteration: number,
+  nextGrantee: () => string
 ) {
   const parent = builder.nodes.find((n) => n.id === parentId);
   if (!parent) return;
   const parentRem = Number(parent.fraction);
   if (parentRem < 1 / 16) return;
   const share = parentRem / 4;
-  const grantee = combinatorialGrantee(tract, iteration * 3 + 500);
+  const grantee = nextGrantee();
   const { date, fileDate } = combinatorialDate(tract, 45 + iteration, iteration);
   // Label the stored share honestly. With share = parentRem/4 and parentRem
   // drawn from a power-of-2 mineral chain, the share lands on 1/4, 1/8, 1/16,
@@ -2579,7 +2598,8 @@ function clusterDeepWarrantyChain(
   builder: StressBuilder,
   parentId: string,
   tract: CombinatorialTractPlan,
-  iteration: number
+  iteration: number,
+  nextGrantee: () => string
 ) {
   const parent = builder.nodes.find((n) => n.id === parentId);
   if (!parent) return;
@@ -2589,7 +2609,7 @@ function clusterDeepWarrantyChain(
   for (let i = 0; i < 3; i += 1) {
     if (currentRem < 1 / 32) break;
     const share = currentRem / 2;
-    const grantee = combinatorialGrantee(tract, iteration * 7 + 600 + i);
+    const grantee = nextGrantee();
     const { date, fileDate } = combinatorialDate(
       tract,
       50 + iteration + i * 4,
@@ -2730,6 +2750,7 @@ function buildCombinatorialTract(
   tract: CombinatorialTractPlan
 ) {
   const beforeCount = builder.nodes.length;
+  const nextGrantee = createCombinatorialGranteeGenerator(tract);
   const patentId = builder.addRoot(tract.landDesc, tract.patentGrantee, tract.patentYear);
   builder.assignPdf(patentId);
 
@@ -2738,7 +2759,7 @@ function buildCombinatorialTract(
   const rootSplitShare = 0.5;
   const topBranchIds: string[] = [];
   for (let i = 0; i < 2; i += 1) {
-    const grantee = combinatorialGrantee(tract, i);
+    const grantee = nextGrantee();
     const { date, fileDate } = combinatorialDate(tract, 25, i);
     const id = builder.addChild(patentId, rootSplitShare, {
       instrument: 'Warranty Deed',
@@ -2879,7 +2900,7 @@ function buildCombinatorialTract(
     // Rotate through candidates deterministically so we don't over-split one branch.
     const parent = candidates[iteration % candidates.length];
     const cluster = cycle[iteration % cycle.length];
-    cluster(builder, parent.id, tract, iteration);
+    cluster(builder, parent.id, tract, iteration, nextGrantee);
     iteration += 1;
     safetyFuse += 1;
   }
