@@ -8,7 +8,7 @@ This section supersedes older branch/status bullets below when they conflict.
 
 - Active branch / GitHub branch for this checkpoint: `codex/curative-cha-cha-slide`
 - Branch base before this Curative change set: `5b813c8` (`feat: add leasehold map and npri discrepancy review`)
-- Curative change set is intended to be committed and pushed on `codex/curative-cha-cha-slide`.
+- Curative change set has been committed on `codex/curative-cha-cha-slide`; use that branch as the GitHub checkpoint for the next chat.
 - New top-level app surface added: `Curative`
   - persistent title issue / curative tracker for Texas landman review
   - issue types include NPRI discrepancy, over-conveyance, missing lease, missing ratification, probate / heirship, bad legal description, name mismatch, unreleased lien, unrecorded assignment, title opinion requirement, and other
