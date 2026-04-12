@@ -10,6 +10,7 @@ export type ViewMode =
   | 'master'
   | 'flowchart'
   | 'owners'
+  | 'curative'
   | 'maps'
   | 'research';
 export type ModalMode =

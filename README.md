@@ -36,6 +36,7 @@ Then open `http://localhost:5173/`.
 - `Flowchart` for presentation and print layout
 - `Runsheet` for chronology review, export, and opening the same node or lease editor cards used in `Desk Map`
 - `Owners` for workspace-scoped owner, lease, contact, and document records, with lease edits flowing back into linked Desk Map and Runsheet lease nodes, a canonical Texas-baseline lease-status picker for new edits, direct buttons to create or reopen the linked Desk Map lease node from each saved lease card, and local search/sort controls so long owner lists are easier to work
+- `Curative` for title issues and curative tracking: probate/heirship gaps, NPRI discrepancies, missing leases or ratifications, bad legal descriptions, liens, name mismatches, unrecorded assignments, over-conveyances, and title-opinion requirements can be prioritized, assigned, linked to tracts/branches/owners/leases, and kept warning-only until resolved
 - `Maps` for the featured-map workspace with supporting PDF/image/GeoJSON assets, linked regions, and outside references
 - `Research` for workspace-scoped RRC dataset cataloging, imported research files, explicit-save metadata editing, readable table previews for delimited RRC TXT files, and structured decoder paths for pending drilling permits, drilling-permit master files, and horizontal drilling permits
 
@@ -47,7 +48,7 @@ Then open `http://localhost:5173/`.
 - Browser autosave keeps the active workspace and flowchart canvas locally.
 - Saved workspace loads now validate the ownership graph before hydration instead of trusting malformed tree data.
 - If autosaved workspace or canvas data is corrupt, LANDroid now opens a safe fresh state and shows a startup warning instead of silently treating the bad record like an empty workspace.
-- `.landroid` exports now capture workspace data, flowchart canvas state, owner records, owner documents, map assets, and research imports in one self-contained backup.
+- `.landroid` exports now capture workspace data, flowchart canvas state, owner records, owner documents, curative title issues, map assets, and research imports in one self-contained backup.
 - `.landroid` imports now fail clearly on malformed top-level payloads and invalid ownership graphs instead of partially loading junk data.
 - CSV imports create a fresh workspace and intentionally start with empty owner, map, and research side records.
 

@@ -2,6 +2,82 @@
 
 Use this file to resume work in a new chat.
 
+## Latest product update — 2026-04-12
+
+This section supersedes older branch/status bullets below when they conflict.
+
+- Active branch / GitHub branch for this checkpoint: `codex/curative-cha-cha-slide`
+- Branch base before this Curative change set: `5b813c8` (`feat: add leasehold map and npri discrepancy review`)
+- Curative change set is intended to be committed and pushed on `codex/curative-cha-cha-slide`.
+- New top-level app surface added: `Curative`
+  - persistent title issue / curative tracker for Texas landman review
+  - issue types include NPRI discrepancy, over-conveyance, missing lease, missing ratification, probate / heirship, bad legal description, name mismatch, unreleased lien, unrecorded assignment, title opinion requirement, and other
+  - each issue tracks priority, status, affected tract / Desk Map, affected branch/card, affected owner, affected lease, source doc number, required curative action, responsible party, due date, working notes, and resolution notes
+  - search and filters can find issues by owner, tract, branch, lease, issue language, document number, responsible party, status, or priority
+  - `Open Desk Map` jumps from a linked issue back to the affected tract and branch
+  - curative issues remain warning-only workflow records; they do not block title-building edits
+  - deleting a linked owner, lease, tract, or branch keeps the issue but clears the stale link so the issue is not silently lost
+- Persistence/export work added:
+  - new `TitleIssue` model and normalization in `/Users/abstractmapping/projects/landroid/src/types/title-issue.ts`
+  - new Dexie table `titleIssues` in `/Users/abstractmapping/projects/landroid/src/storage/db.ts`
+  - new curative persistence/store in `/Users/abstractmapping/projects/landroid/src/storage/curative-persistence.ts` and `/Users/abstractmapping/projects/landroid/src/store/curative-store.ts`
+  - `.landroid` export/import now includes `curativeData`
+  - CSV imports start with an empty curative workspace, matching owner/map/research side-record behavior
+- User-facing docs updated:
+  - `/Users/abstractmapping/projects/landroid/README.md`
+  - `/Users/abstractmapping/projects/landroid/USER_MANUAL.md`
+  - this file
+- Broader Texas/company-readiness backlog added to the running list after Curative:
+  - lease admin calendar and clause flags
+  - division order, pay status, and suspense workflow
+  - pooling / unit document package
+  - RRC well and GIS integration
+  - document OCR and clause extraction
+  - advanced interests: executive rights, life estates, term minerals, NPI, BIAPO
+  - enterprise audit trail and reviewer signoff
+- Validation for this change set:
+  - `npx vitest run src/types/__tests__/title-issue.test.ts src/store/__tests__/curative-store.test.ts src/storage/__tests__/workspace-persistence.test.ts src/views/__tests__/view-helpers.test.ts` passed (`20/20`)
+  - `npm run lint` passed
+  - `npm test` passed (`290/290`)
+  - `npm run build` passed
+- Intentional local noise still present and not part of the active source/docs change set:
+  - `.DS_Store`
+  - `.claude/`
+  - `TORS_Documents/`
+  - generated `dist/` and `dist-node/` artifacts from validation
+- Open risks / likely follow-ups:
+  - browser-QA the new `Curative` tab with a real NPRI discrepancy, missing probate/heirship item, and title-opinion requirement
+  - decide whether red NPRI discrepancy warnings should get a one-click "Create Curative Issue" action from Desk Map
+  - decide whether Curative should eventually feed payout readiness / hold status directly into Leasehold transfer-order rows
+  - decide whether title issues need document attachments of their own or should keep pointing to owner docs / node PDFs for now
+  - user still needs to review the approved markdown archive cleanup later when time allows
+
+## Paste This Into A New Chat — Curative QA / Next Slice
+
+```text
+I am working in `/Users/abstractmapping/projects/landroid` on branch `codex/curative-cha-cha-slide`.
+
+Before making architectural decisions, read:
+- `/Users/abstractmapping/projects/landroid/AGENTS.md`
+- `/Users/abstractmapping/projects/landroid/PROJECT_CONTEXT.md`
+- `/Users/abstractmapping/projects/landroid/CONTINUATION-PROMPT.md`
+
+Current focus:
+- browser-QA the new `Curative` title issue / curative tracker
+- verify `.landroid` save/load keeps curative issues and links
+- test real-world issue examples: NPRI discrepancy, missing probate/heirship, missing ratification, bad legal description, and title-opinion requirement
+- keep the workflow warning-only for title-building edits
+- do not start federal/BLM Phase 2 work
+- do not commit generated `dist/`, `dist-node/`, `.DS_Store`, `.claude/`, or `TORS_Documents/`
+
+Good first checks:
+1. Run `git status --short --branch`
+2. Review the latest 2026-04-12 section in `CONTINUATION-PROMPT.md`
+3. Start LANDroid with `npm run dev`
+4. Open `Curative`, create a few title issues, link them to a tract/branch/owner/lease, save, export `.landroid`, reload, and confirm links survive
+5. If QA looks good, consider adding a Desk Map action that creates a Curative issue from an NPRI title-discrepancy warning
+```
+
 ## Latest audit update — 2026-04-11
 
 This section supersedes older branch/status bullets below when they conflict.

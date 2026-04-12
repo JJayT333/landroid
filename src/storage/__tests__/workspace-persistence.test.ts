@@ -8,6 +8,7 @@ import {
 import { createBlankOwner, createBlankOwnerDoc } from '../../types/owner';
 import { createBlankNode } from '../../types/node';
 import { createBlankResearchImport } from '../../types/research';
+import { createBlankTitleIssue } from '../../types/title-issue';
 import {
   exportLandroidFile,
   importLandroidFile,
@@ -95,6 +96,15 @@ function buildWorkspace(canvas: CanvasSaveData | null): LandroidFileData {
       },
     }
   );
+  const titleIssue = createBlankTitleIssue('ws-1', {
+    id: 'issue-1',
+    title: 'Missing affidavit of heirship',
+    issueType: 'Probate / heirship',
+    priority: 'High',
+    affectedDeskMapId: 'dm-1',
+    affectedNodeId: 'node-1',
+    affectedOwnerId: owner.id,
+  });
 
   return {
     workspaceId: 'ws-1',
@@ -179,6 +189,9 @@ function buildWorkspace(canvas: CanvasSaveData | null): LandroidFileData {
     researchData: {
       imports: [researchImport],
     },
+    curativeData: {
+      titleIssues: [titleIssue],
+    },
   };
 }
 
@@ -214,6 +227,13 @@ describe('workspace-persistence', () => {
     expect(imported.researchData?.imports[0]?.datasetId).toBe(
       'production-data-query-dump'
     );
+    expect(imported.curativeData?.titleIssues[0]).toEqual(
+      expect.objectContaining({
+        id: 'issue-1',
+        title: 'Missing affidavit of heirship',
+        priority: 'High',
+      })
+    );
     expect(await imported.researchData?.imports[0]?.blob.text()).toBe('api,data');
     expect(await imported.mapData?.mapAssets[0]?.blob.text()).toContain('FeatureCollection');
   });
@@ -248,6 +268,7 @@ describe('workspace-persistence', () => {
       mapReferences: [],
     });
     expect(imported.researchData).toEqual({ imports: [] });
+    expect(imported.curativeData).toEqual({ titleIssues: [] });
     expect(imported.leaseholdUnit).toEqual({
       name: '',
       description: '',

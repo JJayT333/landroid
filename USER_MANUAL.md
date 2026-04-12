@@ -24,12 +24,13 @@ Then open `http://localhost:5173/`.
 
 ## 2) Main navigation
 
-The top bar has seven view buttons:
+The top bar has eight view buttons:
 - `Desk Map`
 - `Leasehold`
 - `Flowchart`
 - `Runsheet`
 - `Owners`
+- `Curative`
 - `Maps`
 - `Research`
 
@@ -39,7 +40,7 @@ The top bar also has:
 - `Stress (100/150/500)` to load sample tract data for testing
 - `Leasehold (8 Tracts)` to load an eight-tract unit demo with acreage and lease data
 
-The current project name appears in the top bar. Local autosave still uses browser storage, but `Save` now captures workspace data, flowchart canvas state, owner records, owner documents, map assets, and research imports in the exported `.landroid` file.
+The current project name appears in the top bar. Local autosave still uses browser storage, but `Save` now captures workspace data, flowchart canvas state, owner records, owner documents, curative title issues, map assets, and research imports in the exported `.landroid` file.
 The top-left brand area can also carry a custom logo for demo or prospect-specific presentation.
 If LANDroid detects corrupt autosaved workspace or canvas data during startup, it now opens a safe fresh state and shows a warning banner instead of silently pretending there was no saved data.
 If a render or lazy-load failure occurs, LANDroid now shows a reload screen with the error details instead of dropping to a blank page.
@@ -241,7 +242,54 @@ Useful notes:
 - Loading a `.landroid` file restores owner records and owner docs from that file.
 - Loading a `.csv` creates a fresh workspace and clears owner records for that imported workspace unless you later add them.
 
-## 6) Maps view
+## 6) Curative view
+
+`Curative` is the title issue and curative tracker. It is meant for the real-world problems a Texas landman needs to keep visible while the title chain is still being cleaned up.
+
+### What it tracks
+- NPRI discrepancies and royalty over-claim questions
+- over-conveyances
+- missing leases
+- missing ratifications
+- probate and heirship gaps
+- bad legal descriptions
+- name mismatches
+- unreleased liens
+- unrecorded assignments
+- title opinion requirements
+- other company-specific curative items
+
+### How to use it
+- Click `+ New Issue` to create a curative item.
+- Set the issue type, priority, status, source document number, responsible party, and due date.
+- Use `Required Curative Action` for the actual fix: affidavit, probate, release, ratification, correction deed, title-opinion waiver, or other needed document.
+- Link the issue to a tract / Desk Map, a specific branch or card, an owner record, and a lease record when applicable.
+- Use `Open Desk Map` to jump from a linked issue back to the affected tract and branch.
+- Use the left-side search and filters to cut the list by owner, tract, defect language, document number, responsible party, status, or priority.
+
+### Status convention
+- Curative issues are warning-only workflow records. They do not block title-building edits.
+- Use `Open`, `Researching`, `Curative Requested`, `Waiting on Third Party`, or `Ready for Review` while the problem still matters.
+- Use `Resolved` when the issue is cured.
+- Use `Deferred` when the issue is intentionally held for later review rather than cured now.
+
+### Company readiness backlog
+The Curative view also keeps the next broader company-readiness areas visible so they do not get lost:
+- lease admin calendar and clause flags
+- division order, pay status, and suspense workflow
+- pooling / unit document package
+- RRC well and GIS integration
+- document OCR and clause extraction
+- advanced interests such as executive rights, life estates, term minerals, NPI, and BIAPO
+- enterprise audit trail and reviewer signoff
+
+### Persistence behavior
+- Curative issues are scoped to the current workspace.
+- Loading a `.landroid` file restores title issues from that file.
+- Loading a `.csv` starts a fresh workspace and clears curative records for that imported workspace.
+- If a linked owner, lease, branch, or tract is deleted, LANDroid keeps the issue but clears the broken link so the issue itself is not silently lost.
+
+## 7) Maps view
 
 `Maps` is now the map-first workspace for the current project.
 
@@ -269,7 +317,7 @@ Useful notes:
 - ArcGIS Pro is not embedded in the app.
 - The practical short-term path is to bring ArcGIS outputs into LANDroid as exported PDF, image, or GeoJSON artifacts.
 
-## 7) Research view
+## 8) Research view
 
 `Research` is now the RRC-oriented workspace for official dataset families, imported downloads, and decoder triage.
 
@@ -303,7 +351,7 @@ Useful notes:
 - EBCDIC-heavy families are stored/imported first and decoded later.
 - This phase favors safe cataloging, file organization, and triage over pretending every format is already solved.
 
-## 8) Flowchart view
+## 9) Flowchart view
 
 `Flowchart` is the presentation and print surface.
 
@@ -348,7 +396,7 @@ These settings are now included when you save a `.landroid` file.
 - Use horizontal and vertical spacing controls when the tree feels too cramped or too loose
 - Use browser print preview before final printing
 
-## 9) Files and persistence
+## 10) Files and persistence
 
 ### `.landroid` files
 These are the main workspace snapshot files. They now include:
@@ -359,6 +407,7 @@ These are the main workspace snapshot files. They now include:
 - instrument types
 - workspace owner records
 - workspace owner documents
+- workspace curative title issues
 - workspace map assets
 - workspace research imports
 - flowchart nodes and edges
@@ -367,7 +416,7 @@ These are the main workspace snapshot files. They now include:
 - flowchart spacing settings
 
 ### `.csv` import
-CSV import loads workspace data, resets the flowchart canvas, and starts a fresh empty owner/maps/research side workspace so you can re-import and relink cleanly.
+CSV import loads workspace data, resets the flowchart canvas, and starts a fresh empty owner/curative/maps/research side workspace so you can re-import and relink cleanly.
 
 ### Local browser storage
 The app also uses browser storage for local autosave. This is convenient, but it is not a substitute for named backups.
@@ -378,7 +427,7 @@ Autosaved workspace loads now validate the ownership graph before hydration. If 
 - Save another `.landroid` file before printing or exporting deliverables
 - Keep dated backup copies when testing risky changes
 
-## 10) Precision and ownership math
+## 11) Precision and ownership math
 
 Recent ownership work improved how fractions are stored and displayed.
 
@@ -394,27 +443,29 @@ Recent ownership work improved how fractions are stored and displayed.
 - Parent/child relationships matter for recalculation
 - If something looks wrong, review the branch in Desk Map first, then confirm the chronology in Runsheet
 
-## 11) Recommended workflow
+## 12) Recommended workflow
 
 1. Launch the app from `LANDroid.command` or `LANDroid.bat`.
 2. Load an existing `.landroid` file or import a `.csv`.
 3. Organize work by tract tabs in `Desk Map`.
 4. Build or correct the title chain in `Desk Map`.
 5. Create or open linked owner records where you need follow-up tracking.
-6. Add supporting prospect maps and exhibits in `Maps`.
-7. Bring in any official RRC downloads you want to stage in `Research`.
-8. Review chronology and field quality in `Runsheet`.
-9. Export the runsheet if you need workbook output.
-10. Import the active tract into `Flowchart`.
-11. Adjust paper size, spacing, and fit settings.
-12. Print or save final backups.
+6. Add curative issues for defects, missing documents, title-opinion requirements, and payout holds in `Curative`.
+7. Add supporting prospect maps and exhibits in `Maps`.
+8. Bring in any official RRC downloads you want to stage in `Research`.
+9. Review chronology and field quality in `Runsheet`.
+10. Export the runsheet if you need workbook output.
+11. Import the active tract into `Flowchart`.
+12. Adjust paper size, spacing, and fit settings.
+13. Print or save final backups.
 
-## 12) Troubleshooting
+## 13) Troubleshooting
 
 ### "The app opened, but I still see old work"
 - Load the correct `.landroid` file.
 - If you just imported a `.csv`, re-import the active tract into `Flowchart`.
 - If you just imported a `.csv`, remember that owner records, map assets, and research imports start empty for that imported workspace.
+- If you just imported a `.csv`, remember that curative title issues start empty too.
 
 ### "The flowchart is empty"
 - Make sure the active tract has title cards.
@@ -436,11 +487,12 @@ Recent ownership work improved how fractions are stored and displayed.
 - Use the `Stress (100/150/500)` button to load sample tract data.
 - Save a separate `.landroid` snapshot before going back to real data.
 
-## 13) Practical habits for a new user
+## 14) Practical habits for a new user
 
 - Keep one tract tab per tract unless you have a strong reason not to.
 - Rename tabs early so the runsheet and flowchart stay easy to follow.
 - Link owner records from the node edit modal when you need follow-up work tied to a title holder.
+- Add a Curative issue when something is not ready to rely on yet, even if you are intentionally leaving title-building edits warning-only.
 - Use `Maps` for presentation-facing prospect maps and region storytelling.
 - Use `Research` for official RRC downloads, decoder notes, and research staging.
 - Use `Runsheet` as your QA pass, not just `Desk Map`.

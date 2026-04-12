@@ -39,6 +39,8 @@ import type { ResearchImport } from '../types/research';
 import type { OwnerWorkspaceData } from './owner-persistence';
 import type { MapWorkspaceData } from './map-persistence';
 import type { ResearchWorkspaceData } from './research-persistence';
+import type { CurativeWorkspaceData } from './curative-persistence';
+import { normalizeTitleIssues } from '../types/title-issue';
 
 const WORKSPACE_ID = 'default';
 const PAGE_SIZE_ID_SET = new Set<PageSizeId>(
@@ -63,6 +65,7 @@ export interface LandroidFileData extends WorkspaceData {
   ownerData?: OwnerWorkspaceData;
   mapData?: MapWorkspaceData;
   researchData?: ResearchWorkspaceData;
+  curativeData?: CurativeWorkspaceData;
 }
 
 export interface WorkspaceLoadResult {
@@ -422,7 +425,7 @@ async function serializeResearchData(
 
 export async function exportLandroidFile(data: LandroidFileData): Promise<Blob> {
   const payload = {
-    version: 5,
+    version: 6,
     exportedAt: new Date().toISOString(),
     ...data,
     ownerData: await serializeOwnerData(data.ownerData),
@@ -573,11 +576,21 @@ export async function importLandroidFile(file: File): Promise<LandroidFileData> 
             : [],
         }
       : { imports: [] };
+
+  const curativeData =
+    isRecord(parsed.curativeData)
+      ? {
+          titleIssues: normalizeTitleIssues(parsed.curativeData.titleIssues, {
+            workspaceId,
+          }),
+        }
+      : { titleIssues: [] };
   return {
     ...core,
     canvas: normalizeCanvasSaveData(parsed.canvas),
     ownerData,
     mapData,
     researchData,
+    curativeData,
   };
 }

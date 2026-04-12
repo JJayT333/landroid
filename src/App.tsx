@@ -11,6 +11,7 @@ const FlowchartView = lazy(() => import('./views/FlowchartView'));
 const LeaseholdView = lazy(() => import('./views/LeaseholdView'));
 const RunsheetView = lazy(() => import('./views/RunsheetView'));
 const OwnerDatabaseView = lazy(() => import('./views/OwnerDatabaseView'));
+const CurativeView = lazy(() => import('./views/CurativeView'));
 const MapsView = lazy(() => import('./views/MapsView'));
 const ResearchView = lazy(() => import('./views/ResearchView'));
 
@@ -101,6 +102,18 @@ export default function App() {
             }
           >
             <OwnerDatabaseView />
+          </Suspense>
+        )}
+        {view === 'curative' && (
+          <Suspense
+            fallback={
+              <PlaceholderView
+                name="Loading Curative"
+                description="Preparing title issues and curative workflow."
+              />
+            }
+          >
+            <CurativeView />
           </Suspense>
         )}
         {view === 'maps' && (

@@ -6,6 +6,7 @@
  */
 import { create } from 'zustand';
 import { buildLeaseNode, isLeaseNode } from '../components/deskmap/deskmap-lease-node';
+import { useCurativeStore } from './curative-store';
 import { useMapStore } from './map-store';
 import type { OwnershipNode, DeskMap } from '../types/node';
 import { normalizeDeskMap, normalizeOwnershipNode } from '../types/node';
@@ -356,6 +357,7 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
   deleteDeskMap: (id) =>
     set((state) => {
       void useMapStore.getState().unlinkDeskMap(id);
+      useCurativeStore.getState().unlinkDeskMap(id);
       const remainingDeskMaps = state.deskMaps.filter((dm) => dm.id !== id);
       return {
         deskMaps: remainingDeskMaps,
@@ -543,22 +545,29 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
     });
     for (const removedId of removedIds) {
       void useMapStore.getState().unlinkNode(removedId);
+      useCurativeStore.getState().unlinkNode(removedId);
     }
   },
 
   clearLinkedOwner: (ownerId) =>
-    set((state) => ({
-      nodes: state.nodes.map((node) =>
-        node.linkedOwnerId === ownerId ? { ...node, linkedOwnerId: null } : node
-      ),
-    })),
+    set((state) => {
+      useCurativeStore.getState().unlinkOwner(ownerId);
+      return {
+        nodes: state.nodes.map((node) =>
+          node.linkedOwnerId === ownerId ? { ...node, linkedOwnerId: null } : node
+        ),
+      };
+    }),
 
   clearLinkedLease: (leaseId) =>
-    set((state) => ({
-      nodes: state.nodes.map((node) =>
-        node.linkedLeaseId === leaseId ? { ...node, linkedLeaseId: null } : node
-      ),
-    })),
+    set((state) => {
+      useCurativeStore.getState().unlinkLease(leaseId);
+      return {
+        nodes: state.nodes.map((node) =>
+          node.linkedLeaseId === leaseId ? { ...node, linkedLeaseId: null } : node
+        ),
+      };
+    }),
 
   syncLeaseNodesFromRecord: (lease) =>
     set((state) => {

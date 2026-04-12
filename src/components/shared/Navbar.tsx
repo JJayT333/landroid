@@ -6,6 +6,7 @@ import { useUIStore, type ViewMode } from '../../store/ui-store';
 import { useMapStore } from '../../store/map-store';
 import { useOwnerStore } from '../../store/owner-store';
 import { useResearchStore } from '../../store/research-store';
+import { useCurativeStore } from '../../store/curative-store';
 import { useWorkspaceStore } from '../../store/workspace-store';
 import { useCanvasStore } from '../../store/canvas-store';
 import { downloadLandroidFile, importLandroidFile } from '../../storage/workspace-persistence';
@@ -25,6 +26,7 @@ const views: { id: ViewMode; label: string }[] = [
   { id: 'flowchart', label: 'Flowchart' },
   { id: 'master', label: 'Runsheet' },
   { id: 'owners', label: 'Owners' },
+  { id: 'curative', label: 'Curative' },
   { id: 'maps', label: 'Maps' },
   { id: 'research', label: 'Research' },
 ];
@@ -97,6 +99,7 @@ export default function Navbar() {
       ownerData: await useOwnerStore.getState().exportWorkspaceData(),
       mapData: await useMapStore.getState().exportWorkspaceData(),
       researchData: await useResearchStore.getState().exportWorkspaceData(),
+      curativeData: await useCurativeStore.getState().exportWorkspaceData(),
       canvas: {
         nodes: canvasState.nodes,
         edges: canvasState.edges,
@@ -139,6 +142,10 @@ export default function Navbar() {
             data.workspaceId,
             data.researchData ?? { imports: [] }
           ),
+          useCurativeStore.getState().replaceWorkspaceData(
+            data.workspaceId,
+            data.curativeData ?? { titleIssues: [] }
+          ),
         ]);
       } else if (file.name.endsWith('.csv')) {
         const text = await file.text();
@@ -149,6 +156,7 @@ export default function Navbar() {
           useOwnerStore.getState().setWorkspace(result.workspaceId),
           useMapStore.getState().setWorkspace(result.workspaceId),
           useResearchStore.getState().setWorkspace(result.workspaceId),
+          useCurativeStore.getState().setWorkspace(result.workspaceId),
         ]);
       } else {
         alert('Unsupported file type. Use .landroid or .csv files.');

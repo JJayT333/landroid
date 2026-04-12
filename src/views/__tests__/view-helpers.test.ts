@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createBlankNode } from '../../types/node';
 import { createBlankLease, createBlankOwner } from '../../types/owner';
+import { createBlankTitleIssue } from '../../types/title-issue';
 import { buildLeaseholdUnitSummary } from '../../components/leasehold/leasehold-summary';
 import {
   buildOwnerListRows,
@@ -11,6 +12,7 @@ import {
   buildLeaseholdGraphTractDetail,
 } from '../LeaseholdView';
 import { buildDeskMapOwnerSearchMatches } from '../DeskMapView';
+import { filterTitleIssues } from '../CurativeView';
 
 describe('view helpers', () => {
   it('forces ready transfer-order rows into hold while payout hold is active', () => {
@@ -259,5 +261,65 @@ describe('view helpers', () => {
         ownerName: 'Alice Sutton',
       },
     ]);
+  });
+
+  it('filters curative issues by linked owner, tract, and status text', () => {
+    const owner = createBlankOwner('ws-1', {
+      id: 'owner-1',
+      name: 'Ada Blackbird',
+    });
+    const lease = createBlankLease('ws-1', owner.id, {
+      id: 'lease-1',
+      leaseName: 'Ada Lease',
+      docNo: 'L-1',
+    });
+    const branch = {
+      ...createBlankNode('node-1'),
+      grantee: 'Ada Blackbird',
+      fraction: '1',
+      initialFraction: '1',
+    };
+    const issues = [
+      createBlankTitleIssue('ws-1', {
+        id: 'issue-1',
+        title: 'Missing heirship affidavit',
+        issueType: 'Probate / heirship',
+        status: 'Open',
+        priority: 'High',
+        affectedDeskMapId: 'dm-1',
+        affectedNodeId: branch.id,
+        affectedOwnerId: owner.id,
+        affectedLeaseId: lease.id,
+      }),
+      createBlankTitleIssue('ws-1', {
+        id: 'issue-2',
+        title: 'Old lien release found',
+        status: 'Resolved',
+        priority: 'Low',
+      }),
+    ];
+
+    const filtered = filterTitleIssues(issues, {
+      searchQuery: 'ada lease',
+      statusFilter: 'active',
+      priorityFilter: 'all',
+      deskMaps: [
+        {
+          id: 'dm-1',
+          name: 'Tract 1',
+          code: 'T1',
+          tractId: 'T1',
+          grossAcres: '160',
+          pooledAcres: '160',
+          description: '',
+          nodeIds: [branch.id],
+        },
+      ],
+      nodes: [branch],
+      owners: [owner],
+      leases: [lease],
+    });
+
+    expect(filtered.map((issue) => issue.id)).toEqual(['issue-1']);
   });
 });
