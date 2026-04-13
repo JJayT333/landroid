@@ -1,2 +1,9 @@
 node_modules/
 CHATGPTFAIL.pdf
+.DS_Store
+.claude/
+TORS_Documents/
+dist/
+dist-node/
+playwright-report/
+test-results/

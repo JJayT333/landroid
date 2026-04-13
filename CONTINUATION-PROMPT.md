@@ -2,6 +2,44 @@
 
 Use this file to resume work in a new chat.
 
+## Latest Playwright/browser-QA update — 2026-04-13
+
+This section supersedes older branch/status bullets below when they conflict.
+
+- Active branch: `codex/curative-cha-cha-slide`
+- Latest committed baseline before this work:
+  - `071c79f fix: sync lease cards and show pdf attachments`
+- Completed Playwright setup:
+  - added Playwright Chromium browser QA with `npm run test:e2e` and `npm run test:e2e:headed`
+  - added `playwright.config.ts` to start the local Vite server automatically for E2E tests
+  - added focused browser coverage for:
+    - `Leasehold (8 Tracts)` seed loading
+    - visible seeded PDF filenames on Desk Map title and lease cards
+    - attaching/replacing a lease PDF through the Desk Map lessee modal and seeing the new filename on the card face
+    - same-owner multi-tract behavior for `Raven Bend Minerals, LLC` without merging title branches or losing separate lease records
+    - `Research` opening as the source/formula/project-record workspace with `Data Imports` secondary
+    - `Stress (100/150/500)` loading current Desk Map cards with document badges
+  - ignored local/generated Playwright outputs and known local/generated folders in `.gitignore`
+- Dependency update:
+  - added dev dependency `@playwright/test`
+  - `npm audit fix` updated fixable transitive audit items (`picomatch`/`vite` in the lockfile)
+  - remaining audit risk: `xlsx@0.18.5` still reports high-severity advisories with no npm fix available
+- Validation completed after Playwright setup:
+  - `npm run test:e2e` passed (`3/3`) in Chromium
+  - `npm run lint` passed
+  - `npm test` passed (`311/311`)
+  - `npm run build` passed
+  - `npm audit --audit-level=high` still fails only for the existing no-fix `xlsx` advisories
+- Intentional local noise still present and not part of the source/docs/test commit:
+  - `.DS_Store`
+  - `.claude/`
+  - `TORS_Documents/`
+  - generated `dist/`, `dist-node/`, `playwright-report/`, and `test-results/` artifacts
+- Likely next steps:
+  - expand browser QA to `.landroid` export/import round trips once a stable temp-file flow is added
+  - add browser coverage for delete-lessee-card-to-owner sync if the current hover-action UI gets stable test ids
+  - decide whether to replace or constrain `xlsx` because npm has no fixed version for its current advisories
+
 ## Latest lease/PDF/demo cleanup — 2026-04-13
 
 This section supersedes older branch/status bullets below when they conflict.

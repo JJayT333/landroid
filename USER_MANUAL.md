@@ -511,6 +511,7 @@ Recent ownership work improved how fractions are stored and displayed.
 ### "I want to test without touching real work"
 - Use the `Stress (100/150/500)` button to load sample tract data.
 - Save a separate `.landroid` snapshot before going back to real data.
+- Browser QA now covers the refreshed `Stress (100/150/500)` and `Leasehold (8 Tracts)` loaders with Playwright, including visible PDF filenames and same-owner multi-tract lease records.
 
 ## 14) Practical habits for a new user
 
