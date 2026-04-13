@@ -64,6 +64,7 @@ export interface OwnershipNode {
 
   // Attachment
   hasDoc: boolean;
+  docFileName: string;
   linkedOwnerId: string | null;
   linkedLeaseId: string | null;
   relatedKind: RelatedNodeKind | null;
@@ -234,6 +235,7 @@ export function createBlankNode(id: string, parentId: string | null = null): Own
     obituary: '',
     graveyardLink: '',
     hasDoc: false,
+    docFileName: '',
     linkedOwnerId: null,
     linkedLeaseId: null,
     relatedKind: null,
@@ -282,6 +284,7 @@ export function normalizeOwnershipNode(
     obituary: normalizeText(node.obituary),
     graveyardLink: normalizeText(node.graveyardLink),
     hasDoc: node.hasDoc === true,
+    docFileName: normalizeText(node.docFileName),
     linkedOwnerId: node.linkedOwnerId ?? null,
     linkedLeaseId: node.linkedLeaseId ?? null,
     relatedKind: normalizeRelatedKind(node.relatedKind),

@@ -853,10 +853,24 @@ export async function importLandroidFile(file: File): Promise<LandroidFileData> 
             : [],
         }
       : { pdfs: [] };
-  const pdfNodeIds = new Set(pdfData.pdfs.map((pdf) => pdf.nodeId));
-  const nodes = core.nodes.map((node) =>
-    node.hasDoc && !pdfNodeIds.has(node.id) ? { ...node, hasDoc: false } : node
+  const pdfFileNameByNodeId = new Map(
+    pdfData.pdfs.map((pdf) => [pdf.nodeId, pdf.fileName] as const)
   );
+  const pdfNodeIds = new Set(pdfFileNameByNodeId.keys());
+  const nodes = core.nodes.map((node) => {
+    if (node.hasDoc && !pdfNodeIds.has(node.id)) {
+      return { ...node, hasDoc: false, docFileName: '' };
+    }
+
+    if (node.hasDoc && !node.docFileName) {
+      return {
+        ...node,
+        docFileName: pdfFileNameByNodeId.get(node.id) ?? '',
+      };
+    }
+
+    return node;
+  });
 
   const curativeData =
     isRecord(parsed.curativeData)

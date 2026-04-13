@@ -4,6 +4,7 @@ import { d } from '../../engine/decimal';
 import { useWorkspaceStore } from '../../store/workspace-store';
 import type { OwnershipNode } from '../../types/node';
 import type { NpriBranchDiscrepancy } from '../../engine/math-engine';
+import DeskMapDocumentBadge from './DeskMapDocumentBadge';
 
 interface DeskMapNpriCardProps {
   node: OwnershipNode;
@@ -109,18 +110,7 @@ function DeskMapNpriCard({
               {node.remarks}
             </div>
           )}
-          {node.hasDoc && (
-            <button
-              type="button"
-              onClick={(event) => {
-                event.stopPropagation();
-                onViewPdf(node.id);
-              }}
-              className="text-[9px] text-amber-800 font-semibold hover:underline"
-            >
-              View PDF
-            </button>
-          )}
+          <DeskMapDocumentBadge node={node} tone="amber" onViewPdf={onViewPdf} />
           {hasDiscrepancy && discrepancy && (
             <div className="rounded-md border border-seal/25 bg-seal/10 px-2 py-1.5 text-[10px] leading-4 text-seal">
               <div className="font-semibold">{discrepancyLabel}</div>
@@ -182,18 +172,7 @@ function DeskMapNpriCard({
                     <div className="text-[9px] text-amber-900/75 truncate">{doc.remarks}</div>
                   )}
                 </div>
-                {doc.hasDoc && (
-                  <button
-                    type="button"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onViewPdf(doc.id);
-                    }}
-                    className="text-[9px] text-amber-800 font-bold hover:bg-amber-100 px-1.5 py-0.5 rounded shrink-0"
-                  >
-                    PDF
-                  </button>
-                )}
+                <DeskMapDocumentBadge node={doc} tone="amber" onViewPdf={onViewPdf} />
               </div>
             ))}
           </div>

@@ -33,6 +33,12 @@ describe('buildStressWorkspaceData', () => {
     expect(new Set(deskMapIds)).toEqual(nodeIds);
     expect(workspace.pdfMappings.length).toBeGreaterThan(0);
     expect(
+      workspace.pdfMappings.every((mapping) => {
+        const node = workspace.nodes.find((candidate) => candidate.id === mapping.nodeId);
+        return node?.hasDoc === true && node.docFileName === mapping.fileName;
+      })
+    ).toBe(true);
+    expect(
       workspace.nodes.some(
         (node) => node.type !== 'related' && node.instrument === 'Assignment'
       )
@@ -158,6 +164,32 @@ describe('buildStressWorkspaceData', () => {
       new Set(['1/8'])
     );
     expect(workspace.ownerData.leases.every((lease) => lease.leasedInterest !== '')).toBe(true);
+  });
+
+  it('seeds same-owner multi-tract leasehold behavior without sharing branch lease records', () => {
+    const workspace = buildLeaseholdDemoWorkspaceData();
+    const sharedOwnerNodes = workspace.nodes.filter(
+      (node) => node.grantee === 'Raven Bend Minerals, LLC'
+    );
+    const sharedOwnerIds = new Set(sharedOwnerNodes.map((node) => node.linkedOwnerId));
+    const linkedLeaseNodes = workspace.nodes.filter(
+      (node) =>
+        isLeaseNode(node) &&
+        node.parentId &&
+        sharedOwnerNodes.some((ownerNode) => ownerNode.id === node.parentId)
+    );
+    const linkedLeaseIds = new Set(linkedLeaseNodes.map((node) => node.linkedLeaseId));
+
+    expect(sharedOwnerNodes).toHaveLength(2);
+    expect(sharedOwnerIds.size).toBe(1);
+    expect(workspace.ownerData.owners.filter((owner) => owner.name === 'Raven Bend Minerals, LLC')).toHaveLength(1);
+    expect(linkedLeaseNodes).toHaveLength(2);
+    expect(linkedLeaseIds.size).toBe(2);
+    expect(
+      workspace.ownerData.leases.filter(
+        (lease) => lease.ownerId === sharedOwnerNodes[0]?.linkedOwnerId
+      )
+    ).toHaveLength(2);
   });
 
   it('keeps combinatorial fixture owner-card names unique across the 8x100 sample', () => {

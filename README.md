@@ -31,7 +31,7 @@ Then open `http://localhost:5173/`.
 - Local PDF companion folder for runsheet exports: `TORS_Documents/`
 
 ## Current surfaces
-- `Desk Map` for title-chain editing, ownership-versus-leasing coverage checks, multiple starting root families when title is still incomplete, existing-owner linking on unlinked mineral cards, branch-scoped leased-status flags on mineral-owner cards, separate terminal lessee nodes, separate NPRI branches that do not reduce the mineral coverage totals, warning-only red branch highlights when NPRI burdens over-claim the branch/royalty bucket, and a mineral-owner search box with a clickable results list that can jump across tract tabs by owner name
+- `Desk Map` for title-chain editing, ownership-versus-leasing coverage checks, multiple starting root families when title is still incomplete, existing-owner linking on unlinked mineral cards, branch-scoped leased-status flags on mineral-owner cards, separate terminal lessee nodes, visible PDF filename chips on cards with attachments, separate NPRI branches that do not reduce the mineral coverage totals, warning-only red branch highlights when NPRI burdens over-claim the branch/royalty bucket, and a mineral-owner search box with a clickable results list that can jump across tract tabs by owner name
 - `Leasehold` for acreage-first tract setup, pooled-participation review, unit metadata, dual gross-vs-pooled owner acreage outputs, branch-scoped Desk Map lease-card coverage, aggregated royalty calculations across active lease records, fixed-and-floating NPRI payout support with fixed-deed basis tracking (`burdened branch` vs `whole tract`), leasehold-side ORRI burden tracking across gross `8/8`, working-interest, and net-revenue-interest bases, a full-size `Map` mode that visualizes `Unit -> Tract -> Owner Branch / ORRI / WI -> Lease Slice / NPRI` without changing Desk Map title meaning, and a card-based internal `Deck` view with editable unit-level transfer-order rows layered on top of the derived review surface; floating-NPRI over-carves now keep unit-focus payout readiness on `Hold` while editing stays available
 - `Flowchart` for presentation and print layout
 - `Runsheet` for chronology review, export, and opening the same node or lease editor cards used in `Desk Map`
@@ -41,8 +41,8 @@ Then open `http://localhost:5173/`.
 - `Research` for workspace-scoped source records, landman-readable formula cards, saved questions, federal/private project-record scaffolding, and a secondary advanced `Data Imports` area for RRC cataloging, imported files, readable table previews, and the existing permit decoders
 
 ## Demo loaders
-- `Stress (100/150/500)` loads the Desk Map stress workspace with three tract-sized title trees
-- `Leasehold (8 Tracts)` loads a separate eight-tract unit demo with clean `80`-acre-step gross and pooled acreage, clean half/quarter/eighth present-owner splits, 100% lease coverage for every present owner at `1/8` royalty, a starter unit-wide ORRI burden, and starter WI assignments
+- `Stress (100/150/500)` loads the Desk Map stress workspace with three tract-sized title trees, current owner/lease links, visible seeded PDF filenames, and fresh empty side workspaces for Curative/Maps/Research
+- `Leasehold (8 Tracts)` loads a separate eight-tract unit demo with clean `80`-acre-step gross and pooled acreage, clean half/quarter/eighth present-owner splits, one intentionally shared owner across two tracts, 100% branch-scoped lease coverage for every present owner at `1/8` royalty, a starter unit-wide ORRI burden, and starter WI assignments
 
 ## Persistence notes
 - Browser autosave keeps the active workspace and flowchart canvas locally.

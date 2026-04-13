@@ -6,6 +6,7 @@ import { createBlankLease } from '../../types/owner';
 const mocks = vi.hoisted(() => ({
   unlinkDeskMap: vi.fn(),
   unlinkNode: vi.fn(),
+  deletePdf: vi.fn(),
 }));
 
 vi.mock('../map-store', () => ({
@@ -15,6 +16,10 @@ vi.mock('../map-store', () => ({
       unlinkNode: mocks.unlinkNode,
     }),
   },
+}));
+
+vi.mock('../../storage/pdf-store', () => ({
+  deletePdf: mocks.deletePdf,
 }));
 
 import { useWorkspaceStore } from '../workspace-store';

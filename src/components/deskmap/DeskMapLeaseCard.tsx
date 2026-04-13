@@ -1,6 +1,7 @@
 import { memo } from 'react';
 import { useWorkspaceStore } from '../../store/workspace-store';
 import type { OwnershipNode } from '../../types/node';
+import DeskMapDocumentBadge from './DeskMapDocumentBadge';
 
 interface DeskMapLeaseCardProps {
   node: OwnershipNode;
@@ -75,18 +76,7 @@ function DeskMapLeaseCard({
               ))}
             </div>
           )}
-          {node.hasDoc && (
-            <button
-              type="button"
-              onClick={(event) => {
-                event.stopPropagation();
-                onViewPdf(node.id);
-              }}
-              className="text-[9px] text-emerald-800 font-semibold hover:underline"
-            >
-              View PDF
-            </button>
-          )}
+          <DeskMapDocumentBadge node={node} tone="emerald" onViewPdf={onViewPdf} />
         </div>
 
         <div className="hidden group-hover:flex px-2 py-1.5 border-t border-emerald-200 bg-emerald-100/70 rounded-b-lg gap-1 justify-center">

@@ -18,6 +18,7 @@ import {
 import DeskMapCard from '../components/deskmap/DeskMapCard';
 import DeskMapLeaseCard from '../components/deskmap/DeskMapLeaseCard';
 import DeskMapNpriCard from '../components/deskmap/DeskMapNpriCard';
+import { planDeskMapLeaseDeletion } from '../components/deskmap/deskmap-lease-delete';
 import { isLeaseNode } from '../components/deskmap/deskmap-lease-node';
 import {
   buildDeskMapTree,
@@ -465,6 +466,7 @@ export default function DeskMapView() {
   const pendingNodeEditorRoute = useUIStore((state) => state.pendingNodeEditorRoute);
   const setPendingNodeEditorRoute = useUIStore((state) => state.setPendingNodeEditorRoute);
   const leases = useOwnerStore((state) => state.leases);
+  const removeLeaseRecord = useOwnerStore((state) => state.removeLease);
   const nodes = useWorkspaceStore((s) => s.nodes);
   const deskMaps = useWorkspaceStore((s) => s.deskMaps);
   const activeNodeId = useWorkspaceStore((s) => s.activeNodeId);
@@ -648,14 +650,29 @@ export default function DeskMapView() {
 
   const handleDelete = useCallback((id: string) => {
     const node = nodeById.get(id) ?? null;
-    const message = node?.type === 'related'
+    const leaseDeletionPlan = planDeskMapLeaseDeletion(nodes, id);
+    const message = leaseDeletionPlan.leaseId
+      ? leaseDeletionPlan.removeOwnerLeaseRecord
+        ? 'Delete this lessee card and remove the linked lease from the owner record?'
+        : 'Delete this lessee card? The linked owner lease record is also used by another Desk Map card and will stay in owner info.'
+      : node?.type === 'related'
       ? 'Delete this related node? Any attached related records beneath it will also be removed.'
       : 'Delete this node? Its branch will be removed, and any conveyed amount will be restored to the grantor.';
 
     if (confirm(message)) {
-      removeNode(id);
+      void (async () => {
+        try {
+          if (leaseDeletionPlan.leaseId && leaseDeletionPlan.removeOwnerLeaseRecord) {
+            await removeLeaseRecord(leaseDeletionPlan.leaseId);
+          }
+          removeNode(id);
+        } catch (deleteError) {
+          console.error(deleteError);
+          alert('Lease delete failed. The card was left in place so owner data stays consistent.');
+        }
+      })();
     }
-  }, [nodeById, removeNode]);
+  }, [nodeById, nodes, removeLeaseRecord, removeNode]);
 
   const handleViewPdf = useCallback((id: string) => {
     setPdfViewNodeId(id);

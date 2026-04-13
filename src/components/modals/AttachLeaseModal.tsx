@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { buildLeaseNode, isLeaseNode } from '../deskmap/deskmap-lease-node';
 import {
   buildLeaseScopeIndex,
@@ -20,6 +20,7 @@ import {
 import { deriveCounty } from '../../utils/land';
 import { parseStrictInterestString } from '../../utils/interest-string';
 import { serialize } from '../../engine/decimal';
+import { savePdf } from '../../storage/pdf-store';
 import FormField from '../shared/FormField';
 import Modal from '../shared/Modal';
 import {
@@ -65,6 +66,7 @@ export default function AttachLeaseModal({
   const addLease = useOwnerStore((state) => state.addLease);
   const updateLease = useOwnerStore((state) => state.updateLease);
   const addOwner = useOwnerStore((state) => state.addOwner);
+  const pdfInputRef = useRef<HTMLInputElement>(null);
 
   const activeDeskMap = useMemo(
     () => activeDeskMaps.find((deskMap) => deskMap.id === activeDeskMapId) ?? null,
@@ -136,6 +138,7 @@ export default function AttachLeaseModal({
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [selectedOwnerId, setSelectedOwnerId] = useState('');
+  const [selectedPdfFile, setSelectedPdfFile] = useState<File | null>(null);
   const isEditingExistingLease = Boolean(existingLeaseNode || existingLease);
   const statusOptions = isLeaseStatusOption(draft.status)
     ? [...LEASE_STATUS_OPTIONS]
@@ -220,16 +223,10 @@ export default function AttachLeaseModal({
             ownerId,
           });
 
-      if (existingLease) {
-        await updateLease(existingLease.id, leaseRecord);
-      } else {
-        await addLease(leaseRecord);
-      }
-
       const leaseNodeId =
         existingLeaseNode?.id ??
         `node-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-      const leaseNode = buildLeaseNode({
+      let leaseNode = buildLeaseNode({
         id: leaseNodeId,
         parentNode: {
           ...parentNode,
@@ -238,6 +235,20 @@ export default function AttachLeaseModal({
         lease: leaseRecord,
         existingNode: existingLeaseNode,
       });
+      if (selectedPdfFile) {
+        const attachment = await savePdf(leaseNodeId, selectedPdfFile);
+        leaseNode = {
+          ...leaseNode,
+          hasDoc: true,
+          docFileName: attachment.fileName,
+        };
+      }
+
+      if (existingLease) {
+        await updateLease(existingLease.id, leaseRecord);
+      } else {
+        await addLease(leaseRecord);
+      }
 
       if (existingLeaseNode) {
         updateNode(existingLeaseNode.id, leaseNode);
@@ -248,6 +259,12 @@ export default function AttachLeaseModal({
 
       onSaved?.(leaseNode.id);
       onClose();
+    } catch (saveError) {
+      setSaveError(
+        saveError instanceof Error
+          ? saveError.message
+          : 'Lease save failed. Please try again.'
+      );
     } finally {
       setSaving(false);
     }
@@ -367,6 +384,62 @@ export default function AttachLeaseModal({
             className="w-full px-3 py-2 rounded-lg border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none resize-y"
           />
         </div>
+
+        <fieldset className="space-y-2">
+          <legend className="text-xs font-semibold text-ink-light uppercase tracking-wider mb-2">
+            Lease PDF
+          </legend>
+          <input
+            ref={pdfInputRef}
+            type="file"
+            accept=".pdf"
+            className="hidden"
+            onChange={(event) => {
+              const file = event.target.files?.[0] ?? null;
+              setSaveError(null);
+              setSelectedPdfFile(file);
+              event.target.value = '';
+            }}
+          />
+          <div className="flex flex-wrap items-center gap-2">
+            {existingLeaseNode?.hasDoc && !selectedPdfFile && (
+              <span className="min-w-0 max-w-full rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs text-emerald-900">
+                <span className="font-semibold">Current:</span>{' '}
+                <span className="font-mono break-all">
+                  {existingLeaseNode.docFileName ||
+                    (existingLeaseNode.docNo ? `${existingLeaseNode.docNo}.pdf` : 'PDF')}
+                </span>
+              </span>
+            )}
+            {selectedPdfFile && (
+              <span className="min-w-0 max-w-full rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs text-emerald-900">
+                <span className="font-semibold">Selected:</span>{' '}
+                <span className="font-mono break-all">{selectedPdfFile.name}</span>
+              </span>
+            )}
+            <button
+              type="button"
+              disabled={saving}
+              onClick={() => pdfInputRef.current?.click()}
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold text-emerald-800 hover:bg-emerald-100 border border-emerald-200 transition-colors disabled:opacity-60"
+            >
+              {existingLeaseNode?.hasDoc || selectedPdfFile ? 'Replace PDF' : 'Attach PDF'}
+            </button>
+            {selectedPdfFile && (
+              <button
+                type="button"
+                disabled={saving}
+                onClick={() => setSelectedPdfFile(null)}
+                className="px-3 py-1.5 rounded-lg text-xs text-seal hover:bg-seal/10 transition-colors disabled:opacity-60"
+              >
+                Clear Selected PDF
+              </button>
+            )}
+          </div>
+          <div className="text-[11px] leading-5 text-ink-light">
+            The PDF attaches to the Desk Map lessee card and its filename appears on the card face.
+          </div>
+        </fieldset>
 
         {saveError && (
           <div className="rounded-lg border border-seal/30 bg-seal/10 px-3 py-2 text-xs text-seal">

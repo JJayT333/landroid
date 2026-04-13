@@ -2,6 +2,33 @@
 
 Use this file to resume work in a new chat.
 
+## Latest lease/PDF/demo cleanup — 2026-04-13
+
+This section supersedes older branch/status bullets below when they conflict.
+
+- Active branch: `codex/curative-cha-cha-slide`
+- Latest committed baseline before this work:
+  - `3ebb5fd feat: rebuild research workspace`
+- New in-progress work after `3ebb5fd`:
+  - Desk Map cards now preserve and show the attached PDF filename on the face of title, lessee, NPRI, and related-document cards
+  - node PDF attachment saves now store the filename on the node, and removal clears both `hasDoc` and the filename
+  - the attach-lease modal now lets the user attach or replace the lease PDF while creating/editing the terminal lessee node
+  - `.landroid` import backfills node PDF filenames from the exported PDF payload when old nodes only have `hasDoc`
+  - deleting the only Desk Map lessee card tied to an owner lease removes that lease from the owner record; if another Desk Map card still uses that lease, the owner lease record stays in place
+  - deleting a title/related branch now also deletes orphaned node-PDF blobs for removed node ids
+  - `Stress (100/150/500)` and `Leasehold (8 Tracts)` seed data now mark visible seeded PDF filenames and reset Research along with Owner/Map/Curative side stores for the new workspace
+  - the leasehold demo now intentionally links `Raven Bend Minerals, LLC` across two tracts to exercise same-owner/multi-tract behavior without merging branches or sharing branch lease records
+- Validation completed after this cleanup:
+  - `npm run lint` passed
+  - targeted suite passed: `npx vitest run src/storage/__tests__/seed-test-data.test.ts src/components/deskmap/__tests__/deskmap-document-badge.test.ts src/components/deskmap/__tests__/deskmap-lease-delete.test.ts src/store/__tests__/owner-store.test.ts src/store/__tests__/workspace-store.test.ts src/storage/__tests__/workspace-persistence.test.ts src/components/deskmap/__tests__/deskmap-coverage.test.ts` (`46/46`)
+  - `npm test` passed (`311/311`)
+  - `npm run build` passed
+- Browser/user-flow QA status:
+  - Not completed in automation. This session does not expose the `js_repl` browser tool and the repo does not include Playwright; no new dependency was added.
+- Still needed before final confidence:
+  - browser-QA/manual-QA Desk Map PDF chips, attach-lease PDF upload, lease-card delete-to-owner sync, and refreshed demo buttons
+  - do not stage generated `dist/`, `dist-node/`, `.DS_Store`, `.claude/`, or `TORS_Documents/`
+
 ## Latest workflow + Research rebuild — 2026-04-13
 
 This section supersedes older branch/status bullets below when they conflict.

@@ -171,6 +171,7 @@ function buildWorkspace(canvas: CanvasSaveData | null): LandroidFileData {
         ...createBlankNode('node-1'),
         type: 'related',
         hasDoc: true,
+        docFileName: '20260001.pdf',
         linkedOwnerId: owner.id,
         linkedLeaseId: 'lease-1',
         relatedKind: 'lease',
@@ -290,6 +291,7 @@ describe('workspace-persistence', () => {
     );
     expect(imported.canvas).toEqual(original.canvas);
     expect(imported.pdfData?.pdfs[0]?.fileName).toBe('20260001.pdf');
+    expect(imported.nodes[0]?.docFileName).toBe('20260001.pdf');
     expect(await imported.pdfData?.pdfs[0]?.blob.text()).toBe('node-pdf-body');
     expect(imported.ownerData?.owners).toEqual(original.ownerData?.owners);
     expect(imported.ownerData?.docs[0]?.fileName).toBe('owner-notes.txt');
@@ -385,6 +387,7 @@ describe('workspace-persistence', () => {
         {
           ...createBlankNode('node-with-missing-pdf'),
           hasDoc: true,
+          docFileName: 'missing.pdf',
         },
       ],
       deskMaps: [],
@@ -398,6 +401,7 @@ describe('workspace-persistence', () => {
     const imported = await importLandroidFile(file);
 
     expect(imported.nodes[0]?.hasDoc).toBe(false);
+    expect(imported.nodes[0]?.docFileName).toBe('');
     expect(imported.pdfData).toEqual({ pdfs: [] });
   });
 

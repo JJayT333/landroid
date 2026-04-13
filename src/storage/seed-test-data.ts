@@ -12,6 +12,7 @@ import { useWorkspaceStore } from '../store/workspace-store';
 import { useMapStore } from '../store/map-store';
 import { useOwnerStore } from '../store/owner-store';
 import { useCurativeStore } from '../store/curative-store';
+import { useResearchStore } from '../store/research-store';
 import { buildLeaseNode, isLeaseNode } from '../components/deskmap/deskmap-lease-node';
 import type { OwnerWorkspaceData } from './owner-persistence';
 import { createBundledDeskMapPdfFile } from './bundled-deskmap-pdfs';
@@ -52,6 +53,17 @@ function makeNode(
 interface PdfMapping {
   nodeId: string;
   fileName: string;
+}
+
+function markNodePdfMetadata(
+  nodes: OwnershipNode[],
+  nodeId: string,
+  fileName: string
+): void {
+  const node = nodes.find((candidate) => candidate.id === nodeId);
+  if (!node) return;
+  node.hasDoc = true;
+  node.docFileName = fileName;
 }
 
 function countyFromLandDesc(landDesc: string): string {
@@ -121,40 +133,54 @@ function buildSeedOwnerWorkspaceData(
   nodes: OwnershipNode[];
   ownerData: OwnerWorkspaceData;
 } {
+  const ownerIdByNameKey = new Map<string, string>();
+  const ownerSourceById = new Map<string, { node: OwnershipNode; index: number }>();
+
   const nodesWithOwners = nodes.map((node, index) => {
     if (!hasPositiveFraction(node)) {
       return node;
     }
 
-    const ownerId = `owner-${slugify(node.grantee || node.id)}-${index + 1}`;
+    const ownerName = node.grantee.trim();
+    const nameKey = ownerName ? slugify(ownerName) : `${slugify(node.id)}-${index + 1}`;
+    let ownerId = ownerIdByNameKey.get(nameKey);
+    if (!ownerId) {
+      ownerId = `owner-${nameKey || slugify(node.id)}-${ownerIdByNameKey.size + 1}`;
+      ownerIdByNameKey.set(nameKey, ownerId);
+      ownerSourceById.set(ownerId, { node, index });
+    }
+
     return {
       ...node,
       linkedOwnerId: ownerId,
     };
   });
 
-  const owners = nodesWithOwners.flatMap((node, index) => {
-    if (!hasPositiveFraction(node) || !node.linkedOwnerId) {
-      return [];
-    }
+  const owners = [...ownerSourceById.entries()].map(([ownerId, source]) => {
+    const node = source.node;
+    const matchingNodes = nodesWithOwners.filter(
+      (candidate) => candidate.linkedOwnerId === ownerId
+    );
+    const linkedTractNotes = matchingNodes
+      .map((candidate) => candidate.landDesc)
+      .filter((landDesc, index, all) => landDesc && all.indexOf(landDesc) === index)
+      .map((landDesc) => `Linked tract: ${landDesc}`);
 
-    return [
-      createBlankOwner(workspaceId, {
-        id: node.linkedOwnerId,
-        name: node.grantee || `Owner ${index + 1}`,
-        county: countyFromLandDesc(node.landDesc),
-        prospect: projectName,
-        notes: [
-          node.instrument ? `Source Instrument: ${node.instrument}` : '',
-          node.docNo ? `Doc #: ${node.docNo}` : '',
-          node.landDesc ? `Land: ${node.landDesc}` : '',
-        ]
-          .filter(Boolean)
-          .join('\n'),
-        createdAt: toIsoTimestamp(node.fileDate || node.date),
-        updatedAt: toIsoTimestamp(node.fileDate || node.date),
-      }),
-    ];
+    return createBlankOwner(workspaceId, {
+      id: ownerId,
+      name: node.grantee || `Owner ${source.index + 1}`,
+      county: countyFromLandDesc(node.landDesc),
+      prospect: projectName,
+      notes: [
+        node.instrument ? `Source Instrument: ${node.instrument}` : '',
+        node.docNo ? `Doc #: ${node.docNo}` : '',
+        ...linkedTractNotes,
+      ]
+        .filter(Boolean)
+        .join('\n'),
+      createdAt: toIsoTimestamp(node.fileDate || node.date),
+      updatedAt: toIsoTimestamp(node.fileDate || node.date),
+    });
   });
 
   const nodeById = new Map(nodesWithOwners.map((node) => [node.id, node]));
@@ -734,13 +760,15 @@ function buildTestNodes(): { nodes: OwnershipNode[]; pdfMappings: PdfMapping[] }
 
 async function attachPdf(nodeId: string, fileName: string): Promise<boolean> {
   try {
-    const node = useWorkspaceStore.getState().nodes.find((candidate) => candidate.id === nodeId);
-    const fileNameHint = node?.docNo ? `${node.docNo}.pdf` : fileName;
     const file = await createBundledDeskMapPdfFile(
       `${nodeId}:${fileName}`,
-      fileNameHint
+      fileName
     );
-    await savePdf(nodeId, file);
+    const attachment = await savePdf(nodeId, file);
+    useWorkspaceStore.getState().updateNode(nodeId, {
+      hasDoc: true,
+      docFileName: attachment.fileName,
+    });
     return true;
   } catch (err) {
     console.warn(`[seed] Failed to attach ${fileName}:`, err);
@@ -757,6 +785,13 @@ async function resetWorkspaceSideStores(
     useMapStore.getState().setWorkspace(workspaceId),
     useCurativeStore.getState().replaceWorkspaceData(workspaceId, {
       titleIssues: [],
+    }),
+    useResearchStore.getState().replaceWorkspaceData(workspaceId, {
+      imports: [],
+      sources: [],
+      formulas: [],
+      projectRecords: [],
+      questions: [],
     }),
   ]);
 }
@@ -775,8 +810,7 @@ export async function seedTestData(): Promise<{ nodeCount: number; pdfCount: num
 
   // Mark nodes that will have PDFs
   for (const mapping of pdfMappings) {
-    const node = nodes.find((n) => n.id === mapping.nodeId);
-    if (node) node.hasDoc = true;
+    markNodePdfMetadata(nodes, mapping.nodeId, mapping.fileName);
   }
 
   // Create desk map
@@ -823,7 +857,10 @@ export async function seedTestData(): Promise<{ nodeCount: number; pdfCount: num
 
   if (failedPdfNodeIds.length > 0) {
     for (const failedNodeId of failedPdfNodeIds) {
-      useWorkspaceStore.getState().updateNode(failedNodeId, { hasDoc: false });
+      useWorkspaceStore.getState().updateNode(failedNodeId, {
+        hasDoc: false,
+        docFileName: '',
+      });
     }
   }
 
@@ -980,7 +1017,7 @@ class StressBuilder {
     if (this.pdfIdx >= STRESS_PDFS.length) return;
     const node = this.nodes.find((n) => n.id === nodeId);
     if (node) {
-      node.hasDoc = true;
+      markNodePdfMetadata(this.nodes, nodeId, STRESS_PDFS[this.pdfIdx]);
       this.pdfMappings.push({ nodeId, fileName: STRESS_PDFS[this.pdfIdx++] });
     }
   }
@@ -1402,7 +1439,7 @@ const LEASEHOLD_DEMO_TRACTS: LeaseholdDemoTractPlan[] = [
     patentYear: 1902,
     patentGrantee: 'Della June Moonwhistle',
     pattern: 'half-quarter-quarter',
-    currentOwners: ['Ava Moonwhistle', 'Barton Sodbuster', 'Clara Goosefiddle'],
+    currentOwners: ['Raven Bend Minerals, LLC', 'Barton Sodbuster', 'Clara Goosefiddle'],
     branchHolders: ['Moonwhistle Family Holdings, LLC'],
   },
   {
@@ -1441,7 +1478,7 @@ const LEASEHOLD_DEMO_TRACTS: LeaseholdDemoTractPlan[] = [
     patentYear: 1899,
     patentGrantee: 'Buckshot Ray Velvetanvil',
     pattern: 'half-quarter-quarter',
-    currentOwners: ['Lena Velvetanvil', 'Morris Crowbait', 'Nora Picklebarrel'],
+    currentOwners: ['Raven Bend Minerals, LLC', 'Morris Crowbait', 'Nora Picklebarrel'],
     branchHolders: ['Velvetanvil Mineral Management, LLC'],
   },
   {
@@ -1523,7 +1560,7 @@ function markLeaseholdDemoPdf(
 ) {
   const node = state.nodes.find((candidate) => candidate.id === nodeId);
   if (!node) return;
-  node.hasDoc = true;
+  markNodePdfMetadata(state.nodes, nodeId, fileName);
   state.pdfMappings.push({ nodeId, fileName });
 }
 
@@ -1964,7 +2001,10 @@ export async function seedStressTestData(): Promise<{ nodeCount: number; pdfCoun
 
   if (failedPdfNodeIds.length > 0) {
     for (const failedNodeId of failedPdfNodeIds) {
-      useWorkspaceStore.getState().updateNode(failedNodeId, { hasDoc: false });
+      useWorkspaceStore.getState().updateNode(failedNodeId, {
+        hasDoc: false,
+        docFileName: '',
+      });
     }
   }
 
@@ -2007,7 +2047,10 @@ export async function seedLeaseholdDemoData(): Promise<{
 
   if (failedPdfNodeIds.length > 0) {
     for (const failedNodeId of failedPdfNodeIds) {
-      useWorkspaceStore.getState().updateNode(failedNodeId, { hasDoc: false });
+      useWorkspaceStore.getState().updateNode(failedNodeId, {
+        hasDoc: false,
+        docFileName: '',
+      });
     }
   }
 
@@ -3115,7 +3158,10 @@ export async function seedCombinatorialData(): Promise<{
 
   if (failedPdfNodeIds.length > 0) {
     for (const failedNodeId of failedPdfNodeIds) {
-      useWorkspaceStore.getState().updateNode(failedNodeId, { hasDoc: false });
+      useWorkspaceStore.getState().updateNode(failedNodeId, {
+        hasDoc: false,
+        docFileName: '',
+      });
     }
   }
 

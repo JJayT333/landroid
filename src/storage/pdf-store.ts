@@ -3,7 +3,7 @@
  */
 import db, { type PdfAttachment } from './db';
 
-export async function savePdf(nodeId: string, file: File): Promise<void> {
+export async function savePdf(nodeId: string, file: File): Promise<PdfAttachment> {
   const attachment: PdfAttachment = {
     nodeId,
     fileName: file.name,
@@ -12,6 +12,7 @@ export async function savePdf(nodeId: string, file: File): Promise<void> {
     createdAt: new Date().toISOString(),
   };
   await db.pdfs.put(attachment);
+  return attachment;
 }
 
 export async function getPdf(nodeId: string): Promise<PdfAttachment | undefined> {

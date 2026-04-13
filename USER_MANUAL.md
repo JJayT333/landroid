@@ -80,6 +80,7 @@ Gross acres and tract descriptions now live on the tract record itself, but you 
   - green `Leased` status when that owner has an active lease on file
 - The mineral-owner card stays part of the main title tree and does not turn into a separate lessor card.
 - The attached green lessee node is the lease-side view. It is terminal in Desk Map, holds the lease terms and metadata, and stays linked back to the same owner record so Desk Map and `Owners` use the same lease data.
+- Any Desk Map card with an attached PDF shows a PDF chip and filename on the card face, including title cards, lessee cards, NPRI cards, and related document chips.
 - NPRI nodes render as their own amber royalty cards. They can convey within the NPRI branch, but they stay separate from the mineral-owner coverage totals.
 
 ### Coverage totals
@@ -95,6 +96,7 @@ If `Found in Chain` is temporarily over `100%`, LANDroid keeps that state visibl
 
 ### Important delete behavior
 Deleting a conveyance branch removes that branch and restores the deleted conveyed amount back to the original grantor or parent. This is safer than simply dropping the branch and losing the fraction.
+Deleting the only Desk Map lessee card tied to an owner lease also removes that lease from the owner record. If another Desk Map card still uses the same lease record, deleting one lessee card leaves the owner lease in place and only removes that card.
 
 ### Empty-state behavior
 If a tract has no cards yet, start with `+ Add Root` or load a `.landroid` or `.csv` file.
@@ -143,6 +145,7 @@ It now has three internal modes:
 - Pooled acres drive participation and payout decimals
 - The starter demo begins with pooled acres equal to gross acres on every tract for easier audit checks
 - Leasehold math now aggregates all active owner leases in effective-date order and caps the leased total at the owner's current fraction; a lease linked to a Desk Map lease card is treated as branch-scoped instead of applying to every tract for the same owner
+- Deleting the only branch-scoped Desk Map lease card now removes that linked lease from `Owners`; shared lease records stay in `Owners` while other cards still use them
 - ORRI math now supports gross `8/8`, working-interest, and net-revenue-interest burden bases, with NRI-basis ORRIs stacking in effective-date order
 - If NPRI branches exist, Leasehold now derives separate fixed and floating NPRI payout rows and shows them in both the deck and the transfer-order ledger
 - Fixed NPRIs can now pay two different ways depending on the deed: branch-based fixed burdens scale with the leased slice of the burdened branch, while whole-tract fixed burdens are treated as fixed against tract production and only reduced when less than the full burdened branch is leased
@@ -160,10 +163,13 @@ It now has three internal modes:
 - The tract gross acres are `80`, `160`, `240`, `320`, `400`, `480`, `560`, and `640`
 - The tract pooled acres match those same `80`, `160`, `240`, `320`, `400`, `480`, `560`, and `640` values
 - The present-owner splits stay on clean half / quarter / eighth fractions for easier testing
+- One owner intentionally appears on two different tracts so you can test same-owner, multi-tract behavior without merging title branches or leaking lease status across tracts
 - Every present owner in that demo is leased to the same lessee at `1/8` royalty so the first royalty totals are easier to inspect
+- Seeded title and lease PDFs show their filenames on the Desk Map cards
 - The demo also starts with one unit-wide gross `1/16` ORRI so the burden summary has a clean check number
 - The demo also starts with a unit-wide `1/2` WI assignment and a tract-specific `1/4` WI assignment on `Tract 4` so the deck has clean starter splits
 - The demo starts with no saved transfer-order row metadata, so you can test the first editable row layer from a clean slate
+- The demo loaders reset Curative, Maps, and Research side workspaces for the new sample workspace so stale side records from previous work are not carried over
 - The tract descriptions are prefilled so you can see how the tab is meant to be used before entering your own data
 
 ## 4) Runsheet view
@@ -235,6 +241,7 @@ Useful notes:
 - Editing an existing lease in `Owners` now refreshes any linked Desk Map lease node and Runsheet lease row text that came from that lease record.
 - New lease edits now use a short status list (`Active`, `Expired`, `Released`, `Terminated`, `Inactive`, `Dead`) so active-lease math stays consistent; older custom status text still displays until you choose a canonical replacement.
 - Each saved lease card also shows `Desk Map Lease Node` buttons for the linked tract chains, so you can create or reopen the terminal lessee node from `Owners` without hunting for that owner in the tree first.
+- Deleting a lease from `Owners` clears the linked lease reference on Desk Map cards; deleting the only linked Desk Map lessee card removes that lease from `Owners`.
 
 ### Math safety
 - Core title-math mutations now fail fast on zero, blank, or non-numeric share inputs instead of quietly converting them to zero-interest branches.
@@ -434,6 +441,7 @@ These are the main workspace snapshot files. They now include:
 
 ### `.csv` import
 CSV import loads workspace data, resets the flowchart canvas, and starts a fresh empty owner/curative/maps/research side workspace so you can re-import and relink cleanly. `.landroid` export/import carries node PDF attachments; if an older backup says a title card has a PDF but does not include the attachment payload, LANDroid clears the PDF flag instead of substituting an unrelated document.
+When a PDF payload is present, LANDroid preserves the stored PDF filename so Desk Map can show what is attached instead of only saying that a PDF exists.
 
 ### Local browser storage
 The app also uses browser storage for local autosave. This is convenient, but it is not a substitute for named backups.

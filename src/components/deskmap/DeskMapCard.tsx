@@ -12,6 +12,7 @@ import { d, serialize } from '../../engine/decimal';
 import { useWorkspaceStore } from '../../store/workspace-store';
 import type { OwnershipNode } from '../../types/node';
 import type { DeskMapPrimaryLeaseSummary } from './deskmap-coverage';
+import DeskMapDocumentBadge from './DeskMapDocumentBadge';
 
 interface DeskMapCardProps {
   node: OwnershipNode;
@@ -150,17 +151,7 @@ function DeskMapCard({
               <span className="ml-1 text-[10px] text-seal font-normal">(deceased)</span>
             )}
           </div>
-          {node.hasDoc && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onViewPdf(node.id);
-              }}
-              className="text-[9px] text-leather font-semibold mt-0.5 hover:underline cursor-pointer"
-            >
-              View PDF
-            </button>
-          )}
+          <DeskMapDocumentBadge node={node} onViewPdf={onViewPdf} />
           {hasNpriDiscrepancy && (
             <div className="mt-2 rounded-md border border-seal/25 bg-seal/10 px-2 py-1.5 text-[10px] leading-4 text-seal">
               NPRI burden discrepancy on this branch. Review the red NPRI card
@@ -271,22 +262,8 @@ function RelatedDocChip({
         {doc.remarks && (
           <div className="text-[9px] text-ink-light truncate">{doc.remarks}</div>
         )}
-        {doc.hasDoc && (
-          <div className="text-[8px] text-leather font-semibold mt-0.5">PDF attached</div>
-        )}
+        <DeskMapDocumentBadge node={doc} onViewPdf={onViewPdf} />
       </div>
-      {doc.hasDoc && (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onViewPdf(doc.id);
-          }}
-          className="text-[9px] text-leather font-bold hover:bg-leather/10 px-1.5 py-0.5 rounded shrink-0"
-          title="View PDF"
-        >
-          PDF
-        </button>
-      )}
       <button
         onClick={(e) => {
           e.stopPropagation();

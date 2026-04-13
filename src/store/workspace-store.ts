@@ -8,6 +8,7 @@ import { create } from 'zustand';
 import { buildLeaseNode, isLeaseNode } from '../components/deskmap/deskmap-lease-node';
 import { useCurativeStore } from './curative-store';
 import { useMapStore } from './map-store';
+import { deletePdf } from '../storage/pdf-store';
 import type { OwnershipNode, DeskMap } from '../types/node';
 import { normalizeDeskMap, normalizeOwnershipNode } from '../types/node';
 import {
@@ -544,6 +545,7 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
       lastError: null,
     });
     for (const removedId of removedIds) {
+      void deletePdf(removedId);
       void useMapStore.getState().unlinkNode(removedId);
       useCurativeStore.getState().unlinkNode(removedId);
     }

@@ -62,7 +62,7 @@ export default function PdfViewerModal({
   }, [fileNameHint, nodeId]);
 
   return (
-    <Modal open onClose={onClose} title={fileName || 'View PDF'} wide>
+    <Modal open onClose={onClose} title={fileName || fileNameHint || 'View PDF'} wide>
       {error ? (
         <div className="text-center py-8 text-ink-light">{error}</div>
       ) : objectUrl ? (
