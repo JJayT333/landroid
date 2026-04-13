@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useMemo } from 'react';
-import { getActiveLeases, pickPrimaryLease, toDeskMapPrimaryLeaseSummary } from '../deskmap/deskmap-coverage';
+import {
+  buildLeaseScopeIndex,
+  getActiveLeases,
+  getLeasesForOwnerNode,
+  pickPrimaryLease,
+  toDeskMapPrimaryLeaseSummary,
+} from '../deskmap/deskmap-coverage';
 import { deriveCounty } from '../../utils/land';
 import { useUIStore } from '../../store/ui-store';
 import { useOwnerStore } from '../../store/owner-store';
@@ -9,6 +15,10 @@ import AttachLeaseModal from '../modals/AttachLeaseModal';
 import CreateNpriModal from '../modals/CreateNpriModal';
 import PdfViewerModal from '../modals/PdfViewerModal';
 import { createBlankOwner } from '../../types/owner';
+import {
+  buildOwnerLinkOptions,
+  resolveExistingOwnerSelection,
+} from '../owners/owner-link-options';
 import type { NodeEditorRoute } from '../../utils/node-editor-route';
 
 interface OwnershipNodeEditorModalsProps {
@@ -48,6 +58,11 @@ export default function OwnershipNodeEditorModals({
     () => new Map(owners.map((owner) => [owner.id, owner])),
     [owners]
   );
+  const ownerLinkOptions = useMemo(
+    () => buildOwnerLinkOptions(owners),
+    [owners]
+  );
+  const leaseScopeIndex = useMemo(() => buildLeaseScopeIndex(nodes), [nodes]);
   const deskMapNameByNodeId = useMemo(() => {
     const next = new Map<string, string>();
 
@@ -94,8 +109,12 @@ export default function OwnershipNodeEditorModals({
       return null;
     }
 
-    const ownerLeases = getActiveLeases(
-      leases.filter((lease) => lease.ownerId === editNode.linkedOwnerId)
+    const ownerLeases = getLeasesForOwnerNode(
+      getActiveLeases(
+        leases.filter((lease) => lease.ownerId === editNode.linkedOwnerId)
+      ),
+      editNode,
+      leaseScopeIndex
     );
     const leaseSummary = toDeskMapPrimaryLeaseSummary(pickPrimaryLease(ownerLeases));
 
@@ -106,7 +125,7 @@ export default function OwnershipNodeEditorModals({
     return leaseSummary.lessee
       ? `Leased to ${leaseSummary.lessee}`
       : 'Lease node on file';
-  }, [editNode, leases]);
+  }, [editNode, leaseScopeIndex, leases]);
 
   const handleManageOwner = useCallback(
     async (nodeId: string) => {
@@ -159,6 +178,22 @@ export default function OwnershipNodeEditorModals({
     ]
   );
 
+  const handleLinkExistingOwner = useCallback(
+    (nodeId: string, ownerId: string) => {
+      const node = nodeById.get(nodeId) ?? null;
+      const resolvedOwnerId = resolveExistingOwnerSelection(
+        ownerLinkOptions,
+        ownerId
+      );
+      if (!node || node.type === 'related' || node.linkedOwnerId || !resolvedOwnerId) {
+        return;
+      }
+
+      updateNode(node.id, { linkedOwnerId: resolvedOwnerId });
+    },
+    [nodeById, ownerLinkOptions, updateNode]
+  );
+
   const handleManageLease = useCallback(
     (nodeId: string) => {
       setActiveNode(nodeId);
@@ -188,8 +223,10 @@ export default function OwnershipNodeEditorModals({
               ? ownerById.get(editNode.linkedOwnerId)?.name ?? null
               : null
           }
+          ownerLinkOptions={ownerLinkOptions}
           leaseStatusText={leaseStatusText}
           onManageOwner={handleManageOwner}
+          onLinkOwner={handleLinkExistingOwner}
           onManageLease={handleManageLease}
           onManageNpri={handleManageNpri}
           onClose={() => onSetRoute(null)}

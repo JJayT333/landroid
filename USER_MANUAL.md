@@ -40,7 +40,7 @@ The top bar also has:
 - `Stress (100/150/500)` to load sample tract data for testing
 - `Leasehold (8 Tracts)` to load an eight-tract unit demo with acreage and lease data
 
-The current project name appears in the top bar. Local autosave still uses browser storage, but `Save` now captures workspace data, flowchart canvas state, owner records, owner documents, curative title issues, map assets, and research imports in the exported `.landroid` file.
+The current project name appears in the top bar. Local autosave still uses browser storage, but `Save` now captures workspace data, flowchart canvas state, owner records, owner documents, curative title issues, map assets, and Research sources, formulas, project records, saved questions, and imports in the exported `.landroid` file.
 The top-left brand area can also carry a custom logo for demo or prospect-specific presentation.
 If LANDroid detects corrupt autosaved workspace or canvas data during startup, it now opens a safe fresh state and shows a warning banner instead of silently pretending there was no saved data.
 If a render or lazy-load failure occurs, LANDroid now shows a reload screen with the error details instead of dropping to a blank page.
@@ -69,7 +69,9 @@ Gross acres and tract descriptions now live on the tract record itself, but you 
 - Related documents stay attached to a title card and do not change ownership math.
 - Cards that still retain interest are visually emphasized so they are easier to spot.
 - The node edit modal includes an `Owner Record` section so you can create or open a linked owner record without crowding the card footer.
+- If the title card is not linked to an owner yet, `Owner Record` can link an existing owner record. Use this when the same legal owner appears in another tract and you want one owner/lease file without merging the tract title branches.
 - The node edit modal also includes a `Lease / Lessee Node` section for present-interest mineral owners. Use that button to create or reopen the terminal lessee node.
+- When creating a lessee node from an unlinked title card, choose an existing owner in the lease modal if this is the same party already tracked in `Owners`. Leaving it blank creates a new owner record from the title card when you save.
 - The node edit modal also includes an `Add NPRI` action for present-interest mineral owners. Use it to create a separate fixed or floating NPRI branch without reducing the mineral ownership total.
 - Fixed NPRIs now require one extra deed-reading choice: `Of burdened branch` when the deed fraction is tied to the grantor's branch, or `Of whole tract` when the fixed fraction is already stated against production from the land itself.
 - LANDroid allows NPRI title discrepancies to be entered. If fixed or floating NPRIs over-claim the burdened branch or royalty bucket, the affected Desk Map branch and NPRI cards turn red and the toolbar shows an NPRI title-discrepancy warning.
@@ -225,6 +227,7 @@ Useful notes:
 
 ### Typical workflow
 - Create a new owner from the `Owners` tab, or open `Owner Record` from a node edit modal in `Desk Map`.
+- For a same owner in multiple tracts, link each tract's Desk Map branch to the existing owner record before creating branch-specific lease nodes.
 - Use the left-side `Search` box and `Sort By` picker to cut long owner lists down by owner name, county, prospect, lease text, active lease count, or recent activity.
 - Use the `Info` tab for mailing/contact/prospect notes.
 - Use `Leases` and `Contacts` for working notes tied to that owner.
@@ -297,8 +300,10 @@ The Curative view also keeps the next broader company-readiness areas visible so
 - PDF map files
 - PNG / JPG images
 - GeoJSON files for exported GIS artifacts
+- GeoJSON feature summaries for supported text GeoJSON
 - saved rectangular presentation regions on image assets
 - saved outside reference links for maps or regions
+- links from maps or regions to Research sources and project records
 
 ### How to use it
 - Upload one or more files into `Maps`.
@@ -307,7 +312,7 @@ The Curative view also keeps the next broader company-readiness areas visible so
 - Use `Edit` mode to update metadata, place image-based regions, and save outside reference links.
 - Map reference links accept `http://` and `https://` URLs; plain domains are normalized to `https://`, and unsupported schemes are blocked.
 - Add metadata such as county, prospect, effective date, and source.
-- Optionally link the map or a region to a desk map, title node, owner record, or lease.
+- Optionally link the map or a region to a desk map, title node, owner record, lease, Research source, or Research project record.
 - Preview supported file types inline, or download them back out.
 
 ### Current scope
@@ -315,13 +320,20 @@ The Curative view also keeps the next broader company-readiness areas visible so
 - Region placement in this phase uses saved rectangular overlays rather than freeform GIS drawing.
 - This is still a lightweight map/presentation workflow, not a live GIS viewer.
 - ArcGIS Pro is not embedded in the app.
-- The practical short-term path is to bring ArcGIS outputs into LANDroid as exported PDF, image, or GeoJSON artifacts.
+- The practical short-term path is to bring ArcGIS outputs into LANDroid as exported PDF, image, or GeoJSON artifacts, then link those artifacts back to the sources and project records that explain them.
 
 ## 8) Research view
 
-`Research` is now the RRC-oriented workspace for official dataset families, imported downloads, and decoder triage.
+`Research` is now the source-of-truth workspace for project sources, formulas, federal/private reference records, saved questions, and advanced data imports.
 
 ### What it supports today
+- `Sources` for statutes, cases, agency pages, manuals, uploaded files, project notes, map/GIS references, and lease/source documents
+- `Formulas` for landman-readable formula cards with variables, examples, source links, review status, and optional LANDroid engine references
+- `Project Records` for federal leases, private leases, mapped tracts, target acquisitions, current leases, legal-description notes, map links, and source links
+- `Questions` for saved research questions, manual answers/notes, source links, formula links, project-record links, and review status
+- `Data Imports` for the older RRC catalog/import/decoder workspace, now treated as an advanced section
+
+### Data Imports support today
 - an in-app catalog of major official RRC downloadable dataset families
 - direct links back to the official RRC downloads page
 - workspace-scoped imports of downloaded files, including CSV, JSON, PDF, images, ZIPs, shapefile parts, ASCII, and EBCDIC files
@@ -333,8 +345,12 @@ The Curative view also keeps the next broader company-readiness areas visible so
 - a fixed-width structured decoder for `Horizontal Drilling Permits`, turning the row-based ASCII file into a readable permit preview
 
 ### How to use it
-- Pick a dataset family from the left side.
-- Import the files you downloaded from the official RRC site.
+- Start in `Sources` when you need to save the authority, document, page, map reference, or project note that supports your work.
+- Use `Formulas` to document what a calculation means, which variables go into it, which source or convention supports it, and where LANDroid currently uses the logic.
+- Use `Project Records` to track a federal lease, private lease, mapped tract, target acquisition, or other reference-only project item without changing Texas Desk Map or Leasehold math.
+- Use `Questions` to save a research question and the sources, formulas, or project records that support the answer.
+- Use `Data Imports` only when you want to stage official RRC downloads or review the existing decoder output.
+- In `Data Imports`, pick a dataset family from the left side and import the files you downloaded from the official RRC site.
 - Use the decoder status badges to see what is preview-ready now versus what still needs parser/manual work.
 - Edit title, dataset family, and notes in the detail panel, then use `Save Details` to commit those metadata changes.
 - Use `Reset` if you want to discard local note/title changes before saving.
@@ -344,12 +360,13 @@ The Curative view also keeps the next broader company-readiness areas visible so
 - Even supplemental pending-permit TXT files that are not yet part of the joined decoder can now render as an easier-to-read table instead of raw delimiter text.
 
 ### Current scope
-- LANDroid can stage all of these files now, but it does not fully decode every RRC legacy format yet.
+- Federal/private project records are reference-only in this phase. They can be searched, linked to sources, linked to map assets/regions, and saved in `.landroid` files, but they do not drive federal royalty, CA/TPF, ONRR, payout, or private-lease math.
+- LANDroid can stage RRC files now, but it does not fully decode every RRC legacy format.
 - The pending-permit decoder currently focuses on the core permit/wellbore/lat-long files. Other files in that family are still staged and previewed, but not yet joined into the structured summary.
 - The permit-master decoder currently focuses on the core status and permit records, plus the surface and bottom-hole coordinate records when present. Other companion segment types are still staged and called out honestly instead of being treated as fully decoded.
 - The horizontal-permit decoder currently focuses on the published 360-character row layout for that family. It does not yet cross-link those rows to other RRC families inside LANDroid.
-- EBCDIC-heavy families are stored/imported first and decoded later.
-- This phase favors safe cataloging, file organization, and triage over pretending every format is already solved.
+- DBF and EBCDIC-heavy imports are no longer near-term roadmap work. They remain staged safely for later if that work becomes worth the time.
+- No AI provider, prompt system, or API proxy is active in this phase. The saved source/formula/project/question records are structured so a later AI layer can use them.
 
 ## 9) Flowchart view
 
@@ -409,7 +426,7 @@ These are the main workspace snapshot files. They now include:
 - workspace owner documents
 - workspace curative title issues
 - workspace map assets
-- workspace research imports
+- workspace Research sources, formulas, project records, saved questions, and imports
 - flowchart nodes and edges
 - flowchart viewport
 - page/grid/orientation settings
@@ -452,7 +469,7 @@ Recent ownership work improved how fractions are stored and displayed.
 5. Create or open linked owner records where you need follow-up tracking.
 6. Add curative issues for defects, missing documents, title-opinion requirements, and payout holds in `Curative`.
 7. Add supporting prospect maps and exhibits in `Maps`.
-8. Bring in any official RRC downloads you want to stage in `Research`.
+8. Capture supporting sources, formulas, project records, saved questions, and any useful RRC data imports in `Research`.
 9. Review chronology and field quality in `Runsheet`.
 10. Export the runsheet if you need workbook output.
 11. Import the active tract into `Flowchart`.
@@ -494,7 +511,7 @@ Recent ownership work improved how fractions are stored and displayed.
 - Link owner records from the node edit modal when you need follow-up work tied to a title holder.
 - Add a Curative issue when something is not ready to rely on yet, even if you are intentionally leaving title-building edits warning-only.
 - Use `Maps` for presentation-facing prospect maps and region storytelling.
-- Use `Research` for official RRC downloads, decoder notes, and research staging.
+- Use `Research` as the source-of-truth shelf for laws, formulas, project notes, federal/private reference records, map evidence, and questions you want to revisit.
 - Use `Runsheet` as your QA pass, not just `Desk Map`.
 - Save often, and keep milestone `.landroid` files.
 - Before deleting a branch, pause and confirm you really want the interest restored to the parent.

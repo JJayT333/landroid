@@ -1,6 +1,10 @@
 import { useMemo, useState } from 'react';
 import { buildLeaseNode, isLeaseNode } from '../deskmap/deskmap-lease-node';
-import { pickPrimaryLease } from '../deskmap/deskmap-coverage';
+import {
+  buildLeaseScopeIndex,
+  getLeasesForOwnerNode,
+  pickPrimaryLease,
+} from '../deskmap/deskmap-coverage';
 import { useOwnerStore } from '../../store/owner-store';
 import { useWorkspaceStore } from '../../store/workspace-store';
 import type { OwnershipNode } from '../../types/node';
@@ -18,6 +22,10 @@ import { parseStrictInterestString } from '../../utils/interest-string';
 import { serialize } from '../../engine/decimal';
 import FormField from '../shared/FormField';
 import Modal from '../shared/Modal';
+import {
+  buildOwnerLinkOptions,
+  resolveExistingOwnerSelection,
+} from '../owners/owner-link-options';
 
 interface AttachLeaseModalProps {
   parentNode: OwnershipNode;
@@ -52,6 +60,7 @@ export default function AttachLeaseModal({
   const updateNode = useWorkspaceStore((state) => state.updateNode);
 
   const ownerWorkspaceId = useOwnerStore((state) => state.workspaceId);
+  const owners = useOwnerStore((state) => state.owners);
   const leases = useOwnerStore((state) => state.leases);
   const addLease = useOwnerStore((state) => state.addLease);
   const updateLease = useOwnerStore((state) => state.updateLease);
@@ -61,6 +70,11 @@ export default function AttachLeaseModal({
     () => activeDeskMaps.find((deskMap) => deskMap.id === activeDeskMapId) ?? null,
     [activeDeskMapId, activeDeskMaps]
   );
+  const ownerLinkOptions = useMemo(
+    () => buildOwnerLinkOptions(owners),
+    [owners]
+  );
+  const leaseScopeIndex = useMemo(() => buildLeaseScopeIndex(nodes), [nodes]);
   const leaseNodesForParent = useMemo(
     () => nodes.filter((node) => node.parentId === parentNode.id && isLeaseNode(node)),
     [nodes, parentNode.id]
@@ -93,9 +107,20 @@ export default function AttachLeaseModal({
     }
 
     return pickPrimaryLease(
-      leases.filter((lease) => lease.ownerId === parentNode.linkedOwnerId)
+      getLeasesForOwnerNode(
+        leases.filter((lease) => lease.ownerId === parentNode.linkedOwnerId),
+        parentNode,
+        leaseScopeIndex
+      )
     );
-  }, [existingLeaseNode?.linkedLeaseId, leases, parentNode.linkedOwnerId, preferredLeaseId]);
+  }, [
+    existingLeaseNode?.linkedLeaseId,
+    leaseScopeIndex,
+    leases,
+    parentNode,
+    parentNode.linkedOwnerId,
+    preferredLeaseId,
+  ]);
   const [draft, setDraft] = useState<Lease>(() =>
     existingLease
       ? normalizeLease(existingLease, {
@@ -110,6 +135,7 @@ export default function AttachLeaseModal({
   );
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [selectedOwnerId, setSelectedOwnerId] = useState('');
   const isEditingExistingLease = Boolean(existingLeaseNode || existingLease);
   const statusOptions = isLeaseStatusOption(draft.status)
     ? [...LEASE_STATUS_OPTIONS]
@@ -144,7 +170,11 @@ export default function AttachLeaseModal({
 
     try {
       const resolvedWorkspaceId = ownerWorkspaceId ?? workspaceId;
-      let ownerId = parentNode.linkedOwnerId;
+      const selectedExistingOwnerId = resolveExistingOwnerSelection(
+        ownerLinkOptions,
+        selectedOwnerId
+      );
+      let ownerId = parentNode.linkedOwnerId ?? selectedExistingOwnerId;
 
       if (!ownerId) {
         const nextOwner = createBlankOwner(resolvedWorkspaceId, {
@@ -163,6 +193,8 @@ export default function AttachLeaseModal({
         await addOwner(nextOwner);
         updateNode(parentNode.id, { linkedOwnerId: nextOwner.id });
         ownerId = nextOwner.id;
+      } else if (!parentNode.linkedOwnerId) {
+        updateNode(parentNode.id, { linkedOwnerId: ownerId });
       }
 
       // Preserve the user's raw royalty text (1/8 stays 1/8, not 0.125). Leased
@@ -231,6 +263,33 @@ export default function AttachLeaseModal({
         <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-xs text-emerald-900">
           This creates or updates the terminal lessee node under the present owner without changing mineral ownership.
         </div>
+
+        {!parentNode.linkedOwnerId && (
+          <fieldset className="space-y-2">
+            <legend className="text-xs font-semibold text-ink-light uppercase tracking-wider mb-2">
+              Owner Record
+            </legend>
+            <div className="text-xs leading-5 text-ink-light">
+              Choose an existing owner when this branch is the same party already used on
+              another tract. Leave blank to create a new owner from this title card when saving.
+            </div>
+            <select
+              value={selectedOwnerId}
+              onChange={(event) => {
+                setSaveError(null);
+                setSelectedOwnerId(event.target.value);
+              }}
+              className="w-full px-3 py-2 rounded-lg border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-emerald-600 focus:border-emerald-600 outline-none"
+            >
+              <option value="">Create owner from this title card</option>
+              {ownerLinkOptions.map((owner) => (
+                <option key={owner.id} value={owner.id}>
+                  {owner.detail ? `${owner.label} — ${owner.detail}` : owner.label}
+                </option>
+              ))}
+            </select>
+          </fieldset>
+        )}
 
         <fieldset className="space-y-2">
           <legend className="text-xs font-semibold text-ink-light uppercase tracking-wider mb-2">

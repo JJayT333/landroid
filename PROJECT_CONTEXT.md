@@ -11,13 +11,14 @@ Performance and maintainability are prioritized over rapid feature expansion.
 The active application surface currently lives at the repository root.
 
 ## Jurisdictional scope
-LANDroid is **Texas-only for now**. Texas fee and Texas state leases are the only jurisdictions modeled in the math, data, and UI today.
+LANDroid is **Texas-only for math today**. Texas fee and Texas state leases are the only jurisdictions modeled in calculation logic, leasehold review, and title-math UI today.
 
-**Federal/BLM and private leases are scheduled as Phase 2** work, anchored on a real Communitization Agreement (~10 federal leases) the user already holds plus additional BLM lands pre-selected for the next BLM leasing window. The strategy is to land a flawless Texas baseline first so that Phase 2 attaches to a clean, well-tested foundation. Until Phase 2 begins:
+**Federal/BLM and private leases are scheduled as Phase 2 math work**, anchored on a real Communitization Agreement (~10 federal leases) the user already holds plus additional BLM lands pre-selected for the next BLM leasing window. Research may now store federal/private sources, project records, mapped tracts, acquisition notes, and lease inventory as reference-only project data. That scaffolding must stay structurally separate from the Texas Desk Map and Leasehold math until the user explicitly opens the federal/private math phase. Until that phase begins:
 
 - Do not add federal-specific math (federal royalty rates, communitization tract participation, ONRR forms, federal minimum royalty, federal lease status enums) to the codebase.
+- Do not let federal/private Research records affect Texas ownership, leasehold, transfer-order, payout, NPRI, ORRI, or WI calculations.
 - One piece of federal-adjacent prep work — a `LeaseJurisdiction` discriminator on `Lease`/`LeaseholdUnit` defaulting to `'tx_fee'` — is the only acceptable cross-jurisdiction code in the Texas baseline. It exists so Phase 2 has a clean attachment point.
-- Phase 2 work begins only when the user explicitly says the Texas baseline is ready.
+- Federal/private math work begins only when the user explicitly says the source/project workspace is stable enough for that next decision gate.
 
 ## Repository structure (current)
 The active codebase is currently centered around:

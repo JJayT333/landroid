@@ -3,8 +3,10 @@ import AssetPreviewModal from '../components/modals/AssetPreviewModal';
 import MapAssetModal from '../components/modals/MapAssetModal';
 import MapReferenceModal from '../components/modals/MapReferenceModal';
 import MapRegionModal from '../components/modals/MapRegionModal';
+import { parseGeoJsonSummary, type GeoJsonSummary } from '../maps/geojson-summary';
 import { useMapStore } from '../store/map-store';
 import { useOwnerStore } from '../store/owner-store';
+import { useResearchStore } from '../store/research-store';
 import { useWorkspaceStore } from '../store/workspace-store';
 import {
   createBlankMapAsset,
@@ -82,6 +84,24 @@ function formatLeaseLabel(
   return lease ? lease.leaseName || lease.lessee || lease.docNo || lease.id : leaseId;
 }
 
+function formatResearchSourceLabel(
+  sourceId: string | null,
+  sources: ReturnType<typeof useResearchStore.getState>['sources']
+) {
+  if (!sourceId) return null;
+  const source = sources.find((candidate) => candidate.id === sourceId);
+  return source ? source.title || source.citation || source.id : sourceId;
+}
+
+function formatResearchProjectLabel(
+  projectRecordId: string | null,
+  projectRecords: ReturnType<typeof useResearchStore.getState>['projectRecords']
+) {
+  if (!projectRecordId) return null;
+  const record = projectRecords.find((candidate) => candidate.id === projectRecordId);
+  return record ? record.name || record.serialOrReference || record.id : projectRecordId;
+}
+
 interface FeaturedMapStageProps {
   asset: MapAsset;
   regions: MapRegion[];
@@ -100,11 +120,13 @@ function FeaturedMapStage({
   onPlaceRegion,
 }: FeaturedMapStageProps) {
   const [textPreview, setTextPreview] = useState<string | null>(null);
+  const [geoJsonSummary, setGeoJsonSummary] = useState<GeoJsonSummary | null>(null);
   const objectUrl = useMemo(() => URL.createObjectURL(asset.blob), [asset.blob]);
 
   useEffect(() => {
     if (!isTextLikeAsset(asset)) {
       setTextPreview(null);
+      setGeoJsonSummary(null);
       return;
     }
 
@@ -113,8 +135,11 @@ function FeaturedMapStage({
       if (cancelled) return;
       try {
         setTextPreview(JSON.stringify(JSON.parse(text), null, 2));
+        const nextSummary = parseGeoJsonSummary(text);
+        setGeoJsonSummary(nextSummary.featureCount > 0 ? nextSummary : null);
       } catch {
         setTextPreview(text);
+        setGeoJsonSummary(null);
       }
     });
 
@@ -218,6 +243,41 @@ function FeaturedMapStage({
   if (isTextLikeAsset(asset)) {
     return (
       <div className="space-y-3">
+        {geoJsonSummary && (
+          <div className="rounded-xl border border-ledger-line bg-ledger p-4 space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-sm font-semibold text-ink">GeoJSON Features</div>
+                <div className="text-xs text-ink-light">
+                  Reference-only geometry summary for linking this map artifact.
+                </div>
+              </div>
+              <span className="rounded-full border border-ledger-line bg-parchment px-2 py-0.5 text-[11px] font-semibold text-ink-light">
+                {geoJsonSummary.featureCount} features
+              </span>
+            </div>
+            {geoJsonSummary.bbox && (
+              <div className="text-xs font-mono text-ink-light">
+                Bounds: {geoJsonSummary.bbox.join(', ')}
+              </div>
+            )}
+            <div className="grid gap-2 sm:grid-cols-2">
+              {geoJsonSummary.features.slice(0, 8).map((feature) => (
+                <div
+                  key={feature.id}
+                  className="rounded-lg border border-ledger-line bg-parchment px-3 py-2"
+                >
+                  <div className="text-sm font-semibold text-ink truncate">
+                    {feature.label}
+                  </div>
+                  <div className="text-[11px] text-ink-light">
+                    {feature.geometryType} • {feature.id}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
         <pre className="max-h-[calc(100vh-17rem)] overflow-auto rounded-xl border border-ledger-line bg-ledger p-4 text-xs text-ink whitespace-pre-wrap break-words">
           {textPreview ?? 'Loading preview...'}
         </pre>
@@ -258,6 +318,8 @@ export default function MapsView() {
   const removeReference = useMapStore((state) => state.removeReference);
   const owners = useOwnerStore((state) => state.owners);
   const leases = useOwnerStore((state) => state.leases);
+  const researchSources = useResearchStore((state) => state.sources);
+  const researchProjectRecords = useResearchStore((state) => state.projectRecords);
 
   const [mode, setMode] = useState<ViewMode>('present');
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
@@ -344,6 +406,14 @@ export default function MapsView() {
   const selectedNodeLabel = formatNodeLabel(selectedAsset?.nodeId ?? null, nodes);
   const selectedOwnerLabel = formatOwnerLabel(selectedAsset?.linkedOwnerId ?? null, owners);
   const selectedLeaseLabel = formatLeaseLabel(selectedAsset?.leaseId ?? null, leases);
+  const selectedResearchSourceLabel = formatResearchSourceLabel(
+    selectedAsset?.researchSourceId ?? null,
+    researchSources
+  );
+  const selectedResearchProjectLabel = formatResearchProjectLabel(
+    selectedAsset?.researchProjectRecordId ?? null,
+    researchProjectRecords
+  );
   const selectedRegionDeskMapLabel = formatDeskMapLabel(
     selectedRegion?.deskMapId ?? null,
     deskMaps
@@ -356,6 +426,14 @@ export default function MapsView() {
   const selectedRegionLeaseLabel = formatLeaseLabel(
     selectedRegion?.leaseId ?? null,
     leases
+  );
+  const selectedRegionResearchSourceLabel = formatResearchSourceLabel(
+    selectedRegion?.researchSourceId ?? null,
+    researchSources
+  );
+  const selectedRegionResearchProjectLabel = formatResearchProjectLabel(
+    selectedRegion?.researchProjectRecordId ?? null,
+    researchProjectRecords
   );
 
   return (
@@ -641,6 +719,12 @@ export default function MapsView() {
                     {selectedNodeLabel && <div>Node: {selectedNodeLabel}</div>}
                     {selectedOwnerLabel && <div>Owner: {selectedOwnerLabel}</div>}
                     {selectedLeaseLabel && <div>Lease: {selectedLeaseLabel}</div>}
+                    {selectedResearchSourceLabel && (
+                      <div>Research Source: {selectedResearchSourceLabel}</div>
+                    )}
+                    {selectedResearchProjectLabel && (
+                      <div>Project Record: {selectedResearchProjectLabel}</div>
+                    )}
                     {selectedAsset.source && <div>Source: {selectedAsset.source}</div>}
                   </div>
                   {selectedAsset.notes && (
@@ -753,6 +837,12 @@ export default function MapsView() {
                       )}
                       {selectedRegionLeaseLabel && (
                         <div>Lease: {selectedRegionLeaseLabel}</div>
+                      )}
+                      {selectedRegionResearchSourceLabel && (
+                        <div>Research Source: {selectedRegionResearchSourceLabel}</div>
+                      )}
+                      {selectedRegionResearchProjectLabel && (
+                        <div>Project Record: {selectedRegionResearchProjectLabel}</div>
                       )}
                     </div>
 
@@ -898,6 +988,8 @@ export default function MapsView() {
           nodes={nodes}
           owners={owners}
           leases={leases}
+          researchSources={researchSources}
+          researchProjectRecords={researchProjectRecords}
           onClose={() => setEditingAssetId(null)}
           onPreview={() => setPreviewAssetId(editingAsset.id)}
           onSave={(fields) => updateAsset(editingAsset.id, fields)}
@@ -912,6 +1004,8 @@ export default function MapsView() {
           nodes={nodes}
           owners={owners}
           leases={leases}
+          researchSources={researchSources}
+          researchProjectRecords={researchProjectRecords}
           onClose={() => {
             setEditingRegionId(null);
             setDraftRegion(null);

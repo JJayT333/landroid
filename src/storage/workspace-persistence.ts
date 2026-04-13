@@ -35,7 +35,18 @@ import {
   type MapExternalReference,
   type MapRegion,
 } from '../types/map';
-import type { ResearchImport } from '../types/research';
+import {
+  normalizeResearchFormula,
+  normalizeResearchProjectRecord,
+  normalizeResearchQuestion,
+  normalizeResearchSource,
+  sanitizeResearchLinks,
+  type ResearchFormula,
+  type ResearchImport,
+  type ResearchProjectRecord,
+  type ResearchQuestion,
+  type ResearchSource,
+} from '../types/research';
 import type { OwnerWorkspaceData } from './owner-persistence';
 import type { MapWorkspaceData } from './map-persistence';
 import type { ResearchWorkspaceData } from './research-persistence';
@@ -98,6 +109,14 @@ interface SerializedMapExternalReference extends MapExternalReference {}
 interface SerializedResearchImport extends Omit<ResearchImport, 'blob'> {
   blob: SerializedBlob;
 }
+
+interface SerializedResearchSource extends ResearchSource {}
+
+interface SerializedResearchFormula extends ResearchFormula {}
+
+interface SerializedResearchProjectRecord extends ResearchProjectRecord {}
+
+interface SerializedResearchQuestion extends ResearchQuestion {}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -503,6 +522,10 @@ async function serializeResearchData(
   | undefined
   | {
       imports: SerializedResearchImport[];
+      sources: SerializedResearchSource[];
+      formulas: SerializedResearchFormula[];
+      projectRecords: SerializedResearchProjectRecord[];
+      questions: SerializedResearchQuestion[];
     }
 > {
   if (!researchData) return undefined;
@@ -514,12 +537,16 @@ async function serializeResearchData(
         blob: await serializeBlob(researchImport.blob),
       }))
     ),
+    sources: researchData.sources,
+    formulas: researchData.formulas,
+    projectRecords: researchData.projectRecords,
+    questions: researchData.questions,
   };
 }
 
 export async function exportLandroidFile(data: LandroidFileData): Promise<Blob> {
   const payload = {
-    version: 6,
+    version: 7,
     exportedAt: new Date().toISOString(),
     ...data,
     pdfData: await serializePdfData(data.pdfData),
@@ -687,26 +714,118 @@ export async function importLandroidFile(file: File): Promise<LandroidFileData> 
         }
       : { mapAssets: [], mapRegions: [], mapReferences: [] };
 
-  const researchData =
-    isRecord(parsed.researchData)
-      ? {
-          imports: Array.isArray(parsed.researchData.imports)
-            ? parsed.researchData.imports
-                .filter(
-                  (researchImport): researchImport is SerializedResearchImport =>
-                    isRecord(researchImport) && typeof researchImport.id === 'string'
-                )
-                .map((researchImport) => ({
-                  ...researchImport,
-                  workspaceId:
-                    typeof researchImport.workspaceId === 'string'
-                      ? researchImport.workspaceId
-                      : workspaceId,
-                  blob: deserializeSerializedBlob(researchImport.blob),
-                }))
-            : [],
-        }
-      : { imports: [] };
+  const researchImports =
+    isRecord(parsed.researchData) && Array.isArray(parsed.researchData.imports)
+      ? parsed.researchData.imports
+          .filter(
+            (researchImport): researchImport is SerializedResearchImport =>
+              isRecord(researchImport) && typeof researchImport.id === 'string'
+          )
+          .map((researchImport) => ({
+            ...researchImport,
+            workspaceId:
+              typeof researchImport.workspaceId === 'string'
+                ? researchImport.workspaceId
+                : workspaceId,
+            blob: deserializeSerializedBlob(researchImport.blob),
+          }))
+      : [];
+  const researchSources =
+    isRecord(parsed.researchData) && Array.isArray(parsed.researchData.sources)
+      ? parsed.researchData.sources
+          .filter(
+            (source): source is SerializedResearchSource =>
+              isRecord(source) && typeof source.id === 'string'
+          )
+          .map((source) =>
+            normalizeResearchSource({
+              ...source,
+              workspaceId:
+                typeof source.workspaceId === 'string' ? source.workspaceId : workspaceId,
+            })
+          )
+      : [];
+  const researchFormulas =
+    isRecord(parsed.researchData) && Array.isArray(parsed.researchData.formulas)
+      ? parsed.researchData.formulas
+          .filter(
+            (formula): formula is SerializedResearchFormula =>
+              isRecord(formula) && typeof formula.id === 'string'
+          )
+          .map((formula) =>
+            normalizeResearchFormula({
+              ...formula,
+              workspaceId:
+                typeof formula.workspaceId === 'string'
+                  ? formula.workspaceId
+                  : workspaceId,
+            })
+          )
+      : [];
+  const researchProjectRecords =
+    isRecord(parsed.researchData) && Array.isArray(parsed.researchData.projectRecords)
+      ? parsed.researchData.projectRecords
+          .filter(
+            (projectRecord): projectRecord is SerializedResearchProjectRecord =>
+              isRecord(projectRecord) && typeof projectRecord.id === 'string'
+          )
+          .map((projectRecord) =>
+            normalizeResearchProjectRecord({
+              ...projectRecord,
+              workspaceId:
+                typeof projectRecord.workspaceId === 'string'
+                  ? projectRecord.workspaceId
+                  : workspaceId,
+            })
+          )
+      : [];
+  const researchQuestions =
+    isRecord(parsed.researchData) && Array.isArray(parsed.researchData.questions)
+      ? parsed.researchData.questions
+          .filter(
+            (question): question is SerializedResearchQuestion =>
+              isRecord(question) && typeof question.id === 'string'
+          )
+          .map((question) =>
+            normalizeResearchQuestion({
+              ...question,
+              workspaceId:
+                typeof question.workspaceId === 'string'
+                  ? question.workspaceId
+                  : workspaceId,
+            })
+          )
+      : [];
+  const sanitizedResearchLinks = sanitizeResearchLinks(
+    {
+      sources: researchSources,
+      formulas: researchFormulas,
+      projectRecords: researchProjectRecords,
+      questions: researchQuestions,
+    },
+    {
+      deskMapIds: new Set(core.deskMaps.map((deskMap) => deskMap.id)),
+      nodeIds: new Set(core.nodes.map((node) => node.id)),
+      ownerIds: new Set(
+        ownerData.owners
+          .filter((owner) => isRecord(owner) && typeof owner.id === 'string')
+          .map((owner) => owner.id)
+      ),
+      leaseIds: new Set(ownerData.leases.map((lease) => lease.id)),
+      mapAssetIds: new Set(mapData.mapAssets.map((asset) => asset.id)),
+      mapRegionIds: new Set(mapData.mapRegions.map((region) => region.id)),
+      importIds: new Set(researchImports.map((researchImport) => researchImport.id)),
+      sourceIds: new Set(researchSources.map((source) => source.id)),
+      formulaIds: new Set(researchFormulas.map((formula) => formula.id)),
+      projectRecordIds: new Set(
+        researchProjectRecords.map((projectRecord) => projectRecord.id)
+      ),
+    }
+  );
+  const researchData = {
+    imports: researchImports,
+    ...sanitizedResearchLinks,
+  };
 
   const pdfData =
     isRecord(parsed.pdfData)

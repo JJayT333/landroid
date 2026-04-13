@@ -1,11 +1,32 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { createBlankResearchImport } from '../../types/research';
+import {
+  createBlankResearchFormula,
+  createBlankResearchImport,
+  createBlankResearchProjectRecord,
+  createBlankResearchQuestion,
+  createBlankResearchSource,
+} from '../../types/research';
 
 const mocks = vi.hoisted(() => ({
   loadResearchWorkspaceData: vi.fn(),
   replaceResearchWorkspaceData: vi.fn(),
   saveResearchImport: vi.fn(),
   deleteResearchImport: vi.fn(),
+  saveResearchSource: vi.fn(),
+  deleteResearchSource: vi.fn(),
+  saveResearchFormula: vi.fn(),
+  deleteResearchFormula: vi.fn(),
+  saveResearchProjectRecord: vi.fn(),
+  deleteResearchProjectRecord: vi.fn(),
+  saveResearchQuestion: vi.fn(),
+  deleteResearchQuestion: vi.fn(),
+  normalizeResearchWorkspaceData: vi.fn((_workspaceId, data) => ({
+    imports: data.imports ?? [],
+    sources: data.sources ?? [],
+    formulas: data.formulas ?? [],
+    projectRecords: data.projectRecords ?? [],
+    questions: data.questions ?? [],
+  })),
 }));
 
 vi.mock('../../storage/research-persistence', () => ({
@@ -13,6 +34,15 @@ vi.mock('../../storage/research-persistence', () => ({
   replaceResearchWorkspaceData: mocks.replaceResearchWorkspaceData,
   saveResearchImport: mocks.saveResearchImport,
   deleteResearchImport: mocks.deleteResearchImport,
+  saveResearchSource: mocks.saveResearchSource,
+  deleteResearchSource: mocks.deleteResearchSource,
+  saveResearchFormula: mocks.saveResearchFormula,
+  deleteResearchFormula: mocks.deleteResearchFormula,
+  saveResearchProjectRecord: mocks.saveResearchProjectRecord,
+  deleteResearchProjectRecord: mocks.deleteResearchProjectRecord,
+  saveResearchQuestion: mocks.saveResearchQuestion,
+  deleteResearchQuestion: mocks.deleteResearchQuestion,
+  normalizeResearchWorkspaceData: mocks.normalizeResearchWorkspaceData,
 }));
 
 import { useResearchStore } from '../research-store';
@@ -23,6 +53,10 @@ describe('research-store', () => {
     useResearchStore.setState({
       workspaceId: null,
       imports: [],
+      sources: [],
+      formulas: [],
+      projectRecords: [],
+      questions: [],
       _hydrated: false,
     });
   });
@@ -40,6 +74,10 @@ describe('research-store', () => {
     );
     mocks.loadResearchWorkspaceData.mockResolvedValueOnce({
       imports: [researchImport],
+      sources: [],
+      formulas: [],
+      projectRecords: [],
+      questions: [],
     });
 
     await useResearchStore.getState().setWorkspace('ws-a');
@@ -77,5 +115,40 @@ describe('research-store', () => {
 
     expect(mocks.deleteResearchImport).toHaveBeenCalledWith('rrc-2');
     expect(useResearchStore.getState().imports).toEqual([]);
+  });
+
+  it('stores source-of-truth records in the active workspace', async () => {
+    mocks.saveResearchSource.mockResolvedValue(undefined);
+    mocks.saveResearchFormula.mockResolvedValue(undefined);
+    mocks.saveResearchProjectRecord.mockResolvedValue(undefined);
+    mocks.saveResearchQuestion.mockResolvedValue(undefined);
+    useResearchStore.setState({ workspaceId: 'ws-active' });
+
+    const source = createBlankResearchSource('wrong-ws', {
+      id: 'source-1',
+      title: 'Division order statute',
+    });
+    const formula = createBlankResearchFormula('wrong-ws', {
+      id: 'formula-1',
+      title: 'NRI',
+    });
+    const projectRecord = createBlankResearchProjectRecord('wrong-ws', {
+      id: 'project-1',
+      name: 'Federal Lease NMNM 000000',
+    });
+    const question = createBlankResearchQuestion('wrong-ws', {
+      id: 'question-1',
+      question: 'What source supports this formula?',
+    });
+
+    await useResearchStore.getState().addSource(source);
+    await useResearchStore.getState().addFormula(formula);
+    await useResearchStore.getState().addProjectRecord(projectRecord);
+    await useResearchStore.getState().addQuestion(question);
+
+    expect(useResearchStore.getState().sources[0]?.workspaceId).toBe('ws-active');
+    expect(useResearchStore.getState().formulas[0]?.workspaceId).toBe('ws-active');
+    expect(useResearchStore.getState().projectRecords[0]?.workspaceId).toBe('ws-active');
+    expect(useResearchStore.getState().questions[0]?.workspaceId).toBe('ws-active');
   });
 });

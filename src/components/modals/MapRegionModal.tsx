@@ -5,6 +5,7 @@ import type { DeskMap, OwnershipNode } from '../../types/node';
 import type { Lease, Owner } from '../../types/owner';
 import type { MapRegion, MapRegionStatus } from '../../types/map';
 import { MAP_REGION_STATUS_OPTIONS, clampPercent } from '../../types/map';
+import type { ResearchProjectRecord, ResearchSource } from '../../types/research';
 
 interface MapRegionModalProps {
   region: MapRegion;
@@ -12,6 +13,8 @@ interface MapRegionModalProps {
   nodes: OwnershipNode[];
   owners: Owner[];
   leases: Lease[];
+  researchSources: ResearchSource[];
+  researchProjectRecords: ResearchProjectRecord[];
   onClose: () => void;
   onSave: (fields: Partial<MapRegion>) => Promise<void>;
 }
@@ -22,6 +25,8 @@ export default function MapRegionModal({
   nodes,
   owners,
   leases,
+  researchSources,
+  researchProjectRecords,
   onClose,
   onSave,
 }: MapRegionModalProps) {
@@ -37,6 +42,8 @@ export default function MapRegionModal({
     nodeId: region.nodeId ?? '',
     linkedOwnerId: region.linkedOwnerId ?? '',
     leaseId: region.leaseId ?? '',
+    researchSourceId: region.researchSourceId ?? '',
+    researchProjectRecordId: region.researchProjectRecordId ?? '',
     x: region.rect.x.toString(),
     y: region.rect.y.toString(),
     width: region.rect.width.toString(),
@@ -182,6 +189,42 @@ export default function MapRegionModal({
               ))}
             </select>
           </div>
+
+          <div>
+            <label className="text-[10px] text-ink-light uppercase tracking-wider block mb-1">
+              Research Source
+            </label>
+            <select
+              value={form.researchSourceId}
+              onChange={(event) => set('researchSourceId', event.target.value)}
+              className="w-full px-3 py-2 rounded-lg border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none"
+            >
+              <option value="">Not linked</option>
+              {researchSources.map((source) => (
+                <option key={source.id} value={source.id}>
+                  {source.title || source.citation || source.id}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="text-[10px] text-ink-light uppercase tracking-wider block mb-1">
+              Project Record
+            </label>
+            <select
+              value={form.researchProjectRecordId}
+              onChange={(event) => set('researchProjectRecordId', event.target.value)}
+              className="w-full px-3 py-2 rounded-lg border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none"
+            >
+              <option value="">Not linked</option>
+              {researchProjectRecords.map((record) => (
+                <option key={record.id} value={record.id}>
+                  {record.name || record.serialOrReference || record.id}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
         <div>
@@ -233,6 +276,8 @@ export default function MapRegionModal({
                 nodeId: form.nodeId || null,
                 linkedOwnerId: form.linkedOwnerId || null,
                 leaseId: form.leaseId || null,
+                researchSourceId: form.researchSourceId || null,
+                researchProjectRecordId: form.researchProjectRecordId || null,
                 rect: {
                   x: clampPercent(Number(form.x)),
                   y: clampPercent(Number(form.y)),

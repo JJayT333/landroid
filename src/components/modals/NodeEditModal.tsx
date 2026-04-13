@@ -14,13 +14,16 @@ import { formatAsFraction } from '../../engine/fraction-display';
 import { d } from '../../engine/decimal';
 import { savePdf, deletePdf } from '../../storage/pdf-store';
 import { getInterestClass, type OwnershipNode } from '../../types/node';
+import type { OwnerLinkOption } from '../owners/owner-link-options';
 
 interface NodeEditModalProps {
   node: OwnershipNode;
   onViewPdf?: (nodeId: string) => void;
   linkedOwnerName?: string | null;
+  ownerLinkOptions?: OwnerLinkOption[];
   leaseStatusText?: string | null;
   onManageOwner?: (nodeId: string) => void;
+  onLinkOwner?: (nodeId: string, ownerId: string) => void;
   onManageLease?: (nodeId: string) => void;
   onManageNpri?: (nodeId: string) => void;
   onClose: () => void;
@@ -31,8 +34,10 @@ export default function NodeEditModal({
   onClose,
   onViewPdf,
   linkedOwnerName,
+  ownerLinkOptions = [],
   leaseStatusText,
   onManageOwner,
+  onLinkOwner,
   onManageLease,
   onManageNpri,
 }: NodeEditModalProps) {
@@ -62,11 +67,17 @@ export default function NodeEditModal({
   });
 
   const [error, setError] = useState<string | null>(null);
+  const [ownerLinkDraftId, setOwnerLinkDraftId] = useState('');
 
   const initialChanged = form.initialFraction !== node.initialFraction;
   const previewFrac = formatAsFraction(d(form.initialFraction));
   const oldFrac = formatAsFraction(d(node.initialFraction));
   const canManageOwner = node.type !== 'related' || Boolean(node.linkedOwnerId);
+  const canLinkExistingOwner =
+    node.type !== 'related' &&
+    !node.linkedOwnerId &&
+    ownerLinkOptions.length > 0 &&
+    Boolean(onLinkOwner);
   const interestClass = getInterestClass(node);
   const canManageLease =
     node.type !== 'related' &&
@@ -419,6 +430,39 @@ export default function NodeEditModal({
                 {linkedOwnerName ? 'Open Owner' : 'Create Owner'}
               </button>
             </div>
+            {canLinkExistingOwner && (
+              <div className="grid gap-2 pt-3 sm:grid-cols-[minmax(0,1fr)_auto]">
+                <div>
+                  <label className="text-[10px] text-ink-light uppercase tracking-wider block mb-1">
+                    Link Existing Owner
+                  </label>
+                  <select
+                    value={ownerLinkDraftId}
+                    onChange={(event) => setOwnerLinkDraftId(event.target.value)}
+                    className="w-full px-3 py-2 rounded-lg border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none"
+                  >
+                    <option value="">Choose owner record...</option>
+                    {ownerLinkOptions.map((owner) => (
+                      <option key={owner.id} value={owner.id}>
+                        {owner.detail ? `${owner.label} — ${owner.detail}` : owner.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <button
+                  type="button"
+                  disabled={!ownerLinkDraftId}
+                  onClick={() => {
+                    if (!ownerLinkDraftId) return;
+                    onLinkOwner?.(node.id, ownerLinkDraftId);
+                    setOwnerLinkDraftId('');
+                  }}
+                  className="self-end px-3 py-2 rounded-lg text-xs font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors disabled:opacity-50"
+                >
+                  Link Owner
+                </button>
+              </div>
+            )}
           </fieldset>
         )}
 

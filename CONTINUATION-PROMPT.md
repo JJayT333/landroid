@@ -2,6 +2,66 @@
 
 Use this file to resume work in a new chat.
 
+## Latest workflow + Research rebuild — 2026-04-13
+
+This section supersedes older branch/status bullets below when they conflict.
+
+- Active branch: `codex/curative-cha-cha-slide`
+- Completed workflow cleanup:
+  - unlinked Desk Map title cards can link to an existing owner record
+  - the Desk Map attach-lease modal can reuse an existing owner when the branch is not linked yet
+  - owner picker choices are sorted and include county/prospect context
+  - branch lease-status text is scoped to the lease card on that branch, so the same owner can appear on multiple tracts without lease status leaking across branches
+  - `.landroid` export/import preserves owner links and branch-scoped lease-node links through the workspace persistence path
+- Completed Research rebuild:
+  - `Research` now opens as a source-of-truth workspace instead of the RRC import catalog
+  - added persisted `Sources`, `Formulas`, `Project Records`, and `Questions`
+  - kept RRC catalog/import/decoder work under a secondary `Data Imports` section
+  - `.landroid` export/import now carries Research sources, formulas, project records, questions, and existing imports
+  - stale Research links are normalized/cleared during import instead of trusted blindly
+  - federal/private project records can be tracked as reference-only records, linked to maps/sources, and searched, but they do not affect Texas Desk Map, Leasehold, NPRI, ORRI, WI, payout, or transfer-order math
+  - map assets and map regions can link to Research sources and project records
+  - text GeoJSON uploads render a simple feature summary and feature list before the raw JSON preview
+- Validation completed after the rebuild:
+  - `npm run lint` passed
+  - targeted suite passed: `npx vitest run src/types/__tests__/research.test.ts src/maps/__tests__/geojson-summary.test.ts src/store/__tests__/research-store.test.ts src/storage/__tests__/workspace-persistence.test.ts src/components/owners/__tests__/owner-link-options.test.ts src/components/deskmap/__tests__/deskmap-coverage.test.ts` (`30/30`)
+  - `npm test` passed (`304/304`)
+  - `npm run build` passed
+- Browser/user-flow QA status:
+  - Not completed in automation. This session does not expose the `js_repl` browser tool and the repo does not include Playwright; no new dependency was added because the user explicitly requested no new dependencies unless approved.
+  - Manual/browser QA still needed for the node edit owner picker, attach-lease owner picker, same-owner multi-tract behavior, `.landroid` round-trip, and first-pass Research navigation.
+- Intentional local noise still present and not part of the source/docs commit:
+  - `.DS_Store`
+  - `.claude/`
+  - `TORS_Documents/`
+  - generated `dist/` and `dist-node/` artifacts from validation
+- Likely next steps:
+  - browser-QA the owner-link and Research workflows with a real browser automation setup or manually
+  - add browser-flow coverage once a browser QA dependency/tooling decision is approved
+  - decide whether Research should get seeded formula/source examples from `LANDMAN-MATH-REFERENCE.md`
+  - decide the next Research phase: richer map evidence, project-record templates for federal/private lease packages, or AI-ready source grounding
+
+## Latest owner-link update — 2026-04-13
+
+This section supersedes older branch/status bullets below when they conflict.
+
+- Active branch: `codex/curative-cha-cha-slide`
+- New uncommitted work after commit `93b6d3f`:
+  - unlinked Desk Map title cards can now link an existing owner record from the `Owner Record` section
+  - the Desk Map lease modal now offers an existing-owner picker when the parent branch is unlinked
+  - branch lease status text now respects branch-scoped lease-card coverage instead of showing another tract's linked lease for the same owner
+  - owner picker choices are sorted and include county/prospect context
+- Validation completed for this owner-link slice:
+  - `npx vitest run src/components/owners/__tests__/owner-link-options.test.ts` passed (`2/2`)
+  - `npm run lint` passed
+- Final validation after docs and branch-scoped lease-status follow-up:
+  - `npm run lint` passed
+  - `npm test` passed (`300/300`)
+  - `npm run build` passed
+- Still needed before handoff/final checkpoint:
+  - browser-QA the existing-owner picker from both the node edit modal and the lease modal
+  - do not commit generated `dist/`, `dist-node/`, `.DS_Store`, `.claude/`, or `TORS_Documents/`
+
 ## Latest audit/fix update — 2026-04-13
 
 This section supersedes older branch/status bullets below when they conflict.

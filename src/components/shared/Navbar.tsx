@@ -147,7 +147,13 @@ export default function Navbar() {
           ),
           useResearchStore.getState().replaceWorkspaceData(
             data.workspaceId,
-            data.researchData ?? { imports: [] }
+            data.researchData ?? {
+              imports: [],
+              sources: [],
+              formulas: [],
+              projectRecords: [],
+              questions: [],
+            }
           ),
           useCurativeStore.getState().replaceWorkspaceData(
             data.workspaceId,

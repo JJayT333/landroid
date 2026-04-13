@@ -7,7 +7,13 @@ import {
 } from '../../types/map';
 import { createBlankOwner, createBlankOwnerDoc } from '../../types/owner';
 import { createBlankNode } from '../../types/node';
-import { createBlankResearchImport } from '../../types/research';
+import {
+  createBlankResearchFormula,
+  createBlankResearchImport,
+  createBlankResearchProjectRecord,
+  createBlankResearchQuestion,
+  createBlankResearchSource,
+} from '../../types/research';
 import { createBlankTitleIssue } from '../../types/title-issue';
 import {
   exportLandroidFile,
@@ -96,6 +102,57 @@ function buildWorkspace(canvas: CanvasSaveData | null): LandroidFileData {
       },
     }
   );
+  const researchSource = createBlankResearchSource('ws-1', {
+    id: 'source-1',
+    title: 'Texas division order statute',
+    sourceType: 'Statute',
+    context: 'Texas',
+    citation: 'Tex. Nat. Res. Code Sec. 91.402',
+    links: {
+      deskMapId: 'dm-1',
+      nodeId: 'node-1',
+      ownerId: owner.id,
+      leaseId: 'lease-1',
+      mapAssetId: mapAsset.id,
+      mapRegionId: mapRegion.id,
+      importId: researchImport.id,
+    },
+  });
+  const researchFormula = createBlankResearchFormula('ws-1', {
+    id: 'formula-1',
+    title: 'Mineral owner royalty',
+    category: 'Leasehold',
+    status: 'Verified',
+    formulaText: 'leased fraction x lease royalty',
+    explanation: 'Calculates the royalty row before downstream burdens.',
+    variables: 'leased fraction; lease royalty',
+    example: '1/2 x 1/4 = 1/8',
+    engineReference: 'src/components/leasehold/leasehold-summary.ts',
+    sourceIds: [researchSource.id],
+  });
+  const researchProjectRecord = createBlankResearchProjectRecord('ws-1', {
+    id: 'project-1',
+    recordType: 'Federal Lease',
+    jurisdiction: 'Federal / BLM',
+    status: 'Current',
+    acquisitionStatus: 'Held',
+    name: 'Federal Lease NMNM 000000',
+    serialOrReference: 'NMNM 000000',
+    acres: '640',
+    legalDescription: 'Section 1',
+    sourceIds: [researchSource.id],
+    mapAssetId: mapAsset.id,
+    mapRegionId: mapRegion.id,
+  });
+  const researchQuestion = createBlankResearchQuestion('ws-1', {
+    id: 'question-1',
+    question: 'What source supports the royalty formula?',
+    answer: 'The formula card links to the saved source.',
+    status: 'Answered',
+    sourceIds: [researchSource.id],
+    formulaIds: [researchFormula.id],
+    projectRecordIds: [researchProjectRecord.id],
+  });
   const titleIssue = createBlankTitleIssue('ws-1', {
     id: 'issue-1',
     title: 'Missing affidavit of heirship',
@@ -200,6 +257,10 @@ function buildWorkspace(canvas: CanvasSaveData | null): LandroidFileData {
     },
     researchData: {
       imports: [researchImport],
+      sources: [researchSource],
+      formulas: [researchFormula],
+      projectRecords: [researchProjectRecord],
+      questions: [researchQuestion],
     },
     curativeData: {
       titleIssues: [titleIssue],
@@ -241,6 +302,14 @@ describe('workspace-persistence', () => {
     expect(imported.researchData?.imports[0]?.datasetId).toBe(
       'production-data-query-dump'
     );
+    expect(imported.researchData?.sources[0]?.links.mapAssetId).toBe(
+      original.researchData?.sources[0]?.links.mapAssetId
+    );
+    expect(imported.researchData?.formulas[0]?.sourceIds).toEqual(['source-1']);
+    expect(imported.researchData?.projectRecords[0]?.recordType).toBe('Federal Lease');
+    expect(imported.researchData?.questions[0]?.projectRecordIds).toEqual([
+      'project-1',
+    ]);
     expect(imported.curativeData?.titleIssues[0]).toEqual(
       expect.objectContaining({
         id: 'issue-1',
@@ -281,7 +350,13 @@ describe('workspace-persistence', () => {
       mapRegions: [],
       mapReferences: [],
     });
-    expect(imported.researchData).toEqual({ imports: [] });
+    expect(imported.researchData).toEqual({
+      imports: [],
+      sources: [],
+      formulas: [],
+      projectRecords: [],
+      questions: [],
+    });
     expect(imported.curativeData).toEqual({ titleIssues: [] });
     expect(imported.pdfData).toEqual({ pdfs: [] });
     expect(imported.leaseholdUnit).toEqual({
@@ -472,6 +547,46 @@ describe('workspace-persistence', () => {
           },
         ],
       },
+      researchData: {
+        sources: [
+          createBlankResearchSource('ws-safe', {
+            id: 'source-stale',
+            title: 'Stale source links',
+            links: {
+              deskMapId: 'missing-dm',
+              nodeId: 'missing-node',
+              ownerId: 'missing-owner',
+              leaseId: 'missing-lease',
+              mapAssetId: 'missing-map',
+              mapRegionId: 'missing-region',
+              importId: 'missing-import',
+            },
+          }),
+        ],
+        formulas: [
+          createBlankResearchFormula('ws-safe', {
+            id: 'formula-stale',
+            title: 'Stale formula source',
+            sourceIds: ['source-stale', 'missing-source'],
+          }),
+        ],
+        projectRecords: [
+          createBlankResearchProjectRecord('ws-safe', {
+            id: 'project-stale',
+            sourceIds: ['source-stale', 'missing-source'],
+            mapAssetId: 'missing-map',
+            mapRegionId: 'missing-region',
+          }),
+        ],
+        questions: [
+          createBlankResearchQuestion('ws-safe', {
+            id: 'question-stale',
+            sourceIds: ['source-stale', 'missing-source'],
+            formulaIds: ['formula-stale', 'missing-formula'],
+            projectRecordIds: ['project-stale', 'missing-project'],
+          }),
+        ],
+      },
       curativeData: {
         titleIssues: [
           createBlankTitleIssue('ws-safe', {
@@ -524,6 +639,26 @@ describe('workspace-persistence', () => {
     expect(imported.mapData?.mapReferences[1]?.url).toBe(
       'https://rrc.texas.gov/resource-center'
     );
+    expect(imported.researchData?.sources[0]?.links).toEqual({
+      deskMapId: null,
+      nodeId: null,
+      ownerId: null,
+      leaseId: null,
+      mapAssetId: null,
+      mapRegionId: null,
+      importId: null,
+    });
+    expect(imported.researchData?.formulas[0]?.sourceIds).toEqual(['source-stale']);
+    expect(imported.researchData?.projectRecords[0]?.sourceIds).toEqual([
+      'source-stale',
+    ]);
+    expect(imported.researchData?.projectRecords[0]?.mapAssetId).toBeNull();
+    expect(imported.researchData?.questions[0]?.formulaIds).toEqual([
+      'formula-stale',
+    ]);
+    expect(imported.researchData?.questions[0]?.projectRecordIds).toEqual([
+      'project-stale',
+    ]);
     expect(imported.curativeData?.titleIssues[0]).toEqual(
       expect.objectContaining({
         id: 'issue-stale',

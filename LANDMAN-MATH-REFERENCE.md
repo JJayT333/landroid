@@ -4,7 +4,7 @@ This document is a reviewer-facing math reference for the current Texas baseline
 
 ## 1. Scope and intent
 
-LANDroid currently calculates Texas mineral-title ownership and Texas leasehold decimal review for Texas fee and Texas state leases only. It calculates chain-of-title fractions, lease coverage, acreage-weighted royalty, ORRI burdens, basic working-interest assignment splits, and transfer-order review totals. Desk Map lease cards now scope a linked lease to the branch where that lease card sits; owner lease records without a Desk Map lease card remain owner-level. It does not yet calculate any federal or BLM lease math, any tribal lease math, or the many lease-administration items that sit outside the present Texas baseline. The current regulatory regime modeled in code is Texas fee plus Texas state only; federal is deferred to Phase 2, and tribal is permanently out of scope.
+LANDroid currently calculates Texas mineral-title ownership and Texas leasehold decimal review for Texas fee and Texas state leases only. It calculates chain-of-title fractions, lease coverage, acreage-weighted royalty, ORRI burdens, basic working-interest assignment splits, and transfer-order review totals. Desk Map lease cards now scope a linked lease to the branch where that lease card sits; owner lease records without a Desk Map lease card remain owner-level. Research may track federal/private sources, lease inventory, mapped tracts, and acquisition notes as reference-only project records, but those records do not participate in math. LANDroid does not yet calculate any federal or BLM lease math, any tribal lease math, or the many lease-administration items that sit outside the present Texas baseline. The current regulatory regime modeled in code is Texas fee plus Texas state only; federal math is deferred to Phase 2, and tribal is permanently out of scope.
 
 ## 2. Data model in landman terms
 
@@ -239,7 +239,7 @@ LANDroid uses two layers of protection. First, ownership-tree mutation math is s
 
 ## 9. What LANDroid does NOT calculate (today)
 
-- No federal or BLM lease math. Phase 2 has not started.
+- No federal or BLM lease math. Research can store federal/private reference records, but Phase 2 math has not started.
 - No private lease specialization outside the present Texas fee and Texas state baseline.
 - No tribal lease math. Tribal is permanently out of scope under the current user instructions.
 - No bonus, delay-rental, or shut-in royalty calculations.
