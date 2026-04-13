@@ -14,7 +14,9 @@ import type {
 } from '../../types/leasehold';
 import {
   allocateLeaseCoverage,
+  buildLeaseScopeIndex,
   getActiveLeases,
+  getLeasesForOwnerNode,
   type LeaseCoverageOverlap,
 } from '../deskmap/deskmap-coverage';
 import { parseInterestString } from '../../utils/interest-string';
@@ -516,6 +518,7 @@ export function buildLeaseholdUnitSummary({
 }): LeaseholdUnitSummary {
   const ownerById = new Map(owners.map((owner) => [owner.id, owner]));
   const deskMapById = new Map(deskMaps.map((deskMap) => [deskMap.id, deskMap]));
+  const leaseScopeIndex = buildLeaseScopeIndex(nodes);
   const activeLeasesByOwnerId = new Map<string, Lease[]>();
 
   leases.forEach((lease) => {
@@ -567,7 +570,11 @@ export function buildLeaseholdUnitSummary({
       .map((node) => {
         const ownerFraction = d(node.fraction);
         const ownerLeases = node.linkedOwnerId
-          ? activeLeasesByOwnerId.get(node.linkedOwnerId) ?? []
+          ? getLeasesForOwnerNode(
+              activeLeasesByOwnerId.get(node.linkedOwnerId) ?? [],
+              node,
+              leaseScopeIndex
+            )
           : [];
         const { slices: leaseSlices, overlaps: leaseOverlaps } = buildOwnerLeaseSummaries({
           leases: ownerLeases,

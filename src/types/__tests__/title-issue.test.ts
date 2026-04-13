@@ -51,6 +51,26 @@ describe('title issue normalization', () => {
     expect(issue.affectedNodeId).toBeNull();
   });
 
+  it('trims imported Curative link ids before matching them to records', () => {
+    const issue = normalizeTitleIssue({
+      id: 'issue-linked',
+      workspaceId: 'ws-1',
+      affectedDeskMapId: ' dm-1 ',
+      affectedNodeId: ' node-1 ',
+      affectedOwnerId: ' owner-1 ',
+      affectedLeaseId: ' lease-1 ',
+    });
+
+    expect(issue).toEqual(
+      expect.objectContaining({
+        affectedDeskMapId: 'dm-1',
+        affectedNodeId: 'node-1',
+        affectedOwnerId: 'owner-1',
+        affectedLeaseId: 'lease-1',
+      })
+    );
+  });
+
   it('filters malformed imported issue rows', () => {
     const issues = normalizeTitleIssues(
       [

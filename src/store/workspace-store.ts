@@ -564,7 +564,17 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
       useCurativeStore.getState().unlinkLease(leaseId);
       return {
         nodes: state.nodes.map((node) =>
-          node.linkedLeaseId === leaseId ? { ...node, linkedLeaseId: null } : node
+          node.linkedLeaseId === leaseId
+            ? {
+                ...node,
+                date: '',
+                fileDate: '',
+                docNo: '',
+                grantee: '',
+                remarks: 'Lease record removed; review or delete this lessee card.',
+                linkedLeaseId: null,
+              }
+            : node
         ),
       };
     }),

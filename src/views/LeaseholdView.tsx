@@ -620,7 +620,7 @@ function LeaseholdUnitEditor({
             {unit.name || 'Unnamed Unit'}
           </h2>
           <p className="mt-1 text-sm text-ink-light">
-            Lock these unit-level inputs before WI splits and division-order math.
+            Lock these unit-level inputs before WI splits and transfer-order review math.
           </p>
         </div>
         <div className="rounded-2xl bg-ink/5 px-4 py-3 text-xs text-ink-light">
@@ -2753,7 +2753,7 @@ function LeaseholdTransferOrderEntryEditor({
       {payoutHold && (
         <div className="rounded-lg border border-seal/20 bg-seal/5 px-2.5 py-2 text-[11px] leading-5 text-seal">
           Floating NPRI over-carve keeps payout readiness on hold. Owner numbers and notes can
-          still be saved, but `Ready` stays unavailable until the royalty burden is corrected.
+          still be saved, but Ready stays unavailable until the royalty burden is corrected.
         </div>
       )}
       <textarea
@@ -2829,7 +2829,7 @@ function LeaseholdDecimalLedger({
           </h3>
           <p className="mt-1 text-sm text-ink-light">
             {editable
-              ? `Editable unit-level payout-entry rows for ${title}. Decimals stay derived; owner number, row status, and notes now save on top of the review rows below.`
+              ? `Editable unit-level payout-entry rows for ${title}. Decimals stay derived; owner number, user row status, and notes save on top of the review rows below.`
               : `Read-only review surface for ${title}. This tract view shows partial slices only, so editable transfer-order rows stay in unit focus.`}
           </p>
         </div>
@@ -2852,7 +2852,7 @@ function LeaseholdDecimalLedger({
                     : 'bg-emerald-50 text-emerald-800'
                 }`}
               >
-                {payoutHold ? 'Payout hold' : 'Payout open'}
+                {payoutHold ? 'Payout hold' : 'No NPRI payout hold'}
               </span>
               <span className="rounded-full bg-gold/10 px-3 py-1.5 font-medium text-gold-900">
                 Ready {readyCount}
@@ -2948,7 +2948,7 @@ function LeaseholdDecimalLedger({
           </div>
           <div className="mt-1">
             One or more active leases on this focus claim more of the owner's interest than the
-            owner holds. The later-effective lease is silently clipped in the allocation math, so
+            owner holds. The later-effective lease is clipped in the allocation math and flagged here, so
             a chain-of-title or top-lease scenario is likely — review the leases below before
             relying on this focus' decimals.
           </div>

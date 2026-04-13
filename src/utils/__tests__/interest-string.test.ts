@@ -144,7 +144,7 @@ describe('normalizeInterestString', () => {
 });
 
 describe('parseStrictInterestString', () => {
-  describe('accepted input (same numeric answers as parseInterestString)', () => {
+  describe('accepted input', () => {
     it('parses standard royalty fractions identically', () => {
       expect(parseStrictInterestString('1/8')?.toString()).toBe('0.125');
       expect(parseStrictInterestString('3/16')?.toString()).toBe('0.1875');
@@ -169,17 +169,10 @@ describe('parseStrictInterestString', () => {
       expect(parseStrictInterestString('  3/16')?.toString()).toBe('0.1875');
     });
 
-    it('clamps values greater than 1 to 1', () => {
-      // Over-1 values are still "well-formed" — the clamp is a math guard, not a parse error.
-      expect(parseStrictInterestString('5/4')?.toString()).toBe('1');
-      expect(parseStrictInterestString('2')?.toString()).toBe('1');
-    });
-
-    it('clamps negative values to 0', () => {
-      // Negative values are well-formed; clampUnit floors them at 0 the same as the
-      // lenient parser. The strict parser only flags SHAPE errors, not range errors.
-      expect(parseStrictInterestString('-0.5')?.toString()).toBe('0');
-      expect(parseStrictInterestString('-1/8')?.toString()).toBe('0');
+    it('keeps boundary values in range', () => {
+      expect(parseStrictInterestString('0')?.toString()).toBe('0');
+      expect(parseStrictInterestString('1')?.toString()).toBe('1');
+      expect(parseStrictInterestString('1/1')?.toString()).toBe('1');
     });
   });
 
@@ -226,6 +219,13 @@ describe('parseStrictInterestString', () => {
       expect(parseStrictInterestString('abc/8')).toBeNull();
       expect(parseStrictInterestString('1/abc')).toBeNull();
     });
+
+    it('returns null for out-of-range interests instead of clamping them', () => {
+      expect(parseStrictInterestString('5/4')).toBeNull();
+      expect(parseStrictInterestString('2')).toBeNull();
+      expect(parseStrictInterestString('-0.5')).toBeNull();
+      expect(parseStrictInterestString('-1/8')).toBeNull();
+    });
   });
 
   describe('contrast with parseInterestString', () => {
@@ -239,6 +239,14 @@ describe('parseStrictInterestString', () => {
 
       expect(parseInterestString('1/2/3').toString()).toBe('0');
       expect(parseStrictInterestString('1/2/3')).toBeNull();
+    });
+
+    it('strict rejects range errors where lenient clamps', () => {
+      expect(parseInterestString('2').toString()).toBe('1');
+      expect(parseStrictInterestString('2')).toBeNull();
+
+      expect(parseInterestString('-1/8').toString()).toBe('0');
+      expect(parseStrictInterestString('-1/8')).toBeNull();
     });
 
     it('strict and lenient agree on legitimate zero ("empty" is not malformed)', () => {

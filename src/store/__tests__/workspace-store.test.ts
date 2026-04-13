@@ -174,4 +174,35 @@ describe('workspace-store', () => {
       'Royalty: 1/8'
     );
   });
+
+  it('neutralizes stale lessee card facts when a linked lease record is deleted', () => {
+    const leaseNode = {
+      ...createBlankNode('lease-node', 'owner-node'),
+      type: 'related' as const,
+      relatedKind: 'lease' as const,
+      date: '2026-01-01',
+      fileDate: '2026-01-02',
+      docNo: '2026-1001',
+      grantee: 'Old Lessee',
+      remarks: 'Lease: Old Lease | Royalty: 1/8',
+      linkedLeaseId: 'lease-1',
+    };
+
+    useWorkspaceStore.setState({
+      nodes: [leaseNode],
+    });
+
+    useWorkspaceStore.getState().clearLinkedLease('lease-1');
+
+    expect(useWorkspaceStore.getState().nodes[0]).toEqual(
+      expect.objectContaining({
+        linkedLeaseId: null,
+        date: '',
+        fileDate: '',
+        docNo: '',
+        grantee: '',
+        remarks: 'Lease record removed; review or delete this lessee card.',
+      })
+    );
+  });
 });

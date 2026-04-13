@@ -1,7 +1,7 @@
 # LANDroid User Manual
 
 This manual describes the active LANDroid app in the repository root.
-It focuses on the features that exist today, the safest day-to-day workflow, and the recent additions around tract tabs, owner records, research map assets, flowchart printing, runsheet export, and precision-safe ownership math.
+It focuses on the features that exist today, the safest day-to-day workflow, and the recent additions around tract tabs, owner records, curative issues, research map assets, flowchart printing, runsheet export, and precision-safe ownership math.
 
 ## 1) Quick start
 
@@ -118,7 +118,7 @@ It now has three internal modes:
 - Lets you set `gross acres`, `pooled acres`, and a short tract description for each Desk Map
 - Derives tract participation from pooled acres
 - Derives each present owner's net mineral acres from gross tract acres and also shows the pooled-acre participation equivalent
-- Pulls active lease data from `Owners` so the tract summary and owner rows stay tied to the same lease record
+- Pulls active lease data from `Owners` so the tract summary and owner rows stay tied to the same lease record; leases with linked Desk Map lease cards are scoped to that owner branch, while owner leases without a Desk Map lease card remain owner-level
 - Aggregates multiple active leases per owner instead of collapsing to one primary lease for the math
 - Calculates weighted tract royalty and total unit royalty from the active lease rates now on file
 - Tracks leasehold-side ORRIs at either unit or tract scope, with an explicit burden-basis field
@@ -128,7 +128,7 @@ It now has three internal modes:
 - Includes a full-size `Map` mode that keeps the title story and the payout story separate: Desk Map stays mineral/title, while Map shows the leased-side picture for the same tract
 - Uses `Unit -> Tract` as the overview shape, then expands the selected tract into owner branches with lease slices and branch-bound NPRIs, plus separate tract-level ORRI and WI branches
 - Includes a `Deck` mode that focuses on one tract at a time and shows the lessee-side cards beneath that leasehold estate, including retained WI and assignment cards
-- Includes a read-only transfer-order review surface in `Deck` that rolls up lease royalty, ORRI, retained WI, and assigned WI for the current focus
+- Includes a transfer-order review surface in `Deck` that rolls up lease royalty, ORRI, retained WI, and assigned WI for the current focus
 - Lets unit-focus transfer-order rows carry saved `owner number`, `status`, and `notes` without changing the derived decimal math underneath
 - Pulls lease effective dates and doc numbers into royalty review rows when those details are present on the linked lease record
 - Flags review rows that are still missing an effective date or doc number so source cleanup is visible before payout entry exists
@@ -140,7 +140,7 @@ It now has three internal modes:
 - `Owners` remains the lease-record source of truth
 - Pooled acres drive participation and payout decimals
 - The starter demo begins with pooled acres equal to gross acres on every tract for easier audit checks
-- Leasehold math now aggregates all active owner leases in effective-date order and caps the leased total at the owner's current fraction
+- Leasehold math now aggregates all active owner leases in effective-date order and caps the leased total at the owner's current fraction; a lease linked to a Desk Map lease card is treated as branch-scoped instead of applying to every tract for the same owner
 - ORRI math now supports gross `8/8`, working-interest, and net-revenue-interest burden bases, with NRI-basis ORRIs stacking in effective-date order
 - If NPRI branches exist, Leasehold now derives separate fixed and floating NPRI payout rows and shows them in both the deck and the transfer-order ledger
 - Fixed NPRIs can now pay two different ways depending on the deed: branch-based fixed burdens scale with the leased slice of the burdened branch, while whole-tract fixed burdens are treated as fixed against tract production and only reduced when less than the full burdened branch is leased
@@ -148,7 +148,7 @@ It now has three internal modes:
 - The first WI slice tracks retained and assigned WI and now shows the resulting transfer-order review decimals; the first saved payout-entry layer is unit-focus metadata only, not an editable decimal engine
 - WI over-assignment is currently warning-only instead of hard-blocked; retained WI is clamped at zero until the split is corrected
 - Floating-NPRI over-carves do not block editing, but they now keep unit-focus payout review on `Hold` so the payout sheet cannot be treated as ready by mistake
-- Assignments remain outside Desk Map and outside this first Leasehold tab pass
+- Assignments remain outside Desk Map title math and are handled in the Leasehold deck/review surface
 - Unit focus is the editable payout-entry surface; tract focus stays read-only because those rows are partial tract slices rather than final unit payout rows
 - `Map` mode is the intended visual home for the leasehold hierarchy itself
 - `Deck` mode is the intended visual home for WI, assignments, transfer-order review, and later deeper payout workflows
@@ -416,7 +416,7 @@ These are the main workspace snapshot files. They now include:
 - flowchart spacing settings
 
 ### `.csv` import
-CSV import loads workspace data, resets the flowchart canvas, and starts a fresh empty owner/curative/maps/research side workspace so you can re-import and relink cleanly.
+CSV import loads workspace data, resets the flowchart canvas, and starts a fresh empty owner/curative/maps/research side workspace so you can re-import and relink cleanly. `.landroid` export/import carries node PDF attachments; if an older backup says a title card has a PDF but does not include the attachment payload, LANDroid clears the PDF flag instead of substituting an unrelated document.
 
 ### Local browser storage
 The app also uses browser storage for local autosave. This is convenient, but it is not a substitute for named backups.
@@ -481,7 +481,7 @@ Recent ownership work improved how fractions are stored and displayed.
 
 ### "My runsheet export does not open the PDFs"
 - Make sure the exported workbook can still reference a `TORS_Documents` folder beside it.
-- Confirm the affected records have a document number.
+- Confirm the affected records have both a document number and an attached PDF. Rows without both are exported without fake hyperlinks.
 
 ### "I want to test without touching real work"
 - Use the `Stress (100/150/500)` button to load sample tract data.

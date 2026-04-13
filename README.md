@@ -32,7 +32,7 @@ Then open `http://localhost:5173/`.
 
 ## Current surfaces
 - `Desk Map` for title-chain editing, ownership-versus-leasing coverage checks, multiple starting root families when title is still incomplete, leased-status flags on mineral-owner cards, separate terminal lessee nodes, separate NPRI branches that do not reduce the mineral coverage totals, warning-only red branch highlights when NPRI burdens over-claim the branch/royalty bucket, and a mineral-owner search box with a clickable results list that can jump across tract tabs by owner name
-- `Leasehold` for acreage-first tract setup, pooled-participation review, unit metadata, dual gross-vs-pooled owner acreage outputs, aggregated royalty calculations across active lease records, fixed-and-floating NPRI payout support with fixed-deed basis tracking (`burdened branch` vs `whole tract`), leasehold-side ORRI burden tracking across gross `8/8`, working-interest, and net-revenue-interest bases, a full-size `Map` mode that visualizes `Unit -> Tract -> Owner Branch / ORRI / WI -> Lease Slice / NPRI` without changing Desk Map title meaning, and a card-based internal `Deck` view with editable unit-level transfer-order rows layered on top of the derived review surface; floating-NPRI over-carves now keep unit-focus payout readiness on `Hold` while editing stays available
+- `Leasehold` for acreage-first tract setup, pooled-participation review, unit metadata, dual gross-vs-pooled owner acreage outputs, branch-scoped Desk Map lease-card coverage, aggregated royalty calculations across active lease records, fixed-and-floating NPRI payout support with fixed-deed basis tracking (`burdened branch` vs `whole tract`), leasehold-side ORRI burden tracking across gross `8/8`, working-interest, and net-revenue-interest bases, a full-size `Map` mode that visualizes `Unit -> Tract -> Owner Branch / ORRI / WI -> Lease Slice / NPRI` without changing Desk Map title meaning, and a card-based internal `Deck` view with editable unit-level transfer-order rows layered on top of the derived review surface; floating-NPRI over-carves now keep unit-focus payout readiness on `Hold` while editing stays available
 - `Flowchart` for presentation and print layout
 - `Runsheet` for chronology review, export, and opening the same node or lease editor cards used in `Desk Map`
 - `Owners` for workspace-scoped owner, lease, contact, and document records, with lease edits flowing back into linked Desk Map and Runsheet lease nodes, a canonical Texas-baseline lease-status picker for new edits, direct buttons to create or reopen the linked Desk Map lease node from each saved lease card, and local search/sort controls so long owner lists are easier to work
@@ -48,9 +48,9 @@ Then open `http://localhost:5173/`.
 - Browser autosave keeps the active workspace and flowchart canvas locally.
 - Saved workspace loads now validate the ownership graph before hydration instead of trusting malformed tree data.
 - If autosaved workspace or canvas data is corrupt, LANDroid now opens a safe fresh state and shows a startup warning instead of silently treating the bad record like an empty workspace.
-- `.landroid` exports now capture workspace data, flowchart canvas state, owner records, owner documents, curative title issues, map assets, and research imports in one self-contained backup.
+- `.landroid` exports now capture workspace data, flowchart canvas state, node PDF attachments, owner records, owner documents, curative title issues, map assets, and research imports in one self-contained backup.
 - `.landroid` imports now fail clearly on malformed top-level payloads and invalid ownership graphs instead of partially loading junk data.
-- CSV imports create a fresh workspace and intentionally start with empty owner, map, and research side records.
+- CSV imports create a fresh workspace and intentionally start with empty owner, curative, map, and research side records.
 
 ## Repo notes
 - `dist/` is generated browser-ready output from `npm run build`.

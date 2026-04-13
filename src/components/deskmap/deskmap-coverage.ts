@@ -2,6 +2,7 @@ import { d } from '../../engine/decimal';
 import { isNpriNode, type OwnershipNode } from '../../types/node';
 import { isInactiveLeaseStatus, type Lease } from '../../types/owner';
 import { parseInterestString } from '../../utils/interest-string';
+import { isLeaseNode } from './deskmap-lease-node';
 
 export interface DeskMapPrimaryLeaseSummary {
   id: string;
@@ -56,6 +57,11 @@ export interface LeaseCoverageResult {
   overlaps: LeaseCoverageOverlap[];
 }
 
+export interface LeaseScopeIndex {
+  linkedLeaseIds: Set<string>;
+  linkedLeaseIdsByParentNodeId: Map<string, Set<string>>;
+}
+
 function asLeaseText(value: string | null | undefined): string {
   return typeof value === 'string' ? value : '';
 }
@@ -74,6 +80,39 @@ function compareLeaseAllocationOrder(left: Lease, right: Lease) {
 
 export function getActiveLeases(leases: Lease[]) {
   return leases.filter(isLeaseActive);
+}
+
+export function buildLeaseScopeIndex(nodes: OwnershipNode[]): LeaseScopeIndex {
+  const linkedLeaseIds = new Set<string>();
+  const linkedLeaseIdsByParentNodeId = new Map<string, Set<string>>();
+
+  for (const node of nodes) {
+    if (!isLeaseNode(node) || !node.parentId || !node.linkedLeaseId) {
+      continue;
+    }
+
+    linkedLeaseIds.add(node.linkedLeaseId);
+    const branchLeaseIds = linkedLeaseIdsByParentNodeId.get(node.parentId) ?? new Set<string>();
+    branchLeaseIds.add(node.linkedLeaseId);
+    linkedLeaseIdsByParentNodeId.set(node.parentId, branchLeaseIds);
+  }
+
+  return { linkedLeaseIds, linkedLeaseIdsByParentNodeId };
+}
+
+export function getLeasesForOwnerNode(
+  ownerLeases: Lease[],
+  ownerNode: Pick<OwnershipNode, 'id'>,
+  leaseScopeIndex: LeaseScopeIndex
+): Lease[] {
+  const branchLinkedLeaseIds =
+    leaseScopeIndex.linkedLeaseIdsByParentNodeId.get(ownerNode.id) ?? new Set<string>();
+  const unscopedOwnerLeases = ownerLeases.filter(
+    (lease) => !leaseScopeIndex.linkedLeaseIds.has(lease.id)
+  );
+  const branchLeases = ownerLeases.filter((lease) => branchLinkedLeaseIds.has(lease.id));
+
+  return [...unscopedOwnerLeases, ...branchLeases];
 }
 
 export function allocateLeaseCoverage(
@@ -177,8 +216,10 @@ export function toDeskMapPrimaryLeaseSummary(
 
 export function calculateDeskMapCoverageSummary(
   nodes: OwnershipNode[],
-  activeLeasesByOwnerId: Map<string, Lease[]>
+  activeLeasesByOwnerId: Map<string, Lease[]>,
+  leaseScopeNodes: OwnershipNode[] = nodes
 ): DeskMapCoverageSummary {
+  const leaseScopeIndex = buildLeaseScopeIndex(leaseScopeNodes);
   let currentOwnership = d(0);
   let linkedOwnership = d(0);
   let leasedOwnership = d(0);
@@ -198,7 +239,11 @@ export function calculateDeskMapCoverageSummary(
       linkedOwnerCount += 1;
       linkedOwnership = linkedOwnership.plus(remaining);
 
-      const ownerLeases = activeLeasesByOwnerId.get(node.linkedOwnerId) ?? [];
+      const ownerLeases = getLeasesForOwnerNode(
+        activeLeasesByOwnerId.get(node.linkedOwnerId) ?? [],
+        node,
+        leaseScopeIndex
+      );
       // Overlap warnings are discarded here — the desk-map coverage summary
       // does not surface them today. The leasehold summary (`leasehold-summary.ts`)
       // is the canonical consumer of per-owner overlap warnings and bubbles them

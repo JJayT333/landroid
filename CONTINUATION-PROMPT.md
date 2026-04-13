@@ -2,6 +2,85 @@
 
 Use this file to resume work in a new chat.
 
+## Latest audit/fix update — 2026-04-13
+
+This section supersedes older branch/status bullets below when they conflict.
+
+- Active branch: `codex/curative-cha-cha-slide`
+- Audit baseline at start of this pass:
+  - branch confirmed with `git status --short --branch`
+  - required context files read: `AGENTS.md`, `PROJECT_CONTEXT.md`, `CONTINUATION-PROMPT.md`, `LANDMAN-MATH-REFERENCE.md`, `FULL-AUDIT-PROMPT.md`
+  - baseline validation was green before fixes: `npm run lint`, `npm test` (`290/290`), and `npm run build`
+- Completed audit-backed fixes:
+  - Curative stale-link hardening:
+    - owner deletion now also clears Curative/Map links for leases deleted with that owner
+    - `.landroid` import trims Curative link ids and clears stale tract, branch, owner, and lease references
+    - selecting a Curative branch now infers the containing Desk Map when possible
+    - demo/stress workspace loaders reset Curative to an empty workspace
+    - new issues no longer save instructional placeholder text as real curative action text
+  - Leasehold/math safety:
+    - Desk Map lease-card links now scope a lease to the branch where the lease card sits; owner leases without a Desk Map lease card remain owner-level
+    - `parseStrictInterestString()` now rejects negative and greater-than-100% interests instead of clamping them
+    - stale lessee cards are neutralized when their lease record is deleted
+  - Persistence/export safety:
+    - `.landroid` export/import now carries node PDF attachments
+    - older/malformed `.landroid` imports that claim `hasDoc` without a PDF payload clear the PDF flag instead of substituting an unrelated bundled PDF
+    - PDF viewer now errors clearly when a title-card attachment is missing
+    - runsheet export only creates document hyperlinks when the row has both a document number and an attached PDF
+  - UX/docs cleanup:
+    - new Desk Map lease drafts start with blank royalty instead of a real-looking `1/4` placeholder
+    - Leasehold/Curative copy now avoids stale `division-order`, `Payout open`, literal-backtick `Ready`, and "silently clipped" wording
+    - `README.md`, `USER_MANUAL.md`, `LANDMAN-MATH-REFERENCE.md`, and `FULL-AUDIT-PROMPT.md` were refreshed for the current branch and audit fixes
+- Validation after the fixes:
+  - targeted remediation suite passed: `npx vitest run src/storage/__tests__/workspace-persistence.test.ts src/storage/__tests__/runsheet-export.test.ts src/store/__tests__/owner-store.test.ts src/store/__tests__/workspace-store.test.ts src/components/deskmap/__tests__/deskmap-coverage.test.ts src/components/leasehold/__tests__/leasehold-summary.test.ts src/utils/__tests__/interest-string.test.ts src/views/__tests__/view-helpers.test.ts src/types/__tests__/title-issue.test.ts` (`98/98`)
+  - `npm test` passed (`298/298`)
+  - `npm run build` passed
+  - `npm run lint` passed
+- Browser/user-flow QA was not completed in this pass. The repo does not currently include Playwright/jsdom/browser-flow tooling, the app-side `js_repl` tool was unavailable, and no new dependencies were added.
+- Intentional local noise still present and not part of the active source/docs change set:
+  - `.DS_Store`
+  - `.claude/`
+  - `TORS_Documents/`
+  - generated `dist/` and `dist-node/` artifacts from validation
+- Open risks / likely follow-ups:
+  - manually browser-QA Curative create/edit/link/filter/save/export/import/delete-linked-record flows
+  - add browser-flow coverage before treating Curative as company-reviewer-ready
+  - decide artifact policy for tracked/generated `dist` and untracked `TORS_Documents` PDFs; do not commit generated output without explicit approval
+  - add coverage tooling only if the dependency is explicitly approved
+  - harden Maps link consistency and stale-link warnings
+  - add a Flowchart "stale from Desk Map" cue before relying on printed flowcharts
+  - add Research/RRC file-size warnings for large imports
+  - consider Curative dirty-state protection for unsaved issue form edits
+
+## Paste This Into A New Chat — Audit Follow-Up / Browser QA
+
+```text
+I am working in `/Users/abstractmapping/projects/landroid` on branch `codex/curative-cha-cha-slide`.
+
+Before making architectural decisions, read:
+- `/Users/abstractmapping/projects/landroid/AGENTS.md`
+- `/Users/abstractmapping/projects/landroid/PROJECT_CONTEXT.md`
+- `/Users/abstractmapping/projects/landroid/CONTINUATION-PROMPT.md`
+- `/Users/abstractmapping/projects/landroid/LANDMAN-MATH-REFERENCE.md`
+- `/Users/abstractmapping/projects/landroid/FULL-AUDIT-PROMPT.md`
+
+Current focus:
+- browser-QA the Curative title issue / curative tracker end to end
+- verify `.landroid` save/load keeps Curative links and node PDFs
+- verify branch-scoped lease-card coverage with the same owner in multiple tracts
+- keep Texas fee / Texas state baseline only
+- do not start federal/BLM Phase 2
+- do not add dependencies without explicit approval
+- do not commit generated `dist/`, `dist-node/`, `.DS_Store`, `.claude/`, or `TORS_Documents/`
+
+Good first checks:
+1. Run `git status --short --branch`
+2. Read the latest 2026-04-13 section in `CONTINUATION-PROMPT.md`
+3. Run `npm run lint`, `npm test`, and `npm run build`
+4. Start LANDroid and manually test Curative create/edit/link/filter/save/export/import/delete-linked-record flows
+5. Manually test a same-owner multi-tract case where only one branch has a linked Desk Map lease card
+```
+
 ## Latest product update — 2026-04-12
 
 This section supersedes older branch/status bullets below when they conflict.

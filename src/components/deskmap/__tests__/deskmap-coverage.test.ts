@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createBlankNode } from '../../../types/node';
-import type { Lease } from '../../../types/owner';
+import { createBlankLease, type Lease } from '../../../types/owner';
 import {
   allocateLeaseCoverage,
   calculateDeskMapCoverageSummary,
@@ -72,6 +72,52 @@ describe('deskmap-coverage', () => {
       linkedOwnerCount: 2,
       leasedOwnerCount: 1,
     });
+  });
+
+  it('keeps Desk Map lease-card coverage scoped to the branch with the lease node', () => {
+    const lease = createBlankLease('ws-1', 'owner-1', {
+      id: 'lease-t1',
+      leaseName: 'T1 Only Lease',
+      lessee: 'Acme Energy',
+      royaltyRate: '1/8',
+      leasedInterest: '0.25',
+      status: 'Active',
+    });
+    const linkedLeases = new Map<string, Lease[]>([['owner-1', [lease]]]);
+    const tractOneOwner = {
+      ...createBlankNode('node-t1'),
+      grantee: 'Same Owner',
+      fraction: '0.25',
+      initialFraction: '0.25',
+      linkedOwnerId: 'owner-1',
+    };
+    const tractTwoOwner = {
+      ...createBlankNode('node-t2'),
+      grantee: 'Same Owner',
+      fraction: '0.25',
+      initialFraction: '0.25',
+      linkedOwnerId: 'owner-1',
+    };
+    const leaseNode = {
+      ...createBlankNode('lease-node-t1', tractOneOwner.id),
+      type: 'related' as const,
+      relatedKind: 'lease' as const,
+      linkedLeaseId: lease.id,
+    };
+
+    const tractOneSummary = calculateDeskMapCoverageSummary(
+      [tractOneOwner, leaseNode],
+      linkedLeases,
+      [tractOneOwner, leaseNode, tractTwoOwner]
+    );
+    const tractTwoSummary = calculateDeskMapCoverageSummary(
+      [tractTwoOwner],
+      linkedLeases,
+      [tractOneOwner, leaseNode, tractTwoOwner]
+    );
+
+    expect(tractOneSummary.leasedOwnership).toBe('0.25');
+    expect(tractTwoSummary.leasedOwnership).toBe('0');
   });
 
   it('allocates multiple active leases in effective-date order and caps them at the owner share', () => {

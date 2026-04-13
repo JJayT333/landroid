@@ -32,9 +32,9 @@ export interface Owner {
  *                    minimum royalty, ONRR export) lands when this is wired.
  *   - `'private'`    Private/non-federal/non-Texas-state leases the user
  *                    aggregates into the same project. Phase 2.
- *   - `'tribal'`     Tribal/allotted leases. Listed for completeness only;
- *                    no Phase 2 work scheduled until the user adds tribal
- *                    leases to the project.
+ *   - `'tribal'`     Tribal/allotted leases. Listed for data-shape
+ *                    completeness only; tribal lease math/workflows are out of
+ *                    scope under the current product rules.
  *
  * Order matches the project's Texas-first → Phase-2 rollout. New jurisdictions
  * added later should append to the end so the persisted indexes stay stable.

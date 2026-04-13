@@ -35,8 +35,9 @@ export function parseInterestString(
  * Distinct semantics versus `parseInterestString`:
  *   - `null` / `undefined` / empty / whitespace-only  → `Decimal(0)` (not an error;
  *     "no value entered yet" is a legal state for optional fields).
- *   - Well-formed "a/b" fractions and decimal strings → `clampUnit(value)`.
+ *   - Well-formed "a/b" fractions and decimal strings in the [0, 1] range → parsed value.
  *   - Anything else (`"abc"`, `"1//8"`, `"1/2/3"`, `"/8"`, `"1/"`, `"1/0"`) → `null`.
+ *   - Well-formed but out-of-range values (`"2"`, `"5/4"`, `"-1/8"`) → `null`.
  *
  * Matches the audit finding #4 recommendation: keep the lenient parser for
  * display paths, add a strict parser for form-save paths. Wire this through
@@ -57,7 +58,12 @@ export function parseStrictInterestString(
   const parts = raw.split('/').map((part) => part.trim());
   if (parts.length === 1) {
     try {
-      return clampUnit(new Decimal(raw));
+      const decimal = new Decimal(raw);
+      return decimal.isFinite()
+        && decimal.greaterThanOrEqualTo(0)
+        && decimal.lessThanOrEqualTo(1)
+        ? decimal
+        : null;
     } catch {
       return null;
     }
@@ -77,7 +83,12 @@ export function parseStrictInterestString(
     if (denominator.isZero()) {
       return null;
     }
-    return clampUnit(numerator.div(denominator));
+    const decimal = numerator.div(denominator);
+    return decimal.isFinite()
+      && decimal.greaterThanOrEqualTo(0)
+      && decimal.lessThanOrEqualTo(1)
+      ? decimal
+      : null;
   }
 
   // Multi-slash garbage such as "1/2/3" or "1//8".

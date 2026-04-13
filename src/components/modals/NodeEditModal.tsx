@@ -458,7 +458,7 @@ export default function NodeEditModal({
                   Add a fixed or floating NPRI without reducing the mineral total.
                 </div>
                 <div className="text-xs text-amber-900/75">
-                  Desk Map tracks the NPRI branch separately. Royalty payout math can come later on the lessee side.
+                  Desk Map tracks the NPRI branch separately. Leasehold reads fixed/floating and deed-basis choices for payout review.
                 </div>
               </div>
               <button

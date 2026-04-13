@@ -9,7 +9,12 @@ import { useResearchStore } from '../../store/research-store';
 import { useCurativeStore } from '../../store/curative-store';
 import { useWorkspaceStore } from '../../store/workspace-store';
 import { useCanvasStore } from '../../store/canvas-store';
-import { downloadLandroidFile, importLandroidFile } from '../../storage/workspace-persistence';
+import {
+  downloadLandroidFile,
+  exportPdfWorkspaceData,
+  importLandroidFile,
+  replacePdfWorkspaceData,
+} from '../../storage/workspace-persistence';
 import { importCSV } from '../../storage/csv-io';
 import {
   seedCombinatorialData,
@@ -97,6 +102,7 @@ export default function Navbar() {
       activeDeskMapId: state.activeDeskMapId,
       instrumentTypes: state.instrumentTypes,
       ownerData: await useOwnerStore.getState().exportWorkspaceData(),
+      pdfData: await exportPdfWorkspaceData(state.nodes),
       mapData: await useMapStore.getState().exportWorkspaceData(),
       researchData: await useResearchStore.getState().exportWorkspaceData(),
       curativeData: await useCurativeStore.getState().exportWorkspaceData(),
@@ -134,6 +140,7 @@ export default function Navbar() {
             data.workspaceId,
             data.ownerData ?? { owners: [], leases: [], contacts: [], docs: [] }
           ),
+          replacePdfWorkspaceData(data.pdfData ?? { pdfs: [] }, data.nodes),
           useMapStore.getState().replaceWorkspaceData(
             data.workspaceId,
             data.mapData ?? { mapAssets: [], mapRegions: [], mapReferences: [] }

@@ -12,7 +12,7 @@ import {
   buildLeaseholdGraphTractDetail,
 } from '../LeaseholdView';
 import { buildDeskMapOwnerSearchMatches } from '../DeskMapView';
-import { filterTitleIssues } from '../CurativeView';
+import { filterTitleIssues, findDeskMapIdForNode } from '../CurativeView';
 
 describe('view helpers', () => {
   it('forces ready transfer-order rows into hold while payout hold is active', () => {
@@ -321,5 +321,32 @@ describe('view helpers', () => {
     });
 
     expect(filtered.map((issue) => issue.id)).toEqual(['issue-1']);
+  });
+
+  it('infers a tract link when Curative starts from a branch card', () => {
+    expect(
+      findDeskMapIdForNode('node-2', [
+        {
+          id: 'dm-1',
+          name: 'Tract 1',
+          code: 'T1',
+          tractId: 'T1',
+          grossAcres: '160',
+          pooledAcres: '160',
+          description: '',
+          nodeIds: ['node-1'],
+        },
+        {
+          id: 'dm-2',
+          name: 'Tract 2',
+          code: 'T2',
+          tractId: 'T2',
+          grossAcres: '320',
+          pooledAcres: '320',
+          description: '',
+          nodeIds: ['node-2'],
+        },
+      ])
+    ).toBe('dm-2');
   });
 });

@@ -1684,4 +1684,76 @@ describe('leasehold-summary', () => {
     expect(summary.tracts[0]?.overBurdened).toBe(false);
     expect(summary.overBurdenedTractCount).toBe(0);
   });
+
+  it('does not apply a branch-linked lease node to the same owner in another tract', () => {
+    const summary = buildLeaseholdUnitSummary({
+      deskMaps: [
+        {
+          id: 'dm-1',
+          name: 'Tract 1',
+          code: 'T1',
+          tractId: 'T1',
+          grossAcres: '100',
+          pooledAcres: '100',
+          description: '',
+          nodeIds: ['owner-t1', 'lease-t1-node'],
+        },
+        {
+          id: 'dm-2',
+          name: 'Tract 2',
+          code: 'T2',
+          tractId: 'T2',
+          grossAcres: '100',
+          pooledAcres: '100',
+          description: '',
+          nodeIds: ['owner-t2'],
+        },
+      ],
+      nodes: [
+        {
+          ...createBlankNode('owner-t1', null),
+          grantee: 'Same Owner',
+          linkedOwnerId: 'owner-1',
+          fraction: '0.25',
+          initialFraction: '0.25',
+        },
+        {
+          ...createBlankNode('lease-t1-node', 'owner-t1'),
+          type: 'related' as const,
+          relatedKind: 'lease' as const,
+          linkedLeaseId: 'lease-t1',
+        },
+        {
+          ...createBlankNode('owner-t2', null),
+          grantee: 'Same Owner',
+          linkedOwnerId: 'owner-1',
+          fraction: '0.25',
+          initialFraction: '0.25',
+        },
+      ],
+      owners: [createBlankOwner('ws-1', { id: 'owner-1', name: 'Same Owner' })],
+      leases: [
+        createBlankLease('ws-1', 'owner-1', {
+          id: 'lease-t1',
+          leaseName: 'T1 Only Lease',
+          lessee: 'Operator A',
+          royaltyRate: '1/8',
+          leasedInterest: '0.25',
+          effectiveDate: '2024-01-01',
+        }),
+      ],
+      leaseholdAssignments: [],
+      leaseholdOrris: [],
+    });
+
+    const tractOneOwner = summary.tracts[0]?.owners[0];
+    const tractTwoOwner = summary.tracts[1]?.owners[0];
+
+    expect(tractOneOwner?.leasedFraction).toBe('0.25');
+    expect(tractOneOwner?.activeLeaseCount).toBe(1);
+    expect(tractTwoOwner?.leasedFraction).toBe('0');
+    expect(tractTwoOwner?.activeLeaseCount).toBe(0);
+    expect(summary.tracts[0]?.leasedOwnership).toBe('0.25');
+    expect(summary.tracts[1]?.leasedOwnership).toBe('0');
+  });
 });

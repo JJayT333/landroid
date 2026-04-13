@@ -218,7 +218,9 @@ describe('owner-store', () => {
 
     expect(mocks.deleteOwner).toHaveBeenCalledWith(owner.id);
     expect(mocks.clearLinkedOwner).toHaveBeenCalledWith(owner.id);
+    expect(mocks.clearLinkedLease).toHaveBeenCalledWith('lease-1');
     expect(mocks.unlinkOwner).toHaveBeenCalledWith(owner.id);
+    expect(mocks.unlinkLease).toHaveBeenCalledWith('lease-1');
     expect(useOwnerStore.getState().owners).toEqual([]);
     expect(useOwnerStore.getState().leases).toEqual([]);
     expect(useOwnerStore.getState().contacts).toEqual([]);

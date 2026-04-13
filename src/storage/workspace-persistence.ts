@@ -1,7 +1,7 @@
 /**
  * Workspace persistence — auto-save to IndexedDB, export/import .landroid files.
  */
-import db from './db';
+import db, { type PdfAttachment } from './db';
 import { deserializeBlob, serializeBlob, type SerializedBlob } from './blob-serialization';
 import { PAGE_SIZE_DEFINITIONS } from '../engine/flowchart-pages';
 import { Decimal } from '../engine/decimal';
@@ -40,7 +40,7 @@ import type { OwnerWorkspaceData } from './owner-persistence';
 import type { MapWorkspaceData } from './map-persistence';
 import type { ResearchWorkspaceData } from './research-persistence';
 import type { CurativeWorkspaceData } from './curative-persistence';
-import { normalizeTitleIssues } from '../types/title-issue';
+import { normalizeTitleIssues, type TitleIssue } from '../types/title-issue';
 
 const WORKSPACE_ID = 'default';
 const PAGE_SIZE_ID_SET = new Set<PageSizeId>(
@@ -62,6 +62,7 @@ export interface WorkspaceData {
 
 export interface LandroidFileData extends WorkspaceData {
   canvas?: CanvasSaveData | null;
+  pdfData?: PdfWorkspaceData;
   ownerData?: OwnerWorkspaceData;
   mapData?: MapWorkspaceData;
   researchData?: ResearchWorkspaceData;
@@ -75,6 +76,14 @@ export interface WorkspaceLoadResult {
 }
 
 interface SerializedOwnerDoc extends Omit<OwnerDoc, 'blob'> {
+  blob: SerializedBlob;
+}
+
+export interface PdfWorkspaceData {
+  pdfs: PdfAttachment[];
+}
+
+interface SerializedPdfAttachment extends Omit<PdfAttachment, 'blob'> {
   blob: SerializedBlob;
 }
 
@@ -298,6 +307,71 @@ function normalizeWorkspaceDataRecord(
   };
 }
 
+function sanitizeTitleIssueLinks(
+  titleIssues: TitleIssue[],
+  context: {
+    deskMaps: DeskMap[];
+    nodes: OwnershipNode[];
+    ownerIds: Set<string>;
+    leaseOwnerIds: Map<string, string>;
+  }
+): TitleIssue[] {
+  const validDeskMapIds = new Set(context.deskMaps.map((deskMap) => deskMap.id));
+  const validNodeIds = new Set(context.nodes.map((node) => node.id));
+  const nodeDeskMapIds = new Map<string, Set<string>>();
+
+  context.deskMaps.forEach((deskMap) => {
+    deskMap.nodeIds.forEach((nodeId) => {
+      const deskMapIds = nodeDeskMapIds.get(nodeId) ?? new Set<string>();
+      deskMapIds.add(deskMap.id);
+      nodeDeskMapIds.set(nodeId, deskMapIds);
+    });
+  });
+
+  return titleIssues.map((issue) => {
+    const affectedDeskMapId =
+      issue.affectedDeskMapId && validDeskMapIds.has(issue.affectedDeskMapId)
+        ? issue.affectedDeskMapId
+        : null;
+    let affectedNodeId =
+      issue.affectedNodeId && validNodeIds.has(issue.affectedNodeId)
+        ? issue.affectedNodeId
+        : null;
+    const affectedOwnerId =
+      issue.affectedOwnerId && context.ownerIds.has(issue.affectedOwnerId)
+        ? issue.affectedOwnerId
+        : null;
+    let affectedLeaseId =
+      issue.affectedLeaseId && context.leaseOwnerIds.has(issue.affectedLeaseId)
+        ? issue.affectedLeaseId
+        : null;
+
+    if (
+      affectedDeskMapId &&
+      affectedNodeId &&
+      !nodeDeskMapIds.get(affectedNodeId)?.has(affectedDeskMapId)
+    ) {
+      affectedNodeId = null;
+    }
+
+    if (
+      affectedOwnerId &&
+      affectedLeaseId &&
+      context.leaseOwnerIds.get(affectedLeaseId) !== affectedOwnerId
+    ) {
+      affectedLeaseId = null;
+    }
+
+    return {
+      ...issue,
+      affectedDeskMapId,
+      affectedNodeId,
+      affectedOwnerId,
+      affectedLeaseId,
+    };
+  });
+}
+
 export function parsePersistedWorkspaceData(raw: string): WorkspaceData {
   let parsed: unknown;
 
@@ -379,6 +453,26 @@ async function serializeOwnerData(
   };
 }
 
+async function serializePdfData(
+  pdfData: PdfWorkspaceData | undefined
+): Promise<
+  | undefined
+  | {
+      pdfs: SerializedPdfAttachment[];
+    }
+> {
+  if (!pdfData) return undefined;
+
+  return {
+    pdfs: await Promise.all(
+      pdfData.pdfs.map(async (pdf) => ({
+        ...pdf,
+        blob: await serializeBlob(pdf.blob),
+      }))
+    ),
+  };
+}
+
 async function serializeMapData(
   mapData: MapWorkspaceData | undefined
 ): Promise<
@@ -428,6 +522,7 @@ export async function exportLandroidFile(data: LandroidFileData): Promise<Blob> 
     version: 6,
     exportedAt: new Date().toISOString(),
     ...data,
+    pdfData: await serializePdfData(data.pdfData),
     ownerData: await serializeOwnerData(data.ownerData),
     mapData: await serializeMapData(data.mapData),
     researchData: await serializeResearchData(data.researchData),
@@ -444,6 +539,42 @@ export async function downloadLandroidFile(data: LandroidFileData) {
   a.download = `${data.projectName || 'workspace'}.landroid`;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+export async function exportPdfWorkspaceData(
+  nodes: OwnershipNode[]
+): Promise<PdfWorkspaceData> {
+  const nodeIds = [
+    ...new Set(
+      nodes
+        .filter((node) => node.hasDoc)
+        .map((node) => node.id)
+    ),
+  ];
+  const pdfs = (
+    await Promise.all(nodeIds.map((nodeId) => db.pdfs.get(nodeId)))
+  ).filter(
+    (pdf): pdf is PdfAttachment => Boolean(pdf && pdf.blob.size > 0)
+  );
+
+  return { pdfs };
+}
+
+export async function replacePdfWorkspaceData(
+  data: PdfWorkspaceData,
+  nodes: OwnershipNode[]
+): Promise<void> {
+  const validNodeIds = new Set(nodes.map((node) => node.id));
+  const pdfs = data.pdfs.filter(
+    (pdf) => validNodeIds.has(pdf.nodeId) && pdf.blob.size > 0
+  );
+
+  await db.transaction('rw', db.pdfs, async () => {
+    await db.pdfs.bulkDelete([...validNodeIds]);
+    if (pdfs.length > 0) {
+      await db.pdfs.bulkPut(pdfs);
+    }
+  });
 }
 
 // ── Import .landroid file ──────────────────────────────
@@ -577,17 +708,64 @@ export async function importLandroidFile(file: File): Promise<LandroidFileData> 
         }
       : { imports: [] };
 
+  const pdfData =
+    isRecord(parsed.pdfData)
+      ? {
+          pdfs: Array.isArray(parsed.pdfData.pdfs)
+            ? parsed.pdfData.pdfs
+                .filter(
+                  (pdf): pdf is SerializedPdfAttachment =>
+                    isRecord(pdf) && typeof pdf.nodeId === 'string'
+                )
+                .map((pdf) => ({
+                  nodeId: pdf.nodeId,
+                  fileName: typeof pdf.fileName === 'string' ? pdf.fileName : '',
+                  mimeType:
+                    typeof pdf.mimeType === 'string'
+                      ? pdf.mimeType
+                      : 'application/pdf',
+                  blob: deserializeSerializedBlob(pdf.blob, 'application/pdf'),
+                  createdAt:
+                    typeof pdf.createdAt === 'string'
+                      ? pdf.createdAt
+                      : new Date().toISOString(),
+                }))
+                .filter((pdf) => pdf.blob.size > 0)
+            : [],
+        }
+      : { pdfs: [] };
+  const pdfNodeIds = new Set(pdfData.pdfs.map((pdf) => pdf.nodeId));
+  const nodes = core.nodes.map((node) =>
+    node.hasDoc && !pdfNodeIds.has(node.id) ? { ...node, hasDoc: false } : node
+  );
+
   const curativeData =
     isRecord(parsed.curativeData)
       ? {
-          titleIssues: normalizeTitleIssues(parsed.curativeData.titleIssues, {
-            workspaceId,
-          }),
+          titleIssues: sanitizeTitleIssueLinks(
+            normalizeTitleIssues(parsed.curativeData.titleIssues, {
+              workspaceId,
+            }),
+            {
+              deskMaps: core.deskMaps,
+              nodes,
+              ownerIds: new Set(
+                ownerData.owners
+                  .filter((owner) => isRecord(owner) && typeof owner.id === 'string')
+                  .map((owner) => owner.id)
+              ),
+              leaseOwnerIds: new Map(
+                ownerData.leases.map((lease) => [lease.id, lease.ownerId])
+              ),
+            }
+          ),
         }
       : { titleIssues: [] };
   return {
     ...core,
+    nodes,
     canvas: normalizeCanvasSaveData(parsed.canvas),
+    pdfData,
     ownerData,
     mapData,
     researchData,

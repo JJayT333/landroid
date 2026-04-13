@@ -86,6 +86,17 @@ function describeNode(node: OwnershipNode | undefined) {
   return `${label} (${classLabel})`;
 }
 
+export function findDeskMapIdForNode(
+  nodeId: string | null,
+  deskMaps: DeskMap[]
+): string | null {
+  if (!nodeId) {
+    return null;
+  }
+
+  return deskMaps.find((deskMap) => deskMap.nodeIds.includes(nodeId))?.id ?? null;
+}
+
 function issueToForm(issue: TitleIssue): TitleIssueForm {
   return {
     title: issue.title,
@@ -444,7 +455,7 @@ export default function CurativeView() {
                   createBlankTitleIssue(workspaceId, {
                     title: 'New title issue',
                     issueType: 'Title opinion requirement',
-                    requiredCurativeAction: 'Describe the document or action needed to cure this.',
+                    requiredCurativeAction: '',
                   })
                 );
               }}
@@ -757,7 +768,31 @@ export default function CurativeView() {
                       <LinkedSelect
                         label="Branch / Owner Card"
                         value={form.affectedNodeId}
-                        onChange={(value) => setFormField('affectedNodeId', value)}
+                        onChange={(value) => {
+                          setForm((current) => {
+                            if (!current) {
+                              return current;
+                            }
+
+                            const currentDeskMapHasNode =
+                              value &&
+                              current.affectedDeskMapId &&
+                              deskMaps
+                                .find((deskMap) => deskMap.id === current.affectedDeskMapId)
+                                ?.nodeIds.includes(value);
+                            const nextDeskMapId = value
+                              ? currentDeskMapHasNode
+                                ? current.affectedDeskMapId
+                                : findDeskMapIdForNode(value, deskMaps)
+                              : current.affectedDeskMapId;
+
+                            return {
+                              ...current,
+                              affectedNodeId: value,
+                              affectedDeskMapId: nextDeskMapId,
+                            };
+                          });
+                        }}
                         options={nodeOptions}
                       />
                       <LinkedSelect

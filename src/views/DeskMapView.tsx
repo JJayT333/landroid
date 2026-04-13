@@ -25,8 +25,10 @@ import {
 } from '../components/deskmap/deskmap-tree';
 import DeskMapTabs from '../components/deskmap/DeskMapTabs';
 import {
+  buildLeaseScopeIndex,
   getActiveLeases,
   calculateDeskMapCoverageSummary,
+  getLeasesForOwnerNode,
   pickPrimaryLease,
   toDeskMapPrimaryLeaseSummary,
   type DeskMapPrimaryLeaseSummary,
@@ -520,16 +522,7 @@ export default function DeskMapView() {
         .filter((entry) => entry[1].length > 0)
     );
   }, [leases]);
-  const primaryLeaseByOwnerId = useMemo(() => {
-    return new Map(
-      [...activeLeasesByOwnerId.entries()]
-        .map(([ownerId, ownerLeases]) => [
-          ownerId,
-          toDeskMapPrimaryLeaseSummary(pickPrimaryLease(ownerLeases)),
-        ] as const)
-        .filter((entry): entry is [string, DeskMapPrimaryLeaseSummary] => entry[1] !== null)
-    );
-  }, [activeLeasesByOwnerId]);
+  const leaseScopeIndex = useMemo(() => buildLeaseScopeIndex(nodes), [nodes]);
   const activeDeskMap = useMemo(
     () => deskMaps.find((deskMap) => deskMap.id === activeDeskMapId) ?? null,
     [activeDeskMapId, deskMaps]
@@ -556,15 +549,20 @@ export default function DeskMapView() {
           if (node.type === 'related' || !node.linkedOwnerId || isNpriNode(node)) {
             return [];
           }
-          const leaseSummary = primaryLeaseByOwnerId.get(node.linkedOwnerId);
+          const ownerLeases = getLeasesForOwnerNode(
+            activeLeasesByOwnerId.get(node.linkedOwnerId) ?? [],
+            node,
+            leaseScopeIndex
+          );
+          const leaseSummary = toDeskMapPrimaryLeaseSummary(pickPrimaryLease(ownerLeases));
           return leaseSummary ? ([[node.id, leaseSummary]] as Array<[string, DeskMapPrimaryLeaseSummary]>) : [];
         })
       ),
-    [primaryLeaseByOwnerId, visibleNodes]
+    [activeLeasesByOwnerId, leaseScopeIndex, visibleNodes]
   );
   const coverageSummary = useMemo(
-    () => calculateDeskMapCoverageSummary(visibleNodes, activeLeasesByOwnerId),
-    [activeLeasesByOwnerId, visibleNodes]
+    () => calculateDeskMapCoverageSummary(visibleNodes, activeLeasesByOwnerId, nodes),
+    [activeLeasesByOwnerId, nodes, visibleNodes]
   );
   const npriDiscrepancyState = useMemo(
     () => buildNpriBranchDiscrepancyHighlightState(nodes),

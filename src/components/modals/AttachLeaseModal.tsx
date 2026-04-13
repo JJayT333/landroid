@@ -29,7 +29,7 @@ interface AttachLeaseModalProps {
 function createLeaseDraft(workspaceId: string, ownerId: string, parentNode: OwnershipNode) {
   return createBlankLease(workspaceId, ownerId || 'owner-pending', {
     leaseName: parentNode.grantee ? `${parentNode.grantee} Lease` : '',
-    royaltyRate: '1/4',
+    royaltyRate: '',
     leasedInterest: parentNode.fraction,
     status: DEFAULT_LEASE_STATUS,
   });
@@ -61,12 +61,20 @@ export default function AttachLeaseModal({
     () => activeDeskMaps.find((deskMap) => deskMap.id === activeDeskMapId) ?? null,
     [activeDeskMapId, activeDeskMaps]
   );
-  const existingLeaseNode = useMemo(
-    () =>
-      nodes.find(
-        (node) => node.parentId === parentNode.id && isLeaseNode(node)
-      ) ?? null,
+  const leaseNodesForParent = useMemo(
+    () => nodes.filter((node) => node.parentId === parentNode.id && isLeaseNode(node)),
     [nodes, parentNode.id]
+  );
+  const existingLeaseNode = useMemo(
+    () => {
+      if (preferredLeaseId) {
+        return leaseNodesForParent.find((node) => node.linkedLeaseId === preferredLeaseId)
+          ?? null;
+      }
+
+      return leaseNodesForParent[0] ?? null;
+    },
+    [leaseNodesForParent, preferredLeaseId]
   );
   const existingLease = useMemo(() => {
     if (preferredLeaseId) {
@@ -282,6 +290,10 @@ export default function AttachLeaseModal({
               value={draft.docNo}
               onChange={(value) => set('docNo', value)}
             />
+          </div>
+          <div className="text-[11px] leading-5 text-ink-light">
+            Royalty starts blank so a placeholder rate is not mistaken for lease evidence.
+            Blank economics stay as not entered in payout review.
           </div>
         </fieldset>
 

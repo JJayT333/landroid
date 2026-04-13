@@ -2,6 +2,17 @@
 
 Use this prompt for the next comprehensive audit pass.
 
+## Current checkpoint overlay — 2026-04-13
+
+This overlay supersedes the older 2026-04-08 branch and commit references below when they conflict.
+
+- Current working branch: `codex/curative-cha-cha-slide`
+- Last known pushed Curative checkpoint before this audit: `f6e1b85`
+- Current audit focus: Texas fee / Texas state baseline, Curative tracker, Desk Map, ownership graph math, NPRI, leasehold math, Owners, Runsheet, Flowchart, Maps, Research/RRC import staging, `.landroid` persistence, autosave, tests/build, and documentation accuracy
+- Federal/BLM Phase 2, tribal lease support, and new dependencies remain out of scope unless the user explicitly reopens them
+- Recent audit fixes after the Curative checkpoint include branch-scoped lease-card coverage, strict out-of-range interest rejection, Curative link hardening, node PDF `.landroid` round-trip, runsheet hyperlink safety, and refreshed user-facing docs
+- Older references below to `claude/steadfast-bayou-checkpoint`, commit `1a177bb`, and `261/261` tests are historical context, not the active branch or validation baseline
+
 This file is the controlling audit brief. Use the exact user audit prompt below together with:
 - `/Users/abstractmapping/projects/landroid/AGENTS.md`
 - `/Users/abstractmapping/projects/landroid/PROJECT_CONTEXT.md`

@@ -11,6 +11,7 @@
 import { useWorkspaceStore } from '../store/workspace-store';
 import { useMapStore } from '../store/map-store';
 import { useOwnerStore } from '../store/owner-store';
+import { useCurativeStore } from '../store/curative-store';
 import { buildLeaseNode, isLeaseNode } from '../components/deskmap/deskmap-lease-node';
 import type { OwnerWorkspaceData } from './owner-persistence';
 import { createBundledDeskMapPdfFile } from './bundled-deskmap-pdfs';
@@ -747,6 +748,19 @@ async function attachPdf(nodeId: string, fileName: string): Promise<boolean> {
   }
 }
 
+async function resetWorkspaceSideStores(
+  workspaceId: string,
+  ownerData: OwnerWorkspaceData
+) {
+  await Promise.all([
+    useOwnerStore.getState().replaceWorkspaceData(workspaceId, ownerData),
+    useMapStore.getState().setWorkspace(workspaceId),
+    useCurativeStore.getState().replaceWorkspaceData(workspaceId, {
+      titleIssues: [],
+    }),
+  ]);
+}
+
 // ── Main entry point ────────────────────────────────────
 
 export async function seedTestData(): Promise<{ nodeCount: number; pdfCount: number }> {
@@ -793,10 +807,7 @@ export async function seedTestData(): Promise<{ nodeCount: number; pdfCount: num
       'Will', 'Order',
     ],
   });
-  await Promise.all([
-    useOwnerStore.getState().replaceWorkspaceData(workspaceId, ownerData),
-    useMapStore.getState().setWorkspace(workspaceId),
-  ]);
+  await resetWorkspaceSideStores(workspaceId, ownerData);
 
   // Attach PDFs
   let pdfCount = 0;
@@ -1937,13 +1948,7 @@ export async function seedStressTestData(): Promise<{ nodeCount: number; pdfCoun
     activeDeskMapId: workspace.activeDeskMapId,
     instrumentTypes: workspace.instrumentTypes,
   });
-  await Promise.all([
-    useOwnerStore.getState().replaceWorkspaceData(
-      workspace.workspaceId,
-      workspace.ownerData
-    ),
-    useMapStore.getState().setWorkspace(workspace.workspaceId),
-  ]);
+  await resetWorkspaceSideStores(workspace.workspaceId, workspace.ownerData);
 
   // Attach bundled PDFs sourced from TORS_Documents/
   let pdfCount = 0;
@@ -1987,13 +1992,7 @@ export async function seedLeaseholdDemoData(): Promise<{
     activeDeskMapId: workspace.activeDeskMapId,
     instrumentTypes: workspace.instrumentTypes,
   });
-  await Promise.all([
-    useOwnerStore.getState().replaceWorkspaceData(
-      workspace.workspaceId,
-      workspace.ownerData
-    ),
-    useMapStore.getState().setWorkspace(workspace.workspaceId),
-  ]);
+  await resetWorkspaceSideStores(workspace.workspaceId, workspace.ownerData);
 
   let pdfCount = 0;
   const failedPdfNodeIds: string[] = [];
@@ -3101,13 +3100,7 @@ export async function seedCombinatorialData(): Promise<{
     activeDeskMapId: workspace.activeDeskMapId,
     instrumentTypes: workspace.instrumentTypes,
   });
-  await Promise.all([
-    useOwnerStore.getState().replaceWorkspaceData(
-      workspace.workspaceId,
-      workspace.ownerData
-    ),
-    useMapStore.getState().setWorkspace(workspace.workspaceId),
-  ]);
+  await resetWorkspaceSideStores(workspace.workspaceId, workspace.ownerData);
 
   let pdfCount = 0;
   const failedPdfNodeIds: string[] = [];

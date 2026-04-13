@@ -113,6 +113,7 @@ function buildWorkspace(canvas: CanvasSaveData | null): LandroidFileData {
       {
         ...createBlankNode('node-1'),
         type: 'related',
+        hasDoc: true,
         linkedOwnerId: owner.id,
         linkedLeaseId: 'lease-1',
         relatedKind: 'lease',
@@ -175,6 +176,17 @@ function buildWorkspace(canvas: CanvasSaveData | null): LandroidFileData {
     activeDeskMapId: 'dm-1',
     instrumentTypes: ['Deed'],
     canvas,
+    pdfData: {
+      pdfs: [
+        {
+          nodeId: 'node-1',
+          fileName: '20260001.pdf',
+          mimeType: 'application/pdf',
+          blob: new Blob(['node-pdf-body'], { type: 'application/pdf' }),
+          createdAt: '2026-04-01T00:00:00.000Z',
+        },
+      ],
+    },
     ownerData: {
       owners: [owner],
       leases: [],
@@ -216,6 +228,8 @@ describe('workspace-persistence', () => {
       original.leaseholdTransferOrderEntries
     );
     expect(imported.canvas).toEqual(original.canvas);
+    expect(imported.pdfData?.pdfs[0]?.fileName).toBe('20260001.pdf');
+    expect(await imported.pdfData?.pdfs[0]?.blob.text()).toBe('node-pdf-body');
     expect(imported.ownerData?.owners).toEqual(original.ownerData?.owners);
     expect(imported.ownerData?.docs[0]?.fileName).toBe('owner-notes.txt');
     expect(await imported.ownerData?.docs[0]?.blob.text()).toBe('owner-doc-body');
@@ -269,6 +283,7 @@ describe('workspace-persistence', () => {
     });
     expect(imported.researchData).toEqual({ imports: [] });
     expect(imported.curativeData).toEqual({ titleIssues: [] });
+    expect(imported.pdfData).toEqual({ pdfs: [] });
     expect(imported.leaseholdUnit).toEqual({
       name: '',
       description: '',
@@ -284,6 +299,31 @@ describe('workspace-persistence', () => {
     expect(imported.nodes[0]?.relatedKind).toBeNull();
     expect(imported.nodes[0]?.interestClass).toBe('mineral');
     expect(imported.nodes[0]?.royaltyKind).toBeNull();
+  });
+
+  it('clears stale hasDoc flags when an imported .landroid lacks the node PDF payload', async () => {
+    const payload = {
+      version: 6,
+      workspaceId: 'ws-missing-pdf',
+      projectName: 'Missing PDF',
+      nodes: [
+        {
+          ...createBlankNode('node-with-missing-pdf'),
+          hasDoc: true,
+        },
+      ],
+      deskMaps: [],
+      activeDeskMapId: null,
+      instrumentTypes: [],
+    };
+    const file = new File([JSON.stringify(payload)], 'missing-pdf.landroid', {
+      type: 'application/json',
+    });
+
+    const imported = await importLandroidFile(file);
+
+    expect(imported.nodes[0]?.hasDoc).toBe(false);
+    expect(imported.pdfData).toEqual({ pdfs: [] });
   });
 
   it('normalizes legacy imported leases that predate royalty and leased-interest fields', async () => {
@@ -432,6 +472,18 @@ describe('workspace-persistence', () => {
           },
         ],
       },
+      curativeData: {
+        titleIssues: [
+          createBlankTitleIssue('ws-safe', {
+            id: 'issue-stale',
+            title: 'Stale import link',
+            affectedDeskMapId: 'missing-dm',
+            affectedNodeId: 'missing-node',
+            affectedOwnerId: 'missing-owner',
+            affectedLeaseId: 'missing-lease',
+          }),
+        ],
+      },
     };
     const file = new File([JSON.stringify(payload)], 'sanitized.landroid', {
       type: 'application/json',
@@ -471,6 +523,15 @@ describe('workspace-persistence', () => {
     expect(imported.mapData?.mapReferences[0]?.url).toBe('');
     expect(imported.mapData?.mapReferences[1]?.url).toBe(
       'https://rrc.texas.gov/resource-center'
+    );
+    expect(imported.curativeData?.titleIssues[0]).toEqual(
+      expect.objectContaining({
+        id: 'issue-stale',
+        affectedDeskMapId: null,
+        affectedNodeId: null,
+        affectedOwnerId: null,
+        affectedLeaseId: null,
+      })
     );
   });
 
