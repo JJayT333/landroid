@@ -2,13 +2,13 @@
 
 Use this file to resume work in a new chat.
 
-## Latest Playwright/browser-QA update — 2026-04-13
+## Latest Playwright/browser-QA wrap-up — 2026-04-14
 
 This section supersedes older branch/status bullets below when they conflict.
 
 - Active branch: `codex/curative-cha-cha-slide`
 - Latest committed baseline before this work:
-  - `071c79f fix: sync lease cards and show pdf attachments`
+  - `47bad6d test: cover lease export and deletion flows`
 - Completed Playwright setup:
   - added Playwright Chromium browser QA with `npm run test:e2e` and `npm run test:e2e:headed`
   - added `playwright.config.ts` to start the local Vite server automatically for E2E tests
@@ -19,17 +19,23 @@ This section supersedes older branch/status bullets below when they conflict.
     - `.landroid` export/import preserving replaced lease PDFs and same-owner lease records
     - deleting one branch-scoped lessee card removes only that linked owner lease while preserving another tract's lease for the same owner
     - same-owner multi-tract behavior for `Raven Bend Minerals, LLC` without merging title branches or losing separate lease records
+    - Curative issue creation/editing, tract/branch/owner/lease linking, search no-match behavior, status filtering, and `Open Desk Map`
+    - Research Source, Formula, Federal Lease project record, and Question creation/linking/search, including source-backed formula/question links
     - `Research` opening as the source/formula/project-record workspace with `Data Imports` secondary
     - `Stress (100/150/500)` loading current Desk Map cards with document badges
   - ignored local/generated Playwright outputs and known local/generated folders in `.gitignore`
+- Bug fixed while wrapping Playwright:
+  - Research record updates now apply to local state before persistence resolves, preventing rapid browser edits from overwriting newer field/link changes
+  - added a unit regression for rapid Research formula updates preserving both field edits and linked source ids
 - Dependency update:
   - added dev dependency `@playwright/test`
   - `npm audit fix` updated fixable transitive audit items (`picomatch`/`vite` in the lockfile)
   - remaining audit risk: `xlsx@0.18.5` still reports high-severity advisories with no npm fix available
 - Validation completed after Playwright setup:
-  - `npm run test:e2e` passed (`5/5`) in Chromium
+  - targeted Research store suite passed: `npx vitest run src/store/__tests__/research-store.test.ts` (`4/4`)
+  - `npm run test:e2e` passed (`7/7`) in Chromium
   - `npm run lint` passed
-  - `npm test` passed (`311/311`)
+  - `npm test` passed (`312/312`)
   - `npm run build` passed
   - `npm audit --audit-level=high` still fails only for the existing no-fix `xlsx` advisories
 - Intentional local noise still present and not part of the source/docs/test commit:
@@ -38,8 +44,8 @@ This section supersedes older branch/status bullets below when they conflict.
   - `TORS_Documents/`
   - generated `dist/`, `dist-node/`, `playwright-report/`, and `test-results/` artifacts
 - Likely next steps:
-  - add browser coverage for Curative create/edit/link/filter flows
-  - add browser coverage for Research add/edit/search/link flows
+  - start the next Research product phase now that the browser QA net is in place
+  - keep using `npm run test:e2e` for workflow changes touching Desk Map, Owners, Curative, Research, save/load, or seeded demo loaders
   - decide whether to replace or constrain `xlsx` because npm has no fixed version for its current advisories
 
 ## Latest lease/PDF/demo cleanup — 2026-04-13

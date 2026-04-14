@@ -511,7 +511,7 @@ Recent ownership work improved how fractions are stored and displayed.
 ### "I want to test without touching real work"
 - Use the `Stress (100/150/500)` button to load sample tract data.
 - Save a separate `.landroid` snapshot before going back to real data.
-- Browser QA now covers the refreshed `Stress (100/150/500)` and `Leasehold (8 Tracts)` loaders with Playwright, including visible PDF filenames, `.landroid` export/import, same-owner multi-tract lease records, and branch-scoped lessee-card deletion back to `Owners`.
+- Browser QA now covers the refreshed `Stress (100/150/500)` and `Leasehold (8 Tracts)` loaders with Playwright, including visible PDF filenames, `.landroid` export/import, same-owner multi-tract lease records, branch-scoped lessee-card deletion back to `Owners`, Curative issue linking/filtering, and Research add/link/search workflows.
 
 ## 14) Practical habits for a new user
 

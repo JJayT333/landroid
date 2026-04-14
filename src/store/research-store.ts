@@ -124,17 +124,21 @@ export const useResearchStore = create<ResearchState>()((set, get) => ({
   },
 
   updateImport: async (id, fields) => {
-    const current = get().imports.find((researchImport) => researchImport.id === id);
-    if (!current) return;
-    const next = normalizeResearchImport(
-      touch({ ...current, ...fields, workspaceId: current.workspaceId })
-    );
-    await saveResearchImport(next);
+    let next: ResearchImport | null = null;
     set((state) => ({
-      imports: state.imports.map((researchImport) =>
-        researchImport.id === id ? next : researchImport
-      ),
+      imports: state.imports.map((researchImport) => {
+        if (researchImport.id !== id) {
+          return researchImport;
+        }
+        next = normalizeResearchImport(
+          touch({ ...researchImport, ...fields, workspaceId: researchImport.workspaceId })
+        );
+        return next;
+      }),
     }));
+    if (next) {
+      await saveResearchImport(next);
+    }
   },
 
   removeImport: async (id) => {
@@ -152,15 +156,21 @@ export const useResearchStore = create<ResearchState>()((set, get) => ({
   },
 
   updateSource: async (id, fields) => {
-    const current = get().sources.find((source) => source.id === id);
-    if (!current) return;
-    const next = normalizeResearchSource(
-      touch({ ...current, ...fields, workspaceId: current.workspaceId })
-    );
-    await saveResearchSource(next);
+    let next: ResearchSource | null = null;
     set((state) => ({
-      sources: state.sources.map((source) => (source.id === id ? next : source)),
+      sources: state.sources.map((source) => {
+        if (source.id !== id) {
+          return source;
+        }
+        next = normalizeResearchSource(
+          touch({ ...source, ...fields, workspaceId: source.workspaceId })
+        );
+        return next;
+      }),
     }));
+    if (next) {
+      await saveResearchSource(next);
+    }
   },
 
   removeSource: async (id) => {
@@ -178,17 +188,21 @@ export const useResearchStore = create<ResearchState>()((set, get) => ({
   },
 
   updateFormula: async (id, fields) => {
-    const current = get().formulas.find((formula) => formula.id === id);
-    if (!current) return;
-    const next = normalizeResearchFormula(
-      touch({ ...current, ...fields, workspaceId: current.workspaceId })
-    );
-    await saveResearchFormula(next);
+    let next: ResearchFormula | null = null;
     set((state) => ({
-      formulas: state.formulas.map((formula) =>
-        formula.id === id ? next : formula
-      ),
+      formulas: state.formulas.map((formula) => {
+        if (formula.id !== id) {
+          return formula;
+        }
+        next = normalizeResearchFormula(
+          touch({ ...formula, ...fields, workspaceId: formula.workspaceId })
+        );
+        return next;
+      }),
     }));
+    if (next) {
+      await saveResearchFormula(next);
+    }
   },
 
   removeFormula: async (id) => {
@@ -206,17 +220,25 @@ export const useResearchStore = create<ResearchState>()((set, get) => ({
   },
 
   updateProjectRecord: async (id, fields) => {
-    const current = get().projectRecords.find((projectRecord) => projectRecord.id === id);
-    if (!current) return;
-    const next = normalizeResearchProjectRecord(
-      touch({ ...current, ...fields, workspaceId: current.workspaceId })
-    );
-    await saveResearchProjectRecord(next);
+    let next: ResearchProjectRecord | null = null;
     set((state) => ({
-      projectRecords: state.projectRecords.map((projectRecord) =>
-        projectRecord.id === id ? next : projectRecord
-      ),
+      projectRecords: state.projectRecords.map((projectRecord) => {
+        if (projectRecord.id !== id) {
+          return projectRecord;
+        }
+        next = normalizeResearchProjectRecord(
+          touch({
+            ...projectRecord,
+            ...fields,
+            workspaceId: projectRecord.workspaceId,
+          })
+        );
+        return next;
+      }),
     }));
+    if (next) {
+      await saveResearchProjectRecord(next);
+    }
   },
 
   removeProjectRecord: async (id) => {
@@ -236,17 +258,21 @@ export const useResearchStore = create<ResearchState>()((set, get) => ({
   },
 
   updateQuestion: async (id, fields) => {
-    const current = get().questions.find((question) => question.id === id);
-    if (!current) return;
-    const next = normalizeResearchQuestion(
-      touch({ ...current, ...fields, workspaceId: current.workspaceId })
-    );
-    await saveResearchQuestion(next);
+    let next: ResearchQuestion | null = null;
     set((state) => ({
-      questions: state.questions.map((question) =>
-        question.id === id ? next : question
-      ),
+      questions: state.questions.map((question) => {
+        if (question.id !== id) {
+          return question;
+        }
+        next = normalizeResearchQuestion(
+          touch({ ...question, ...fields, workspaceId: question.workspaceId })
+        );
+        return next;
+      }),
     }));
+    if (next) {
+      await saveResearchQuestion(next);
+    }
   },
 
   removeQuestion: async (id) => {

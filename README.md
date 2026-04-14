@@ -53,7 +53,7 @@ npm run test:e2e
 ```
 
 - `npm run test:e2e` uses Playwright Chromium and starts the local Vite server automatically.
-- Current browser coverage checks the refreshed demo loaders, visible Desk Map PDF filename chips, attach/replace lease PDF behavior, `.landroid` export/import preservation, same-owner multi-tract lease records, branch-scoped lessee-card deletion back to owner records, Research opening as the source workspace, and stress-seed document badges.
+- Current browser coverage checks the refreshed demo loaders, visible Desk Map PDF filename chips, attach/replace lease PDF behavior, `.landroid` export/import preservation, same-owner multi-tract lease records, branch-scoped lessee-card deletion back to owner records, Curative create/edit/link/filter behavior, Research source/formula/project/question add/link/search behavior, Research opening as the source workspace, and stress-seed document badges.
 
 ## Persistence notes
 - Browser autosave keeps the active workspace and flowchart canvas locally.

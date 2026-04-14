@@ -151,4 +151,40 @@ describe('research-store', () => {
     expect(useResearchStore.getState().projectRecords[0]?.workspaceId).toBe('ws-active');
     expect(useResearchStore.getState().questions[0]?.workspaceId).toBe('ws-active');
   });
+
+  it('applies rapid formula edits to the latest local record before persistence resolves', async () => {
+    mocks.saveResearchFormula.mockResolvedValue(undefined);
+    const formula = createBlankResearchFormula('ws-active', {
+      id: 'formula-rapid',
+      title: 'Draft Formula',
+      sourceIds: [],
+    });
+    useResearchStore.setState({
+      workspaceId: 'ws-active',
+      formulas: [formula],
+    });
+
+    const titleUpdate = useResearchStore
+      .getState()
+      .updateFormula('formula-rapid', { title: 'Branch lease royalty check' });
+    const sourceUpdate = useResearchStore
+      .getState()
+      .updateFormula('formula-rapid', { sourceIds: ['source-1'] });
+
+    expect(useResearchStore.getState().formulas[0]).toEqual(
+      expect.objectContaining({
+        title: 'Branch lease royalty check',
+        sourceIds: ['source-1'],
+      })
+    );
+
+    await Promise.all([titleUpdate, sourceUpdate]);
+
+    expect(mocks.saveResearchFormula).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        title: 'Branch lease royalty check',
+        sourceIds: ['source-1'],
+      })
+    );
+  });
 });
