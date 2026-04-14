@@ -16,6 +16,8 @@ This section supersedes older branch/status bullets below when they conflict.
     - `Leasehold (8 Tracts)` seed loading
     - visible seeded PDF filenames on Desk Map title and lease cards
     - attaching/replacing a lease PDF through the Desk Map lessee modal and seeing the new filename on the card face
+    - `.landroid` export/import preserving replaced lease PDFs and same-owner lease records
+    - deleting one branch-scoped lessee card removes only that linked owner lease while preserving another tract's lease for the same owner
     - same-owner multi-tract behavior for `Raven Bend Minerals, LLC` without merging title branches or losing separate lease records
     - `Research` opening as the source/formula/project-record workspace with `Data Imports` secondary
     - `Stress (100/150/500)` loading current Desk Map cards with document badges
@@ -25,7 +27,7 @@ This section supersedes older branch/status bullets below when they conflict.
   - `npm audit fix` updated fixable transitive audit items (`picomatch`/`vite` in the lockfile)
   - remaining audit risk: `xlsx@0.18.5` still reports high-severity advisories with no npm fix available
 - Validation completed after Playwright setup:
-  - `npm run test:e2e` passed (`3/3`) in Chromium
+  - `npm run test:e2e` passed (`5/5`) in Chromium
   - `npm run lint` passed
   - `npm test` passed (`311/311`)
   - `npm run build` passed
@@ -36,8 +38,8 @@ This section supersedes older branch/status bullets below when they conflict.
   - `TORS_Documents/`
   - generated `dist/`, `dist-node/`, `playwright-report/`, and `test-results/` artifacts
 - Likely next steps:
-  - expand browser QA to `.landroid` export/import round trips once a stable temp-file flow is added
-  - add browser coverage for delete-lessee-card-to-owner sync if the current hover-action UI gets stable test ids
+  - add browser coverage for Curative create/edit/link/filter flows
+  - add browser coverage for Research add/edit/search/link flows
   - decide whether to replace or constrain `xlsx` because npm has no fixed version for its current advisories
 
 ## Latest lease/PDF/demo cleanup — 2026-04-13
