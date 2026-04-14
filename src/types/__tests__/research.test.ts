@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
+  createBlankResearchImport,
   createBlankResearchFormula,
   createBlankResearchProjectRecord,
   createBlankResearchQuestion,
   createBlankResearchSource,
+  normalizeResearchImport,
   normalizeResearchFormula,
   normalizeResearchProjectRecord,
   normalizeResearchQuestion,
@@ -25,6 +27,7 @@ describe('research types', () => {
       title: 'Source',
       sourceType: 'Project Note',
       context: 'General',
+      status: 'Draft',
     });
 
     expect(
@@ -57,6 +60,37 @@ describe('research types', () => {
         status: 'Bad Status' as never,
       })
     ).toMatchObject({ status: 'Draft' });
+  });
+
+  it('normalizes source status and malformed import formats', () => {
+    expect(
+      normalizeResearchSource({
+        id: 'source-1',
+        workspaceId: 'ws-1',
+        status: 'Bad Status' as never,
+      }).status
+    ).toBe('Draft');
+
+    const researchImport = createBlankResearchImport(
+      'ws-1',
+      new Blob(['{}'], { type: 'application/json' }),
+      {
+        fileName: 'map.geojson',
+        mimeType: 'application/json',
+        overrides: {
+          id: 'import-1',
+          detectedFormat: 'Bad Format' as never,
+        },
+      }
+    );
+
+    expect(researchImport.detectedFormat).toBe('JSON');
+    expect(
+      normalizeResearchImport({
+        ...researchImport,
+        detectedFormat: 'Bad Format' as never,
+      }).detectedFormat
+    ).toBe('JSON');
   });
 
   it('clears stale cross-record and app-object links', () => {

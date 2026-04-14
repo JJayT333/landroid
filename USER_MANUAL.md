@@ -331,14 +331,21 @@ The Curative view also keeps the next broader company-readiness areas visible so
 
 ## 8) Research view
 
-`Research` is now the source-of-truth workspace for project sources, formulas, federal/private reference records, saved questions, and advanced data imports.
+`Research` is now the source-of-truth workspace for project sources, formulas, federal/private reference records, saved questions, and advanced data imports. It opens to a home view with cross-library search, a review queue, and quick actions before you dive into any one record type.
 
 ### What it supports today
-- `Sources` for statutes, cases, agency pages, manuals, uploaded files, project notes, map/GIS references, and lease/source documents
-- `Formulas` for landman-readable formula cards with variables, examples, source links, review status, and optional LANDroid engine references
+- `Sources` for statutes, cases, agency pages, manuals, uploaded files, project notes, map/GIS references, lease/source documents, linked LANDroid objects, and review status
+- `Formulas` for landman-readable formula cards with variables, examples, source links, review status, optional LANDroid engine references, and starter Texas formula cards scaffolded from `LANDMAN-MATH-REFERENCE.md`
 - `Project Records` for federal leases, private leases, mapped tracts, target acquisitions, current leases, legal-description notes, map links, and source links
 - `Questions` for saved research questions, manual answers/notes, source links, formula links, project-record links, and review status
 - `Data Imports` for the older RRC catalog/import/decoder workspace, now treated as an advanced section
+
+### Research home
+- Use the home tiles to add a source, add formula starters, add a project record, or add a saved question.
+- Use `Search Research` from the home view when you want to search across sources, formulas, project records, and saved questions at once.
+- Search includes linked source names, map asset/region labels, owner names, lease labels, Desk Map labels, and import labels where those links exist.
+- Use the review queue to jump to sources or formulas marked `Needs Review`, project records under review, or saved questions that still need an answer.
+- Federal/private records shown from Research home remain reference-only. They do not change Texas Desk Map or Leasehold math.
 
 ### Data Imports support today
 - an in-app catalog of major official RRC downloadable dataset families
@@ -352,10 +359,11 @@ The Curative view also keeps the next broader company-readiness areas visible so
 - a fixed-width structured decoder for `Horizontal Drilling Permits`, turning the row-based ASCII file into a readable permit preview
 
 ### How to use it
-- Start in `Sources` when you need to save the authority, document, page, map reference, or project note that supports your work.
-- Use `Formulas` to document what a calculation means, which variables go into it, which source or convention supports it, and where LANDroid currently uses the logic.
+- Start in `Sources` when you need to save the authority, document, page, map reference, or project note that supports your work. Set the source status to `Draft`, `Needs Review`, or `Verified` as your confidence changes.
+- Use `Formulas` to document what a calculation means, which variables go into it, which source or convention supports it, and where LANDroid currently uses the logic. Use `Add Math Starters` when you want starter cards for the current Texas math reference.
 - Use `Project Records` to track a federal lease, private lease, mapped tract, target acquisition, or other reference-only project item without changing Texas Desk Map or Leasehold math.
 - Use `Questions` to save a research question and the sources, formulas, or project records that support the answer.
+- Use the filters in each section to narrow sources by type/context/status, formulas by category/status, project records by type/status, and saved questions by status.
 - Use `Data Imports` only when you want to stage official RRC downloads or review the existing decoder output.
 - In `Data Imports`, pick a dataset family from the left side and import the files you downloaded from the official RRC site.
 - Use the decoder status badges to see what is preview-ready now versus what still needs parser/manual work.
@@ -368,6 +376,8 @@ The Curative view also keeps the next broader company-readiness areas visible so
 
 ### Current scope
 - Federal/private project records are reference-only in this phase. They can be searched, linked to sources, linked to map assets/regions, and saved in `.landroid` files, but they do not drive federal royalty, CA/TPF, ONRR, payout, or private-lease math.
+- Formula starters document current Texas LANDroid behavior and are marked `Needs Review` so company conventions can still be confirmed before relying on them.
+- Deleting a Research source, formula, project record, or import now clears dependent Research links inside the active workspace so saved questions and formula cards do not keep hidden stale references.
 - LANDroid can stage RRC files now, but it does not fully decode every RRC legacy format.
 - The pending-permit decoder currently focuses on the core permit/wellbore/lat-long files. Other files in that family are still staged and previewed, but not yet joined into the structured summary.
 - The permit-master decoder currently focuses on the core status and permit records, plus the surface and bottom-hole coordinate records when present. Other companion segment types are still staged and called out honestly instead of being treated as fully decoded.

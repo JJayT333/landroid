@@ -116,6 +116,7 @@ export interface ResearchSource {
   title: string;
   sourceType: ResearchSourceType;
   context: ResearchContext;
+  status: ResearchReviewStatus;
   citation: string;
   url: string;
   notes: string;
@@ -271,6 +272,7 @@ export function createBlankResearchSource(
     title: '',
     sourceType: 'Project Note',
     context: 'General',
+    status: 'Draft',
     citation: '',
     url: '',
     notes: '',
@@ -286,6 +288,11 @@ export function createBlankResearchSource(
     'Project Note'
   );
   source.context = normalizeOption(RESEARCH_CONTEXT_OPTIONS, source.context, 'General');
+  source.status = normalizeOption(
+    RESEARCH_REVIEW_STATUS_OPTIONS,
+    source.status,
+    'Draft'
+  );
   source.links = normalizeResearchLinks(source.links);
   return source;
 }
@@ -639,8 +646,11 @@ export function createBlankResearchImport(
   researchImport.mimeType = overrides?.mimeType ?? mimeType;
   researchImport.datasetId = overrides?.datasetId ?? datasetId;
   researchImport.detectedFormat =
-    overrides?.detectedFormat ??
-    detectResearchImportFormat(researchImport.fileName, researchImport.mimeType);
+    normalizeOption(
+      RESEARCH_IMPORT_FORMAT_OPTIONS,
+      overrides?.detectedFormat,
+      detectResearchImportFormat(researchImport.fileName, researchImport.mimeType)
+    );
   researchImport.blob = overrides?.blob ?? file;
   return researchImport;
 }

@@ -187,4 +187,79 @@ describe('research-store', () => {
       })
     );
   });
+
+  it('cleans dependent Research links when linked records are deleted', async () => {
+    mocks.deleteResearchImport.mockResolvedValue(undefined);
+    mocks.deleteResearchSource.mockResolvedValue(undefined);
+    mocks.deleteResearchFormula.mockResolvedValue(undefined);
+    mocks.deleteResearchProjectRecord.mockResolvedValue(undefined);
+    mocks.saveResearchSource.mockResolvedValue(undefined);
+    mocks.saveResearchFormula.mockResolvedValue(undefined);
+    mocks.saveResearchProjectRecord.mockResolvedValue(undefined);
+    mocks.saveResearchQuestion.mockResolvedValue(undefined);
+
+    const source = createBlankResearchSource('ws-active', {
+      id: 'source-1',
+      links: {
+        deskMapId: null,
+        nodeId: null,
+        ownerId: null,
+        leaseId: null,
+        mapAssetId: null,
+        mapRegionId: null,
+        importId: 'import-1',
+      },
+    });
+    const formula = createBlankResearchFormula('ws-active', {
+      id: 'formula-1',
+      sourceIds: ['source-1', 'source-keep'],
+    });
+    const projectRecord = createBlankResearchProjectRecord('ws-active', {
+      id: 'project-1',
+      sourceIds: ['source-1'],
+    });
+    const question = createBlankResearchQuestion('ws-active', {
+      id: 'question-1',
+      sourceIds: ['source-1'],
+      formulaIds: ['formula-1'],
+      projectRecordIds: ['project-1'],
+    });
+    useResearchStore.setState({
+      workspaceId: 'ws-active',
+      imports: [
+        createBlankResearchImport(
+          'ws-active',
+          new Blob(['{}'], { type: 'application/json' }),
+          {
+            fileName: 'import.json',
+            mimeType: 'application/json',
+            overrides: { id: 'import-1' },
+          }
+        ),
+      ],
+      sources: [source],
+      formulas: [formula],
+      projectRecords: [projectRecord],
+      questions: [question],
+    });
+
+    await useResearchStore.getState().removeImport('import-1');
+    expect(useResearchStore.getState().sources[0]?.links.importId).toBeNull();
+
+    await useResearchStore.getState().removeSource('source-1');
+    expect(useResearchStore.getState().sources).toEqual([]);
+    expect(useResearchStore.getState().formulas[0]?.sourceIds).toEqual([
+      'source-keep',
+    ]);
+    expect(useResearchStore.getState().projectRecords[0]?.sourceIds).toEqual([]);
+    expect(useResearchStore.getState().questions[0]?.sourceIds).toEqual([]);
+
+    await useResearchStore.getState().removeFormula('formula-1');
+    expect(useResearchStore.getState().formulas).toEqual([]);
+    expect(useResearchStore.getState().questions[0]?.formulaIds).toEqual([]);
+
+    await useResearchStore.getState().removeProjectRecord('project-1');
+    expect(useResearchStore.getState().projectRecords).toEqual([]);
+    expect(useResearchStore.getState().questions[0]?.projectRecordIds).toEqual([]);
+  });
 });

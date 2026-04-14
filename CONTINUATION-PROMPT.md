@@ -2,6 +2,45 @@
 
 Use this file to resume work in a new chat.
 
+## Latest Research source-workspace checkpoint — 2026-04-14
+
+This section supersedes older Research/RRC bullets below when they conflict.
+
+- Active branch: `codex/curative-cha-cha-slide`
+- Research phase completed in this checkpoint:
+  - added a default `Research` home view with source/formula/project/question tiles, cross-library search, and a review queue
+  - kept `Data Imports` secondary/advanced while preserving the existing RRC catalog/import/decoder behavior
+  - added source review status (`Draft`, `Verified`, `Needs Review`) so source-library authority can be reviewed before relying on it
+  - added practical source/formula/project/question filters
+  - made Research search include linked source names, map assets/regions, owners, leases, Desk Map/card labels, and imported file labels where available
+  - improved map-region labels in Research by showing the parent map asset and auto-linking the parent map asset when a region is selected
+  - added `Used By` summaries for sources and formulas so citations are not isolated from the records that depend on them
+  - added an explicit `Add Math Starters`/`Add Starters` action that scaffolds current Texas LANDroid formula cards from `LANDMAN-MATH-REFERENCE.md`
+  - seeded formula starters are `Needs Review`, linked to a `LANDMAN Math Reference` manual source, and avoid federal/private math activation
+  - project record creation is now neutral (`New Project Record`) instead of defaulting every new record to a federal lease
+  - deleting a Research source, formula, project record, or import now clears dependent same-store links from formulas/project records/questions/sources
+  - malformed Research import format overrides now normalize back to detected safe formats
+- Research audit summary:
+  - solid: typed source/formula/project/question records, Dexie persistence, `.landroid` round-trip, import-time stale-link sanitization, and existing browser coverage
+  - improved: default landing/workspace feel, linked-label search, source review visibility, formula starter scaffolding, same-store stale-link cleanup, and user-facing docs
+  - still intentionally secondary: RRC DBF/EBCDIC import work and deeper decoder expansion
+- Validation completed after this checkpoint:
+  - `npm run lint` passed
+  - `npx vitest run src/types/__tests__/research.test.ts src/store/__tests__/research-store.test.ts src/research/__tests__/formula-starters.test.ts` passed (`10/10`)
+  - `npm test` passed (`316/316`)
+  - `npm run build` passed
+  - `npm run test:e2e` passed (`7/7`) in Chromium
+- Intentional local/generated noise still present and not part of the source/docs/test checkpoint:
+  - `.DS_Store`
+  - `.claude/`
+  - `TORS_Documents/`
+  - generated `dist/`, `dist-node/`, `playwright-report/`, and `test-results/` artifacts
+- Open risks / likely follow-ups:
+  - map-side Research links are still independent; a future cleanup can synchronize or clear `MapAsset.researchSourceId` / `researchProjectRecordId` when Research records are deleted
+  - Project Records still have one `serialOrReference` field; separate legacy BLM and MLRS serial fields remain a later federal/private reference decision, not active math
+  - source links remain scalar per object type; broader many-to-many evidence links can wait until real usage proves the need
+  - if formula starters become crowded, consider grouping starter packs by Ownership, Leasehold, NPRI, ORRI, and Transfer Order rather than adding new abstractions now
+
 ## Latest Playwright/browser-QA wrap-up — 2026-04-14
 
 This section supersedes older branch/status bullets below when they conflict.

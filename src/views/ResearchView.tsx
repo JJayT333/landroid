@@ -22,6 +22,7 @@ import {
   createResearchImportMetadataDraft,
   researchImportMetadataDraftIsDirty,
 } from '../research/research-import-metadata';
+import { buildResearchFormulaStarterRecords } from '../research/formula-starters';
 import {
   PENDING_DRILLING_FILE_SPECS,
   PENDING_DRILLING_DATASET_ID,
@@ -82,6 +83,10 @@ function matchesSearch(search: string, values: Array<string | null | undefined>)
   return values.some((value) => value?.toLowerCase().includes(query));
 }
 
+function matchesFilter<T extends string>(filter: T | 'All', value: T) {
+  return filter === 'All' || filter === value;
+}
+
 function toggleId(ids: string[], id: string): string[] {
   return ids.includes(id)
     ? ids.filter((candidate) => candidate !== id)
@@ -102,6 +107,21 @@ function labelForProjectRecord(record: ResearchProjectRecord) {
 
 function labelForQuestion(question: ResearchQuestion) {
   return question.question || question.id;
+}
+
+function mapFromOptions(options: Array<{ id: string; label: string }>) {
+  return new Map(options.map((option) => [option.id, option.label]));
+}
+
+function labelFromMap(
+  labels: Map<string, string>,
+  id: string | null | undefined
+): string {
+  return id ? labels.get(id) ?? id : '';
+}
+
+function labelsFromIds(labels: Map<string, string>, ids: string[]): string[] {
+  return ids.map((id) => labels.get(id) ?? id);
 }
 
 function SelectField<T extends string>({
@@ -235,7 +255,13 @@ function LinkCheckboxes({
   );
 }
 
-type ResearchSection = 'sources' | 'formulas' | 'projects' | 'questions' | 'imports';
+type ResearchSection =
+  | 'home'
+  | 'sources'
+  | 'formulas'
+  | 'projects'
+  | 'questions'
+  | 'imports';
 type DatasetCategoryFilter =
   | (typeof RRC_DATASET_CATEGORIES)[number]
   | 'All';
@@ -245,6 +271,11 @@ const RESEARCH_SECTIONS: Array<{
   label: string;
   description: string;
 }> = [
+  {
+    id: 'home',
+    label: 'Home',
+    description: 'Research overview, review queue, and cross-library search.',
+  },
   {
     id: 'sources',
     label: 'Sources',
@@ -308,8 +339,32 @@ export default function ResearchView() {
   const mapAssets = useMapStore((state) => state.mapAssets);
   const mapRegions = useMapStore((state) => state.mapRegions);
 
-  const [section, setSection] = useState<ResearchSection>('sources');
+  const [section, setSection] = useState<ResearchSection>('home');
   const [search, setSearch] = useState('');
+  const [sourceTypeFilter, setSourceTypeFilter] = useState<
+    ResearchSourceType | 'All'
+  >('All');
+  const [sourceContextFilter, setSourceContextFilter] = useState<
+    ResearchContext | 'All'
+  >('All');
+  const [sourceStatusFilter, setSourceStatusFilter] = useState<
+    ResearchReviewStatus | 'All'
+  >('All');
+  const [formulaCategoryFilter, setFormulaCategoryFilter] = useState<
+    ResearchFormulaCategory | 'All'
+  >('All');
+  const [formulaStatusFilter, setFormulaStatusFilter] = useState<
+    ResearchReviewStatus | 'All'
+  >('All');
+  const [projectTypeFilter, setProjectTypeFilter] = useState<
+    ResearchProjectRecordType | 'All'
+  >('All');
+  const [projectStatusFilter, setProjectStatusFilter] = useState<
+    ResearchProjectStatus | 'All'
+  >('All');
+  const [questionStatusFilter, setQuestionStatusFilter] = useState<
+    ResearchQuestionStatus | 'All'
+  >('All');
   const [selectedSourceId, setSelectedSourceId] = useState<string | null>(null);
   const [selectedFormulaId, setSelectedFormulaId] = useState<string | null>(null);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
@@ -367,11 +422,18 @@ export default function ResearchView() {
   }));
   const mapAssetOptions = mapAssets.map((asset) => ({
     id: asset.id,
-    label: asset.title || asset.fileName || asset.id,
+    label: [asset.title || asset.fileName || asset.id, asset.kind]
+      .filter(Boolean)
+      .join(' • '),
   }));
   const mapRegionOptions = mapRegions.map((region) => ({
     id: region.id,
-    label: region.title || region.shortLabel || region.id,
+    label: [
+      mapAssets.find((asset) => asset.id === region.assetId)?.title ??
+        mapAssets.find((asset) => asset.id === region.assetId)?.fileName ??
+        'Unlinked map',
+      region.title || region.shortLabel || region.id,
+    ].join(' / '),
   }));
   const importOptions = imports.map((researchImport) => ({
     id: researchImport.id,
@@ -394,65 +456,149 @@ export default function ResearchView() {
     label: lease.leaseName || lease.lessee || lease.docNo || lease.id,
   }));
 
+  const sourceLabelById = useMemo(() => mapFromOptions(sourceOptions), [sourceOptions]);
+  const formulaLabelById = useMemo(
+    () => mapFromOptions(formulaOptions),
+    [formulaOptions]
+  );
+  const projectLabelById = useMemo(
+    () => mapFromOptions(projectOptions),
+    [projectOptions]
+  );
+  const deskMapLabelById = useMemo(
+    () => mapFromOptions(deskMapOptions),
+    [deskMapOptions]
+  );
+  const nodeLabelById = useMemo(() => mapFromOptions(nodeOptions), [nodeOptions]);
+  const ownerLabelById = useMemo(() => mapFromOptions(ownerOptions), [ownerOptions]);
+  const leaseLabelById = useMemo(() => mapFromOptions(leaseOptions), [leaseOptions]);
+  const mapAssetLabelById = useMemo(
+    () => mapFromOptions(mapAssetOptions),
+    [mapAssetOptions]
+  );
+  const mapRegionLabelById = useMemo(
+    () => mapFromOptions(mapRegionOptions),
+    [mapRegionOptions]
+  );
+  const importLabelById = useMemo(
+    () => mapFromOptions(importOptions),
+    [importOptions]
+  );
+
   const filteredSources = useMemo(
     () =>
-      sources.filter((source) =>
-        matchesSearch(search, [
-          source.title,
-          source.sourceType,
-          source.context,
-          source.citation,
-          source.url,
-          source.notes,
-        ])
+      sources.filter(
+        (source) =>
+          matchesFilter(sourceTypeFilter, source.sourceType) &&
+          matchesFilter(sourceContextFilter, source.context) &&
+          matchesFilter(sourceStatusFilter, source.status) &&
+          matchesSearch(search, [
+            source.title,
+            source.sourceType,
+            source.context,
+            source.status,
+            source.citation,
+            source.url,
+            source.notes,
+            labelFromMap(deskMapLabelById, source.links.deskMapId),
+            labelFromMap(nodeLabelById, source.links.nodeId),
+            labelFromMap(ownerLabelById, source.links.ownerId),
+            labelFromMap(leaseLabelById, source.links.leaseId),
+            labelFromMap(mapAssetLabelById, source.links.mapAssetId),
+            labelFromMap(mapRegionLabelById, source.links.mapRegionId),
+            labelFromMap(importLabelById, source.links.importId),
+          ])
       ),
-    [search, sources]
+    [
+      deskMapLabelById,
+      importLabelById,
+      leaseLabelById,
+      mapAssetLabelById,
+      mapRegionLabelById,
+      nodeLabelById,
+      ownerLabelById,
+      search,
+      sourceContextFilter,
+      sourceStatusFilter,
+      sourceTypeFilter,
+      sources,
+    ]
   );
   const filteredFormulas = useMemo(
     () =>
-      formulas.filter((formula) =>
-        matchesSearch(search, [
-          formula.title,
-          formula.category,
-          formula.status,
-          formula.formulaText,
-          formula.explanation,
-          formula.variables,
-          formula.example,
-          formula.engineReference,
-          formula.notes,
-        ])
+      formulas.filter(
+        (formula) =>
+          matchesFilter(formulaCategoryFilter, formula.category) &&
+          matchesFilter(formulaStatusFilter, formula.status) &&
+          matchesSearch(search, [
+            formula.title,
+            formula.category,
+            formula.status,
+            formula.formulaText,
+            formula.explanation,
+            formula.variables,
+            formula.example,
+            formula.engineReference,
+            formula.notes,
+            ...labelsFromIds(sourceLabelById, formula.sourceIds),
+          ])
       ),
-    [formulas, search]
+    [formulaCategoryFilter, formulaStatusFilter, formulas, search, sourceLabelById]
   );
   const filteredProjectRecords = useMemo(
     () =>
-      projectRecords.filter((record) =>
-        matchesSearch(search, [
-          record.name,
-          record.recordType,
-          record.jurisdiction,
-          record.status,
-          record.acquisitionStatus,
-          record.serialOrReference,
-          record.acres,
-          record.legalDescription,
-          record.notes,
-        ])
+      projectRecords.filter(
+        (record) =>
+          matchesFilter(projectTypeFilter, record.recordType) &&
+          matchesFilter(projectStatusFilter, record.status) &&
+          matchesSearch(search, [
+            record.name,
+            record.recordType,
+            record.jurisdiction,
+            record.status,
+            record.acquisitionStatus,
+            record.serialOrReference,
+            record.acres,
+            record.legalDescription,
+            record.notes,
+            ...labelsFromIds(sourceLabelById, record.sourceIds),
+            labelFromMap(mapAssetLabelById, record.mapAssetId),
+            labelFromMap(mapRegionLabelById, record.mapRegionId),
+          ])
       ),
-    [projectRecords, search]
+    [
+      mapAssetLabelById,
+      mapRegionLabelById,
+      projectRecords,
+      projectStatusFilter,
+      projectTypeFilter,
+      search,
+      sourceLabelById,
+    ]
   );
   const filteredQuestions = useMemo(
     () =>
-      questions.filter((question) =>
-        matchesSearch(search, [
-          question.question,
-          question.answer,
-          question.status,
-          question.notes,
-        ])
+      questions.filter(
+        (question) =>
+          matchesFilter(questionStatusFilter, question.status) &&
+          matchesSearch(search, [
+            question.question,
+            question.answer,
+            question.status,
+            question.notes,
+            ...labelsFromIds(sourceLabelById, question.sourceIds),
+            ...labelsFromIds(formulaLabelById, question.formulaIds),
+            ...labelsFromIds(projectLabelById, question.projectRecordIds),
+          ])
       ),
-    [questions, search]
+    [
+      formulaLabelById,
+      projectLabelById,
+      questionStatusFilter,
+      questions,
+      search,
+      sourceLabelById,
+    ]
   );
 
   useEffect(() => {
@@ -989,6 +1135,71 @@ export default function ResearchView() {
     }
   };
 
+  const createSourceRecord = async (overrides: Partial<ResearchSource> = {}) => {
+    if (!workspaceId) return;
+    const source = createBlankResearchSource(workspaceId, {
+      title: 'New Source',
+      ...overrides,
+    });
+    await addSource(source);
+    setSection('sources');
+    setSelectedSourceId(source.id);
+  };
+
+  const createFormulaRecord = async (overrides: Partial<ResearchFormula> = {}) => {
+    if (!workspaceId) return;
+    const formula = createBlankResearchFormula(workspaceId, {
+      title: 'New Formula',
+      ...overrides,
+    });
+    await addFormula(formula);
+    setSection('formulas');
+    setSelectedFormulaId(formula.id);
+  };
+
+  const createProjectRecord = async (
+    overrides: Partial<ResearchProjectRecord> = {}
+  ) => {
+    if (!workspaceId) return;
+    const record = createBlankResearchProjectRecord(workspaceId, {
+      name: 'New Project Record',
+      ...overrides,
+    });
+    await addProjectRecord(record);
+    setSection('projects');
+    setSelectedProjectId(record.id);
+  };
+
+  const createQuestionRecord = async (
+    overrides: Partial<ResearchQuestion> = {}
+  ) => {
+    if (!workspaceId) return;
+    const question = createBlankResearchQuestion(workspaceId, {
+      question: 'New research question',
+      ...overrides,
+    });
+    await addQuestion(question);
+    setSection('questions');
+    setSelectedQuestionId(question.id);
+  };
+
+  const addFormulaStarters = async () => {
+    if (!workspaceId) return;
+    const starters = buildResearchFormulaStarterRecords(
+      workspaceId,
+      sources,
+      formulas
+    );
+    if (starters.source) {
+      await addSource(starters.source);
+    }
+    for (const formula of starters.formulas) {
+      await addFormula(formula);
+    }
+    setSection('formulas');
+    setSelectedFormulaId(starters.formulas[0]?.id ?? formulas[0]?.id ?? null);
+  };
+
   const activeSection = RESEARCH_SECTIONS.find((item) => item.id === section)!;
   const totalRecords =
     sources.length + formulas.length + projectRecords.length + questions.length;
@@ -1015,7 +1226,9 @@ export default function ResearchView() {
         <div className="flex-1 overflow-auto">
           {RESEARCH_SECTIONS.map((item) => {
             const count =
-              item.id === 'sources'
+              item.id === 'home'
+                ? totalRecords
+                : item.id === 'sources'
                 ? sources.length
                 : item.id === 'formulas'
                   ? formulas.length
@@ -1071,14 +1284,7 @@ export default function ResearchView() {
             <button
               type="button"
               disabled={!workspaceId}
-              onClick={async () => {
-                if (!workspaceId) return;
-                const source = createBlankResearchSource(workspaceId, {
-                  title: 'New Source',
-                });
-                await addSource(source);
-                setSelectedSourceId(source.id);
-              }}
+              onClick={() => void createSourceRecord()}
               className="px-3 py-2 rounded-lg text-sm font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors disabled:opacity-50"
             >
               Add Source
@@ -1088,14 +1294,7 @@ export default function ResearchView() {
             <button
               type="button"
               disabled={!workspaceId}
-              onClick={async () => {
-                if (!workspaceId) return;
-                const formula = createBlankResearchFormula(workspaceId, {
-                  title: 'New Formula',
-                });
-                await addFormula(formula);
-                setSelectedFormulaId(formula.id);
-              }}
+              onClick={() => void createFormulaRecord()}
               className="px-3 py-2 rounded-lg text-sm font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors disabled:opacity-50"
             >
               Add Formula
@@ -1105,14 +1304,7 @@ export default function ResearchView() {
             <button
               type="button"
               disabled={!workspaceId}
-              onClick={async () => {
-                if (!workspaceId) return;
-                const record = createBlankResearchProjectRecord(workspaceId, {
-                  name: 'New Federal Lease Record',
-                });
-                await addProjectRecord(record);
-                setSelectedProjectId(record.id);
-              }}
+              onClick={() => void createProjectRecord()}
               className="px-3 py-2 rounded-lg text-sm font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors disabled:opacity-50"
             >
               Add Project Record
@@ -1122,14 +1314,7 @@ export default function ResearchView() {
             <button
               type="button"
               disabled={!workspaceId}
-              onClick={async () => {
-                if (!workspaceId) return;
-                const question = createBlankResearchQuestion(workspaceId, {
-                  question: 'New research question',
-                });
-                await addQuestion(question);
-                setSelectedQuestionId(question.id);
-              }}
+              onClick={() => void createQuestionRecord()}
               className="px-3 py-2 rounded-lg text-sm font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors disabled:opacity-50"
             >
               Add Question
@@ -1137,14 +1322,237 @@ export default function ResearchView() {
           )}
         </div>
 
+        {section === 'home' && (
+          <div className="min-h-0 overflow-auto rounded-xl border border-ledger-line bg-parchment shadow-sm p-4 space-y-4">
+            <div className="grid gap-3 xl:grid-cols-4 md:grid-cols-2">
+              <ResearchHomeTile
+                title="Sources"
+                count={sources.length}
+                description="Authorities, documents, notes, and map evidence."
+                actionLabel="Add Source"
+                onOpen={() => setSection('sources')}
+                onAction={() => void createSourceRecord()}
+              />
+              <ResearchHomeTile
+                title="Formulas"
+                count={formulas.length}
+                description="Current Texas math cards with variables and source links."
+                actionLabel="Add Starters"
+                onOpen={() => setSection('formulas')}
+                onAction={() => void addFormulaStarters()}
+              />
+              <ResearchHomeTile
+                title="Project Records"
+                count={projectRecords.length}
+                description="Federal/private leases, mapped tracts, and targets."
+                actionLabel="Add Record"
+                onOpen={() => setSection('projects')}
+                onAction={() => void createProjectRecord()}
+              />
+              <ResearchHomeTile
+                title="Questions"
+                count={questions.length}
+                description="Manual answers and later AI-grounding prompts."
+                actionLabel="Add Question"
+                onOpen={() => setSection('questions')}
+                onAction={() => void createQuestionRecord()}
+              />
+            </div>
+
+            <div className="grid gap-4 xl:grid-cols-[minmax(0,1.25fr)_minmax(320px,0.75fr)]">
+              <section className="rounded-xl border border-ledger-line bg-ledger p-4 space-y-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-semibold text-ink">
+                      Cross-Library Search
+                    </div>
+                    <div className="text-xs text-ink-light">
+                      Search reads record text plus linked sources, map evidence, owners,
+                      leases, tracts, and imported file labels.
+                    </div>
+                  </div>
+                  <span className="rounded-full border border-ledger-line bg-parchment px-2 py-0.5 text-[11px] text-ink-light">
+                    {search.trim()
+                      ? filteredSources.length +
+                        filteredFormulas.length +
+                        filteredProjectRecords.length +
+                        filteredQuestions.length
+                      : totalRecords}{' '}
+                    records
+                  </span>
+                </div>
+
+                {search.trim() ? (
+                  <div className="grid gap-2">
+                    {filteredSources.slice(0, 4).map((source) => (
+                      <SearchResultButton
+                        key={source.id}
+                        type="Source"
+                        title={labelForSource(source)}
+                        meta={`${source.sourceType} • ${source.context} • ${source.status}`}
+                        onClick={() => {
+                          setSection('sources');
+                          setSelectedSourceId(source.id);
+                        }}
+                      />
+                    ))}
+                    {filteredFormulas.slice(0, 4).map((formula) => (
+                      <SearchResultButton
+                        key={formula.id}
+                        type="Formula"
+                        title={labelForFormula(formula)}
+                        meta={`${formula.category} • ${formula.status}`}
+                        onClick={() => {
+                          setSection('formulas');
+                          setSelectedFormulaId(formula.id);
+                        }}
+                      />
+                    ))}
+                    {filteredProjectRecords.slice(0, 4).map((record) => (
+                      <SearchResultButton
+                        key={record.id}
+                        type="Project"
+                        title={labelForProjectRecord(record)}
+                        meta={`${record.recordType} • ${record.status}`}
+                        onClick={() => {
+                          setSection('projects');
+                          setSelectedProjectId(record.id);
+                        }}
+                      />
+                    ))}
+                    {filteredQuestions.slice(0, 4).map((question) => (
+                      <SearchResultButton
+                        key={question.id}
+                        type="Question"
+                        title={labelForQuestion(question)}
+                        meta={question.status}
+                        onClick={() => {
+                          setSection('questions');
+                          setSelectedQuestionId(question.id);
+                        }}
+                      />
+                    ))}
+                    {filteredSources.length +
+                      filteredFormulas.length +
+                      filteredProjectRecords.length +
+                      filteredQuestions.length ===
+                      0 && (
+                      <div className="rounded-lg border border-dashed border-ledger-line bg-parchment px-4 py-5 text-sm text-ink-light">
+                        No Research records match this search.
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="rounded-lg border border-dashed border-ledger-line bg-parchment px-4 py-5 text-sm text-ink-light">
+                    Use the search box to find sources, formulas, project records, and
+                    saved questions from one place.
+                  </div>
+                )}
+              </section>
+
+              <section className="rounded-xl border border-ledger-line bg-ledger p-4 space-y-3">
+                <div>
+                  <div className="text-sm font-semibold text-ink">Review Queue</div>
+                  <div className="text-xs text-ink-light">
+                    Draft, Needs Review, and Under Review records stay visible before
+                    they become relied-upon authority.
+                  </div>
+                </div>
+                <ReviewQueueRow
+                  label="Sources marked Needs Review"
+                  count={
+                    sources.filter((source) => source.status === 'Needs Review').length
+                  }
+                  onClick={() => {
+                    setSection('sources');
+                    setSourceStatusFilter('Needs Review');
+                  }}
+                />
+                <ReviewQueueRow
+                  label="Formula cards marked Needs Review"
+                  count={
+                    formulas.filter((formula) => formula.status === 'Needs Review').length
+                  }
+                  onClick={() => {
+                    setSection('formulas');
+                    setFormulaStatusFilter('Needs Review');
+                  }}
+                />
+                <ReviewQueueRow
+                  label="Project records under review"
+                  count={
+                    projectRecords.filter(
+                      (record) => record.status === 'Under Review'
+                    ).length
+                  }
+                  onClick={() => {
+                    setSection('projects');
+                    setProjectStatusFilter('Under Review');
+                  }}
+                />
+                <ReviewQueueRow
+                  label="Saved questions still open"
+                  count={
+                    questions.filter((question) => question.status !== 'Answered')
+                      .length
+                  }
+                  onClick={() => {
+                    setSection('questions');
+                    setQuestionStatusFilter('Needs Review');
+                  }}
+                />
+                <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                  Federal/private records stay reference-only here. They do not run
+                  Texas Desk Map, Leasehold, NPRI, ORRI, WI, payout, or ONRR math.
+                </div>
+              </section>
+            </div>
+          </div>
+        )}
+
         {section === 'sources' && (
           <div className="grid min-h-0 gap-4 lg:grid-cols-[340px_minmax(0,1fr)]">
             <RecordList
-              emptyText="No sources yet. Add statutes, cases, BLM/RRC links, project notes, or file-backed references here."
+              emptyText={
+                search.trim() ||
+                sourceTypeFilter !== 'All' ||
+                sourceContextFilter !== 'All' ||
+                sourceStatusFilter !== 'All'
+                  ? 'No sources match this search or filter.'
+                  : 'No sources yet. Add statutes, cases, BLM/RRC links, project notes, or file-backed references here.'
+              }
+              toolbar={
+                <FilterToolbar>
+                  <FilterSelect
+                    label="Type"
+                    value={sourceTypeFilter}
+                    options={['All', ...RESEARCH_SOURCE_TYPE_OPTIONS]}
+                    onChange={(value) =>
+                      setSourceTypeFilter(value as ResearchSourceType | 'All')
+                    }
+                  />
+                  <FilterSelect
+                    label="Context"
+                    value={sourceContextFilter}
+                    options={['All', ...RESEARCH_CONTEXT_OPTIONS]}
+                    onChange={(value) =>
+                      setSourceContextFilter(value as ResearchContext | 'All')
+                    }
+                  />
+                  <FilterSelect
+                    label="Status"
+                    value={sourceStatusFilter}
+                    options={['All', ...RESEARCH_REVIEW_STATUS_OPTIONS]}
+                    onChange={(value) =>
+                      setSourceStatusFilter(value as ResearchReviewStatus | 'All')
+                    }
+                  />
+                </FilterToolbar>
+              }
               records={filteredSources.map((source) => ({
                 id: source.id,
                 title: labelForSource(source),
-                meta: `${source.sourceType} • ${source.context}`,
+                meta: `${source.sourceType} • ${source.context} • ${source.status}`,
                 body: source.citation || source.url || source.notes,
               }))}
               selectedId={selectedSourceId}
@@ -1181,6 +1589,12 @@ export default function ResearchView() {
                       value={selectedSource.context}
                       options={RESEARCH_CONTEXT_OPTIONS}
                       onChange={(value) => updateSource(selectedSource.id, { context: value })}
+                    />
+                    <SelectField<ResearchReviewStatus>
+                      label="Review Status"
+                      value={selectedSource.status}
+                      options={RESEARCH_REVIEW_STATUS_OPTIONS}
+                      onChange={(value) => updateSource(selectedSource.id, { status: value })}
                     />
                     <FormField
                       label="Citation / Doc Ref"
@@ -1262,11 +1676,18 @@ export default function ResearchView() {
                       value={selectedSource.links.mapRegionId}
                       options={mapRegionOptions}
                       emptyLabel="No map region link"
-                      onChange={(mapRegionId) =>
+                      onChange={(mapRegionId) => {
+                        const regionAssetId =
+                          mapRegions.find((region) => region.id === mapRegionId)
+                            ?.assetId ?? selectedSource.links.mapAssetId;
                         updateSource(selectedSource.id, {
-                          links: { ...selectedSource.links, mapRegionId },
-                        })
-                      }
+                          links: {
+                            ...selectedSource.links,
+                            mapAssetId: regionAssetId,
+                            mapRegionId,
+                          },
+                        });
+                      }}
                     />
                     <NullableSelect
                       label="Imported File"
@@ -1280,6 +1701,36 @@ export default function ResearchView() {
                       }
                     />
                   </div>
+                  <LinkedSummary
+                    title="Used By"
+                    emptyText="No formulas, project records, or saved questions cite this source yet."
+                    items={[
+                      ...formulas
+                        .filter((formula) =>
+                          formula.sourceIds.includes(selectedSource.id)
+                        )
+                        .map((formula) => ({
+                          label: labelForFormula(formula),
+                          meta: `Formula • ${formula.category}`,
+                        })),
+                      ...projectRecords
+                        .filter((record) =>
+                          record.sourceIds.includes(selectedSource.id)
+                        )
+                        .map((record) => ({
+                          label: labelForProjectRecord(record),
+                          meta: `Project Record • ${record.recordType}`,
+                        })),
+                      ...questions
+                        .filter((question) =>
+                          question.sourceIds.includes(selectedSource.id)
+                        )
+                        .map((question) => ({
+                          label: labelForQuestion(question),
+                          meta: `Question • ${question.status}`,
+                        })),
+                    ]}
+                  />
                 </div>
               ) : (
                 <EmptyDetail message="Add or select a source to begin." />
@@ -1291,7 +1742,43 @@ export default function ResearchView() {
         {section === 'formulas' && (
           <div className="grid min-h-0 gap-4 lg:grid-cols-[340px_minmax(0,1fr)]">
             <RecordList
-              emptyText="No formulas yet. Add the formulas you want LANDroid to explain and later expose to AI."
+              emptyText={
+                search.trim() ||
+                formulaCategoryFilter !== 'All' ||
+                formulaStatusFilter !== 'All'
+                  ? 'No formula cards match this search or filter.'
+                  : 'No formulas yet. Add the formulas you want LANDroid to explain and later expose to AI.'
+              }
+              toolbar={
+                <FilterToolbar>
+                  <FilterSelect
+                    label="Category"
+                    value={formulaCategoryFilter}
+                    options={['All', ...RESEARCH_FORMULA_CATEGORY_OPTIONS]}
+                    onChange={(value) =>
+                      setFormulaCategoryFilter(
+                        value as ResearchFormulaCategory | 'All'
+                      )
+                    }
+                  />
+                  <FilterSelect
+                    label="Status"
+                    value={formulaStatusFilter}
+                    options={['All', ...RESEARCH_REVIEW_STATUS_OPTIONS]}
+                    onChange={(value) =>
+                      setFormulaStatusFilter(value as ResearchReviewStatus | 'All')
+                    }
+                  />
+                  <button
+                    type="button"
+                    disabled={!workspaceId}
+                    onClick={() => void addFormulaStarters()}
+                    className="self-end px-3 py-2 rounded-lg text-xs font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors disabled:opacity-50"
+                  >
+                    Add Math Starters
+                  </button>
+                </FilterToolbar>
+              }
               records={filteredFormulas.map((formula) => ({
                 id: formula.id,
                 title: labelForFormula(formula),
@@ -1392,6 +1879,18 @@ export default function ResearchView() {
                     rows={4}
                     onChange={(value) => updateFormula(selectedFormula.id, { notes: value })}
                   />
+                  <LinkedSummary
+                    title="Used By"
+                    emptyText="No saved questions cite this formula yet."
+                    items={questions
+                      .filter((question) =>
+                        question.formulaIds.includes(selectedFormula.id)
+                      )
+                      .map((question) => ({
+                        label: labelForQuestion(question),
+                        meta: `Question • ${question.status}`,
+                      }))}
+                  />
                 </div>
               ) : (
                 <EmptyDetail message="Add or select a formula card to begin." />
@@ -1403,7 +1902,33 @@ export default function ResearchView() {
         {section === 'projects' && (
           <div className="grid min-h-0 gap-4 lg:grid-cols-[340px_minmax(0,1fr)]">
             <RecordList
-              emptyText="No project records yet. Add federal leases, private leases, mapped tracts, or acquisition targets here."
+              emptyText={
+                search.trim() ||
+                projectTypeFilter !== 'All' ||
+                projectStatusFilter !== 'All'
+                  ? 'No project records match this search or filter.'
+                  : 'No project records yet. Add federal leases, private leases, mapped tracts, or acquisition targets here.'
+              }
+              toolbar={
+                <FilterToolbar>
+                  <FilterSelect
+                    label="Type"
+                    value={projectTypeFilter}
+                    options={['All', ...RESEARCH_PROJECT_RECORD_TYPE_OPTIONS]}
+                    onChange={(value) =>
+                      setProjectTypeFilter(value as ResearchProjectRecordType | 'All')
+                    }
+                  />
+                  <FilterSelect
+                    label="Status"
+                    value={projectStatusFilter}
+                    options={['All', ...RESEARCH_PROJECT_STATUS_OPTIONS]}
+                    onChange={(value) =>
+                      setProjectStatusFilter(value as ResearchProjectStatus | 'All')
+                    }
+                  />
+                </FilterToolbar>
+              }
               records={filteredProjectRecords.map((record) => ({
                 id: record.id,
                 title: labelForProjectRecord(record),
@@ -1522,9 +2047,15 @@ export default function ResearchView() {
                       value={selectedProjectRecord.mapRegionId}
                       options={mapRegionOptions}
                       emptyLabel="No map region link"
-                      onChange={(mapRegionId) =>
-                        updateProjectRecord(selectedProjectRecord.id, { mapRegionId })
-                      }
+                      onChange={(mapRegionId) => {
+                        const regionAssetId =
+                          mapRegions.find((region) => region.id === mapRegionId)
+                            ?.assetId ?? selectedProjectRecord.mapAssetId;
+                        updateProjectRecord(selectedProjectRecord.id, {
+                          mapAssetId: regionAssetId,
+                          mapRegionId,
+                        });
+                      }}
                     />
                   </div>
                   <LinkCheckboxes
@@ -1554,7 +2085,23 @@ export default function ResearchView() {
         {section === 'questions' && (
           <div className="grid min-h-0 gap-4 lg:grid-cols-[340px_minmax(0,1fr)]">
             <RecordList
-              emptyText="No saved questions yet. Add questions you want LANDroid or a future AI layer to answer from sources."
+              emptyText={
+                search.trim() || questionStatusFilter !== 'All'
+                  ? 'No saved questions match this search or filter.'
+                  : 'No saved questions yet. Add questions you want LANDroid or a future AI layer to answer from sources.'
+              }
+              toolbar={
+                <FilterToolbar>
+                  <FilterSelect
+                    label="Status"
+                    value={questionStatusFilter}
+                    options={['All', ...RESEARCH_QUESTION_STATUS_OPTIONS]}
+                    onChange={(value) =>
+                      setQuestionStatusFilter(value as ResearchQuestionStatus | 'All')
+                    }
+                  />
+                </FilterToolbar>
+              }
               records={filteredQuestions.map((question) => ({
                 id: question.id,
                 title: labelForQuestion(question),
@@ -1988,15 +2535,18 @@ function RecordList({
   records,
   selectedId,
   emptyText,
+  toolbar,
   onSelect,
 }: {
   records: Array<{ id: string; title: string; meta: string; body: string }>;
   selectedId: string | null;
   emptyText: string;
+  toolbar?: ReactNode;
   onSelect: (id: string) => void;
 }) {
   return (
     <div className="rounded-xl border border-ledger-line bg-parchment shadow-sm overflow-hidden flex flex-col">
+      {toolbar && <div className="border-b border-ledger-line bg-ledger p-3">{toolbar}</div>}
       <div className="flex-1 overflow-auto">
         {records.length === 0 ? (
           <div className="px-4 py-6 text-sm text-ink-light">{emptyText}</div>
@@ -2019,6 +2569,162 @@ function RecordList({
           ))
         )}
       </div>
+    </div>
+  );
+}
+
+function FilterToolbar({ children }: { children: ReactNode }) {
+  return <div className="grid gap-2 sm:grid-cols-2">{children}</div>;
+}
+
+function FilterSelect({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  options: readonly string[];
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div>
+      <label className="text-[10px] text-ink-light uppercase tracking-wider block mb-1">
+        {label}
+      </label>
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="w-full px-3 py-2 rounded-lg border border-ledger-line bg-parchment text-xs text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none"
+      >
+        {options.map((option) => (
+          <option key={option} value={option}>
+            {option}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
+function ResearchHomeTile({
+  title,
+  count,
+  description,
+  actionLabel,
+  onOpen,
+  onAction,
+}: {
+  title: string;
+  count: number;
+  description: string;
+  actionLabel: string;
+  onOpen: () => void;
+  onAction: () => void;
+}) {
+  return (
+    <section className="rounded-xl border border-ledger-line bg-ledger p-4 space-y-3">
+      <button
+        type="button"
+        onClick={onOpen}
+        className="w-full text-left hover:text-leather transition-colors"
+      >
+        <div className="flex items-center justify-between gap-3">
+          <div className="text-sm font-semibold text-ink">{title}</div>
+          <div className="text-xl font-display font-bold text-ink">{count}</div>
+        </div>
+        <div className="mt-1 text-xs text-ink-light">{description}</div>
+      </button>
+      <button
+        type="button"
+        onClick={onAction}
+        className="px-3 py-2 rounded-lg text-xs font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors"
+      >
+        {actionLabel}
+      </button>
+    </section>
+  );
+}
+
+function SearchResultButton({
+  type,
+  title,
+  meta,
+  onClick,
+}: {
+  type: string;
+  title: string;
+  meta: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="w-full rounded-lg border border-ledger-line bg-parchment px-3 py-2 text-left hover:border-leather/40 hover:bg-parchment-dark/30 transition-colors"
+    >
+      <div className="text-[11px] font-semibold uppercase tracking-wider text-ink-light">
+        {type}
+      </div>
+      <div className="mt-0.5 text-sm font-semibold text-ink">{title}</div>
+      <div className="mt-1 text-xs text-ink-light">{meta}</div>
+    </button>
+  );
+}
+
+function ReviewQueueRow({
+  label,
+  count,
+  onClick,
+}: {
+  label: string;
+  count: number;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="w-full rounded-lg border border-ledger-line bg-parchment px-3 py-2 text-left hover:border-leather/40 hover:bg-parchment-dark/30 transition-colors"
+    >
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-sm text-ink">{label}</span>
+        <span className="text-sm font-semibold text-ink">{count}</span>
+      </div>
+    </button>
+  );
+}
+
+function LinkedSummary({
+  title,
+  emptyText,
+  items,
+}: {
+  title: string;
+  emptyText: string;
+  items: Array<{ label: string; meta: string }>;
+}) {
+  return (
+    <div className="rounded-lg border border-ledger-line bg-ledger px-3 py-3 space-y-2">
+      <div className="text-xs font-semibold uppercase tracking-wider text-ink-light">
+        {title}
+      </div>
+      {items.length === 0 ? (
+        <div className="text-sm text-ink-light">{emptyText}</div>
+      ) : (
+        <div className="grid gap-2 sm:grid-cols-2">
+          {items.map((item) => (
+            <div
+              key={`${item.meta}-${item.label}`}
+              className="rounded-lg border border-ledger-line bg-parchment px-3 py-2"
+            >
+              <div className="text-sm font-semibold text-ink truncate">{item.label}</div>
+              <div className="mt-1 text-[11px] text-ink-light">{item.meta}</div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

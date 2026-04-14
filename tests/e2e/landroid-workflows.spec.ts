@@ -463,7 +463,7 @@ test('research records can be created, linked, and searched', async ({ page }) =
   await page.getByRole('button', { name: 'Research' }).click();
   await fillInput(researchSidebar, 'Search Research', '');
 
-  await page.getByRole('button', { name: /^Questions/ }).click();
+  await researchSidebar.getByRole('button', { name: /^Questions/ }).click();
   await page.getByRole('button', { name: 'Add Question' }).click();
   await fillTextArea(
     researchDetail,
@@ -489,13 +489,13 @@ test('research records can be created, linked, and searched', async ({ page }) =
     page.getByText('What source supports the branch lease royalty formula?').first()
   ).toBeVisible();
   await fillInput(researchSidebar, 'Search Research', 'no matching research record');
-  await expect(page.getByText('No saved questions yet.')).toBeVisible();
+  await expect(page.getByText('No saved questions match this search or filter.')).toBeVisible();
 
   await expect(researchShell.getByRole('button', { name: /^Data Imports/ })).toBeVisible();
   expect(browserErrors).toEqual([]);
 });
 
-test('research opens as the source workspace and keeps imports secondary', async ({
+test('research opens as the source workspace home and keeps imports secondary', async ({
   page,
 }) => {
   const browserErrors = collectBrowserErrors(page);
@@ -511,11 +511,24 @@ test('research opens as the source workspace and keeps imports secondary', async
       'Source library, formula cards, federal/private project records, and saved questions.'
     )
   ).toBeVisible();
-  await expect(page.getByRole('button', { name: /Sources/ })).toBeVisible();
-  await expect(page.getByRole('button', { name: /Formulas/ })).toBeVisible();
-  await expect(page.getByRole('button', { name: /Project Records/ })).toBeVisible();
-  await expect(page.getByRole('button', { name: /Data Imports/ })).toBeVisible();
+  const researchSidebar = page.locator('main aside').first();
+  await expect(researchSidebar.getByRole('button', { name: /Sources/ })).toBeVisible();
+  await expect(researchSidebar.getByRole('button', { name: /Formulas/ })).toBeVisible();
+  await expect(
+    researchSidebar.getByRole('button', { name: /Project Records/ })
+  ).toBeVisible();
+  await expect(
+    researchSidebar.getByRole('button', { name: /Data Imports/ })
+  ).toBeVisible();
   await expect(page.getByRole('button', { name: 'Add Source' })).toBeVisible();
+  await expect(page.getByText('Cross-Library Search', { exact: true })).toBeVisible();
+  await expect(page.getByText('Review Queue', { exact: true })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Add Starters' }).click();
+  await fillInput(page.locator('main').first(), 'Search Research', 'NRI Before ORRI');
+  await page.getByText('NRI Before ORRI').first().click();
+  await expect(page.getByText('LANDMAN Math Reference').first()).toBeVisible();
+  await expect(page.getByText('Data Imports').first()).toBeVisible();
 
   expect(browserErrors).toEqual([]);
 });

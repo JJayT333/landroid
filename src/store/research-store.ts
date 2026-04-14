@@ -35,6 +35,14 @@ function touch<T extends { updatedAt: string }>(record: T): T {
   };
 }
 
+function withoutId(ids: string[], id: string): string[] {
+  return ids.filter((candidate) => candidate !== id);
+}
+
+function idsChanged(left: string[], right: string[]): boolean {
+  return left.length !== right.length || left.some((value, index) => value !== right[index]);
+}
+
 interface ResearchState {
   workspaceId: string | null;
   imports: ResearchImport[];
@@ -142,9 +150,25 @@ export const useResearchStore = create<ResearchState>()((set, get) => ({
   },
 
   removeImport: async (id) => {
+    const state = get();
+    const sources = state.sources.map((source) => {
+      if (source.links.importId !== id) {
+        return source;
+      }
+      return touch({
+        ...source,
+        links: { ...source.links, importId: null },
+      });
+    });
+    const changedSources = sources.filter(
+      (source, index) => source !== state.sources[index]
+    );
+
     await deleteResearchImport(id);
+    await Promise.all(changedSources.map((source) => saveResearchSource(source)));
     set((state) => ({
       imports: state.imports.filter((researchImport) => researchImport.id !== id),
+      sources,
     }));
   },
 
@@ -174,9 +198,48 @@ export const useResearchStore = create<ResearchState>()((set, get) => ({
   },
 
   removeSource: async (id) => {
+    const state = get();
+    const formulas = state.formulas.map((formula) => {
+      const sourceIds = withoutId(formula.sourceIds, id);
+      return idsChanged(formula.sourceIds, sourceIds)
+        ? touch({ ...formula, sourceIds })
+        : formula;
+    });
+    const projectRecords = state.projectRecords.map((projectRecord) => {
+      const sourceIds = withoutId(projectRecord.sourceIds, id);
+      return idsChanged(projectRecord.sourceIds, sourceIds)
+        ? touch({ ...projectRecord, sourceIds })
+        : projectRecord;
+    });
+    const questions = state.questions.map((question) => {
+      const sourceIds = withoutId(question.sourceIds, id);
+      return idsChanged(question.sourceIds, sourceIds)
+        ? touch({ ...question, sourceIds })
+        : question;
+    });
+    const changedFormulas = formulas.filter(
+      (formula, index) => formula !== state.formulas[index]
+    );
+    const changedProjectRecords = projectRecords.filter(
+      (projectRecord, index) => projectRecord !== state.projectRecords[index]
+    );
+    const changedQuestions = questions.filter(
+      (question, index) => question !== state.questions[index]
+    );
+
     await deleteResearchSource(id);
+    await Promise.all([
+      ...changedFormulas.map((formula) => saveResearchFormula(formula)),
+      ...changedProjectRecords.map((projectRecord) =>
+        saveResearchProjectRecord(projectRecord)
+      ),
+      ...changedQuestions.map((question) => saveResearchQuestion(question)),
+    ]);
     set((state) => ({
       sources: state.sources.filter((source) => source.id !== id),
+      formulas,
+      projectRecords,
+      questions,
     }));
   },
 
@@ -206,9 +269,22 @@ export const useResearchStore = create<ResearchState>()((set, get) => ({
   },
 
   removeFormula: async (id) => {
+    const state = get();
+    const questions = state.questions.map((question) => {
+      const formulaIds = withoutId(question.formulaIds, id);
+      return idsChanged(question.formulaIds, formulaIds)
+        ? touch({ ...question, formulaIds })
+        : question;
+    });
+    const changedQuestions = questions.filter(
+      (question, index) => question !== state.questions[index]
+    );
+
     await deleteResearchFormula(id);
+    await Promise.all(changedQuestions.map((question) => saveResearchQuestion(question)));
     set((state) => ({
       formulas: state.formulas.filter((formula) => formula.id !== id),
+      questions,
     }));
   },
 
@@ -242,11 +318,24 @@ export const useResearchStore = create<ResearchState>()((set, get) => ({
   },
 
   removeProjectRecord: async (id) => {
+    const state = get();
+    const questions = state.questions.map((question) => {
+      const projectRecordIds = withoutId(question.projectRecordIds, id);
+      return idsChanged(question.projectRecordIds, projectRecordIds)
+        ? touch({ ...question, projectRecordIds })
+        : question;
+    });
+    const changedQuestions = questions.filter(
+      (question, index) => question !== state.questions[index]
+    );
+
     await deleteResearchProjectRecord(id);
+    await Promise.all(changedQuestions.map((question) => saveResearchQuestion(question)));
     set((state) => ({
       projectRecords: state.projectRecords.filter(
         (projectRecord) => projectRecord.id !== id
       ),
+      questions,
     }));
   },
 
