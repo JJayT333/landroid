@@ -5,7 +5,7 @@ import {
   createBlankMapExternalReference,
   createBlankMapRegion,
 } from '../../types/map';
-import { createBlankOwner, createBlankOwnerDoc } from '../../types/owner';
+import { createBlankLease, createBlankOwner, createBlankOwnerDoc } from '../../types/owner';
 import { createBlankNode } from '../../types/node';
 import {
   createBlankResearchFormula,
@@ -51,6 +51,11 @@ function buildWorkspace(canvas: CanvasSaveData | null): LandroidFileData {
     id: 'owner-1',
     name: 'Pat Doe',
     county: 'Elmore',
+  });
+  const lease = createBlankLease('ws-1', owner.id, {
+    id: 'lease-1',
+    leaseName: 'Pat Doe Lease',
+    lessee: 'Federal Lessee LLC',
   });
   const ownerDoc = createBlankOwnerDoc(
     'ws-1',
@@ -138,11 +143,30 @@ function buildWorkspace(canvas: CanvasSaveData | null): LandroidFileData {
     acquisitionStatus: 'Held',
     name: 'Federal Lease NMNM 000000',
     serialOrReference: 'NMNM 000000',
+    legacySerial: 'NMNM 000000',
+    mlrsSerial: 'MLRS-000000',
+    lesseeOrApplicant: 'Federal Lessee LLC',
+    operator: 'Federal Operator LLC',
+    state: 'NM',
+    county: 'Eddy',
+    prospectArea: 'Delaware North',
+    effectiveDate: '2026-01-01',
+    expirationDate: '2036-01-01',
+    primaryTerm: '10 years',
+    nextAction: 'Review BLM source packet before bid window.',
+    nextActionDate: '2026-05-01',
+    priority: 'High',
+    sourcePacketStatus: 'Ready',
     acres: '640',
     legalDescription: 'Section 1',
     sourceIds: [researchSource.id],
     mapAssetId: mapAsset.id,
     mapRegionId: mapRegion.id,
+    deskMapId: 'dm-1',
+    nodeId: 'node-1',
+    ownerId: owner.id,
+    leaseId: 'lease-1',
+    importId: researchImport.id,
   });
   const researchQuestion = createBlankResearchQuestion('ws-1', {
     id: 'question-1',
@@ -247,7 +271,7 @@ function buildWorkspace(canvas: CanvasSaveData | null): LandroidFileData {
     },
     ownerData: {
       owners: [owner],
-      leases: [],
+      leases: [lease],
       contacts: [],
       docs: [ownerDoc],
     },
@@ -309,6 +333,27 @@ describe('workspace-persistence', () => {
     );
     expect(imported.researchData?.formulas[0]?.sourceIds).toEqual(['source-1']);
     expect(imported.researchData?.projectRecords[0]?.recordType).toBe('Federal Lease');
+    expect(imported.researchData?.projectRecords[0]).toMatchObject({
+      legacySerial: 'NMNM 000000',
+      mlrsSerial: 'MLRS-000000',
+      lesseeOrApplicant: 'Federal Lessee LLC',
+      operator: 'Federal Operator LLC',
+      state: 'NM',
+      county: 'Eddy',
+      prospectArea: 'Delaware North',
+      effectiveDate: '2026-01-01',
+      expirationDate: '2036-01-01',
+      primaryTerm: '10 years',
+      nextAction: 'Review BLM source packet before bid window.',
+      nextActionDate: '2026-05-01',
+      priority: 'High',
+      sourcePacketStatus: 'Ready',
+      deskMapId: 'dm-1',
+      nodeId: 'node-1',
+      ownerId: 'owner-1',
+      leaseId: 'lease-1',
+      importId: 'rrc-1',
+    });
     expect(imported.researchData?.questions[0]?.projectRecordIds).toEqual([
       'project-1',
     ]);
@@ -580,6 +625,11 @@ describe('workspace-persistence', () => {
             sourceIds: ['source-stale', 'missing-source'],
             mapAssetId: 'missing-map',
             mapRegionId: 'missing-region',
+            deskMapId: 'missing-dm',
+            nodeId: 'missing-node',
+            ownerId: 'missing-owner',
+            leaseId: 'missing-lease',
+            importId: 'missing-import',
           }),
         ],
         questions: [
@@ -657,6 +707,12 @@ describe('workspace-persistence', () => {
       'source-stale',
     ]);
     expect(imported.researchData?.projectRecords[0]?.mapAssetId).toBeNull();
+    expect(imported.researchData?.projectRecords[0]?.mapRegionId).toBeNull();
+    expect(imported.researchData?.projectRecords[0]?.deskMapId).toBeNull();
+    expect(imported.researchData?.projectRecords[0]?.nodeId).toBeNull();
+    expect(imported.researchData?.projectRecords[0]?.ownerId).toBeNull();
+    expect(imported.researchData?.projectRecords[0]?.leaseId).toBeNull();
+    expect(imported.researchData?.projectRecords[0]?.importId).toBeNull();
     expect(imported.researchData?.questions[0]?.formulaIds).toEqual([
       'formula-stale',
     ]);

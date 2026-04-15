@@ -2,6 +2,47 @@
 
 Use this file to resume work in a new chat.
 
+## Latest Federal Leasing workspace checkpoint — 2026-04-15
+
+This section supersedes older federal/private Research-only bullets below when they conflict.
+
+- Active branch: `codex/curative-cha-cha-slide`
+- Federal Leasing phase completed in this checkpoint:
+  - added `Federal Leasing` as a first-class top navigation workspace
+  - kept the data backbone shared with Research project records instead of adding a duplicate persistence store
+  - expanded Research project records with reference-only federal tracking fields:
+    - legacy serial, MLRS serial, lessee/applicant, operator
+    - state, county, prospect area
+    - effective date, expiration date, primary term
+    - next action, next action date, priority, source-packet status
+    - direct links to Desk Map, title/lease card, owner, lease, and import file
+  - added a Federal Leasing dashboard with counts for current leases, targets, under-review records, expired records, upcoming expirations, missing expiration dates, and next actions
+  - added Federal Leasing sections for `Inventory`, `Targets`, `Expirations`, `Map Evidence`, and `Source Packets`
+  - added quick actions for existing federal leases, potential targets, Unit / CA references, and mapped federal tracts
+  - added federal tracking helpers for federal-record detection, expiration buckets, search text, urgency sorting, and summary counts
+  - updated Research project-record search/details so the same federal records remain visible and editable from Research
+  - kept `Data Imports` secondary/advanced; no RRC import behavior was removed
+  - kept federal/private math inactive: no federal royalty, ONRR, payout, CA/TPF, BLM calculation behavior, or tribal workflow was added
+- Validation completed after this checkpoint:
+  - `npm run lint` passed
+  - `npm test` passed (`321/321`)
+  - `npm run build` passed
+  - `npm run test:e2e` passed (`8/8`) in Chromium
+- New/updated coverage:
+  - unit tests for federal lease tracking helper buckets/search/sorting/summary
+  - normalization, stale-link cleanup, and `.landroid` round-trip tests for new federal tracking fields
+  - Playwright coverage for creating a federal lease, linking a Research source and GeoJSON map asset, searching by serial/source, creating a target, checking expiration copy, and confirming the same record appears in Research
+- Intentional local/generated noise still present and not part of the source/docs/test checkpoint:
+  - `.DS_Store`
+  - `.claude/`
+  - `TORS_Documents/`
+  - generated `dist/`, `dist-node/`, `playwright-report/`, and `test-results/` artifacts
+- Open risks / likely follow-ups:
+  - Federal Leasing is intentionally reference-only; federal/private math still needs a separate decision gate
+  - source-packet status and priority are free-text fields for now, not controlled vocabularies
+  - map-side `MapAsset.researchProjectRecordId` links are still independent from project-record map links; deeper bidirectional cleanup can wait until needed
+  - future federal work may split legacy BLM and MLRS workflows further once real lease packets are entered
+
 ## Latest Research source-workspace checkpoint — 2026-04-14
 
 This section supersedes older Research/RRC bullets below when they conflict.

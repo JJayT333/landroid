@@ -12,6 +12,7 @@ export type ViewMode =
   | 'owners'
   | 'curative'
   | 'maps'
+  | 'federalLeasing'
   | 'research';
 export type ModalMode =
   | null

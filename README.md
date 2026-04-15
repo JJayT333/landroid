@@ -4,7 +4,7 @@ This repository root is now the active LANDroid application.
 
 ## Scope
 
-**Texas math remains Texas-only for now.** LANDroid currently calculates Texas fee and Texas state lease/title math only. Research can now track federal/private project records, mapped tracts, source notes, and lease inventory as reference records, but federal/BLM and private lease math remain **Phase 2** work behind a separate decision gate. See `PROJECT_CONTEXT.md` for details.
+**Texas math remains Texas-only for now.** LANDroid currently calculates Texas fee and Texas state lease/title math only. `Federal Leasing` now gives federal/BLM lease inventory, expiration, target, source-packet, and map-evidence tracking its own reference workspace, backed by Research project records. Federal/BLM and private lease math remain **Phase 2** work behind a separate decision gate. See `PROJECT_CONTEXT.md` for details.
 
 ## Quick start
 
@@ -38,7 +38,8 @@ Then open `http://localhost:5173/`.
 - `Owners` for workspace-scoped owner, lease, contact, and document records, with lease edits flowing back into linked Desk Map and Runsheet lease nodes, a canonical Texas-baseline lease-status picker for new edits, direct buttons to create or reopen the linked Desk Map lease node from each saved lease card, existing-owner reuse for same-party multi-tract title, and local search/sort controls so long owner lists are easier to work
 - `Curative` for title issues and curative tracking: probate/heirship gaps, NPRI discrepancies, missing leases or ratifications, bad legal descriptions, liens, name mismatches, unrecorded assignments, over-conveyances, and title-opinion requirements can be prioritized, assigned, linked to tracts/branches/owners/leases, and kept warning-only until resolved
 - `Maps` for the featured-map workspace with supporting PDF/image/GeoJSON assets, linked regions, GeoJSON feature summaries, outside references, and links to Research sources or project records
-- `Research` for a source-of-truth home workspace with cross-library search, review queues, source records with review status, landman-readable formula cards, starter Texas formula scaffolds from `LANDMAN-MATH-REFERENCE.md`, saved questions, federal/private project-record scaffolding, map/import links, and a secondary advanced `Data Imports` area for RRC cataloging, imported files, readable table previews, and the existing permit decoders
+- `Federal Leasing` for reference-only federal/BLM lease tracking: current lease inventory, potential targets, expirations, next actions, source-packet status, legacy/MLRS serials, county/prospect notes, map evidence, and links back to Research sources and LANDroid objects without touching Texas math
+- `Research` for a source-of-truth home workspace with cross-library search, review queues, source records with review status, landman-readable formula cards, starter Texas formula scaffolds from `LANDMAN-MATH-REFERENCE.md`, saved questions, shared project records, map/import links, and a secondary advanced `Data Imports` area for RRC cataloging, imported files, readable table previews, and the existing permit decoders
 
 ## Demo loaders
 - `Stress (100/150/500)` loads the Desk Map stress workspace with three tract-sized title trees, current owner/lease links, visible seeded PDF filenames, and fresh empty side workspaces for Curative/Maps/Research
@@ -53,7 +54,7 @@ npm run test:e2e
 ```
 
 - `npm run test:e2e` uses Playwright Chromium and starts the local Vite server automatically.
-- Current browser coverage checks the refreshed demo loaders, visible Desk Map PDF filename chips, attach/replace lease PDF behavior, `.landroid` export/import preservation, same-owner multi-tract lease records, branch-scoped lessee-card deletion back to owner records, Curative create/edit/link/filter behavior, Research source/formula/project/question add/link/search behavior, Research opening to the source workspace home, starter formula creation/search, Data Imports staying secondary, and stress-seed document badges.
+- Current browser coverage checks the refreshed demo loaders, visible Desk Map PDF filename chips, attach/replace lease PDF behavior, `.landroid` export/import preservation, same-owner multi-tract lease records, branch-scoped lessee-card deletion back to owner records, Curative create/edit/link/filter behavior, Research source/formula/project/question add/link/search behavior, Federal Leasing lease/target/source/map/search tracking, Research opening to the source workspace home, starter formula creation/search, Data Imports staying secondary, and stress-seed document badges.
 
 ## Persistence notes
 - Browser autosave keeps the active workspace and flowchart canvas locally.

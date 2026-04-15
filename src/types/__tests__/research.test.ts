@@ -115,6 +115,11 @@ describe('research types', () => {
       sourceIds: ['source-1', 'missing-source'],
       mapAssetId: 'map-1',
       mapRegionId: 'missing-region',
+      deskMapId: 'desk-map-1',
+      nodeId: 'missing-node',
+      ownerId: 'owner-1',
+      leaseId: 'missing-lease',
+      importId: 'import-1',
     });
     const question = createBlankResearchQuestion('ws-1', {
       id: 'question-1',
@@ -157,7 +162,60 @@ describe('research types', () => {
     expect(sanitized.projectRecords[0]?.sourceIds).toEqual(['source-1']);
     expect(sanitized.projectRecords[0]?.mapAssetId).toBe('map-1');
     expect(sanitized.projectRecords[0]?.mapRegionId).toBeNull();
+    expect(sanitized.projectRecords[0]?.deskMapId).toBeNull();
+    expect(sanitized.projectRecords[0]?.nodeId).toBeNull();
+    expect(sanitized.projectRecords[0]?.ownerId).toBe('owner-1');
+    expect(sanitized.projectRecords[0]?.leaseId).toBeNull();
+    expect(sanitized.projectRecords[0]?.importId).toBe('import-1');
     expect(sanitized.questions[0]?.formulaIds).toEqual(['formula-1']);
     expect(sanitized.questions[0]?.projectRecordIds).toEqual(['project-1']);
+  });
+
+  it('normalizes federal tracking fields on project records', () => {
+    expect(
+      normalizeResearchProjectRecord({
+        id: 'project-2',
+        workspaceId: 'ws-1',
+        legacySerial: '  NMNM 123456  ',
+        mlrsSerial: '  MLRS-987654  ',
+        lesseeOrApplicant: 'Mesa Acquisition Co.',
+        operator: 'Raven Federal Operating',
+        state: '  NM  ',
+        county: '  Eddy  ',
+        prospectArea: '  Delaware North  ',
+        effectiveDate: '  2026-01-01  ',
+        expirationDate: '  2036-01-01  ',
+        primaryTerm: '  10 years  ',
+        nextAction: 'Review source packet',
+        nextActionDate: '  2026-05-01  ',
+        priority: '  High  ',
+        sourcePacketStatus: '  Ready  ',
+        deskMapId: '  desk-map-1  ',
+        nodeId: '  node-1  ',
+        ownerId: '  owner-1  ',
+        leaseId: '  lease-1  ',
+        importId: '  import-1  ',
+      })
+    ).toMatchObject({
+      legacySerial: 'NMNM 123456',
+      mlrsSerial: 'MLRS-987654',
+      lesseeOrApplicant: 'Mesa Acquisition Co.',
+      operator: 'Raven Federal Operating',
+      state: 'NM',
+      county: 'Eddy',
+      prospectArea: 'Delaware North',
+      effectiveDate: '2026-01-01',
+      expirationDate: '2036-01-01',
+      primaryTerm: '10 years',
+      nextAction: 'Review source packet',
+      nextActionDate: '2026-05-01',
+      priority: 'High',
+      sourcePacketStatus: 'Ready',
+      deskMapId: 'desk-map-1',
+      nodeId: 'node-1',
+      ownerId: 'owner-1',
+      leaseId: 'lease-1',
+      importId: 'import-1',
+    });
   });
 });

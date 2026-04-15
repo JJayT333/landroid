@@ -32,6 +32,7 @@ The top bar has eight view buttons:
 - `Owners`
 - `Curative`
 - `Maps`
+- `Federal Leasing`
 - `Research`
 
 The top bar also has:
@@ -329,14 +330,38 @@ The Curative view also keeps the next broader company-readiness areas visible so
 - ArcGIS Pro is not embedded in the app.
 - The practical short-term path is to bring ArcGIS outputs into LANDroid as exported PDF, image, or GeoJSON artifacts, then link those artifacts back to the sources and project records that explain them.
 
-## 8) Research view
+## 8) Federal Leasing view
 
-`Research` is now the source-of-truth workspace for project sources, formulas, federal/private reference records, saved questions, and advanced data imports. It opens to a home view with cross-library search, a review queue, and quick actions before you dive into any one record type.
+`Federal Leasing` is the first-class workspace for federal/BLM lease inventory, expiration tracking, potential leasing targets, source packets, and map evidence. It uses the same saved project-record backbone as `Research`, so a federal lease created here still appears in Research project records and exports in the same `.landroid` file.
+
+### What it supports today
+- current federal lease inventory with legacy BLM serials, MLRS serials, lessee/applicant, operator, county, prospect area, acres, and legal-description notes
+- potential targets, mapped tracts, and Unit / CA reference records for tracking only
+- expiration-date and next-action tracking, including missing-date visibility and 180-day upcoming-expiration counts
+- source-packet status, linked Research sources, linked import files, map assets, map regions, Desk Map tracts/cards, owners, and owner lease records
+- search across federal lease names, serials, county/prospect notes, parties, source names, map labels, linked LANDroid object labels, next actions, and notes
+
+### How to use it
+- Use `Add Existing Federal Lease` for a lease you already hold or are actively tracking as current.
+- Use `Add Potential Target` for a lease-sale target, acquisition target, or federal tract you may pursue.
+- Use `Add Unit / CA Reference` for a communitization-agreement or unit reference packet without turning on CA/TPF math.
+- Use `Add Mapped Tract` when the map evidence is the starting point and the lease/source packet is still being assembled.
+- Use `Inventory`, `Targets`, `Expirations`, `Map Evidence`, and `Source Packets` to work from the operational view you need that day.
+- Link Research sources and map evidence as soon as the record depends on a source packet, case file, GIS artifact, or tract exhibit.
+
+### Current scope
+- Federal Leasing records are reference and tracking records only. They do not change Texas Desk Map, Leasehold, transfer-order, payout, NPRI, ORRI, or WI calculations.
+- No federal royalty math, ONRR reporting, payout math, BLM calculation behavior, CA/TPF math, or tribal lease workflow is active here.
+- Research remains the source library and cross-record hub; Federal Leasing is the working board for the federal lease inventory itself.
+
+## 9) Research view
+
+`Research` is now the source-of-truth workspace for project sources, formulas, shared project records, saved questions, and advanced data imports. It opens to a home view with cross-library search, a review queue, and quick actions before you dive into any one record type.
 
 ### What it supports today
 - `Sources` for statutes, cases, agency pages, manuals, uploaded files, project notes, map/GIS references, lease/source documents, linked LANDroid objects, and review status
 - `Formulas` for landman-readable formula cards with variables, examples, source links, review status, optional LANDroid engine references, and starter Texas formula cards scaffolded from `LANDMAN-MATH-REFERENCE.md`
-- `Project Records` for federal leases, private leases, mapped tracts, target acquisitions, current leases, legal-description notes, map links, and source links
+- `Project Records` for shared reference records used by Federal Leasing, private leases, mapped tracts, target acquisitions, current leases, legal-description notes, map links, and source links
 - `Questions` for saved research questions, manual answers/notes, source links, formula links, project-record links, and review status
 - `Data Imports` for the older RRC catalog/import/decoder workspace, now treated as an advanced section
 
@@ -361,7 +386,7 @@ The Curative view also keeps the next broader company-readiness areas visible so
 ### How to use it
 - Start in `Sources` when you need to save the authority, document, page, map reference, or project note that supports your work. Set the source status to `Draft`, `Needs Review`, or `Verified` as your confidence changes.
 - Use `Formulas` to document what a calculation means, which variables go into it, which source or convention supports it, and where LANDroid currently uses the logic. Use `Add Math Starters` when you want starter cards for the current Texas math reference.
-- Use `Project Records` to track a federal lease, private lease, mapped tract, target acquisition, or other reference-only project item without changing Texas Desk Map or Leasehold math.
+- Use `Project Records` to inspect or edit the same reference records used by Federal Leasing, plus private leases, mapped tracts, target acquisitions, or other project items that should not change Texas Desk Map or Leasehold math.
 - Use `Questions` to save a research question and the sources, formulas, or project records that support the answer.
 - Use the filters in each section to narrow sources by type/context/status, formulas by category/status, project records by type/status, and saved questions by status.
 - Use `Data Imports` only when you want to stage official RRC downloads or review the existing decoder output.
@@ -375,7 +400,7 @@ The Curative view also keeps the next broader company-readiness areas visible so
 - Even supplemental pending-permit TXT files that are not yet part of the joined decoder can now render as an easier-to-read table instead of raw delimiter text.
 
 ### Current scope
-- Federal/private project records are reference-only in this phase. They can be searched, linked to sources, linked to map assets/regions, and saved in `.landroid` files, but they do not drive federal royalty, CA/TPF, ONRR, payout, or private-lease math.
+- Federal/private project records are reference-only in this phase. They can be searched, linked to sources, linked to map assets/regions, linked to LANDroid objects, and saved in `.landroid` files, but they do not drive federal royalty, CA/TPF, ONRR, payout, or private-lease math.
 - Formula starters document current Texas LANDroid behavior and are marked `Needs Review` so company conventions can still be confirmed before relying on them.
 - Deleting a Research source, formula, project record, or import now clears dependent Research links inside the active workspace so saved questions and formula cards do not keep hidden stale references.
 - LANDroid can stage RRC files now, but it does not fully decode every RRC legacy format.
@@ -385,7 +410,7 @@ The Curative view also keeps the next broader company-readiness areas visible so
 - DBF and EBCDIC-heavy imports are no longer near-term roadmap work. They remain staged safely for later if that work becomes worth the time.
 - No AI provider, prompt system, or API proxy is active in this phase. The saved source/formula/project/question records are structured so a later AI layer can use them.
 
-## 9) Flowchart view
+## 10) Flowchart view
 
 `Flowchart` is the presentation and print surface.
 
@@ -430,7 +455,7 @@ These settings are now included when you save a `.landroid` file.
 - Use horizontal and vertical spacing controls when the tree feels too cramped or too loose
 - Use browser print preview before final printing
 
-## 10) Files and persistence
+## 11) Files and persistence
 
 ### `.landroid` files
 These are the main workspace snapshot files. They now include:
@@ -462,7 +487,7 @@ Autosaved workspace loads now validate the ownership graph before hydration. If 
 - Save another `.landroid` file before printing or exporting deliverables
 - Keep dated backup copies when testing risky changes
 
-## 11) Precision and ownership math
+## 12) Precision and ownership math
 
 Recent ownership work improved how fractions are stored and displayed.
 
@@ -478,7 +503,7 @@ Recent ownership work improved how fractions are stored and displayed.
 - Parent/child relationships matter for recalculation
 - If something looks wrong, review the branch in Desk Map first, then confirm the chronology in Runsheet
 
-## 12) Recommended workflow
+## 13) Recommended workflow
 
 1. Launch the app from `LANDroid.command` or `LANDroid.bat`.
 2. Load an existing `.landroid` file or import a `.csv`.
@@ -487,14 +512,15 @@ Recent ownership work improved how fractions are stored and displayed.
 5. Create or open linked owner records where you need follow-up tracking.
 6. Add curative issues for defects, missing documents, title-opinion requirements, and payout holds in `Curative`.
 7. Add supporting prospect maps and exhibits in `Maps`.
-8. Capture supporting sources, formulas, project records, saved questions, and any useful RRC data imports in `Research`.
-9. Review chronology and field quality in `Runsheet`.
-10. Export the runsheet if you need workbook output.
-11. Import the active tract into `Flowchart`.
-12. Adjust paper size, spacing, and fit settings.
-13. Print or save final backups.
+8. Track federal lease inventory, expirations, potential targets, source packets, and federal map evidence in `Federal Leasing` when that work is part of the project.
+9. Capture supporting sources, formulas, shared project records, saved questions, and any useful RRC data imports in `Research`.
+10. Review chronology and field quality in `Runsheet`.
+11. Export the runsheet if you need workbook output.
+12. Import the active tract into `Flowchart`.
+13. Adjust paper size, spacing, and fit settings.
+14. Print or save final backups.
 
-## 13) Troubleshooting
+## 14) Troubleshooting
 
 ### "The app opened, but I still see old work"
 - Load the correct `.landroid` file.
@@ -521,16 +547,17 @@ Recent ownership work improved how fractions are stored and displayed.
 ### "I want to test without touching real work"
 - Use the `Stress (100/150/500)` button to load sample tract data.
 - Save a separate `.landroid` snapshot before going back to real data.
-- Browser QA now covers the refreshed `Stress (100/150/500)` and `Leasehold (8 Tracts)` loaders with Playwright, including visible PDF filenames, `.landroid` export/import, same-owner multi-tract lease records, branch-scoped lessee-card deletion back to `Owners`, Curative issue linking/filtering, and Research add/link/search workflows.
+- Browser QA now covers the refreshed `Stress (100/150/500)` and `Leasehold (8 Tracts)` loaders with Playwright, including visible PDF filenames, `.landroid` export/import, same-owner multi-tract lease records, branch-scoped lessee-card deletion back to `Owners`, Curative issue linking/filtering, Federal Leasing lease/target/source/map/search tracking, and Research add/link/search workflows.
 
-## 14) Practical habits for a new user
+## 15) Practical habits for a new user
 
 - Keep one tract tab per tract unless you have a strong reason not to.
 - Rename tabs early so the runsheet and flowchart stay easy to follow.
 - Link owner records from the node edit modal when you need follow-up work tied to a title holder.
 - Add a Curative issue when something is not ready to rely on yet, even if you are intentionally leaving title-building edits warning-only.
 - Use `Maps` for presentation-facing prospect maps and region storytelling.
-- Use `Research` as the source-of-truth shelf for laws, formulas, project notes, federal/private reference records, map evidence, and questions you want to revisit.
+- Use `Federal Leasing` for federal lease inventory, expirations, potential targets, source packets, and federal map evidence.
+- Use `Research` as the source-of-truth shelf for laws, formulas, project notes, supporting records, map evidence, and questions you want to revisit.
 - Use `Runsheet` as your QA pass, not just `Desk Map`.
 - Save often, and keep milestone `.landroid` files.
 - Before deleting a branch, pause and confirm you really want the interest restored to the parent.

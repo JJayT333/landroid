@@ -33,6 +33,7 @@ const views: { id: ViewMode; label: string }[] = [
   { id: 'owners', label: 'Owners' },
   { id: 'curative', label: 'Curative' },
   { id: 'maps', label: 'Maps' },
+  { id: 'federalLeasing', label: 'Federal Leasing' },
   { id: 'research', label: 'Research' },
 ];
 

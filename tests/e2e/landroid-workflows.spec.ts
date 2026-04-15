@@ -149,6 +149,12 @@ async function checkLinkedRecord(root: Locator, recordText: string) {
     .check();
 }
 
+function isoDateOffset(days: number) {
+  const date = new Date();
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
 test('leasehold seed keeps PDF filenames visible and owner leases branch-aware', async ({
   page,
 }) => {
@@ -203,7 +209,7 @@ test('landroid export/import preserves lease PDFs and same-owner records', async
   await replaceFirstVisibleLeasePdf(page, 'roundtrip-lease.pdf');
 
   const downloadPromise = page.waitForEvent('download');
-  await page.getByRole('button', { name: 'Save' }).click();
+  await page.getByRole('navigation').getByRole('button', { name: 'Save' }).click();
   const download = await downloadPromise;
   await download.saveAs(roundTripPath);
 
@@ -370,7 +376,7 @@ test('research records can be created, linked, and searched', async ({ page }) =
 
   await openApp(page);
   await loadLeaseholdDemo(page);
-  await page.getByRole('button', { name: 'Research' }).click();
+  await page.getByRole('button', { name: 'Research', exact: true }).click();
 
   await page.getByRole('button', { name: 'Add Source' }).click();
   await fillInput(researchDetail, 'Title', 'Texas royalty payment statute');
@@ -460,7 +466,7 @@ test('research records can be created, linked, and searched', async ({ page }) =
 
   await page.getByRole('button', { name: 'Desk Map' }).click();
   await expect(page.getByText('Fully leased')).toBeVisible();
-  await page.getByRole('button', { name: 'Research' }).click();
+  await page.getByRole('button', { name: 'Research', exact: true }).click();
   await fillInput(researchSidebar, 'Search Research', '');
 
   await researchSidebar.getByRole('button', { name: /^Questions/ }).click();
@@ -503,7 +509,7 @@ test('research opens as the source workspace home and keeps imports secondary', 
   await openApp(page);
   await loadLeaseholdDemo(page);
 
-  await page.getByRole('button', { name: 'Research' }).click();
+  await page.getByRole('button', { name: 'Research', exact: true }).click();
 
   await expect(page.getByText('Research').first()).toBeVisible();
   await expect(
@@ -529,6 +535,103 @@ test('research opens as the source workspace home and keeps imports secondary', 
   await page.getByText('NRI Before ORRI').first().click();
   await expect(page.getByText('LANDMAN Math Reference').first()).toBeVisible();
   await expect(page.getByText('Data Imports').first()).toBeVisible();
+
+  expect(browserErrors).toEqual([]);
+});
+
+test('federal leasing tracks leases, targets, expirations, sources, and maps', async ({
+  page,
+}) => {
+  const browserErrors = collectBrowserErrors(page);
+  const expirationDate = isoDateOffset(45);
+  const nextActionDate = isoDateOffset(10);
+
+  await openApp(page);
+  await loadLeaseholdDemo(page);
+
+  await page.getByRole('button', { name: 'Research' }).click();
+  const researchSidebar = page.locator('main aside').first();
+  const researchDetail = page.locator('main section').first();
+  await page.getByRole('button', { name: 'Add Source' }).click();
+  await fillInput(researchDetail, 'Title', 'BLM case file');
+  await selectExact(researchDetail, 'Source Type', 'Lease Document');
+  await selectExact(researchDetail, 'Context', 'Federal / BLM');
+  await selectExact(researchDetail, 'Review Status', 'Verified');
+  await fillInput(researchDetail, 'Citation / Doc Ref', 'BLM NMNM case file packet');
+
+  await page.getByRole('button', { name: 'Maps' }).click();
+  await page
+    .locator('input[type="file"][accept=".pdf,.png,.jpg,.jpeg,.geojson,.json"]')
+    .setInputFiles({
+      name: 'north-mesa.geojson',
+      mimeType: 'application/geo+json',
+      buffer: Buffer.from('{"type":"FeatureCollection","features":[]}'),
+    });
+  await expect(page.getByText('north-mesa.geojson').first()).toBeVisible();
+  await page
+    .getByLabel('Map Asset Details')
+    .getByRole('button', { name: 'Save' })
+    .click();
+
+  await page.getByRole('button', { name: 'Federal Leasing' }).click();
+  const federalShell = page.locator('main').first();
+  const federalSidebar = federalShell.locator('aside').first();
+  const federalDetail = federalShell.locator('section').last();
+  await expect(page.getByText('Federal Leasing').first()).toBeVisible();
+  await expect(
+    page.getByText(
+      'Federal Leasing records are reference and tracking records only.'
+    )
+  ).toBeVisible();
+
+  await page.getByRole('button', { name: 'Add Existing Federal Lease' }).click();
+  await fillInput(federalDetail, 'Name', 'North Mesa Federal Lease');
+  await fillInput(federalDetail, 'Serial / Reference', 'NMNM 123456');
+  await fillInput(federalDetail, 'Legacy Serial', 'NMNM 123456');
+  await fillInput(federalDetail, 'MLRS Serial', 'MLRS-987654');
+  await fillInput(federalDetail, 'Lessee / Applicant', 'Mesa Acquisition Co.');
+  await fillInput(federalDetail, 'Operator', 'Raven Federal Operating');
+  await fillInput(federalDetail, 'State', 'NM');
+  await fillInput(federalDetail, 'County', 'Eddy');
+  await fillInput(federalDetail, 'Prospect Area', 'Delaware North');
+  await fillInput(federalDetail, 'Effective Date', isoDateOffset(-365));
+  await fillInput(federalDetail, 'Expiration Date', expirationDate);
+  await fillInput(federalDetail, 'Primary Term', '10 years');
+  await fillInput(federalDetail, 'Next Action Date', nextActionDate);
+  await fillInput(federalDetail, 'Priority', 'High');
+  await fillInput(federalDetail, 'Source Packet Status', 'Ready for bid review');
+  await fillInput(federalDetail, 'Acres', '640');
+  await fillTextArea(
+    federalDetail,
+    'Legal Description / Tract Notes',
+    'Section 12, T20S-R30E, federal reference-only lease tracking.'
+  );
+  await fillTextArea(
+    federalDetail,
+    'Next Action',
+    'Confirm source packet before the next BLM lease sale window.'
+  );
+  await selectContaining(federalDetail, 'Map Asset', 'north-mesa');
+  await checkLinkedRecord(federalDetail, 'BLM case file');
+
+  await fillInput(federalSidebar, 'Search Federal Leasing', 'MLRS-987654');
+  await expect(page.getByText('North Mesa Federal Lease').first()).toBeVisible();
+  await fillInput(federalSidebar, 'Search Federal Leasing', 'BLM case file');
+  await expect(page.getByText('North Mesa Federal Lease').first()).toBeVisible();
+  await fillInput(federalSidebar, 'Search Federal Leasing', '');
+  await expect(page.getByText(`Upcoming ${expirationDate}`).first()).toBeVisible();
+
+  await page.getByRole('button', { name: 'Add Potential Target' }).click();
+  await fillInput(federalDetail, 'Name', 'North Mesa Potential Parcel');
+  await fillInput(federalDetail, 'MLRS Serial', 'MLRS-TARGET-100');
+  await fillInput(federalDetail, 'County', 'Lea');
+  await fillInput(federalDetail, 'Prospect Area', 'Delaware North');
+  await federalSidebar.getByRole('button', { name: /Targets/ }).click();
+  await expect(page.getByText('North Mesa Potential Parcel').first()).toBeVisible();
+
+  await page.getByRole('button', { name: 'Research', exact: true }).click();
+  await fillInput(researchSidebar, 'Search Research', 'MLRS-987654');
+  await expect(page.getByText('North Mesa Federal Lease').first()).toBeVisible();
 
   expect(browserErrors).toEqual([]);
 });

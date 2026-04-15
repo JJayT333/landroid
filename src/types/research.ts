@@ -151,11 +151,30 @@ export interface ResearchProjectRecord {
   acquisitionStatus: string;
   name: string;
   serialOrReference: string;
+  legacySerial: string;
+  mlrsSerial: string;
+  lesseeOrApplicant: string;
+  operator: string;
+  state: string;
+  county: string;
+  prospectArea: string;
+  effectiveDate: string;
+  expirationDate: string;
+  primaryTerm: string;
+  nextAction: string;
+  nextActionDate: string;
+  priority: string;
+  sourcePacketStatus: string;
   acres: string;
   legalDescription: string;
   sourceIds: string[];
   mapAssetId: string | null;
   mapRegionId: string | null;
+  deskMapId: string | null;
+  nodeId: string | null;
+  ownerId: string | null;
+  leaseId: string | null;
+  importId: string | null;
   notes: string;
   createdAt: string;
   updatedAt: string;
@@ -378,11 +397,30 @@ export function createBlankResearchProjectRecord(
     acquisitionStatus: '',
     name: '',
     serialOrReference: '',
+    legacySerial: '',
+    mlrsSerial: '',
+    lesseeOrApplicant: '',
+    operator: '',
+    state: '',
+    county: '',
+    prospectArea: '',
+    effectiveDate: '',
+    expirationDate: '',
+    primaryTerm: '',
+    nextAction: '',
+    nextActionDate: '',
+    priority: '',
+    sourcePacketStatus: '',
     acres: '',
     legalDescription: '',
     sourceIds: [],
     mapAssetId: null,
     mapRegionId: null,
+    deskMapId: null,
+    nodeId: null,
+    ownerId: null,
+    leaseId: null,
+    importId: null,
     notes: '',
     createdAt: overrides.createdAt ?? now,
     updatedAt: overrides.updatedAt ?? now,
@@ -421,6 +459,24 @@ export function normalizeResearchProjectRecord(
         : '',
     name: asString(projectRecord.name),
     serialOrReference: asString(projectRecord.serialOrReference),
+    legacySerial: asString(projectRecord.legacySerial),
+    mlrsSerial: asString(projectRecord.mlrsSerial),
+    lesseeOrApplicant:
+      typeof projectRecord.lesseeOrApplicant === 'string'
+        ? projectRecord.lesseeOrApplicant
+        : '',
+    operator: typeof projectRecord.operator === 'string' ? projectRecord.operator : '',
+    state: asString(projectRecord.state),
+    county: asString(projectRecord.county),
+    prospectArea: asString(projectRecord.prospectArea),
+    effectiveDate: asString(projectRecord.effectiveDate),
+    expirationDate: asString(projectRecord.expirationDate),
+    primaryTerm: asString(projectRecord.primaryTerm),
+    nextAction:
+      typeof projectRecord.nextAction === 'string' ? projectRecord.nextAction : '',
+    nextActionDate: asString(projectRecord.nextActionDate),
+    priority: asString(projectRecord.priority),
+    sourcePacketStatus: asString(projectRecord.sourcePacketStatus),
     acres: asString(projectRecord.acres),
     legalDescription:
       typeof projectRecord.legalDescription === 'string'
@@ -429,6 +485,11 @@ export function normalizeResearchProjectRecord(
     sourceIds: normalizeStringArray(projectRecord.sourceIds),
     mapAssetId: asNullableId(projectRecord.mapAssetId),
     mapRegionId: asNullableId(projectRecord.mapRegionId),
+    deskMapId: asNullableId(projectRecord.deskMapId),
+    nodeId: asNullableId(projectRecord.nodeId),
+    ownerId: asNullableId(projectRecord.ownerId),
+    leaseId: asNullableId(projectRecord.leaseId),
+    importId: asNullableId(projectRecord.importId),
     notes: typeof projectRecord.notes === 'string' ? projectRecord.notes : '',
   });
 }
@@ -530,6 +591,11 @@ export function sanitizeResearchLinks(
       sourceIds: keepValidIds(projectRecord.sourceIds, validity.sourceIds),
       mapAssetId: keepValidId(projectRecord.mapAssetId, validity.mapAssetIds),
       mapRegionId: keepValidId(projectRecord.mapRegionId, validity.mapRegionIds),
+      deskMapId: keepValidId(projectRecord.deskMapId, validity.deskMapIds),
+      nodeId: keepValidId(projectRecord.nodeId, validity.nodeIds),
+      ownerId: keepValidId(projectRecord.ownerId, validity.ownerIds),
+      leaseId: keepValidId(projectRecord.leaseId, validity.leaseIds),
+      importId: keepValidId(projectRecord.importId, validity.importIds),
     })),
     questions: data.questions.map((question) => ({
       ...question,

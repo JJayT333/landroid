@@ -160,15 +160,33 @@ export const useResearchStore = create<ResearchState>()((set, get) => ({
         links: { ...source.links, importId: null },
       });
     });
+    const projectRecords = state.projectRecords.map((projectRecord) => {
+      if (projectRecord.importId !== id) {
+        return projectRecord;
+      }
+      return touch({
+        ...projectRecord,
+        importId: null,
+      });
+    });
     const changedSources = sources.filter(
       (source, index) => source !== state.sources[index]
     );
+    const changedProjectRecords = projectRecords.filter(
+      (projectRecord, index) => projectRecord !== state.projectRecords[index]
+    );
 
     await deleteResearchImport(id);
-    await Promise.all(changedSources.map((source) => saveResearchSource(source)));
+    await Promise.all([
+      ...changedSources.map((source) => saveResearchSource(source)),
+      ...changedProjectRecords.map((projectRecord) =>
+        saveResearchProjectRecord(projectRecord)
+      ),
+    ]);
     set((state) => ({
       imports: state.imports.filter((researchImport) => researchImport.id !== id),
       sources,
+      projectRecords,
     }));
   },
 

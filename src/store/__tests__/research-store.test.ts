@@ -217,6 +217,7 @@ describe('research-store', () => {
     const projectRecord = createBlankResearchProjectRecord('ws-active', {
       id: 'project-1',
       sourceIds: ['source-1'],
+      importId: 'import-1',
     });
     const question = createBlankResearchQuestion('ws-active', {
       id: 'question-1',
@@ -245,6 +246,7 @@ describe('research-store', () => {
 
     await useResearchStore.getState().removeImport('import-1');
     expect(useResearchStore.getState().sources[0]?.links.importId).toBeNull();
+    expect(useResearchStore.getState().projectRecords[0]?.importId).toBeNull();
 
     await useResearchStore.getState().removeSource('source-1');
     expect(useResearchStore.getState().sources).toEqual([]);

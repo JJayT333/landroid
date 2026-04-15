@@ -102,7 +102,13 @@ function labelForFormula(formula: ResearchFormula) {
 }
 
 function labelForProjectRecord(record: ResearchProjectRecord) {
-  return record.name || record.serialOrReference || record.id;
+  return (
+    record.name ||
+    record.mlrsSerial ||
+    record.legacySerial ||
+    record.serialOrReference ||
+    record.id
+  );
 }
 
 function labelForQuestion(question: ResearchQuestion) {
@@ -558,17 +564,41 @@ export default function ResearchView() {
             record.status,
             record.acquisitionStatus,
             record.serialOrReference,
+            record.legacySerial,
+            record.mlrsSerial,
+            record.lesseeOrApplicant,
+            record.operator,
+            record.state,
+            record.county,
+            record.prospectArea,
+            record.effectiveDate,
+            record.expirationDate,
+            record.primaryTerm,
+            record.nextAction,
+            record.nextActionDate,
+            record.priority,
+            record.sourcePacketStatus,
             record.acres,
             record.legalDescription,
             record.notes,
             ...labelsFromIds(sourceLabelById, record.sourceIds),
             labelFromMap(mapAssetLabelById, record.mapAssetId),
             labelFromMap(mapRegionLabelById, record.mapRegionId),
+            labelFromMap(deskMapLabelById, record.deskMapId),
+            labelFromMap(nodeLabelById, record.nodeId),
+            labelFromMap(ownerLabelById, record.ownerId),
+            labelFromMap(leaseLabelById, record.leaseId),
+            labelFromMap(importLabelById, record.importId),
           ])
       ),
     [
+      deskMapLabelById,
+      importLabelById,
+      leaseLabelById,
       mapAssetLabelById,
       mapRegionLabelById,
+      nodeLabelById,
+      ownerLabelById,
       projectRecords,
       projectStatusFilter,
       projectTypeFilter,
@@ -1163,6 +1193,8 @@ export default function ResearchView() {
     if (!workspaceId) return;
     const record = createBlankResearchProjectRecord(workspaceId, {
       name: 'New Project Record',
+      recordType: 'Other',
+      jurisdiction: 'General',
       ...overrides,
     });
     await addProjectRecord(record);
@@ -1933,7 +1965,16 @@ export default function ResearchView() {
                 id: record.id,
                 title: labelForProjectRecord(record),
                 meta: `${record.recordType} • ${record.status}`,
-                body: record.serialOrReference || record.legalDescription || record.notes,
+                body:
+                  [
+                    record.mlrsSerial || record.legacySerial || record.serialOrReference,
+                    record.county || record.prospectArea,
+                    record.expirationDate ? `Expires ${record.expirationDate}` : '',
+                  ]
+                    .filter(Boolean)
+                    .join(' • ') ||
+                  record.legalDescription ||
+                  record.notes,
               }))}
               selectedId={selectedProjectId}
               onSelect={setSelectedProjectId}
@@ -1977,6 +2018,24 @@ export default function ResearchView() {
                         })
                       }
                     />
+                    <FormField
+                      label="Legacy Serial"
+                      value={selectedProjectRecord.legacySerial}
+                      onChange={(value) =>
+                        updateProjectRecord(selectedProjectRecord.id, {
+                          legacySerial: value,
+                        })
+                      }
+                    />
+                    <FormField
+                      label="MLRS Serial"
+                      value={selectedProjectRecord.mlrsSerial}
+                      onChange={(value) =>
+                        updateProjectRecord(selectedProjectRecord.id, {
+                          mlrsSerial: value,
+                        })
+                      }
+                    />
                     <SelectField<ResearchProjectRecordType>
                       label="Record Type"
                       value={selectedProjectRecord.recordType}
@@ -2011,6 +2070,100 @@ export default function ResearchView() {
                       onChange={(value) =>
                         updateProjectRecord(selectedProjectRecord.id, {
                           acquisitionStatus: value,
+                        })
+                      }
+                    />
+                    <FormField
+                      label="Lessee / Applicant"
+                      value={selectedProjectRecord.lesseeOrApplicant}
+                      onChange={(value) =>
+                        updateProjectRecord(selectedProjectRecord.id, {
+                          lesseeOrApplicant: value,
+                        })
+                      }
+                    />
+                    <FormField
+                      label="Operator"
+                      value={selectedProjectRecord.operator}
+                      onChange={(value) =>
+                        updateProjectRecord(selectedProjectRecord.id, { operator: value })
+                      }
+                    />
+                    <FormField
+                      label="State"
+                      value={selectedProjectRecord.state}
+                      onChange={(value) =>
+                        updateProjectRecord(selectedProjectRecord.id, { state: value })
+                      }
+                    />
+                    <FormField
+                      label="County"
+                      value={selectedProjectRecord.county}
+                      onChange={(value) =>
+                        updateProjectRecord(selectedProjectRecord.id, { county: value })
+                      }
+                    />
+                    <FormField
+                      label="Prospect Area"
+                      value={selectedProjectRecord.prospectArea}
+                      onChange={(value) =>
+                        updateProjectRecord(selectedProjectRecord.id, {
+                          prospectArea: value,
+                        })
+                      }
+                    />
+                    <FormField
+                      label="Effective Date"
+                      type="date"
+                      value={selectedProjectRecord.effectiveDate}
+                      onChange={(value) =>
+                        updateProjectRecord(selectedProjectRecord.id, {
+                          effectiveDate: value,
+                        })
+                      }
+                    />
+                    <FormField
+                      label="Expiration Date"
+                      type="date"
+                      value={selectedProjectRecord.expirationDate}
+                      onChange={(value) =>
+                        updateProjectRecord(selectedProjectRecord.id, {
+                          expirationDate: value,
+                        })
+                      }
+                    />
+                    <FormField
+                      label="Primary Term"
+                      value={selectedProjectRecord.primaryTerm}
+                      onChange={(value) =>
+                        updateProjectRecord(selectedProjectRecord.id, {
+                          primaryTerm: value,
+                        })
+                      }
+                    />
+                    <FormField
+                      label="Next Action Date"
+                      type="date"
+                      value={selectedProjectRecord.nextActionDate}
+                      onChange={(value) =>
+                        updateProjectRecord(selectedProjectRecord.id, {
+                          nextActionDate: value,
+                        })
+                      }
+                    />
+                    <FormField
+                      label="Priority"
+                      value={selectedProjectRecord.priority}
+                      onChange={(value) =>
+                        updateProjectRecord(selectedProjectRecord.id, { priority: value })
+                      }
+                    />
+                    <FormField
+                      label="Source Packet Status"
+                      value={selectedProjectRecord.sourcePacketStatus}
+                      onChange={(value) =>
+                        updateProjectRecord(selectedProjectRecord.id, {
+                          sourcePacketStatus: value,
                         })
                       }
                     />
@@ -2058,12 +2211,69 @@ export default function ResearchView() {
                       }}
                     />
                   </div>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <NullableSelect
+                      label="Desk Map"
+                      value={selectedProjectRecord.deskMapId}
+                      options={deskMapOptions}
+                      emptyLabel="No desk map link"
+                      onChange={(deskMapId) =>
+                        updateProjectRecord(selectedProjectRecord.id, { deskMapId })
+                      }
+                    />
+                    <NullableSelect
+                      label="Title / Lease Card"
+                      value={selectedProjectRecord.nodeId}
+                      options={nodeOptions}
+                      emptyLabel="No card link"
+                      onChange={(nodeId) =>
+                        updateProjectRecord(selectedProjectRecord.id, { nodeId })
+                      }
+                    />
+                    <NullableSelect
+                      label="Owner"
+                      value={selectedProjectRecord.ownerId}
+                      options={ownerOptions}
+                      emptyLabel="No owner link"
+                      onChange={(ownerId) =>
+                        updateProjectRecord(selectedProjectRecord.id, { ownerId })
+                      }
+                    />
+                    <NullableSelect
+                      label="Lease"
+                      value={selectedProjectRecord.leaseId}
+                      options={leaseOptions}
+                      emptyLabel="No lease link"
+                      onChange={(leaseId) =>
+                        updateProjectRecord(selectedProjectRecord.id, { leaseId })
+                      }
+                    />
+                    <NullableSelect
+                      label="Import File"
+                      value={selectedProjectRecord.importId}
+                      options={importOptions}
+                      emptyLabel="No import link"
+                      onChange={(importId) =>
+                        updateProjectRecord(selectedProjectRecord.id, { importId })
+                      }
+                    />
+                  </div>
                   <LinkCheckboxes
                     title="Supporting Sources"
                     ids={selectedProjectRecord.sourceIds}
                     options={sourceOptions}
                     onChange={(sourceIds) =>
                       updateProjectRecord(selectedProjectRecord.id, { sourceIds })
+                    }
+                  />
+                  <TextAreaField
+                    label="Next Action"
+                    value={selectedProjectRecord.nextAction}
+                    rows={3}
+                    onChange={(value) =>
+                      updateProjectRecord(selectedProjectRecord.id, {
+                        nextAction: value,
+                      })
                     }
                   />
                   <TextAreaField

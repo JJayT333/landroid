@@ -13,6 +13,7 @@ const RunsheetView = lazy(() => import('./views/RunsheetView'));
 const OwnerDatabaseView = lazy(() => import('./views/OwnerDatabaseView'));
 const CurativeView = lazy(() => import('./views/CurativeView'));
 const MapsView = lazy(() => import('./views/MapsView'));
+const FederalLeasingView = lazy(() => import('./views/FederalLeasingView'));
 const ResearchView = lazy(() => import('./views/ResearchView'));
 
 function PlaceholderView({
@@ -128,12 +129,24 @@ export default function App() {
             <MapsView />
           </Suspense>
         )}
+        {view === 'federalLeasing' && (
+          <Suspense
+            fallback={
+              <PlaceholderView
+                name="Loading Federal Leasing"
+                description="Preparing federal lease tracking."
+              />
+            }
+          >
+            <FederalLeasingView />
+          </Suspense>
+        )}
         {view === 'research' && (
           <Suspense
             fallback={
               <PlaceholderView
                 name="Loading Research"
-                description="Preparing RRC datasets and imported research files."
+                description="Preparing sources, formulas, and project records."
               />
             }
           >
