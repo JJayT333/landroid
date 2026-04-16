@@ -74,9 +74,10 @@ Gross acres and tract descriptions now live on the tract record itself, but you 
 - The node edit modal also includes an `Add NPRI` action for present-interest mineral owners. Use it to create a separate fixed or floating NPRI branch without reducing the mineral ownership total.
 - Fixed NPRIs now require one extra deed-reading choice: `Of burdened branch` when the deed fraction is tied to the grantor's branch, or `Of whole tract` when the fixed fraction is already stated against production from the land itself.
 - LANDroid allows NPRI title discrepancies to be entered. If fixed or floating NPRIs over-claim the burdened branch or royalty bucket, the affected Desk Map branch and NPRI cards turn red and the toolbar shows an NPRI title-discrepancy warning.
-- Current-owner cards now distinguish ownership from leasing:
-  - blue `Present Owner` status for the mineral owner who still holds the interest
-  - green `Leased` status when that owner has an active lease on file
+- Current-owner cards now distinguish ownership from leasing through the card tint itself:
+  - soft sky-blue card for a mineral owner who still holds the interest
+  - soft emerald-green card when that owner also has an active lease on file
+  - a small gold dot in the card header marks any card that still retains mineral interest
 - The mineral-owner card stays part of the main title tree and does not turn into a separate lessor card.
 - The attached green lessee node is the lease-side view. It is terminal in Desk Map, holds the lease terms and metadata, and stays linked back to the same owner record so Desk Map and `Owners` use the same lease data.
 - Any Desk Map card with an attached PDF shows a PDF chip and filename on the card face, including title cards, lessee cards, NPRI cards, and related document chips.

@@ -148,7 +148,10 @@ test('combinatorial demo loads with desk-map cards and PDF badges', async ({
   await expect(page.getByText(/Combinatorial Demo — /)).toBeVisible();
   await expect(page.getByText(/^\d+ cards$/).first()).toBeVisible();
   await expect(page.locator('[title^="View attached PDF:"]').first()).toBeVisible();
-  await expect(page.getByText('Present Owner').first()).toBeVisible();
+  // Present-owner status now shows as a sky card tint + retained-interest gold
+  // dot instead of a "Present Owner" pill — assert at least one retained-interest
+  // marker rendered on a combinatorial desk-map card.
+  await expect(page.locator('[title^="Present owner"]').first()).toBeVisible();
 
   expect(browserErrors).toEqual([]);
 });

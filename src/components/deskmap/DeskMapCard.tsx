@@ -63,6 +63,28 @@ function DeskMapCard({
   const ofWholeFrac = formatAsFraction(initial);
   const remainingFrac = formatAsFraction(remaining);
 
+  // ── Card tint by status ──────────────────────────────────
+  // Present-owner status is signalled by tinting the card body itself:
+  //   • retained mineral interest, unleased → soft sky tint ("present owner")
+  //   • retained mineral interest, leased   → soft emerald tint ("leased")
+  //   • fully-conveyed historical card      → parchment (no tint)
+  //   • NPRI-discrepancy card               → seal tint (error state, wins)
+  const isLeased = Boolean(leaseSummary) && holdsInterest;
+  const cardBodyTint = hasNpriDiscrepancy
+    ? 'bg-seal/5 text-ink'
+    : isLeased
+      ? 'bg-emerald-50 text-ink'
+      : holdsInterest
+        ? 'bg-sky-50 text-ink'
+        : 'bg-parchment text-ink';
+  const headerTint = hasNpriDiscrepancy
+    ? 'bg-seal/10'
+    : isLeased
+      ? 'bg-emerald-100/60'
+      : holdsInterest
+        ? 'bg-sky-100/70'
+        : 'bg-parchment-dark';
+
   return (
     <div className="flex flex-col items-center">
       {/* Main card */}
@@ -78,26 +100,20 @@ function DeskMapCard({
               ? 'border-leather/60 shadow-[0_8px_18px_rgba(92,61,46,0.12)]'
               : 'border-ledger-line'}
           ${isFullyConveyed ? 'opacity-75' : ''}
-          ${hasNpriDiscrepancy ? 'bg-seal/5 text-ink' : 'bg-parchment text-ink'}
+          ${cardBodyTint}
         `}
         onClick={() => onEdit(node.id)}
       >
         {/* Header */}
         <div
-          className={`px-3 py-1.5 border-b border-ledger-line rounded-t-lg ${
-            hasNpriDiscrepancy
-              ? 'bg-seal/10'
-              : holdsInterest
-                ? 'bg-gold/10'
-                : 'bg-parchment-dark'
-          }`}
+          className={`px-3 py-1.5 border-b border-ledger-line rounded-t-lg ${headerTint}`}
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5 min-w-0">
               {holdsInterest && (
                 <span
                   className="h-2 w-2 shrink-0 rounded-full bg-gold shadow-[0_0_0_2px_rgba(212,197,169,0.9)]"
-                  title="Retains interest"
+                  title={isLeased ? 'Present owner — leased' : 'Present owner'}
                 />
               )}
               <span className="text-[10px] font-semibold text-ink-light uppercase tracking-wide truncate">
@@ -105,16 +121,6 @@ function DeskMapCard({
               </span>
             </div>
             <div className="flex items-center gap-1.5 ml-2 shrink-0">
-              {holdsInterest && (
-                <span className="rounded-full border border-sky-200 bg-sky-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-sky-800">
-                  Present Owner
-                </span>
-              )}
-              {leaseSummary && holdsInterest && (
-                <span className="rounded-full border border-emerald-200 bg-emerald-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-emerald-800">
-                  Leased
-                </span>
-              )}
               {hasNpriDiscrepancy && (
                 <span className="rounded-full border border-seal/25 bg-seal/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-seal">
                   NPRI Issue
