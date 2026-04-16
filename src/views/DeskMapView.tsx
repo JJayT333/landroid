@@ -27,6 +27,7 @@ import {
 import DeskMapTabs from '../components/deskmap/DeskMapTabs';
 import {
   buildLeaseScopeIndex,
+  canOwnerNodeHoldLease,
   getActiveLeases,
   calculateDeskMapCoverageSummary,
   getLeasesForOwnerNode,
@@ -548,7 +549,10 @@ export default function DeskMapView() {
     () =>
       new Map(
         visibleNodes.flatMap((node) => {
-          if (node.type === 'related' || !node.linkedOwnerId || isNpriNode(node)) {
+          // Mineral-only lease gate (canOwnerNodeHoldLease): related,
+          // unlinked, NPRI, and any future non-mineral interest class cannot
+          // carry a lease summary on the Desk Map.
+          if (!canOwnerNodeHoldLease(node)) {
             return [];
           }
           const ownerLeases = getLeasesForOwnerNode(

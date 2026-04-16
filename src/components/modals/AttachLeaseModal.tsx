@@ -72,9 +72,28 @@ export default function AttachLeaseModal({
     () => activeDeskMaps.find((deskMap) => deskMap.id === activeDeskMapId) ?? null,
     [activeDeskMapId, activeDeskMaps]
   );
+  // Texas leasehold math only consumes leases that attach under mineral-class
+  // owners. NPRI royalty streams (and any future non-mineral interest class)
+  // must never be lessors here — the modal gates both opening and save on
+  // `parentNode.interestClass === 'mineral'`. Owner options are also filtered
+  // down to owners referenced by at least one mineral node so the user cannot
+  // re-attach to an NPRI-only owner.
+  const isParentMineral = parentNode.interestClass === 'mineral';
+  const mineralOwnerIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const node of nodes) {
+      if (node.type === 'related' || node.interestClass !== 'mineral') continue;
+      if (node.linkedOwnerId) ids.add(node.linkedOwnerId);
+    }
+    return ids;
+  }, [nodes]);
   const ownerLinkOptions = useMemo(
-    () => buildOwnerLinkOptions(owners),
-    [owners]
+    () => buildOwnerLinkOptions(
+      isParentMineral
+        ? owners.filter((owner) => mineralOwnerIds.has(owner.id))
+        : owners
+    ),
+    [isParentMineral, mineralOwnerIds, owners]
   );
   const leaseScopeIndex = useMemo(() => buildLeaseScopeIndex(nodes), [nodes]);
   const leaseNodesForParent = useMemo(
@@ -150,6 +169,15 @@ export default function AttachLeaseModal({
   };
 
   const handleSave = async () => {
+    if (!isParentMineral) {
+      // Belt-and-suspenders: the modal body already renders a mineral-only
+      // error state in this case, but guard the save path directly so a stale
+      // prop can never write a lease under a non-mineral parent.
+      setSaveError(
+        'Leases can only be attached to mineral owners. Open this from a mineral-class card.'
+      );
+      return;
+    }
     // Strict-parse both interest fields BEFORE any persistence. A blank value is a
     // legal "not entered yet" state and parses as Decimal(0); malformed input ("abc",
     // "1/0", multi-slash garbage) returns null and blocks the save with an inline
@@ -269,6 +297,34 @@ export default function AttachLeaseModal({
       setSaving(false);
     }
   };
+
+  if (!isParentMineral) {
+    return (
+      <Modal open onClose={onClose} title="Lease Attachment Blocked">
+        <div className="space-y-4">
+          <div className="rounded-lg border border-seal/30 bg-seal/10 p-3 text-sm text-seal">
+            <p className="font-semibold mb-1">Leases can only be attached to mineral owners.</p>
+            <p className="text-xs leading-5">
+              This card carries the{' '}
+              <span className="font-mono">{parentNode.interestClass}</span> interest
+              class. NPRI royalty streams and any future non-mineral classes are not
+              lessors — open the parent mineral-owner card to manage leasing for this
+              branch.
+            </p>
+          </div>
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 rounded-lg text-sm font-semibold bg-leather text-parchment hover:bg-leather/90 transition-colors"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      </Modal>
+    );
+  }
 
   return (
     <Modal

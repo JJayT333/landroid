@@ -70,6 +70,22 @@ export function isLeaseActive(lease: Lease) {
   return !isInactiveLeaseStatus(lease.status);
 }
 
+/**
+ * Mineral-only lease gate: Texas leasehold math only consumes leases attached
+ * under a mineral-class owner node. NPRI royalty streams and any future
+ * non-mineral interest class (e.g. federal-scope work) are never lessors. This
+ * predicate is the single source of truth shared by the AttachLeaseModal and
+ * by DeskMapView's per-node lease summary builder.
+ */
+export function canOwnerNodeHoldLease<
+  T extends Pick<OwnershipNode, 'type' | 'interestClass' | 'linkedOwnerId'>,
+>(node: T): node is T & { linkedOwnerId: string; interestClass: 'mineral' } {
+  if (node.type === 'related') return false;
+  if (!node.linkedOwnerId) return false;
+  if (isNpriNode(node)) return false;
+  return node.interestClass === 'mineral';
+}
+
 function compareLeaseAllocationOrder(left: Lease, right: Lease) {
   return (
     `${asLeaseText(left.effectiveDate) || '9999-12-31'}|${left.createdAt}|${left.updatedAt}|${left.id}`

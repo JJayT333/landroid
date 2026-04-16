@@ -4,6 +4,7 @@ import { createBlankLease, type Lease } from '../../../types/owner';
 import {
   allocateLeaseCoverage,
   calculateDeskMapCoverageSummary,
+  canOwnerNodeHoldLease,
   isLeaseActive,
   pickPrimaryLease,
   toDeskMapPrimaryLeaseSummary,
@@ -536,5 +537,44 @@ describe('deskmap-coverage', () => {
     expect(summary.currentOwnership).toBe('1.5');
     expect(summary.missingOwnership).toBe('-0.5');
     expect(summary.currentOwnerCount).toBe(2);
+  });
+
+  describe('canOwnerNodeHoldLease (mineral-only gate)', () => {
+    it('accepts a linked mineral owner node', () => {
+      const node = {
+        ...createBlankNode('node-1'),
+        interestClass: 'mineral' as const,
+        linkedOwnerId: 'owner-1',
+      };
+      expect(canOwnerNodeHoldLease(node)).toBe(true);
+    });
+
+    it('rejects related (non-ownership) nodes', () => {
+      const node = {
+        ...createBlankNode('node-1'),
+        type: 'related' as const,
+        interestClass: 'mineral' as const,
+        linkedOwnerId: 'owner-1',
+      };
+      expect(canOwnerNodeHoldLease(node)).toBe(false);
+    });
+
+    it('rejects unlinked mineral nodes', () => {
+      const node = {
+        ...createBlankNode('node-1'),
+        interestClass: 'mineral' as const,
+        linkedOwnerId: null,
+      };
+      expect(canOwnerNodeHoldLease(node)).toBe(false);
+    });
+
+    it('rejects NPRI royalty nodes even when linked to an owner', () => {
+      const node = {
+        ...createBlankNode('node-1'),
+        interestClass: 'npri' as const,
+        linkedOwnerId: 'owner-1',
+      };
+      expect(canOwnerNodeHoldLease(node)).toBe(false);
+    });
   });
 });
