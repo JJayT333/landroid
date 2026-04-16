@@ -1,7 +1,7 @@
 /**
  * Top navigation bar — view switcher, workspace name, save/load.
  */
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useUIStore, type ViewMode } from '../../store/ui-store';
 import { useMapStore } from '../../store/map-store';
 import { useOwnerStore } from '../../store/owner-store';
@@ -16,11 +16,7 @@ import {
   replacePdfWorkspaceData,
 } from '../../storage/workspace-persistence';
 import { importCSV } from '../../storage/csv-io';
-import {
-  seedCombinatorialData,
-  seedLeaseholdDemoData,
-  seedStressTestData,
-} from '../../storage/seed-test-data';
+import { seedCombinatorialData } from '../../storage/seed-test-data';
 
 const landroidLogoUrl = new URL('../../assets/branding/landroid-logo.png', import.meta.url).href;
 const ravenForestBackdropUrl = new URL('../../assets/branding/raven-forest-backdrop.png', import.meta.url).href;
@@ -41,6 +37,7 @@ export default function Navbar() {
   const view = useUIStore((s) => s.view);
   const setView = useUIStore((s) => s.setView);
   const projectName = useWorkspaceStore((s) => s.projectName);
+  const setProjectName = useWorkspaceStore((s) => s.setProjectName);
   const leaseholdUnit = useWorkspaceStore((s) => s.leaseholdUnit);
   const leaseholdAssignments = useWorkspaceStore((s) => s.leaseholdAssignments);
   const leaseholdOrris = useWorkspaceStore((s) => s.leaseholdOrris);
@@ -48,35 +45,61 @@ export default function Navbar() {
     (s) => s.leaseholdTransferOrderEntries
   );
   const loadWorkspace = useWorkspaceStore((s) => s.loadWorkspace);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [seedMode, setSeedMode] = useState<
-    'stress' | 'leasehold' | 'combinatorial' | null
-  >(null);
 
-  const handleStressTest = async () => {
-    setSeedMode('stress');
-    try {
-      const { nodeCount, pdfCount } = await seedStressTestData();
-      console.log(`[stress] Loaded ${nodeCount} nodes, attached ${pdfCount} PDFs`);
-    } catch (err) {
-      console.error('[stress] Failed:', err);
-    }
-    setSeedMode(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const fileMenuRef = useRef<HTMLDivElement>(null);
+  const demoMenuRef = useRef<HTMLDivElement>(null);
+
+  const [seedLoading, setSeedLoading] = useState(false);
+  const [fileMenuOpen, setFileMenuOpen] = useState(false);
+  const [demoMenuOpen, setDemoMenuOpen] = useState(false);
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [nameDraft, setNameDraft] = useState(projectName);
+
+  // Close dropdowns when clicking outside.
+  useEffect(() => {
+    if (!fileMenuOpen && !demoMenuOpen) return;
+    const onDocClick = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (fileMenuOpen && fileMenuRef.current && !fileMenuRef.current.contains(target)) {
+        setFileMenuOpen(false);
+      }
+      if (demoMenuOpen && demoMenuRef.current && !demoMenuRef.current.contains(target)) {
+        setDemoMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onDocClick);
+    return () => document.removeEventListener('mousedown', onDocClick);
+  }, [fileMenuOpen, demoMenuOpen]);
+
+  // Keep the draft in sync when the store name changes externally (e.g. Load).
+  useEffect(() => {
+    if (!isEditingName) setNameDraft(projectName);
+  }, [projectName, isEditingName]);
+
+  const beginEditingName = () => {
+    setNameDraft(projectName);
+    setIsEditingName(true);
   };
 
-  const handleLeaseholdDemo = async () => {
-    setSeedMode('leasehold');
-    try {
-      const { nodeCount, pdfCount } = await seedLeaseholdDemoData();
-      console.log(`[leasehold] Loaded ${nodeCount} nodes, attached ${pdfCount} PDFs`);
-    } catch (err) {
-      console.error('[leasehold] Failed:', err);
+  const commitName = () => {
+    const trimmed = nameDraft.trim();
+    if (trimmed && trimmed !== projectName) {
+      setProjectName(trimmed);
+    } else {
+      setNameDraft(projectName);
     }
-    setSeedMode(null);
+    setIsEditingName(false);
+  };
+
+  const cancelNameEdit = () => {
+    setNameDraft(projectName);
+    setIsEditingName(false);
   };
 
   const handleCombinatorial = async () => {
-    setSeedMode('combinatorial');
+    setDemoMenuOpen(false);
+    setSeedLoading(true);
     try {
       const { nodeCount, pdfCount } = await seedCombinatorialData();
       console.log(
@@ -85,10 +108,11 @@ export default function Navbar() {
     } catch (err) {
       console.error('[combinatorial] Failed:', err);
     }
-    setSeedMode(null);
+    setSeedLoading(false);
   };
 
   const handleSave = async () => {
+    setFileMenuOpen(false);
     const state = useWorkspaceStore.getState();
     const canvasState = useCanvasStore.getState();
     await downloadLandroidFile({
@@ -124,6 +148,7 @@ export default function Navbar() {
   };
 
   const handleLoad = () => {
+    setFileMenuOpen(false);
     fileInputRef.current?.click();
   };
 
@@ -194,9 +219,35 @@ export default function Navbar() {
         </div>
         <div className="min-w-0">
           <h1 className="text-lg font-display font-bold tracking-wide">LANDroid</h1>
-          <span className="block truncate text-xs text-parchment/60 font-mono">
-            {projectName}
-          </span>
+          {isEditingName ? (
+            <input
+              autoFocus
+              value={nameDraft}
+              onChange={(e) => setNameDraft(e.target.value)}
+              onBlur={commitName}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  commitName();
+                } else if (e.key === 'Escape') {
+                  e.preventDefault();
+                  cancelNameEdit();
+                }
+              }}
+              aria-label="Project name"
+              className="block w-48 truncate rounded border border-parchment/30 bg-ink-light/40 px-1 text-xs text-parchment font-mono focus:outline-none focus:border-gold"
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={beginEditingName}
+              title="Click to rename project"
+              aria-label={`Project name: ${projectName}. Click to rename.`}
+              className="block max-w-[12rem] truncate rounded px-0.5 text-left text-xs text-parchment/60 font-mono hover:text-parchment hover:bg-ink-light/30"
+            >
+              {projectName}
+            </button>
+          )}
         </div>
       </div>
 
@@ -228,39 +279,75 @@ export default function Navbar() {
         </div>
 
         <div className="flex gap-1 border-l border-parchment/20 pl-3">
-          <button
-            onClick={handleSave}
-            className="px-3 py-1.5 rounded-lg text-xs font-medium text-parchment/70 hover:text-parchment hover:bg-ink-light/30 transition-colors"
-          >
-            Save
-          </button>
-          <button
-            onClick={handleLoad}
-            className="px-3 py-1.5 rounded-lg text-xs font-medium text-parchment/70 hover:text-parchment hover:bg-ink-light/30 transition-colors"
-          >
-            Load
-          </button>
-          <button
-            onClick={handleStressTest}
-            disabled={seedMode !== null}
-            className="px-3 py-1.5 rounded-lg text-xs font-medium text-seal/70 hover:text-seal hover:bg-seal/10 transition-colors disabled:opacity-50"
-          >
-            {seedMode === 'stress' ? 'Loading...' : 'Stress (100/150/500)'}
-          </button>
-          <button
-            onClick={handleLeaseholdDemo}
-            disabled={seedMode !== null}
-            className="px-3 py-1.5 rounded-lg text-xs font-medium text-gold/80 hover:text-gold hover:bg-gold/10 transition-colors disabled:opacity-50"
-          >
-            {seedMode === 'leasehold' ? 'Loading...' : 'Leasehold (8 Tracts)'}
-          </button>
-          <button
-            onClick={handleCombinatorial}
-            disabled={seedMode !== null}
-            className="px-3 py-1.5 rounded-lg text-xs font-medium text-gold/80 hover:text-gold hover:bg-gold/10 transition-colors disabled:opacity-50"
-          >
-            {seedMode === 'combinatorial' ? 'Loading...' : 'Combinatorial (8×100)'}
-          </button>
+          <div ref={fileMenuRef} className="relative">
+            <button
+              type="button"
+              onClick={() => {
+                setFileMenuOpen((open) => !open);
+                setDemoMenuOpen(false);
+              }}
+              aria-haspopup="menu"
+              aria-expanded={fileMenuOpen}
+              className="px-3 py-1.5 rounded-lg text-xs font-medium text-parchment/70 hover:text-parchment hover:bg-ink-light/30 transition-colors"
+            >
+              File ▾
+            </button>
+            {fileMenuOpen && (
+              <div
+                role="menu"
+                className="absolute right-0 z-20 mt-1 w-40 overflow-hidden rounded-lg border border-leather bg-ink shadow-xl"
+              >
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={handleSave}
+                  className="block w-full px-3 py-2 text-left text-xs text-parchment/80 hover:bg-ink-light/40 hover:text-parchment"
+                >
+                  Save workspace
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={handleLoad}
+                  className="block w-full px-3 py-2 text-left text-xs text-parchment/80 hover:bg-ink-light/40 hover:text-parchment"
+                >
+                  Load workspace
+                </button>
+              </div>
+            )}
+          </div>
+
+          <div ref={demoMenuRef} className="relative">
+            <button
+              type="button"
+              onClick={() => {
+                setDemoMenuOpen((open) => !open);
+                setFileMenuOpen(false);
+              }}
+              disabled={seedLoading}
+              aria-haspopup="menu"
+              aria-expanded={demoMenuOpen}
+              className="px-3 py-1.5 rounded-lg text-xs font-medium text-gold/80 hover:text-gold hover:bg-gold/10 transition-colors disabled:opacity-50"
+            >
+              {seedLoading ? 'Loading…' : 'Demo Data ▾'}
+            </button>
+            {demoMenuOpen && (
+              <div
+                role="menu"
+                className="absolute right-0 z-20 mt-1 w-56 overflow-hidden rounded-lg border border-leather bg-ink shadow-xl"
+              >
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={handleCombinatorial}
+                  disabled={seedLoading}
+                  className="block w-full px-3 py-2 text-left text-xs text-parchment/80 hover:bg-ink-light/40 hover:text-parchment disabled:opacity-50"
+                >
+                  Combinatorial — Raven Forest
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

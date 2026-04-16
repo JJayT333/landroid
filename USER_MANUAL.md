@@ -36,12 +36,10 @@ The top bar has eight view buttons:
 - `Research`
 
 The top bar also has:
-- `Save` to export a `.landroid` workspace snapshot
-- `Load` to import a `.landroid` or `.csv` file
-- `Stress (100/150/500)` to load sample tract data for testing
-- `Leasehold (8 Tracts)` to load an eight-tract unit demo with acreage and lease data
+- `File ▾` with `Save workspace` (exports a `.landroid` snapshot) and `Load workspace` (imports a `.landroid` or `.csv` file)
+- `Demo Data ▾` with the `Combinatorial — Raven Forest` sample fixture for exercising Desk Map, Leasehold, and Federal Leasing surfaces without real project data
 
-The current project name appears in the top bar. Local autosave still uses browser storage, but `Save` now captures workspace data, flowchart canvas state, owner records, owner documents, curative title issues, map assets, and Research sources, formulas, project records, saved questions, and imports in the exported `.landroid` file.
+The current project name appears in the top bar and is editable inline — click the name, type a new one, and press `Enter` to commit or `Esc` to cancel. Local autosave still uses browser storage, but `Save` now captures workspace data, flowchart canvas state, owner records, owner documents, curative title issues, map assets, and Research sources, formulas, project records, saved questions, and imports in the exported `.landroid` file.
 The top-left brand area can also carry a custom logo for demo or prospect-specific presentation.
 If LANDroid detects corrupt autosaved workspace or canvas data during startup, it now opens a safe fresh state and shows a warning banner instead of silently pretending there was no saved data.
 If a render or lazy-load failure occurs, LANDroid now shows a reload screen with the error details instead of dropping to a blank page.
@@ -103,7 +101,7 @@ Deleting the only Desk Map lessee card tied to an owner lease also removes that 
 If a tract has no cards yet, start with `+ Add Root` or load a `.landroid` or `.csv` file.
 
 ### Sample data readability
-The combinatorial `8 x 100` demo now uses conventional person names with no duplicate owner-card grantee names, so it is easier to scan when you are stress-testing Desk Map or Leasehold behavior.
+The combinatorial Raven Forest demo uses conventional person names with no duplicate owner-card grantee names, so it is easier to scan when you are exercising Desk Map or Leasehold behavior.
 
 ### Presentation watermark
 LANDroid can display a small full-color prospect mark in the top navigation next to the `Desk Map` button so it stays visible across pages. This is visual context only and does not affect node behavior, math, or printing.
@@ -159,18 +157,13 @@ It now has three internal modes:
 - `Map` mode is the intended visual home for the leasehold hierarchy itself
 - `Deck` mode is the intended visual home for WI, assignments, transfer-order review, and later deeper payout workflows
 
-### Leasehold demo workspace
-- `Leasehold (8 Tracts)` loads a dedicated eight-tract unit demo
-- The tract gross acres are `80`, `160`, `240`, `320`, `400`, `480`, `560`, and `640`
-- The tract pooled acres match those same `80`, `160`, `240`, `320`, `400`, `480`, `560`, and `640` values
-- The present-owner splits stay on clean half / quarter / eighth fractions for easier testing
-- One owner intentionally appears on two different tracts so you can test same-owner, multi-tract behavior without merging title branches or leaking lease status across tracts
-- Every present owner in that demo is leased to the same lessee at `1/8` royalty so the first royalty totals are easier to inspect
+### Demo workspace
+- `Demo Data ▾ → Combinatorial — Raven Forest` loads the sample fixture
+- Every tract covers one or more of the combinatorial flavors (baseline splits, probate / heirship, fixed NPRI carves, floating NPRI carves, correction / release, royalty deeds, lease overlap, kitchen sink) so the same workspace can exercise Desk Map, Leasehold, and Research surfaces without real project data
+- Owner-card grantee names stay unique across the fixture so it is easy to scan
 - Seeded title and lease PDFs show their filenames on the Desk Map cards
-- The demo also starts with one unit-wide gross `1/16` ORRI so the burden summary has a clean check number
-- The demo also starts with a unit-wide `1/2` WI assignment and a tract-specific `1/4` WI assignment on `Tract 4` so the deck has clean starter splits
-- The demo starts with no saved transfer-order row metadata, so you can test the first editable row layer from a clean slate
-- The demo loaders reset Curative, Maps, and Research side workspaces for the new sample workspace so stale side records from previous work are not carried over
+- The demo starts with one unit, a small ORRI burden, and a starter WI assignment so the leasehold deck has a clean check number from the first load
+- The demo loader resets Curative, Maps, and Research side workspaces so stale side records from previous work are not carried over
 - The tract descriptions are prefilled so you can see how the tab is meant to be used before entering your own data
 
 ## 4) Runsheet view
@@ -545,9 +538,9 @@ Recent ownership work improved how fractions are stored and displayed.
 - Confirm the affected records have both a document number and an attached PDF. Rows without both are exported without fake hyperlinks.
 
 ### "I want to test without touching real work"
-- Use the `Stress (100/150/500)` button to load sample tract data.
+- Use `Demo Data ▾ → Combinatorial — Raven Forest` to load sample tract data.
 - Save a separate `.landroid` snapshot before going back to real data.
-- Browser QA now covers the refreshed `Stress (100/150/500)` and `Leasehold (8 Tracts)` loaders with Playwright, including visible PDF filenames, `.landroid` export/import, same-owner multi-tract lease records, branch-scoped lessee-card deletion back to `Owners`, Curative issue linking/filtering, Federal Leasing lease/target/source/map/search tracking, and Research add/link/search workflows.
+- Browser QA covers the combinatorial demo loader with Playwright, including visible PDF filenames on Desk Map cards, inline project-name editing, Federal Leasing lease/target/source/map/search tracking, and Research home surfacing. Deeper leasehold-branch coverage is temporarily skipped in the Playwright suite while the Raven Forest fixture is rebuilt.
 
 ## 15) Practical habits for a new user
 
