@@ -799,4 +799,123 @@ describe('workspace-persistence', () => {
       'saved flowchart canvas payload must be an object'
     );
   });
+
+  it('round-trips desk-map unit grouping fields (unitName, unitCode)', async () => {
+    const payload = {
+      version: 6,
+      workspaceId: 'ws-raven',
+      projectName: 'Raven Forest',
+      nodes: [createBlankNode('node-1')],
+      deskMaps: [
+        {
+          id: 'dm-unit-a',
+          name: 'C1 Smith',
+          code: 'C1',
+          tractId: 'C1',
+          grossAcres: '640',
+          pooledAcres: '640',
+          description: 'Sam Houston NF — Walker County',
+          nodeIds: ['node-1'],
+          unitName: 'Raven Forest Unit A',
+          unitCode: 'A',
+        },
+        {
+          id: 'dm-unit-b',
+          name: 'C6 Jones',
+          code: 'C6',
+          tractId: 'C6',
+          grossAcres: '320',
+          pooledAcres: '320',
+          description: 'Sam Houston NF — Walker/Montgomery line',
+          nodeIds: [],
+          unitName: 'Raven Forest Unit B',
+          unitCode: 'B',
+        },
+      ],
+      activeDeskMapId: 'dm-unit-a',
+      instrumentTypes: [],
+    };
+    const file = new File([JSON.stringify(payload)], 'raven.landroid', {
+      type: 'application/json',
+    });
+
+    const imported = await importLandroidFile(file);
+
+    expect(imported.deskMaps).toEqual([
+      expect.objectContaining({
+        id: 'dm-unit-a',
+        unitName: 'Raven Forest Unit A',
+        unitCode: 'A',
+      }),
+      expect.objectContaining({
+        id: 'dm-unit-b',
+        unitName: 'Raven Forest Unit B',
+        unitCode: 'B',
+      }),
+    ]);
+  });
+
+  it('loads pre-overhaul desk maps without unit fields and leaves them undefined', async () => {
+    const legacyPayload = {
+      version: 5,
+      workspaceId: 'ws-legacy-unit',
+      projectName: 'Legacy Without Units',
+      nodes: [createBlankNode('node-1')],
+      deskMaps: [
+        {
+          id: 'dm-1',
+          name: 'Tract 1',
+          code: 'T1',
+          tractId: 'T1',
+          grossAcres: '160',
+          pooledAcres: '',
+          description: '',
+          nodeIds: ['node-1'],
+        },
+      ],
+      activeDeskMapId: 'dm-1',
+      instrumentTypes: [],
+    };
+    const file = new File([JSON.stringify(legacyPayload)], 'legacy-unit.landroid', {
+      type: 'application/json',
+    });
+
+    const imported = await importLandroidFile(file);
+
+    expect(imported.deskMaps[0]).not.toHaveProperty('unitName');
+    expect(imported.deskMaps[0]).not.toHaveProperty('unitCode');
+  });
+
+  it('drops malformed desk-map unit fields during import', async () => {
+    const payload = {
+      version: 6,
+      workspaceId: 'ws-bad-unit',
+      projectName: 'Bad Unit Fields',
+      nodes: [createBlankNode('node-1')],
+      deskMaps: [
+        {
+          id: 'dm-bad',
+          name: 'Mystery Tract',
+          code: '',
+          tractId: null,
+          grossAcres: '',
+          pooledAcres: '',
+          description: '',
+          nodeIds: ['node-1'],
+          unitName: '   ',
+          unitCode: 'Z',
+        },
+      ],
+      activeDeskMapId: 'dm-bad',
+      instrumentTypes: [],
+    };
+    const file = new File([JSON.stringify(payload)], 'bad-unit.landroid', {
+      type: 'application/json',
+    });
+
+    const imported = await importLandroidFile(file);
+
+    expect(imported.deskMaps[0]).not.toHaveProperty('unitName');
+    expect(imported.deskMaps[0]).not.toHaveProperty('unitCode');
+  });
 });

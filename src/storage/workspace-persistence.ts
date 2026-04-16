@@ -178,6 +178,11 @@ function normalizeDeskMaps(
         nodeIds: readStringArray(candidate.nodeIds).filter((nodeId) =>
           nodeIdSet.has(nodeId)
         ),
+        // Pre-overhaul `.landroid` files predate the Raven Forest pooled-unit
+        // grouping and will not carry these keys. `normalizeDeskMap` drops
+        // them when absent, so the pass-through is safe for backward compat.
+        unitName: candidate.unitName,
+        unitCode: candidate.unitCode,
       }),
     ];
   });

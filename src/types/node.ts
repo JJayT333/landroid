@@ -85,6 +85,16 @@ export interface OwnershipNode {
   isCollapsed: boolean;
 }
 
+/**
+ * Pooled-unit grouping fields (`unitName`, `unitCode`) are optional and only
+ * surfaced by the Raven Forest demo seed today. Real-world workspaces may not
+ * carry them, so the DeskMap normalizer passes them through when present and
+ * drops them otherwise — pre-overhaul `.landroid` files continue to load
+ * cleanly. `unitCode` is intentionally narrowed to `'A' | 'B'`; broadening
+ * comes with Phase 4+ scope work, not here.
+ */
+export type DeskMapUnitCode = 'A' | 'B';
+
 export interface DeskMap {
   id: string;
   name: string;
@@ -94,6 +104,8 @@ export interface DeskMap {
   pooledAcres: string;
   description: string;
   nodeIds: string[];
+  unitName?: string;
+  unitCode?: DeskMapUnitCode;
 }
 
 function normalizeText(value: unknown): string {
@@ -162,6 +174,18 @@ function normalizeFixedRoyaltyBasis(value: unknown): FixedRoyaltyBasis {
   return null;
 }
 
+function normalizeUnitCode(value: unknown): DeskMapUnitCode | undefined {
+  return value === 'A' || value === 'B' ? value : undefined;
+}
+
+function normalizeUnitName(value: unknown): string | undefined {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
 function normalizeAcreage(value: unknown): string {
   if (typeof value === 'number') {
     return Number.isFinite(value) && value >= 0 ? value.toString() : '';
@@ -182,15 +206,25 @@ function normalizeAcreage(value: unknown): string {
 
 export function normalizeDeskMap(
   deskMap: Pick<DeskMap, 'id'> &
-    Partial<Omit<DeskMap, 'grossAcres' | 'pooledAcres' | 'description' | 'nodeIds'>> & {
+    Partial<
+      Omit<
+        DeskMap,
+        'grossAcres' | 'pooledAcres' | 'description' | 'nodeIds' | 'unitName' | 'unitCode'
+      >
+    > & {
       grossAcres?: unknown;
       pooledAcres?: unknown;
       description?: unknown;
       nodeIds?: unknown;
+      unitName?: unknown;
+      unitCode?: unknown;
     },
   fallbackName = 'Untitled Tract'
 ): DeskMap {
-  return {
+  const unitName = normalizeUnitName(deskMap.unitName);
+  const unitCode = normalizeUnitCode(deskMap.unitCode);
+
+  const base: DeskMap = {
     id: deskMap.id,
     name:
       typeof deskMap.name === 'string' && deskMap.name.trim().length > 0
@@ -206,6 +240,19 @@ export function normalizeDeskMap(
       ? deskMap.nodeIds.filter((nodeId): nodeId is string => typeof nodeId === 'string')
       : [],
   };
+
+  // Only attach the optional unit fields when present so that serialized
+  // output for pre-overhaul workspaces stays byte-identical (the keys never
+  // appear), which matters for workspace-persistence round-trip tests and for
+  // diff-friendly JSON exports.
+  if (unitName !== undefined) {
+    base.unitName = unitName;
+  }
+  if (unitCode !== undefined) {
+    base.unitCode = unitCode;
+  }
+
+  return base;
 }
 
 /** Factory for a blank node with defaults. */
