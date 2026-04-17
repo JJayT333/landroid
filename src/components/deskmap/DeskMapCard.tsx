@@ -11,6 +11,7 @@ import { formatAsFraction } from '../../engine/fraction-display';
 import { d, serialize } from '../../engine/decimal';
 import { useWorkspaceStore } from '../../store/workspace-store';
 import type { OwnershipNode } from '../../types/node';
+import { isNpriNode } from '../../types/node';
 import type { DeskMapPrimaryLeaseSummary } from './deskmap-coverage';
 import DeskMapDocumentBadge from './DeskMapDocumentBadge';
 import { isLeaseNode } from './deskmap-lease-node';
@@ -65,24 +66,34 @@ function DeskMapCard({
   const remainingFrac = formatAsFraction(remaining);
 
   // ── Card tint by status ──────────────────────────────────
-  // Present-owner status is signalled by tinting the card body itself:
-  //   • retained mineral interest (leased or not) → soft sky tint ("present owner")
-  //   • fully-conveyed historical card            → parchment (no tint)
-  //   • NPRI-discrepancy card                     → seal tint (error state, wins)
+  // Card body tints communicate node class at a glance:
+  //   • mineral present owner (leased or not) → soft sky tint (blue)
+  //   • NPRI burden card, healthy             → soft green tint (a distinct
+  //                                              shade from the emerald lease
+  //                                              chips, so NPRIs and lease
+  //                                              chips never get confused)
+  //   • NPRI-discrepancy card                 → seal tint (red, wins everything)
+  //   • fully-conveyed historical card        → parchment (no tint)
+  //
   // Leased state is conveyed not by recoloring the lessor card, but by the
-  // green lease chip rendered beneath it (see RelatedDocChip). The lessor is
-  // still a present mineral owner — they just have a lease attached.
+  // emerald lease chip rendered beneath it (see RelatedDocChip). The lessor
+  // is still a present mineral owner — they just have a lease attached.
   const isLeased = Boolean(leaseSummary) && holdsInterest;
+  const isNpri = isNpriNode(node);
   const cardBodyTint = hasNpriDiscrepancy
     ? 'bg-seal/5 text-ink'
-    : holdsInterest
-      ? 'bg-sky-50 text-ink'
-      : 'bg-parchment text-ink';
+    : isNpri && holdsInterest
+      ? 'bg-green-50 text-ink'
+      : holdsInterest
+        ? 'bg-sky-50 text-ink'
+        : 'bg-parchment text-ink';
   const headerTint = hasNpriDiscrepancy
     ? 'bg-seal/10'
-    : holdsInterest
-      ? 'bg-sky-100/70'
-      : 'bg-parchment-dark';
+    : isNpri && holdsInterest
+      ? 'bg-green-100/70'
+      : holdsInterest
+        ? 'bg-sky-100/70'
+        : 'bg-parchment-dark';
 
   return (
     <div className="flex flex-col items-center">
