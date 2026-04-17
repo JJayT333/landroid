@@ -672,10 +672,24 @@ export default function DeskMapView() {
           if (leaseDeletionPlan.leaseId && leaseDeletionPlan.removeOwnerLeaseRecord) {
             await removeLeaseRecord(leaseDeletionPlan.leaseId);
           }
+          // Snapshot pre-delete state so we can detect a silent failure
+          // (the store sets `lastError` instead of throwing for math/graph
+          // rejections). If the node is still present afterwards, surface
+          // the actual error to the user instead of leaving them puzzled.
+          const beforeIds = new Set(
+            useWorkspaceStore.getState().nodes.map((n) => n.id)
+          );
           removeNode(id);
+          const after = useWorkspaceStore.getState();
+          const stillPresent = after.nodes.some((n) => n.id === id);
+          if (stillPresent && beforeIds.has(id)) {
+            const reason = after.lastError ?? 'Delete was rejected by the ownership-graph validator.';
+            console.error('[DeskMap delete] failed:', reason);
+            alert(`Could not delete this node.\n\n${reason}`);
+          }
         } catch (deleteError) {
           console.error(deleteError);
-          alert('Lease delete failed. The card was left in place so owner data stays consistent.');
+          alert('Delete failed. The card was left in place so owner data stays consistent.');
         }
       })();
     }

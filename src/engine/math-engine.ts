@@ -762,12 +762,25 @@ export function executeDeleteBranch(params: DeleteBranchParams): Result<Ownershi
       return n;
     });
 
-  const validation = validateCalcGraph(updatedNodes);
-  if (!validation.valid) {
+  // Validation must compare PRE- and POST-delete state: pre-existing graph
+  // issues (e.g. a deliberately-orphaned demo node) should not block a
+  // user-initiated delete on an unrelated branch. We only reject when the
+  // delete itself introduces a new validation issue. Issues are keyed by
+  // (code, nodeId) so a delete that removes an offending node is recognised
+  // as an improvement, never a regression.
+  const preValidation = validateCalcGraph(nodes);
+  const postValidation = validateCalcGraph(updatedNodes);
+  const issueKey = (issue: ValidationIssue) =>
+    `${issue.code}::${issue.nodeId ?? ''}`;
+  const preExistingKeys = new Set(preValidation.issues.map(issueKey));
+  const newIssues = postValidation.issues.filter(
+    (issue) => !preExistingKeys.has(issueKey(issue))
+  );
+  if (newIssues.length > 0) {
     return err(
       'invalid_graph',
-      'Delete would produce invalid ownership graph',
-      validation.issues
+      'Delete would introduce new ownership-graph issues',
+      newIssues
     );
   }
 

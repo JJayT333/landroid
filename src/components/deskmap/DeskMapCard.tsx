@@ -13,6 +13,7 @@ import { useWorkspaceStore } from '../../store/workspace-store';
 import type { OwnershipNode } from '../../types/node';
 import type { DeskMapPrimaryLeaseSummary } from './deskmap-coverage';
 import DeskMapDocumentBadge from './DeskMapDocumentBadge';
+import { isLeaseNode } from './deskmap-lease-node';
 
 interface DeskMapCardProps {
   node: OwnershipNode;
@@ -65,25 +66,23 @@ function DeskMapCard({
 
   // ── Card tint by status ──────────────────────────────────
   // Present-owner status is signalled by tinting the card body itself:
-  //   • retained mineral interest, unleased → soft sky tint ("present owner")
-  //   • retained mineral interest, leased   → soft emerald tint ("leased")
-  //   • fully-conveyed historical card      → parchment (no tint)
-  //   • NPRI-discrepancy card               → seal tint (error state, wins)
+  //   • retained mineral interest (leased or not) → soft sky tint ("present owner")
+  //   • fully-conveyed historical card            → parchment (no tint)
+  //   • NPRI-discrepancy card                     → seal tint (error state, wins)
+  // Leased state is conveyed not by recoloring the lessor card, but by the
+  // green lease chip rendered beneath it (see RelatedDocChip). The lessor is
+  // still a present mineral owner — they just have a lease attached.
   const isLeased = Boolean(leaseSummary) && holdsInterest;
   const cardBodyTint = hasNpriDiscrepancy
     ? 'bg-seal/5 text-ink'
-    : isLeased
-      ? 'bg-emerald-50 text-ink'
-      : holdsInterest
-        ? 'bg-sky-50 text-ink'
-        : 'bg-parchment text-ink';
+    : holdsInterest
+      ? 'bg-sky-50 text-ink'
+      : 'bg-parchment text-ink';
   const headerTint = hasNpriDiscrepancy
     ? 'bg-seal/10'
-    : isLeased
-      ? 'bg-emerald-100/60'
-      : holdsInterest
-        ? 'bg-sky-100/70'
-        : 'bg-parchment-dark';
+    : holdsInterest
+      ? 'bg-sky-100/70'
+      : 'bg-parchment-dark';
 
   return (
     <div className="flex flex-col items-center">
@@ -250,16 +249,25 @@ function RelatedDocChip({
   onDelete: (id: string) => void;
   onViewPdf: (id: string) => void;
 }) {
+  // Lease chips render in emerald (lessee = green) so the leased relationship
+  // is visible beneath the still-blue lessor card. Other related docs keep the
+  // gold treatment.
+  const isLease = isLeaseNode(doc);
+  const chipChrome = isLease
+    ? 'border-emerald-400/50 bg-emerald-50 hover:bg-emerald-100'
+    : 'border-gold/30 bg-gold/5 hover:bg-gold/10';
+  const chipLabelTone = isLease ? 'text-emerald-800' : 'text-gold';
+
   return (
     <div
-      className="flex items-center gap-1.5 px-2 py-1 rounded border cursor-pointer transition-colors border-gold/30 bg-gold/5 hover:bg-gold/10"
+      className={`flex items-center gap-1.5 px-2 py-1 rounded border cursor-pointer transition-colors ${chipChrome}`}
       onClick={(e) => {
         e.stopPropagation();
         onEdit(doc.id);
       }}
     >
       <div className="flex-1 min-w-0">
-        <div className="text-[9px] font-semibold uppercase tracking-wider truncate text-gold">
+        <div className={`text-[9px] font-semibold uppercase tracking-wider truncate ${chipLabelTone}`}>
           {doc.instrument || 'Related Doc'}
         </div>
         {(doc.date || doc.fileDate) && (
