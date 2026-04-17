@@ -160,7 +160,10 @@ It now has three internal modes:
 
 ### Demo workspace
 - `Demo Data ▾ → Combinatorial — Raven Forest` loads the sample fixture
-- Every tract covers one or more of the combinatorial flavors (baseline splits, probate / heirship, fixed NPRI carves, floating NPRI carves, correction / release, royalty deeds, lease overlap, kitchen sink) so the same workspace can exercise Desk Map, Leasehold, and Research surfaces without real project data
+- 10 tracts in two pooled units — Raven Forest Unit A (C1–C5, Walker County) and Unit B (C6–C10, Walker/Montgomery line), reflecting the Sam Houston National Forest prospect
+- Unit A tracts are leased to Texas Energy Acquisitions LP at 1/8 royalty; Unit B tracts to Lone Star Minerals LLC at 3/16 royalty
+- The DeskMap tab bar groups tracts under bold unit headings; tracts C3, C7, and C9 show an error-dot indicator for NPRI discrepancy, over-conveyance, and orphan-node warnings respectively
+- Every tract covers one or more of the combinatorial flavors (baseline splits, probate / heirship, fixed NPRI carves, floating NPRI carves, correction / release, royalty deeds, over-conveyance, lease overlap, kitchen sink) so the same workspace can exercise Desk Map, Leasehold, and Research surfaces without real project data
 - Owner-card grantee names stay unique across the fixture so it is easy to scan
 - Seeded title and lease PDFs show their filenames on the Desk Map cards
 - The demo starts with one unit, a small ORRI burden, and a starter WI assignment so the leasehold deck has a clean check number from the first load

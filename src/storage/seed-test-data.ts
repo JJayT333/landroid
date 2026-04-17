@@ -1045,121 +1045,205 @@ interface CombinatorialTractPlan {
     | 'correction_release'
     | 'royalty_deeds'
     | 'lease_overlap'
+    | 'over_conveyance'
     | 'kitchen_sink';
+  /** Raven Forest pooled-unit grouping. */
+  unitName: string;
+  unitCode: 'A' | 'B';
+  /** Target node count — varies per tract so the dataset has realistic variety. */
+  targetNodes: number;
+  /** Lessee name for leases generated on this tract. */
+  lessee: string;
 }
 
+const UNIT_A_LESSEE = 'Texas Energy Acquisitions LP';
+const UNIT_B_LESSEE = 'Lone Star Minerals LLC';
+
 const COMBINATORIAL_TRACTS: CombinatorialTractPlan[] = [
+  // ── Unit A — Walker County, TX (Sam Houston NF) ─────────────
   {
-    name: 'Tract 1 — Baseline Splits',
+    name: 'C1 — Baseline Splits',
     code: 'C1',
     grossAcres: '160',
     pooledAcres: '160',
     description:
-      'Clean 1/2, 1/4, 1/8 warranty-deed chain of title with simple power-of-2 splits and leases at 1/8 royalty.',
-    landDesc: 'Section 4, Block 18, T&P RR Co. Survey, Howard County, Texas',
-    patentYear: 1898,
+      'Clean 1/2, 1/4, 1/8 warranty-deed chain with simple power-of-2 splits and leases at 1/8 royalty.',
+    landDesc: 'J. Walker Survey, Abstract 42, Walker County, Texas',
+    patentYear: 1856,
     patentGrantee: 'Harold Whitaker',
     primaryRoyalty: '1/8',
     surnames: ['Whitaker', 'Bennett', 'Parker', 'Collins', 'Hayes', 'Foster', 'Mercer', 'Lawson'],
     flavor: 'baseline_splits',
+    unitName: 'Raven Forest Unit A',
+    unitCode: 'A',
+    targetNodes: 60,
+    lessee: UNIT_A_LESSEE,
   },
   {
-    name: 'Tract 2 — Probate & Heirship',
+    name: 'C2 — Probate & Heirship',
     code: 'C2',
     grossAcres: '240',
     pooledAcres: '240',
     description:
       'Multi-generation death certificate, affidavit of heirship, will, and probate chains feeding the present owners.',
-    landDesc: 'Section 9, Block 22, H&GN RR Co. Survey, Reagan County, Texas',
-    patentYear: 1895,
+    landDesc: 'S. Houston Survey, Abstract 71, Walker County, Texas',
+    patentYear: 1858,
     patentGrantee: 'Eleanor Sutton',
-    primaryRoyalty: '3/16',
+    primaryRoyalty: '1/8',
     surnames: ['Sutton', 'Baker', 'Fletcher', 'Morgan', 'Russell', 'Snyder', 'Keller', 'Preston'],
     flavor: 'probate_heirship',
+    unitName: 'Raven Forest Unit A',
+    unitCode: 'A',
+    targetNodes: 80,
+    lessee: UNIT_A_LESSEE,
   },
   {
-    name: 'Tract 3 — Fixed NPRI Carves',
+    name: 'C3 — NPRI Discrepancy',
     code: 'C3',
     grossAcres: '320',
     pooledAcres: '320',
     description:
-      'Fixed NPRIs at 1/16 and 1/32 of the whole, stacked under a clean mineral chain so the deck shows the classic Hahn-style setup.',
-    landDesc: 'Section 15, Block 6, I&GN RR Co. Survey, Upton County, Texas',
-    patentYear: 1901,
+      'Fixed NPRIs at 1/16 and 1/32 of the whole stacked under a mineral chain — triggers NPRI-discrepancy warning on the desk map.',
+    landDesc: 'I. Irwin Survey, Abstract 103, Walker County, Texas',
+    patentYear: 1861,
     patentGrantee: 'Leonard Carlisle',
-    primaryRoyalty: '1/4',
+    primaryRoyalty: '1/8',
     surnames: ['Carlisle', 'Bishop', 'Kendall', 'Porter', 'Maddox', 'Dalton', 'Barrett', 'Holland'],
     flavor: 'fixed_npri',
+    unitName: 'Raven Forest Unit A',
+    unitCode: 'A',
+    targetNodes: 90,
+    lessee: UNIT_A_LESSEE,
   },
   {
-    name: 'Tract 4 — Floating NPRI Carves',
+    name: 'C4 — Floating NPRI',
     code: 'C4',
     grossAcres: '400',
     pooledAcres: '400',
     description:
-      'Floating NPRIs at 1/2 and 1/4 of lease royalty, with sibling fixed NPRIs for contrast and mixed lease royalty rates.',
-    landDesc: 'Section 21, Block 14, H&TC RR Co. Survey, Reeves County, Texas',
-    patentYear: 1906,
+      'Floating NPRIs at 1/2 and 1/4 of lease royalty with sibling fixed NPRIs for contrast and mixed royalty rates.',
+    landDesc: 'B. Buckner Survey, Abstract 115, Walker County, Texas',
+    patentYear: 1860,
     patentGrantee: 'Dorothy Langley',
-    primaryRoyalty: '1/5',
+    primaryRoyalty: '1/8',
     surnames: ['Langley', 'Whitman', 'Turner', 'Griffin', 'Hawkins', 'Brady', 'Sawyer', 'Monroe'],
     flavor: 'floating_npri',
+    unitName: 'Raven Forest Unit A',
+    unitCode: 'A',
+    targetNodes: 100,
+    lessee: UNIT_A_LESSEE,
   },
   {
-    name: 'Tract 5 — Corrections & Releases',
+    name: 'C5 — Corrections & Releases',
     code: 'C5',
     grossAcres: '480',
     pooledAcres: '480',
     description:
-      'Quitclaims, correction deeds, and release instruments layered on top of a working warranty-deed chain.',
-    landDesc: 'Section 27, Block C-23, PSL Survey, Loving County, Texas',
-    patentYear: 1904,
+      'Quitclaims, correction deeds, and release instruments layered on a working warranty-deed chain.',
+    landDesc: 'R. Rankin Survey, Abstract 128, Walker County, Texas',
+    patentYear: 1862,
     patentGrantee: 'Stanley Rutledge',
     primaryRoyalty: '1/8',
     surnames: ['Rutledge', 'Donovan', 'Wheeler', 'Harrison', 'Farley', 'Patterson', 'Granger', 'Baxter'],
     flavor: 'correction_release',
+    unitName: 'Raven Forest Unit A',
+    unitCode: 'A',
+    targetNodes: 110,
+    lessee: UNIT_A_LESSEE,
   },
+  // ── Unit B — Walker/Montgomery County line (Sam Houston NF) ─
   {
-    name: 'Tract 6 — Royalty Deeds + ORRI Deck',
+    name: 'C6 — Royalty Deeds + ORRI Deck',
     code: 'C6',
     grossAcres: '560',
     pooledAcres: '560',
     description:
       'Royalty-deed carve-outs on the mineral side plus unit-level ORRIs on all three basis types (gross 8/8, NRI, WI).',
-    landDesc: 'Section 3, Block 7, GC&SF RR Co. Survey, Midland County, Texas',
-    patentYear: 1905,
+    landDesc: 'T. Tobin Survey, Abstract 201, Walker County, Texas',
+    patentYear: 1863,
     patentGrantee: 'Marjorie Caldwell',
     primaryRoyalty: '3/16',
     surnames: ['Caldwell', 'Carver', 'Kirkland', 'Sinclair', 'Atkins', 'Presley', 'Merrill', 'Thornton'],
     flavor: 'royalty_deeds',
+    unitName: 'Raven Forest Unit B',
+    unitCode: 'B',
+    targetNodes: 120,
+    lessee: UNIT_B_LESSEE,
   },
   {
-    name: 'Tract 7 — Lease Overlap / Top-Lease',
+    name: 'C7 — Over-conveyance',
     code: 'C7',
     grossAcres: '640',
     pooledAcres: '640',
     description:
-      'Deliberate two-lease overlap on a present owner: an original lease and a later top-lease at a higher royalty, wired to exercise the overlap warning surface.',
-    landDesc: 'Section 11, Block 2, GH&H RR Co. Survey, Martin County, Texas',
-    patentYear: 1910,
+      'Deliberate conveyances that sum past 100% on one branch, triggering the over-conveyance validation warning.',
+    landDesc: 'M. McCoy Survey, Abstract 215, Montgomery County, Texas',
+    patentYear: 1865,
     patentGrantee: 'Clarence Whitfield',
-    primaryRoyalty: '1/4',
+    primaryRoyalty: '3/16',
     surnames: ['Whitfield', 'Sherman', 'Ellison', 'McAllister', 'Benson', 'Campbell', 'Atwood', 'Sterling'],
-    flavor: 'lease_overlap',
+    flavor: 'over_conveyance',
+    unitName: 'Raven Forest Unit B',
+    unitCode: 'B',
+    targetNodes: 130,
+    lessee: UNIT_B_LESSEE,
   },
   {
-    name: 'Tract 8 — Kitchen Sink',
+    name: 'C8 — Lease Overlap / Top-Lease',
     code: 'C8',
     grossAcres: '640',
     pooledAcres: '640',
     description:
-      'Every scenario in one tract: probate, NPRI (fixed + floating), correction, release, royalty deed, top-lease, and mixed-royalty unit leases.',
-    landDesc: 'Section 19, Block 32, T-2-S, T&P RR Co. Survey, Glasscock County, Texas',
-    patentYear: 1909,
-    patentGrantee: 'Beatrice Hollister',
-    primaryRoyalty: '1/8',
+      'Deliberate two-lease overlap on a present owner: an original lease and a later top-lease at a higher royalty.',
+    landDesc: 'G. Grimes Survey, Abstract 230, Montgomery County, Texas',
+    patentYear: 1867,
+    patentGrantee: 'Agnes Hollister',
+    primaryRoyalty: '3/16',
     surnames: ['Hollister', 'Bradford', 'Remington', 'Winslow', 'Chandler', 'Kensington', 'Stanford', 'Wellington'],
+    flavor: 'lease_overlap',
+    unitName: 'Raven Forest Unit B',
+    unitCode: 'B',
+    targetNodes: 140,
+    lessee: UNIT_B_LESSEE,
+  },
+  {
+    name: 'C9 — Orphan Node',
+    code: 'C9',
+    grossAcres: '320',
+    pooledAcres: '320',
+    description:
+      'A correction-and-release tract with one deliberately broken parentId reference, triggering the orphan-node validation warning.',
+    landDesc: 'W. Willis Survey, Abstract 244, Montgomery County, Texas',
+    patentYear: 1868,
+    patentGrantee: 'Frederick Grant',
+    primaryRoyalty: '3/16',
+    surnames: ['Grant', 'Ogden', 'Perry', 'Lawton', 'Hale', 'Corbin', 'Marsh', 'Drake'],
+    flavor: 'correction_release',
+    unitName: 'Raven Forest Unit B',
+    unitCode: 'B',
+    targetNodes: 80,
+    lessee: UNIT_B_LESSEE,
+  },
+  {
+    name: 'C10 — Kitchen Sink',
+    code: 'C10',
+    grossAcres: '640',
+    pooledAcres: '640',
+    description:
+      'Every scenario in one tract: probate, NPRI (fixed + floating), correction, release, royalty deed, top-lease, and mixed-royalty unit leases.',
+    landDesc: 'H. Henderson Survey, Abstract 260, Montgomery County, Texas',
+    patentYear: 1870,
+    patentGrantee: 'Beatrice Holloway',
+    primaryRoyalty: '3/16',
+    surnames: ['Holloway', 'Graves', 'Fielding', 'Norwood', 'Prescott', 'Stafford', 'Langdon', 'Waverly'],
     flavor: 'kitchen_sink',
+    unitName: 'Raven Forest Unit B',
+    unitCode: 'B',
+    // Target is higher than other tracts but capped by fertile-parent availability
+    // (the builder filters for fraction >= 1/32). The actual count will settle
+    // around 200–250 including lease overlays — still 2–3× any other tract.
+    targetNodes: 250,
+    lessee: UNIT_B_LESSEE,
   },
 ];
 
@@ -1172,8 +1256,6 @@ const COMBINATORIAL_FIRST_NAMES = [
   'Michael', 'Nancy', 'Nicholas', 'Olivia', 'Patrick', 'Paul', 'Peter', 'Rebecca',
   'Robert', 'Sarah', 'Scott', 'Stephen', 'Susan', 'Thomas', 'Victoria', 'William',
 ] as const;
-
-const COMBINATORIAL_TARGET_NODES_PER_TRACT = 100;
 
 /**
  * Per-tract grantee name generator. Deterministic so reseeding produces the
@@ -1590,6 +1672,51 @@ function clusterRoyaltyDeed(
   if (iteration % 2 === 0) builder.assignPdf(rdId);
 }
 
+/**
+ * Deliberately creates conveyances from a parent that sum to more than 100%,
+ * triggering the over-conveyance validation warning. This is the only cluster
+ * runner that intentionally violates the fraction budget — all others respect
+ * parent remaining. Used exclusively on tract C7.
+ */
+function clusterOverConveyance(
+  builder: StressBuilder,
+  parentId: string,
+  tract: CombinatorialTractPlan,
+  iteration: number,
+  nextGrantee: () => string
+) {
+  const parent = builder.nodes.find((n) => n.id === parentId);
+  if (!parent) return;
+  const parentRem = Number(parent.fraction);
+  if (parentRem < 1 / 16) return;
+  // Only inject the over-conveyance once per tract.
+  const alreadyInjected = builder.nodes.some(
+    (n) => n.landDesc === tract.landDesc && n.remarks.includes('over-conveyance trigger')
+  );
+  if (alreadyInjected) {
+    // Fall through to a normal split pair.
+    clusterSplitPair(builder, parentId, tract, iteration, nextGrantee);
+    return;
+  }
+  // Convey 60% twice from the same parent — totals 120%.
+  for (let i = 0; i < 2; i += 1) {
+    const grantee = nextGrantee();
+    const { date, fileDate } = combinatorialDate(tract, 70 + iteration, iteration + i);
+    builder.addChild(parentId, parentRem * 0.6, {
+      instrument: 'Mineral Deed',
+      date,
+      fileDate,
+      grantor: parent.grantee,
+      grantee,
+      remarks: `${tract.name} over-conveyance trigger — 60% of ${parent.grantee}'s interest to ${grantee} (intentional).`,
+      numerator: '3',
+      denominator: '5',
+      conveyanceMode: 'fraction',
+      splitBasis: 'initial',
+    });
+  }
+}
+
 function clusterDeepWarrantyChain(
   builder: StressBuilder,
   parentId: string,
@@ -1713,7 +1840,7 @@ function addCombinatorialLeasesToLeaves(
       parentId: leaf.id,
       tract,
       royalty,
-      lessee: PRIMARY_TEST_LESSEE,
+      lessee: tract.lessee,
       effectiveDate: `2024-${monthSeq}-01`,
       fileDate: `2024-${monthSeq}-12`,
       notes: `${tract.description}`,
@@ -1849,6 +1976,18 @@ function buildCombinatorialTract(
       clusterCorrectionAndRelease,
       clusterFloatingNpri,
     ],
+    over_conveyance: [
+      clusterOverConveyance,
+      clusterSplitPair,
+      clusterQuarterFan,
+      clusterDeepWarrantyChain,
+      clusterSplitPair,
+      clusterProbate,
+      clusterCorrectionAndRelease,
+      clusterFixedNpri,
+      clusterRoyaltyDeed,
+      clusterFloatingNpri,
+    ],
     lease_overlap: [
       clusterSplitPair,
       clusterQuarterFan,
@@ -1876,12 +2015,12 @@ function buildCombinatorialTract(
   };
   const cycle = FLAVOR_CYCLES[tract.flavor];
 
-  // Run the cycle until the tract hits its target node count.
+  // Run the cycle until the tract hits its per-tract target node count.
   let iteration = 0;
   let safetyFuse = 0;
-  const maxIterations = 400;
+  const maxIterations = 2000;
   while (
-    builder.nodes.length - beforeCount < COMBINATORIAL_TARGET_NODES_PER_TRACT
+    builder.nodes.length - beforeCount < tract.targetNodes
     && safetyFuse < maxIterations
   ) {
     // Pick a fertile mineral-class parent inside this tract.
@@ -1910,6 +2049,23 @@ function buildCombinatorialTract(
 
   // Leases overlay on every fertile leaf.
   addCombinatorialLeasesToLeaves(builder, leaseOverrides, tract, tractNodeIds);
+
+  // ── Post-build error injection ──────────────────────────────
+  // C9 gets an orphan node whose parentId points to a nonexistent ID.
+  if (tract.code === 'C9') {
+    const orphanCandidate = builder.nodes.find(
+      (n) =>
+        n.landDesc === tract.landDesc
+        && n.type === 'conveyance'
+        && n.parentId !== null
+        && Number(n.fraction) < 1 / 8
+    );
+    if (orphanCandidate) {
+      orphanCandidate.parentId = 'missing-parent-orphan-trigger';
+      orphanCandidate.remarks =
+        `${tract.name} orphan node — parentId deliberately broken to trigger validation warning.`;
+    }
+  }
 }
 
 export function buildCombinatorialWorkspaceData(): {
@@ -1946,7 +2102,7 @@ export function buildCombinatorialWorkspaceData(): {
   );
   const ts = Date.now();
 
-  const deskMaps = COMBINATORIAL_TRACTS.map((tract, index) => ({
+  const deskMaps: DeskMap[] = COMBINATORIAL_TRACTS.map((tract, index) => ({
     id: `dm-combinatorial-${index + 1}-${ts}`,
     name: tract.name,
     code: tract.code,
@@ -1955,6 +2111,8 @@ export function buildCombinatorialWorkspaceData(): {
     pooledAcres: tract.pooledAcres,
     description: tract.description,
     nodeIds: getTractNodes(nodes, tract.landDesc).map((node) => node.id),
+    unitName: tract.unitName,
+    unitCode: tract.unitCode,
   }));
   const deskMapIdByCode = new Map(deskMaps.map((deskMap) => [deskMap.code, deskMap.id]));
 
@@ -2008,12 +2166,12 @@ export function buildCombinatorialWorkspaceData(): {
       id: 'combinatorial-orri-5',
       payee: 'Brazos Bend Overrides, LP',
       scope: 'tract',
-      deskMapId: deskMapIdByCode.get('C8') ?? null,
+      deskMapId: deskMapIdByCode.get('C10') ?? null,
       burdenFraction: '1/128',
       burdenBasis: 'net_revenue_interest',
       effectiveDate: '2024-05-20',
       sourceDocNo: 'CB-ORRI-5',
-      notes: 'Tract-scope NRI-basis ORRI on Tract 8 (kitchen sink).',
+      notes: 'Tract-scope NRI-basis ORRI on Tract 10 (kitchen sink).',
     },
   ];
 
@@ -2021,7 +2179,7 @@ export function buildCombinatorialWorkspaceData(): {
   const leaseholdAssignments: LeaseholdAssignment[] = [
     {
       id: 'combinatorial-assignment-1',
-      assignor: PRIMARY_TEST_LESSEE,
+      assignor: UNIT_A_LESSEE,
       assignee: 'Caprock Resources, LLC',
       scope: 'unit',
       deskMapId: null,
@@ -2032,7 +2190,7 @@ export function buildCombinatorialWorkspaceData(): {
     },
     {
       id: 'combinatorial-assignment-2',
-      assignor: PRIMARY_TEST_LESSEE,
+      assignor: UNIT_B_LESSEE,
       assignee: 'Rio Draw Operating Co.',
       scope: 'tract',
       deskMapId: deskMapIdByCode.get('C6') ?? null,
@@ -2043,29 +2201,29 @@ export function buildCombinatorialWorkspaceData(): {
     },
     {
       id: 'combinatorial-assignment-3',
-      assignor: PRIMARY_TEST_LESSEE,
+      assignor: UNIT_B_LESSEE,
       assignee: 'Staked Plains Minerals',
       scope: 'tract',
-      deskMapId: deskMapIdByCode.get('C8') ?? null,
+      deskMapId: deskMapIdByCode.get('C10') ?? null,
       workingInterestFraction: '1/8',
       effectiveDate: '2024-05-01',
       sourceDocNo: 'CB-ASG-3',
-      notes: 'Tract-scope 12.5% WI assignment on Tract 8 (kitchen sink).',
+      notes: 'Tract-scope 12.5% WI assignment on Tract 10 (kitchen sink).',
     },
   ];
 
   const leaseholdUnit: LeaseholdUnit = {
-    name: 'Combinatorial Test Unit',
+    name: 'Raven Forest Unit',
     description:
-      'Eight-tract combinatorial test unit covering every conveyance scenario a Texas landman regularly encounters.',
-    operator: PRIMARY_TEST_LESSEE,
+      'Ten-tract Raven Forest prospect in Sam Houston National Forest (Walker/Montgomery counties, TX) with two pooled units of five tracts each.',
+    operator: UNIT_A_LESSEE,
     effectiveDate: '2024-01-01',
     jurisdiction: 'tx_fee',
   };
 
   return {
     workspaceId,
-    projectName: `Combinatorial Demo — ${deskMaps.length} Tracts (${builder.nodes.length} nodes)`,
+    projectName: `Combinatorial Demo — Raven Forest (${deskMaps.length} Tracts, ${builder.nodes.length} nodes)`,
     nodes,
     deskMaps,
     leaseholdUnit,
