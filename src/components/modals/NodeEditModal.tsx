@@ -14,13 +14,16 @@ import { formatAsFraction } from '../../engine/fraction-display';
 import { d } from '../../engine/decimal';
 import { savePdf, deletePdf } from '../../storage/pdf-store';
 import { getInterestClass, type OwnershipNode } from '../../types/node';
+import type { OwnerLinkOption } from '../owners/owner-link-options';
 
 interface NodeEditModalProps {
   node: OwnershipNode;
   onViewPdf?: (nodeId: string) => void;
   linkedOwnerName?: string | null;
+  ownerLinkOptions?: OwnerLinkOption[];
   leaseStatusText?: string | null;
   onManageOwner?: (nodeId: string) => void;
+  onLinkOwner?: (nodeId: string, ownerId: string) => void;
   onManageLease?: (nodeId: string) => void;
   onManageNpri?: (nodeId: string) => void;
   onClose: () => void;
@@ -31,13 +34,16 @@ export default function NodeEditModal({
   onClose,
   onViewPdf,
   linkedOwnerName,
+  ownerLinkOptions = [],
   leaseStatusText,
   onManageOwner,
+  onLinkOwner,
   onManageLease,
   onManageNpri,
 }: NodeEditModalProps) {
   const updateNode = useWorkspaceStore((s) => s.updateNode);
   const rebalance = useWorkspaceStore((s) => s.rebalance);
+  const nodes = useWorkspaceStore((s) => s.nodes);
   const pdfInputRef = useRef<HTMLInputElement>(null);
 
   const [form, setForm] = useState({
@@ -52,17 +58,28 @@ export default function NodeEditModal({
     landDesc: node.landDesc,
     remarks: node.remarks,
     initialFraction: node.initialFraction,
+    royaltyKind: node.royaltyKind,
+    fixedRoyaltyBasis:
+      node.fixedRoyaltyBasis ?? (node.royaltyKind === 'fixed' ? 'burdened_branch' : null),
     isDeceased: node.isDeceased,
     obituary: node.obituary,
     graveyardLink: node.graveyardLink,
   });
 
   const [error, setError] = useState<string | null>(null);
+  const [pdfError, setPdfError] = useState<string | null>(null);
+  const [pdfSaving, setPdfSaving] = useState(false);
+  const [ownerLinkDraftId, setOwnerLinkDraftId] = useState('');
 
   const initialChanged = form.initialFraction !== node.initialFraction;
   const previewFrac = formatAsFraction(d(form.initialFraction));
   const oldFrac = formatAsFraction(d(node.initialFraction));
   const canManageOwner = node.type !== 'related' || Boolean(node.linkedOwnerId);
+  const canLinkExistingOwner =
+    node.type !== 'related' &&
+    !node.linkedOwnerId &&
+    ownerLinkOptions.length > 0 &&
+    Boolean(onLinkOwner);
   const interestClass = getInterestClass(node);
   const canManageLease =
     node.type !== 'related' &&
@@ -74,12 +91,25 @@ export default function NodeEditModal({
     d(node.fraction).greaterThan(0);
   const trackedShareLabel =
     interestClass === 'npri'
-      ? node.royaltyKind === 'floating'
+      ? form.royaltyKind === 'floating'
         ? 'Share of Lease Royalty'
-        : 'Fixed Royalty Share'
+        : form.fixedRoyaltyBasis === 'whole_tract'
+          ? 'Fixed Share of Whole Tract'
+          : 'Fixed Share of Burdened Branch'
       : 'Interest of Whole Tract';
   const remainingLabel =
     interestClass === 'npri' ? 'Unconveyed Balance' : 'Remaining';
+  const parentNode = node.parentId
+    ? nodes.find((candidate) => candidate.id === node.parentId) ?? null
+    : null;
+  const editedInitialFraction = d(form.initialFraction);
+  const npriExceedsFullShare =
+    interestClass === 'npri' && editedInitialFraction.greaterThan(1);
+  const fixedWholeTractExceedsBranch =
+    interestClass === 'npri'
+    && form.royaltyKind === 'fixed'
+    && form.fixedRoyaltyBasis === 'whole_tract'
+    && Boolean(parentNode && editedInitialFraction.greaterThan(d(parentNode.initialFraction)));
 
   const set = (field: string, value: string | boolean) =>
     setForm((f) => ({ ...f, [field]: value }));
@@ -87,15 +117,30 @@ export default function NodeEditModal({
   const handleSave = () => {
     setError(null);
 
+    const normalizedNpriFields = interestClass === 'npri'
+      ? {
+          royaltyKind: form.royaltyKind,
+          fixedRoyaltyBasis:
+            form.royaltyKind === 'fixed'
+              ? (form.fixedRoyaltyBasis ?? 'burdened_branch')
+              : null,
+        }
+      : {};
     if (initialChanged) {
       const { initialFraction, ...otherFields } = form;
-      const success = rebalance(node.id, initialFraction, otherFields);
+      const success = rebalance(node.id, initialFraction, {
+        ...otherFields,
+        ...normalizedNpriFields,
+      });
       if (!success) {
         setError(useWorkspaceStore.getState().lastError || 'Rebalance failed');
         return;
       }
     } else {
-      updateNode(node.id, form);
+      updateNode(node.id, {
+        ...form,
+        ...normalizedNpriFields,
+      });
     }
 
     onClose();
@@ -138,6 +183,76 @@ export default function NodeEditModal({
           </legend>
 
           <div className="bg-ledger rounded-lg p-3 space-y-2">
+            {interestClass === 'npri' && (
+              <>
+                <div className="space-y-1.5">
+                  <div className="text-[10px] text-ink-light uppercase tracking-wider">
+                    NPRI Kind
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {([
+                      ['fixed', 'Fixed NPRI'],
+                      ['floating', 'Floating NPRI'],
+                    ] as const).map(([kind, label]) => (
+                      <button
+                        key={kind}
+                        type="button"
+                        onClick={() =>
+                          setForm((current) => ({
+                            ...current,
+                            royaltyKind: kind,
+                            fixedRoyaltyBasis:
+                              kind === 'fixed'
+                                ? (current.fixedRoyaltyBasis ?? 'burdened_branch')
+                                : null,
+                          }))
+                        }
+                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                          form.royaltyKind === kind
+                            ? 'bg-amber-700 text-amber-50'
+                            : 'text-amber-900 hover:bg-amber-100 border border-amber-200'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {form.royaltyKind === 'fixed' && (
+                  <div className="space-y-1.5">
+                    <div className="text-[10px] text-ink-light uppercase tracking-wider">
+                      Fixed Deed Basis
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {([
+                        ['burdened_branch', 'Of burdened branch'],
+                        ['whole_tract', 'Of whole tract'],
+                      ] as const).map(([basis, label]) => (
+                        <button
+                          key={basis}
+                          type="button"
+                          onClick={() => set('fixedRoyaltyBasis', basis)}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                            form.fixedRoyaltyBasis === basis
+                              ? 'bg-leather text-parchment'
+                              : 'text-ink hover:bg-parchment-dark border border-ledger-line'
+                          }`}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="text-[10px] text-ink-light">
+                      Use whole-tract basis when the fixed fraction is already
+                      stated against production from the land, not merely against
+                      the grantor branch.
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+
             <div>
               <label className="text-[10px] text-ink-light uppercase tracking-wider block mb-1">
                 {trackedShareLabel}
@@ -152,6 +267,17 @@ export default function NodeEditModal({
                 = {previewFrac}
               </div>
             </div>
+
+            {(npriExceedsFullShare || fixedWholeTractExceedsBranch) && (
+              <div className="rounded-lg border border-seal/30 bg-seal/10 px-3 py-2 text-xs leading-5 text-seal">
+                <span className="font-semibold">Title discrepancy allowed.</span>{' '}
+                LANDroid will save this NPRI and highlight the affected Desk Map branch in red.
+                {npriExceedsFullShare && ' The entered NPRI is greater than 100%.'}
+                {fixedWholeTractExceedsBranch && parentNode
+                  ? ` The fixed whole-tract burden exceeds the burdened branch share of ${formatAsFraction(d(parentNode.initialFraction))}.`
+                  : ''}
+              </div>
+            )}
 
             {initialChanged && (
               <div className="bg-gold/10 border border-gold/30 rounded-lg p-2 text-xs text-ink">
@@ -244,14 +370,35 @@ export default function NodeEditModal({
             onChange={async (e) => {
               const file = e.target.files?.[0];
               if (!file) return;
-              await savePdf(node.id, file);
-              updateNode(node.id, { hasDoc: true });
-              e.target.value = '';
+              setPdfError(null);
+              setPdfSaving(true);
+              try {
+                const attachment = await savePdf(node.id, file);
+                updateNode(node.id, {
+                  hasDoc: true,
+                  docFileName: attachment.fileName,
+                });
+                e.target.value = '';
+              } catch (uploadError) {
+                setPdfError(
+                  uploadError instanceof Error
+                    ? uploadError.message
+                    : 'PDF attachment failed. Please try again.'
+                );
+              } finally {
+                setPdfSaving(false);
+              }
             }}
           />
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {node.hasDoc ? (
               <>
+                <span className="min-w-0 max-w-full rounded-md border border-ledger-line bg-ledger px-2 py-1 text-xs text-ink">
+                  <span className="font-semibold">Attached:</span>{' '}
+                  <span className="font-mono break-all">
+                    {node.docFileName || (node.docNo ? `${node.docNo}.pdf` : 'PDF')}
+                  </span>
+                </span>
                 <button
                   type="button"
                   onClick={() => onViewPdf?.(node.id)}
@@ -262,8 +409,9 @@ export default function NodeEditModal({
                 <button
                   type="button"
                   onClick={async () => {
+                    setPdfError(null);
                     await deletePdf(node.id);
-                    updateNode(node.id, { hasDoc: false });
+                    updateNode(node.id, { hasDoc: false, docFileName: '' });
                   }}
                   className="px-3 py-1.5 rounded-lg text-xs text-seal hover:bg-seal/10 transition-colors"
                 >
@@ -273,13 +421,29 @@ export default function NodeEditModal({
             ) : (
               <button
                 type="button"
+                disabled={pdfSaving}
                 onClick={() => pdfInputRef.current?.click()}
                 className="px-3 py-1.5 rounded-lg text-xs font-semibold text-leather hover:bg-leather/10 border border-ledger-line transition-colors"
               >
-                Attach PDF
+                {pdfSaving ? 'Attaching...' : 'Attach PDF'}
               </button>
             )}
           </div>
+          {node.hasDoc && (
+            <button
+              type="button"
+              disabled={pdfSaving}
+              onClick={() => pdfInputRef.current?.click()}
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold text-leather hover:bg-leather/10 border border-ledger-line transition-colors disabled:opacity-60"
+            >
+              {pdfSaving ? 'Attaching...' : 'Replace PDF'}
+            </button>
+          )}
+          {pdfError && (
+            <div className="rounded-lg border border-seal/30 bg-seal/10 px-3 py-2 text-xs text-seal">
+              {pdfError}
+            </div>
+          )}
         </fieldset>
 
         {canManageOwner && (
@@ -306,6 +470,39 @@ export default function NodeEditModal({
                 {linkedOwnerName ? 'Open Owner' : 'Create Owner'}
               </button>
             </div>
+            {canLinkExistingOwner && (
+              <div className="grid gap-2 pt-3 sm:grid-cols-[minmax(0,1fr)_auto]">
+                <div>
+                  <label className="text-[10px] text-ink-light uppercase tracking-wider block mb-1">
+                    Link Existing Owner
+                  </label>
+                  <select
+                    value={ownerLinkDraftId}
+                    onChange={(event) => setOwnerLinkDraftId(event.target.value)}
+                    className="w-full px-3 py-2 rounded-lg border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none"
+                  >
+                    <option value="">Choose owner record...</option>
+                    {ownerLinkOptions.map((owner) => (
+                      <option key={owner.id} value={owner.id}>
+                        {owner.detail ? `${owner.label} — ${owner.detail}` : owner.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <button
+                  type="button"
+                  disabled={!ownerLinkDraftId}
+                  onClick={() => {
+                    if (!ownerLinkDraftId) return;
+                    onLinkOwner?.(node.id, ownerLinkDraftId);
+                    setOwnerLinkDraftId('');
+                  }}
+                  className="self-end px-3 py-2 rounded-lg text-xs font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors disabled:opacity-50"
+                >
+                  Link Owner
+                </button>
+              </div>
+            )}
           </fieldset>
         )}
 
@@ -345,7 +542,7 @@ export default function NodeEditModal({
                   Add a fixed or floating NPRI without reducing the mineral total.
                 </div>
                 <div className="text-xs text-amber-900/75">
-                  Desk Map tracks the NPRI branch separately. Royalty payout math can come later on the lessee side.
+                  Desk Map tracks the NPRI branch separately. Leasehold reads fixed/floating and deed-basis choices for payout review.
                 </div>
               </div>
               <button

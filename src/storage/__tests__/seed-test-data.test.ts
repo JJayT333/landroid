@@ -1,160 +1,122 @@
 import { describe, expect, it } from 'vitest';
-import { isLeaseNode } from '../../components/deskmap/deskmap-lease-node';
-import {
-  buildLeaseholdDemoWorkspaceData,
-  buildStressWorkspaceData,
-} from '../seed-test-data';
+import { buildCombinatorialWorkspaceData } from '../seed-test-data';
 
-describe('buildStressWorkspaceData', () => {
-  it('builds separate tract desk maps sized for stress testing', () => {
-    const workspace = buildStressWorkspaceData();
-    const cardCounts = workspace.deskMaps.map((deskMap) =>
-      deskMap.nodeIds.filter((nodeId) => {
-        const node = workspace.nodes.find((candidate) => candidate.id === nodeId);
-        return node?.type !== 'related';
-      }).length
-    );
+describe('buildCombinatorialWorkspaceData', () => {
+  // Build once — the generator is deterministic, so sharing a single snapshot
+  // across all assertions is safe and keeps the suite fast.
+  const workspace = buildCombinatorialWorkspaceData();
 
-    expect(workspace.projectName).toBe('Stress Test — 3 Tracts');
-    expect(workspace.deskMaps).toHaveLength(3);
-    expect(workspace.deskMaps.map((deskMap) => deskMap.name)).toEqual([
-      'Tract 1',
-      'Tract 2',
-      'Tract 3',
-    ]);
-    expect(cardCounts).toEqual([100, 150, 500]);
-    expect(workspace.activeDeskMapId).toBe(workspace.deskMaps[0].id);
-
-    const nodeIds = new Set(workspace.nodes.map((node) => node.id));
-    const deskMapIds = workspace.deskMaps.flatMap((deskMap) => deskMap.nodeIds);
-    expect(cardCounts.reduce((sum, count) => sum + count, 0)).toBe(750);
-    expect(deskMapIds).toHaveLength(workspace.nodes.length);
-    expect(new Set(deskMapIds)).toEqual(nodeIds);
-    expect(workspace.pdfMappings.length).toBeGreaterThan(0);
-    expect(
-      workspace.nodes.some(
-        (node) => node.type !== 'related' && node.instrument === 'Assignment'
-      )
-    ).toBe(false);
+  it('produces 10 desk maps in two units of 5 tracts each', () => {
+    expect(workspace.deskMaps).toHaveLength(10);
+    const unitA = workspace.deskMaps.filter((dm) => dm.unitCode === 'A');
+    const unitB = workspace.deskMaps.filter((dm) => dm.unitCode === 'B');
+    expect(unitA).toHaveLength(5);
+    expect(unitB).toHaveLength(5);
+    expect(unitA.every((dm) => dm.unitName === 'Raven Forest Unit A')).toBe(true);
+    expect(unitB.every((dm) => dm.unitName === 'Raven Forest Unit B')).toBe(true);
   });
 
-  it('keeps lease overlays separate from present ownership in the stress fixtures', () => {
-    const workspace = buildStressWorkspaceData();
-    const leasedOwners = workspace.nodes.filter(
-      (node) => node.type !== 'related' && Number(node.fraction) > 0 && node.linkedOwnerId
+  it('assigns Unit A tracts to Texas Energy Acquisitions LP', () => {
+    const unitANodeIds = new Set(
+      workspace.deskMaps
+        .filter((dm) => dm.unitCode === 'A')
+        .flatMap((dm) => dm.nodeIds)
     );
-    const leaseNodes = workspace.nodes.filter((node) => isLeaseNode(node));
-
-    expect(
-      workspace.nodes.some(
-        (node) => node.type !== 'related' && node.instrument === 'Oil & Gas Lease'
-      )
-    ).toBe(false);
-    expect(leasedOwners.length).toBeGreaterThan(0);
-    expect(leasedOwners.every((node) => node.linkedOwnerId)).toBe(true);
-    expect(leaseNodes.length).toBeGreaterThan(0);
-    expect(leaseNodes.every((node) => node.linkedLeaseId)).toBe(true);
-    expect(workspace.ownerData.leases).toHaveLength(leaseNodes.length);
+    const unitALeaseNodes = workspace.nodes.filter(
+      (n) =>
+        unitANodeIds.has(n.id)
+        && n.type === 'related'
+        && n.relatedKind === 'lease'
+        && n.grantee === 'Texas Energy Acquisitions LP'
+    );
+    expect(unitALeaseNodes.length).toBeGreaterThan(0);
   });
 
-  it('fills the generated desk-map nodes with complete metadata', () => {
-    const workspace = buildStressWorkspaceData();
+  it('assigns Unit B tracts to Lone Star Minerals LLC', () => {
+    const unitBLeaseNodes = workspace.nodes.filter(
+      (n) =>
+        n.type === 'related'
+        && n.relatedKind === 'lease'
+        && n.grantee === 'Lone Star Minerals LLC'
+    );
+    const unitBNodeIds = new Set(
+      workspace.deskMaps
+        .filter((dm) => dm.unitCode === 'B')
+        .flatMap((dm) => dm.nodeIds)
+    );
+    expect(unitBLeaseNodes.some((n) => unitBNodeIds.has(n.id))).toBe(true);
+  });
 
-    for (const node of workspace.nodes) {
-      expect(node.instrument).not.toBe('');
-      expect(node.vol).not.toBe('');
-      expect(node.page).not.toBe('');
-      expect(node.docNo).not.toBe('');
-      expect(node.fileDate).not.toBe('');
-      expect(node.date).not.toBe('');
-      expect(node.grantor).not.toBe('');
-      expect(node.grantee).not.toBe('');
-      expect(node.landDesc).not.toBe('');
-      expect(node.remarks).not.toBe('');
-      expect(node.manualAmount).not.toBe('');
+  it('keeps owner-card names unique across the combinatorial sample', () => {
+    const visiblePartyNames = workspace.nodes
+      .filter((node) => node.type !== 'related')
+      .map((node) => node.grantee.trim())
+      .filter((name) => name.length > 0);
 
-      if (node.type !== 'related') {
-        expect(node.numerator).not.toBe('0');
-        expect(node.denominator).not.toBe('');
-      }
+    expect(visiblePartyNames.length).toBeGreaterThan(0);
+    expect(new Set(visiblePartyNames).size).toBe(visiblePartyNames.length);
+  });
 
-      if (node.isDeceased) {
-        expect(node.obituary).not.toBe('');
-        expect(node.graveyardLink).not.toBe('');
-      }
+  it('marks combinatorial fixed NPRI demo nodes as whole-tract burdens', () => {
+    const fixedNpriNodes = workspace.nodes.filter(
+      (node) => node.type !== 'related'
+        && node.interestClass === 'npri'
+        && node.royaltyKind === 'fixed'
+    );
+
+    expect(fixedNpriNodes.length).toBeGreaterThan(0);
+    expect(fixedNpriNodes.every((node) => node.fixedRoyaltyBasis === 'whole_tract')).toBe(true);
+  });
+
+  it('produces variable node counts per tract', () => {
+    const nodeCountsByCode = new Map<string, number>();
+    for (const dm of workspace.deskMaps) {
+      nodeCountsByCode.set(dm.code, dm.nodeIds.length);
     }
+    // Kitchen sink (C10) should be substantially larger than baseline (C1).
+    const c1 = nodeCountsByCode.get('C1') ?? 0;
+    const c10 = nodeCountsByCode.get('C10') ?? 0;
+    expect(c1).toBeGreaterThan(30);
+    expect(c10).toBeGreaterThan(200);
+    expect(c10).toBeGreaterThan(c1 * 2);
   });
 
-  it('builds a dedicated 8-tract leasehold demo with acreage and lease coverage', () => {
-    const workspace = buildLeaseholdDemoWorkspaceData();
-    const currentOwners = workspace.nodes.filter(
-      (node) => node.type !== 'related' && Number(node.fraction) > 0
+  it('C7 has an over-conveyance trigger node', () => {
+    const c7NodeIds = new Set(
+      workspace.deskMaps.find((dm) => dm.code === 'C7')?.nodeIds ?? []
     );
-    const currentOwnerIds = new Set(currentOwners.map((node) => node.id));
-    const leaseParents = new Set(
-      workspace.nodes.flatMap((node) =>
-        isLeaseNode(node) && node.parentId ? [node.parentId] : []
-      )
+    const overConveyed = workspace.nodes.find(
+      (n) => c7NodeIds.has(n.id) && n.remarks.includes('over-conveyance trigger')
     );
+    expect(overConveyed).toBeDefined();
+  });
 
-    expect(workspace.projectName).toBe('Leasehold Demo — 8 Tracts');
-    expect(workspace.deskMaps).toHaveLength(8);
-    expect(workspace.deskMaps.map((deskMap) => deskMap.grossAcres)).toEqual([
-      '80',
-      '160',
-      '240',
-      '320',
-      '400',
-      '480',
-      '560',
-      '640',
-    ]);
-    expect(workspace.deskMaps.map((deskMap) => deskMap.pooledAcres)).toEqual([
-      '80',
-      '160',
-      '240',
-      '320',
-      '400',
-      '480',
-      '560',
-      '640',
-    ]);
-    expect(workspace.deskMaps.every((deskMap) => deskMap.description.length > 0)).toBe(true);
-    expect(workspace.leaseholdUnit).toEqual({
-      name: 'Raven Bend Unit',
-      description:
-        'Eight-tract pooled unit template with clean acreage, clean fractions, and full lease coverage for leasehold review.',
-      operator: 'Permian Basin Operating, LLC',
-      effectiveDate: '2024-01-01',
-    });
-    expect(workspace.leaseholdAssignments).toEqual([
-      expect.objectContaining({
-        assignor: 'Permian Basin Operating, LLC',
-        assignee: 'Raven Bend Partners, LLC',
-        scope: 'unit',
-        workingInterestFraction: '1/2',
-      }),
-      expect.objectContaining({
-        assignor: 'Permian Basin Operating, LLC',
-        assignee: 'Cedar Draw Operating, LLC',
-        scope: 'tract',
-        workingInterestFraction: '1/4',
-      }),
-    ]);
-    expect(workspace.leaseholdOrris).toEqual([
-      expect.objectContaining({
-        payee: 'Raven Bend Override, LP',
-        scope: 'unit',
-        burdenFraction: '1/16',
-        burdenBasis: 'gross_8_8',
-      }),
-    ]);
-    expect(workspace.leaseholdTransferOrderEntries).toEqual([]);
-    expect(leaseParents).toEqual(currentOwnerIds);
-    expect(workspace.ownerData.leases).toHaveLength(currentOwners.length);
-    expect(new Set(workspace.ownerData.leases.map((lease) => lease.royaltyRate))).toEqual(
-      new Set(['1/8'])
+  it('C9 has an orphan node with a broken parentId', () => {
+    const c9NodeIds = new Set(
+      workspace.deskMaps.find((dm) => dm.code === 'C9')?.nodeIds ?? []
     );
-    expect(workspace.ownerData.leases.every((lease) => lease.leasedInterest !== '')).toBe(true);
+    const orphan = workspace.nodes.find(
+      (n) =>
+        c9NodeIds.has(n.id)
+        && n.parentId === 'missing-parent-orphan-trigger'
+    );
+    expect(orphan).toBeDefined();
+  });
+
+  it('C3 has NPRI nodes triggering discrepancy scenario', () => {
+    const c3NodeIds = new Set(
+      workspace.deskMaps.find((dm) => dm.code === 'C3')?.nodeIds ?? []
+    );
+    const npriNodes = workspace.nodes.filter(
+      (n) =>
+        c3NodeIds.has(n.id)
+        && n.interestClass === 'npri'
+        && n.royaltyKind === 'fixed'
+    );
+    expect(npriNodes.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('project name includes Raven Forest', () => {
+    expect(workspace.projectName).toMatch(/Raven Forest/);
   });
 });

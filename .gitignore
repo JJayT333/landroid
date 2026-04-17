@@ -1,2 +1,14 @@
 node_modules/
 CHATGPTFAIL.pdf
+.DS_Store
+.claude/
+TORS_Documents/
+dist/
+dist-node/
+playwright-report/
+test-results/
+
+# Large AI-wizard binary fixtures (xlsx committed, zip/tif kept locally)
+tests/fixtures/ai-wizard/**/*.zip
+tests/fixtures/ai-wizard/**/*.tif
+tests/fixtures/ai-wizard/**/*.tiff

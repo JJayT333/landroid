@@ -16,6 +16,7 @@ import {
   executeAttachConveyance,
   executeDeleteBranch,
   calculateShare,
+  findNpriBranchDiscrepancies,
   validateOwnershipGraph,
   rootOwnershipTotal,
 } from '../math-engine';
@@ -223,6 +224,28 @@ describe('executeConveyance', () => {
     expect(findNode(result.data, 'root').fraction).toBe('0.666666667');
     expect(findNode(result.data, 'child1').fraction).toBe('0.333333333');
   });
+
+  it('rejects zero or invalid share values', () => {
+    const root = makeNode('root', null, '1.000000000', '1.000000000');
+
+    const zeroShare = executeConveyance({
+      allNodes: [root],
+      parentId: 'root',
+      newNodeId: 'child-zero',
+      share: '0',
+      form: createBlankNode('child-zero', 'root'),
+    });
+    expect(zeroShare.ok).toBe(false);
+
+    const invalidShare = executeConveyance({
+      allNodes: [root],
+      parentId: 'root',
+      newNodeId: 'child-invalid',
+      share: 'not-a-number',
+      form: createBlankNode('child-invalid', 'root'),
+    });
+    expect(invalidShare.ok).toBe(false);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -351,6 +374,24 @@ describe('executeRebalance', () => {
     const validation = validateOwnershipGraph(result.data);
     expect(validation.valid).toBe(true);
   });
+
+  it('rejects zero or invalid new initial fractions', () => {
+    const nodes: OwnershipNode[] = [makeNode('root', null, '1.000000000', '1.000000000')];
+
+    const zeroInitial = executeRebalance({
+      allNodes: nodes,
+      nodeId: 'root',
+      newInitialFraction: '0',
+    });
+    expect(zeroInitial.ok).toBe(false);
+
+    const invalidInitial = executeRebalance({
+      allNodes: nodes,
+      nodeId: 'root',
+      newInitialFraction: 'not-a-number',
+    });
+    expect(invalidInitial.ok).toBe(false);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -406,6 +447,28 @@ describe('executePredecessorInsert', () => {
       form: createBlankNode('n1'),
     });
     expect(result.ok).toBe(false);
+  });
+
+  it('supports predecessor insert on a root node', () => {
+    const nodes = [makeNode('root', null, '1.000000000', '1.000000000')];
+    const result = executePredecessorInsert({
+      allNodes: nodes,
+      activeNodeId: 'root',
+      activeNodeParentId: null,
+      newPredecessorId: 'pred-root',
+      newInitialFraction: '0.500000000',
+      form: { ...createBlankNode('pred-root', null), grantee: 'Earlier Owner' },
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(findNode(result.data, 'pred-root').parentId).toBeNull();
+    expect(findNode(result.data, 'pred-root').initialFraction).toBe('0.500000000');
+    expect(findNode(result.data, 'pred-root').fraction).toBe('0.000000000');
+    expect(findNode(result.data, 'root').parentId).toBe('pred-root');
+    expect(findNode(result.data, 'root').initialFraction).toBe('0.500000000');
+    expect(validateOwnershipGraph(result.data).valid).toBe(true);
   });
 });
 
@@ -514,6 +577,36 @@ describe('executeAttachConveyance', () => {
     const validation = validateOwnershipGraph(result.data);
     expect(validation.valid).toBe(true);
   });
+
+  it('rejects zero-share and related-node attachments', () => {
+    const owner = makeNode('owner', null, '1.000000000', '1.000000000');
+    const child = makeNode('child', 'owner', '0.500000000', '0.500000000');
+    const destination = makeNode('dest', null, '1.000000000', '1.000000000');
+    const leaseNode: OwnershipNode = {
+      ...createBlankNode('lease-node', 'owner'),
+      type: 'related',
+      relatedKind: 'lease',
+      linkedLeaseId: 'lease-1',
+    };
+
+    const zeroShare = executeAttachConveyance({
+      allNodes: [owner, child, destination],
+      activeNodeId: 'child',
+      attachParentId: 'dest',
+      calcShare: '0',
+      form: createBlankNode('child', 'dest'),
+    });
+    expect(zeroShare.ok).toBe(false);
+
+    const relatedAttach = executeAttachConveyance({
+      allNodes: [owner, child, destination, leaseNode],
+      activeNodeId: 'child',
+      attachParentId: 'lease-node',
+      calcShare: '0.250000000',
+      form: createBlankNode('child', 'lease-node'),
+    });
+    expect(relatedAttach.ok).toBe(false);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -573,6 +666,24 @@ describe('validateOwnershipGraph', () => {
     const result = validateOwnershipGraph(nodes);
     expect(result.valid).toBe(false);
     expect(result.issues.some((i) => i.code === 'duplicate_id')).toBe(true);
+  });
+
+  it('detects related nodes carrying ownership fractions', () => {
+    const nodes: OwnershipNode[] = [
+      {
+        ...createBlankNode('lease-node', 'root'),
+        type: 'related',
+        relatedKind: 'lease',
+        initialFraction: '0.250000000',
+        fraction: '0.250000000',
+      },
+    ];
+
+    const result = validateOwnershipGraph(nodes);
+    expect(result.valid).toBe(false);
+    expect(
+      result.issues.some((issue) => issue.code === 'related_node_with_fraction')
+    ).toBe(true);
   });
 });
 
@@ -814,6 +925,42 @@ describe('NPRI branch handling', () => {
     });
     expect(rootOwnershipTotal(result.data).toFixed(9)).toBe('1.000000000');
     expect(validateOwnershipGraph(result.data).valid).toBe(true);
+  });
+
+  it('allows but reports a fixed whole-tract NPRI that exceeds the burdened branch share', () => {
+    const nodes: OwnershipNode[] = [
+      makeNode('grantor', null, '0.125000000', '0.125000000'),
+    ];
+
+    const result = executeCreateNpri({
+      allNodes: nodes,
+      parentId: 'grantor',
+      newNodeId: 'npri-1',
+      share: '0.250000000',
+      form: {
+        ...createBlankNode('npri-1', 'grantor'),
+        instrument: 'Royalty Deed',
+        grantee: 'NPRI Holder',
+        interestClass: 'npri',
+        royaltyKind: 'fixed',
+        fixedRoyaltyBasis: 'whole_tract',
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(validateOwnershipGraph(result.data).valid).toBe(true);
+    expect(findNpriBranchDiscrepancies(result.data)).toEqual([
+      {
+        kind: 'fixed_whole_tract_over_branch',
+        burdenedBranchNodeId: 'grantor',
+        npriNodeIds: ['npri-1'],
+        totalBurden: '0.250000000',
+        capacity: '0.125000000',
+        excess: '0.125000000',
+      },
+    ]);
   });
 
   it('keeps NPRI branches out of mineral rebalances and delete restores', () => {

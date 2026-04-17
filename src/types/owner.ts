@@ -13,6 +13,112 @@ export interface Owner {
   updatedAt: string;
 }
 
+/**
+ * Jurisdiction discriminator for leasehold records (audit finding C2 / §7 item 7).
+ *
+ * LANDroid is Texas-only today. This field exists so Phase 2 (federal/BLM and
+ * private leases) has a clean attachment point: jurisdiction-aware status enums,
+ * royalty validation, communitization-agreement math, and ONRR exports will all
+ * key off this discriminator. Until those land, every lease is `'tx_fee'` and
+ * the math layer ignores the field.
+ *
+ *   - `'tx_fee'`     Texas privately-owned mineral fee — the default and only
+ *                    jurisdiction that the v1 math layer is wired for.
+ *   - `'tx_state'`   Texas state-owned minerals (GLO leases). Same Texas math
+ *                    rules as fee today; reserved so future GLO-specific
+ *                    payment tracking has a place to live.
+ *   - `'federal'`    Federal/BLM onshore. Phase 2 — full federal scaffolding
+ *                    (status enum, post-IRA 16.67% royalty, CA TPF math,
+ *                    minimum royalty, ONRR export) lands when this is wired.
+ *   - `'private'`    Private/non-federal/non-Texas-state leases the user
+ *                    aggregates into the same project. Phase 2.
+ *   - `'tribal'`     Tribal/allotted leases. Listed for data-shape
+ *                    completeness only; tribal lease math/workflows are out of
+ *                    scope under the current product rules.
+ *
+ * Order matches the project's Texas-first → Phase-2 rollout. New jurisdictions
+ * added later should append to the end so the persisted indexes stay stable.
+ */
+export const LEASE_JURISDICTION_OPTIONS = [
+  'tx_fee',
+  'tx_state',
+  'federal',
+  'private',
+  'tribal',
+] as const;
+export type LeaseJurisdiction = (typeof LEASE_JURISDICTION_OPTIONS)[number];
+
+/**
+ * Default jurisdiction for any lease that does not carry one — every existing
+ * record on import migrates to `'tx_fee'`. Pinned as a const so the migration
+ * default and the form default cannot drift apart.
+ */
+export const DEFAULT_LEASE_JURISDICTION: LeaseJurisdiction = 'tx_fee';
+
+export const LEASE_STATUS_OPTIONS = [
+  'Active',
+  'Expired',
+  'Released',
+  'Terminated',
+  'Inactive',
+  'Dead',
+] as const;
+export type LeaseStatus = (typeof LEASE_STATUS_OPTIONS)[number];
+export const DEFAULT_LEASE_STATUS: LeaseStatus = 'Active';
+
+const CANONICAL_LEASE_STATUS_BY_NORMALIZED = new Map<string, LeaseStatus>(
+  LEASE_STATUS_OPTIONS.map((status) => [status.toLowerCase(), status])
+);
+const INACTIVE_LEASE_STATUS_TEXT = new Set<string>([
+  'expired',
+  'released',
+  'terminated',
+  'inactive',
+  'dead',
+  'cancelled',
+  'canceled',
+]);
+
+function toNormalizedLeaseStatusText(value: unknown): string {
+  return typeof value === 'string' ? value.trim().toLowerCase() : '';
+}
+
+export function normalizeLeaseJurisdiction(value: unknown): LeaseJurisdiction {
+  if (typeof value === 'string') {
+    const candidate = value.trim() as LeaseJurisdiction;
+    if ((LEASE_JURISDICTION_OPTIONS as readonly string[]).includes(candidate)) {
+      return candidate;
+    }
+  }
+  return DEFAULT_LEASE_JURISDICTION;
+}
+
+export function isLeaseStatusOption(value: string): value is LeaseStatus {
+  return CANONICAL_LEASE_STATUS_BY_NORMALIZED.has(value.trim().toLowerCase());
+}
+
+export function normalizeLeaseStatus(value: unknown): string {
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (trimmed.length === 0) {
+      return DEFAULT_LEASE_STATUS;
+    }
+
+    return CANONICAL_LEASE_STATUS_BY_NORMALIZED.get(trimmed.toLowerCase()) ?? trimmed;
+  }
+
+  return DEFAULT_LEASE_STATUS;
+}
+
+export function isInactiveLeaseStatus(value: unknown): boolean {
+  const normalized = toNormalizedLeaseStatusText(value);
+  if (normalized.length === 0) {
+    return false;
+  }
+
+  return INACTIVE_LEASE_STATUS_TEXT.has(normalized);
+}
+
 export interface Lease {
   id: string;
   workspaceId: string;
@@ -26,6 +132,11 @@ export interface Lease {
   status: string;
   docNo: string;
   notes: string;
+  /**
+   * Jurisdiction discriminator. See `LeaseJurisdiction`. Defaults to `'tx_fee'`
+   * for every existing record; Phase 2 will key federal/BLM behaviors off this.
+   */
+  jurisdiction: LeaseJurisdiction;
   createdAt: string;
   updatedAt: string;
 }
@@ -119,15 +230,20 @@ export function createBlankLease(
     leasedInterest: '',
     effectiveDate: '',
     expirationDate: '',
-    status: 'Active',
+    status: DEFAULT_LEASE_STATUS,
     docNo: '',
     notes: '',
+    jurisdiction: DEFAULT_LEASE_JURISDICTION,
     createdAt: overrides.createdAt ?? now,
     updatedAt: overrides.updatedAt ?? now,
     ...overrides,
   };
   lease.workspaceId = workspaceId;
   lease.ownerId = ownerId;
+  // Coerce jurisdiction even when overrides supplies a junk value, so a stray
+  // import that hands us {jurisdiction: 'fee'} or undefined still lands on tx_fee.
+  lease.jurisdiction = normalizeLeaseJurisdiction(lease.jurisdiction);
+  lease.status = normalizeLeaseStatus(lease.status);
   return lease;
 }
 
@@ -150,9 +266,10 @@ export function normalizeLease(
     leasedInterest: asString(lease.leasedInterest),
     effectiveDate: asString(lease.effectiveDate),
     expirationDate: asString(lease.expirationDate),
-    status: asString(lease.status) || normalized.status,
+    status: normalizeLeaseStatus(lease.status),
     docNo: asString(lease.docNo),
     notes: asString(lease.notes),
+    jurisdiction: normalizeLeaseJurisdiction(lease.jurisdiction),
     createdAt: asString(lease.createdAt) || normalized.createdAt,
     updatedAt: asString(lease.updatedAt) || normalized.updatedAt,
   };

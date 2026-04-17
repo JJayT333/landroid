@@ -3,10 +3,13 @@ import { formatAsFraction } from '../../engine/fraction-display';
 import { d } from '../../engine/decimal';
 import { useWorkspaceStore } from '../../store/workspace-store';
 import type { OwnershipNode } from '../../types/node';
+import type { NpriBranchDiscrepancy } from '../../engine/math-engine';
+import DeskMapDocumentBadge from './DeskMapDocumentBadge';
 
 interface DeskMapNpriCardProps {
   node: OwnershipNode;
   relatedDocs: OwnershipNode[];
+  discrepancy?: NpriBranchDiscrepancy | null;
   onEdit: (nodeId: string) => void;
   onConvey: (nodeId: string) => void;
   onPrecede: (nodeId: string) => void;
@@ -18,6 +21,7 @@ interface DeskMapNpriCardProps {
 function DeskMapNpriCard({
   node,
   relatedDocs,
+  discrepancy = null,
   onEdit,
   onConvey,
   onPrecede,
@@ -30,23 +34,38 @@ function DeskMapNpriCard({
   const initial = d(node.initialFraction);
   const hasConveyedSome = initial.greaterThan(0) && remaining.lessThan(initial);
   const isFloating = node.royaltyKind === 'floating';
+  const fixedRoyaltyBasis =
+    node.fixedRoyaltyBasis === 'whole_tract' ? 'Whole tract basis' : 'Branch basis';
+  const hasDiscrepancy = Boolean(discrepancy);
+  const discrepancyLabel =
+    discrepancy?.kind === 'floating_over_royalty'
+      ? 'Floating NPRIs exceed royalty'
+      : discrepancy?.kind === 'fixed_branch_over_branch'
+        ? 'Fixed NPRIs exceed branch'
+        : 'Whole-tract NPRIs exceed branch';
 
   return (
     <div className="flex flex-col items-center">
       <div
         className={`
           group w-72 rounded-lg border-2 shadow-md cursor-pointer transition-all
-          hover:shadow-lg hover:border-amber-500
+          hover:shadow-lg ${hasDiscrepancy ? 'hover:border-seal' : 'hover:border-amber-500'}
           ${
-            isActive
+            hasDiscrepancy
+              ? 'border-seal ring-2 ring-seal/20 shadow-[0_10px_24px_rgba(127,29,29,0.20)]'
+              : isActive
               ? 'border-amber-600 ring-2 ring-amber-200'
               : 'border-amber-200 shadow-[0_8px_18px_rgba(217,119,6,0.14)]'
           }
-          bg-amber-50 text-ink
+          ${hasDiscrepancy ? 'bg-seal/5 text-ink' : 'bg-amber-50 text-ink'}
         `}
         onClick={() => onEdit(node.id)}
       >
-        <div className="px-3 py-1.5 border-b border-amber-200 rounded-t-lg bg-amber-100/80">
+        <div className={`px-3 py-1.5 border-b rounded-t-lg ${
+          hasDiscrepancy
+            ? 'border-seal/20 bg-seal/10'
+            : 'border-amber-200 bg-amber-100/80'
+        }`}>
           <div className="flex items-center justify-between gap-2">
             <span className="text-[10px] font-semibold text-amber-900 uppercase tracking-wide truncate">
               {node.instrument || 'Royalty Deed'}
@@ -58,6 +77,16 @@ function DeskMapNpriCard({
               <span className="rounded-full border border-amber-300 bg-white/80 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-amber-900">
                 {isFloating ? 'Floating' : 'Fixed'}
               </span>
+              {!isFloating && (
+                <span className="rounded-full border border-amber-300 bg-white/80 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-amber-900">
+                  {fixedRoyaltyBasis}
+                </span>
+              )}
+              {hasDiscrepancy && (
+                <span className="rounded-full border border-seal/25 bg-white/80 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-seal">
+                  Review
+                </span>
+              )}
             </div>
           </div>
           {(node.date || node.fileDate || node.docNo) && (
@@ -81,24 +110,27 @@ function DeskMapNpriCard({
               {node.remarks}
             </div>
           )}
-          {node.hasDoc && (
-            <button
-              type="button"
-              onClick={(event) => {
-                event.stopPropagation();
-                onViewPdf(node.id);
-              }}
-              className="text-[9px] text-amber-800 font-semibold hover:underline"
-            >
-              View PDF
-            </button>
+          <DeskMapDocumentBadge node={node} tone="amber" onViewPdf={onViewPdf} />
+          {hasDiscrepancy && discrepancy && (
+            <div className="rounded-md border border-seal/25 bg-seal/10 px-2 py-1.5 text-[10px] leading-4 text-seal">
+              <div className="font-semibold">{discrepancyLabel}</div>
+              <div>
+                Total {formatAsFraction(d(discrepancy.totalBurden))}; capacity{' '}
+                {formatAsFraction(d(discrepancy.capacity))}; over by{' '}
+                {formatAsFraction(d(discrepancy.excess))}.
+              </div>
+            </div>
           )}
         </div>
 
         <div className="px-3 py-2 border-t border-amber-200 bg-amber-100/40 space-y-0.5">
           <div className="flex items-center justify-between gap-2">
             <span className="text-amber-900/75 text-[10px] uppercase tracking-wider shrink-0">
-              {isFloating ? 'Of Lease Royalty' : 'Fixed Royalty'}
+              {isFloating
+                ? 'Of Lease Royalty'
+                : node.fixedRoyaltyBasis === 'whole_tract'
+                  ? 'Of Whole Tract'
+                  : 'Of Burdened Branch'}
             </span>
             <span className="text-sm font-mono font-semibold text-amber-950">
               {formatAsFraction(initial)}
@@ -140,18 +172,7 @@ function DeskMapNpriCard({
                     <div className="text-[9px] text-amber-900/75 truncate">{doc.remarks}</div>
                   )}
                 </div>
-                {doc.hasDoc && (
-                  <button
-                    type="button"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onViewPdf(doc.id);
-                    }}
-                    className="text-[9px] text-amber-800 font-bold hover:bg-amber-100 px-1.5 py-0.5 rounded shrink-0"
-                  >
-                    PDF
-                  </button>
-                )}
+                <DeskMapDocumentBadge node={doc} tone="amber" onViewPdf={onViewPdf} />
               </div>
             ))}
           </div>
@@ -202,6 +223,7 @@ function deskMapNpriCardPropsAreEqual(
   return (
     previous.node === next.node &&
     previous.relatedDocs === next.relatedDocs &&
+    previous.discrepancy === next.discrepancy &&
     previous.onEdit === next.onEdit &&
     previous.onConvey === next.onConvey &&
     previous.onPrecede === next.onPrecede &&

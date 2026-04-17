@@ -11,8 +11,11 @@ const FlowchartView = lazy(() => import('./views/FlowchartView'));
 const LeaseholdView = lazy(() => import('./views/LeaseholdView'));
 const RunsheetView = lazy(() => import('./views/RunsheetView'));
 const OwnerDatabaseView = lazy(() => import('./views/OwnerDatabaseView'));
+const CurativeView = lazy(() => import('./views/CurativeView'));
 const MapsView = lazy(() => import('./views/MapsView'));
+const FederalLeasingView = lazy(() => import('./views/FederalLeasingView'));
 const ResearchView = lazy(() => import('./views/ResearchView'));
+const AIToggleButton = lazy(() => import('./ai/AIToggleButton'));
 
 function PlaceholderView({
   name,
@@ -103,6 +106,18 @@ export default function App() {
             <OwnerDatabaseView />
           </Suspense>
         )}
+        {view === 'curative' && (
+          <Suspense
+            fallback={
+              <PlaceholderView
+                name="Loading Curative"
+                description="Preparing title issues and curative workflow."
+              />
+            }
+          >
+            <CurativeView />
+          </Suspense>
+        )}
         {view === 'maps' && (
           <Suspense
             fallback={
@@ -115,12 +130,24 @@ export default function App() {
             <MapsView />
           </Suspense>
         )}
+        {view === 'federalLeasing' && (
+          <Suspense
+            fallback={
+              <PlaceholderView
+                name="Loading Federal Leasing"
+                description="Preparing federal lease tracking."
+              />
+            }
+          >
+            <FederalLeasingView />
+          </Suspense>
+        )}
         {view === 'research' && (
           <Suspense
             fallback={
               <PlaceholderView
                 name="Loading Research"
-                description="Preparing RRC datasets and imported research files."
+                description="Preparing sources, formulas, and project records."
               />
             }
           >
@@ -128,6 +155,9 @@ export default function App() {
           </Suspense>
         )}
       </main>
+      <Suspense fallback={null}>
+        <AIToggleButton />
+      </Suspense>
     </div>
   );
 }

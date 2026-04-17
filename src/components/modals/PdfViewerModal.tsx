@@ -6,9 +6,7 @@
  */
 import { useEffect, useState } from 'react';
 import Modal from '../shared/Modal';
-import { createBundledDeskMapPdfFile } from '../../storage/bundled-deskmap-pdfs';
 import { getPdf } from '../../storage/pdf-store';
-import { savePdf } from '../../storage/pdf-store';
 
 interface PdfViewerModalProps {
   nodeId: string;
@@ -35,21 +33,12 @@ export default function PdfViewerModal({
 
     (async () => {
       try {
-        let attachment = await getPdf(nodeId);
+        const attachment = await getPdf(nodeId);
 
         if (!attachment || attachment.blob.size === 0) {
-          const fallbackFile = await createBundledDeskMapPdfFile(
-            nodeId,
-            fileNameHint
+          throw new Error(
+            'No PDF attachment was found for this title card. Reattach the recorded instrument before relying on View PDF.'
           );
-          await savePdf(nodeId, fallbackFile);
-          attachment = {
-            nodeId,
-            fileName: fallbackFile.name,
-            mimeType: fallbackFile.type,
-            blob: fallbackFile,
-            createdAt: new Date().toISOString(),
-          };
         }
 
         if (cancelled) return;
@@ -73,7 +62,7 @@ export default function PdfViewerModal({
   }, [fileNameHint, nodeId]);
 
   return (
-    <Modal open onClose={onClose} title={fileName || 'View PDF'} wide>
+    <Modal open onClose={onClose} title={fileName || fileNameHint || 'View PDF'} wide>
       {error ? (
         <div className="text-center py-8 text-ink-light">{error}</div>
       ) : objectUrl ? (

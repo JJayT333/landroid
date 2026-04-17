@@ -11,13 +11,18 @@ import { formatAsFraction } from '../../engine/fraction-display';
 import { d, serialize } from '../../engine/decimal';
 import { useWorkspaceStore } from '../../store/workspace-store';
 import type { OwnershipNode } from '../../types/node';
+import { isNpriNode } from '../../types/node';
 import type { DeskMapPrimaryLeaseSummary } from './deskmap-coverage';
+import DeskMapDocumentBadge from './DeskMapDocumentBadge';
+import { isLeaseNode } from './deskmap-lease-node';
 
 interface DeskMapCardProps {
   node: OwnershipNode;
   parentInitialFraction: string | null;
   relatedDocs: OwnershipNode[];
   leaseSummary: DeskMapPrimaryLeaseSummary | null;
+  npriDiscrepancyActive?: boolean;
+  npriDiscrepancyCount?: number;
   onEdit: (nodeId: string) => void;
   onConvey: (nodeId: string) => void;
   onPrecede: (nodeId: string) => void;
@@ -31,6 +36,8 @@ function DeskMapCard({
   parentInitialFraction,
   relatedDocs,
   leaseSummary,
+  npriDiscrepancyActive = false,
+  npriDiscrepancyCount = 0,
   onEdit,
   onConvey,
   onPrecede,
@@ -44,6 +51,7 @@ function DeskMapCard({
   const holdsInterest = node.type !== 'related' && remaining.greaterThan(0);
   const hasConveyedSome = initial.greaterThan(0) && remaining.lessThan(initial);
   const isFullyConveyed = initial.greaterThan(0) && remaining.isZero();
+  const hasNpriDiscrepancy = npriDiscrepancyActive || npriDiscrepancyCount > 0;
 
   const relativeShare = parentInitialFraction
     ? (() => {
@@ -57,35 +65,65 @@ function DeskMapCard({
   const ofWholeFrac = formatAsFraction(initial);
   const remainingFrac = formatAsFraction(remaining);
 
+  // ── Card tint by status ──────────────────────────────────
+  // Card body tints communicate node class at a glance:
+  //   • mineral present owner (leased or not) → soft sky tint (blue)
+  //   • NPRI burden card, healthy             → soft green tint (a distinct
+  //                                              shade from the emerald lease
+  //                                              chips, so NPRIs and lease
+  //                                              chips never get confused)
+  //   • NPRI-discrepancy card                 → seal tint (red, wins everything)
+  //   • fully-conveyed historical card        → parchment (no tint)
+  //
+  // Leased state is conveyed not by recoloring the lessor card, but by the
+  // emerald lease chip rendered beneath it (see RelatedDocChip). The lessor
+  // is still a present mineral owner — they just have a lease attached.
+  const isLeased = Boolean(leaseSummary) && holdsInterest;
+  const isNpri = isNpriNode(node);
+  const cardBodyTint = hasNpriDiscrepancy
+    ? 'bg-seal/5 text-ink'
+    : isNpri && holdsInterest
+      ? 'bg-green-50 text-ink'
+      : holdsInterest
+        ? 'bg-sky-50 text-ink'
+        : 'bg-parchment text-ink';
+  const headerTint = hasNpriDiscrepancy
+    ? 'bg-seal/10'
+    : isNpri && holdsInterest
+      ? 'bg-green-100/70'
+      : holdsInterest
+        ? 'bg-sky-100/70'
+        : 'bg-parchment-dark';
+
   return (
     <div className="flex flex-col items-center">
       {/* Main card */}
       <div
         className={`
           group w-72 rounded-lg border-2 shadow-md cursor-pointer transition-all
-          hover:shadow-lg hover:border-leather
-          ${isActive
+          hover:shadow-lg ${hasNpriDiscrepancy ? 'hover:border-seal' : 'hover:border-leather'}
+          ${hasNpriDiscrepancy
+            ? 'border-seal ring-2 ring-seal/20 shadow-[0_10px_24px_rgba(127,29,29,0.20)]'
+            : isActive
             ? 'border-leather ring-2 ring-gold/50'
             : holdsInterest
               ? 'border-leather/60 shadow-[0_8px_18px_rgba(92,61,46,0.12)]'
               : 'border-ledger-line'}
           ${isFullyConveyed ? 'opacity-75' : ''}
-          bg-parchment text-ink
+          ${cardBodyTint}
         `}
         onClick={() => onEdit(node.id)}
       >
         {/* Header */}
         <div
-          className={`px-3 py-1.5 border-b border-ledger-line rounded-t-lg ${
-            holdsInterest ? 'bg-gold/10' : 'bg-parchment-dark'
-          }`}
+          className={`px-3 py-1.5 border-b border-ledger-line rounded-t-lg ${headerTint}`}
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5 min-w-0">
               {holdsInterest && (
                 <span
                   className="h-2 w-2 shrink-0 rounded-full bg-gold shadow-[0_0_0_2px_rgba(212,197,169,0.9)]"
-                  title="Retains interest"
+                  title={isLeased ? 'Present owner — leased' : 'Present owner'}
                 />
               )}
               <span className="text-[10px] font-semibold text-ink-light uppercase tracking-wide truncate">
@@ -93,14 +131,9 @@ function DeskMapCard({
               </span>
             </div>
             <div className="flex items-center gap-1.5 ml-2 shrink-0">
-              {holdsInterest && (
-                <span className="rounded-full border border-sky-200 bg-sky-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-sky-800">
-                  Present Owner
-                </span>
-              )}
-              {leaseSummary && holdsInterest && (
-                <span className="rounded-full border border-emerald-200 bg-emerald-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-emerald-800">
-                  Leased
+              {hasNpriDiscrepancy && (
+                <span className="rounded-full border border-seal/25 bg-seal/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-seal">
+                  NPRI Issue
                 </span>
               )}
               {(node.date || node.fileDate) && (
@@ -134,16 +167,12 @@ function DeskMapCard({
               <span className="ml-1 text-[10px] text-seal font-normal">(deceased)</span>
             )}
           </div>
-          {node.hasDoc && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onViewPdf(node.id);
-              }}
-              className="text-[9px] text-leather font-semibold mt-0.5 hover:underline cursor-pointer"
-            >
-              View PDF
-            </button>
+          <DeskMapDocumentBadge node={node} onViewPdf={onViewPdf} />
+          {hasNpriDiscrepancy && (
+            <div className="mt-2 rounded-md border border-seal/25 bg-seal/10 px-2 py-1.5 text-[10px] leading-4 text-seal">
+              NPRI burden discrepancy on this branch. Review the red NPRI card
+              {npriDiscrepancyCount > 1 ? `s (${npriDiscrepancyCount})` : ''}.
+            </div>
           )}
         </div>
 
@@ -205,6 +234,8 @@ function deskMapCardPropsAreEqual(
     previous.parentInitialFraction === next.parentInitialFraction &&
     previous.relatedDocs === next.relatedDocs &&
     previous.leaseSummary === next.leaseSummary &&
+    previous.npriDiscrepancyActive === next.npriDiscrepancyActive &&
+    previous.npriDiscrepancyCount === next.npriDiscrepancyCount &&
     previous.onEdit === next.onEdit &&
     previous.onConvey === next.onConvey &&
     previous.onPrecede === next.onPrecede &&
@@ -229,16 +260,25 @@ function RelatedDocChip({
   onDelete: (id: string) => void;
   onViewPdf: (id: string) => void;
 }) {
+  // Lease chips render in emerald (lessee = green) so the leased relationship
+  // is visible beneath the still-blue lessor card. Other related docs keep the
+  // gold treatment.
+  const isLease = isLeaseNode(doc);
+  const chipChrome = isLease
+    ? 'border-emerald-400/50 bg-emerald-50 hover:bg-emerald-100'
+    : 'border-gold/30 bg-gold/5 hover:bg-gold/10';
+  const chipLabelTone = isLease ? 'text-emerald-800' : 'text-gold';
+
   return (
     <div
-      className="flex items-center gap-1.5 px-2 py-1 rounded border cursor-pointer transition-colors border-gold/30 bg-gold/5 hover:bg-gold/10"
+      className={`flex items-center gap-1.5 px-2 py-1 rounded border cursor-pointer transition-colors ${chipChrome}`}
       onClick={(e) => {
         e.stopPropagation();
         onEdit(doc.id);
       }}
     >
       <div className="flex-1 min-w-0">
-        <div className="text-[9px] font-semibold uppercase tracking-wider truncate text-gold">
+        <div className={`text-[9px] font-semibold uppercase tracking-wider truncate ${chipLabelTone}`}>
           {doc.instrument || 'Related Doc'}
         </div>
         {(doc.date || doc.fileDate) && (
@@ -247,22 +287,8 @@ function RelatedDocChip({
         {doc.remarks && (
           <div className="text-[9px] text-ink-light truncate">{doc.remarks}</div>
         )}
-        {doc.hasDoc && (
-          <div className="text-[8px] text-leather font-semibold mt-0.5">PDF attached</div>
-        )}
+        <DeskMapDocumentBadge node={doc} onViewPdf={onViewPdf} />
       </div>
-      {doc.hasDoc && (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onViewPdf(doc.id);
-          }}
-          className="text-[9px] text-leather font-bold hover:bg-leather/10 px-1.5 py-0.5 rounded shrink-0"
-          title="View PDF"
-        >
-          PDF
-        </button>
-      )}
       <button
         onClick={(e) => {
           e.stopPropagation();

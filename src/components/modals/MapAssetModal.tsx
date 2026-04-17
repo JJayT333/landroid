@@ -5,6 +5,7 @@ import type { DeskMap, OwnershipNode } from '../../types/node';
 import type { Lease, Owner } from '../../types/owner';
 import type { MapAsset, MapAssetKind } from '../../types/map';
 import { MAP_ASSET_KIND_OPTIONS } from '../../types/map';
+import type { ResearchProjectRecord, ResearchSource } from '../../types/research';
 
 interface MapAssetModalProps {
   asset: MapAsset;
@@ -12,6 +13,8 @@ interface MapAssetModalProps {
   nodes: OwnershipNode[];
   owners: Owner[];
   leases: Lease[];
+  researchSources: ResearchSource[];
+  researchProjectRecords: ResearchProjectRecord[];
   onClose: () => void;
   onPreview: () => void;
   onSave: (fields: Partial<MapAsset>) => Promise<void>;
@@ -23,6 +26,8 @@ export default function MapAssetModal({
   nodes,
   owners,
   leases,
+  researchSources,
+  researchProjectRecords,
   onClose,
   onPreview,
   onSave,
@@ -37,6 +42,8 @@ export default function MapAssetModal({
     nodeId: asset.nodeId ?? '',
     linkedOwnerId: asset.linkedOwnerId ?? '',
     leaseId: asset.leaseId ?? '',
+    researchSourceId: asset.researchSourceId ?? '',
+    researchProjectRecordId: asset.researchProjectRecordId ?? '',
     county: asset.county,
     prospect: asset.prospect,
     effectiveDate: asset.effectiveDate,
@@ -179,6 +186,42 @@ export default function MapAssetModal({
               ))}
             </select>
           </div>
+
+          <div>
+            <label className="text-[10px] text-ink-light uppercase tracking-wider block mb-1">
+              Research Source
+            </label>
+            <select
+              value={form.researchSourceId}
+              onChange={(event) => set('researchSourceId', event.target.value)}
+              className="w-full px-3 py-2 rounded-lg border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none"
+            >
+              <option value="">Not linked</option>
+              {researchSources.map((source) => (
+                <option key={source.id} value={source.id}>
+                  {source.title || source.citation || source.id}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="text-[10px] text-ink-light uppercase tracking-wider block mb-1">
+              Project Record
+            </label>
+            <select
+              value={form.researchProjectRecordId}
+              onChange={(event) => set('researchProjectRecordId', event.target.value)}
+              className="w-full px-3 py-2 rounded-lg border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none"
+            >
+              <option value="">Not linked</option>
+              {researchProjectRecords.map((record) => (
+                <option key={record.id} value={record.id}>
+                  {record.name || record.serialOrReference || record.id}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
         <div>
@@ -237,6 +280,8 @@ export default function MapAssetModal({
                   nodeId: form.nodeId || null,
                   linkedOwnerId: form.linkedOwnerId || null,
                   leaseId: form.leaseId || null,
+                  researchSourceId: form.researchSourceId || null,
+                  researchProjectRecordId: form.researchProjectRecordId || null,
                   county: form.county,
                   prospect: form.prospect,
                   effectiveDate: form.effectiveDate,

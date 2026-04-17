@@ -6,6 +6,7 @@ import './theme/index.css';
 import { useMapStore } from './store/map-store';
 import { useOwnerStore } from './store/owner-store';
 import { useResearchStore } from './store/research-store';
+import { useCurativeStore } from './store/curative-store';
 import { useWorkspaceStore } from './store/workspace-store';
 import { useCanvasStore } from './store/canvas-store';
 import { saveWorkspaceToDb, loadWorkspaceFromDb } from './storage/workspace-persistence';
@@ -33,6 +34,7 @@ async function bootstrapApp() {
       useOwnerStore.getState().setWorkspace(workspaceResult.data.workspaceId),
       useMapStore.getState().setWorkspace(workspaceResult.data.workspaceId),
       useResearchStore.getState().setWorkspace(workspaceResult.data.workspaceId),
+      useCurativeStore.getState().setWorkspace(workspaceResult.data.workspaceId),
     ]);
   } else {
     useWorkspaceStore.getState().setHydrated();
@@ -41,6 +43,7 @@ async function bootstrapApp() {
       useOwnerStore.getState().setWorkspace(workspaceId),
       useMapStore.getState().setWorkspace(workspaceId),
       useResearchStore.getState().setWorkspace(workspaceId),
+      useCurativeStore.getState().setWorkspace(workspaceId),
     ]);
   }
 

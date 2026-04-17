@@ -1,0 +1,221 @@
+import { describe, expect, it } from 'vitest';
+import {
+  createBlankResearchImport,
+  createBlankResearchFormula,
+  createBlankResearchProjectRecord,
+  createBlankResearchQuestion,
+  createBlankResearchSource,
+  normalizeResearchImport,
+  normalizeResearchFormula,
+  normalizeResearchProjectRecord,
+  normalizeResearchQuestion,
+  normalizeResearchSource,
+  sanitizeResearchLinks,
+} from '../research';
+
+describe('research types', () => {
+  it('normalizes invalid enum values to safe source-of-truth defaults', () => {
+    expect(
+      normalizeResearchSource({
+        id: 'source-1',
+        workspaceId: 'ws-1',
+        title: '  Source  ',
+        sourceType: 'Bad Type' as never,
+        context: 'Bad Context' as never,
+      })
+    ).toMatchObject({
+      title: 'Source',
+      sourceType: 'Project Note',
+      context: 'General',
+      status: 'Draft',
+    });
+
+    expect(
+      normalizeResearchFormula({
+        id: 'formula-1',
+        workspaceId: 'ws-1',
+        category: 'Bad Category' as never,
+        status: 'Bad Status' as never,
+      })
+    ).toMatchObject({ category: 'Ownership', status: 'Draft' });
+
+    expect(
+      normalizeResearchProjectRecord({
+        id: 'project-1',
+        workspaceId: 'ws-1',
+        recordType: 'Bad Record' as never,
+        jurisdiction: 'Bad Jurisdiction' as never,
+        status: 'Bad Status' as never,
+      })
+    ).toMatchObject({
+      recordType: 'Federal Lease',
+      jurisdiction: 'Federal / BLM',
+      status: 'Under Review',
+    });
+
+    expect(
+      normalizeResearchQuestion({
+        id: 'question-1',
+        workspaceId: 'ws-1',
+        status: 'Bad Status' as never,
+      })
+    ).toMatchObject({ status: 'Draft' });
+  });
+
+  it('normalizes source status and malformed import formats', () => {
+    expect(
+      normalizeResearchSource({
+        id: 'source-1',
+        workspaceId: 'ws-1',
+        status: 'Bad Status' as never,
+      }).status
+    ).toBe('Draft');
+
+    const researchImport = createBlankResearchImport(
+      'ws-1',
+      new Blob(['{}'], { type: 'application/json' }),
+      {
+        fileName: 'map.geojson',
+        mimeType: 'application/json',
+        overrides: {
+          id: 'import-1',
+          detectedFormat: 'Bad Format' as never,
+        },
+      }
+    );
+
+    expect(researchImport.detectedFormat).toBe('JSON');
+    expect(
+      normalizeResearchImport({
+        ...researchImport,
+        detectedFormat: 'Bad Format' as never,
+      }).detectedFormat
+    ).toBe('JSON');
+  });
+
+  it('clears stale cross-record and app-object links', () => {
+    const source = createBlankResearchSource('ws-1', {
+      id: 'source-1',
+      links: {
+        deskMapId: 'missing-dm',
+        nodeId: 'node-1',
+        ownerId: 'owner-1',
+        leaseId: 'missing-lease',
+        mapAssetId: 'map-1',
+        mapRegionId: 'missing-region',
+        importId: 'import-1',
+      },
+    });
+    const formula = createBlankResearchFormula('ws-1', {
+      id: 'formula-1',
+      sourceIds: ['source-1', 'missing-source'],
+    });
+    const projectRecord = createBlankResearchProjectRecord('ws-1', {
+      id: 'project-1',
+      sourceIds: ['source-1', 'missing-source'],
+      mapAssetId: 'map-1',
+      mapRegionId: 'missing-region',
+      deskMapId: 'desk-map-1',
+      nodeId: 'missing-node',
+      ownerId: 'owner-1',
+      leaseId: 'missing-lease',
+      importId: 'import-1',
+    });
+    const question = createBlankResearchQuestion('ws-1', {
+      id: 'question-1',
+      sourceIds: ['source-1', 'missing-source'],
+      formulaIds: ['formula-1', 'missing-formula'],
+      projectRecordIds: ['project-1', 'missing-project'],
+    });
+
+    const sanitized = sanitizeResearchLinks(
+      {
+        sources: [source],
+        formulas: [formula],
+        projectRecords: [projectRecord],
+        questions: [question],
+      },
+      {
+        deskMapIds: new Set(),
+        nodeIds: new Set(['node-1']),
+        ownerIds: new Set(['owner-1']),
+        leaseIds: new Set(),
+        mapAssetIds: new Set(['map-1']),
+        mapRegionIds: new Set(),
+        importIds: new Set(['import-1']),
+        sourceIds: new Set(['source-1']),
+        formulaIds: new Set(['formula-1']),
+        projectRecordIds: new Set(['project-1']),
+      }
+    );
+
+    expect(sanitized.sources[0]?.links).toEqual({
+      deskMapId: null,
+      nodeId: 'node-1',
+      ownerId: 'owner-1',
+      leaseId: null,
+      mapAssetId: 'map-1',
+      mapRegionId: null,
+      importId: 'import-1',
+    });
+    expect(sanitized.formulas[0]?.sourceIds).toEqual(['source-1']);
+    expect(sanitized.projectRecords[0]?.sourceIds).toEqual(['source-1']);
+    expect(sanitized.projectRecords[0]?.mapAssetId).toBe('map-1');
+    expect(sanitized.projectRecords[0]?.mapRegionId).toBeNull();
+    expect(sanitized.projectRecords[0]?.deskMapId).toBeNull();
+    expect(sanitized.projectRecords[0]?.nodeId).toBeNull();
+    expect(sanitized.projectRecords[0]?.ownerId).toBe('owner-1');
+    expect(sanitized.projectRecords[0]?.leaseId).toBeNull();
+    expect(sanitized.projectRecords[0]?.importId).toBe('import-1');
+    expect(sanitized.questions[0]?.formulaIds).toEqual(['formula-1']);
+    expect(sanitized.questions[0]?.projectRecordIds).toEqual(['project-1']);
+  });
+
+  it('normalizes federal tracking fields on project records', () => {
+    expect(
+      normalizeResearchProjectRecord({
+        id: 'project-2',
+        workspaceId: 'ws-1',
+        legacySerial: '  NMNM 123456  ',
+        mlrsSerial: '  MLRS-987654  ',
+        lesseeOrApplicant: 'Mesa Acquisition Co.',
+        operator: 'Raven Federal Operating',
+        state: '  NM  ',
+        county: '  Eddy  ',
+        prospectArea: '  Delaware North  ',
+        effectiveDate: '  2026-01-01  ',
+        expirationDate: '  2036-01-01  ',
+        primaryTerm: '  10 years  ',
+        nextAction: 'Review source packet',
+        nextActionDate: '  2026-05-01  ',
+        priority: '  High  ',
+        sourcePacketStatus: '  Ready  ',
+        deskMapId: '  desk-map-1  ',
+        nodeId: '  node-1  ',
+        ownerId: '  owner-1  ',
+        leaseId: '  lease-1  ',
+        importId: '  import-1  ',
+      })
+    ).toMatchObject({
+      legacySerial: 'NMNM 123456',
+      mlrsSerial: 'MLRS-987654',
+      lesseeOrApplicant: 'Mesa Acquisition Co.',
+      operator: 'Raven Federal Operating',
+      state: 'NM',
+      county: 'Eddy',
+      prospectArea: 'Delaware North',
+      effectiveDate: '2026-01-01',
+      expirationDate: '2036-01-01',
+      primaryTerm: '10 years',
+      nextAction: 'Review source packet',
+      nextActionDate: '2026-05-01',
+      priority: 'High',
+      sourcePacketStatus: 'Ready',
+      deskMapId: 'desk-map-1',
+      nodeId: 'node-1',
+      ownerId: 'owner-1',
+      leaseId: 'lease-1',
+      importId: 'import-1',
+    });
+  });
+});

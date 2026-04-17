@@ -63,10 +63,14 @@ export default function ConveyModal({ parentNode, onClose }: ConveyModalProps) {
   });
   const previewFrac = formatAsFraction(previewShare);
   const parentRemaining = formatAsFraction(d(parentNode.fraction));
+  const fixedNpriLabel =
+    parentNode.fixedRoyaltyBasis === 'whole_tract'
+      ? 'Grantor remaining whole-tract fixed burden'
+      : 'Grantor remaining branch-based fixed burden';
   const parentRemainingLabel = isNpriParent
     ? parentNode.royaltyKind === 'floating'
       ? 'Grantor remaining lease royalty'
-      : 'Grantor remaining fixed royalty'
+      : fixedNpriLabel
     : 'Grantor remaining';
 
   const handleSave = () => {
@@ -211,7 +215,11 @@ export default function ConveyModal({ parentNode, onClose }: ConveyModalProps) {
           <div className="bg-ledger rounded-lg p-3">
             <div className="flex items-center justify-between">
               <span className="text-[10px] text-ink-light uppercase tracking-wider">
-                {isNpriParent ? 'Royalty share to convey' : 'Amount to convey'}
+                {isNpriParent
+                  ? parentNode.royaltyKind === 'floating'
+                    ? 'Royalty share to convey'
+                    : 'Fixed burden to convey'
+                  : 'Amount to convey'}
               </span>
               <span className="font-mono font-semibold text-leather text-sm">
                 {previewFrac}

@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { createBlankNode } from '../../../types/node';
-import type { Lease } from '../../../types/owner';
+import { createBlankLease, type Lease } from '../../../types/owner';
 import {
   allocateLeaseCoverage,
   calculateDeskMapCoverageSummary,
+  canOwnerNodeHoldLease,
+  isLeaseActive,
   pickPrimaryLease,
   toDeskMapPrimaryLeaseSummary,
 } from '../deskmap-coverage';
@@ -26,6 +28,7 @@ describe('deskmap-coverage', () => {
           status: 'Active',
           docNo: '1001',
           notes: '',
+          jurisdiction: 'tx_fee',
           createdAt: '2026-03-30T00:00:00.000Z',
           updatedAt: '2026-03-30T00:00:00.000Z',
         }],
@@ -72,8 +75,54 @@ describe('deskmap-coverage', () => {
     });
   });
 
+  it('keeps Desk Map lease-card coverage scoped to the branch with the lease node', () => {
+    const lease = createBlankLease('ws-1', 'owner-1', {
+      id: 'lease-t1',
+      leaseName: 'T1 Only Lease',
+      lessee: 'Acme Energy',
+      royaltyRate: '1/8',
+      leasedInterest: '0.25',
+      status: 'Active',
+    });
+    const linkedLeases = new Map<string, Lease[]>([['owner-1', [lease]]]);
+    const tractOneOwner = {
+      ...createBlankNode('node-t1'),
+      grantee: 'Same Owner',
+      fraction: '0.25',
+      initialFraction: '0.25',
+      linkedOwnerId: 'owner-1',
+    };
+    const tractTwoOwner = {
+      ...createBlankNode('node-t2'),
+      grantee: 'Same Owner',
+      fraction: '0.25',
+      initialFraction: '0.25',
+      linkedOwnerId: 'owner-1',
+    };
+    const leaseNode = {
+      ...createBlankNode('lease-node-t1', tractOneOwner.id),
+      type: 'related' as const,
+      relatedKind: 'lease' as const,
+      linkedLeaseId: lease.id,
+    };
+
+    const tractOneSummary = calculateDeskMapCoverageSummary(
+      [tractOneOwner, leaseNode],
+      linkedLeases,
+      [tractOneOwner, leaseNode, tractTwoOwner]
+    );
+    const tractTwoSummary = calculateDeskMapCoverageSummary(
+      [tractTwoOwner],
+      linkedLeases,
+      [tractOneOwner, leaseNode, tractTwoOwner]
+    );
+
+    expect(tractOneSummary.leasedOwnership).toBe('0.25');
+    expect(tractTwoSummary.leasedOwnership).toBe('0');
+  });
+
   it('allocates multiple active leases in effective-date order and caps them at the owner share', () => {
-    const allocations = allocateLeaseCoverage(
+    const result = allocateLeaseCoverage(
       [
         {
           id: 'lease-1',
@@ -88,6 +137,7 @@ describe('deskmap-coverage', () => {
           status: 'Active',
           docNo: '1001',
           notes: '',
+          jurisdiction: 'tx_fee',
           createdAt: '2026-03-01T00:00:00.000Z',
           updatedAt: '2026-03-01T00:00:00.000Z',
         },
@@ -104,6 +154,7 @@ describe('deskmap-coverage', () => {
           status: 'Active',
           docNo: '1002',
           notes: '',
+          jurisdiction: 'tx_fee',
           createdAt: '2026-04-01T00:00:00.000Z',
           updatedAt: '2026-04-01T00:00:00.000Z',
         },
@@ -111,7 +162,7 @@ describe('deskmap-coverage', () => {
       '0.5'
     );
 
-    expect(allocations).toEqual([
+    expect(result.allocations).toEqual([
       expect.objectContaining({
         lease: expect.objectContaining({ id: 'lease-1' }),
         allocatedFraction: '0.25',
@@ -121,6 +172,145 @@ describe('deskmap-coverage', () => {
         allocatedFraction: '0.25',
       }),
     ]);
+    // Second lease is clipped from 0.5 to 0.25; surface it as an overlap warning.
+    expect(result.overlaps).toEqual([
+      expect.objectContaining({
+        leaseId: 'lease-2',
+        leaseName: 'Second Lease',
+        lessee: 'Bravo Energy',
+        requestedFraction: '0.5',
+        allocatedFraction: '0.25',
+        clippedFraction: '0.25',
+      }),
+    ]);
+  });
+
+  it('flags a fully-clipped follow-on lease when an earlier lease already took the owner share', () => {
+    const result = allocateLeaseCoverage(
+      [
+        {
+          id: 'lease-a',
+          workspaceId: 'ws-1',
+          ownerId: 'owner-1',
+          leaseName: 'Early Full Lease',
+          lessee: 'Acme',
+          royaltyRate: '1/8',
+          leasedInterest: '0.5',
+          effectiveDate: '2026-01-01',
+          expirationDate: '',
+          status: 'Active',
+          docNo: '',
+          notes: '',
+          jurisdiction: 'tx_fee',
+          createdAt: '2026-01-01T00:00:00.000Z',
+          updatedAt: '2026-01-01T00:00:00.000Z',
+        },
+        {
+          id: 'lease-b',
+          workspaceId: 'ws-1',
+          ownerId: 'owner-1',
+          leaseName: 'Late Full Lease',
+          lessee: 'Bravo',
+          royaltyRate: '1/4',
+          leasedInterest: '0.5',
+          effectiveDate: '2026-06-01',
+          expirationDate: '',
+          status: 'Active',
+          docNo: '',
+          notes: '',
+          jurisdiction: 'tx_fee',
+          createdAt: '2026-06-01T00:00:00.000Z',
+          updatedAt: '2026-06-01T00:00:00.000Z',
+        },
+      ],
+      '0.5'
+    );
+
+    expect(result.allocations).toHaveLength(1);
+    expect(result.allocations[0]).toEqual(
+      expect.objectContaining({
+        lease: expect.objectContaining({ id: 'lease-a' }),
+        allocatedFraction: '0.5',
+      })
+    );
+    expect(result.overlaps).toEqual([
+      expect.objectContaining({
+        leaseId: 'lease-b',
+        requestedFraction: '0.5',
+        allocatedFraction: '0',
+        clippedFraction: '0.5',
+      }),
+    ]);
+  });
+
+  it('returns no overlap warnings when active leases fit inside the owner share', () => {
+    const result = allocateLeaseCoverage(
+      [
+        {
+          id: 'lease-1',
+          workspaceId: 'ws-1',
+          ownerId: 'owner-1',
+          leaseName: 'Half Lease',
+          lessee: 'Acme',
+          royaltyRate: '1/8',
+          leasedInterest: '0.25',
+          effectiveDate: '2026-03-01',
+          expirationDate: '',
+          status: 'Active',
+          docNo: '',
+          notes: '',
+          jurisdiction: 'tx_fee',
+          createdAt: '2026-03-01T00:00:00.000Z',
+          updatedAt: '2026-03-01T00:00:00.000Z',
+        },
+      ],
+      '0.5'
+    );
+
+    expect(result.allocations).toHaveLength(1);
+    expect(result.overlaps).toEqual([]);
+  });
+
+  it('treats canonical inactive labels as inactive while preserving legacy text as active', () => {
+    expect(
+      isLeaseActive({
+        id: 'lease-active',
+        workspaceId: 'ws-1',
+        ownerId: 'owner-1',
+        leaseName: 'Legacy Active Lease',
+        lessee: 'Acme',
+        royaltyRate: '1/8',
+        leasedInterest: '0.5',
+        effectiveDate: '',
+        expirationDate: '',
+        status: 'Held by Production',
+        docNo: '',
+        notes: '',
+        jurisdiction: 'tx_fee',
+        createdAt: '2026-03-01T00:00:00.000Z',
+        updatedAt: '2026-03-01T00:00:00.000Z',
+      })
+    ).toBe(true);
+
+    expect(
+      isLeaseActive({
+        id: 'lease-inactive',
+        workspaceId: 'ws-1',
+        ownerId: 'owner-1',
+        leaseName: 'Released Lease',
+        lessee: 'Acme',
+        royaltyRate: '1/8',
+        leasedInterest: '0.5',
+        effectiveDate: '',
+        expirationDate: '',
+        status: ' released ',
+        docNo: '',
+        notes: '',
+        jurisdiction: 'tx_fee',
+        createdAt: '2026-03-01T00:00:00.000Z',
+        updatedAt: '2026-03-01T00:00:00.000Z',
+      })
+    ).toBe(false);
   });
 
   it('prefers the most recently updated active lease', () => {
@@ -138,6 +328,7 @@ describe('deskmap-coverage', () => {
         status: 'Active',
         docNo: '',
         notes: '',
+        jurisdiction: 'tx_fee',
         createdAt: '2026-03-29T00:00:00.000Z',
         updatedAt: '2026-03-29T00:00:00.000Z',
       },
@@ -154,6 +345,7 @@ describe('deskmap-coverage', () => {
         status: 'Active',
         docNo: '',
         notes: '',
+        jurisdiction: 'tx_fee',
         createdAt: '2026-03-30T00:00:00.000Z',
         updatedAt: '2026-03-30T00:00:00.000Z',
       },
@@ -170,6 +362,7 @@ describe('deskmap-coverage', () => {
         status: 'Expired',
         docNo: '',
         notes: '',
+        jurisdiction: 'tx_fee',
         createdAt: '2026-04-01T00:00:00.000Z',
         updatedAt: '2026-04-01T00:00:00.000Z',
       },
@@ -222,6 +415,7 @@ describe('deskmap-coverage', () => {
           status: 'Active',
           docNo: '1001',
           notes: '',
+          jurisdiction: 'tx_fee',
           createdAt: '2026-03-30T00:00:00.000Z',
           updatedAt: '2026-03-30T00:00:00.000Z',
         }],
@@ -260,6 +454,7 @@ describe('deskmap-coverage', () => {
             status: 'Active',
             docNo: '1001',
             notes: '',
+            jurisdiction: 'tx_fee',
             createdAt: '2026-03-01T00:00:00.000Z',
             updatedAt: '2026-03-01T00:00:00.000Z',
           },
@@ -276,6 +471,7 @@ describe('deskmap-coverage', () => {
             status: 'Active',
             docNo: '1002',
             notes: '',
+            jurisdiction: 'tx_fee',
             createdAt: '2026-04-01T00:00:00.000Z',
             updatedAt: '2026-04-01T00:00:00.000Z',
           },
@@ -341,5 +537,44 @@ describe('deskmap-coverage', () => {
     expect(summary.currentOwnership).toBe('1.5');
     expect(summary.missingOwnership).toBe('-0.5');
     expect(summary.currentOwnerCount).toBe(2);
+  });
+
+  describe('canOwnerNodeHoldLease (mineral-only gate)', () => {
+    it('accepts a linked mineral owner node', () => {
+      const node = {
+        ...createBlankNode('node-1'),
+        interestClass: 'mineral' as const,
+        linkedOwnerId: 'owner-1',
+      };
+      expect(canOwnerNodeHoldLease(node)).toBe(true);
+    });
+
+    it('rejects related (non-ownership) nodes', () => {
+      const node = {
+        ...createBlankNode('node-1'),
+        type: 'related' as const,
+        interestClass: 'mineral' as const,
+        linkedOwnerId: 'owner-1',
+      };
+      expect(canOwnerNodeHoldLease(node)).toBe(false);
+    });
+
+    it('rejects unlinked mineral nodes', () => {
+      const node = {
+        ...createBlankNode('node-1'),
+        interestClass: 'mineral' as const,
+        linkedOwnerId: null,
+      };
+      expect(canOwnerNodeHoldLease(node)).toBe(false);
+    });
+
+    it('rejects NPRI royalty nodes even when linked to an owner', () => {
+      const node = {
+        ...createBlankNode('node-1'),
+        interestClass: 'npri' as const,
+        linkedOwnerId: 'owner-1',
+      };
+      expect(canOwnerNodeHoldLease(node)).toBe(false);
+    });
   });
 });

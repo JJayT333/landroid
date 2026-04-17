@@ -1,10 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createBlankLeaseholdUnit } from '../../types/leasehold';
 import { createBlankNode } from '../../types/node';
+import { createBlankLease } from '../../types/owner';
 
 const mocks = vi.hoisted(() => ({
   unlinkDeskMap: vi.fn(),
   unlinkNode: vi.fn(),
+  deletePdf: vi.fn(),
 }));
 
 vi.mock('../map-store', () => ({
@@ -14,6 +16,10 @@ vi.mock('../map-store', () => ({
       unlinkNode: mocks.unlinkNode,
     }),
   },
+}));
+
+vi.mock('../../storage/pdf-store', () => ({
+  deletePdf: mocks.deletePdf,
 }));
 
 import { useWorkspaceStore } from '../workspace-store';
@@ -120,5 +126,88 @@ describe('workspace-store', () => {
     expect(state.activeDeskMapId).toBe('dm-1');
     expect(state.deskMaps[0]?.nodeIds).toEqual(['node-99']);
     expect(state.deskMaps[1]?.nodeIds).toEqual([]);
+  });
+
+  it('refreshes linked lease node display fields from the canonical lease record', () => {
+    const parentNode = {
+      ...createBlankNode('owner-node', null),
+      grantee: 'Ava Moonwhistle',
+      landDesc: 'Abstract 1, Example County, Texas',
+      linkedOwnerId: 'owner-1',
+      initialFraction: '1',
+      fraction: '1',
+    };
+    const leaseNode = {
+      ...createBlankNode('lease-node', 'owner-node'),
+      type: 'related' as const,
+      relatedKind: 'lease' as const,
+      grantee: 'Old Lessee',
+      remarks: 'stale remarks',
+      linkedOwnerId: 'owner-1',
+      linkedLeaseId: 'lease-1',
+    };
+    const lease = createBlankLease('ws-test', 'owner-1', {
+      id: 'lease-1',
+      leaseName: 'Updated Lease',
+      lessee: 'Bluebonnet Operating',
+      royaltyRate: '1/8',
+      leasedInterest: '1',
+      status: 'Active',
+      docNo: '2026-1001',
+      notes: 'Fresh notes',
+    });
+
+    useWorkspaceStore.setState({
+      nodes: [parentNode, leaseNode],
+    });
+
+    useWorkspaceStore.getState().syncLeaseNodesFromRecord(lease);
+
+    expect(useWorkspaceStore.getState().nodes).toEqual([
+      expect.objectContaining({ id: 'owner-node' }),
+      expect.objectContaining({
+        id: 'lease-node',
+        grantee: 'Bluebonnet Operating',
+        docNo: '2026-1001',
+        linkedLeaseId: 'lease-1',
+      }),
+    ]);
+    expect(useWorkspaceStore.getState().nodes[1]?.remarks).toContain(
+      'Lease: Updated Lease'
+    );
+    expect(useWorkspaceStore.getState().nodes[1]?.remarks).toContain(
+      'Royalty: 1/8'
+    );
+  });
+
+  it('neutralizes stale lessee card facts when a linked lease record is deleted', () => {
+    const leaseNode = {
+      ...createBlankNode('lease-node', 'owner-node'),
+      type: 'related' as const,
+      relatedKind: 'lease' as const,
+      date: '2026-01-01',
+      fileDate: '2026-01-02',
+      docNo: '2026-1001',
+      grantee: 'Old Lessee',
+      remarks: 'Lease: Old Lease | Royalty: 1/8',
+      linkedLeaseId: 'lease-1',
+    };
+
+    useWorkspaceStore.setState({
+      nodes: [leaseNode],
+    });
+
+    useWorkspaceStore.getState().clearLinkedLease('lease-1');
+
+    expect(useWorkspaceStore.getState().nodes[0]).toEqual(
+      expect.objectContaining({
+        linkedLeaseId: null,
+        date: '',
+        fileDate: '',
+        docNo: '',
+        grantee: '',
+        remarks: 'Lease record removed; review or delete this lessee card.',
+      })
+    );
   });
 });

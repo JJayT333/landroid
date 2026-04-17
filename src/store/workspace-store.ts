@@ -5,7 +5,10 @@
  * All math operations go through the engine and produce immutable updates.
  */
 import { create } from 'zustand';
+import { buildLeaseNode, isLeaseNode } from '../components/deskmap/deskmap-lease-node';
+import { useCurativeStore } from './curative-store';
 import { useMapStore } from './map-store';
+import { deletePdf } from '../storage/pdf-store';
 import type { OwnershipNode, DeskMap } from '../types/node';
 import { normalizeDeskMap, normalizeOwnershipNode } from '../types/node';
 import {
@@ -24,6 +27,7 @@ import {
   type LeaseholdTransferOrderEntry,
   type LeaseholdUnit,
 } from '../types/leasehold';
+import type { Lease } from '../types/owner';
 import {
   executeConveyance,
   executeCreateNpri,
@@ -116,6 +120,7 @@ interface WorkspaceState {
   removeNode: (id: string) => void;
   clearLinkedOwner: (ownerId: string) => void;
   clearLinkedLease: (leaseId: string) => void;
+  syncLeaseNodesFromRecord: (lease: Lease) => void;
   addNodeToActiveDeskMap: (nodeId: string) => void;
   setHydrated: () => void;
   setStartupWarning: (message: string | null) => void;
@@ -353,6 +358,7 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
   deleteDeskMap: (id) =>
     set((state) => {
       void useMapStore.getState().unlinkDeskMap(id);
+      useCurativeStore.getState().unlinkDeskMap(id);
       const remainingDeskMaps = state.deskMaps.filter((dm) => dm.id !== id);
       return {
         deskMaps: remainingDeskMaps,
@@ -539,23 +545,70 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
       lastError: null,
     });
     for (const removedId of removedIds) {
+      void deletePdf(removedId);
       void useMapStore.getState().unlinkNode(removedId);
+      useCurativeStore.getState().unlinkNode(removedId);
     }
   },
 
   clearLinkedOwner: (ownerId) =>
-    set((state) => ({
-      nodes: state.nodes.map((node) =>
-        node.linkedOwnerId === ownerId ? { ...node, linkedOwnerId: null } : node
-      ),
-    })),
+    set((state) => {
+      useCurativeStore.getState().unlinkOwner(ownerId);
+      return {
+        nodes: state.nodes.map((node) =>
+          node.linkedOwnerId === ownerId ? { ...node, linkedOwnerId: null } : node
+        ),
+      };
+    }),
 
   clearLinkedLease: (leaseId) =>
-    set((state) => ({
-      nodes: state.nodes.map((node) =>
-        node.linkedLeaseId === leaseId ? { ...node, linkedLeaseId: null } : node
-      ),
-    })),
+    set((state) => {
+      useCurativeStore.getState().unlinkLease(leaseId);
+      return {
+        nodes: state.nodes.map((node) =>
+          node.linkedLeaseId === leaseId
+            ? {
+                ...node,
+                date: '',
+                fileDate: '',
+                docNo: '',
+                grantee: '',
+                remarks: 'Lease record removed; review or delete this lessee card.',
+                linkedLeaseId: null,
+              }
+            : node
+        ),
+      };
+    }),
+
+  syncLeaseNodesFromRecord: (lease) =>
+    set((state) => {
+      const nodeById = new Map(state.nodes.map((node) => [node.id, node]));
+      let changed = false;
+
+      const nextNodes = state.nodes.map((node) => {
+        if (!isLeaseNode(node) || node.linkedLeaseId !== lease.id) {
+          return node;
+        }
+
+        const parentNode = node.parentId ? nodeById.get(node.parentId) ?? null : null;
+        if (!parentNode) {
+          return node;
+        }
+
+        changed = true;
+        return normalizeOwnershipNode(
+          buildLeaseNode({
+            id: node.id,
+            parentNode,
+            lease,
+            existingNode: node,
+          })
+        );
+      });
+
+      return changed ? { nodes: nextNodes } : {};
+    }),
 
   addNodeToActiveDeskMap: (nodeId) =>
     set((state) => {

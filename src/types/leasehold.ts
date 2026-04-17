@@ -1,8 +1,21 @@
+import {
+  DEFAULT_LEASE_JURISDICTION,
+  normalizeLeaseJurisdiction,
+  type LeaseJurisdiction,
+} from './owner';
+
 export interface LeaseholdUnit {
   name: string;
   description: string;
   operator: string;
   effectiveDate: string;
+  /**
+   * Jurisdiction discriminator (audit finding C2 / §7 item 7). LANDroid is
+   * Texas-only today, so every existing unit migrates to `'tx_fee'`. Phase 2
+   * will key federal CA/TPF math, ONRR exports, and federal-only views off
+   * this so the Texas baseline has a clean attachment point.
+   */
+  jurisdiction: LeaseJurisdiction;
 }
 
 export const LEASEHOLD_INTEREST_SCOPE_OPTIONS = ['unit', 'tract'] as const;
@@ -86,13 +99,18 @@ function normalizeTransferOrderStatus(value: unknown): LeaseholdTransferOrderSta
 export function createBlankLeaseholdUnit(
   overrides: Partial<LeaseholdUnit> = {}
 ): LeaseholdUnit {
-  return {
+  const unit: LeaseholdUnit = {
     name: '',
     description: '',
     operator: '',
     effectiveDate: '',
+    jurisdiction: DEFAULT_LEASE_JURISDICTION,
     ...overrides,
   };
+  // Coerce so an override of `{jurisdiction: 'fee'}` or undefined still
+  // lands on tx_fee instead of a structurally-invalid value.
+  unit.jurisdiction = normalizeLeaseJurisdiction(unit.jurisdiction);
+  return unit;
 }
 
 export function normalizeLeaseholdUnit(value: unknown): LeaseholdUnit {
@@ -105,6 +123,9 @@ export function normalizeLeaseholdUnit(value: unknown): LeaseholdUnit {
     description: asString((value as { description?: unknown }).description),
     operator: asString((value as { operator?: unknown }).operator),
     effectiveDate: asString((value as { effectiveDate?: unknown }).effectiveDate),
+    jurisdiction: normalizeLeaseJurisdiction(
+      (value as { jurisdiction?: unknown }).jurisdiction
+    ),
   });
 }
 

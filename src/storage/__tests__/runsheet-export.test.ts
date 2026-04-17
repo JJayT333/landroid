@@ -12,6 +12,7 @@ function buildNode(
   return {
     ...createBlankNode(id),
     instrument: 'Warranty Deed',
+    hasDoc: true,
     vol: '12',
     page: '34',
     docNo: '20260001',
@@ -65,6 +66,24 @@ describe('runsheet-export', () => {
 
     expect(sheet['!autofilter']).toEqual({ ref: 'A1:M3' });
     expect(sheet['!cols']).toHaveLength(13);
+  });
+
+  it('does not create document hyperlinks for blank doc numbers or missing PDFs', async () => {
+    const workbook = await buildRunsheetWorkbook([
+      buildNode('node-no-doc-no', { docNo: '' }),
+      buildNode('node-no-pdf', { hasDoc: false }),
+    ]);
+
+    const sheet = workbook.Sheets.Leasehold;
+    expect(sheet.A2?.f).toBeUndefined();
+    expect(sheet.A2?.v).toBe(1);
+    expect(sheet.D2?.f).toBeUndefined();
+    expect(sheet.D2?.v).toBe('');
+
+    expect(sheet.A3?.f).toBeUndefined();
+    expect(sheet.A3?.v).toBe(2);
+    expect(sheet.D3?.f).toBeUndefined();
+    expect(sheet.D3?.v).toBe('');
   });
 
   it('sanitizes the download name and includes the tract label when present', () => {

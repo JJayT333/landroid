@@ -46,6 +46,8 @@ export interface MapAsset {
   nodeId: string | null;
   linkedOwnerId: string | null;
   leaseId: string | null;
+  researchSourceId: string | null;
+  researchProjectRecordId: string | null;
   county: string;
   prospect: string;
   effectiveDate: string;
@@ -80,6 +82,8 @@ export interface MapRegion {
   nodeId: string | null;
   linkedOwnerId: string | null;
   leaseId: string | null;
+  researchSourceId: string | null;
+  researchProjectRecordId: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -196,6 +200,8 @@ export function createBlankMapAsset(
     nodeId: null,
     linkedOwnerId: null,
     leaseId: null,
+    researchSourceId: null,
+    researchProjectRecordId: null,
     county: '',
     prospect: '',
     effectiveDate: '',
@@ -243,6 +249,8 @@ export function createBlankMapRegion(
     nodeId: null,
     linkedOwnerId: null,
     leaseId: null,
+    researchSourceId: null,
+    researchProjectRecordId: null,
     createdAt: overrides.createdAt ?? now,
     updatedAt: overrides.updatedAt ?? now,
     ...overrides,
@@ -288,6 +296,10 @@ export function normalizeMapAsset(
   );
   normalized.presentationSummary = asset.presentationSummary ?? '';
   normalized.isFeatured = asset.isFeatured ?? false;
+  normalized.researchSourceId = coerceNullableId(asset.researchSourceId);
+  normalized.researchProjectRecordId = coerceNullableId(
+    asset.researchProjectRecordId
+  );
   return normalized;
 }
 
@@ -306,6 +318,10 @@ export function normalizeMapRegion(
     height: clampPercent(region.rect?.height ?? normalized.rect.height),
     page: Math.max(0, Math.floor(region.rect?.page ?? normalized.rect.page)),
   };
+  normalized.researchSourceId = coerceNullableId(region.researchSourceId);
+  normalized.researchProjectRecordId = coerceNullableId(
+    region.researchProjectRecordId
+  );
   return normalized;
 }
 

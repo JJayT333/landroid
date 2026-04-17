@@ -1,0 +1,151 @@
+import { beforeEach, describe, expect, it } from 'vitest';
+import { useWorkspaceStore } from '../../store/workspace-store';
+import { useOwnerStore } from '../../store/owner-store';
+import { useCurativeStore } from '../../store/curative-store';
+import { createBlankNode, type DeskMap } from '../../types/node';
+import { createBlankOwner, createBlankLease } from '../../types/owner';
+import { landroidTools } from '../tools';
+
+function deskMap(overrides: Partial<DeskMap>): DeskMap {
+  return {
+    id: 'dm-1',
+    name: 'Tract 1',
+    code: 'T1',
+    tractId: null,
+    grossAcres: '100',
+    pooledAcres: '100',
+    description: '',
+    nodeIds: [],
+    ...overrides,
+  };
+}
+
+async function runTool<Tool extends { execute?: (...args: never[]) => unknown }>(
+  tool: Tool,
+  args: unknown
+): Promise<any> {
+  // Tools can technically stream; in tests we always await a concrete value.
+  const exec = tool.execute as (a: unknown, o: unknown) => Promise<unknown>;
+  return await exec(args, {} as never);
+}
+
+describe('AI tools — read-only project queries', () => {
+  beforeEach(() => {
+    useWorkspaceStore.setState({
+      projectName: 'Test Project',
+      deskMaps: [],
+      nodes: [],
+      activeDeskMapId: null,
+      leaseholdAssignments: [],
+      leaseholdOrris: [],
+      leaseholdTransferOrderEntries: [],
+    });
+    useOwnerStore.setState({ owners: [], leases: [] });
+    useCurativeStore.setState({ titleIssues: [] });
+  });
+
+  it('getProjectSummary returns counts from current state', async () => {
+    useWorkspaceStore.setState({
+      deskMaps: [deskMap({ id: 'dm-1' })],
+      activeDeskMapId: 'dm-1',
+      nodes: [
+        { ...createBlankNode('n1'), interestClass: 'mineral' },
+        { ...createBlankNode('n2'), interestClass: 'mineral' },
+        { ...createBlankNode('n3'), interestClass: 'npri' },
+      ],
+    });
+
+    const result = await runTool(landroidTools.getProjectSummary, {});
+    expect(result).toMatchObject({
+      projectName: 'Test Project',
+      deskMapCount: 1,
+      totalNodes: 3,
+      nodeCountsByInterestClass: { mineral: 2, npri: 1 },
+      activeDeskMap: { id: 'dm-1', name: 'Tract 1', code: 'T1' },
+    });
+  });
+
+  it('listDeskMaps reports per-tract node count', async () => {
+    useWorkspaceStore.setState({
+      deskMaps: [
+        deskMap({ id: 'dm-1', nodeIds: ['n1', 'n2'] }),
+        deskMap({ id: 'dm-2', name: 'Tract 2', code: 'T2', nodeIds: ['n3'] }),
+      ],
+      nodes: [
+        createBlankNode('n1'),
+        createBlankNode('n2'),
+        createBlankNode('n3'),
+      ],
+    });
+
+    const result = await runTool(landroidTools.listDeskMaps, {});
+    expect(result).toHaveLength(2);
+    expect(result[0]).toMatchObject({ id: 'dm-1', nodeCount: 2 });
+    expect(result[1]).toMatchObject({ id: 'dm-2', nodeCount: 1 });
+  });
+
+  it('getLessorRoster joins owners to leases and sorts by lease count', async () => {
+    const ownerA = { ...createBlankOwner('ws-1'), id: 'o-1', name: 'Aiken' };
+    const ownerB = { ...createBlankOwner('ws-1'), id: 'o-2', name: 'Zebra' };
+    const lease1 = { ...createBlankLease('ws-1', 'o-2'), id: 'l-1', leaseName: 'Z1' };
+    const lease2 = { ...createBlankLease('ws-1', 'o-2'), id: 'l-2', leaseName: 'Z2' };
+    const lease3 = { ...createBlankLease('ws-1', 'o-1'), id: 'l-3', leaseName: 'A1' };
+    useOwnerStore.setState({ owners: [ownerA, ownerB], leases: [lease1, lease2, lease3] });
+
+    const result = await runTool(landroidTools.getLessorRoster, {});
+    expect(result[0].name).toBe('Zebra');
+    expect(result[0].leaseCount).toBe(2);
+    expect(result[1].name).toBe('Aiken');
+    expect(result[1].leaseCount).toBe(1);
+  });
+
+  it('searchInstruments matches grantor/grantee/docNo substrings', async () => {
+    useWorkspaceStore.setState({
+      nodes: [
+        { ...createBlankNode('n1'), grantor: 'Famcor Oil, Inc.', grantee: 'Public', docNo: '11-769' },
+        { ...createBlankNode('n2'), grantor: 'Elmore Family Partners, Ltd.', grantee: 'Famcor Oil, Inc.' },
+        { ...createBlankNode('n3'), grantor: 'Billie Jo Trapp', grantee: 'Famcor Oil, Inc.' },
+      ],
+    });
+
+    const result = await runTool(landroidTools.searchInstruments, {
+      query: 'famcor',
+      limit: 10,
+    });
+    expect(result).toHaveLength(3);
+
+    const byDoc = await runTool(landroidTools.searchInstruments, {
+      query: '11-769',
+      limit: 10,
+    });
+    expect(byDoc).toHaveLength(1);
+    expect(byDoc[0].nodeId).toBe('n1');
+  });
+
+  it('explainNode returns parent chain walking up to root', async () => {
+    useWorkspaceStore.setState({
+      deskMaps: [deskMap({ id: 'dm-1', nodeIds: ['root', 'child', 'grandchild'] })],
+      nodes: [
+        { ...createBlankNode('root'), grantor: 'State of TX', grantee: 'Patent Grantee' },
+        { ...createBlankNode('child'), grantor: 'Patent Grantee', grantee: 'Bridges', parentId: 'root' },
+        { ...createBlankNode('grandchild'), grantor: 'Bridges', grantee: 'Elmore', parentId: 'child' },
+      ],
+    });
+
+    const result = await runTool(landroidTools.explainNode, { nodeId: 'grandchild' });
+    expect(result).toMatchObject({
+      nodeId: 'grandchild',
+      grantor: 'Bridges',
+      grantee: 'Elmore',
+      hostingDeskMap: { id: 'dm-1', name: 'Tract 1' },
+    });
+    expect(result.parentChain).toHaveLength(2);
+    expect(result.parentChain?.[0].grantee).toBe('Bridges');
+    expect(result.parentChain?.[1].grantee).toBe('Patent Grantee');
+  });
+
+  it('explainNode returns error for unknown id', async () => {
+    const result = await runTool(landroidTools.explainNode, { nodeId: 'nope' });
+    expect(result).toMatchObject({ error: expect.stringContaining('nope') });
+  });
+});

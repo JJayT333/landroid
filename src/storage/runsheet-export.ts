@@ -37,8 +37,9 @@ const RUNSHEET_COLUMN_WIDTHS: ColInfo[] = [
   { wch: 55.33 },
 ] as const;
 
-function buildImagePath(docNo: string) {
-  return `TORS_Documents\\${docNo}.pdf`;
+function buildImagePath(node: OwnershipNode) {
+  const docNo = node.docNo.trim();
+  return node.hasDoc && docNo ? `TORS_Documents\\${docNo}.pdf` : '';
 }
 
 function sanitizeFileNamePart(value: string) {
@@ -56,7 +57,7 @@ export async function buildRunsheetWorkbook(nodes: OwnershipNode[]) {
       index + 1,
       node.instrument || '',
       index + 1,
-      buildImagePath(node.docNo || ''),
+      buildImagePath(node),
       node.vol || '',
       node.page || '',
       node.docNo || '',
@@ -79,16 +80,28 @@ export async function buildRunsheetWorkbook(nodes: OwnershipNode[]) {
     const orderByDate = rowNumber - 1;
     const node = nodes[orderByDate - 1];
 
-    worksheet[`A${rowNumber}`] = {
-      t: 'n',
-      f: `HYPERLINK(D${rowNumber},C${rowNumber})`,
-      v: orderByDate,
-    };
-    worksheet[`D${rowNumber}`] = {
-      t: 's',
-      f: `CONCATENATE("TORS_Documents\\",G${rowNumber},".pdf")`,
-      v: buildImagePath(node.docNo || ''),
-    };
+    const imagePath = node ? buildImagePath(node) : '';
+
+    worksheet[`A${rowNumber}`] = imagePath
+      ? {
+          t: 'n',
+          f: `HYPERLINK(D${rowNumber},C${rowNumber})`,
+          v: orderByDate,
+        }
+      : {
+          t: 'n',
+          v: orderByDate,
+        };
+    worksheet[`D${rowNumber}`] = imagePath
+      ? {
+          t: 's',
+          f: `CONCATENATE("TORS_Documents\\",G${rowNumber},".pdf")`,
+          v: imagePath,
+        }
+      : {
+          t: 's',
+          v: '',
+        };
   }
 
   const workbook = XLSX.utils.book_new();

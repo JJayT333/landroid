@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   deleteOwnerDoc: vi.fn(),
   clearLinkedOwner: vi.fn(),
   clearLinkedLease: vi.fn(),
+  syncLeaseNodesFromRecord: vi.fn(),
   unlinkOwner: vi.fn(),
   unlinkLease: vi.fn(),
 }));
@@ -36,6 +37,7 @@ vi.mock('../workspace-store', () => ({
     getState: () => ({
       clearLinkedOwner: mocks.clearLinkedOwner,
       clearLinkedLease: mocks.clearLinkedLease,
+      syncLeaseNodesFromRecord: mocks.syncLeaseNodesFromRecord,
     }),
   },
 }));
@@ -174,6 +176,7 @@ describe('owner-store', () => {
           status: 'Active',
           docNo: '',
           notes: '',
+          jurisdiction: 'tx_fee',
           createdAt: '',
           updatedAt: '',
         },
@@ -215,7 +218,9 @@ describe('owner-store', () => {
 
     expect(mocks.deleteOwner).toHaveBeenCalledWith(owner.id);
     expect(mocks.clearLinkedOwner).toHaveBeenCalledWith(owner.id);
+    expect(mocks.clearLinkedLease).toHaveBeenCalledWith('lease-1');
     expect(mocks.unlinkOwner).toHaveBeenCalledWith(owner.id);
+    expect(mocks.unlinkLease).toHaveBeenCalledWith('lease-1');
     expect(useOwnerStore.getState().owners).toEqual([]);
     expect(useOwnerStore.getState().leases).toEqual([]);
     expect(useOwnerStore.getState().contacts).toEqual([]);
@@ -244,6 +249,7 @@ describe('owner-store', () => {
           status: 'Active',
           docNo: '',
           notes: '',
+          jurisdiction: 'tx_fee',
           createdAt: '',
           updatedAt: '',
         },
@@ -260,5 +266,56 @@ describe('owner-store', () => {
     expect(mocks.clearLinkedLease).toHaveBeenCalledWith('lease-1');
     expect(mocks.unlinkLease).toHaveBeenCalledWith('lease-1');
     expect(useOwnerStore.getState().leases).toEqual([]);
+  });
+
+  it('refreshes linked lease nodes when a lease record is updated', async () => {
+    mocks.saveLease.mockResolvedValue(undefined);
+    useOwnerStore.setState({
+      workspaceId: 'ws-a',
+      owners: [],
+      leases: [
+        {
+          id: 'lease-1',
+          workspaceId: 'ws-a',
+          ownerId: 'owner-1',
+          leaseName: 'Old Lease Name',
+          lessee: 'Acme Energy',
+          royaltyRate: '1/4',
+          leasedInterest: '0.5',
+          effectiveDate: '',
+          expirationDate: '',
+          status: 'Active',
+          docNo: '12345',
+          notes: '',
+          jurisdiction: 'tx_fee',
+          createdAt: '',
+          updatedAt: '',
+        },
+      ],
+      contacts: [],
+      docs: [],
+      selectedOwnerId: null,
+      selectedOwnerTab: 'info',
+    });
+
+    await useOwnerStore.getState().updateLease('lease-1', {
+      leaseName: 'Updated Lease Name',
+      lessee: 'Bluebonnet Operating',
+    });
+
+    expect(mocks.saveLease).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'lease-1',
+        leaseName: 'Updated Lease Name',
+        lessee: 'Bluebonnet Operating',
+      })
+    );
+    expect(mocks.syncLeaseNodesFromRecord).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'lease-1',
+        leaseName: 'Updated Lease Name',
+        lessee: 'Bluebonnet Operating',
+      })
+    );
   });
 });

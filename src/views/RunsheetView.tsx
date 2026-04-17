@@ -4,12 +4,16 @@
  * Sortable by clicking column headers (instrument date or file date).
  * Shows every node including related documents (visually distinguished).
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { isLeaseNode } from '../components/deskmap/deskmap-lease-node';
+import OwnershipNodeEditorModals from '../components/shared/OwnershipNodeEditorModals';
 import { useWorkspaceStore } from '../store/workspace-store';
 import { formatAsFraction } from '../engine/fraction-display';
 import { d } from '../engine/decimal';
 import { downloadRunsheetWorkbook } from '../storage/runsheet-export';
 import type { OwnershipNode } from '../types/node';
+import type { NodeEditorRoute } from '../utils/node-editor-route';
+import { resolveNodeEditorRoute } from '../utils/node-editor-route';
 
 type SortField = 'date' | 'fileDate' | 'instrument' | 'grantor' | 'grantee';
 type SortDir = 'asc' | 'desc';
@@ -42,9 +46,13 @@ export default function RunsheetView() {
   const nodes = useWorkspaceStore((s) => s.nodes);
   const deskMaps = useWorkspaceStore((s) => s.deskMaps);
   const projectName = useWorkspaceStore((s) => s.projectName);
+  const setActiveNode = useWorkspaceStore((s) => s.setActiveNode);
   const [sortField, setSortField] = useState<SortField>('date');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
   const [tractFilter, setTractFilter] = useState<TractFilter>('all');
+  const [editorRoute, setEditorRoute] = useState<NodeEditorRoute | null>(null);
+  const [npriParentId, setNpriParentId] = useState<string | null>(null);
+  const [pdfViewNodeId, setPdfViewNodeId] = useState<string | null>(null);
 
   const tractOptions = useMemo(
     () =>
@@ -100,6 +108,19 @@ export default function RunsheetView() {
       tractLabel: activeTractLabel,
     });
   };
+
+  const handleOpenEditor = useCallback(
+    (node: OwnershipNode) => {
+      const route = resolveNodeEditorRoute(node);
+      if (!route) {
+        return;
+      }
+
+      setActiveNode(node.id);
+      setEditorRoute(route);
+    },
+    [setActiveNode]
+  );
 
   if (nodes.length === 0) {
     return (
@@ -166,6 +187,7 @@ export default function RunsheetView() {
             <th className="px-3 py-2 text-left text-[10px] font-semibold text-ink-light uppercase tracking-wider">Interest</th>
             <th className="px-3 py-2 text-left text-[10px] font-semibold text-ink-light uppercase tracking-wider">Land Desc.</th>
             <th className="px-3 py-2 text-left text-[10px] font-semibold text-ink-light uppercase tracking-wider">Remarks</th>
+            <th className="px-3 py-2 text-right text-[10px] font-semibold text-ink-light uppercase tracking-wider">Edit</th>
           </tr>
         </thead>
         <tbody>
@@ -200,11 +222,29 @@ export default function RunsheetView() {
                 <td className="px-3 py-2 text-xs text-ink-light truncate max-w-48">
                   {node.remarks || ''}
                 </td>
+                <td className="px-3 py-2 text-right">
+                  <button
+                    type="button"
+                    onClick={() => handleOpenEditor(node)}
+                    className="px-3 py-1.5 rounded-lg text-[11px] font-semibold text-leather hover:bg-leather/10 border border-ledger-line transition-colors"
+                  >
+                    {isLeaseNode(node) ? 'Edit Lease' : 'Edit'}
+                  </button>
+                </td>
               </tr>
             );
           })}
         </tbody>
       </table>
+
+      <OwnershipNodeEditorModals
+        route={editorRoute}
+        onSetRoute={setEditorRoute}
+        npriParentId={npriParentId}
+        onSetNpriParentId={setNpriParentId}
+        pdfViewNodeId={pdfViewNodeId}
+        onSetPdfViewNodeId={setPdfViewNodeId}
+      />
     </div>
   );
 }

@@ -43,6 +43,7 @@ describe('autosave-change-detection', () => {
         description: 'Unit description',
         operator: 'Operator A',
         effectiveDate: '2024-01-01',
+        jurisdiction: 'tx_fee' as const,
       },
       leaseholdAssignments: [
         {

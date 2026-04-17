@@ -143,9 +143,18 @@ export const useOwnerStore = create<OwnerState>()((set, get) => ({
   },
 
   removeOwner: async (id) => {
+    const ownedLeaseIds = get()
+      .leases.filter((lease) => lease.ownerId === id)
+      .map((lease) => lease.id);
     await deleteOwner(id);
     useWorkspaceStore.getState().clearLinkedOwner(id);
+    ownedLeaseIds.forEach((leaseId) => {
+      useWorkspaceStore.getState().clearLinkedLease(leaseId);
+    });
     await useMapStore.getState().unlinkOwner(id);
+    await Promise.all(
+      ownedLeaseIds.map((leaseId) => useMapStore.getState().unlinkLease(leaseId))
+    );
     set((state) => ({
       owners: state.owners.filter((owner) => owner.id !== id),
       leases: state.leases.filter((lease) => lease.ownerId !== id),
@@ -178,6 +187,7 @@ export const useOwnerStore = create<OwnerState>()((set, get) => ({
       }
     );
     await saveLease(next);
+    useWorkspaceStore.getState().syncLeaseNodesFromRecord(next);
     set((state) => ({
       leases: state.leases.map((lease) => (lease.id === id ? next : lease)),
     }));

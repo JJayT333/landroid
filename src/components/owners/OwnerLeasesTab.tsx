@@ -1,9 +1,20 @@
 import { useState } from 'react';
 import FormField from '../shared/FormField';
-import { createBlankLease, normalizeLease, type Lease } from '../../types/owner';
-import { d } from '../../engine/decimal';
+import {
+  LEASE_STATUS_OPTIONS,
+  createBlankLease,
+  isLeaseStatusOption,
+  normalizeLease,
+  type Lease,
+} from '../../types/owner';
+import { d, serialize } from '../../engine/decimal';
 import { formatAsFraction } from '../../engine/fraction-display';
-import { normalizeInterestString, parseInterestString } from '../../utils/interest-string';
+import {
+  normalizeInterestString,
+  parseInterestString,
+  parseStrictInterestString,
+} from '../../utils/interest-string';
+import type { OwnerLeaseDeskMapTarget } from './owner-lease-deskmap';
 
 interface OwnerLeasesTabProps {
   workspaceId: string;
@@ -12,6 +23,11 @@ interface OwnerLeasesTabProps {
   onAdd: (lease: Lease) => Promise<void>;
   onUpdate: (id: string, fields: Partial<Lease>) => Promise<void>;
   onRemove: (id: string) => Promise<void>;
+  getDeskMapTargetsForLease: (leaseId: string) => OwnerLeaseDeskMapTarget[];
+  onOpenDeskMapLeaseTarget: (
+    lease: Lease,
+    target: OwnerLeaseDeskMapTarget
+  ) => void;
 }
 
 export default function OwnerLeasesTab({
@@ -21,19 +37,25 @@ export default function OwnerLeasesTab({
   onAdd,
   onUpdate,
   onRemove,
+  getDeskMapTargetsForLease,
+  onOpenDeskMapLeaseTarget,
 }: OwnerLeasesTabProps) {
   const [draft, setDraft] = useState<Lease | null>(null);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const beginAdd = () => {
+    setSaveError(null);
     setDraft(createBlankLease(workspaceId, ownerId));
   };
 
   const beginEdit = (lease: Lease) => {
+    setSaveError(null);
     setDraft(normalizeLease(lease, { workspaceId, ownerId }));
   };
 
   const set = (field: keyof Lease, value: string) => {
+    setSaveError(null);
     setDraft((current) => (current ? { ...current, [field]: value } : current));
   };
 
@@ -45,6 +67,12 @@ export default function OwnerLeasesTab({
 
     return formatAsFraction(d(parseInterestString(normalized)));
   };
+
+  const statusOptions = draft
+    ? (isLeaseStatusOption(draft.status)
+      ? [...LEASE_STATUS_OPTIONS]
+      : [draft.status, ...LEASE_STATUS_OPTIONS])
+    : [...LEASE_STATUS_OPTIONS];
 
   return (
     <div className="space-y-4">
@@ -83,11 +111,22 @@ export default function OwnerLeasesTab({
               value={draft.expirationDate}
               onChange={(value) => set('expirationDate', value)}
             />
-            <FormField
-              label="Status"
-              value={draft.status}
-              onChange={(value) => set('status', value)}
-            />
+            <div>
+              <label className="text-[10px] text-ink-light uppercase tracking-wider block mb-1">
+                Status
+              </label>
+              <select
+                value={draft.status}
+                onChange={(event) => set('status', event.target.value)}
+                className="w-full px-3 py-2 rounded-lg border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none"
+              >
+                {statusOptions.map((status) => (
+                  <option key={status} value={status}>
+                    {isLeaseStatusOption(status) ? status : `${status} (legacy)`}
+                  </option>
+                ))}
+              </select>
+            </div>
             <FormField
               label="Doc #"
               value={draft.docNo}
@@ -107,10 +146,19 @@ export default function OwnerLeasesTab({
             />
           </div>
 
+          {saveError && (
+            <div className="rounded-lg border border-seal/30 bg-seal/10 px-3 py-2 text-xs text-seal">
+              {saveError}
+            </div>
+          )}
+
           <div className="flex justify-end gap-2">
             <button
               type="button"
-              onClick={() => setDraft(null)}
+              onClick={() => {
+                setSaveError(null);
+                setDraft(null);
+              }}
               className="px-3 py-2 rounded-lg text-sm text-ink-light hover:bg-parchment-dark transition-colors"
             >
               Cancel
@@ -119,11 +167,37 @@ export default function OwnerLeasesTab({
               type="button"
               disabled={saving}
               onClick={async () => {
+                // Strict-parse both interest fields BEFORE saving. A blank value is a
+                // legal "not entered yet" state and parses as Decimal(0); a typo like
+                // "abc" or "1/0" returns null and blocks the save with an inline error.
+                // This closes audit finding #4 — the silent-zero bug on malformed input.
+                const parsedRoyalty = parseStrictInterestString(draft.royaltyRate);
+                if (parsedRoyalty === null) {
+                  setSaveError(
+                    'Royalty must be a fraction (e.g. 1/8), a decimal (e.g. 0.125), or blank.'
+                  );
+                  return;
+                }
+                const parsedLeasedInterest = parseStrictInterestString(draft.leasedInterest);
+                if (parsedLeasedInterest === null) {
+                  setSaveError(
+                    'Leased Interest must be a fraction (e.g. 1/2), a decimal (e.g. 0.5), or blank.'
+                  );
+                  return;
+                }
+
+                setSaveError(null);
                 setSaving(true);
+                // Preserve the user's raw royalty text (1/8 stays 1/8, not 0.125) — the
+                // parse above is a validator only. Leased Interest normalizes to a
+                // serialized decimal to match existing storage format.
+                const trimmedLeasedInterest = draft.leasedInterest.trim();
                 const normalizedDraft = {
                   ...draft,
                   royaltyRate: draft.royaltyRate.trim(),
-                  leasedInterest: normalizeInterestString(draft.leasedInterest),
+                  leasedInterest: trimmedLeasedInterest.length === 0
+                    ? ''
+                    : serialize(parsedLeasedInterest),
                 };
                 if (leases.some((lease) => lease.id === draft.id)) {
                   await onUpdate(draft.id, normalizedDraft);
@@ -161,6 +235,11 @@ export default function OwnerLeasesTab({
             key={lease.id}
             className="rounded-xl border border-ledger-line bg-parchment px-4 py-3"
           >
+            {(() => {
+              const deskMapTargets = getDeskMapTargetsForLease(lease.id);
+
+              return (
+                <>
             <div className="flex items-start justify-between gap-3">
               <div className="space-y-1">
                 <div className="text-sm font-semibold text-ink">
@@ -218,6 +297,36 @@ export default function OwnerLeasesTab({
                 </button>
               </div>
             </div>
+                  <div className="mt-3 pt-3 border-t border-ledger-line/70">
+                    <div className="text-[10px] font-semibold uppercase tracking-wider text-ink-light">
+                      Desk Map Lease Node
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {deskMapTargets.length > 0 ? (
+                        deskMapTargets.map((target) => (
+                          <button
+                            key={`${lease.id}-${target.parentNodeId}`}
+                            type="button"
+                            onClick={() => onOpenDeskMapLeaseTarget(lease, target)}
+                            className="px-3 py-1.5 rounded-lg text-xs font-semibold text-emerald-900 hover:bg-emerald-100 border border-emerald-300 transition-colors"
+                          >
+                            {target.leaseNodeId ? 'Open' : 'Create'} {target.deskMapName}
+                          </button>
+                        ))
+                      ) : (
+                        <button
+                          type="button"
+                          disabled
+                          className="px-3 py-1.5 rounded-lg text-xs font-semibold text-ink-light border border-ledger-line opacity-70 cursor-not-allowed"
+                        >
+                          Link Owner In Desk Map First
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </>
+              );
+            })()}
           </div>
         ))}
       </div>

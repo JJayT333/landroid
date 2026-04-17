@@ -1,7 +1,7 @@
 /**
  * Workspace persistence — auto-save to IndexedDB, export/import .landroid files.
  */
-import db from './db';
+import db, { type PdfAttachment } from './db';
 import { deserializeBlob, serializeBlob, type SerializedBlob } from './blob-serialization';
 import { PAGE_SIZE_DEFINITIONS } from '../engine/flowchart-pages';
 import { Decimal } from '../engine/decimal';
@@ -35,10 +35,23 @@ import {
   type MapExternalReference,
   type MapRegion,
 } from '../types/map';
-import type { ResearchImport } from '../types/research';
+import {
+  normalizeResearchFormula,
+  normalizeResearchProjectRecord,
+  normalizeResearchQuestion,
+  normalizeResearchSource,
+  sanitizeResearchLinks,
+  type ResearchFormula,
+  type ResearchImport,
+  type ResearchProjectRecord,
+  type ResearchQuestion,
+  type ResearchSource,
+} from '../types/research';
 import type { OwnerWorkspaceData } from './owner-persistence';
 import type { MapWorkspaceData } from './map-persistence';
 import type { ResearchWorkspaceData } from './research-persistence';
+import type { CurativeWorkspaceData } from './curative-persistence';
+import { normalizeTitleIssues, type TitleIssue } from '../types/title-issue';
 
 const WORKSPACE_ID = 'default';
 const PAGE_SIZE_ID_SET = new Set<PageSizeId>(
@@ -60,9 +73,11 @@ export interface WorkspaceData {
 
 export interface LandroidFileData extends WorkspaceData {
   canvas?: CanvasSaveData | null;
+  pdfData?: PdfWorkspaceData;
   ownerData?: OwnerWorkspaceData;
   mapData?: MapWorkspaceData;
   researchData?: ResearchWorkspaceData;
+  curativeData?: CurativeWorkspaceData;
 }
 
 export interface WorkspaceLoadResult {
@@ -72,6 +87,14 @@ export interface WorkspaceLoadResult {
 }
 
 interface SerializedOwnerDoc extends Omit<OwnerDoc, 'blob'> {
+  blob: SerializedBlob;
+}
+
+export interface PdfWorkspaceData {
+  pdfs: PdfAttachment[];
+}
+
+interface SerializedPdfAttachment extends Omit<PdfAttachment, 'blob'> {
   blob: SerializedBlob;
 }
 
@@ -86,6 +109,14 @@ interface SerializedMapExternalReference extends MapExternalReference {}
 interface SerializedResearchImport extends Omit<ResearchImport, 'blob'> {
   blob: SerializedBlob;
 }
+
+interface SerializedResearchSource extends ResearchSource {}
+
+interface SerializedResearchFormula extends ResearchFormula {}
+
+interface SerializedResearchProjectRecord extends ResearchProjectRecord {}
+
+interface SerializedResearchQuestion extends ResearchQuestion {}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -147,6 +178,11 @@ function normalizeDeskMaps(
         nodeIds: readStringArray(candidate.nodeIds).filter((nodeId) =>
           nodeIdSet.has(nodeId)
         ),
+        // Pre-overhaul `.landroid` files predate the Raven Forest pooled-unit
+        // grouping and will not carry these keys. `normalizeDeskMap` drops
+        // them when absent, so the pass-through is safe for backward compat.
+        unitName: candidate.unitName,
+        unitCode: candidate.unitCode,
       }),
     ];
   });
@@ -295,6 +331,71 @@ function normalizeWorkspaceDataRecord(
   };
 }
 
+function sanitizeTitleIssueLinks(
+  titleIssues: TitleIssue[],
+  context: {
+    deskMaps: DeskMap[];
+    nodes: OwnershipNode[];
+    ownerIds: Set<string>;
+    leaseOwnerIds: Map<string, string>;
+  }
+): TitleIssue[] {
+  const validDeskMapIds = new Set(context.deskMaps.map((deskMap) => deskMap.id));
+  const validNodeIds = new Set(context.nodes.map((node) => node.id));
+  const nodeDeskMapIds = new Map<string, Set<string>>();
+
+  context.deskMaps.forEach((deskMap) => {
+    deskMap.nodeIds.forEach((nodeId) => {
+      const deskMapIds = nodeDeskMapIds.get(nodeId) ?? new Set<string>();
+      deskMapIds.add(deskMap.id);
+      nodeDeskMapIds.set(nodeId, deskMapIds);
+    });
+  });
+
+  return titleIssues.map((issue) => {
+    const affectedDeskMapId =
+      issue.affectedDeskMapId && validDeskMapIds.has(issue.affectedDeskMapId)
+        ? issue.affectedDeskMapId
+        : null;
+    let affectedNodeId =
+      issue.affectedNodeId && validNodeIds.has(issue.affectedNodeId)
+        ? issue.affectedNodeId
+        : null;
+    const affectedOwnerId =
+      issue.affectedOwnerId && context.ownerIds.has(issue.affectedOwnerId)
+        ? issue.affectedOwnerId
+        : null;
+    let affectedLeaseId =
+      issue.affectedLeaseId && context.leaseOwnerIds.has(issue.affectedLeaseId)
+        ? issue.affectedLeaseId
+        : null;
+
+    if (
+      affectedDeskMapId &&
+      affectedNodeId &&
+      !nodeDeskMapIds.get(affectedNodeId)?.has(affectedDeskMapId)
+    ) {
+      affectedNodeId = null;
+    }
+
+    if (
+      affectedOwnerId &&
+      affectedLeaseId &&
+      context.leaseOwnerIds.get(affectedLeaseId) !== affectedOwnerId
+    ) {
+      affectedLeaseId = null;
+    }
+
+    return {
+      ...issue,
+      affectedDeskMapId,
+      affectedNodeId,
+      affectedOwnerId,
+      affectedLeaseId,
+    };
+  });
+}
+
 export function parsePersistedWorkspaceData(raw: string): WorkspaceData {
   let parsed: unknown;
 
@@ -376,6 +477,26 @@ async function serializeOwnerData(
   };
 }
 
+async function serializePdfData(
+  pdfData: PdfWorkspaceData | undefined
+): Promise<
+  | undefined
+  | {
+      pdfs: SerializedPdfAttachment[];
+    }
+> {
+  if (!pdfData) return undefined;
+
+  return {
+    pdfs: await Promise.all(
+      pdfData.pdfs.map(async (pdf) => ({
+        ...pdf,
+        blob: await serializeBlob(pdf.blob),
+      }))
+    ),
+  };
+}
+
 async function serializeMapData(
   mapData: MapWorkspaceData | undefined
 ): Promise<
@@ -406,6 +527,10 @@ async function serializeResearchData(
   | undefined
   | {
       imports: SerializedResearchImport[];
+      sources: SerializedResearchSource[];
+      formulas: SerializedResearchFormula[];
+      projectRecords: SerializedResearchProjectRecord[];
+      questions: SerializedResearchQuestion[];
     }
 > {
   if (!researchData) return undefined;
@@ -417,14 +542,19 @@ async function serializeResearchData(
         blob: await serializeBlob(researchImport.blob),
       }))
     ),
+    sources: researchData.sources,
+    formulas: researchData.formulas,
+    projectRecords: researchData.projectRecords,
+    questions: researchData.questions,
   };
 }
 
 export async function exportLandroidFile(data: LandroidFileData): Promise<Blob> {
   const payload = {
-    version: 5,
+    version: 7,
     exportedAt: new Date().toISOString(),
     ...data,
+    pdfData: await serializePdfData(data.pdfData),
     ownerData: await serializeOwnerData(data.ownerData),
     mapData: await serializeMapData(data.mapData),
     researchData: await serializeResearchData(data.researchData),
@@ -441,6 +571,42 @@ export async function downloadLandroidFile(data: LandroidFileData) {
   a.download = `${data.projectName || 'workspace'}.landroid`;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+export async function exportPdfWorkspaceData(
+  nodes: OwnershipNode[]
+): Promise<PdfWorkspaceData> {
+  const nodeIds = [
+    ...new Set(
+      nodes
+        .filter((node) => node.hasDoc)
+        .map((node) => node.id)
+    ),
+  ];
+  const pdfs = (
+    await Promise.all(nodeIds.map((nodeId) => db.pdfs.get(nodeId)))
+  ).filter(
+    (pdf): pdf is PdfAttachment => Boolean(pdf && pdf.blob.size > 0)
+  );
+
+  return { pdfs };
+}
+
+export async function replacePdfWorkspaceData(
+  data: PdfWorkspaceData,
+  nodes: OwnershipNode[]
+): Promise<void> {
+  const validNodeIds = new Set(nodes.map((node) => node.id));
+  const pdfs = data.pdfs.filter(
+    (pdf) => validNodeIds.has(pdf.nodeId) && pdf.blob.size > 0
+  );
+
+  await db.transaction('rw', db.pdfs, async () => {
+    await db.pdfs.bulkDelete([...validNodeIds]);
+    if (pdfs.length > 0) {
+      await db.pdfs.bulkPut(pdfs);
+    }
+  });
 }
 
 // ── Import .landroid file ──────────────────────────────
@@ -553,31 +719,194 @@ export async function importLandroidFile(file: File): Promise<LandroidFileData> 
         }
       : { mapAssets: [], mapRegions: [], mapReferences: [] };
 
-  const researchData =
-    isRecord(parsed.researchData)
+  const researchImports =
+    isRecord(parsed.researchData) && Array.isArray(parsed.researchData.imports)
+      ? parsed.researchData.imports
+          .filter(
+            (researchImport): researchImport is SerializedResearchImport =>
+              isRecord(researchImport) && typeof researchImport.id === 'string'
+          )
+          .map((researchImport) => ({
+            ...researchImport,
+            workspaceId:
+              typeof researchImport.workspaceId === 'string'
+                ? researchImport.workspaceId
+                : workspaceId,
+            blob: deserializeSerializedBlob(researchImport.blob),
+          }))
+      : [];
+  const researchSources =
+    isRecord(parsed.researchData) && Array.isArray(parsed.researchData.sources)
+      ? parsed.researchData.sources
+          .filter(
+            (source): source is SerializedResearchSource =>
+              isRecord(source) && typeof source.id === 'string'
+          )
+          .map((source) =>
+            normalizeResearchSource({
+              ...source,
+              workspaceId:
+                typeof source.workspaceId === 'string' ? source.workspaceId : workspaceId,
+            })
+          )
+      : [];
+  const researchFormulas =
+    isRecord(parsed.researchData) && Array.isArray(parsed.researchData.formulas)
+      ? parsed.researchData.formulas
+          .filter(
+            (formula): formula is SerializedResearchFormula =>
+              isRecord(formula) && typeof formula.id === 'string'
+          )
+          .map((formula) =>
+            normalizeResearchFormula({
+              ...formula,
+              workspaceId:
+                typeof formula.workspaceId === 'string'
+                  ? formula.workspaceId
+                  : workspaceId,
+            })
+          )
+      : [];
+  const researchProjectRecords =
+    isRecord(parsed.researchData) && Array.isArray(parsed.researchData.projectRecords)
+      ? parsed.researchData.projectRecords
+          .filter(
+            (projectRecord): projectRecord is SerializedResearchProjectRecord =>
+              isRecord(projectRecord) && typeof projectRecord.id === 'string'
+          )
+          .map((projectRecord) =>
+            normalizeResearchProjectRecord({
+              ...projectRecord,
+              workspaceId:
+                typeof projectRecord.workspaceId === 'string'
+                  ? projectRecord.workspaceId
+                  : workspaceId,
+            })
+          )
+      : [];
+  const researchQuestions =
+    isRecord(parsed.researchData) && Array.isArray(parsed.researchData.questions)
+      ? parsed.researchData.questions
+          .filter(
+            (question): question is SerializedResearchQuestion =>
+              isRecord(question) && typeof question.id === 'string'
+          )
+          .map((question) =>
+            normalizeResearchQuestion({
+              ...question,
+              workspaceId:
+                typeof question.workspaceId === 'string'
+                  ? question.workspaceId
+                  : workspaceId,
+            })
+          )
+      : [];
+  const sanitizedResearchLinks = sanitizeResearchLinks(
+    {
+      sources: researchSources,
+      formulas: researchFormulas,
+      projectRecords: researchProjectRecords,
+      questions: researchQuestions,
+    },
+    {
+      deskMapIds: new Set(core.deskMaps.map((deskMap) => deskMap.id)),
+      nodeIds: new Set(core.nodes.map((node) => node.id)),
+      ownerIds: new Set(
+        ownerData.owners
+          .filter((owner) => isRecord(owner) && typeof owner.id === 'string')
+          .map((owner) => owner.id)
+      ),
+      leaseIds: new Set(ownerData.leases.map((lease) => lease.id)),
+      mapAssetIds: new Set(mapData.mapAssets.map((asset) => asset.id)),
+      mapRegionIds: new Set(mapData.mapRegions.map((region) => region.id)),
+      importIds: new Set(researchImports.map((researchImport) => researchImport.id)),
+      sourceIds: new Set(researchSources.map((source) => source.id)),
+      formulaIds: new Set(researchFormulas.map((formula) => formula.id)),
+      projectRecordIds: new Set(
+        researchProjectRecords.map((projectRecord) => projectRecord.id)
+      ),
+    }
+  );
+  const researchData = {
+    imports: researchImports,
+    ...sanitizedResearchLinks,
+  };
+
+  const pdfData =
+    isRecord(parsed.pdfData)
       ? {
-          imports: Array.isArray(parsed.researchData.imports)
-            ? parsed.researchData.imports
+          pdfs: Array.isArray(parsed.pdfData.pdfs)
+            ? parsed.pdfData.pdfs
                 .filter(
-                  (researchImport): researchImport is SerializedResearchImport =>
-                    isRecord(researchImport) && typeof researchImport.id === 'string'
+                  (pdf): pdf is SerializedPdfAttachment =>
+                    isRecord(pdf) && typeof pdf.nodeId === 'string'
                 )
-                .map((researchImport) => ({
-                  ...researchImport,
-                  workspaceId:
-                    typeof researchImport.workspaceId === 'string'
-                      ? researchImport.workspaceId
-                      : workspaceId,
-                  blob: deserializeSerializedBlob(researchImport.blob),
+                .map((pdf) => ({
+                  nodeId: pdf.nodeId,
+                  fileName: typeof pdf.fileName === 'string' ? pdf.fileName : '',
+                  mimeType:
+                    typeof pdf.mimeType === 'string'
+                      ? pdf.mimeType
+                      : 'application/pdf',
+                  blob: deserializeSerializedBlob(pdf.blob, 'application/pdf'),
+                  createdAt:
+                    typeof pdf.createdAt === 'string'
+                      ? pdf.createdAt
+                      : new Date().toISOString(),
                 }))
+                .filter((pdf) => pdf.blob.size > 0)
             : [],
         }
-      : { imports: [] };
+      : { pdfs: [] };
+  const pdfFileNameByNodeId = new Map(
+    pdfData.pdfs.map((pdf) => [pdf.nodeId, pdf.fileName] as const)
+  );
+  const pdfNodeIds = new Set(pdfFileNameByNodeId.keys());
+  const nodes = core.nodes.map((node) => {
+    if (node.hasDoc && !pdfNodeIds.has(node.id)) {
+      return { ...node, hasDoc: false, docFileName: '' };
+    }
+
+    if (node.hasDoc && !node.docFileName) {
+      return {
+        ...node,
+        docFileName: pdfFileNameByNodeId.get(node.id) ?? '',
+      };
+    }
+
+    return node;
+  });
+
+  const curativeData =
+    isRecord(parsed.curativeData)
+      ? {
+          titleIssues: sanitizeTitleIssueLinks(
+            normalizeTitleIssues(parsed.curativeData.titleIssues, {
+              workspaceId,
+            }),
+            {
+              deskMaps: core.deskMaps,
+              nodes,
+              ownerIds: new Set(
+                ownerData.owners
+                  .filter((owner) => isRecord(owner) && typeof owner.id === 'string')
+                  .map((owner) => owner.id)
+              ),
+              leaseOwnerIds: new Map(
+                ownerData.leases.map((lease) => [lease.id, lease.ownerId])
+              ),
+            }
+          ),
+        }
+      : { titleIssues: [] };
   return {
     ...core,
+    nodes,
     canvas: normalizeCanvasSaveData(parsed.canvas),
+    pdfData,
     ownerData,
     mapData,
     researchData,
+    curativeData,
   };
 }

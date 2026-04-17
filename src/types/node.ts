@@ -5,6 +5,26 @@ export type SplitBasis = 'initial' | 'remaining' | 'whole';
 export type NodeType = 'conveyance' | 'related';
 export type RelatedNodeKind = 'document' | 'lease';
 export type InterestClass = 'mineral' | 'npri';
+export type FixedRoyaltyBasis = 'burdened_branch' | 'whole_tract' | null;
+/**
+ * NPRI royalty characterization (audit finding #5).
+ *
+ * `'fixed'` — a fixed share of production; does not scale with the lease royalty.
+ * `'floating'` — a fraction of whatever lease royalty is later negotiated.
+ * `null`   — not an NPRI (mineral nodes always carry `null`).
+ *
+ * LANDroid stores this value on the NPRI node, propagates it through
+ * conveyances and predecessor inserts, and now consumes it in leasehold payout
+ * math:
+ * - floating NPRIs multiply against the burdened branch's lease royalty
+ * - fixed NPRIs now also carry a deed-basis discriminator so LANDroid can tell
+ *   whether the entered fraction is of the burdened branch or of the whole
+ *   tract share carried by that branch
+ *
+ * The title-tree math is still mineral-only: NPRIs remain sibling burdens and
+ * do not reduce mineral coverage totals on Desk Map. See
+ * `LANDMAN-MATH-REFERENCE.md` → "NPRI handling".
+ */
 export type RoyaltyKind = 'fixed' | 'floating' | null;
 
 export interface OwnershipNode {
@@ -44,15 +64,36 @@ export interface OwnershipNode {
 
   // Attachment
   hasDoc: boolean;
+  docFileName: string;
   linkedOwnerId: string | null;
   linkedLeaseId: string | null;
   relatedKind: RelatedNodeKind | null;
   interestClass: InterestClass;
+  /** See `RoyaltyKind` — stored on the node and consumed by leasehold payout math. */
   royaltyKind: RoyaltyKind;
+  /**
+   * Fixed-NPRI deed basis:
+   * - `burdened_branch` means the fixed fraction is read as a share of the
+   *   burdened branch's mineral interest
+   * - `whole_tract` means the fixed fraction is already a share of whole tract
+   *   production carried by that burdened branch
+   * - `null` means not applicable (mineral nodes and floating NPRIs)
+   */
+  fixedRoyaltyBasis: FixedRoyaltyBasis;
 
   // UI state
   isCollapsed: boolean;
 }
+
+/**
+ * Pooled-unit grouping fields (`unitName`, `unitCode`) are optional and only
+ * surfaced by the Raven Forest demo seed today. Real-world workspaces may not
+ * carry them, so the DeskMap normalizer passes them through when present and
+ * drops them otherwise — pre-overhaul `.landroid` files continue to load
+ * cleanly. `unitCode` is intentionally narrowed to `'A' | 'B'`; broadening
+ * comes with Phase 4+ scope work, not here.
+ */
+export type DeskMapUnitCode = 'A' | 'B';
 
 export interface DeskMap {
   id: string;
@@ -63,6 +104,8 @@ export interface DeskMap {
   pooledAcres: string;
   description: string;
   nodeIds: string[];
+  unitName?: string;
+  unitCode?: DeskMapUnitCode;
 }
 
 function normalizeText(value: unknown): string {
@@ -124,6 +167,25 @@ function normalizeRoyaltyKind(value: unknown): RoyaltyKind {
   return null;
 }
 
+function normalizeFixedRoyaltyBasis(value: unknown): FixedRoyaltyBasis {
+  if (value === 'whole_tract' || value === 'burdened_branch') {
+    return value;
+  }
+  return null;
+}
+
+function normalizeUnitCode(value: unknown): DeskMapUnitCode | undefined {
+  return value === 'A' || value === 'B' ? value : undefined;
+}
+
+function normalizeUnitName(value: unknown): string | undefined {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
 function normalizeAcreage(value: unknown): string {
   if (typeof value === 'number') {
     return Number.isFinite(value) && value >= 0 ? value.toString() : '';
@@ -144,15 +206,25 @@ function normalizeAcreage(value: unknown): string {
 
 export function normalizeDeskMap(
   deskMap: Pick<DeskMap, 'id'> &
-    Partial<Omit<DeskMap, 'grossAcres' | 'pooledAcres' | 'description' | 'nodeIds'>> & {
+    Partial<
+      Omit<
+        DeskMap,
+        'grossAcres' | 'pooledAcres' | 'description' | 'nodeIds' | 'unitName' | 'unitCode'
+      >
+    > & {
       grossAcres?: unknown;
       pooledAcres?: unknown;
       description?: unknown;
       nodeIds?: unknown;
+      unitName?: unknown;
+      unitCode?: unknown;
     },
   fallbackName = 'Untitled Tract'
 ): DeskMap {
-  return {
+  const unitName = normalizeUnitName(deskMap.unitName);
+  const unitCode = normalizeUnitCode(deskMap.unitCode);
+
+  const base: DeskMap = {
     id: deskMap.id,
     name:
       typeof deskMap.name === 'string' && deskMap.name.trim().length > 0
@@ -168,6 +240,19 @@ export function normalizeDeskMap(
       ? deskMap.nodeIds.filter((nodeId): nodeId is string => typeof nodeId === 'string')
       : [],
   };
+
+  // Only attach the optional unit fields when present so that serialized
+  // output for pre-overhaul workspaces stays byte-identical (the keys never
+  // appear), which matters for workspace-persistence round-trip tests and for
+  // diff-friendly JSON exports.
+  if (unitName !== undefined) {
+    base.unitName = unitName;
+  }
+  if (unitCode !== undefined) {
+    base.unitCode = unitCode;
+  }
+
+  return base;
 }
 
 /** Factory for a blank node with defaults. */
@@ -197,11 +282,13 @@ export function createBlankNode(id: string, parentId: string | null = null): Own
     obituary: '',
     graveyardLink: '',
     hasDoc: false,
+    docFileName: '',
     linkedOwnerId: null,
     linkedLeaseId: null,
     relatedKind: null,
     interestClass: 'mineral',
     royaltyKind: null,
+    fixedRoyaltyBasis: null,
     isCollapsed: false,
   };
 }
@@ -209,6 +296,15 @@ export function createBlankNode(id: string, parentId: string | null = null): Own
 export function normalizeOwnershipNode(
   node: Pick<OwnershipNode, 'id'> & Partial<OwnershipNode>
 ): OwnershipNode {
+  const interestClass = normalizeInterestClass(node.interestClass);
+  const royaltyKind = normalizeRoyaltyKind(node.royaltyKind);
+  const splitBasis = normalizeSplitBasis(node.splitBasis);
+  const explicitFixedRoyaltyBasis = normalizeFixedRoyaltyBasis(node.fixedRoyaltyBasis);
+  const fixedRoyaltyBasis =
+    interestClass === 'npri' && royaltyKind === 'fixed'
+      ? explicitFixedRoyaltyBasis ?? (splitBasis === 'whole' ? 'whole_tract' : 'burdened_branch')
+      : null;
+
   return {
     ...createBlankNode(node.id, node.parentId ?? null),
     id: node.id,
@@ -227,7 +323,7 @@ export function normalizeOwnershipNode(
     initialFraction: normalizeDecimalInput(node.initialFraction, '0'),
     parentId: typeof node.parentId === 'string' ? node.parentId : null,
     conveyanceMode: normalizeConveyanceMode(node.conveyanceMode),
-    splitBasis: normalizeSplitBasis(node.splitBasis),
+    splitBasis,
     numerator: normalizeDecimalInput(node.numerator, '0'),
     denominator: normalizeDecimalInput(node.denominator, '1'),
     manualAmount: normalizeDecimalInput(node.manualAmount, '0'),
@@ -235,11 +331,13 @@ export function normalizeOwnershipNode(
     obituary: normalizeText(node.obituary),
     graveyardLink: normalizeText(node.graveyardLink),
     hasDoc: node.hasDoc === true,
+    docFileName: normalizeText(node.docFileName),
     linkedOwnerId: node.linkedOwnerId ?? null,
     linkedLeaseId: node.linkedLeaseId ?? null,
     relatedKind: normalizeRelatedKind(node.relatedKind),
-    interestClass: normalizeInterestClass(node.interestClass),
-    royaltyKind: normalizeRoyaltyKind(node.royaltyKind),
+    interestClass,
+    royaltyKind,
+    fixedRoyaltyBasis,
     isCollapsed: node.isCollapsed === true,
   };
 }
