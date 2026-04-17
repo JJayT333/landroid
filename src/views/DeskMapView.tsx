@@ -487,6 +487,9 @@ export default function DeskMapView() {
   const [pdfViewNodeId, setPdfViewNodeId] = useState<string | null>(null);
   const [ownerSearchQuery, setOwnerSearchQuery] = useState('');
   const [ownerSearchMatchIndex, setOwnerSearchMatchIndex] = useState(0);
+  // Phase 7 polish: collapsible toolbar so the canvas stays unobstructed once
+  // the landman knows the controls.
+  const [toolbarCollapsed, setToolbarCollapsed] = useState(false);
 
   const hydrated = useWorkspaceStore((s) => s._hydrated);
 
@@ -719,18 +722,47 @@ export default function DeskMapView() {
 
       <div className="flex-1 relative overflow-hidden bg-canvas-bg">
         {/* Toolbar */}
-        <div className="absolute top-3 left-3 z-20 w-[19.5rem] max-w-[calc(100%-1.5rem)] space-y-2.5 rounded-xl bg-parchment/92 backdrop-blur border border-ledger-line shadow-md p-2.5">
+        <div
+          className={`absolute top-3 left-3 z-20 max-w-[calc(100%-1.5rem)] rounded-xl bg-parchment/92 backdrop-blur border border-ledger-line shadow-md ${
+            toolbarCollapsed ? 'w-auto p-2' : 'w-[19.5rem] p-2.5 space-y-2.5'
+          }`}
+        >
           <div className="flex items-center gap-2">
             <button
-              onClick={handleAddRoot}
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold text-leather hover:bg-leather/10 transition-colors"
+              type="button"
+              onClick={() => setToolbarCollapsed((prev) => !prev)}
+              className="rounded-md border border-ledger-line bg-parchment px-1.5 py-1 text-[10px] font-semibold text-ink-light hover:bg-parchment-dark/70 transition-colors"
+              title={
+                toolbarCollapsed
+                  ? 'Expand Desk Map toolbar'
+                  : 'Collapse Desk Map toolbar to free canvas space'
+              }
+              aria-label={toolbarCollapsed ? 'Expand toolbar' : 'Collapse toolbar'}
             >
-              + Add Root
+              {toolbarCollapsed ? '▸' : '▾'}
             </button>
+            {!toolbarCollapsed && (
+              <button
+                onClick={handleAddRoot}
+                className="px-3 py-1.5 rounded-lg text-xs font-semibold text-leather hover:bg-leather/10 transition-colors"
+              >
+                + Add Root
+              </button>
+            )}
             <span className="text-[10px] text-ink-light font-mono">
               {visibleCardCount} cards
             </span>
+            {!toolbarCollapsed && (
+              <span
+                className="ml-auto text-[12px] text-ink-light cursor-help"
+                title="Toolbar — add roots, search owners, and review tract coverage. Click ▾ to collapse."
+              >
+                ℹ
+              </span>
+            )}
           </div>
+          {!toolbarCollapsed && (
+          <>
           <div className="text-[9px] leading-tight text-ink-light">
             Add more than one root when title starts from separate families. Temporary
             coverage over 100% is okay until you reconcile farther back in title.
@@ -891,6 +923,8 @@ export default function DeskMapView() {
               <span>{coverageSummary.leasedOwnerCount} leased</span>
             </div>
           </div>
+          </>
+          )}
         </div>
 
         {visibleNodes.length === 0 ? (
