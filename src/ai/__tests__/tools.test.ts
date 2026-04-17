@@ -11,12 +11,22 @@ function deskMap(overrides: Partial<DeskMap>): DeskMap {
     id: 'dm-1',
     name: 'Tract 1',
     code: 'T1',
+    tractId: null,
     grossAcres: '100',
     pooledAcres: '100',
     description: '',
     nodeIds: [],
     ...overrides,
   };
+}
+
+async function runTool<Tool extends { execute?: (...args: never[]) => unknown }>(
+  tool: Tool,
+  args: unknown
+): Promise<any> {
+  // Tools can technically stream; in tests we always await a concrete value.
+  const exec = tool.execute as (a: unknown, o: unknown) => Promise<unknown>;
+  return await exec(args, {} as never);
 }
 
 describe('AI tools — read-only project queries', () => {
@@ -45,7 +55,7 @@ describe('AI tools — read-only project queries', () => {
       ],
     });
 
-    const result = await landroidTools.getProjectSummary.execute!({}, {} as never);
+    const result = await runTool(landroidTools.getProjectSummary, {});
     expect(result).toMatchObject({
       projectName: 'Test Project',
       deskMapCount: 1,
@@ -68,7 +78,7 @@ describe('AI tools — read-only project queries', () => {
       ],
     });
 
-    const result = await landroidTools.listDeskMaps.execute!({}, {} as never);
+    const result = await runTool(landroidTools.listDeskMaps, {});
     expect(result).toHaveLength(2);
     expect(result[0]).toMatchObject({ id: 'dm-1', nodeCount: 2 });
     expect(result[1]).toMatchObject({ id: 'dm-2', nodeCount: 1 });
@@ -82,7 +92,7 @@ describe('AI tools — read-only project queries', () => {
     const lease3 = { ...createBlankLease('ws-1', 'o-1'), id: 'l-3', leaseName: 'A1' };
     useOwnerStore.setState({ owners: [ownerA, ownerB], leases: [lease1, lease2, lease3] });
 
-    const result = await landroidTools.getLessorRoster.execute!({}, {} as never);
+    const result = await runTool(landroidTools.getLessorRoster, {});
     expect(result[0].name).toBe('Zebra');
     expect(result[0].leaseCount).toBe(2);
     expect(result[1].name).toBe('Aiken');
@@ -98,16 +108,16 @@ describe('AI tools — read-only project queries', () => {
       ],
     });
 
-    const result = await landroidTools.searchInstruments.execute!(
-      { query: 'famcor', limit: 10 },
-      {} as never
-    );
+    const result = await runTool(landroidTools.searchInstruments, {
+      query: 'famcor',
+      limit: 10,
+    });
     expect(result).toHaveLength(3);
 
-    const byDoc = await landroidTools.searchInstruments.execute!(
-      { query: '11-769', limit: 10 },
-      {} as never
-    );
+    const byDoc = await runTool(landroidTools.searchInstruments, {
+      query: '11-769',
+      limit: 10,
+    });
     expect(byDoc).toHaveLength(1);
     expect(byDoc[0].nodeId).toBe('n1');
   });
@@ -122,10 +132,7 @@ describe('AI tools — read-only project queries', () => {
       ],
     });
 
-    const result = await landroidTools.explainNode.execute!(
-      { nodeId: 'grandchild' },
-      {} as never
-    );
+    const result = await runTool(landroidTools.explainNode, { nodeId: 'grandchild' });
     expect(result).toMatchObject({
       nodeId: 'grandchild',
       grantor: 'Bridges',
@@ -138,10 +145,7 @@ describe('AI tools — read-only project queries', () => {
   });
 
   it('explainNode returns error for unknown id', async () => {
-    const result = await landroidTools.explainNode.execute!(
-      { nodeId: 'nope' },
-      {} as never
-    );
+    const result = await runTool(landroidTools.explainNode, { nodeId: 'nope' });
     expect(result).toMatchObject({ error: expect.stringContaining('nope') });
   });
 });

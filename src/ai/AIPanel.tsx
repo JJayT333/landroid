@@ -10,6 +10,7 @@ import type { ModelMessage } from 'ai';
 import { runChatTurn, type ChatTurnResult } from './runChat';
 import { useAISettingsStore, isConfigured } from './settings-store';
 import AISettingsPanel from './AISettingsPanel';
+import WizardPanel from './wizard/WizardPanel';
 
 interface ChatEntry {
   role: 'user' | 'assistant';
@@ -18,10 +19,13 @@ interface ChatEntry {
   error?: string;
 }
 
+type Mode = 'chat' | 'wizard';
+
 export default function AIPanel({ onClose }: { onClose: () => void }) {
   const settings = useAISettingsStore();
   const configured = isConfigured(settings);
 
+  const [mode, setMode] = useState<Mode>('chat');
   const [entries, setEntries] = useState<ChatEntry[]>([]);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
@@ -94,26 +98,38 @@ export default function AIPanel({ onClose }: { onClose: () => void }) {
         </div>
       </header>
 
+      <nav className="flex border-b border-leather/30 bg-parchment/70 text-[11px] font-semibold uppercase tracking-wide">
+        <TabButton active={mode === 'chat'} onClick={() => setMode('chat')}>
+          Chat
+        </TabButton>
+        <TabButton active={mode === 'wizard'} onClick={() => setMode('wizard')}>
+          Import wizard
+        </TabButton>
+      </nav>
+
       <div className="flex-1 space-y-3 overflow-y-auto p-3 text-sm text-ink">
         {showSettings && <AISettingsPanel onClose={() => setShowSettings(false)} />}
 
-        {entries.length === 0 && !showSettings && (
-          <div className="rounded-lg border border-leather/30 bg-parchment p-3 text-xs text-ink-light">
-            Ask about the current project, a tract, a lessor, or a mineral-math
-            scenario. All active calculations assume Texas oil-and-gas rules.
-            Try: <em>"What's in this project?"</em>
-          </div>
-        )}
+        {mode === 'wizard' && !showSettings && <WizardPanel />}
 
-        {entries.map((e, i) => (
-          <ChatBubble key={i} entry={e} />
-        ))}
-
-        {busy && (
-          <div className="text-xs italic text-ink-light">Thinking…</div>
+        {mode === 'chat' && !showSettings && (
+          <>
+            {entries.length === 0 && (
+              <div className="rounded-lg border border-leather/30 bg-parchment p-3 text-xs text-ink-light">
+                Ask about the current project, a tract, a lessor, or a mineral-math
+                scenario. All active calculations assume Texas oil-and-gas rules.
+                Try: <em>"What's in this project?"</em>
+              </div>
+            )}
+            {entries.map((e, i) => (
+              <ChatBubble key={i} entry={e} />
+            ))}
+            {busy && <div className="text-xs italic text-ink-light">Thinking…</div>}
+          </>
         )}
       </div>
 
+      {mode === 'chat' && (
       <footer className="border-t border-leather/40 bg-parchment p-2">
         <form
           onSubmit={(ev) => {
@@ -145,7 +161,32 @@ export default function AIPanel({ onClose }: { onClose: () => void }) {
           </button>
         </form>
       </footer>
+      )}
     </aside>
+  );
+}
+
+function TabButton({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex-1 px-3 py-1.5 transition ${
+        active
+          ? 'border-b-2 border-gold bg-parchment text-ink'
+          : 'text-ink-light hover:bg-parchment/90 hover:text-ink'
+      }`}
+    >
+      {children}
+    </button>
   );
 }
 
