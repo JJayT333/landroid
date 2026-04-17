@@ -15,6 +15,7 @@ const CurativeView = lazy(() => import('./views/CurativeView'));
 const MapsView = lazy(() => import('./views/MapsView'));
 const FederalLeasingView = lazy(() => import('./views/FederalLeasingView'));
 const ResearchView = lazy(() => import('./views/ResearchView'));
+const AIToggleButton = lazy(() => import('./ai/AIToggleButton'));
 
 function PlaceholderView({
   name,
@@ -154,6 +155,9 @@ export default function App() {
           </Suspense>
         )}
       </main>
+      <Suspense fallback={null}>
+        <AIToggleButton />
+      </Suspense>
     </div>
   );
 }
