@@ -16,7 +16,7 @@ describe('formula starters', () => {
       status: 'Needs Review',
       citation: 'LANDMAN-MATH-REFERENCE.md',
     });
-    expect(plan.formulas).toHaveLength(16);
+    expect(plan.formulas).toHaveLength(32);
     expect(plan.formulas.map((formula) => formula.title)).toEqual(
       expect.arrayContaining([
         'Lease Coverage Allocation',
@@ -34,6 +34,23 @@ describe('formula starters', () => {
           formula.sourceIds.includes(plan.supportingSourceId)
       )
     ).toBe(true);
+  });
+
+  it('includes foundational starter cards across the five new landman categories', () => {
+    const plan = buildResearchFormulaStarterRecords('ws-1', [], []);
+
+    const categories = new Set(plan.formulas.map((formula) => formula.category));
+    expect(categories.has('Royalty Math')).toBe(true);
+    expect(categories.has('Decimal Interest Calculations')).toBe(true);
+    expect(categories.has('Unit / Pooling Math')).toBe(true);
+    expect(categories.has('Federal Lease Math')).toBe(true);
+    expect(categories.has('Title Math Checks')).toBe(true);
+
+    const ids = plan.formulas.map((formula) => formula.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(
+      plan.formulas.filter((formula) => formula.id.includes('foundation-'))
+    ).toHaveLength(16);
   });
 
   it('is idempotent when the reference source and starter formulas already exist', () => {

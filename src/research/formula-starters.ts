@@ -221,6 +221,212 @@ const FORMULA_STARTERS: FormulaStarterDefinition[] = [
     engineReference: 'src/components/leasehold/leasehold-summary.ts',
     referenceSection: 'LANDMAN-MATH-REFERENCE.md Section 6.13',
   },
+  // ── Phase 6 foundational cards ─────────────────────────────
+  // The 16 cards below document the underlying landman math that the 16
+  // Texas-advanced cards above assume. Keys are prefixed `foundation-` so
+  // they never collide with existing starter keys in pre-overhaul workspaces.
+
+  // Royalty Math (5)
+  {
+    key: 'foundation-royalty-fraction-to-decimal',
+    title: 'Royalty Fraction → Decimal',
+    category: 'Royalty Math',
+    formulaText: 'numerator / denominator',
+    explanation:
+      'Converts a royalty fraction (e.g., 1/8, 3/16, 1/5) into the decimal form used in every downstream calculation.',
+    variables: 'numerator; denominator',
+    example: '1/8 = 0.125; 3/16 = 0.1875; 1/5 = 0.200.',
+    engineReference: 'src/components/leasehold/leasehold-summary.ts',
+    referenceSection: 'LANDMAN-MATH-REFERENCE.md Foundations — royalty fractions',
+  },
+  {
+    key: 'foundation-lessor-royalty',
+    title: 'Lessor Royalty on Production',
+    category: 'Royalty Math',
+    formulaText: 'production volume x lease royalty',
+    explanation:
+      'Calculates the gross lessor royalty share of production for a leased mineral owner before deductions.',
+    variables: 'production volume; lease royalty',
+    example: '1,000 bbl x 1/8 = 125 bbl lessor royalty.',
+    engineReference: 'src/components/leasehold/leasehold-summary.ts',
+    referenceSection: 'LANDMAN-MATH-REFERENCE.md Foundations — royalty on production',
+  },
+  {
+    key: 'foundation-lessee-working-interest',
+    title: 'Lessee Working Interest Share',
+    category: 'Royalty Math',
+    formulaText: '1 - lease royalty',
+    explanation:
+      'The fraction of production the lessee (WI owner) is entitled to before cost deductions and override burdens.',
+    variables: 'lease royalty',
+    example: '1 - 1/8 = 7/8 lessee WI share.',
+    engineReference: 'src/components/leasehold/leasehold-summary.ts',
+    referenceSection: 'LANDMAN-MATH-REFERENCE.md Foundations — WI share',
+  },
+  {
+    key: 'foundation-bonus-consideration',
+    title: 'Lease Bonus Consideration',
+    category: 'Royalty Math',
+    formulaText: 'bonus per net mineral acre x net mineral acres',
+    explanation:
+      'Calculates the upfront cash bonus owed to a mineral owner when the lease is executed.',
+    variables: 'bonus per net mineral acre; net mineral acres',
+    example: '$500/NMA x 160 NMA = $80,000 bonus.',
+    engineReference: 'n/a — reference only',
+    referenceSection: 'LANDMAN-MATH-REFERENCE.md Foundations — bonus math',
+  },
+  {
+    key: 'foundation-delay-rental',
+    title: 'Delay Rental',
+    category: 'Royalty Math',
+    formulaText: 'rental per acre x leased gross acres',
+    explanation:
+      'Annual rental paid to keep an unheld lease alive during its primary term.',
+    variables: 'rental per acre; leased gross acres',
+    example: '$1.50/acre x 640 acres = $960 annual delay rental.',
+    engineReference: 'n/a — reference only',
+    referenceSection: 'LANDMAN-MATH-REFERENCE.md Foundations — rental math',
+  },
+
+  // Decimal Interest Calculations (3)
+  {
+    key: 'foundation-mineral-decimal-interest',
+    title: 'Mineral Decimal Interest',
+    category: 'Decimal Interest Calculations',
+    formulaText: 'undivided mineral fraction x lease royalty',
+    explanation:
+      'Converts a mineral owner undivided fraction into the royalty decimal used on division orders.',
+    variables: 'undivided mineral fraction; lease royalty',
+    example: '1/2 mineral x 1/8 royalty = 1/16 = 0.0625 decimal.',
+    engineReference: 'src/components/leasehold/leasehold-summary.ts',
+    referenceSection: 'LANDMAN-MATH-REFERENCE.md Foundations — decimal interest',
+  },
+  {
+    key: 'foundation-unit-decimal-interest',
+    title: 'Unit Decimal Interest',
+    category: 'Decimal Interest Calculations',
+    formulaText: '(net mineral acres / unit acres) x lease royalty',
+    explanation:
+      'Acreage-weights a tract owner royalty into the pooled unit decimal.',
+    variables: 'net mineral acres; unit acres; lease royalty',
+    example: '(160 NMA / 640 unit acres) x 1/8 royalty = 0.03125 unit decimal.',
+    engineReference: 'src/components/leasehold/leasehold-summary.ts',
+    referenceSection: 'LANDMAN-MATH-REFERENCE.md Foundations — unit decimal',
+  },
+  {
+    key: 'foundation-decimal-interest-sum-check',
+    title: 'Decimal Interest Sum Check',
+    category: 'Decimal Interest Calculations',
+    formulaText: 'sum of all owner decimal interests',
+    explanation:
+      'On a fully-leased unit the sum of royalty + ORRI + WI decimals must equal 1.0 (8/8). Used as a balance check before releasing a division order deck.',
+    variables: 'owner decimal interests',
+    example: 'A unit with 0.125 total royalty + 0.03125 ORRI + 0.84375 WI = 1.000.',
+    engineReference: 'src/components/leasehold/leasehold-summary.ts',
+    referenceSection: 'LANDMAN-MATH-REFERENCE.md Foundations — 8/8 balance',
+  },
+
+  // Unit / Pooling Math (3)
+  {
+    key: 'foundation-tract-factor',
+    title: 'Tract Factor (Pooling Weight)',
+    category: 'Unit / Pooling Math',
+    formulaText: 'tract pooled acres / total unit acres',
+    explanation:
+      'Dimensionless weight each tract carries in a pooled unit. Every owner decimal in that tract multiplies by this factor.',
+    variables: 'tract pooled acres; total unit acres',
+    example: '320 tract acres / 640 unit acres = 0.500 tract factor.',
+    engineReference: 'src/components/leasehold/leasehold-summary.ts',
+    referenceSection: 'LANDMAN-MATH-REFERENCE.md Foundations — tract factor',
+  },
+  {
+    key: 'foundation-pooling-contribution',
+    title: 'Owner Pooling Contribution',
+    category: 'Unit / Pooling Math',
+    formulaText: 'owner net mineral acres / total unit acres',
+    explanation:
+      'The fraction of the pooled unit represented by a single owner before royalty is applied.',
+    variables: 'owner net mineral acres; total unit acres',
+    example: '80 NMA / 640 unit acres = 0.125 pooling contribution.',
+    engineReference: 'src/components/leasehold/leasehold-summary.ts',
+    referenceSection: 'LANDMAN-MATH-REFERENCE.md Foundations — pooling contribution',
+  },
+  {
+    key: 'foundation-fully-pooled-check',
+    title: 'Fully-Pooled Acreage Check',
+    category: 'Unit / Pooling Math',
+    formulaText: 'sum of tract pooled acres = declared unit acres',
+    explanation:
+      'Balance check that every tract brings the pooled acreage declared in the unit designation. Missing or over-contributed acres cause downstream decimals to drift.',
+    variables: 'tract pooled acres; declared unit acres',
+    example: '320 + 320 = 640 declared unit acres → balanced.',
+    engineReference: 'src/components/leasehold/leasehold-summary.ts',
+    referenceSection: 'LANDMAN-MATH-REFERENCE.md Foundations — pooling balance',
+  },
+
+  // Federal Lease Math (3)
+  {
+    key: 'foundation-federal-lease-rental',
+    title: 'Federal Lease Annual Rental',
+    category: 'Federal Lease Math',
+    formulaText: 'rental per acre x gross leased acres',
+    explanation:
+      'BLM form 3100-11 standard rental math — applied annually during the primary term. Reference-only for LANDroid (Texas math engine is not federal).',
+    variables: 'rental per acre; gross leased acres',
+    example: '$1.50/acre x 640 acres = $960/year.',
+    engineReference: 'n/a — reference only (federal leases are inventory)',
+    referenceSection: 'BLM Form 3100-11 — rental schedule',
+  },
+  {
+    key: 'foundation-federal-royalty-rate',
+    title: 'Federal Lease Royalty Rate',
+    category: 'Federal Lease Math',
+    formulaText: 'lease royalty fraction (typically 1/8 or 3/16)',
+    explanation:
+      'Federal onshore oil & gas leases issued today carry either a 1/8 (12.5%) or 3/16 (18.75%) royalty depending on acquisition method. BLM lease schedules list the rate explicitly.',
+    variables: 'federal lease royalty rate',
+    example: 'Raven Forest Unit A leases carry 1/8 federal royalty; Unit B carries 3/16.',
+    engineReference: 'n/a — reference only',
+    referenceSection: 'BLM Form 3100-11 — royalty section',
+  },
+  {
+    key: 'foundation-federal-bonus-bid',
+    title: 'Federal Bonus Bid',
+    category: 'Federal Lease Math',
+    formulaText: 'winning bid per acre x parcel acres',
+    explanation:
+      'Bonus consideration paid to the BLM at lease issuance. Separate from annual rental and from production royalty.',
+    variables: 'winning bid per acre; parcel acres',
+    example: '$2/acre minimum x 640 acres = $1,280 minimum bid.',
+    engineReference: 'n/a — reference only',
+    referenceSection: 'BLM — competitive onshore lease sale',
+  },
+
+  // Title Math Checks (2)
+  {
+    key: 'foundation-conveyance-sum-check',
+    title: 'Conveyance Sum Check',
+    category: 'Title Math Checks',
+    formulaText: 'sum of conveyed fractions from a parent ≤ parent fraction',
+    explanation:
+      'Across every child conveyance from a single grantor, the total conveyed fraction cannot exceed what the grantor owned. Violations trigger the over-conveyance warning on Desk Map.',
+    variables: 'parent fraction; child conveyance fractions',
+    example: 'A grantor with 1/2 interest cannot convey 3/8 + 1/4 = 5/8 to two grantees.',
+    engineReference: 'src/engine/fraction-math.ts',
+    referenceSection: 'LANDMAN-MATH-REFERENCE.md Foundations — conveyance budget',
+  },
+  {
+    key: 'foundation-npri-reservation-check',
+    title: 'NPRI Reservation Sanity Check',
+    category: 'Title Math Checks',
+    formulaText: 'sum of whole-tract-basis NPRIs ≤ 1',
+    explanation:
+      'Multiple whole-tract fixed NPRIs are carved sibling-style from the whole production stream. Their sum cannot exceed 1.0 or the tract would over-pay royalty on 8/8.',
+    variables: 'whole-tract-basis NPRI fractions',
+    example: 'A 1/16 + 1/32 whole-tract NPRI pair sums to 3/32 — safe.',
+    engineReference: 'src/components/deskmap/deskmap-coverage.ts',
+    referenceSection: 'LANDMAN-MATH-REFERENCE.md Foundations — NPRI budget',
+  },
 ];
 
 function idPart(value: string): string {

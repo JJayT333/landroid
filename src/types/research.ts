@@ -66,6 +66,15 @@ export const RESEARCH_FORMULA_CATEGORY_OPTIONS = [
   'ORRI',
   'Federal / Private Prep',
   'Transfer Order',
+  // Phase 6 foundational categories — each groups a few starter cards that
+  // explain the underlying landman math. Existing 16 advanced cards keep their
+  // original Texas-math categories above; the new 16 foundation- cards live
+  // in the five categories below.
+  'Royalty Math',
+  'Decimal Interest Calculations',
+  'Unit / Pooling Math',
+  'Federal Lease Math',
+  'Title Math Checks',
   'Other',
 ] as const;
 export type ResearchFormulaCategory =

@@ -1539,6 +1539,8 @@ export default function ResearchView() {
                 </div>
               </section>
             </div>
+
+            <LandmanResourcesPanel />
           </div>
         )}
 
@@ -2903,6 +2905,173 @@ function ReviewQueueRow({
         <span className="text-sm font-semibold text-ink">{count}</span>
       </div>
     </button>
+  );
+}
+
+interface LandmanResource {
+  label: string;
+  url: string;
+  note?: string;
+}
+
+interface LandmanResourceGroup {
+  title: string;
+  blurb: string;
+  resources: LandmanResource[];
+}
+
+const LANDMAN_RESOURCE_GROUPS: LandmanResourceGroup[] = [
+  {
+    title: 'Texas Regulatory',
+    blurb: 'Railroad Commission and General Land Office references for TX mineral title.',
+    resources: [
+      {
+        label: 'Texas Railroad Commission — Public GIS Viewer',
+        url: 'https://gis.rrc.texas.gov/GISViewer/',
+        note: 'RRC well, lease, and pipeline layers.',
+      },
+      {
+        label: 'RRC Online Research Queries',
+        url: 'https://www.rrc.texas.gov/resource-center/research/online-research-queries/',
+        note: 'Lease, operator, and production queries.',
+      },
+      {
+        label: 'Texas General Land Office',
+        url: 'https://www.glo.texas.gov/',
+        note: 'State lands, mineral leasing, Permanent School Fund tracts.',
+      },
+      {
+        label: 'GLO State Lands Viewer',
+        url: 'https://glo.texas.gov/history/archives/map-store/',
+      },
+    ],
+  },
+  {
+    title: 'Federal / BLM',
+    blurb: 'Federal minerals, BLM lease records, and ONRR reporting.',
+    resources: [
+      {
+        label: 'BLM Mineral & Land Records System (MLRS)',
+        url: 'https://reports.blm.gov/',
+        note: 'Federal lease serials, case files, and status.',
+      },
+      {
+        label: 'BLM LR2000 Legacy',
+        url: 'https://reports.blm.gov/reports/LR2000/',
+        note: 'Historical case records (pre-MLRS).',
+      },
+      {
+        label: 'BLM Oil & Gas Stipulations',
+        url: 'https://www.blm.gov/programs/energy-and-minerals/oil-and-gas/leasing',
+      },
+      {
+        label: 'Office of Natural Resources Revenue (ONRR)',
+        url: 'https://onrr.gov/',
+        note: 'Federal royalty reporting and disbursements.',
+      },
+    ],
+  },
+  {
+    title: 'National Forest Leasing (Texas)',
+    blurb: 'Sam Houston, Davy Crockett, Angelina, Sabine National Forest surface-use references.',
+    resources: [
+      {
+        label: 'USFS — National Forests & Grasslands in Texas',
+        url: 'https://www.fs.usda.gov/texas',
+      },
+      {
+        label: 'BLM/USFS Oil & Gas Leasing Handbook (H-3100-1)',
+        url: 'https://www.blm.gov/sites/default/files/docs/2020-11/H-3100-1-FinalFuture.pdf',
+      },
+      {
+        label: 'USFS Minerals & Geology Management',
+        url: 'https://www.fs.usda.gov/science-technology/energy-mineral-resources',
+      },
+    ],
+  },
+  {
+    title: 'Title / Ownership Math Reference',
+    blurb: 'Canonical math references landmen cite for decimal interest and royalty work.',
+    resources: [
+      {
+        label: 'AAPL — American Association of Professional Landmen',
+        url: 'https://www.landman.org/',
+        note: 'Model forms, CPL/RPL materials, ethics.',
+      },
+      {
+        label: 'NADOA — National Association of Division Order Analysts',
+        url: 'https://www.nadoa.org/',
+        note: 'Decimal interest calculation guidance.',
+      },
+      {
+        label: 'Texas Oil & Gas Law (TX Natural Resources Code)',
+        url: 'https://statutes.capitol.texas.gov/Docs/NR/htm/NR.52.htm',
+      },
+    ],
+  },
+  {
+    title: 'County Records',
+    blurb: 'Walker and Montgomery County clerks for Raven Forest chain of title.',
+    resources: [
+      {
+        label: 'Walker County Clerk — Official Public Records',
+        url: 'https://www.co.walker.tx.us/page/walker.County.Clerk',
+      },
+      {
+        label: 'Montgomery County Clerk — Records Search',
+        url: 'https://www.mctx.org/departments/departments_a_-_c/county_clerk/index.php',
+      },
+      {
+        label: 'TexasFile (TX county records aggregator)',
+        url: 'https://www.texasfile.com/',
+      },
+    ],
+  },
+];
+
+function LandmanResourcesPanel() {
+  return (
+    <section className="rounded-xl border border-ledger-line bg-ledger p-4 space-y-3">
+      <div>
+        <div className="text-sm font-semibold text-ink">Landman Resources</div>
+        <div className="text-xs text-ink-light">
+          Curated external references. Links open in a new tab — they are reference
+          material, not authority for Desk Map or Leasehold math.
+        </div>
+      </div>
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        {LANDMAN_RESOURCE_GROUPS.map((group) => (
+          <div
+            key={group.title}
+            className="rounded-lg border border-ledger-line bg-parchment p-3 space-y-2"
+          >
+            <div>
+              <div className="text-[11px] font-bold uppercase tracking-wider text-leather">
+                {group.title}
+              </div>
+              <div className="mt-0.5 text-xs text-ink-light">{group.blurb}</div>
+            </div>
+            <ul className="space-y-1.5">
+              {group.resources.map((resource) => (
+                <li key={resource.url}>
+                  <a
+                    href={resource.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm font-semibold text-leather hover:underline"
+                  >
+                    {resource.label}
+                  </a>
+                  {resource.note && (
+                    <div className="text-[11px] text-ink-light">{resource.note}</div>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 
