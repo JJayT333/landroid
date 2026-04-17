@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import FormField from '../components/shared/FormField';
+import LeaseDocumentModal from '../components/modals/LeaseDocumentModal';
+import { getFederalLeaseDocument } from '../storage/federal-lease-seed';
 import {
   buildFederalLeaseSearchText,
   buildFederalLeaseSummary,
@@ -312,6 +314,9 @@ export default function FederalLeasingView() {
   const [tab, setTab] = useState<FederalLeasingTab>('inventory');
   const [search, setSearch] = useState('');
   const [selectedRecordId, setSelectedRecordId] = useState<string | null>(null);
+  const [leaseDocumentRecordId, setLeaseDocumentRecordId] = useState<string | null>(
+    null
+  );
   const asOfDate = useMemo(() => new Date(), []);
 
   const sourceOptions = sources.map((source) => ({
@@ -727,6 +732,19 @@ export default function FederalLeasingView() {
                   </button>
                   <button
                     type="button"
+                    disabled={!getFederalLeaseDocument(selectedRecord.id)}
+                    onClick={() => setLeaseDocumentRecordId(selectedRecord.id)}
+                    className="rounded-lg border border-leather/30 bg-leather/5 px-3 py-2 text-xs font-semibold text-leather transition-colors hover:bg-leather/10 disabled:opacity-50"
+                    title={
+                      getFederalLeaseDocument(selectedRecord.id)
+                        ? 'View structured BLM Form 3100-11 summary'
+                        : 'No lease document registered for this record'
+                    }
+                  >
+                    View Lease Document
+                  </button>
+                  <button
+                    type="button"
                     onClick={async () => {
                       if (!confirm('Delete this federal leasing record?')) return;
                       await removeProjectRecord(selectedRecord.id);
@@ -982,6 +1000,13 @@ export default function FederalLeasingView() {
           )}
         </section>
       </div>
+
+      {leaseDocumentRecordId && (
+        <LeaseDocumentModal
+          recordId={leaseDocumentRecordId}
+          onClose={() => setLeaseDocumentRecordId(null)}
+        />
+      )}
     </div>
   );
 }

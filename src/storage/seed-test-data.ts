@@ -27,6 +27,11 @@ import type {
   LeaseholdUnit,
 } from '../types/leasehold';
 import { createWorkspaceId } from '../utils/workspace-id';
+import {
+  buildRavenForestFederalLeases,
+  clearFederalLeaseDocuments,
+  registerFederalLeaseDocuments,
+} from './federal-lease-seed';
 
 // ── Node factory ────────────────────────────────────────
 
@@ -2256,6 +2261,17 @@ export async function seedCombinatorialData(): Promise<{
     instrumentTypes: workspace.instrumentTypes,
   });
   await resetWorkspaceSideStores(workspace.workspaceId, workspace.ownerData);
+
+  // Seed Raven Forest federal lease inventory + register their BLM Form
+  // 3100-11 documents so the LeaseDocumentModal has structured data to render.
+  // Federal records are reference-only and intentionally do not feed Texas
+  // leasehold or Desk Map math.
+  clearFederalLeaseDocuments();
+  const federal = buildRavenForestFederalLeases(workspace.workspaceId);
+  registerFederalLeaseDocuments(federal.documents);
+  for (const record of federal.records) {
+    await useResearchStore.getState().addProjectRecord(record);
+  }
 
   let pdfCount = 0;
   const failedPdfNodeIds: string[] = [];
