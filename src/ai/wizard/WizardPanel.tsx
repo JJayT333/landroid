@@ -1,13 +1,22 @@
 /**
- * Spreadsheet-to-Deskmap wizard — upload → preview → AI analyze → review proposal.
+ * Spreadsheet-to-Deskmap wizard — upload → preview → AI analyze → review →
+ * validated apply.
  *
- * This commit 3 surface is preview-only. Commit 4 will add a validated apply
- * step that runs `validateCalcGraph` before committing any nodes.
+ * The apply step builds a deterministic plan, runs `validateOwnershipGraph`
+ * on the existing nodes, surfaces collisions, then commits via the workspace
+ * store. AI never writes to the store directly.
  */
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { parseWorkbook, type ParsedWorkbook } from './parse-workbook';
 import { analyzeWorkbook } from './analyze-workbook';
 import type { WorkspaceImportProposal, SheetRole } from './schemas';
+import {
+  buildApplyPlan,
+  executeApplyPlan,
+  type ApplyPlan,
+  type ApplyResult,
+} from './apply-proposal';
+import { useWorkspaceStore } from '../../store/workspace-store';
 
 type Status = 'idle' | 'parsing' | 'parsed' | 'analyzing' | 'analyzed' | 'error';
 
@@ -113,6 +122,117 @@ export default function WizardPanel() {
 
       {proposal && <ProposalView proposal={proposal} onReset={handleReset} />}
     </div>
+  );
+}
+
+function ApplySection({ proposal }: { proposal: WorkspaceImportProposal }) {
+  const projectName = useWorkspaceStore((s) => s.projectName);
+  const deskMaps = useWorkspaceStore((s) => s.deskMaps);
+  const nodes = useWorkspaceStore((s) => s.nodes);
+  const setProjectName = useWorkspaceStore((s) => s.setProjectName);
+  const createDeskMap = useWorkspaceStore((s) => s.createDeskMap);
+  const updateDeskMapDetails = useWorkspaceStore((s) => s.updateDeskMapDetails);
+
+  const [applied, setApplied] = useState<ApplyResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const plan: ApplyPlan = useMemo(
+    () => buildApplyPlan(proposal, { projectName, deskMaps, nodes }),
+    [proposal, projectName, deskMaps, nodes]
+  );
+
+  const onApply = () => {
+    setError(null);
+    try {
+      const result = executeApplyPlan(plan, {
+        setProjectName,
+        createDeskMap,
+        updateDeskMapDetails,
+      });
+      setApplied(result);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  if (applied) {
+    return (
+      <section className="rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-xs text-emerald-900">
+        <div className="font-semibold">Applied to workspace.</div>
+        <ul className="mt-1 list-disc space-y-0.5 pl-4">
+          {applied.projectRenamed && (
+            <li>Project renamed to "{plan.projectNameChange}"</li>
+          )}
+          {applied.createdDeskMapIds.length > 0 && (
+            <li>{applied.createdDeskMapIds.length} desk map(s) created</li>
+          )}
+        </ul>
+      </section>
+    );
+  }
+
+  return (
+    <section className="space-y-2 rounded-lg border-2 border-gold/50 bg-parchment p-3 text-xs">
+      <h4 className="font-semibold uppercase tracking-wide text-ink">
+        Apply plan
+      </h4>
+
+      <ul className="space-y-1 text-[11px] text-ink">
+        {plan.projectNameChange && (
+          <li>
+            <strong>Rename project</strong> →{' '}
+            <span className="font-mono">{plan.projectNameChange}</span>
+          </li>
+        )}
+        <li>
+          <strong>Create desk maps:</strong> {plan.deskMapsToCreate.length}
+          {plan.deskMapsToCreate.length > 0 && (
+            <span className="ml-1 font-mono text-ink-light">
+              ({plan.deskMapsToCreate.map((d) => d.code).join(', ')})
+            </span>
+          )}
+        </li>
+        {plan.collisions.length > 0 && (
+          <li className="text-amber-800">
+            <strong>Skip (already exist):</strong> {plan.collisions.length}{' '}
+            <span className="font-mono">
+              ({plan.collisions.map((c) => c.code).join(', ')})
+            </span>
+          </li>
+        )}
+      </ul>
+
+      {plan.existingGraphIssues.length > 0 && (
+        <div className="rounded border border-amber-300 bg-amber-50 p-2 text-[10px] text-amber-900">
+          <strong>{plan.existingGraphIssues.length} pre-existing graph issue(s)</strong>{' '}
+          in the current workspace. Apply is allowed but you should fix these
+          first.
+        </div>
+      )}
+
+      {plan.blockers.length > 0 && (
+        <div className="rounded border border-rose-300 bg-rose-50 p-2 text-[10px] text-rose-900">
+          {plan.blockers.map((b, i) => (
+            <div key={i}>{b}</div>
+          ))}
+        </div>
+      )}
+
+      {error && (
+        <div className="rounded border border-rose-400 bg-rose-50 p-2 text-[10px] text-rose-900">
+          {error}
+        </div>
+      )}
+
+      <button
+        type="button"
+        onClick={onApply}
+        disabled={plan.blockers.length > 0}
+        className="rounded bg-ink px-3 py-1.5 text-xs font-semibold text-parchment hover:bg-ink-light disabled:opacity-40"
+      >
+        Apply to workspace
+      </button>
+    </section>
   );
 }
 
@@ -253,10 +373,7 @@ function ProposalView({
         </section>
       )}
 
-      <div className="rounded border border-leather/20 bg-parchment/50 p-2 text-[10px] text-ink-light">
-        <strong>Preview only.</strong> The next commit adds a validated apply step.
-        Until then, nothing is written to your workspace.
-      </div>
+      <ApplySection proposal={proposal} />
     </div>
   );
 }
