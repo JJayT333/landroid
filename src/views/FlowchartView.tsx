@@ -729,7 +729,7 @@ function FlowchartCanvas() {
       />
 
       {nodes.length > 0 && (
-        <div className="no-print absolute top-3 right-3 z-10 px-3 py-1.5 rounded-lg bg-parchment/95 backdrop-blur border border-ledger-line shadow text-xs font-mono text-ink-light">
+        <div className="no-print absolute bottom-3 left-3 z-10 px-3 py-1.5 rounded-lg bg-parchment border border-ledger-line shadow text-xs font-mono text-ink-light">
           {nodes.length} nodes on canvas
         </div>
       )}

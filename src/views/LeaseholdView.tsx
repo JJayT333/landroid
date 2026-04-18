@@ -3593,111 +3593,95 @@ export default function LeaseholdView() {
           isMapMode ? 'flex h-full flex-col space-y-5' : 'mx-auto max-w-7xl space-y-5'
         }
       >
-        <header className="shrink-0 rounded-3xl border border-ledger-line bg-parchment/95 p-6 shadow-md">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div className="max-w-3xl">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.2em] text-ink-light">
-                Leasehold Template
-              </div>
-              <h1 className="mt-2 text-3xl font-display font-bold text-ink">Leasehold</h1>
-              <p className="mt-2 text-sm leading-6 text-ink-light">
-                Pooled acres now drive participation here. Leasehold derives tract participation,
-                owner net mineral acres, lease royalty, fixed and floating NPRI payout burdens,
-                ORRI burdens, and working-interest splits from the current Desk Map title chain
-                plus active lease records. Use `Overview` for setup and numeric review, `Map` for
-                the full-size leasehold canvas, and `Deck` for the card-based leasehold side with
-                NPRIs, ORRIs, retained WI, and assignments.
-              </p>
-            </div>
-            <div className="flex flex-col items-start gap-3">
-              <LeaseholdDeckModeToggle mode={mode} onChange={setMode} />
-              <div className="rounded-2xl border border-gold/30 bg-gold/10 px-4 py-3 text-sm text-gold-950">
-              <div className="font-semibold">Current v1 assumption</div>
-              <div className="mt-1">
-                  Royalty, NPRI, ORRI, and WI payout decimals are acreage-weighted by pooled acres.
-                  Gross-acre NMA and pooled-acre participation acres are both shown so the tract view
-                  makes the base acreage explicit.
-                </div>
-              </div>
-            </div>
-          </div>
-
+        <header className="shrink-0 rounded-3xl border border-ledger-line bg-parchment/95 shadow-md">
           {isMapMode ? (
-            <div className="mt-5 flex flex-wrap gap-2 text-xs">
-              <span className="rounded-full border border-ledger-line bg-white/80 px-3 py-1.5 font-medium text-ink">
-                {summary.tractCount} tract{summary.tractCount === 1 ? '' : 's'}
-              </span>
-              <span className="rounded-full border border-ledger-line bg-white/80 px-3 py-1.5 font-medium text-ink">
-                Gross {formatAcres(summary.totalGrossAcres)} ac
-              </span>
-              <span className="rounded-full border border-ledger-line bg-white/80 px-3 py-1.5 font-medium text-ink">
-                Pooled {formatAcres(summary.totalPooledAcres)} ac
-              </span>
-              <span className="rounded-full border border-leather/20 bg-leather/10 px-3 py-1.5 font-medium text-leather">
-                Royalty {formatPercent(summary.totalRoyaltyDecimal)}
-              </span>
-              <span className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1.5 font-medium text-sky-900">
-                NPRI {formatPercent(summary.totalNpriDecimal)}
-              </span>
-              <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 font-medium text-amber-900">
-                ORRI {formatPercent(summary.totalOrriDecimal)}
-              </span>
+            <div className="flex items-center justify-between gap-4 px-5 py-3">
+              <h1 className="text-base font-display font-bold text-ink">Leasehold</h1>
+              <LeaseholdDeckModeToggle mode={mode} onChange={setMode} />
             </div>
           ) : (
-            <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-7">
-              <SummaryCard
-                label="Tracts"
-                value={summary.tractCount.toString()}
-                detail={`${summary.currentOwnerCount} present owners across the unit`}
-              />
-              <SummaryCard
-                label="Gross Acres"
-                value={formatAcres(summary.totalGrossAcres)}
-                detail={`${summary.configuredGrossAcresCount}/${summary.tractCount} tracts configured`}
-              />
-              <SummaryCard
-                label="Pooled Acres"
-                value={formatAcres(summary.totalPooledAcres)}
-                detail={`${summary.configuredPooledAcresCount}/${summary.tractCount} tracts configured`}
-              />
-              <SummaryCard
-                label="Unit Royalty"
-                value={formatPercent(summary.totalRoyaltyDecimal)}
-                detail="Total unit royalty decimal from all active owner leases"
-              />
-              <SummaryCard
-                label="Unit NPRI"
-                value={formatPercent(summary.totalNpriDecimal)}
-                detail={`${summary.includedNpriCount}/${summary.trackedNpriCount} NPRI branches currently in payout math`}
-              />
-              <SummaryCard
-                label="Fully Leased"
-                value={`${summary.fullyLeasedTractCount}/${summary.tractCount}`}
-                detail="Based on current owner lease coverage"
-              />
-              <SummaryCard
-                label="Lessee Set"
-                value={summary.uniqueLessees.length.toString()}
-                detail={
-                  summary.uniqueLessees.length > 0
-                    ? summary.uniqueLessees.join(', ')
-                    : 'No active lessees linked yet'
-                }
-              />
-            </div>
-          )}
-
-          {npriSummary.total > 0 && (
-            <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-              <div className="font-semibold">NPRI payout layer active</div>
-              <div className="mt-1 leading-6">
-                {npriSummary.total} NPRI branch{npriSummary.total === 1 ? '' : 'es'} on file
-                ({npriSummary.fixedCount} fixed, {npriSummary.floatingCount} floating). Fixed
-                NPRIs now carry a deed-basis choice, so LANDroid can distinguish whole-tract fixed
-                burdens from branch-based fixed burdens; floating NPRIs still burden lease royalty.
-                Review the NPRI lane and transfer-order ledger before treating the deck as final
-                payout support.
+            <div className="p-6">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                <div className="max-w-3xl">
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.2em] text-ink-light">
+                    Leasehold Template
+                  </div>
+                  <h1 className="mt-2 text-3xl font-display font-bold text-ink">Leasehold</h1>
+                  <p className="mt-2 text-sm leading-6 text-ink-light">
+                    Pooled acres now drive participation here. Leasehold derives tract participation,
+                    owner net mineral acres, lease royalty, fixed and floating NPRI payout burdens,
+                    ORRI burdens, and working-interest splits from the current Desk Map title chain
+                    plus active lease records. Use `Overview` for setup and numeric review, `Map` for
+                    the full-size leasehold canvas, and `Deck` for the card-based leasehold side with
+                    NPRIs, ORRIs, retained WI, and assignments.
+                  </p>
+                </div>
+                <div className="flex flex-col items-start gap-3">
+                  <LeaseholdDeckModeToggle mode={mode} onChange={setMode} />
+                  <div className="rounded-2xl border border-gold/30 bg-gold/10 px-4 py-3 text-sm text-gold-950">
+                    <div className="font-semibold">Current v1 assumption</div>
+                    <div className="mt-1">
+                      Royalty, NPRI, ORRI, and WI payout decimals are acreage-weighted by pooled acres.
+                      Gross-acre NMA and pooled-acre participation acres are both shown so the tract view
+                      makes the base acreage explicit.
+                    </div>
+                  </div>
+                </div>
               </div>
+              <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-7">
+                <SummaryCard
+                  label="Tracts"
+                  value={summary.tractCount.toString()}
+                  detail={`${summary.currentOwnerCount} present owners across the unit`}
+                />
+                <SummaryCard
+                  label="Gross Acres"
+                  value={formatAcres(summary.totalGrossAcres)}
+                  detail={`${summary.configuredGrossAcresCount}/${summary.tractCount} tracts configured`}
+                />
+                <SummaryCard
+                  label="Pooled Acres"
+                  value={formatAcres(summary.totalPooledAcres)}
+                  detail={`${summary.configuredPooledAcresCount}/${summary.tractCount} tracts configured`}
+                />
+                <SummaryCard
+                  label="Unit Royalty"
+                  value={formatPercent(summary.totalRoyaltyDecimal)}
+                  detail="Total unit royalty decimal from all active owner leases"
+                />
+                <SummaryCard
+                  label="Unit NPRI"
+                  value={formatPercent(summary.totalNpriDecimal)}
+                  detail={`${summary.includedNpriCount}/${summary.trackedNpriCount} NPRI branches currently in payout math`}
+                />
+                <SummaryCard
+                  label="Fully Leased"
+                  value={`${summary.fullyLeasedTractCount}/${summary.tractCount}`}
+                  detail="Based on current owner lease coverage"
+                />
+                <SummaryCard
+                  label="Lessee Set"
+                  value={summary.uniqueLessees.length.toString()}
+                  detail={
+                    summary.uniqueLessees.length > 0
+                      ? summary.uniqueLessees.join(', ')
+                      : 'No active lessees linked yet'
+                  }
+                />
+              </div>
+              {npriSummary.total > 0 && (
+                <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+                  <div className="font-semibold">NPRI payout layer active</div>
+                  <div className="mt-1 leading-6">
+                    {npriSummary.total} NPRI branch{npriSummary.total === 1 ? '' : 'es'} on file
+                    ({npriSummary.fixedCount} fixed, {npriSummary.floatingCount} floating). Fixed
+                    NPRIs now carry a deed-basis choice, so LANDroid can distinguish whole-tract fixed
+                    burdens from branch-based fixed burdens; floating NPRIs still burden lease royalty.
+                    Review the NPRI lane and transfer-order ledger before treating the deck as final
+                    payout support.
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </header>

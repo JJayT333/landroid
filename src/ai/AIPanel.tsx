@@ -107,7 +107,7 @@ export default function AIPanel({ onClose }: { onClose: () => void }) {
         </TabButton>
       </nav>
 
-      <div className="flex-1 space-y-3 overflow-y-auto p-3 text-sm text-ink">
+      <div className="flex-1 space-y-3 overflow-y-auto bg-parchment-light p-3 text-sm text-ink">
         {showSettings && <AISettingsPanel onClose={() => setShowSettings(false)} />}
 
         {mode === 'wizard' && !showSettings && <WizardPanel />}

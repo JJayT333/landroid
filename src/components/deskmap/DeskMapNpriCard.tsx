@@ -34,8 +34,6 @@ function DeskMapNpriCard({
   const initial = d(node.initialFraction);
   const hasConveyedSome = initial.greaterThan(0) && remaining.lessThan(initial);
   const isFloating = node.royaltyKind === 'floating';
-  const fixedRoyaltyBasis =
-    node.fixedRoyaltyBasis === 'whole_tract' ? 'Whole tract basis' : 'Branch basis';
   const hasDiscrepancy = Boolean(discrepancy);
   const discrepancyLabel =
     discrepancy?.kind === 'floating_over_royalty'
@@ -78,8 +76,8 @@ function DeskMapNpriCard({
                 {isFloating ? 'Floating' : 'Fixed'}
               </span>
               {!isFloating && (
-                <span className="rounded-full border border-amber-300 bg-white/80 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-amber-900">
-                  {fixedRoyaltyBasis}
+                <span className="rounded border border-amber-300 bg-white/80 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-amber-900">
+                  {node.fixedRoyaltyBasis === 'whole_tract' ? 'Whole tract' : 'Branch'}
                 </span>
               )}
               {hasDiscrepancy && (
