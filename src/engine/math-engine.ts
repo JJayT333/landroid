@@ -402,6 +402,98 @@ export function executeCreateNpri(params: CreateNpriParams): Result<OwnershipNod
   });
 }
 
+export interface CreateRootNodeParams {
+  allNodes: OwnershipNode[];
+  newNodeId: string;
+  initialFraction: string;
+  form: Partial<OwnershipNode>;
+}
+
+/**
+ * Create a standalone tree root — a node with no parent. Used by AI flows that
+ * import owners before the common grantor is known (orphan trees that get
+ * grafted later via `executeAttachConveyance`). Mineral by default; NPRI roots
+ * are allowed too. Lease-as-root is rejected — leases must hang off a mineral
+ * conveyance, never stand alone.
+ */
+export function executeCreateRootNode(
+  params: CreateRootNodeParams
+): Result<OwnershipNode[]> {
+  const { newNodeId, initialFraction, form } = params;
+  const nodes = params.allNodes.map(toCalc);
+
+  if (!newNodeId) return err('invalid_input', 'newNodeId is required');
+  if (nodes.find((n) => n.id === newNodeId)) {
+    return err('conflicting_structure', `newNodeId ${newNodeId} already exists`);
+  }
+
+  const requestedType = (form.type as OwnershipNode['type'] | undefined) ?? 'conveyance';
+  if (requestedType === 'related') {
+    return err('invalid_input', 'Standalone root nodes must be conveyance nodes (not lease/document)');
+  }
+
+  const parsed = parseStrictDecimal(initialFraction);
+  if (!parsed) return err('invalid_input', 'initialFraction must be a finite number');
+  if (parsed.lessThanOrEqualTo(0)) {
+    return err('invalid_input', 'initialFraction must be greater than zero');
+  }
+  if (parsed.greaterThan(new Decimal(1).plus(EPSILON))) {
+    return err('invalid_input', 'initialFraction cannot exceed 1');
+  }
+
+  const interestClass =
+    (form.interestClass as InterestClass | undefined) ?? 'mineral';
+  const royaltyKind =
+    interestClass === 'npri'
+      ? (form.royaltyKind as OwnershipNode['royaltyKind'] | undefined) ?? 'fixed'
+      : null;
+  const fixedRoyaltyBasis =
+    interestClass === 'npri' && royaltyKind === 'fixed'
+      ? (form.fixedRoyaltyBasis as OwnershipNode['fixedRoyaltyBasis'] | undefined)
+        ?? 'burdened_branch'
+      : null;
+
+  const newNode: CalcNode = {
+    id: newNodeId,
+    type: 'conveyance',
+    parentId: null,
+    fraction: parsed,
+    initialFraction: parsed,
+    rest: {
+      ...(form ?? {}),
+      interestClass,
+      royaltyKind,
+      fixedRoyaltyBasis,
+    } as Record<string, unknown>,
+  };
+  delete newNode.rest.fraction;
+  delete newNode.rest.initialFraction;
+  delete newNode.rest.id;
+  delete newNode.rest.type;
+  delete newNode.rest.parentId;
+
+  const updatedNodes = [...nodes, newNode];
+
+  // Pre/post diff so a pre-existing graph problem doesn't block creating a
+  // brand-new orphan tree on a workspace that already has unrelated issues.
+  const preValidation = validateCalcGraph(nodes);
+  const postValidation = validateCalcGraph(updatedNodes);
+  const issueKey = (issue: ValidationIssue) =>
+    `${issue.code}::${issue.nodeId ?? ''}`;
+  const preExistingKeys = new Set(preValidation.issues.map(issueKey));
+  const newIssues = postValidation.issues.filter(
+    (issue) => !preExistingKeys.has(issueKey(issue))
+  );
+  if (newIssues.length > 0) {
+    return err('invalid_graph', 'Root creation would produce invalid ownership graph', newIssues);
+  }
+
+  return ok(updatedNodes, {
+    action: 'create_root_node',
+    affectedCount: 1,
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Operation 2: Rebalance
 // ---------------------------------------------------------------------------

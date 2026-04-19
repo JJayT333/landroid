@@ -7,7 +7,11 @@
  * store. AI never writes to the store directly.
  */
 import { useMemo, useState } from 'react';
-import { parseWorkbook, type ParsedWorkbook } from './parse-workbook';
+import {
+  parseWorkbook,
+  renderWorkbookForPrompt,
+  type ParsedWorkbook,
+} from './parse-workbook';
 import { analyzeWorkbook } from './analyze-workbook';
 import type { WorkspaceImportProposal, SheetRole } from './schemas';
 import {
@@ -31,7 +35,11 @@ const ROLE_LABELS: Record<SheetRole, { label: string; tone: string }> = {
   unknown: { label: 'Unknown', tone: 'rose' },
 };
 
-export default function WizardPanel() {
+export default function WizardPanel({
+  onStartGuided,
+}: {
+  onStartGuided?: (workbookText: string) => void;
+}) {
   const [status, setStatus] = useState<Status>('idle');
   const [error, setError] = useState<string | null>(null);
   const [parsed, setParsed] = useState<ParsedWorkbook | null>(null);
@@ -102,21 +110,39 @@ export default function WizardPanel() {
       )}
 
       {status === 'parsed' && (
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={handleAnalyze}
-            className="rounded bg-ink px-3 py-1.5 text-xs font-semibold text-parchment hover:bg-ink-light"
-          >
-            Analyze with AI
-          </button>
-          <button
-            type="button"
-            onClick={handleReset}
-            className="rounded border border-leather/40 px-3 py-1.5 text-xs text-ink-light hover:bg-leather/10"
-          >
-            Choose different file
-          </button>
+        <div className="space-y-2">
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={handleAnalyze}
+              className="rounded bg-ink px-3 py-1.5 text-xs font-semibold text-parchment hover:bg-ink-light"
+            >
+              Analyze with AI
+            </button>
+            {onStartGuided && parsed && (
+              <button
+                type="button"
+                onClick={() => onStartGuided(renderWorkbookForPrompt(parsed))}
+                className="rounded border-2 border-gold bg-gold/10 px-3 py-1.5 text-xs font-semibold text-ink hover:bg-gold/20"
+                title="Switch to chat and walk through the import row-by-row with the AI, using mutating tools."
+              >
+                Walk me through it ↗
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={handleReset}
+              className="rounded border border-leather/40 px-3 py-1.5 text-xs text-ink-light hover:bg-leather/10"
+            >
+              Choose different file
+            </button>
+          </div>
+          <p className="text-[10px] italic text-ink-light">
+            <strong>Analyze with AI</strong> — deterministic apply plan (creates desk maps only).
+            <br />
+            <strong>Walk me through it</strong> — conversational import: AI proposes, asks clarifying
+            questions, creates owners as standalone trees you can graft later.
+          </p>
         </div>
       )}
 

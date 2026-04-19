@@ -31,6 +31,7 @@ import type { Lease } from '../types/owner';
 import {
   executeConveyance,
   executeCreateNpri,
+  executeCreateRootNode,
   executeRebalance,
   executePredecessorInsert,
   executeAttachConveyance,
@@ -110,9 +111,11 @@ interface WorkspaceState {
   // Math operations (delegate to engine, replace nodes on success)
   convey: (parentId: string, newNodeId: string, share: string, form: Partial<OwnershipNode>) => boolean;
   createNpri: (parentId: string, newNodeId: string, share: string, form: Partial<OwnershipNode>) => boolean;
+  createRootNode: (newNodeId: string, initialFraction: string, form: Partial<OwnershipNode>, deskMapId?: string) => boolean;
   rebalance: (nodeId: string, newInitialFraction: string, formFields?: Partial<OwnershipNode>) => boolean;
   insertPredecessor: (activeNodeId: string, newPredecessorId: string, newInitialFraction: string, form: Partial<OwnershipNode>) => boolean;
   attachConveyance: (activeNodeId: string, attachParentId: string, calcShare: string, form: Partial<OwnershipNode>) => boolean;
+  attachLease: (mineralNodeId: string, lease: Lease, leaseNodeId?: string) => string | null;
 
   // CRUD
   addNode: (node: OwnershipNode) => void;
@@ -390,7 +393,13 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
     const state = get();
     const result = executeConveyance({ allNodes: state.nodes, parentId, newNodeId, share, form });
     if (result.ok) {
-      const targetDeskMapId = resolveActiveDeskMapId(state.deskMaps, state.activeDeskMapId);
+      // Child always lives in the same tract as its parent. Falls back to the
+      // active desk map only when the parent has somehow been orphaned from
+      // every tract (shouldn't happen via the AI tools, but possible in
+      // legacy workspaces).
+      const parentDeskMap = state.deskMaps.find((dm) => dm.nodeIds.includes(parentId));
+      const targetDeskMapId = parentDeskMap?.id
+        ?? resolveActiveDeskMapId(state.deskMaps, state.activeDeskMapId);
       const dmUpdate = targetDeskMapId
         ? {
             deskMaps: state.deskMaps.map((dm) =>
@@ -423,7 +432,46 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
       form,
     });
     if (result.ok) {
-      const targetDeskMapId = resolveActiveDeskMapId(state.deskMaps, state.activeDeskMapId);
+      const parentDeskMap = state.deskMaps.find((dm) => dm.nodeIds.includes(parentId));
+      const targetDeskMapId = parentDeskMap?.id
+        ?? resolveActiveDeskMapId(state.deskMaps, state.activeDeskMapId);
+      const dmUpdate = targetDeskMapId
+        ? {
+            deskMaps: state.deskMaps.map((dm) =>
+              dm.id === targetDeskMapId
+                ? { ...dm, nodeIds: [...dm.nodeIds, newNodeId] }
+                : dm
+            ),
+            activeDeskMapId: targetDeskMapId,
+          }
+        : {};
+      set({
+        nodes: result.data.map((node) => normalizeOwnershipNode(node)),
+        lastAudit: result.audit,
+        lastError: null,
+        ...dmUpdate,
+      });
+      return true;
+    }
+    set({ lastError: result.error.message });
+    return false;
+  },
+
+  createRootNode: (newNodeId, initialFraction, form, deskMapId) => {
+    const state = get();
+    const result = executeCreateRootNode({
+      allNodes: state.nodes,
+      newNodeId,
+      initialFraction,
+      form,
+    });
+    if (result.ok) {
+      const explicitDeskMapExists =
+        deskMapId !== undefined
+        && state.deskMaps.some((dm) => dm.id === deskMapId);
+      const targetDeskMapId = explicitDeskMapExists
+        ? deskMapId!
+        : resolveActiveDeskMapId(state.deskMaps, state.activeDeskMapId);
       const dmUpdate = targetDeskMapId
         ? {
             deskMaps: state.deskMaps.map((dm) =>
@@ -474,7 +522,10 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
       form,
     });
     if (result.ok) {
-      const targetDeskMapId = resolveActiveDeskMapId(state.deskMaps, state.activeDeskMapId);
+      // Predecessor joins the same tract as the node it now parents.
+      const childDeskMap = state.deskMaps.find((dm) => dm.nodeIds.includes(activeNodeId));
+      const targetDeskMapId = childDeskMap?.id
+        ?? resolveActiveDeskMapId(state.deskMaps, state.activeDeskMapId);
       const dmUpdate = targetDeskMapId
         ? {
             deskMaps: state.deskMaps.map((dm) =>
@@ -510,6 +561,53 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
     }
     set({ lastError: result.error.message });
     return false;
+  },
+
+  attachLease: (mineralNodeId, lease, leaseNodeId) => {
+    const state = get();
+    const parent = state.nodes.find((n) => n.id === mineralNodeId);
+    if (!parent) {
+      set({ lastError: `Mineral node ${mineralNodeId} not found` });
+      return null;
+    }
+    if (parent.type === 'related') {
+      set({ lastError: 'Leases must attach to a title-interest node, not a lease or document node' });
+      return null;
+    }
+    if (parent.interestClass !== 'mineral') {
+      set({ lastError: 'Leases can only attach to mineral nodes, never NPRI' });
+      return null;
+    }
+
+    const newId =
+      leaseNodeId
+      ?? `leasenode-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    if (state.nodes.some((n) => n.id === newId)) {
+      set({ lastError: `Node id ${newId} already exists` });
+      return null;
+    }
+
+    const leaseNode = normalizeOwnershipNode(
+      buildLeaseNode({ id: newId, parentNode: parent, lease })
+    );
+    // Lease node lives in the same tract as the mineral owner it burdens,
+    // never blindly the active desk map (which may be a different tract).
+    const parentDeskMap = state.deskMaps.find((dm) => dm.nodeIds.includes(mineralNodeId));
+    const targetDeskMapId = parentDeskMap?.id
+      ?? resolveActiveDeskMapId(state.deskMaps, state.activeDeskMapId);
+    set({
+      nodes: [...state.nodes, leaseNode],
+      deskMaps: targetDeskMapId
+        ? state.deskMaps.map((dm) =>
+            dm.id === targetDeskMapId
+              ? { ...dm, nodeIds: [...dm.nodeIds, newId] }
+              : dm
+          )
+        : state.deskMaps,
+      activeDeskMapId: targetDeskMapId ?? state.activeDeskMapId,
+      lastError: null,
+    });
+    return newId;
   },
 
   addNode: (node) => set((state) => ({ nodes: [...state.nodes, node] })),

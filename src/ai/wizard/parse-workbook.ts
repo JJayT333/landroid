@@ -22,7 +22,7 @@ export interface ParsedWorkbook {
   sheets: ParsedSheet[];
 }
 
-const MAX_SAMPLE_ROWS = 30;
+const MAX_SAMPLE_ROWS = 150;
 const MAX_SAMPLE_COLS = 20;
 
 function cellToString(value: unknown): string {
@@ -101,6 +101,13 @@ export function renderWorkbookForPrompt(parsed: ParsedWorkbook): string {
         .filter(Boolean)
         .join(' | ');
       if (cells) parts.push(`row ${i + 1}: ${cells}`);
+    }
+    // Explicit truncation marker so the AI knows more rows exist and can tell
+    // the user rather than silently processing a partial workbook.
+    if (sheet.rawRowCount > sheet.rows.length) {
+      parts.push(
+        `[TRUNCATED: ${sheet.rawRowCount - sheet.rows.length} more row(s) not shown — tell the user before assuming you've seen the whole sheet.]`
+      );
     }
   }
   return parts.join('\n');

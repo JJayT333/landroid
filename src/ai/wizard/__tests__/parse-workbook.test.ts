@@ -32,7 +32,7 @@ describe('parseWorkbook — Elmore #1 Unit fixtures', () => {
     );
     expect(parsed.sheets.length).toBeGreaterThan(0);
     for (const sheet of parsed.sheets) {
-      expect(sheet.rows.length).toBeLessThanOrEqual(30);
+      expect(sheet.rows.length).toBeLessThanOrEqual(150);
       for (const row of sheet.rows) {
         expect(row.length).toBeLessThanOrEqual(20);
       }
