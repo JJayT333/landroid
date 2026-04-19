@@ -10,7 +10,9 @@ import * as XLSX from 'xlsx';
 
 export interface ParsedSheet {
   name: string;
-  /** 2D array of string cells. Trailing empty rows trimmed. */
+  /** Full 2D array of string cells. Trailing empty rows trimmed. */
+  allRows: string[][];
+  /** Sampled rows used for AI prompts. Trailing empty rows trimmed. */
   rows: string[][];
   /** Full dimensions before any sampling. */
   rawRowCount: number;
@@ -67,6 +69,7 @@ export function parseWorkbook(
 
     return {
       name,
+      allRows: trimmed,
       rows: sampled,
       rawRowCount,
       rawColCount,

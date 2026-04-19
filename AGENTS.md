@@ -47,7 +47,8 @@ Restate the current phase in 1 to 3 bullets:
 - Reuse existing helpers and utilities where possible.
 - Keep functions and modules focused and readable.
 - Add comments only when they clarify non-obvious logic.
-- After user-facing changes, keep `/README.md`, `/USER_MANUAL.md`, `/CONTINUATION-PROMPT.md`, and launcher entry points aligned.
+- After user-facing changes, keep `/README.md`, `/USER_MANUAL.md`, `/CHANGELOG.md`, `/CONTINUATION-PROMPT.md`, and launcher entry points aligned.
+- After architecture, validation, security, or roadmap changes, update the matching source-of-truth file: `/ARCHITECTURE.md`, `/TESTING.md`, `/SECURITY.md`, or `/ROADMAP.md`.
 
 ### 3) Validation
 Validation is required for every phase.
@@ -67,7 +68,7 @@ Provide:
 
 ### 5) Chat handoff / switching chats
 Before ending or switching chats after meaningful work:
-- Update `/CONTINUATION-PROMPT.md` with the current branch, meaningful completed work, validation status, open risks, and likely next steps.
+- Update `/CONTINUATION-PROMPT.md` with the current branch, current workstream, latest validation status, open risks, and likely next steps. Keep long history in `/CHANGELOG.md`.
 - If the user asks for a GitHub checkpoint, create or use a non-`main` branch, commit the relevant source/docs changes, and push that branch.
 - Call out intentionally uncommitted local noise separately so it is not confused with the active handoff snapshot.
 - Provide a short paste-ready prompt for the next chat that points back to `/AGENTS.md`, `/PROJECT_CONTEXT.md`, and `/CONTINUATION-PROMPT.md`.

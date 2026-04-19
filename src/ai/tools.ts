@@ -18,7 +18,12 @@ import { useOwnerStore } from '../store/owner-store';
 import { useCurativeStore } from '../store/curative-store';
 import type { OwnershipNode } from '../types/node';
 import { validateOwnershipGraph } from '../engine/math-engine';
-import { createBlankLease, createBlankOwner } from '../types/owner';
+import {
+  createBlankLease,
+  createBlankOwner,
+  isTexasMathLeaseJurisdiction,
+} from '../types/owner';
+import { parseStrictInterestString } from '../utils/interest-string';
 
 function truncate(text: string, max = 140): string {
   const trimmed = (text ?? '').trim();
@@ -670,7 +675,10 @@ export const landroidTools = {
       status: z.string().optional().describe('e.g. "Active", "Expired", "HBP".'),
       docNo: z.string().optional(),
       notes: z.string().optional(),
-      jurisdiction: z.string().optional().describe('e.g. "tx_fee" (default), "nm_state", "federal".'),
+      jurisdiction: z
+        .enum(['tx_fee', 'tx_state'])
+        .optional()
+        .describe('Active Desk Map/Leasehold math is Texas-only. Use "tx_fee" (default) or "tx_state"; keep federal/private records in Research/Federal Leasing.'),
     }),
     execute: async ({ ownerId, ...rest }) => {
       const workspaceId = useWorkspaceStore.getState().workspaceId;
@@ -680,6 +688,25 @@ export const landroidTools = {
       const owner = useOwnerStore.getState().owners.find((o) => o.id === ownerId);
       if (!owner) {
         return { ok: false, error: `Owner ${ownerId} not found. Use listOwners or createOwner first.` };
+      }
+      if (typeof rest.royaltyRate === 'string' && parseStrictInterestString(rest.royaltyRate) === null) {
+        return {
+          ok: false,
+          error: 'Royalty rate must be a fraction (e.g. 1/8), a decimal (e.g. 0.125), or blank.',
+        };
+      }
+      if (typeof rest.leasedInterest === 'string' && parseStrictInterestString(rest.leasedInterest) === null) {
+        return {
+          ok: false,
+          error: 'Leased interest must be a fraction (e.g. 1/2), a decimal (e.g. 0.5), or blank.',
+        };
+      }
+      if (rest.jurisdiction && !isTexasMathLeaseJurisdiction(rest.jurisdiction)) {
+        return {
+          ok: false,
+          error:
+            'Only Texas fee/state leases can be created from the active Desk Map AI tools. Keep federal/private/tribal leases in Research or Federal Leasing as reference records.',
+        };
       }
       const overrides: Record<string, string> = {};
       for (const [k, v] of Object.entries(rest)) {

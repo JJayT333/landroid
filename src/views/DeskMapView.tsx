@@ -931,6 +931,26 @@ export default function DeskMapView() {
                 toneClassName={coverageTone(coverageSummary.unleasedOwnership)}
               />
             </div>
+            {d(coverageSummary.currentOwnership).greaterThan(1) && (
+              <div className="rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-2 text-[10px] leading-4 text-amber-950">
+                <div className="font-semibold uppercase tracking-wider">
+                  Over 100% mineral coverage
+                </div>
+                <div className="mt-1">
+                  Current cards contributing to the tract total:{' '}
+                  {coverageSummary.currentOwnershipContributors
+                    .slice(0, 6)
+                    .map((contributor) =>
+                      `${contributor.grantee} (${formatAsFraction(d(contributor.fraction))})`
+                    )
+                    .join(', ')}
+                  {coverageSummary.currentOwnershipContributors.length > 6
+                    ? `, +${coverageSummary.currentOwnershipContributors.length - 6} more`
+                    : ''}
+                  . This is warning-only while title is being reconciled.
+                </div>
+              </div>
+            )}
             <div className="flex flex-wrap gap-x-2 gap-y-1 text-[9px] text-ink-light font-mono">
               <span>{coverageSummary.currentOwnerCount} present owners</span>
               <span>{coverageSummary.linkedOwnerCount} linked</span>

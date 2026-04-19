@@ -20,6 +20,11 @@ import type { OwnershipNode, DeskMap } from '../types/node';
 import type { OwnerWorkspaceData } from '../storage/owner-persistence';
 import type { CurativeWorkspaceData } from '../storage/curative-persistence';
 import type { MapWorkspaceData } from '../storage/map-persistence';
+import {
+  exportPdfWorkspaceData,
+  replacePdfWorkspaceData,
+  type PdfWorkspaceData,
+} from '../storage/workspace-persistence';
 import type {
   LeaseholdAssignment,
   LeaseholdOrri,
@@ -46,6 +51,7 @@ export interface UndoSnapshot {
   owner: OwnerWorkspaceData;
   curative: CurativeWorkspaceData;
   map: MapWorkspaceData;
+  pdf: PdfWorkspaceData;
   /** Short human-readable summary of what the AI did (for button tooltip). */
   label: string;
 }
@@ -73,6 +79,7 @@ export async function captureSnapshot(label: string): Promise<UndoSnapshot | nul
   const ownerData = await useOwnerStore.getState().exportWorkspaceData();
   const curativeData = await useCurativeStore.getState().exportWorkspaceData();
   const mapData = await useMapStore.getState().exportWorkspaceData();
+  const pdfData = await exportPdfWorkspaceData(ws.nodes);
 
   return {
     capturedAt: Date.now(),
@@ -92,6 +99,7 @@ export async function captureSnapshot(label: string): Promise<UndoSnapshot | nul
     owner: deepClone(ownerData),
     curative: deepClone(curativeData),
     map: deepClone(mapData),
+    pdf: pdfData,
   };
 }
 
@@ -116,6 +124,7 @@ export async function restoreSnapshot(snapshot: UndoSnapshot): Promise<void> {
   await useOwnerStore
     .getState()
     .replaceWorkspaceData(snapshot.workspaceId, snapshot.owner);
+  await replacePdfWorkspaceData(snapshot.pdf, snapshot.workspace.nodes);
   await useCurativeStore
     .getState()
     .replaceWorkspaceData(snapshot.workspaceId, snapshot.curative);

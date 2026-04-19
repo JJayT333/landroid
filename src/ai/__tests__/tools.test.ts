@@ -32,6 +32,7 @@ async function runTool<Tool extends { execute?: (...args: never[]) => unknown }>
 describe('AI tools — read-only project queries', () => {
   beforeEach(() => {
     useWorkspaceStore.setState({
+      workspaceId: 'ws-1',
       projectName: 'Test Project',
       deskMaps: [],
       nodes: [],
@@ -147,5 +148,98 @@ describe('AI tools — read-only project queries', () => {
   it('explainNode returns error for unknown id', async () => {
     const result = await runTool(landroidTools.explainNode, { nodeId: 'nope' });
     expect(result).toMatchObject({ error: expect.stringContaining('nope') });
+  });
+
+  it('rejects malformed lease economics before AI-created leases enter active math', async () => {
+    const owner = { ...createBlankOwner('ws-1'), id: 'owner-1', name: 'Owner One' };
+    useOwnerStore.setState({ owners: [owner], leases: [] });
+
+    const badRoyalty = await runTool(landroidTools.createLease, {
+      ownerId: owner.id,
+      royaltyRate: 'one eighth',
+    });
+    expect(badRoyalty).toMatchObject({
+      ok: false,
+      error: expect.stringContaining('Royalty rate'),
+    });
+
+    const badLeasedInterest = await runTool(landroidTools.createLease, {
+      ownerId: owner.id,
+      leasedInterest: 'all of it',
+    });
+    expect(badLeasedInterest).toMatchObject({
+      ok: false,
+      error: expect.stringContaining('Leased interest'),
+    });
+    expect(useOwnerStore.getState().leases).toEqual([]);
+  });
+
+  it('keeps non-Texas leases out of active AI lease creation and attachment', async () => {
+    const owner = { ...createBlankOwner('ws-1'), id: 'owner-1', name: 'Owner One' };
+    const mineralNode = {
+      ...createBlankNode('node-1'),
+      interestClass: 'mineral' as const,
+      linkedOwnerId: owner.id,
+    };
+    const federalLease = createBlankLease('ws-1', owner.id, {
+      id: 'lease-federal',
+      jurisdiction: 'federal',
+    });
+    useOwnerStore.setState({ owners: [owner], leases: [federalLease] });
+    useWorkspaceStore.setState({
+      nodes: [mineralNode],
+      deskMaps: [deskMap({ id: 'dm-1', nodeIds: [mineralNode.id] })],
+      activeDeskMapId: 'dm-1',
+    });
+
+    const createdFederal = await runTool(landroidTools.createLease, {
+      ownerId: owner.id,
+      jurisdiction: 'federal',
+    });
+    expect(createdFederal).toMatchObject({
+      ok: false,
+      error: expect.stringContaining('Only Texas fee/state leases'),
+    });
+
+    const attachedFederal = await runTool(landroidTools.attachLease, {
+      mineralNodeId: mineralNode.id,
+      leaseId: federalLease.id,
+    });
+    expect(attachedFederal).toMatchObject({
+      ok: false,
+      error: expect.stringContaining('Only Texas fee/state leases'),
+    });
+    expect(useWorkspaceStore.getState().nodes).toHaveLength(1);
+  });
+
+  it('rejects attaching a lease to a mineral node linked to a different owner', async () => {
+    const ownerOne = { ...createBlankOwner('ws-1'), id: 'owner-1', name: 'Owner One' };
+    const ownerTwo = { ...createBlankOwner('ws-1'), id: 'owner-2', name: 'Owner Two' };
+    const mineralNode = {
+      ...createBlankNode('node-1'),
+      interestClass: 'mineral' as const,
+      linkedOwnerId: ownerOne.id,
+    };
+    const ownerTwoLease = createBlankLease('ws-1', ownerTwo.id, {
+      id: 'lease-owner-two',
+      jurisdiction: 'tx_fee',
+    });
+    useOwnerStore.setState({ owners: [ownerOne, ownerTwo], leases: [ownerTwoLease] });
+    useWorkspaceStore.setState({
+      nodes: [mineralNode],
+      deskMaps: [deskMap({ id: 'dm-1', nodeIds: [mineralNode.id] })],
+      activeDeskMapId: 'dm-1',
+    });
+
+    const result = await runTool(landroidTools.attachLease, {
+      mineralNodeId: mineralNode.id,
+      leaseId: ownerTwoLease.id,
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      error: expect.stringContaining('does not match'),
+    });
+    expect(useWorkspaceStore.getState().nodes).toHaveLength(1);
   });
 });

@@ -405,9 +405,36 @@ The Curative view also keeps the next broader company-readiness areas visible so
 - The permit-master decoder currently focuses on the core status and permit records, plus the surface and bottom-hole coordinate records when present. Other companion segment types are still staged and called out honestly instead of being treated as fully decoded.
 - The horizontal-permit decoder currently focuses on the published 360-character row layout for that family. It does not yet cross-link those rows to other RRC families inside LANDroid.
 - DBF and EBCDIC-heavy imports are no longer near-term roadmap work. They remain staged safely for later if that work becomes worth the time.
-- No AI provider, prompt system, or API proxy is active in this phase. The saved source/formula/project/question records are structured so a later AI layer can use them.
 
-## 10) Flowchart view
+## 10) Ask LANDroid AI
+
+`Ask LANDroid AI` is active for single-user local workflows.
+
+### Provider posture
+- Ollama is the default and preferred provider.
+- OpenAI and Anthropic are optional cloud providers.
+- Cloud provider keys are session-only and should be treated as sensitive.
+- Cloud AI may send project context to third-party providers; use it only when that is acceptable for the current project.
+
+### Live edits and rollback
+- AI can make live Desk Map and owner/lease edits in the current local workflow.
+- Before an AI mutation is applied, LANDroid captures rollback state for the latest AI change.
+- Use the AI back/rollback control if an AI edit takes the project in the wrong direction.
+- The rollback is a safety net, not a replacement for reviewing title/math changes.
+
+### Workbook row review
+- In the AI workbook panel, `Review rows` stages recognizable spreadsheet title rows from the full parsed sheet.
+- Common columns such as Grantor, Grantee, Instrument, Doc #, dates, legal description, remarks, and fraction map into editable node drafts.
+- LANDroid suggests a parent when a row grantor matches an existing grantee.
+- Each staged row can be edited, created as a root, attached to a parent, or skipped.
+- Row creation uses the same Desk Map math actions as the normal editor, so bad fractions, invalid NPRI/mineral attachments, and over-capacity conveyances fail visibly instead of silently importing.
+
+### Practical AI habit
+- Let AI reduce typing and suggest structure.
+- Do not treat AI suggestions as final title opinions.
+- Review every imported row, attachment target, fraction, and NPRI/mineral classification before relying on the result.
+
+## 11) Flowchart view
 
 `Flowchart` is the presentation and print surface.
 
@@ -452,7 +479,7 @@ These settings are now included when you save a `.landroid` file.
 - Use horizontal and vertical spacing controls when the tree feels too cramped or too loose
 - Use browser print preview before final printing
 
-## 11) Files and persistence
+## 12) Files and persistence
 
 ### `.landroid` files
 These are the main workspace snapshot files. They now include:
@@ -484,7 +511,7 @@ Autosaved workspace loads now validate the ownership graph before hydration. If 
 - Save another `.landroid` file before printing or exporting deliverables
 - Keep dated backup copies when testing risky changes
 
-## 12) Precision and ownership math
+## 13) Precision and ownership math
 
 Recent ownership work improved how fractions are stored and displayed.
 
@@ -500,7 +527,7 @@ Recent ownership work improved how fractions are stored and displayed.
 - Parent/child relationships matter for recalculation
 - If something looks wrong, review the branch in Desk Map first, then confirm the chronology in Runsheet
 
-## 13) Recommended workflow
+## 14) Recommended workflow
 
 1. Launch the app from `LANDroid.command` or `LANDroid.bat`.
 2. Load an existing `.landroid` file or import a `.csv`.
@@ -511,13 +538,14 @@ Recent ownership work improved how fractions are stored and displayed.
 7. Add supporting prospect maps and exhibits in `Maps`.
 8. Track federal lease inventory, expirations, potential targets, source packets, and federal map evidence in `Federal Leasing` when that work is part of the project.
 9. Capture supporting sources, formulas, shared project records, saved questions, and any useful RRC data imports in `Research`.
-10. Review chronology and field quality in `Runsheet`.
-11. Export the runsheet if you need workbook output.
-12. Import the active tract into `Flowchart`.
-13. Adjust paper size, spacing, and fit settings.
-14. Print or save final backups.
+10. Use `Ask LANDroid AI` to reduce typing or stage spreadsheet rows, while reviewing each suggested title/math change.
+11. Review chronology and field quality in `Runsheet`.
+12. Export the runsheet if you need workbook output.
+13. Import the active tract into `Flowchart`.
+14. Adjust paper size, spacing, and fit settings.
+15. Print or save final backups.
 
-## 14) Troubleshooting
+## 15) Troubleshooting
 
 ### "The app opened, but I still see old work"
 - Load the correct `.landroid` file.
@@ -546,7 +574,7 @@ Recent ownership work improved how fractions are stored and displayed.
 - Save a separate `.landroid` snapshot before going back to real data.
 - Browser QA covers the combinatorial demo loader with Playwright, including visible PDF filenames on Desk Map cards, inline project-name editing, Federal Leasing lease/target/source/map/search tracking, and Research home surfacing. Deeper leasehold-branch coverage is temporarily skipped in the Playwright suite while the Raven Forest fixture is rebuilt.
 
-## 15) Practical habits for a new user
+## 16) Practical habits for a new user
 
 - Keep one tract tab per tract unless you have a strong reason not to.
 - Rename tabs early so the runsheet and flowchart stay easy to follow.
@@ -555,6 +583,7 @@ Recent ownership work improved how fractions are stored and displayed.
 - Use `Maps` for presentation-facing prospect maps and region storytelling.
 - Use `Federal Leasing` for federal lease inventory, expirations, potential targets, source packets, and federal map evidence.
 - Use `Research` as the source-of-truth shelf for laws, formulas, project notes, supporting records, map evidence, and questions you want to revisit.
+- Use `Ask LANDroid AI` for suggestions and data-entry speed, but still review the title consequences yourself.
 - Use `Runsheet` as your QA pass, not just `Desk Map`.
 - Save often, and keep milestone `.landroid` files.
 - Before deleting a branch, pause and confirm you really want the interest restored to the parent.

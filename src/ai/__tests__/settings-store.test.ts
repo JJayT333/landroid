@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import {
   DEFAULT_MODELS,
   isConfigured,
+  toPersistedAISettings,
   useAISettingsStore,
 } from '../settings-store';
 
@@ -47,5 +48,24 @@ describe('AI settings store', () => {
     expect(isConfigured(useAISettingsStore.getState())).toBe(false);
     useAISettingsStore.getState().setAnthropicKey('sk-ant-test');
     expect(isConfigured(useAISettingsStore.getState())).toBe(true);
+  });
+
+  it('persists provider preferences but not cloud API keys', () => {
+    const persisted = toPersistedAISettings({
+      ...useAISettingsStore.getState(),
+      provider: 'openai',
+      model: 'gpt-4o',
+      ollamaBaseURL: 'http://localhost:11434/v1',
+      openaiApiKey: 'sk-test',
+      anthropicApiKey: 'sk-ant-test',
+    });
+
+    expect(persisted).toEqual({
+      provider: 'openai',
+      model: 'gpt-4o',
+      ollamaBaseURL: 'http://localhost:11434/v1',
+    });
+    expect(persisted).not.toHaveProperty('openaiApiKey');
+    expect(persisted).not.toHaveProperty('anthropicApiKey');
   });
 });

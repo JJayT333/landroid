@@ -1,7 +1,11 @@
 # Ownership Math Reference
 
-This note is the canonical reference for LANDroid's ownership, leasehold, and
-decimal-interest math.
+> ARCHIVED / HISTORICAL.
+> This file has been superseded by `LANDMAN-MATH-REFERENCE.md`.
+> Do not use it as the current math source of truth.
+
+This archived note was once the main reference for LANDroid's ownership,
+leasehold, and decimal-interest math.
 
 It is written for humans first and future AI tooling second.
 

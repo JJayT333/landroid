@@ -5,7 +5,7 @@
  * model made, and inline settings. Keeps zero workspace state of its own —
  * everything deterministic still lives in the Zustand stores the tools read.
  */
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type { ModelMessage } from 'ai';
 import { runChatTurn, type ChatTurnResult } from './runChat';
 import { useAISettingsStore, isConfigured } from './settings-store';
@@ -30,10 +30,12 @@ export default function AIPanel({ onClose }: { onClose: () => void }) {
   const [entries, setEntries] = useState<ChatEntry[]>([]);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
+  const [statusText, setStatusText] = useState('');
   const [showSettings, setShowSettings] = useState(!configured);
   const undoSnapshot = useAIUndoStore((s) => s.snapshot);
   const clearSnapshot = useAIUndoStore((s) => s.clear);
   const [undoing, setUndoing] = useState(false);
+  const abortRef = useRef<AbortController | null>(null);
 
   const onUndo = async () => {
     if (!undoSnapshot || undoing) return;
@@ -76,6 +78,9 @@ export default function AIPanel({ onClose }: { onClose: () => void }) {
     setEntries([...baseEntries, streamingPlaceholder]);
     setInput('');
     setBusy(true);
+    setStatusText('Thinking...');
+    const abortController = new AbortController();
+    abortRef.current = abortController;
 
     const modelMessages: ModelMessage[] = baseEntries.map((e) => ({
       role: e.role,
@@ -101,12 +106,18 @@ export default function AIPanel({ onClose }: { onClose: () => void }) {
     try {
       const result = await runChatTurn({
         messages: modelMessages,
+        signal: abortController.signal,
         onDelta: (delta) => {
           liveText += delta;
+          setStatusText('Writing response...');
           patchStreaming();
+        },
+        onToolStart: (call) => {
+          setStatusText(`Using ${describeToolActivity(call.toolName)}...`);
         },
         onToolCall: (call) => {
           liveToolCalls.push(call);
+          setStatusText(`Finished ${describeToolActivity(call.toolName)}.`);
           patchStreaming();
         },
       });
@@ -122,22 +133,31 @@ export default function AIPanel({ onClose }: { onClose: () => void }) {
         return next;
       });
     } catch (err) {
+      const wasAborted = abortController.signal.aborted;
       setEntries((prev) => {
         const next = [...prev];
         next[streamingIndex] = {
           role: 'assistant',
-          text: liveText,
+          text: liveText || (wasAborted ? 'Canceled. Any AI change already made can still be undone with the back button.' : ''),
           toolCalls: liveToolCalls,
-          error: err instanceof Error ? err.message : String(err),
+          error: wasAborted
+            ? undefined
+            : err instanceof Error ? err.message : String(err),
         };
         return next;
       });
     } finally {
+      abortRef.current = null;
+      setStatusText('');
       setBusy(false);
     }
   };
 
   const send = () => sendText(input);
+  const cancel = () => {
+    abortRef.current?.abort();
+    setStatusText('Canceling...');
+  };
 
   const startGuidedImport = (workbookText: string) => {
     setMode('chat');
@@ -226,7 +246,7 @@ export default function AIPanel({ onClose }: { onClose: () => void }) {
               && entries[entries.length - 1]?.role === 'assistant'
               && !entries[entries.length - 1]?.text
               && (entries[entries.length - 1]?.toolCalls ?? []).length === 0 && (
-                <div className="text-xs italic text-ink-light">Thinking…</div>
+                <div className="text-xs italic text-ink-light">{statusText || 'Thinking...'}</div>
               )}
           </>
         )}
@@ -255,18 +275,52 @@ export default function AIPanel({ onClose }: { onClose: () => void }) {
             className="flex-1 resize-none rounded border border-leather/40 bg-parchment-light px-2 py-1 text-xs focus:border-gold focus:outline-none"
             disabled={busy}
           />
-          <button
-            type="submit"
-            disabled={busy || !input.trim()}
-            className="self-end rounded bg-ink px-3 py-1 text-xs font-semibold text-parchment hover:bg-ink-light disabled:opacity-40"
-          >
-            Send
-          </button>
+          {busy ? (
+            <button
+              type="button"
+              onClick={cancel}
+              className="self-end rounded border border-seal/40 px-3 py-1 text-xs font-semibold text-seal hover:bg-seal/10"
+            >
+              Cancel
+            </button>
+          ) : (
+            <button
+              type="submit"
+              disabled={!input.trim()}
+              className="self-end rounded bg-ink px-3 py-1 text-xs font-semibold text-parchment hover:bg-ink-light disabled:opacity-40"
+            >
+              Send
+            </button>
+          )}
         </form>
       </footer>
       )}
     </aside>
   );
+}
+
+function describeToolActivity(toolName: string): string {
+  const labels: Record<string, string> = {
+    getProjectSummary: 'project summary',
+    listDeskMaps: 'desk maps',
+    getLessorRoster: 'lessor roster',
+    searchInstruments: 'instrument search',
+    explainNode: 'node explanation',
+    createRootNode: 'new root node',
+    convey: 'conveyance',
+    createNpri: 'NPRI branch',
+    precede: 'predecessor insert',
+    graftToParent: 'graft',
+    previewDeleteNode: 'delete preview',
+    deleteNode: 'delete',
+    createOwner: 'owner creation',
+    createLease: 'lease creation',
+    createDeskMap: 'desk map creation',
+    setActiveDeskMap: 'desk map switch',
+    attachLease: 'lease attachment',
+  };
+
+  return labels[toolName] ?? toolName;
 }
 
 function TabButton({

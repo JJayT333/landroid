@@ -47,6 +47,10 @@ export const LEASE_JURISDICTION_OPTIONS = [
   'tribal',
 ] as const;
 export type LeaseJurisdiction = (typeof LEASE_JURISDICTION_OPTIONS)[number];
+export const TEXAS_MATH_LEASE_JURISDICTIONS: readonly LeaseJurisdiction[] = [
+  'tx_fee',
+  'tx_state',
+];
 
 /**
  * Default jurisdiction for any lease that does not carry one — every existing
@@ -93,6 +97,12 @@ export function normalizeLeaseJurisdiction(value: unknown): LeaseJurisdiction {
   return DEFAULT_LEASE_JURISDICTION;
 }
 
+export function isTexasMathLeaseJurisdiction(value: unknown): boolean {
+  return TEXAS_MATH_LEASE_JURISDICTIONS.includes(
+    normalizeLeaseJurisdiction(value)
+  );
+}
+
 export function isLeaseStatusOption(value: string): value is LeaseStatus {
   return CANONICAL_LEASE_STATUS_BY_NORMALIZED.has(value.trim().toLowerCase());
 }
@@ -117,6 +127,10 @@ export function isInactiveLeaseStatus(value: unknown): boolean {
   }
 
   return INACTIVE_LEASE_STATUS_TEXT.has(normalized);
+}
+
+export function isTexasMathLease(lease: Pick<Lease, 'jurisdiction'>): boolean {
+  return isTexasMathLeaseJurisdiction(lease.jurisdiction);
 }
 
 export interface Lease {

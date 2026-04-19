@@ -27,7 +27,7 @@ import {
   type LeaseholdTransferOrderEntry,
   type LeaseholdUnit,
 } from '../types/leasehold';
-import type { Lease } from '../types/owner';
+import { isTexasMathLease, type Lease } from '../types/owner';
 import {
   executeConveyance,
   executeCreateNpri,
@@ -576,6 +576,20 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
     }
     if (parent.interestClass !== 'mineral') {
       set({ lastError: 'Leases can only attach to mineral nodes, never NPRI' });
+      return null;
+    }
+    if (!isTexasMathLease(lease)) {
+      set({
+        lastError:
+          'Only Texas fee/state leases can attach to Desk Map math. Keep federal/private/tribal leases in Research or Federal Leasing as reference records.',
+      });
+      return null;
+    }
+    if (parent.linkedOwnerId && lease.ownerId !== parent.linkedOwnerId) {
+      set({
+        lastError:
+          'Lease owner does not match the mineral node linked owner. Link the correct owner or create a separate lease record before attaching.',
+      });
       return null;
     }
 

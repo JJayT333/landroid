@@ -93,7 +93,7 @@ export default function AISettingsPanel({ onClose }: { onClose: () => void }) {
 
       {provider !== 'ollama' && (
         <p className="rounded border border-amber-300 bg-amber-50 p-2 text-[10px] leading-snug text-amber-900">
-          Cloud API keys are stored in your browser's localStorage and sent
+          Cloud API keys stay in memory for this session only and are sent
           directly to the provider. For single-user local use only.
         </p>
       )}

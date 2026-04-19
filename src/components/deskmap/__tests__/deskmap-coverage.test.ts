@@ -313,6 +313,39 @@ describe('deskmap-coverage', () => {
     ).toBe(false);
   });
 
+  it('excludes non-Texas leases from active Texas math', () => {
+    expect(
+      isLeaseActive(
+        createBlankLease('ws-1', 'owner-1', {
+          status: 'Active',
+          jurisdiction: 'federal',
+        })
+      )
+    ).toBe(false);
+
+    const ownerOne = {
+      ...createBlankNode('node-1'),
+      grantee: 'Owner One',
+      fraction: '0.5',
+      initialFraction: '0.5',
+      linkedOwnerId: 'owner-1',
+    };
+    const federalLease = createBlankLease('ws-1', 'owner-1', {
+      id: 'lease-federal',
+      status: 'Active',
+      jurisdiction: 'federal',
+      leasedInterest: '0.5',
+    });
+
+    const summary = calculateDeskMapCoverageSummary(
+      [ownerOne],
+      new Map([['owner-1', [federalLease]]])
+    );
+
+    expect(summary.leasedOwnership).toBe('0');
+    expect(summary.unleasedOwnership).toBe('1');
+  });
+
   it('prefers the most recently updated active lease', () => {
     const lease = pickPrimaryLease([
       {
@@ -537,6 +570,10 @@ describe('deskmap-coverage', () => {
     expect(summary.currentOwnership).toBe('1.5');
     expect(summary.missingOwnership).toBe('-0.5');
     expect(summary.currentOwnerCount).toBe(2);
+    expect(summary.currentOwnershipContributors).toEqual([
+      { nodeId: 'node-1', grantee: 'Family One', fraction: '1' },
+      { nodeId: 'node-2', grantee: 'Family Two', fraction: '0.5' },
+    ]);
   });
 
   describe('canOwnerNodeHoldLease (mineral-only gate)', () => {

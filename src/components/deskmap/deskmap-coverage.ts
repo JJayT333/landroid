@@ -1,6 +1,10 @@
 import { d } from '../../engine/decimal';
 import { isNpriNode, type OwnershipNode } from '../../types/node';
-import { isInactiveLeaseStatus, type Lease } from '../../types/owner';
+import {
+  isInactiveLeaseStatus,
+  isTexasMathLease,
+  type Lease,
+} from '../../types/owner';
 import { parseInterestString } from '../../utils/interest-string';
 import { isLeaseNode } from './deskmap-lease-node';
 
@@ -27,6 +31,11 @@ export interface DeskMapCoverageSummary {
   currentOwnerCount: number;
   linkedOwnerCount: number;
   leasedOwnerCount: number;
+  currentOwnershipContributors: Array<{
+    nodeId: string;
+    grantee: string;
+    fraction: string;
+  }>;
 }
 
 export interface LeaseCoverageAllocation {
@@ -67,7 +76,7 @@ function asLeaseText(value: string | null | undefined): string {
 }
 
 export function isLeaseActive(lease: Lease) {
-  return !isInactiveLeaseStatus(lease.status);
+  return !isInactiveLeaseStatus(lease.status) && isTexasMathLease(lease);
 }
 
 /**
@@ -248,8 +257,8 @@ export function calculateDeskMapCoverageSummary(
     const remaining = d(node.fraction);
     if (!remaining.greaterThan(0)) return;
 
-    currentOwnerCount += 1;
-    currentOwnership = currentOwnership.plus(remaining);
+      currentOwnerCount += 1;
+      currentOwnership = currentOwnership.plus(remaining);
 
     if (node.linkedOwnerId) {
       linkedOwnerCount += 1;
@@ -293,5 +302,15 @@ export function calculateDeskMapCoverageSummary(
     currentOwnerCount,
     linkedOwnerCount,
     leasedOwnerCount,
+    currentOwnershipContributors: nodes
+      .filter((node) => {
+        if (node.type === 'related' || isNpriNode(node)) return false;
+        return d(node.fraction).greaterThan(0);
+      })
+      .map((node) => ({
+        nodeId: node.id,
+        grantee: node.grantee || 'Unknown',
+        fraction: node.fraction,
+      })),
   };
 }

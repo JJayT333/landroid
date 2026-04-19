@@ -14,8 +14,11 @@ import { captureSnapshot, useAIUndoStore } from './undo-store';
 
 export interface ChatTurnInput {
   messages: ModelMessage[];
+  signal?: AbortSignal;
   /** Called for every text delta as the assistant streams. */
   onDelta?: (delta: string) => void;
+  /** Called as soon as the model starts a tool call. */
+  onToolStart?: (call: { toolName: string; input: unknown }) => void;
   /** Called when a tool call resolves, before the next token arrives. */
   onToolCall?: (call: {
     toolName: string;
@@ -56,6 +59,8 @@ export async function runChatTurn(
     messages: input.messages,
     tools: landroidTools,
     stopWhen: stepCountIs(8),
+    abortSignal: input.signal,
+    timeout: settings.provider === 'ollama' ? 10 * 60_000 : 2 * 60_000,
   });
 
   // Consume the full stream. `fullStream` yields text deltas, tool-call events,
@@ -64,7 +69,14 @@ export async function runChatTurn(
   const toolCallsInProgress = new Map<string, { toolName: string; input: unknown }>();
   const toolCalls: ChatTurnResult['toolCalls'] = [];
   let mutated = false;
+  let snapshotCommitted = false;
   let finalText = '';
+
+  const commitMutationSnapshot = () => {
+    if (snapshotCommitted || !pendingSnapshot) return;
+    useAIUndoStore.getState().setSnapshot(pendingSnapshot);
+    snapshotCommitted = true;
+  };
 
   for await (const part of result.fullStream) {
     switch (part.type) {
@@ -80,7 +92,9 @@ export async function runChatTurn(
         });
         if (MUTATING_TOOL_NAMES.has(part.toolName)) {
           mutated = true;
+          commitMutationSnapshot();
         }
+        input.onToolStart?.({ toolName: part.toolName, input: part.input });
         break;
       }
       case 'tool-result': {
@@ -90,6 +104,10 @@ export async function runChatTurn(
           input: pending?.input ?? null,
           output: part.output ?? null,
         };
+        if (MUTATING_TOOL_NAMES.has(call.toolName)) {
+          mutated = true;
+          commitMutationSnapshot();
+        }
         toolCalls.push(call);
         toolCallsInProgress.delete(part.toolCallId);
         input.onToolCall?.(call);
@@ -102,8 +120,8 @@ export async function runChatTurn(
 
   // Keep the snapshot only if the turn actually mutated workspace state;
   // otherwise a harmless read-only question would wipe a prior usable undo.
-  if (mutated && pendingSnapshot) {
-    useAIUndoStore.getState().setSnapshot(pendingSnapshot);
+  if (mutated && !snapshotCommitted) {
+    commitMutationSnapshot();
   }
 
   const usage = await Promise.resolve(result.usage).catch(() => undefined);

@@ -22,6 +22,7 @@ describe('parseWorkbook — Elmore #1 Unit fixtures', () => {
       expect(sheet.name).toBeTruthy();
       expect(sheet.rawRowCount).toBeGreaterThan(0);
       expect(sheet.rawColCount).toBeGreaterThan(0);
+      expect(sheet.allRows.length).toBeGreaterThanOrEqual(sheet.rows.length);
     }
   });
 
