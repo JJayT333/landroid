@@ -18,6 +18,7 @@ export interface WorkspaceAutosaveState {
   leaseholdOrris?: LeaseholdOrri[];
   leaseholdTransferOrderEntries?: LeaseholdTransferOrderEntry[];
   activeDeskMapId: string | null;
+  activeUnitCode?: string | null;
   instrumentTypes: string[];
 }
 
@@ -45,6 +46,7 @@ interface WorkspaceAutosaveSnapshot {
   leaseholdOrris?: LeaseholdOrri[];
   leaseholdTransferOrderEntries?: LeaseholdTransferOrderEntry[];
   activeDeskMapId: string | null;
+  activeUnitCode?: string | null;
   instrumentTypes: string[];
 }
 
@@ -75,6 +77,7 @@ export function captureWorkspaceAutosaveSnapshot(
     leaseholdOrris: state.leaseholdOrris,
     leaseholdTransferOrderEntries: state.leaseholdTransferOrderEntries,
     activeDeskMapId: state.activeDeskMapId,
+    activeUnitCode: state.activeUnitCode,
     instrumentTypes: state.instrumentTypes,
   };
 }
@@ -94,6 +97,7 @@ export function workspaceAutosaveStateChanged(
     previous.leaseholdOrris !== state.leaseholdOrris ||
     previous.leaseholdTransferOrderEntries !== state.leaseholdTransferOrderEntries ||
     previous.activeDeskMapId !== state.activeDeskMapId ||
+    previous.activeUnitCode !== state.activeUnitCode ||
     previous.instrumentTypes !== state.instrumentTypes
   );
 }
@@ -111,6 +115,7 @@ export function buildWorkspaceAutosavePayload(
     leaseholdOrris: state.leaseholdOrris,
     leaseholdTransferOrderEntries: state.leaseholdTransferOrderEntries,
     activeDeskMapId: state.activeDeskMapId,
+    activeUnitCode: state.activeUnitCode,
     instrumentTypes: state.instrumentTypes,
   };
 }

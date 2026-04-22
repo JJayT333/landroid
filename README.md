@@ -54,6 +54,7 @@ handoff, 4 workflows are active and 5 are intentionally skipped pending retarget
 | `ARCHITECTURE.md` | Runtime stack, state ownership, module boundaries, and data flow. |
 | `TESTING.md` | Validation commands, known warnings, and test policy. |
 | `SECURITY.md` | Local-first security model, AI/key handling, and upload risks. |
+| `DEPLOYMENT_PLAN.md` | Hosted deployment architecture, security controls, and rollout phases. |
 | `USER_MANUAL.md` | User-facing workflow guide. |
 | `LANDMAN-MATH-REFERENCE.md` | Landman-facing math formulas and review conventions. |
 | `ROADMAP.md` | Current, next, and later work. |
@@ -65,20 +66,22 @@ See `docs/README.md` for the full documentation map.
 ## Current App Surfaces
 
 - `Desk Map`: title-chain editing and ownership review.
-- `Leasehold`: acreage, lease, ORRI, WI, NPRI payout, and transfer-order review.
+- `Leasehold`: unit-focused acreage, lease, ORRI, WI, NPRI payout, and transfer-order review.
 - `Flowchart`: presentation and print layout.
 - `Runsheet`: chronology review and workbook export.
-- `Owners`: owner, lease, contact, and document records.
+- `Owners`: unit-filtered owner, lease, contact, and document records.
 - `Curative`: title issue and curative tracking.
 - `Maps`: project map assets, regions, and references.
 - `Federal Leasing`: reference-only federal/BLM lease tracking.
 - `Research`: source records, formulas, project records, saved questions, and RRC imports.
-- `Ask LANDroid AI`: local-first assistant workflows, with Ollama as the default provider.
+- `Ask LANDroid AI`: local-first assistant workflows and workbook row review, with Ollama as the default provider.
 
 ## Demo Data
 
 Use `Demo Data -> Combinatorial - Raven Forest` to load the current sample
-workspace. Older stress and 8-tract leasehold demos have been retired.
+workspace. It starts on Raven Forest Unit A and separates Unit A and Unit B so
+Leasehold and Owners can be reviewed by unit. Older stress and 8-tract leasehold
+demos have been retired.
 
 ## Persistence Notes
 

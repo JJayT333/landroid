@@ -1,8 +1,8 @@
 /**
  * Desk Map tab bar — switch between tracts, create/rename/delete desk maps.
  *
- * When desk maps carry `unitCode` / `unitName` (Phase 4a), the tab bar groups
- * them under bold section headers. Tracts without a `unitCode` render under an
+ * When desk maps carry `unitCode` / `unitName`, the tab bar groups them under
+ * bold section headers. Tracts without a `unitCode` render under an
  * "Unassigned" header for backward compatibility with pre-overhaul workspaces.
  *
  * Double-click a tab to rename. Click × to delete.
@@ -31,6 +31,7 @@ interface UnitGroup {
 export default function DeskMapTabs() {
   const deskMaps = useWorkspaceStore((s) => s.deskMaps);
   const activeDeskMapId = useWorkspaceStore((s) => s.activeDeskMapId);
+  const activeUnitCode = useWorkspaceStore((s) => s.activeUnitCode);
   const createDeskMap = useWorkspaceStore((s) => s.createDeskMap);
   const setActiveDeskMap = useWorkspaceStore((s) => s.setActiveDeskMap);
   const renameDeskMap = useWorkspaceStore((s) => s.renameDeskMap);
@@ -62,8 +63,19 @@ export default function DeskMapTabs() {
   const hasMultipleGroups = groups.length > 1 || (groups.length === 1 && groups[0].unitCode !== null);
 
   const handleCreate = () => {
-    const num = deskMaps.length + 1;
-    createDeskMap(`Tract ${num}`, `T${num}`);
+    const activeDeskMap = activeDeskMapId
+      ? deskMaps.find((deskMap) => deskMap.id === activeDeskMapId) ?? null
+      : null;
+    const activeUnit = activeUnitCode
+      ? groups.find((group) => group.unitCode === activeUnitCode) ?? null
+      : activeDeskMap?.unitCode
+        ? groups.find((group) => group.unitCode === activeDeskMap.unitCode) ?? null
+        : null;
+    const num = activeUnit ? activeUnit.deskMaps.length + 1 : deskMaps.length + 1;
+    createDeskMap(`Tract ${num}`, `T${deskMaps.length + 1}`, [], {
+      unitName: activeUnit?.unitName,
+      unitCode: activeUnit?.unitCode ?? undefined,
+    });
   };
 
   const handleStartRename = (id: string, name: string) => {

@@ -25,8 +25,9 @@ summarizes how the app is put together and where changes should live.
 
 ## State Ownership
 
-- `workspace-store`: Desk Map nodes, tract/DeskMap records, leasehold review
-  records, active tract, instrument types, graph mutations, and lease-node sync.
+- `workspace-store`: Desk Map nodes, tract/DeskMap records, active unit focus,
+  leasehold review records, active tract, instrument types, graph mutations,
+  and lease-node sync.
 - `owner-store`: owner records, owner contacts, owner documents, and owner lease
   records.
 - `research-store`: research sources, formulas, project records, questions, and
@@ -103,6 +104,9 @@ Future policy work is tracked in `PATCH_PLAN.md`.
 - Desk Map is the title-tree source of truth.
 - Owners is the owner/lease record source of truth.
 - Leasehold consumes Desk Map and Owners data for review outputs.
+- Unit focus is driven by Desk Map `unitCode` / `unitName` fields. Leasehold
+  filters its tract set by active unit, and unit-wide ORRI/WI records carry a
+  `unitCode` so multi-unit projects do not blend payout math across units.
 - Federal Leasing and Research may store federal/private reference records, but
   those records must not affect active Texas math.
 - NPRI, ORRI, mineral ownership, leases, assignments, and curative issues are

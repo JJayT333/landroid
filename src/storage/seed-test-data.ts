@@ -1054,7 +1054,7 @@ interface CombinatorialTractPlan {
     | 'kitchen_sink';
   /** Raven Forest pooled-unit grouping. */
   unitName: string;
-  unitCode: 'A' | 'B';
+  unitCode: string;
   /** Target node count — varies per tract so the dataset has realistic variety. */
   targetNodes: number;
   /** Lessee name for leases generated on this tract. */
@@ -2083,6 +2083,7 @@ export function buildCombinatorialWorkspaceData(): {
   leaseholdOrris: LeaseholdOrri[];
   leaseholdTransferOrderEntries: LeaseholdTransferOrderEntry[];
   activeDeskMapId: string | null;
+  activeUnitCode: string | null;
   instrumentTypes: string[];
   pdfMappings: PdfMapping[];
   ownerData: OwnerWorkspaceData;
@@ -2127,39 +2128,55 @@ export function buildCombinatorialWorkspaceData(): {
       id: 'combinatorial-orri-1',
       payee: 'Prairie Vista Override, LP',
       scope: 'unit',
+      unitCode: 'A',
       deskMapId: null,
       burdenFraction: '1/32',
       burdenBasis: 'gross_8_8',
       effectiveDate: '2024-02-01',
       sourceDocNo: 'CB-ORRI-1',
-      notes: 'Unit-wide gross 8/8 ORRI covering every tract.',
+      notes: 'Unit A gross 8/8 ORRI covering every Unit A tract.',
     },
     {
       id: 'combinatorial-orri-2',
       payee: 'Salt Fork Royalty Partners',
       scope: 'unit',
+      unitCode: 'A',
       deskMapId: null,
       burdenFraction: '1/64',
       burdenBasis: 'net_revenue_interest',
       effectiveDate: '2024-02-15',
       sourceDocNo: 'CB-ORRI-2',
-      notes: 'Unit-wide NRI-basis ORRI for stacking-order review.',
+      notes: 'Unit A NRI-basis ORRI for stacking-order review.',
     },
     {
       id: 'combinatorial-orri-3',
       payee: 'Llano Working Interest Override LLC',
       scope: 'unit',
+      unitCode: 'A',
       deskMapId: null,
       burdenFraction: '1/80',
       burdenBasis: 'working_interest',
       effectiveDate: '2024-03-01',
       sourceDocNo: 'CB-ORRI-3',
-      notes: 'Unit-wide WI-basis ORRI (note: see audit finding #2 on the WI-basis convention).',
+      notes: 'Unit A WI-basis ORRI.',
+    },
+    {
+      id: 'combinatorial-orri-3b',
+      payee: 'Pine Island Override, LP',
+      scope: 'unit',
+      unitCode: 'B',
+      deskMapId: null,
+      burdenFraction: '1/40',
+      burdenBasis: 'gross_8_8',
+      effectiveDate: '2024-03-15',
+      sourceDocNo: 'CB-ORRI-3B',
+      notes: 'Unit B gross 8/8 ORRI covering every Unit B tract.',
     },
     {
       id: 'combinatorial-orri-4',
       payee: 'Pecos Override Co.',
       scope: 'tract',
+      unitCode: null,
       deskMapId: deskMapIdByCode.get('C6') ?? null,
       burdenFraction: '1/16',
       burdenBasis: 'gross_8_8',
@@ -2171,6 +2188,7 @@ export function buildCombinatorialWorkspaceData(): {
       id: 'combinatorial-orri-5',
       payee: 'Brazos Bend Overrides, LP',
       scope: 'tract',
+      unitCode: null,
       deskMapId: deskMapIdByCode.get('C10') ?? null,
       burdenFraction: '1/128',
       burdenBasis: 'net_revenue_interest',
@@ -2187,17 +2205,19 @@ export function buildCombinatorialWorkspaceData(): {
       assignor: UNIT_A_LESSEE,
       assignee: 'Caprock Resources, LLC',
       scope: 'unit',
+      unitCode: 'A',
       deskMapId: null,
       workingInterestFraction: '1/2',
       effectiveDate: '2024-03-01',
       sourceDocNo: 'CB-ASG-1',
-      notes: 'Unit-wide 50% working-interest assignment to Caprock Resources.',
+      notes: 'Unit A 50% working-interest assignment to Caprock Resources.',
     },
     {
       id: 'combinatorial-assignment-2',
       assignor: UNIT_B_LESSEE,
       assignee: 'Rio Draw Operating Co.',
       scope: 'tract',
+      unitCode: null,
       deskMapId: deskMapIdByCode.get('C6') ?? null,
       workingInterestFraction: '1/4',
       effectiveDate: '2024-04-01',
@@ -2209,6 +2229,7 @@ export function buildCombinatorialWorkspaceData(): {
       assignor: UNIT_B_LESSEE,
       assignee: 'Staked Plains Minerals',
       scope: 'tract',
+      unitCode: null,
       deskMapId: deskMapIdByCode.get('C10') ?? null,
       workingInterestFraction: '1/8',
       effectiveDate: '2024-05-01',
@@ -2236,6 +2257,7 @@ export function buildCombinatorialWorkspaceData(): {
     leaseholdOrris,
     leaseholdTransferOrderEntries: [],
     activeDeskMapId: deskMaps[0]?.id ?? null,
+    activeUnitCode: 'A',
     instrumentTypes: [...DEMO_INSTRUMENT_TYPES],
     pdfMappings: builder.pdfMappings,
     ownerData,
@@ -2258,6 +2280,7 @@ export async function seedCombinatorialData(): Promise<{
     leaseholdOrris: workspace.leaseholdOrris,
     leaseholdTransferOrderEntries: workspace.leaseholdTransferOrderEntries,
     activeDeskMapId: workspace.activeDeskMapId,
+    activeUnitCode: workspace.activeUnitCode,
     instrumentTypes: workspace.instrumentTypes,
   });
   await resetWorkspaceSideStores(workspace.workspaceId, workspace.ownerData);

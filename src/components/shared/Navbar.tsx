@@ -125,6 +125,7 @@ export default function Navbar() {
       leaseholdOrris,
       leaseholdTransferOrderEntries,
       activeDeskMapId: state.activeDeskMapId,
+      activeUnitCode: state.activeUnitCode,
       instrumentTypes: state.instrumentTypes,
       ownerData: await useOwnerStore.getState().exportWorkspaceData(),
       pdfData: await exportPdfWorkspaceData(state.nodes),

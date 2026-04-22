@@ -39,6 +39,7 @@ import {
 } from '../engine/math-engine';
 import type { Audit } from '../types/result';
 import { createWorkspaceId } from '../utils/workspace-id';
+import { resolveActiveUnitCode } from '../utils/desk-map-units';
 
 const DEFAULT_INSTRUMENT_TYPES = [
   'Deed',
@@ -69,6 +70,7 @@ interface WorkspaceState {
   leaseholdOrris: LeaseholdOrri[];
   leaseholdTransferOrderEntries: LeaseholdTransferOrderEntry[];
   activeDeskMapId: string | null;
+  activeUnitCode: string | null;
   instrumentTypes: string[];
 
   // Lifecycle
@@ -96,15 +98,32 @@ interface WorkspaceState {
   removeLeaseholdTransferOrderEntry: (sourceRowId: string) => void;
   setActiveNode: (id: string | null) => void;
   setActiveDeskMap: (id: string) => void;
+  setActiveUnitCode: (unitCode: string | null) => void;
   addInstrumentType: (type: string) => void;
 
   // Desk map management
-  createDeskMap: (name: string, code: string, initialNodeIds?: string[]) => string;
+  createDeskMap: (
+    name: string,
+    code: string,
+    initialNodeIds?: string[],
+    fields?: Partial<
+      Pick<
+        DeskMap,
+        'tractId' | 'grossAcres' | 'pooledAcres' | 'description' | 'unitName' | 'unitCode'
+      >
+    >
+  ) => string;
   renameDeskMap: (id: string, name: string) => void;
   updateDeskMapDetails: (
     id: string,
-    fields: Partial<Pick<DeskMap, 'grossAcres' | 'pooledAcres' | 'description'>>
+    fields: Partial<
+      Pick<
+        DeskMap,
+        'grossAcres' | 'pooledAcres' | 'description' | 'unitName' | 'unitCode'
+      >
+    >
   ) => void;
+  clearDeskMapNodes: (id: string) => void;
   deleteDeskMap: (id: string) => void;
   getActiveDeskMapNodes: () => OwnershipNode[];
 
@@ -137,6 +156,7 @@ interface WorkspaceState {
     leaseholdOrris?: LeaseholdOrri[];
     leaseholdTransferOrderEntries?: LeaseholdTransferOrderEntry[];
     activeDeskMapId: string | null;
+    activeUnitCode?: string | null;
     instrumentTypes?: string[];
   }) => void;
 }
@@ -160,6 +180,50 @@ function resolveActiveDeskMapId(
   return deskMaps[0]?.id ?? null;
 }
 
+function collectDescendantIds(
+  nodes: OwnershipNode[],
+  rootIds: Set<string>
+): Set<string> {
+  const childrenByParentId = new Map<string, string[]>();
+  for (const node of nodes) {
+    if (!node.parentId) continue;
+    const children = childrenByParentId.get(node.parentId) ?? [];
+    children.push(node.id);
+    childrenByParentId.set(node.parentId, children);
+  }
+
+  const collected = new Set(rootIds);
+  const stack = [...rootIds];
+  while (stack.length > 0) {
+    const currentId = stack.pop()!;
+    for (const childId of childrenByParentId.get(currentId) ?? []) {
+      if (collected.has(childId)) continue;
+      collected.add(childId);
+      stack.push(childId);
+    }
+  }
+  return collected;
+}
+
+function collectAncestorIds(
+  nodes: OwnershipNode[],
+  startIds: Set<string>
+): Set<string> {
+  const nodeById = new Map(nodes.map((node) => [node.id, node]));
+  const ancestors = new Set<string>();
+
+  for (const id of startIds) {
+    let parentId = nodeById.get(id)?.parentId ?? null;
+    while (parentId) {
+      if (ancestors.has(parentId)) break;
+      ancestors.add(parentId);
+      parentId = nodeById.get(parentId)?.parentId ?? null;
+    }
+  }
+
+  return ancestors;
+}
+
 export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
   workspaceId: createWorkspaceId(),
   projectName: 'Untitled Workspace',
@@ -170,6 +234,7 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
   leaseholdOrris: [],
   leaseholdTransferOrderEntries: [],
   activeDeskMapId: null,
+  activeUnitCode: null,
   instrumentTypes: [...DEFAULT_INSTRUMENT_TYPES],
   _hydrated: false,
   activeNodeId: null,
@@ -186,10 +251,15 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
       }),
     })),
   addLeaseholdAssignment: (assignment = {}) => {
+    const state = get();
+    const validUnitCodes = new Set(
+      state.deskMaps.flatMap((deskMap) => (deskMap.unitCode ? [deskMap.unitCode] : []))
+    );
     const next = normalizeLeaseholdAssignment({
       ...createBlankLeaseholdAssignment(),
+      unitCode: assignment.scope === 'tract' ? null : state.activeUnitCode,
       ...assignment,
-    });
+    }, { validUnitCodes });
     set((state) => ({
       leaseholdAssignments: [...state.leaseholdAssignments, next],
     }));
@@ -198,6 +268,9 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
   updateLeaseholdAssignment: (id, fields) =>
     set((state) => {
       const validDeskMapIds = new Set(state.deskMaps.map((deskMap) => deskMap.id));
+      const validUnitCodes = new Set(
+        state.deskMaps.flatMap((deskMap) => (deskMap.unitCode ? [deskMap.unitCode] : []))
+      );
       return {
         leaseholdAssignments: state.leaseholdAssignments.map((assignment) =>
           assignment.id === id
@@ -205,8 +278,14 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
                 {
                   ...assignment,
                   ...fields,
+                  unitCode:
+                    fields.scope === 'tract'
+                      ? null
+                      : fields.scope === 'unit' && fields.unitCode === undefined
+                        ? state.activeUnitCode
+                        : fields.unitCode ?? assignment.unitCode,
                 },
-                { validDeskMapIds }
+                { validDeskMapIds, validUnitCodes }
               )
             : assignment
         ),
@@ -222,7 +301,14 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
       ),
     })),
   addLeaseholdOrri: (orri = {}) => {
-    const next = normalizeLeaseholdOrri(orri);
+    const state = get();
+    const validUnitCodes = new Set(
+      state.deskMaps.flatMap((deskMap) => (deskMap.unitCode ? [deskMap.unitCode] : []))
+    );
+    const next = normalizeLeaseholdOrri({
+      unitCode: orri.scope === 'tract' ? null : state.activeUnitCode,
+      ...orri,
+    }, { validUnitCodes });
     set((state) => ({
       leaseholdOrris: [...state.leaseholdOrris, next],
     }));
@@ -231,6 +317,9 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
   updateLeaseholdOrri: (id, fields) =>
     set((state) => {
       const validDeskMapIds = new Set(state.deskMaps.map((deskMap) => deskMap.id));
+      const validUnitCodes = new Set(
+        state.deskMaps.flatMap((deskMap) => (deskMap.unitCode ? [deskMap.unitCode] : []))
+      );
       return {
         leaseholdOrris: state.leaseholdOrris.map((orri) =>
           orri.id === id
@@ -238,8 +327,14 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
                 {
                   ...orri,
                   ...fields,
+                  unitCode:
+                    fields.scope === 'tract'
+                      ? null
+                      : fields.scope === 'unit' && fields.unitCode === undefined
+                        ? state.activeUnitCode
+                        : fields.unitCode ?? orri.unitCode,
                 },
-                { validDeskMapIds }
+                { validDeskMapIds, validUnitCodes }
               )
             : orri
         ),
@@ -304,9 +399,35 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
     })),
   setActiveNode: (id) => set({ activeNodeId: id }),
   setActiveDeskMap: (id) =>
-    set((state) => ({
-      activeDeskMapId: resolveActiveDeskMapId(state.deskMaps, id),
-    })),
+    set((state) => {
+      const activeDeskMapId = resolveActiveDeskMapId(state.deskMaps, id);
+      const activeDeskMap = activeDeskMapId
+        ? state.deskMaps.find((deskMap) => deskMap.id === activeDeskMapId) ?? null
+        : null;
+      return {
+        activeDeskMapId,
+        activeUnitCode: activeDeskMap?.unitCode
+          ? activeDeskMap.unitCode
+          : resolveActiveUnitCode(state.deskMaps, state.activeUnitCode, activeDeskMapId),
+      };
+    }),
+  setActiveUnitCode: (unitCode) =>
+    set((state) => {
+      const activeUnitCode = resolveActiveUnitCode(
+        state.deskMaps,
+        unitCode,
+        state.activeDeskMapId
+      );
+      const activeDeskMapId = activeUnitCode
+        ? state.deskMaps.find((deskMap) => deskMap.unitCode === activeUnitCode)?.id
+          ?? state.activeDeskMapId
+        : state.activeDeskMapId;
+
+      return {
+        activeUnitCode,
+        activeDeskMapId: resolveActiveDeskMapId(state.deskMaps, activeDeskMapId),
+      };
+    }),
   addInstrumentType: (type) =>
     set((state) => ({
       instrumentTypes: state.instrumentTypes.includes(type)
@@ -314,26 +435,29 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
         : [...state.instrumentTypes, type],
     })),
 
-  createDeskMap: (name, code, initialNodeIds) => {
+  createDeskMap: (name, code, initialNodeIds, fields = {}) => {
     const id = `dm-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    const normalized = normalizeDeskMap(
+      {
+        id,
+        name,
+        code,
+        tractId: fields.tractId ?? null,
+        grossAcres: fields.grossAcres ?? '',
+        pooledAcres: fields.pooledAcres ?? '',
+        description: fields.description ?? '',
+        nodeIds: initialNodeIds ?? [],
+        unitName: fields.unitName,
+        unitCode: fields.unitCode,
+      },
+      name
+    );
     set((state) => ({
-      deskMaps: [
-        ...state.deskMaps,
-        normalizeDeskMap(
-          {
-            id,
-            name,
-            code,
-            tractId: null,
-            grossAcres: '',
-            pooledAcres: '',
-            description: '',
-            nodeIds: initialNodeIds ?? [],
-          },
-          name
-        ),
-      ],
+      deskMaps: [...state.deskMaps, normalized],
       activeDeskMapId: id,
+      activeUnitCode: normalized.unitCode
+        ? normalized.unitCode
+        : resolveActiveUnitCode([...state.deskMaps, normalized], state.activeUnitCode, id),
     }));
     return id;
   },
@@ -344,8 +468,8 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
     })),
 
   updateDeskMapDetails: (id, fields) =>
-    set((state) => ({
-      deskMaps: state.deskMaps.map((deskMap) =>
+    set((state) => {
+      const deskMaps = state.deskMaps.map((deskMap) =>
         deskMap.id === id
           ? normalizeDeskMap(
               {
@@ -355,14 +479,94 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
               deskMap.name
             )
           : deskMap
+      );
+      return {
+        deskMaps,
+        activeUnitCode: resolveActiveUnitCode(
+          deskMaps,
+          state.activeUnitCode,
+          state.activeDeskMapId
+        ),
+      };
+    }),
+
+  clearDeskMapNodes: (id) => {
+    const state = get();
+    const targetDeskMap = state.deskMaps.find((deskMap) => deskMap.id === id);
+    if (!targetDeskMap) {
+      set({ lastError: `Desk map ${id} not found` });
+      return;
+    }
+
+    const activeIds = new Set(targetDeskMap.nodeIds);
+    if (activeIds.size === 0) {
+      set({ lastError: null });
+      return;
+    }
+
+    const idsReferencedElsewhere = new Set(
+      state.deskMaps
+        .filter((deskMap) => deskMap.id !== id)
+        .flatMap((deskMap) => deskMap.nodeIds)
+    );
+    const deleteCandidates = collectDescendantIds(state.nodes, activeIds);
+    const protectedAncestors = collectAncestorIds(state.nodes, idsReferencedElsewhere);
+
+    for (const protectedId of idsReferencedElsewhere) {
+      deleteCandidates.delete(protectedId);
+    }
+    for (const protectedId of protectedAncestors) {
+      deleteCandidates.delete(protectedId);
+    }
+
+    const deletedIds = [...deleteCandidates];
+    const deletedIdSet = new Set(deletedIds);
+
+    set({
+      nodes: state.nodes.filter((node) => !deletedIdSet.has(node.id)),
+      deskMaps: state.deskMaps.map((deskMap) =>
+        deskMap.id === id
+          ? { ...deskMap, nodeIds: [] }
+          : {
+              ...deskMap,
+              nodeIds: deskMap.nodeIds.filter((nodeId) => !deletedIdSet.has(nodeId)),
+            }
       ),
-    })),
+      leaseholdAssignments: state.leaseholdAssignments.filter(
+        (assignment) => assignment.deskMapId !== id
+      ),
+      leaseholdOrris: state.leaseholdOrris.filter((orri) => orri.deskMapId !== id),
+      leaseholdTransferOrderEntries: state.leaseholdTransferOrderEntries.filter(
+        (entry) => !entry.sourceRowId.startsWith(`royalty-${id}-`)
+      ),
+      activeNodeId:
+        state.activeNodeId && activeIds.has(state.activeNodeId)
+          ? null
+          : state.activeNodeId,
+      lastAudit: null,
+      lastError: null,
+    });
+
+    for (const nodeId of deletedIds) {
+      void deletePdf(nodeId);
+      void useMapStore.getState().unlinkNode(nodeId);
+      useCurativeStore.getState().unlinkNode(nodeId);
+    }
+  },
 
   deleteDeskMap: (id) =>
     set((state) => {
       void useMapStore.getState().unlinkDeskMap(id);
       useCurativeStore.getState().unlinkDeskMap(id);
       const remainingDeskMaps = state.deskMaps.filter((dm) => dm.id !== id);
+      const activeDeskMapId = state.activeDeskMapId === id
+        ? (remainingDeskMaps[0]?.id ?? null)
+        : state.activeDeskMapId;
+      const activeUnitCode = resolveActiveUnitCode(
+        remainingDeskMaps,
+        state.activeUnitCode,
+        activeDeskMapId
+      );
       return {
         deskMaps: remainingDeskMaps,
         leaseholdAssignments: state.leaseholdAssignments.filter(
@@ -372,9 +576,11 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
         leaseholdTransferOrderEntries: state.leaseholdTransferOrderEntries.filter(
           (entry) => !entry.sourceRowId.startsWith(`royalty-${id}-`)
         ),
-        activeDeskMapId: state.activeDeskMapId === id
-          ? (remainingDeskMaps[0]?.id ?? null)
-          : state.activeDeskMapId,
+        activeDeskMapId: activeUnitCode
+          ? remainingDeskMaps.find((deskMap) => deskMap.unitCode === activeUnitCode)?.id
+            ?? activeDeskMapId
+          : activeDeskMapId,
+        activeUnitCode,
       };
     }),
 
@@ -753,6 +959,20 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
         )
       );
       const validDeskMapIds = new Set(normalizedDeskMaps.map((deskMap) => deskMap.id));
+      const validUnitCodes = new Set(
+        normalizedDeskMaps.flatMap((deskMap) =>
+          deskMap.unitCode ? [deskMap.unitCode] : []
+        )
+      );
+      const activeDeskMapId = resolveActiveDeskMapId(
+        normalizedDeskMaps,
+        data.activeDeskMapId
+      );
+      const activeUnitCode = resolveActiveUnitCode(
+        normalizedDeskMaps,
+        data.activeUnitCode,
+        activeDeskMapId
+      );
 
       return {
         workspaceId: data.workspaceId,
@@ -762,15 +982,20 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
         leaseholdUnit: normalizeLeaseholdUnit(data.leaseholdUnit),
         leaseholdAssignments: normalizeLeaseholdAssignments(data.leaseholdAssignments, {
           validDeskMapIds,
+          validUnitCodes,
         }),
-        leaseholdOrris: normalizeLeaseholdOrris(data.leaseholdOrris, { validDeskMapIds }),
+        leaseholdOrris: normalizeLeaseholdOrris(data.leaseholdOrris, {
+          validDeskMapIds,
+          validUnitCodes,
+        }),
         leaseholdTransferOrderEntries: normalizeLeaseholdTransferOrderEntries(
           data.leaseholdTransferOrderEntries
         ),
-        activeDeskMapId: resolveActiveDeskMapId(
-          normalizedDeskMaps,
-          data.activeDeskMapId
-        ),
+        activeDeskMapId: activeUnitCode
+          ? normalizedDeskMaps.find((deskMap) => deskMap.unitCode === activeUnitCode)?.id
+            ?? activeDeskMapId
+          : activeDeskMapId,
+        activeUnitCode,
         instrumentTypes: data.instrumentTypes?.length
           ? data.instrumentTypes
           : [...DEFAULT_INSTRUMENT_TYPES],

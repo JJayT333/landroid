@@ -12,6 +12,7 @@ Use this map to decide which Markdown file to read or update.
 | `ARCHITECTURE.md` | Implementation map and module ownership. | Entrypoints, store ownership, data flow, or boundaries change. |
 | `TESTING.md` | Validation command selection and known warnings. | Tests, fixtures, skipped e2e status, or validation policy changes. |
 | `SECURITY.md` | Security model, AI key policy, and import risk notes. | Provider, hosting, upload, or secret-handling posture changes. |
+| `DEPLOYMENT_PLAN.md` | Hosted deployment, cloud security, and online AI rollout plan. | Hosted architecture, rollout phases, or provider strategy changes. |
 | `USER_MANUAL.md` | User-facing app workflow guide. | User-visible behavior changes. |
 | `LANDMAN-MATH-REFERENCE.md` | Landman-facing math formulas and conventions. | Calculation semantics or warning/blocking behavior changes. |
 | `ROADMAP.md` | Short priority map. | Strategic priorities change. |

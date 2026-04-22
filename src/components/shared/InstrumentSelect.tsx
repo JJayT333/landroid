@@ -10,9 +10,16 @@ import { useWorkspaceStore } from '../../store/workspace-store';
 interface InstrumentSelectProps {
   value: string;
   onChange: (v: string) => void;
+  disabled?: boolean;
+  label?: string;
 }
 
-export default function InstrumentSelect({ value, onChange }: InstrumentSelectProps) {
+export default function InstrumentSelect({
+  value,
+  onChange,
+  disabled = false,
+  label = 'Instrument',
+}: InstrumentSelectProps) {
   const instrumentTypes = useWorkspaceStore((s) => s.instrumentTypes);
   const addInstrumentType = useWorkspaceStore((s) => s.addInstrumentType);
 
@@ -39,12 +46,14 @@ export default function InstrumentSelect({ value, onChange }: InstrumentSelectPr
   );
 
   const handleSelect = (type: string) => {
+    if (disabled) return;
     onChange(type);
     setOpen(false);
     setFilter('');
   };
 
   const handleAddCustom = () => {
+    if (disabled) return;
     const trimmed = customValue.trim();
     if (!trimmed) return;
     addInstrumentType(trimmed);
@@ -57,12 +66,13 @@ export default function InstrumentSelect({ value, onChange }: InstrumentSelectPr
   return (
     <div ref={wrapperRef} className="relative">
       <label className="text-[10px] text-ink-light uppercase tracking-wider block mb-1">
-        Instrument
+        {label}
       </label>
       <button
         type="button"
+        disabled={disabled}
         onClick={() => { setOpen(!open); setFilter(''); }}
-        className="w-full px-3 py-1.5 rounded-lg border border-ledger-line bg-parchment text-ink text-sm text-left focus:ring-2 focus:ring-leather focus:border-leather outline-none flex items-center justify-between"
+        className="w-full px-3 py-1.5 rounded-lg border border-ledger-line bg-parchment text-ink text-sm text-left focus:ring-2 focus:ring-leather focus:border-leather outline-none flex items-center justify-between disabled:bg-leather/10 disabled:opacity-70"
       >
         <span className={value ? 'text-ink' : 'text-ink-light'}>{value || 'Select...'}</span>
         <span className="text-ink-light text-xs">&#9662;</span>

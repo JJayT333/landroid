@@ -33,6 +33,9 @@ export interface StagedImportRow {
   id: string;
   sheetName: string;
   rowNumber: number;
+  tractCode: string;
+  tractName: string;
+  grossAcres: string;
   sourceRow: string[];
   columnMap: StagedImportColumnMap;
   status: StagedImportRowStatus;
@@ -59,6 +62,9 @@ export interface StagedImportSheetSummary {
   headerRowNumber: number | null;
   stagedRowCount: number;
   mappedFields: StagedImportField[];
+  tractCode: string;
+  tractName: string;
+  grossAcres: string;
 }
 
 export interface StagedImportBuildResult {
@@ -77,14 +83,14 @@ export interface ParentSuggestion {
 const HEADER_ALIASES: Record<StagedImportField, RegExp[]> = {
   grantor: [
     /\bgrantor\b/i,
-    /\bfrom\b/i,
+    /^from$/i,
     /\bassignor\b/i,
     /\blessor\b/i,
     /\bpredecessor\b/i,
   ],
   grantee: [
     /\bgrantee\b/i,
-    /\bto\b/i,
+    /^to$/i,
     /\bassignee\b/i,
     /\blessee\b/i,
     /\bsuccessor\b/i,
@@ -108,6 +114,7 @@ const HEADER_ALIASES: Record<StagedImportField, RegExp[]> = {
   page: [/\bpage\b/i, /\bpg\b/i],
   date: [
     /\binstrument\s*date\b/i,
+    /\binst\.?\s*date\b/i,
     /\bdeed\s*date\b/i,
     /\bexecution\s*date\b/i,
     /^date$/i,
@@ -161,12 +168,43 @@ const HEADER_ALIASES: Record<StagedImportField, RegExp[]> = {
 const MIN_HEADER_SCORE = 2;
 const MAX_HEADER_SCAN_ROWS = 12;
 
+interface SheetTractInfo {
+  code: string;
+  name: string;
+  grossAcres: string;
+}
+
+interface InheritedInstrumentContext {
+  instrument: string;
+  docNo: string;
+  vol: string;
+  page: string;
+  date: string;
+  fileDate: string;
+  grantor: string;
+  grantee: string;
+  landDesc: string;
+}
+
 function normalizeCell(value: string | undefined): string {
   return (value ?? '').replace(/\s+/g, ' ').trim();
 }
 
 function getImportRows(sheet: ParsedSheet): string[][] {
   return sheet.allRows?.length ? sheet.allRows : sheet.rows;
+}
+
+export function inferTractInfoFromSheetName(
+  sheetName: string,
+  fallbackIndex = 0
+): SheetTractInfo {
+  const tractMatch = sheetName.match(/\btract\s*([a-z0-9]+)\b/i);
+  const acresMatch = sheetName.match(/([\d,.]+)\s*ac(?:\.|\b)/i);
+  const tractNumber = tractMatch?.[1]?.toUpperCase() ?? String(fallbackIndex + 1);
+  const code = `T${tractNumber.replace(/^T/i, '')}`;
+  const grossAcres = acresMatch?.[1]?.replace(/,/g, '') ?? '';
+  const name = grossAcres ? `Tract ${tractNumber} - ${grossAcres} ac.` : `Tract ${tractNumber}`;
+  return { code, name, grossAcres };
 }
 
 function compactHeader(value: string): string {
@@ -226,6 +264,88 @@ function getCell(row: string[], map: StagedImportColumnMap, field: StagedImportF
   return columnIndex === undefined ? '' : normalizeCell(row[columnIndex]);
 }
 
+function getLikelyFractionText(value: string): string {
+  const text = normalizeCell(value);
+  if (!text) return '';
+  if (/\d+(?:\.\d+)?\s*\/\s*\d+(?:\.\d+)?|\d+(?:\.\d+)?%/.test(text)) {
+    return text;
+  }
+  if (/^0?\.\d+$|^1(?:\.0+)?$/.test(text)) {
+    return text;
+  }
+  return '';
+}
+
+function isSectionBreakRow(row: string[]): boolean {
+  const filled = row
+    .map(normalizeCell)
+    .filter(Boolean);
+  if (filled.length === 0) return true;
+  const first = normalizeCell(row[0]).toLowerCase();
+  if (/^(subsequent title|current ownership|ownership|notes?)$/.test(first)) {
+    return true;
+  }
+  return filled.length <= 2 && /^(subtotal|total)$/i.test(filled[0]);
+}
+
+function looksLikeDotoOwnershipRow(row: StagedImportRow): boolean {
+  if (!row.fractionInput.trim()) return false;
+  if (!row.grantor.trim()) return false;
+  const granteeLooksLikeSource = !row.grantee.trim() || /^exh(?:ibit)?\.?\s+/i.test(row.grantee.trim());
+  if (!granteeLooksLikeSource) return false;
+  return !row.instrument.trim() || /\b(?:doto|ownership|runsheet)\b/i.test(row.instrument);
+}
+
+function buildDotoOwnershipRemarks(row: StagedImportRow): string {
+  const parts = [
+    row.remarks,
+    row.grantee ? `Source exhibit: ${row.grantee}` : '',
+  ];
+  return parts
+    .map(normalizeCell)
+    .filter(Boolean)
+    .join(' | ');
+}
+
+function inheritInstrumentFields(
+  row: StagedImportRow,
+  context: InheritedInstrumentContext | null
+): StagedImportRow {
+  if (!context) return row;
+
+  const inherited = {
+    ...row,
+    instrument: row.instrument || context.instrument,
+    docNo: row.docNo || context.docNo,
+    vol: row.vol || context.vol,
+    page: row.page || context.page,
+    date: row.date || context.date,
+    fileDate: row.fileDate || context.fileDate,
+    landDesc: row.landDesc || context.landDesc,
+  };
+
+  if (looksLikeDotoOwnershipRow(row)) {
+    return {
+      ...inherited,
+      grantor: context.grantor || context.grantee || '',
+      grantee: row.grantor,
+      remarks: buildDotoOwnershipRemarks(row),
+    };
+  }
+
+  return inherited;
+}
+
+function isInstrumentContextRow(row: StagedImportRow): boolean {
+  return Boolean(
+    row.instrument
+      || row.docNo
+      || row.fileDate
+      || row.date
+      || (row.grantor && row.grantee && row.landDesc)
+  );
+}
+
 function inferInterestClass(rawClass: string): InterestClass {
   const text = rawClass.toLowerCase();
   if (/\bnpri\b/.test(text) || /non[-\s]*participating/.test(text)) {
@@ -267,6 +387,11 @@ export function parseImportFraction(value: string): { ok: true; value: string } 
     return { ok: false, error: 'Fraction is required before creating a node.' };
   }
 
+  const expressionResult = parseInterestExpression(raw);
+  if (expressionResult.ok) {
+    return expressionResult;
+  }
+
   if (raw.endsWith('%')) {
     try {
       const percent = new Decimal(raw.slice(0, -1).trim());
@@ -288,6 +413,88 @@ export function parseImportFraction(value: string): { ok: true; value: string } 
     return { ok: false, error: 'Fraction must be greater than zero.' };
   }
   return { ok: true, value: serialize(parsed) };
+}
+
+function parseInterestExpression(raw: string): { ok: true; value: string } | { ok: false } {
+  const normalized = raw
+    .replace(/\b(?:MI|RI|NPRI|mineral\s+interest)\b.*$/i, '')
+    .replace(/\bburdened\b.*$/i, '')
+    .replace(/,/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!normalized) {
+    return { ok: false };
+  }
+  if (!/[xX*+\-]/.test(normalized)) {
+    const singleTerm = parseInterestTerm(normalized);
+    if (
+      singleTerm
+      && singleTerm.isFinite()
+      && singleTerm.greaterThan(0)
+      && singleTerm.lessThanOrEqualTo(1)
+      && normalized !== raw.trim()
+    ) {
+      return { ok: true, value: serialize(singleTerm) };
+    }
+    return { ok: false };
+  }
+
+  const tokens = normalized.match(/(\d+(?:\.\d+)?\s*\/\s*\d+(?:\.\d+)?|\d+(?:\.\d+)?%?|[xX*+\-])/g);
+  if (!tokens || tokens.length < 3) {
+    return { ok: false };
+  }
+
+  let value: Decimal | null = null;
+  let pendingOperator: 'mul' | 'add' | 'sub' | null = null;
+  for (const token of tokens) {
+    const operator = token.toLowerCase();
+    if (operator === 'x' || operator === '*' || operator === '+' || operator === '-') {
+      if (!value || pendingOperator) return { ok: false };
+      pendingOperator = operator === 'x' || operator === '*' ? 'mul' : operator === '+' ? 'add' : 'sub';
+      continue;
+    }
+
+    const term = parseInterestTerm(token);
+    if (!term) return { ok: false };
+    if (!value) {
+      value = term;
+      continue;
+    }
+    if (!pendingOperator) return { ok: false };
+    if (pendingOperator === 'mul') value = value.mul(term);
+    if (pendingOperator === 'add') value = value.plus(term);
+    if (pendingOperator === 'sub') value = value.minus(term);
+    pendingOperator = null;
+  }
+
+  if (!value || pendingOperator || !value.isFinite() || value.lessThanOrEqualTo(0) || value.greaterThan(1)) {
+    return { ok: false };
+  }
+  return { ok: true, value: serialize(value) };
+}
+
+function parseInterestTerm(raw: string): Decimal | null {
+  const token = raw.trim();
+  if (!token) return null;
+  try {
+    if (token.endsWith('%')) {
+      const percent = new Decimal(token.slice(0, -1).trim());
+      return percent.div(100);
+    }
+    const fractionParts = token.split('/').map((part) => part.trim());
+    if (fractionParts.length === 2) {
+      const numerator = new Decimal(fractionParts[0]);
+      const denominator = new Decimal(fractionParts[1]);
+      if (denominator.isZero()) return null;
+      return numerator.div(denominator);
+    }
+    if (fractionParts.length === 1) {
+      return new Decimal(token);
+    }
+  } catch {
+    return null;
+  }
+  return null;
 }
 
 export function validateStagedImportRow(row: StagedImportRow): string[] {
@@ -318,12 +525,16 @@ export function buildStagedImportRows(parsed: ParsedWorkbook): StagedImportBuild
   parsed.sheets.forEach((sheet, sheetIndex) => {
     const sheetRows = getImportRows(sheet);
     const header = detectHeader(sheet);
+    const tractInfo = inferTractInfoFromSheetName(sheet.name, sheetIndex);
     if (!header) {
       sheetSummaries.push({
         sheetName: sheet.name,
         headerRowNumber: null,
         stagedRowCount: 0,
         mappedFields: [],
+        tractCode: tractInfo.code,
+        tractName: tractInfo.name,
+        grossAcres: tractInfo.grossAcres,
       });
       if (sheetRows.some((row) => row.some((cell) => normalizeCell(cell)))) {
         warnings.push(`Skipped "${sheet.name}" because no recognizable title header row was found.`);
@@ -332,8 +543,12 @@ export function buildStagedImportRows(parsed: ParsedWorkbook): StagedImportBuild
     }
 
     const beforeCount = rows.length;
+    let context: InheritedInstrumentContext | null = null;
     for (let rowIndex = header.index + 1; rowIndex < sheetRows.length; rowIndex += 1) {
       const sourceRow = sheetRows[rowIndex];
+      if (isSectionBreakRow(sourceRow)) {
+        continue;
+      }
       const interestClass = inferInterestClass(
         getCell(sourceRow, header.columnMap, 'interestClass')
       );
@@ -345,10 +560,16 @@ export function buildStagedImportRows(parsed: ParsedWorkbook): StagedImportBuild
         getCell(sourceRow, header.columnMap, 'fixedRoyaltyBasis'),
         royaltyKind
       );
-      const stagedRow: StagedImportRow = {
+      const rawFractionInput =
+        getCell(sourceRow, header.columnMap, 'fraction')
+        || getLikelyFractionText(getCell(sourceRow, header.columnMap, 'remarks'));
+      const rawRow: StagedImportRow = {
         id: `sheet-${sheetIndex + 1}-row-${rowIndex + 1}`,
         sheetName: sheet.name,
         rowNumber: rowIndex + 1,
+        tractCode: tractInfo.code,
+        tractName: tractInfo.name,
+        grossAcres: tractInfo.grossAcres,
         sourceRow,
         columnMap: header.columnMap,
         status: 'pending',
@@ -362,13 +583,28 @@ export function buildStagedImportRows(parsed: ParsedWorkbook): StagedImportBuild
         date: getCell(sourceRow, header.columnMap, 'date'),
         fileDate: getCell(sourceRow, header.columnMap, 'fileDate'),
         landDesc: getCell(sourceRow, header.columnMap, 'landDesc'),
-        fractionInput: getCell(sourceRow, header.columnMap, 'fraction'),
+        fractionInput: rawFractionInput,
         interestClass,
         royaltyKind,
         fixedRoyaltyBasis,
         remarks: getCell(sourceRow, header.columnMap, 'remarks'),
         warnings: [],
       };
+      const ownershipSummaryRow = looksLikeDotoOwnershipRow(rawRow);
+      const stagedRow = inheritInstrumentFields(rawRow, context);
+      if (!ownershipSummaryRow && isInstrumentContextRow(rawRow)) {
+        context = {
+          instrument: rawRow.instrument,
+          docNo: rawRow.docNo,
+          vol: rawRow.vol,
+          page: rawRow.page,
+          date: rawRow.date,
+          fileDate: rawRow.fileDate,
+          grantor: rawRow.grantor,
+          grantee: rawRow.grantee,
+          landDesc: rawRow.landDesc,
+        };
+      }
       if (!rowHasUsefulTitleData(stagedRow)) {
         continue;
       }
@@ -381,6 +617,9 @@ export function buildStagedImportRows(parsed: ParsedWorkbook): StagedImportBuild
       headerRowNumber: header.index + 1,
       stagedRowCount: rows.length - beforeCount,
       mappedFields: Object.keys(header.columnMap) as StagedImportField[],
+      tractCode: tractInfo.code,
+      tractName: tractInfo.name,
+      grossAcres: tractInfo.grossAcres,
     });
   });
 

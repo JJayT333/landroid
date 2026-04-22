@@ -27,6 +27,7 @@ import type {
   OwnershipNode,
   RoyaltyKind,
 } from '../../types/node';
+import InstrumentSelect from '../../components/shared/InstrumentSelect';
 import {
   buildImportNodeId,
   buildStagedImportRows,
@@ -37,6 +38,7 @@ import {
   type StagedImportBuildResult,
   type StagedImportRow,
   type StagedImportRowStatus,
+  type StagedImportSheetSummary,
 } from './row-staging';
 
 type Status = 'idle' | 'parsing' | 'parsed' | 'staged' | 'analyzing' | 'analyzed' | 'error';
@@ -324,16 +326,25 @@ function StagedImportReview({
   const createRootNode = useWorkspaceStore((s) => s.createRootNode);
   const convey = useWorkspaceStore((s) => s.convey);
   const createNpri = useWorkspaceStore((s) => s.createNpri);
+  const createDeskMap = useWorkspaceStore((s) => s.createDeskMap);
+  const updateDeskMapDetails = useWorkspaceStore((s) => s.updateDeskMapDetails);
+  const addInstrumentType = useWorkspaceStore((s) => s.addInstrumentType);
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [targetDeskMapId, setTargetDeskMapId] = useState(
     activeDeskMapId ?? deskMaps[0]?.id ?? ''
+  );
+  const [sheetDeskMapIds, setSheetDeskMapIds] = useState<Record<string, string>>(
+    () => buildInitialSheetDeskMapIds(result.sheetSummaries, deskMaps)
   );
   const [parentSelections, setParentSelections] = useState<Record<string, string>>({});
   const [actionError, setActionError] = useState<string | null>(null);
 
   const rows = result.rows;
   const currentRow = rows[currentIndex] ?? rows[0] ?? null;
+  const selectedDeskMapId = currentRow
+    ? sheetDeskMapIds[currentRow.sheetName] ?? targetDeskMapId
+    : targetDeskMapId;
   const suggestion = useMemo(
     () => currentRow ? suggestParentForRow(currentRow, nodes) : null,
     [currentRow, nodes]
@@ -345,9 +356,14 @@ function StagedImportReview({
   const pendingCount = rows.filter((row) => row.status === 'pending').length;
   const completedCount = rows.filter((row) => row.status !== 'pending').length;
   const parentOptions = useMemo(
-    () => nodes
-      .filter((node) => {
+    () => {
+      const selectedDeskMap = deskMaps.find((deskMap) => deskMap.id === selectedDeskMapId);
+      const selectedNodeIds = selectedDeskMap
+        ? new Set(selectedDeskMap.nodeIds)
+        : null;
+      return nodes.filter((node) => {
         if (!currentRow || node.type === 'related') return false;
+        if (selectedNodeIds && !selectedNodeIds.has(node.id)) return false;
         if (currentRow.interestClass === 'mineral') {
           return node.interestClass === 'mineral';
         }
@@ -355,8 +371,9 @@ function StagedImportReview({
       })
       .sort((a, b) =>
         (a.grantee || a.grantor || a.id).localeCompare(b.grantee || b.grantor || b.id)
-      ),
-    [currentRow, nodes]
+      );
+    },
+    [currentRow, deskMaps, nodes, selectedDeskMapId]
   );
 
   const updateRows = (updater: (rows: StagedImportRow[]) => StagedImportRow[]) => {
@@ -407,6 +424,37 @@ function StagedImportReview({
     setParentSelections((current) => ({ ...current, [rowId]: nodeId }));
   };
 
+  const setSelectedDeskMapForCurrentSheet = (deskMapId: string) => {
+    if (!currentRow) return;
+    setTargetDeskMapId(deskMapId);
+    setSheetDeskMapIds((current) => ({
+      ...current,
+      [currentRow.sheetName]: deskMapId,
+    }));
+  };
+
+  const createMissingTracts = () => {
+    const next: Record<string, string> = {};
+    for (const summary of result.sheetSummaries) {
+      const existingId = sheetDeskMapIds[summary.sheetName];
+      if (existingId && deskMaps.some((deskMap) => deskMap.id === existingId)) {
+        next[summary.sheetName] = existingId;
+        continue;
+      }
+      const existingDeskMap = findDeskMapForSheet(summary, deskMaps);
+      const deskMapId = existingDeskMap?.id
+        ?? createDeskMap(summary.tractName, summary.tractCode);
+      if (summary.grossAcres) {
+        updateDeskMapDetails(deskMapId, {
+          grossAcres: summary.grossAcres,
+          description: summary.tractName,
+        });
+      }
+      next[summary.sheetName] = deskMapId;
+    }
+    setSheetDeskMapIds((current) => ({ ...current, ...next }));
+  };
+
   const createFromCurrentRow = (mode: 'root' | 'attach') => {
     if (!currentRow) return;
     setActionError(null);
@@ -428,13 +476,20 @@ function StagedImportReview({
     );
     const form = stagedRowToNodeForm(currentRow, parsedFraction.value);
     let ok = false;
+    if (currentRow.instrument.trim()) {
+      addInstrumentType(currentRow.instrument.trim());
+    }
 
     if (mode === 'root') {
+      if (!selectedDeskMapId) {
+        setActionError('Choose or create a tract before creating this root node.');
+        return;
+      }
       ok = createRootNode(
         nodeId,
         parsedFraction.value,
         form,
-        targetDeskMapId || undefined
+        selectedDeskMapId
       );
       if (ok) {
         markRow(currentRow.id, 'created_root', nodeId);
@@ -517,6 +572,7 @@ function StagedImportReview({
                 {summary.headerRowNumber
                   ? `header row ${summary.headerRowNumber}, ${summary.stagedRowCount} row(s)`
                   : 'no title header found'}
+                {' '}· {summary.tractName}
                 {summary.mappedFields.length > 0 && (
                   <span> · {summary.mappedFields.join(', ')}</span>
                 )}
@@ -528,6 +584,36 @@ function StagedImportReview({
           </ul>
         </details>
       )}
+
+      <div className="rounded-lg border border-leather/30 bg-parchment p-3 text-xs">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <div className="font-semibold text-ink">Detected tracts</div>
+            <div className="text-[10px] text-ink-light">
+              Each workbook tab can map to its own Desk Map before you create roots.
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={createMissingTracts}
+            className="rounded bg-ink px-3 py-1.5 text-xs font-semibold text-parchment hover:bg-ink-light"
+          >
+            Create missing tracts
+          </button>
+        </div>
+        <ul className="mt-2 grid gap-1 text-[10px] text-ink-light md:grid-cols-2">
+          {result.sheetSummaries.map((summary) => {
+            const mappedId = sheetDeskMapIds[summary.sheetName];
+            const mapped = deskMaps.find((deskMap) => deskMap.id === mappedId);
+            return (
+              <li key={summary.sheetName} className="rounded border border-leather/20 bg-white/60 px-2 py-1">
+                <span className="font-mono text-ink">{summary.sheetName}</span>
+                <span> → {mapped ? mapped.name : 'not created yet'}</span>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
 
       <div className="flex flex-wrap items-center gap-2 text-[10px]">
         {rows.map((row, index) => (
@@ -564,14 +650,14 @@ function StagedImportReview({
             </div>
           </div>
           <div className="rounded border border-leather/30 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-ink-light">
-            {currentRow.interestClass}
+            {currentRow.tractCode} · {currentRow.interestClass}
           </div>
         </div>
 
         <div className="grid gap-2 md:grid-cols-2">
           <StageTextField label="Grantor" value={currentRow.grantor} disabled={currentRow.status !== 'pending'} onChange={(value) => updateCurrentRow({ grantor: value })} />
           <StageTextField label="Grantee" value={currentRow.grantee} disabled={currentRow.status !== 'pending'} onChange={(value) => updateCurrentRow({ grantee: value })} />
-          <StageTextField label="Instrument" value={currentRow.instrument} disabled={currentRow.status !== 'pending'} onChange={(value) => updateCurrentRow({ instrument: value })} />
+          <InstrumentSelect value={currentRow.instrument} disabled={currentRow.status !== 'pending'} onChange={(value) => updateCurrentRow({ instrument: value })} />
           <StageTextField label="Fraction" value={currentRow.fractionInput} disabled={currentRow.status !== 'pending'} onChange={(value) => updateCurrentRow({ fractionInput: value })} />
           <StageTextField label="Doc #" value={currentRow.docNo} disabled={currentRow.status !== 'pending'} onChange={(value) => updateCurrentRow({ docNo: value })} />
           <div className="grid grid-cols-2 gap-2">
@@ -671,13 +757,13 @@ function StagedImportReview({
         {currentRow.status === 'pending' && (
           <div className="mt-3 grid gap-2 md:grid-cols-[1fr_1fr]">
             <label className="block text-[10px] font-semibold uppercase tracking-wide text-ink-light">
-              Root Desk Map
+              Tract / Desk Map
               <select
-                value={targetDeskMapId}
-                onChange={(event) => setTargetDeskMapId(event.target.value)}
+                value={selectedDeskMapId}
+                onChange={(event) => setSelectedDeskMapForCurrentSheet(event.target.value)}
                 className="mt-1 w-full rounded border border-leather/30 bg-white px-2 py-1 text-xs normal-case tracking-normal text-ink"
               >
-                {deskMaps.length === 0 && <option value="">No desk map selected</option>}
+                <option value="">Choose tract...</option>
                 {deskMaps.map((deskMap) => (
                   <option key={deskMap.id} value={deskMap.id}>
                     {deskMap.name} {deskMap.code ? `(${deskMap.code})` : ''}
@@ -808,6 +894,42 @@ function rowStatusLabel(status: StagedImportRowStatus): string {
   if (status === 'attached') return 'attached';
   if (status === 'skipped') return 'skipped';
   return 'pending';
+}
+
+function buildInitialSheetDeskMapIds(
+  summaries: StagedImportSheetSummary[],
+  deskMaps: { id: string; name: string; code: string }[]
+): Record<string, string> {
+  const ids: Record<string, string> = {};
+  for (const summary of summaries) {
+    const match = findDeskMapForSheet(summary, deskMaps);
+    if (match) {
+      ids[summary.sheetName] = match.id;
+    }
+  }
+  return ids;
+}
+
+function findDeskMapForSheet(
+  summary: StagedImportSheetSummary,
+  deskMaps: { id: string; name: string; code: string }[]
+): { id: string; name: string; code: string } | null {
+  const summaryCode = normalizeDeskMapLookup(summary.tractCode);
+  const summaryName = normalizeDeskMapLookup(summary.tractName);
+  const sheetName = normalizeDeskMapLookup(summary.sheetName);
+  return deskMaps.find((deskMap) => {
+    const code = normalizeDeskMapLookup(deskMap.code);
+    const name = normalizeDeskMapLookup(deskMap.name);
+    return Boolean(
+      (summaryCode && code === summaryCode)
+        || (summaryName && name === summaryName)
+        || (sheetName && name === sheetName)
+    );
+  }) ?? null;
+}
+
+function normalizeDeskMapLookup(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, '');
 }
 
 function nodeLabel(node: OwnershipNode): string {

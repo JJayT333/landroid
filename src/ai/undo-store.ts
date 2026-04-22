@@ -41,6 +41,7 @@ interface WorkspaceSnapshot {
   leaseholdOrris: LeaseholdOrri[];
   leaseholdTransferOrderEntries: LeaseholdTransferOrderEntry[];
   activeDeskMapId: string | null;
+  activeUnitCode: string | null;
   activeNodeId: string | null;
 }
 
@@ -94,6 +95,7 @@ export async function captureSnapshot(label: string): Promise<UndoSnapshot | nul
       leaseholdOrris: ws.leaseholdOrris,
       leaseholdTransferOrderEntries: ws.leaseholdTransferOrderEntries,
       activeDeskMapId: ws.activeDeskMapId,
+      activeUnitCode: ws.activeUnitCode,
       activeNodeId: ws.activeNodeId,
     }),
     owner: deepClone(ownerData),
@@ -119,6 +121,7 @@ export async function restoreSnapshot(snapshot: UndoSnapshot): Promise<void> {
     leaseholdTransferOrderEntries:
       snapshot.workspace.leaseholdTransferOrderEntries,
     activeDeskMapId: snapshot.workspace.activeDeskMapId,
+    activeUnitCode: snapshot.workspace.activeUnitCode,
   });
 
   await useOwnerStore

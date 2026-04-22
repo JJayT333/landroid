@@ -52,6 +52,7 @@ import type { MapWorkspaceData } from './map-persistence';
 import type { ResearchWorkspaceData } from './research-persistence';
 import type { CurativeWorkspaceData } from './curative-persistence';
 import { normalizeTitleIssues, type TitleIssue } from '../types/title-issue';
+import { resolveActiveUnitCode } from '../utils/desk-map-units';
 
 const WORKSPACE_ID = 'default';
 const PAGE_SIZE_ID_SET = new Set<PageSizeId>(
@@ -68,6 +69,7 @@ export interface WorkspaceData {
   leaseholdOrris?: LeaseholdOrri[];
   leaseholdTransferOrderEntries?: LeaseholdTransferOrderEntry[];
   activeDeskMapId: string | null;
+  activeUnitCode?: string | null;
   instrumentTypes: string[];
 }
 
@@ -308,10 +310,18 @@ function normalizeWorkspaceDataRecord(
   const nodeIdSet = new Set(nodes.map((node) => node.id));
   const deskMaps = normalizeDeskMaps(value.deskMaps, nodeIdSet);
   const validDeskMapIds = new Set(deskMaps.map((deskMap) => deskMap.id));
+  const validUnitCodes = new Set(
+    deskMaps.flatMap((deskMap) => (deskMap.unitCode ? [deskMap.unitCode] : []))
+  );
   const activeDeskMapId =
     typeof value.activeDeskMapId === 'string' && validDeskMapIds.has(value.activeDeskMapId)
       ? value.activeDeskMapId
       : deskMaps[0]?.id ?? null;
+  const activeUnitCode = resolveActiveUnitCode(
+    deskMaps,
+    typeof value.activeUnitCode === 'string' ? value.activeUnitCode : null,
+    activeDeskMapId
+  );
 
   return {
     workspaceId: value.workspaceId ?? createWorkspaceId(),
@@ -321,12 +331,19 @@ function normalizeWorkspaceDataRecord(
     leaseholdUnit: normalizeLeaseholdUnit(value.leaseholdUnit),
     leaseholdAssignments: normalizeLeaseholdAssignments(value.leaseholdAssignments, {
       validDeskMapIds,
+      validUnitCodes,
     }),
-    leaseholdOrris: normalizeLeaseholdOrris(value.leaseholdOrris, { validDeskMapIds }),
+    leaseholdOrris: normalizeLeaseholdOrris(value.leaseholdOrris, {
+      validDeskMapIds,
+      validUnitCodes,
+    }),
     leaseholdTransferOrderEntries: normalizeLeaseholdTransferOrderEntries(
       value.leaseholdTransferOrderEntries
     ),
-    activeDeskMapId,
+    activeDeskMapId: activeUnitCode
+      ? deskMaps.find((deskMap) => deskMap.unitCode === activeUnitCode)?.id ?? activeDeskMapId
+      : activeDeskMapId,
+    activeUnitCode,
     instrumentTypes: readStringArray(value.instrumentTypes),
   };
 }

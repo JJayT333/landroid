@@ -4,6 +4,7 @@ import type { ParsedWorkbook } from '../parse-workbook';
 import {
   buildImportNodeId,
   buildStagedImportRows,
+  inferTractInfoFromSheetName,
   parseImportFraction,
   stagedRowToNodeForm,
   suggestParentForRow,
@@ -47,6 +48,114 @@ describe('row staging', () => {
     expect(parseImportFraction(result.rows[0].fractionInput)).toEqual({
       ok: true,
       value: '0.500000000',
+    });
+  });
+
+  it('does not mistake helper header text containing "to" for the grantee column', () => {
+    const result = buildStagedImportRows(
+      workbook([
+        [
+          'Documents Hyperlinked to TORS_Documents Folder',
+          'Instrument',
+          'Instrument No. San Jacinto',
+          'File Date',
+          'Inst. Date',
+          'Grantor',
+          'Grantee',
+          'Land Desc.',
+          'Remarks',
+          'Decimal Mineral Ownership per DOTO',
+        ],
+        [
+          '1',
+          'Mineral Deed',
+          '2013000463',
+          '1/30/13',
+          '11/27/12',
+          'Lewis R. Tyra',
+          'LCT Revocable Trust',
+          'All minerals',
+          '',
+          '0.25',
+        ],
+      ])
+    );
+
+    expect(result.rows[0]).toMatchObject({
+      grantor: 'Lewis R. Tyra',
+      grantee: 'LCT Revocable Trust',
+      instrument: 'Mineral Deed',
+      docNo: '2013000463',
+      fileDate: '1/30/13',
+      date: '11/27/12',
+      fractionInput: '0.25',
+    });
+  });
+
+  it('converts Elmore-style DOTO ownership rows into owner node drafts with inherited context', () => {
+    const result = buildStagedImportRows(
+      workbook([
+        [
+          'Documents Hyperlinked to TORS_Documents Folder',
+          'Instrument',
+          'Order by Date',
+          'Image Path',
+          'Vol',
+          'Page',
+          'Instrument No. San Jacinto',
+          'File Date',
+          'Inst. Date',
+          'Grantor',
+          'Grantee',
+          'Land Desc.',
+          'Remarks',
+          'Decimal Mineral Ownership per 6/4/2009 DOTO',
+        ],
+        [
+          '1',
+          'DOTO',
+          '1',
+          'TORS_Documents\\DOTO.pdf',
+          '',
+          '',
+          'DOTO_ElmoreC-1_Unit',
+          '6/4/09',
+          '4/3/09',
+          'John G. Gaston, Attorney',
+          'Famcor Oil, Inc.',
+          'Unit Tr. 1',
+          'Ownership listed below for examination convenience',
+          '',
+        ],
+        [
+          '',
+          '',
+          '',
+          '',
+          '',
+          '',
+          '',
+          '',
+          '',
+          'Elmore Family Partners, Ltd.',
+          'Exh. B, Pg. 38',
+          '',
+          '17/84 MI',
+          '0.20238095',
+        ],
+      ])
+    );
+
+    expect(result.rows[1]).toMatchObject({
+      grantor: 'John G. Gaston, Attorney',
+      grantee: 'Elmore Family Partners, Ltd.',
+      instrument: 'DOTO',
+      docNo: 'DOTO_ElmoreC-1_Unit',
+      fileDate: '6/4/09',
+      date: '4/3/09',
+      landDesc: 'Unit Tr. 1',
+      fractionInput: '0.20238095',
+      remarks: '17/84 MI | Source exhibit: Exh. B, Pg. 38',
     });
   });
 
@@ -117,5 +226,28 @@ describe('row staging', () => {
         manualAmount: '0.250000000',
       });
     }
+  });
+
+  it('parses common title interest expressions when the decimal column is missing', () => {
+    expect(parseImportFraction('1/2 x 25/420 MI')).toEqual({
+      ok: true,
+      value: '0.0297619047619047619047619',
+    });
+    expect(parseImportFraction('17/84 - 1/8 MI')).toEqual({
+      ok: true,
+      value: '0.077380952380952380952381',
+    });
+    expect(parseImportFraction('80% x 25/420 MI')).toEqual({
+      ok: true,
+      value: '0.047619047619047619047619',
+    });
+  });
+
+  it('infers tract code and acreage from workbook tab names', () => {
+    expect(inferTractInfoFromSheetName('Tract 2 - 106.19 ac.')).toEqual({
+      code: 'T2',
+      name: 'Tract 2 - 106.19 ac.',
+      grossAcres: '106.19',
+    });
   });
 });

@@ -734,8 +734,10 @@ export const landroidTools = {
       grossAcres: z.string().optional(),
       pooledAcres: z.string().optional(),
       description: z.string().optional(),
+      unitName: z.string().optional(),
+      unitCode: z.string().optional(),
     }),
-    execute: async ({ name, code, grossAcres, pooledAcres, description }) => {
+    execute: async ({ name, code, grossAcres, pooledAcres, description, unitName, unitCode }) => {
       const store = useWorkspaceStore.getState();
       const existing = store.deskMaps.find(
         (dm) => dm.code.trim().toLowerCase() === code.trim().toLowerCase()
@@ -747,7 +749,10 @@ export const landroidTools = {
           existingDeskMapId: existing.id,
         };
       }
-      const id = store.createDeskMap(name.trim(), code.trim());
+      const id = store.createDeskMap(name.trim(), code.trim(), [], {
+        ...(unitName ? { unitName: unitName.trim() } : {}),
+        ...(unitCode ? { unitCode: unitCode.trim() } : {}),
+      });
       if (grossAcres || pooledAcres || description) {
         store.updateDeskMapDetails(id, {
           ...(grossAcres ? { grossAcres: grossAcres.trim() } : {}),
