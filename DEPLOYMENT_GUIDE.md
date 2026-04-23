@@ -103,6 +103,8 @@ npm run bundle
 1. Function → **Code** tab → **Upload from** → `.zip file` → select `backend/ai-proxy/lambda.zip`.
 2. After upload, **Runtime settings → Edit** → Handler: `handler.handler` → Save.
 
+> **If you already uploaded an earlier `lambda.zip`:** the handler has since been updated to fix the daily-ceiling tracking and add structured logging. Re-run `cd backend/ai-proxy && npm run bundle` to get a fresh zip, then re-upload here. CloudWatch logs will not show the new `evt: "request"` lines until this re-upload is complete.
+
 ### 2d. Environment variables
 
 Function → **Configuration → Environment variables → Edit → Add**:
@@ -265,10 +267,11 @@ These are intentional trade-offs to keep the first deploy cheap and small. They 
 | Single Cognito user pool, no groups/roles | Simplicity | When you need admin vs. user distinction |
 | No per-project data isolation — browser IndexedDB only | Backend DB isn't built yet | Before two users share data |
 | OpenAI key in Lambda env var, not Secrets Manager | One moving part, not two | When you want rotation |
-| Daily token ceiling resets on Lambda cold start | In-memory counter | When budgets need to be durable |
+| Daily token ceiling is per-Lambda-instance (in-memory); a cold start resets it | No DynamoDB yet | When budgets must be durable across cold starts |
 | File uploads still stored in IndexedDB | No S3 yet | When files are big or shared |
-| AI mutating tools disabled in hosted mode (read-only Q&A + import) | Approval boundary not yet built | When the proposal/approval UI ships |
-| No structured audit log | Not urgent for solo use | Before multi-user |
+| AI mutating tools **disabled** in hosted mode — enforced at the `streamText` tool filter (`readOnlyLandroidTools` in `src/ai/tools.ts`), test `read-only-tools.test.ts` | Approval boundary not yet built | When the proposal/approval UI ships |
+| Audit log is CloudWatch JSON lines only (one per request) | No DynamoDB ledger yet | Before multi-user |
+| No MIME-sniff on uploads — extension + size caps only | Single-user trust model | Before broader exposure |
 
 ---
 
