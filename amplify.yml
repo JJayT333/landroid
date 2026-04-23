@@ -3,6 +3,13 @@ frontend:
   phases:
     preBuild:
       commands:
+        - |
+          for var in VITE_COGNITO_DOMAIN VITE_COGNITO_CLIENT_ID VITE_COGNITO_REDIRECT_URI; do
+            if [ -z "${!var}" ]; then
+              echo "ERROR: required env var $var is not set. Add it in Amplify → App settings → Environment variables."
+              exit 1
+            fi
+          done
         - npm ci
     build:
       commands:

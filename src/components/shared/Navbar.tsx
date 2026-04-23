@@ -18,6 +18,8 @@ import {
 import { importCSV } from '../../storage/csv-io';
 import { assertFileSize, FILE_SIZE_LIMITS } from '../../utils/file-validation';
 import { seedCombinatorialData } from '../../storage/seed-test-data';
+import { isHostedMode } from '../../utils/deploy-env';
+import HostedUserMenu from '../../auth/HostedUserMenu';
 
 const landroidLogoUrl = new URL('../../assets/branding/landroid-logo.png', import.meta.url).href;
 const ravenForestBackdropUrl = new URL('../../assets/branding/raven-forest-backdrop.png', import.meta.url).href;
@@ -320,6 +322,8 @@ export default function Navbar() {
               </div>
             )}
           </div>
+
+          {isHostedMode() && <HostedUserMenu />}
 
           <div ref={demoMenuRef} className="relative">
             <button

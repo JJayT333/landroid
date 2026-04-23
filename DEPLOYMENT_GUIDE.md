@@ -168,16 +168,16 @@ Save and deploy. First build takes ~3 minutes.
 
 ### 3d. API rewrite to Lambda
 
-After the first deploy, Amplify app → **Hosting → Rewrites and redirects → Manage rewrites**:
+After the first deploy, Amplify app → **Hosting → Rewrites and redirects → Manage rewrites** → open the **JSON editor** and paste the contents of [`amplify-rewrites.json`](./amplify-rewrites.json) from this repo, then replace `REPLACE_WITH_FUNCTION_URL_HOST` with your Lambda Function URL host (e.g., `abc123xyz.lambda-url.us-east-1.on.aws` — no `https://`, no trailing slash).
 
-| Source | Target | Type |
-| --- | --- | --- |
-| `/api/ai/<*>` | `https://<your-function-url>/<*>` | **200 (Rewrite)** |
-| `/<*>` | `/index.html` | **200 (Rewrite)** |
+The JSON encodes two rules, in order:
 
-The second row is the SPA fallback — it catches all other paths and returns `index.html` so client-side routing works. Order matters: the `/api/ai/*` rule must be above the SPA catch-all.
+1. `/api/ai/<*>` → Lambda Function URL (the AI proxy)
+2. SPA catch-all (excludes common asset extensions) → `/index.html`
 
-> **Gotcha:** when you paste the Function URL, **strip the trailing slash** and use `<*>` as the suffix so the path is forwarded.
+Order matters — the API rule must come first.
+
+> **Gotcha:** when you paste the Function URL, **strip the `https://` prefix and any trailing slash**; the JSON file has `https://` in front already.
 
 ### 3e. Custom headers (CSP, HSTS)
 
@@ -219,12 +219,23 @@ GoDaddy → **My Products → DNS (on `abstractmapping.com`) → Add record**:
 
 ## Step 5 — Smoke test
 
+Automated pass first:
+
+```bash
+bash scripts/smoke-test-hosted.sh
+```
+
+This checks the root page loads, security headers are applied, `/api/ai/*` rejects unauthenticated requests (NOT returning 200 or 404), the SPA catch-all works, and the Cognito JWKS endpoint responds. Any failure points to a specific remediation in the output.
+
+Then manual end-to-end:
+
 1. Open `https://landroid.abstractmapping.com`.
 2. Login screen appears → **Sign in** → Cognito Hosted UI → enter `Landroid@abstractmapping.com` + the password you set on first login.
 3. Redirected back to LANDroid → app renders.
-4. Open the AI panel. Settings should say "Managed by the server. Model: gpt-4o-mini."
-5. Ask a simple question like "hello, can you see the workspace?" — it should stream a reply.
-6. Upload a small `.csv` and confirm the wizard still parses it.
+4. Top-right of the navbar should now show your email with a **Sign out** dropdown (hosted mode only).
+5. Open the AI panel. Settings should say "Managed by the server. Model: gpt-4o-mini."
+6. Ask a simple question like "hello, can you see the workspace?" — it should stream a reply.
+7. Upload a small `.csv` and confirm the wizard still parses it.
 
 If any step fails, check in order:
 - **Login redirect fails with "Invalid request":** the `redirect_uri` in Cognito pool settings must exactly match `VITE_COGNITO_REDIRECT_URI`.
