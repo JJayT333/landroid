@@ -109,8 +109,8 @@ Function → **Configuration → Environment variables → Edit → Add**:
 
 | Key | Value |
 | --- | --- |
-| `COGNITO_USER_POOL_ID` | your pool ID from Step 1 |
-| `COGNITO_CLIENT_ID` | your app client ID from Step 1 |
+| `COGNITO_USER_POOL_ID` | `us-east-1_TWeBB7xvQ` |
+| `COGNITO_CLIENT_ID` | `6os4uiu0b46pf74nhbrm5gsg0v` |
 | `OPENAI_API_KEY` | paste your real OpenAI key here |
 
 Save.
@@ -146,7 +146,7 @@ Function → **Configuration → Function URL → Create function URL**:
 
 1. AWS console → **AWS Amplify** → **Create new app** → **Host web app**.
 2. Source: **GitHub**. Authorize and pick `JJayT333/landroid`.
-3. Branch: for staging, pick the current checkpoint branch (or create a new `staging` branch). For prod, use `main`.
+3. Branch: **`codex/landroid-checkpoint-2026-04-21`** (the branch that's already pushed with all the deployment wiring). You can switch to `main` later once you've merged.
 
 ### 3b. Build settings
 
@@ -160,8 +160,8 @@ Amplify auto-detects Vite. The `amplify.yml` committed at repo root will be used
 
 | Key | Value |
 | --- | --- |
-| `VITE_COGNITO_DOMAIN` | e.g. `landroid-abstractmapping.auth.us-east-1.amazoncognito.com` |
-| `VITE_COGNITO_CLIENT_ID` | app client ID from Step 1 |
+| `VITE_COGNITO_DOMAIN` | `us-east-1twebb7xvq.auth.us-east-1.amazoncognito.com` |
+| `VITE_COGNITO_CLIENT_ID` | `6os4uiu0b46pf74nhbrm5gsg0v` |
 | `VITE_COGNITO_REDIRECT_URI` | `https://landroid.abstractmapping.com/` |
 
 Save and deploy. First build takes ~3 minutes.
