@@ -9,10 +9,28 @@ import { createAnthropic } from '@ai-sdk/anthropic';
 import { createOpenAI } from '@ai-sdk/openai';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import type { AISettings } from './settings-store';
+import { isHostedMode } from '../utils/deploy-env';
+import { getIdToken } from '../auth/session';
 
 export class AISettingsError extends Error {}
 
+export const HOSTED_MODEL_ID = 'gpt-4o-mini';
+
 export function resolveModel(settings: AISettings): LanguageModel {
+  if (isHostedMode()) {
+    const proxy = createOpenAICompatible({
+      name: 'landroid-proxy',
+      baseURL: '/api/ai',
+      fetch: async (url, init) => {
+        const token = await getIdToken();
+        const headers = new Headers(init?.headers);
+        if (token) headers.set('Authorization', `Bearer ${token}`);
+        return fetch(url as string, { ...init, headers });
+      },
+    });
+    return proxy(HOSTED_MODEL_ID);
+  }
+
   if (settings.provider === 'ollama') {
     const ollama = createOpenAICompatible({
       name: 'ollama',

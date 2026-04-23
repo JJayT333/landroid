@@ -28,6 +28,7 @@ import type {
   RoyaltyKind,
 } from '../../types/node';
 import InstrumentSelect from '../../components/shared/InstrumentSelect';
+import { assertFileSize, FILE_SIZE_LIMITS } from '../../utils/file-validation';
 import {
   buildImportNodeId,
   buildStagedImportRows,
@@ -71,6 +72,7 @@ export default function WizardPanel({
     setProposal(null);
     setStageResult(null);
     try {
+      assertFileSize(file, FILE_SIZE_LIMITS.SPREADSHEET, 'Spreadsheet');
       const buffer = await file.arrayBuffer();
       const result = parseWorkbook(file.name, buffer);
       setParsed(result);

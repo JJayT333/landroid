@@ -3,10 +3,33 @@
  * Keys live in localStorage only — we warn the user about browser exposure.
  */
 import { useAISettingsStore, MODEL_SUGGESTIONS, type AIProvider } from './settings-store';
+import { isHostedMode } from '../utils/deploy-env';
+import { HOSTED_MODEL_ID } from './client';
 
 export default function AISettingsPanel({ onClose }: { onClose: () => void }) {
   const settings = useAISettingsStore();
   const { provider, model, ollamaBaseURL, openaiApiKey, anthropicApiKey } = settings;
+
+  if (isHostedMode()) {
+    return (
+      <div className="space-y-2 rounded-lg border border-leather/40 bg-parchment/60 p-3 text-xs text-ink">
+        <div className="flex items-center justify-between">
+          <span className="font-semibold uppercase tracking-wide text-ink-light">AI Settings</span>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded border border-leather/40 px-2 py-0.5 text-[10px] text-ink-light hover:bg-leather/10"
+          >
+            Done
+          </button>
+        </div>
+        <div className="text-ink-light">
+          Managed by the server. Model: <span className="font-mono text-ink">{HOSTED_MODEL_ID}</span>.
+          Keys are held by the backend; nothing is stored in your browser.
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-3 rounded-lg border border-leather/40 bg-parchment/60 p-3 text-xs text-ink">

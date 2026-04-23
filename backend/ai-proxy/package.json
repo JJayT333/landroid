@@ -1,0 +1,21 @@
+{
+  "name": "landroid-ai-proxy",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Lambda that verifies a Cognito ID token and proxies OpenAI chat completions.",
+  "type": "module",
+  "main": "dist/handler.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "package": "npm run build && cd dist && zip -r ../lambda.zip . && cd .. && zip -g lambda.zip -j node_modules/aws-jwt-verify/dist/cjs/*.js 2>/dev/null || true",
+    "bundle": "rm -rf dist lambda.zip && npm run build && cp package.json dist/ && cp -r node_modules dist/ && cd dist && zip -qr ../lambda.zip . && cd .. && ls -lh lambda.zip"
+  },
+  "dependencies": {
+    "aws-jwt-verify": "^5.0.0"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.145",
+    "@types/node": "^20.14.0",
+    "typescript": "^5.4.5"
+  }
+}

@@ -2,6 +2,9 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
 import RootErrorBoundary from './components/shared/RootErrorBoundary';
+import { AuthProvider } from './auth/AuthProvider';
+import LoginGate from './auth/LoginGate';
+import { isHostedMode } from './utils/deploy-env';
 import './theme/index.css';
 import { useMapStore } from './store/map-store';
 import { useOwnerStore } from './store/owner-store';
@@ -109,7 +112,15 @@ useCanvasStore.subscribe((state) => {
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <RootErrorBoundary>
-      <App />
+      {isHostedMode() ? (
+        <AuthProvider>
+          <LoginGate>
+            <App />
+          </LoginGate>
+        </AuthProvider>
+      ) : (
+        <App />
+      )}
     </RootErrorBoundary>
   </StrictMode>
 );

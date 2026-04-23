@@ -10,6 +10,7 @@ import {
   type ValidationIssue,
 } from '../engine/math-engine';
 import { createWorkspaceId } from '../utils/workspace-id';
+import { assertFileSize, FILE_SIZE_LIMITS } from '../utils/file-validation';
 import {
   normalizeDeskMap,
   normalizeOwnershipNode,
@@ -629,6 +630,7 @@ export async function replacePdfWorkspaceData(
 // ── Import .landroid file ──────────────────────────────
 
 export async function importLandroidFile(file: File): Promise<LandroidFileData> {
+  assertFileSize(file, FILE_SIZE_LIMITS.LANDROID, '.landroid file');
   const text = await file.text();
   let parsed: unknown;
 

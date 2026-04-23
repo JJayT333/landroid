@@ -4,6 +4,7 @@ import MapAssetModal from '../components/modals/MapAssetModal';
 import MapReferenceModal from '../components/modals/MapReferenceModal';
 import MapRegionModal from '../components/modals/MapRegionModal';
 import { parseGeoJsonSummary, type GeoJsonSummary } from '../maps/geojson-summary';
+import { assertFileSize, limitForExtension } from '../utils/file-validation';
 import { useMapStore } from '../store/map-store';
 import { useOwnerStore } from '../store/owner-store';
 import { useResearchStore } from '../store/research-store';
@@ -483,14 +484,20 @@ export default function MapsView() {
         onChange={async (event) => {
           if (!workspaceId) return;
           const files = Array.from(event.target.files ?? []);
-          for (const file of files) {
-            const asset = createBlankMapAsset(workspaceId, file, {
-              fileName: file.name,
-              mimeType: file.type || 'application/octet-stream',
-            });
-            await addAsset(asset);
-            setSelectedAssetId(asset.id);
-            setEditingAssetId(asset.id);
+          try {
+            for (const file of files) {
+              const limit = limitForExtension(file.name);
+              assertFileSize(file, limit.bytes, limit.label);
+              const asset = createBlankMapAsset(workspaceId, file, {
+                fileName: file.name,
+                mimeType: file.type || 'application/octet-stream',
+              });
+              await addAsset(asset);
+              setSelectedAssetId(asset.id);
+              setEditingAssetId(asset.id);
+            }
+          } catch (err) {
+            alert(err instanceof Error ? err.message : 'Upload failed');
           }
           event.target.value = '';
         }}
