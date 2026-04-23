@@ -9,7 +9,7 @@
  */
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { UserManager, type User } from 'oidc-client-ts';
-import { setIdToken } from './session';
+import { setIdToken, setUnauthorizedHandler } from './session';
 
 interface AuthContextValue {
   user: User | null;
@@ -110,13 +110,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const onUserLoaded = (u: User) => syncUser(u);
     const onUserUnloaded = () => syncUser(null);
+    // When the access/ID token expires mid-session, drop the user so the
+    // LoginGate re-mounts and prompts for re-auth. Iframe-based silent renew
+    // does not work with Cognito (X-Frame-Options: DENY), so a full redirect
+    // is the correct recovery path for POC.
+    const onTokenExpired = () => {
+      void manager.removeUser();
+    };
     manager.events.addUserLoaded(onUserLoaded);
     manager.events.addUserUnloaded(onUserUnloaded);
+    manager.events.addAccessTokenExpired(onTokenExpired);
+
+    // If any authenticated fetch (e.g. the AI proxy) returns 401, treat it
+    // as session expiry even if the token claims are still unexpired locally.
+    setUnauthorizedHandler(() => {
+      void manager.removeUser();
+    });
 
     return () => {
       cancelled = true;
       manager.events.removeUserLoaded(onUserLoaded);
       manager.events.removeUserUnloaded(onUserUnloaded);
+      manager.events.removeAccessTokenExpired(onTokenExpired);
+      setUnauthorizedHandler(null);
     };
   }, [manager]);
 

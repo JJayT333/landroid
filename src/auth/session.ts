@@ -10,6 +10,7 @@
  */
 
 let currentIdToken: string | null = null;
+let unauthorizedHandler: (() => void) | null = null;
 
 export function setIdToken(token: string | null): void {
   currentIdToken = token;
@@ -17,4 +18,23 @@ export function setIdToken(token: string | null): void {
 
 export async function getIdToken(): Promise<string | null> {
   return currentIdToken;
+}
+
+/**
+ * Register a callback to invoke when a downstream request returns 401.
+ * AuthProvider wires this to `UserManager.removeUser()`, which flips
+ * `LoginGate` back to the sign-in screen so the user can re-authenticate.
+ *
+ * Passing `null` removes the handler (AuthProvider cleanup on unmount).
+ */
+export function setUnauthorizedHandler(fn: (() => void) | null): void {
+  unauthorizedHandler = fn;
+}
+
+/**
+ * Invoked by fetch wrappers (e.g. AI client) when the server rejects
+ * the current token. Safe to call with no handler registered.
+ */
+export function triggerUnauthorized(): void {
+  unauthorizedHandler?.();
 }
