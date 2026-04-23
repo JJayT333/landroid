@@ -857,7 +857,8 @@ export const landroidTools = {
 
 /**
  * Names of tools that mutate workspace state. Consumed by `runChat.ts` to
- * decide whether to commit the pre-turn snapshot for undo.
+ * decide whether to commit the pre-turn snapshot for undo AND to filter
+ * the tool set handed to the model in hosted mode.
  */
 export const MUTATING_TOOL_NAMES: ReadonlySet<string> = new Set([
   'createRootNode',
@@ -874,3 +875,12 @@ export const MUTATING_TOOL_NAMES: ReadonlySet<string> = new Set([
   // workspace-data mutation and should not burn the undo slot on its own.
   // previewDeleteNode intentionally excluded — read-only.
 ]);
+
+/**
+ * Read-only subset of `landroidTools`. Used by hosted mode until the
+ * proposal/approval boundary (AUDIT CB-4) ships. The model can still answer
+ * questions and compute summaries but cannot alter workspace state.
+ */
+export const readOnlyLandroidTools: Partial<typeof landroidTools> = Object.fromEntries(
+  Object.entries(landroidTools).filter(([name]) => !MUTATING_TOOL_NAMES.has(name))
+) as Partial<typeof landroidTools>;

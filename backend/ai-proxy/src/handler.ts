@@ -42,6 +42,11 @@ const OPENAI_API_KEY = requireEnv('OPENAI_API_KEY');
 const HARDCODED_MODEL = 'gpt-4o-mini';
 const MAX_OUTPUT_TOKENS = 2048;
 const DAILY_TOKEN_CEILING = 500_000;
+// Rough tokens-per-character ratio for English text. Used to size-estimate
+// the request before forwarding so we can enforce the daily ceiling on a
+// real number instead of the completion-tokens header that OpenAI doesn't
+// actually emit. Deliberately slightly generous (3.5 vs ~4) to over-count.
+const CHARS_PER_TOKEN = 3.5;
 
 const verifier = CognitoJwtVerifier.create({
   userPoolId: COGNITO_USER_POOL_ID,
@@ -61,13 +66,28 @@ function today(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-function trackUsage(sub: string, tokens: number): boolean {
+function trackUsage(sub: string, tokens: number): { underCeiling: boolean; dayTotal: number } {
   const day = today();
   const existing = userUsage.get(sub);
   const bucket = existing && existing.day === day ? existing : { day, tokens: 0 };
   bucket.tokens += tokens;
   userUsage.set(sub, bucket);
-  return bucket.tokens <= DAILY_TOKEN_CEILING;
+  return { underCeiling: bucket.tokens <= DAILY_TOKEN_CEILING, dayTotal: bucket.tokens };
+}
+
+function estimateInputTokens(rawBody: string): number {
+  // The request body is mostly the chat message payload. Dividing by
+  // CHARS_PER_TOKEN over-counts vs OpenAI's real tokenizer — which is the
+  // safe direction for a hard ceiling.
+  return Math.ceil(rawBody.length / CHARS_PER_TOKEN) + MAX_OUTPUT_TOKENS;
+}
+
+function logEvent(event: Record<string, unknown>): void {
+  // One JSON object per line — CloudWatch Logs Insights parses this
+  // automatically. Emit to stdout instead of stderr so ERROR-level parsing
+  // in AWS console doesn't flag routine events.
+  // eslint-disable-next-line no-console
+  console.log(JSON.stringify({ ts: new Date().toISOString(), ...event }));
 }
 
 function jsonError(stream: ResponseStream, status: number, message: string): void {
@@ -81,16 +101,20 @@ function jsonError(stream: ResponseStream, status: number, message: string): voi
 
 export const handler = awslambda.streamifyResponse(
   async (event: LambdaUrlEvent, responseStream: ResponseStream): Promise<void> => {
+    const startedAt = Date.now();
+    let userSub: string | null = null;
     try {
       const method = event.requestContext.http.method;
       const path = event.requestContext.http.path;
 
       if (method !== 'POST' || !path.endsWith('/chat/completions')) {
+        logEvent({ evt: 'reject', reason: 'not_found', method, path, status: 404 });
         return jsonError(responseStream, 404, 'Not found.');
       }
 
       const auth = event.headers['authorization'] ?? event.headers['Authorization'];
       if (!auth?.startsWith('Bearer ')) {
+        logEvent({ evt: 'reject', reason: 'missing_bearer', status: 401 });
         return jsonError(responseStream, 401, 'Missing Authorization bearer token.');
       }
 
@@ -98,21 +122,34 @@ export const handler = awslambda.streamifyResponse(
       try {
         payload = (await verifier.verify(auth.slice('Bearer '.length))) as { sub: string };
       } catch {
+        logEvent({ evt: 'reject', reason: 'invalid_token', status: 401 });
         return jsonError(responseStream, 401, 'Invalid or expired token.');
       }
-
-      if (!trackUsage(payload.sub, 0)) {
-        return jsonError(responseStream, 429, 'Daily token ceiling reached. Try again tomorrow.');
-      }
+      userSub = payload.sub;
 
       const rawBody = event.isBase64Encoded
         ? Buffer.from(event.body ?? '', 'base64').toString('utf8')
         : event.body ?? '';
 
+      const estimatedTokens = estimateInputTokens(rawBody);
+      const ceilingCheck = trackUsage(payload.sub, estimatedTokens);
+      if (!ceilingCheck.underCeiling) {
+        logEvent({
+          evt: 'reject',
+          reason: 'daily_ceiling',
+          user: payload.sub,
+          dayTotal: ceilingCheck.dayTotal,
+          ceiling: DAILY_TOKEN_CEILING,
+          status: 429,
+        });
+        return jsonError(responseStream, 429, 'Daily token ceiling reached. Try again tomorrow.');
+      }
+
       let body: Record<string, unknown>;
       try {
         body = JSON.parse(rawBody);
       } catch {
+        logEvent({ evt: 'reject', reason: 'bad_json', user: payload.sub, status: 400 });
         return jsonError(responseStream, 400, 'Body must be JSON.');
       }
 
@@ -134,6 +171,12 @@ export const handler = awslambda.streamifyResponse(
 
       if (!upstream.ok) {
         const errText = await upstream.text();
+        logEvent({
+          evt: 'upstream_error',
+          user: payload.sub,
+          upstreamStatus: upstream.status,
+          bodyPrefix: errText.slice(0, 200),
+        });
         return jsonError(responseStream, upstream.status, `Upstream error: ${errText.slice(0, 500)}`);
       }
 
@@ -148,6 +191,15 @@ export const handler = awslambda.streamifyResponse(
       const reader = upstream.body?.getReader();
       if (!reader) {
         framed.end();
+        logEvent({
+          evt: 'request',
+          user: payload.sub,
+          status: 200,
+          estimatedTokens,
+          dayTotal: ceilingCheck.dayTotal,
+          latencyMs: Date.now() - startedAt,
+          streamed: false,
+        });
         return;
       }
 
@@ -158,10 +210,23 @@ export const handler = awslambda.streamifyResponse(
       }
       framed.end();
 
-      const responseTokens = Number(upstream.headers.get('openai-completion-tokens') ?? 0);
-      trackUsage(payload.sub, responseTokens);
+      logEvent({
+        evt: 'request',
+        user: payload.sub,
+        status: 200,
+        estimatedTokens,
+        dayTotal: ceilingCheck.dayTotal,
+        latencyMs: Date.now() - startedAt,
+        streamed: true,
+      });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
+      logEvent({
+        evt: 'handler_error',
+        user: userSub,
+        message,
+        latencyMs: Date.now() - startedAt,
+      });
       try {
         jsonError(responseStream, 500, `Proxy error: ${message}`);
       } catch {

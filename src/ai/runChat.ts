@@ -8,9 +8,10 @@
 import { streamText, stepCountIs, type ModelMessage } from 'ai';
 import { resolveModel } from './client';
 import { LANDROID_SYSTEM_PROMPT } from './system-prompt';
-import { landroidTools, MUTATING_TOOL_NAMES } from './tools';
+import { landroidTools, MUTATING_TOOL_NAMES, readOnlyLandroidTools } from './tools';
 import { useAISettingsStore } from './settings-store';
 import { captureSnapshot, useAIUndoStore } from './undo-store';
+import { isHostedMode } from '../utils/deploy-env';
 
 export interface ChatTurnInput {
   messages: ModelMessage[];
@@ -53,11 +54,16 @@ export async function runChatTurn(
       : 'AI mutation';
   const pendingSnapshot = await captureSnapshot(label);
 
+  // Hosted deploy: ship the read-only tool subset until the proposal/approval
+  // boundary (AUDIT CB-4) lands. Local dev keeps the full tool set so the
+  // user-as-operator can continue authoring.
+  const activeTools = isHostedMode() ? readOnlyLandroidTools : landroidTools;
+
   const result = streamText({
     model,
     system: LANDROID_SYSTEM_PROMPT,
     messages: input.messages,
-    tools: landroidTools,
+    tools: activeTools,
     stopWhen: stepCountIs(8),
     abortSignal: input.signal,
     timeout: settings.provider === 'ollama' ? 10 * 60_000 : 2 * 60_000,
