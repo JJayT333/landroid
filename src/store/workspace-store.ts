@@ -134,6 +134,26 @@ interface WorkspaceState {
   rebalance: (nodeId: string, newInitialFraction: string, formFields?: Partial<OwnershipNode>) => boolean;
   insertPredecessor: (activeNodeId: string, newPredecessorId: string, newInitialFraction: string, form: Partial<OwnershipNode>) => boolean;
   attachConveyance: (activeNodeId: string, attachParentId: string, calcShare: string, form: Partial<OwnershipNode>) => boolean;
+  /**
+   * Atomic batch attach (audit M1).
+   *
+   * Either every item attaches or the store is not mutated at all. Returns
+   * which orphans would attach (`attached`) and which would fail (`failed`)
+   * with per-orphan reasons. On failure the store is NOT mutated — caller
+   * must read `failed` and retry after fixing the input.
+   */
+  batchAttachConveyance: (
+    items: Array<{
+      activeNodeId: string;
+      attachParentId: string;
+      calcShare: string;
+      form: Partial<OwnershipNode>;
+    }>
+  ) => {
+    ok: boolean;
+    attached: string[];
+    failed: Array<{ nodeId: string; reason: string }>;
+  };
   attachLease: (mineralNodeId: string, lease: Lease, leaseNodeId?: string) => string | null;
 
   // CRUD
@@ -665,6 +685,14 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
 
   createRootNode: (newNodeId, initialFraction, form, deskMapId) => {
     const state = get();
+    // Audit M2: when caller passes an explicit deskMapId it must exist.
+    // Silently falling back to the active map lets a mistyped ID attach a
+    // root to the wrong tract without any signal to the user. Reject loudly
+    // and let the caller retry with a valid ID (or omit it to fall back).
+    if (deskMapId !== undefined && !state.deskMaps.some((dm) => dm.id === deskMapId)) {
+      set({ lastError: `Desk map not found: ${deskMapId}` });
+      return false;
+    }
     const result = executeCreateRootNode({
       allNodes: state.nodes,
       newNodeId,
@@ -767,6 +795,48 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
     }
     set({ lastError: result.error.message });
     return false;
+  },
+
+  batchAttachConveyance: (items) => {
+    // Audit M1: either every item attaches or the store is not mutated.
+    // We simulate the batch on an in-memory candidate graph; only after all
+    // grafts succeed do we commit the result with a single set().
+    const initial = get().nodes;
+    let candidate: OwnershipNode[] = initial;
+    const attached: string[] = [];
+    const failed: Array<{ nodeId: string; reason: string }> = [];
+    let lastAudit: Audit | null = null;
+
+    for (const { activeNodeId, attachParentId, calcShare, form } of items) {
+      const result = executeAttachConveyance({
+        allNodes: candidate,
+        activeNodeId,
+        attachParentId,
+        calcShare,
+        form,
+      });
+      if (result.ok) {
+        candidate = result.data;
+        lastAudit = result.audit;
+        attached.push(activeNodeId);
+      } else {
+        failed.push({ nodeId: activeNodeId, reason: result.error.message });
+      }
+    }
+
+    if (failed.length > 0) {
+      set({
+        lastError: `Batch attach aborted — ${failed.length} of ${items.length} invalid. No change committed.`,
+      });
+      return { ok: false, attached: [], failed };
+    }
+
+    set({
+      nodes: candidate.map((node) => normalizeOwnershipNode(node)),
+      lastAudit: lastAudit,
+      lastError: null,
+    });
+    return { ok: true, attached, failed: [] };
   },
 
   attachLease: (mineralNodeId, lease, leaseNodeId) => {

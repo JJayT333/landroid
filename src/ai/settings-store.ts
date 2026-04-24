@@ -6,7 +6,39 @@
  * long-lived secrets in browser storage.
  */
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { createJSONStorage, persist } from 'zustand/middleware';
+
+/**
+ * Audit L2: under jsdom-less vitest runs the default `localStorage` isn't
+ * present and zustand's persist middleware logs a noisy "No storage" warning
+ * on every write. Wire an in-memory fallback so the store works identically
+ * regardless of environment and tests can assert against persisted payloads
+ * without env setup.
+ */
+function resolvePersistStorage(): Storage {
+  // Feature-check by method shape, not truthiness — Node 25+ exposes a
+  // localStorage property whose methods are undefined unless a backing file
+  // is configured, which otherwise blows up with "setItem is not a function".
+  const ls = typeof globalThis !== 'undefined' ? globalThis.localStorage : undefined;
+  if (ls && typeof ls.setItem === 'function' && typeof ls.getItem === 'function') {
+    return ls;
+  }
+  const backing = new Map<string, string>();
+  return {
+    get length() {
+      return backing.size;
+    },
+    clear: () => backing.clear(),
+    getItem: (key) => (backing.has(key) ? backing.get(key)! : null),
+    key: (index) => Array.from(backing.keys())[index] ?? null,
+    removeItem: (key) => {
+      backing.delete(key);
+    },
+    setItem: (key, value) => {
+      backing.set(key, String(value));
+    },
+  } satisfies Storage;
+}
 
 export type AIProvider = 'ollama' | 'openai' | 'anthropic';
 
@@ -74,6 +106,7 @@ export const useAISettingsStore = create<AISettings & AISettingsActions>()(
     {
       name: 'landroid-ai-settings',
       version: 1,
+      storage: createJSONStorage(resolvePersistStorage),
       partialize: toPersistedAISettings,
       migrate: (persisted) => {
         const safe =

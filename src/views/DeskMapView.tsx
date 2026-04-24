@@ -978,6 +978,28 @@ export default function DeskMapView() {
                 </div>
               </div>
             )}
+            {coverageSummary.leaseOverlaps.length > 0 && (
+              <div
+                className="rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-2 text-[10px] leading-4 text-amber-950"
+                title="Audit M5: overlapping active leases on the same owner. Later leases are clipped by earlier ones until reconciled."
+              >
+                <div className="font-semibold uppercase tracking-wider">
+                  Lease overlap ({coverageSummary.leaseOverlaps.length})
+                </div>
+                <div className="mt-1">
+                  {coverageSummary.leaseOverlaps
+                    .slice(0, 3)
+                    .map(({ ownerGrantee, overlap }) =>
+                      `${ownerGrantee}: ${overlap.leaseName || overlap.lessee} clipped ${overlap.clippedFraction}`
+                    )
+                    .join('; ')}
+                  {coverageSummary.leaseOverlaps.length > 3
+                    ? `, +${coverageSummary.leaseOverlaps.length - 3} more`
+                    : ''}
+                  . Review the leasehold deck to reconcile.
+                </div>
+              </div>
+            )}
             <div className="flex flex-wrap gap-x-2 gap-y-1 text-[9px] text-ink-light font-mono">
               <span>{coverageSummary.currentOwnerCount} present owners</span>
               <span>{coverageSummary.linkedOwnerCount} linked</span>

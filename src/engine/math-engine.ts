@@ -230,6 +230,54 @@ function err(code: string, message: string, details?: unknown): Result<Ownership
 
 const EPSILON = new Decimal('0.000000001');
 
+/**
+ * Audit H6: root mineral-ownership total cannot exceed 1.
+ *
+ * `rootOwnershipTotal` already computes the sum, but rebalance and predecessor
+ * insert can locally grow a root's initial fraction without checking the
+ * aggregate. A pre-existing over-100 state (legacy imports) must not be made
+ * worse by a mutating operation — we compare the prior total to the post-op
+ * total and reject any operation that *increases* a total beyond 1. A
+ * workspace that already has total > 1 can still be edited back downward; the
+ * only forbidden move is pushing it higher.
+ */
+function calcRootMineralTotal(nodes: CalcNode[]): Decimal {
+  // Use initialFraction rather than remaining fraction: a root's ownership
+  // budget is the amount it was granted, not the residue after descendants
+  // took shares. With `fraction`, any predecessor insert on a root appears
+  // to shrink the total to 0 (the new predecessor has 0 remaining) even
+  // when the net ownership went up.
+  let total = new Decimal(0);
+  for (const node of nodes) {
+    if (node.type === 'related' || node.parentId === 'unlinked') continue;
+    const ic = getCalcInterestClass(node);
+    if (ic !== 'mineral') continue;
+    if (node.parentId == null) {
+      total = total.plus(node.initialFraction);
+    }
+  }
+  return total;
+}
+
+function assertRootTotalNotWorsened(
+  before: CalcNode[],
+  after: CalcNode[]
+): Result<OwnershipNode[]> | null {
+  const beforeTotal = calcRootMineralTotal(before);
+  const afterTotal = calcRootMineralTotal(after);
+  const overByAfter = afterTotal.minus(1);
+  if (overByAfter.lessThanOrEqualTo(EPSILON)) return null;
+  // After > 1. Only reject if the operation increased the total.
+  if (afterTotal.greaterThan(beforeTotal.plus(EPSILON))) {
+    return err(
+      'invalid_graph',
+      `Operation would push root mineral total to ${afterTotal.toFixed(9)} (limit 1.0)`,
+      { beforeTotal: beforeTotal.toFixed(9), afterTotal: afterTotal.toFixed(9) }
+    );
+  }
+  return null;
+}
+
 // ---------------------------------------------------------------------------
 // Operation 1: Conveyance
 // ---------------------------------------------------------------------------
@@ -508,7 +556,8 @@ export interface RebalanceParams {
 
 export function executeRebalance(params: RebalanceParams): Result<OwnershipNode[]> {
   const { nodeId, newInitialFraction, formFields } = params;
-  let nodes = params.allNodes.map(toCalc);
+  const originalNodes = params.allNodes.map(toCalc);
+  let nodes = originalNodes;
 
   if (!nodeId) return err('invalid_input', 'nodeId is required');
   const node = nodes.find((n) => n.id === nodeId);
@@ -561,6 +610,9 @@ export function executeRebalance(params: RebalanceParams): Result<OwnershipNode[
   const validation = validateCalcGraph(nodes);
   if (!validation.valid) return err('invalid_graph', 'Rebalance would produce invalid ownership graph', validation.issues);
 
+  const rootTotalErr = assertRootTotalNotWorsened(originalNodes, nodes);
+  if (rootTotalErr) return rootTotalErr;
+
   return ok(nodes, {
     action: 'rebalance',
     oldInitialFraction: serialize(oldInitial),
@@ -585,7 +637,8 @@ export interface PredecessorInsertParams {
 
 export function executePredecessorInsert(params: PredecessorInsertParams): Result<OwnershipNode[]> {
   const { activeNodeId, activeNodeParentId, newPredecessorId, newInitialFraction, form } = params;
-  let nodes = params.allNodes.map(toCalc);
+  const originalNodes = params.allNodes.map(toCalc);
+  let nodes = originalNodes;
 
   if (!activeNodeId || !newPredecessorId) return err('invalid_input', 'activeNodeId and newPredecessorId are required');
   const activeNode = nodes.find((n) => n.id === activeNodeId);
@@ -669,6 +722,9 @@ export function executePredecessorInsert(params: PredecessorInsertParams): Resul
 
   const validation = validateCalcGraph(nodes);
   if (!validation.valid) return err('invalid_graph', 'Predecessor insert would produce invalid ownership graph', validation.issues);
+
+  const rootTotalErr = assertRootTotalNotWorsened(originalNodes, nodes);
+  if (rootTotalErr) return rootTotalErr;
 
   return ok(nodes, {
     action: 'precede',

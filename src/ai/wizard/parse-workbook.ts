@@ -27,6 +27,28 @@ export interface ParsedWorkbook {
 const MAX_SAMPLE_ROWS = 150;
 const MAX_SAMPLE_COLS = 20;
 
+/**
+ * Audit H2 partial: hard guards around the xlsx parser.
+ *
+ * Until we can move parsing into a Web Worker or swap in a safer parser, we
+ * defensively cap what we hand to `xlsx`:
+ *
+ *   - `MAX_PARSE_BYTES` — 10 MB buffer cap. The UI file-size limit is 15 MB,
+ *     but the parser is the known-vulnerable surface so we narrow harder here.
+ *   - `MAX_SHEETS` — reject workbooks with an implausible sheet count
+ *     (defense against zip-bomb / parser resource exhaustion).
+ *   - `MAX_CELLS_PER_SHEET` — sheet-level cell-count ceiling from the sheet's
+ *     declared `!ref` range. A sheet advertising a billion-cell range is
+ *     rejected *before* we call `sheet_to_json`, which is where memory blows
+ *     up.
+ *
+ * These are partial — a worker would be better — but close the easy abuse
+ * paths today.
+ */
+const MAX_PARSE_BYTES = 10 * 1024 * 1024;
+const MAX_SHEETS = 50;
+const MAX_CELLS_PER_SHEET = 500_000;
+
 function cellToString(value: unknown): string {
   if (value === null || value === undefined) return '';
   if (value instanceof Date) return value.toISOString().slice(0, 10);
@@ -47,12 +69,28 @@ export function parseWorkbook(
   fileName: string,
   buffer: ArrayBuffer
 ): ParsedWorkbook {
+  if (buffer.byteLength > MAX_PARSE_BYTES) {
+    throw new Error(
+      `Workbook too large to parse safely (${(buffer.byteLength / (1024 * 1024)).toFixed(1)} MB; limit ${(MAX_PARSE_BYTES / (1024 * 1024)).toFixed(0)} MB). Save as CSV and try again.`
+    );
+  }
   const workbook = XLSX.read(buffer, { type: 'array', cellDates: true });
+  if (workbook.SheetNames.length > MAX_SHEETS) {
+    throw new Error(
+      `Workbook has ${workbook.SheetNames.length} sheets; limit is ${MAX_SHEETS}. Split the file and import one section at a time.`
+    );
+  }
   const sheets: ParsedSheet[] = workbook.SheetNames.map((name) => {
     const worksheet = workbook.Sheets[name];
     const range = XLSX.utils.decode_range(worksheet['!ref'] ?? 'A1:A1');
     const rawRowCount = range.e.r - range.s.r + 1;
     const rawColCount = range.e.c - range.s.c + 1;
+    const cellCount = rawRowCount * rawColCount;
+    if (cellCount > MAX_CELLS_PER_SHEET) {
+      throw new Error(
+        `Sheet "${name}" declares ${cellCount.toLocaleString()} cells; limit is ${MAX_CELLS_PER_SHEET.toLocaleString()}. Refuse to parse.`
+      );
+    }
     const aoa = XLSX.utils.sheet_to_json(worksheet, {
       header: 1,
       defval: '',

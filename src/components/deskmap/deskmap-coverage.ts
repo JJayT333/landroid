@@ -36,6 +36,16 @@ export interface DeskMapCoverageSummary {
     grantee: string;
     fraction: string;
   }>;
+  /**
+   * Audit M5: surfaced lease overlap warnings so the Desk Map coverage card
+   * can call out top-lease or duplicated-lease scenarios. Populated per
+   * owner node; one entry per clipped lease. Empty array means no overlaps.
+   */
+  leaseOverlaps: Array<{
+    ownerNodeId: string;
+    ownerGrantee: string;
+    overlap: LeaseCoverageOverlap;
+  }>;
 }
 
 export interface LeaseCoverageAllocation {
@@ -251,6 +261,7 @@ export function calculateDeskMapCoverageSummary(
   let currentOwnerCount = 0;
   let linkedOwnerCount = 0;
   let leasedOwnerCount = 0;
+  const leaseOverlaps: DeskMapCoverageSummary['leaseOverlaps'] = [];
 
   nodes.forEach((node) => {
     if (node.type === 'related' || isNpriNode(node)) return;
@@ -269,11 +280,17 @@ export function calculateDeskMapCoverageSummary(
         node,
         leaseScopeIndex
       );
-      // Overlap warnings are discarded here — the desk-map coverage summary
-      // does not surface them today. The leasehold summary (`leasehold-summary.ts`)
-      // is the canonical consumer of per-owner overlap warnings and bubbles them
-      // up to the tract and unit level for the leasehold deck UI.
-      const { allocations } = allocateLeaseCoverage(ownerLeases, remaining.toString());
+      // Audit M5: overlap warnings used to be discarded here. We now keep
+      // them alongside allocations so the Desk Map coverage card can flag
+      // top-lease / duplicate-lease situations that need human review.
+      const { allocations, overlaps } = allocateLeaseCoverage(ownerLeases, remaining.toString());
+      for (const overlap of overlaps) {
+        leaseOverlaps.push({
+          ownerNodeId: node.id,
+          ownerGrantee: node.grantee || 'Unknown',
+          overlap,
+        });
+      }
 
       if (allocations.length > 0) {
         leasedOwnerCount += 1;
@@ -312,5 +329,6 @@ export function calculateDeskMapCoverageSummary(
         grantee: node.grantee || 'Unknown',
         fraction: node.fraction,
       })),
+    leaseOverlaps,
   };
 }

@@ -501,7 +501,7 @@ export const landroidTools = {
 
   graftToParent: tool({
     description:
-      'Batch-attach one or more orphan tree roots to a common parent — the workhorse move once the common grantor is found. Each orphan keeps its current initialFraction at the new destination unless calcShares overrides. Partial success is returned; individual failures do not abort the batch. All orphans must share the parent\'s interest class (mineral↔mineral, NPRI↔NPRI).',
+      'Batch-attach one or more orphan tree roots to a common parent — the workhorse move once the common grantor is found. Each orphan keeps its current initialFraction at the new destination unless calcShares overrides. ATOMIC: either every orphan attaches or none do — if any orphan fails validation, the whole batch is aborted and no parent IDs change. All orphans must share the parent\'s interest class (mineral↔mineral, NPRI↔NPRI).',
     inputSchema: z.object({
       parentNodeId: z.string().min(1),
       orphanNodeIds: z.array(z.string().min(1)).min(1).max(100),
@@ -520,41 +520,49 @@ export const landroidTools = {
           validation: summariseValidation(),
         };
       }
-      const attached: string[] = [];
-      const failed: Array<{ nodeId: string; reason: string }> = [];
+      const { nodes } = useWorkspaceStore.getState();
+      const items: Array<{
+        activeNodeId: string;
+        attachParentId: string;
+        calcShare: string;
+        form: Partial<OwnershipNode>;
+      }> = [];
+      const prefailed: Array<{ nodeId: string; reason: string }> = [];
       for (let i = 0; i < orphanNodeIds.length; i += 1) {
         const orphanId = orphanNodeIds[i];
-        const { nodes } = useWorkspaceStore.getState();
         const orphan = nodes.find((n) => n.id === orphanId);
         if (!orphan) {
-          failed.push({ nodeId: orphanId, reason: 'Node not found' });
+          prefailed.push({ nodeId: orphanId, reason: 'Node not found' });
           continue;
         }
-        const share = calcShares?.[i] ?? orphan.initialFraction;
-        const okFlag = useWorkspaceStore.getState().attachConveyance(
-          orphanId,
-          parentNodeId,
-          share,
-          {}
-        );
-        if (okFlag) {
-          attached.push(orphanId);
-        } else {
-          failed.push({
-            nodeId: orphanId,
-            reason: useWorkspaceStore.getState().lastError ?? 'Unknown error',
-          });
-        }
+        items.push({
+          activeNodeId: orphanId,
+          attachParentId: parentNodeId,
+          calcShare: calcShares?.[i] ?? orphan.initialFraction,
+          form: {},
+        });
       }
-      const summary =
-        failed.length === 0
-          ? `Attached all ${attached.length} orphan(s) to ${parentNodeId}.`
-          : `Attached ${attached.length} of ${orphanNodeIds.length}. Failed: ${failed
-              .map((f) => `${f.nodeId} (${f.reason})`)
-              .join('; ')}.`;
+      if (prefailed.length > 0) {
+        return {
+          ok: false,
+          partialSuccess: false,
+          attached: [],
+          failed: prefailed,
+          summary: `Batch aborted — ${prefailed.length} orphan(s) not found, nothing attached.`,
+          validation: summariseValidation(),
+        };
+      }
+      const { ok, attached, failed } =
+        useWorkspaceStore.getState().batchAttachConveyance(items);
+      const summary = ok
+        ? `Attached all ${attached.length} orphan(s) to ${parentNodeId}.`
+        : `Batch aborted — ${failed.length} of ${orphanNodeIds.length} invalid. No parent IDs changed. Failed: ${failed
+            .map((f) => `${f.nodeId} (${f.reason})`)
+            .join('; ')}.`;
       return {
-        ok: failed.length === 0,
-        partialSuccess: attached.length > 0 && failed.length > 0,
+        ok,
+        // Kept for message-shape compatibility; atomic batch never partial-succeeds.
+        partialSuccess: false,
         attached,
         failed,
         summary,

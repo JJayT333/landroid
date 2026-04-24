@@ -1204,3 +1204,75 @@ describe('high precision chained conveyances', () => {
     expect(validateOwnershipGraph(nodes).valid).toBe(true);
   });
 });
+
+describe('root mineral total invariant (audit H6)', () => {
+  it('rejects a rebalance that would push root total above 1', () => {
+    // Two roots each at 0.5 — legal, totals to 1.0. Rebalancing one to 0.75
+    // would push the total to 1.25.
+    const nodes = [
+      { ...makeNode('root-a', null, '0.5', '0.5'), interestClass: 'mineral' as const },
+      { ...makeNode('root-b', null, '0.5', '0.5'), interestClass: 'mineral' as const },
+    ];
+    const result = executeRebalance({
+      allNodes: nodes,
+      nodeId: 'root-a',
+      newInitialFraction: '0.75',
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.code).toBe('invalid_graph');
+    expect(result.error.message).toMatch(/root mineral total/i);
+  });
+
+  it('rejects a predecessor insert that would push root total above 1', () => {
+    // One root at 0.6. Inserting a predecessor at 0.75 moves the root up
+    // (the new predecessor replaces root, totaling 0.75 — fine), but if we
+    // had another root at 0.6, the combined total would be 1.35.
+    const nodes = [
+      { ...makeNode('root-a', null, '0.6', '0.6'), interestClass: 'mineral' as const },
+      { ...makeNode('root-b', null, '0.6', '0.6'), interestClass: 'mineral' as const },
+    ];
+    const result = executePredecessorInsert({
+      allNodes: nodes,
+      activeNodeId: 'root-a',
+      activeNodeParentId: null,
+      newPredecessorId: 'pred-a',
+      newInitialFraction: '0.9',
+      form: { interestClass: 'mineral' },
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.code).toBe('invalid_graph');
+  });
+
+  it('allows a rebalance that decreases a root total that was already over 1', () => {
+    // Pre-existing over-100 state (1.5). Shrinking a root leaves the state
+    // still over 1 but better than before — allowed.
+    const nodes = [
+      { ...makeNode('root-a', null, '0.9', '0.9'), interestClass: 'mineral' as const },
+      { ...makeNode('root-b', null, '0.6', '0.6'), interestClass: 'mineral' as const },
+    ];
+    const result = executeRebalance({
+      allNodes: nodes,
+      nodeId: 'root-a',
+      newInitialFraction: '0.5',
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(rootOwnershipTotal(result.data).toFixed(9)).toBe('1.100000000');
+  });
+
+  it('allows rebalance that raises total but stays <= 1', () => {
+    const nodes = [
+      { ...makeNode('root-a', null, '0.25', '0.25'), interestClass: 'mineral' as const },
+    ];
+    const result = executeRebalance({
+      allNodes: nodes,
+      nodeId: 'root-a',
+      newInitialFraction: '0.9',
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(rootOwnershipTotal(result.data).toFixed(9)).toBe('0.900000000');
+  });
+});

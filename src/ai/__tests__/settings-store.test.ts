@@ -68,4 +68,19 @@ describe('AI settings store', () => {
     expect(persisted).not.toHaveProperty('openaiApiKey');
     expect(persisted).not.toHaveProperty('anthropicApiKey');
   });
+
+  it('never writes cloud API keys through the persisted partial (audit L2)', () => {
+    useAISettingsStore.getState().setProvider('openai');
+    useAISettingsStore.getState().setOpenAIKey('sk-should-not-persist');
+    useAISettingsStore.getState().setProvider('anthropic');
+    useAISettingsStore.getState().setAnthropicKey('sk-ant-should-not-persist');
+
+    const persisted = JSON.stringify(
+      toPersistedAISettings(useAISettingsStore.getState())
+    );
+    expect(persisted).not.toContain('sk-should-not-persist');
+    expect(persisted).not.toContain('sk-ant-should-not-persist');
+    expect(persisted).not.toContain('openaiApiKey');
+    expect(persisted).not.toContain('anthropicApiKey');
+  });
 });

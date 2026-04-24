@@ -473,4 +473,173 @@ describe('workspace-store', () => {
     expect(mocks.deletePdf).not.toHaveBeenCalled();
     expect(mocks.unlinkNode).not.toHaveBeenCalled();
   });
+
+  it('rejects createRootNode when explicit deskMapId does not exist (audit M2)', () => {
+    useWorkspaceStore.setState({
+      deskMaps: [
+        {
+          id: 'dm-real',
+          name: 'Real Tract',
+          code: 'R1',
+          tractId: 'R1',
+          grossAcres: '',
+          pooledAcres: '',
+          description: '',
+          nodeIds: [],
+        },
+      ],
+      activeDeskMapId: 'dm-real',
+    });
+
+    const ok = useWorkspaceStore.getState().createRootNode(
+      'root-x',
+      '1',
+      { grantee: 'Typed Wrong ID', instrument: 'Patent' },
+      'dm-does-not-exist'
+    );
+
+    const state = useWorkspaceStore.getState();
+    expect(ok).toBe(false);
+    expect(state.nodes).toEqual([]);
+    expect(state.deskMaps[0]?.nodeIds).toEqual([]);
+    expect(state.lastError).toMatch(/not found/i);
+  });
+
+  it('batchAttachConveyance is atomic — one invalid orphan aborts all (audit M1)', () => {
+    const parent = {
+      ...createBlankNode('parent', null),
+      grantee: 'Common Grantor',
+      instrument: 'Patent',
+      interestClass: 'mineral' as const,
+      initialFraction: '1.000000000',
+      fraction: '1.000000000',
+    };
+    const orphanA = {
+      ...createBlankNode('orphan-a', null),
+      grantee: 'Orphan A',
+      instrument: 'Deed',
+      interestClass: 'mineral' as const,
+      initialFraction: '0.250000000',
+      fraction: '0.250000000',
+    };
+    const orphanB = {
+      ...createBlankNode('orphan-b', null),
+      grantee: 'Orphan B',
+      instrument: 'Deed',
+      interestClass: 'mineral' as const,
+      initialFraction: '0.250000000',
+      fraction: '0.250000000',
+    };
+    useWorkspaceStore.setState({
+      nodes: [parent, orphanA, orphanB],
+      deskMaps: [],
+    });
+
+    const snapshotParentIds = () =>
+      useWorkspaceStore.getState().nodes.map((n) => [n.id, n.parentId]);
+    const before = snapshotParentIds();
+
+    const result = useWorkspaceStore.getState().batchAttachConveyance([
+      {
+        activeNodeId: 'orphan-a',
+        attachParentId: 'parent',
+        calcShare: '0.25',
+        form: {},
+      },
+      {
+        activeNodeId: 'does-not-exist',
+        attachParentId: 'parent',
+        calcShare: '0.25',
+        form: {},
+      },
+    ]);
+
+    expect(result.ok).toBe(false);
+    expect(result.attached).toEqual([]);
+    expect(result.failed).toHaveLength(1);
+    // Critical: no parent IDs changed despite orphan-a being valid.
+    expect(snapshotParentIds()).toEqual(before);
+  });
+
+  it('batchAttachConveyance commits all orphans when every item is valid (audit M1)', () => {
+    const parent = {
+      ...createBlankNode('parent', null),
+      grantee: 'Common Grantor',
+      instrument: 'Patent',
+      interestClass: 'mineral' as const,
+      initialFraction: '1.000000000',
+      fraction: '1.000000000',
+    };
+    const orphanA = {
+      ...createBlankNode('orphan-a', null),
+      grantee: 'Orphan A',
+      instrument: 'Deed',
+      interestClass: 'mineral' as const,
+      initialFraction: '0.250000000',
+      fraction: '0.250000000',
+    };
+    const orphanB = {
+      ...createBlankNode('orphan-b', null),
+      grantee: 'Orphan B',
+      instrument: 'Deed',
+      interestClass: 'mineral' as const,
+      initialFraction: '0.250000000',
+      fraction: '0.250000000',
+    };
+    useWorkspaceStore.setState({
+      nodes: [parent, orphanA, orphanB],
+      deskMaps: [],
+    });
+
+    const result = useWorkspaceStore.getState().batchAttachConveyance([
+      {
+        activeNodeId: 'orphan-a',
+        attachParentId: 'parent',
+        calcShare: '0.25',
+        form: {},
+      },
+      {
+        activeNodeId: 'orphan-b',
+        attachParentId: 'parent',
+        calcShare: '0.25',
+        form: {},
+      },
+    ]);
+
+    expect(result.ok).toBe(true);
+    expect(result.attached.sort()).toEqual(['orphan-a', 'orphan-b']);
+    const parentIds = Object.fromEntries(
+      useWorkspaceStore.getState().nodes.map((n) => [n.id, n.parentId])
+    );
+    expect(parentIds['orphan-a']).toBe('parent');
+    expect(parentIds['orphan-b']).toBe('parent');
+  });
+
+  it('falls back to the active desk map when deskMapId is omitted', () => {
+    useWorkspaceStore.setState({
+      deskMaps: [
+        {
+          id: 'dm-active',
+          name: 'Active Tract',
+          code: 'A1',
+          tractId: 'A1',
+          grossAcres: '',
+          pooledAcres: '',
+          description: '',
+          nodeIds: [],
+        },
+      ],
+      activeDeskMapId: 'dm-active',
+    });
+
+    const ok = useWorkspaceStore.getState().createRootNode(
+      'root-y',
+      '1',
+      { grantee: 'Omitted DM', instrument: 'Patent' }
+    );
+
+    const state = useWorkspaceStore.getState();
+    expect(ok).toBe(true);
+    expect(state.deskMaps[0]?.nodeIds).toEqual(['root-y']);
+  });
 });

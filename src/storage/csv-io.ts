@@ -15,6 +15,7 @@ import {
   type LeaseholdUnit,
 } from '../types/leasehold';
 import { createWorkspaceId } from '../utils/workspace-id';
+import { validateOwnershipGraph } from '../engine/math-engine';
 
 // ── CSV column names ────────────────────────────────────────
 
@@ -84,14 +85,48 @@ function parseCSVText(text: string): Papa.ParseResult<Record<string, string>> {
   });
 }
 
-function toDecimalString(value: unknown): string {
-  const num = Number(value ?? 0);
-  if (!Number.isFinite(num) || num < 0) return '0.000000000';
+/**
+ * Audit M4: strict fraction parsing.
+ *
+ * The legacy `toDecimalString` coerced every unparseable value to `0`, which
+ * silently converted bad imports into broken workspaces. Now we accept:
+ *   - numeric literals (including "0.5", "1", "0")
+ *   - simple fractions "1/2" (numerator/denominator, both finite, denom != 0)
+ * and throw on anything else — including negative numbers, NaN, Infinity,
+ * empty strings, or garbage.
+ */
+function parseStrictDecimalString(
+  value: unknown,
+  nodeId: string,
+  column: string
+): string {
+  const raw = typeof value === 'number'
+    ? String(value)
+    : String(value ?? '').trim();
+  if (raw === '') {
+    throw new Error(`CSV row for node "${nodeId}" has empty ${column}.`);
+  }
+  let num: number;
+  if (raw.includes('/')) {
+    const [n, d] = raw.split('/').map((s) => Number(s.trim()));
+    if (!Number.isFinite(n) || !Number.isFinite(d) || d === 0) {
+      throw new Error(`CSV row for node "${nodeId}" has invalid ${column}: "${raw}".`);
+    }
+    num = n / d;
+  } else {
+    num = Number(raw);
+  }
+  if (!Number.isFinite(num) || num < 0) {
+    throw new Error(`CSV row for node "${nodeId}" has invalid ${column}: "${raw}".`);
+  }
   return num.toFixed(9);
 }
 
 function rawNodeToOwnership(raw: RawNode): OwnershipNode {
-  const base = createBlankNode(raw.id, raw.parentId);
+  if (!raw.id || typeof raw.id !== 'string') {
+    throw new Error('CSV row missing node id.');
+  }
+  const base = createBlankNode(raw.id, raw.parentId ?? null);
   return {
     ...base,
     type: (raw.type === 'related' ? 'related' : 'conveyance'),
@@ -105,8 +140,8 @@ function rawNodeToOwnership(raw: RawNode): OwnershipNode {
     date: raw.date ?? '',
     landDesc: raw.landDesc ?? '',
     remarks: raw.remarks ?? '',
-    fraction: toDecimalString(raw.fraction),
-    initialFraction: toDecimalString(raw.initialFraction),
+    fraction: parseStrictDecimalString(raw.fraction, raw.id, 'fraction'),
+    initialFraction: parseStrictDecimalString(raw.initialFraction, raw.id, 'initialFraction'),
     isDeceased: Boolean(raw.isDeceased),
     obituary: raw.obituary ?? '',
     graveyardLink: raw.graveyardLink ?? '',
@@ -177,17 +212,44 @@ export function importCSV(csvText: string): ImportResult {
     );
   }
 
-  // Deduplicate node IDs (shouldn't happen, but safety)
+  // Audit M4: duplicate node IDs previously silently dropped all but the
+  // first occurrence. That hid genuine data-corruption bugs in exporting
+  // tools. Reject outright so the user can fix the source.
   const seen = new Set<string>();
-  const uniqueNodes = allNodes.filter(n => {
-    if (seen.has(n.id)) return false;
-    seen.add(n.id);
-    return true;
-  });
+  const duplicates: string[] = [];
+  for (const node of allNodes) {
+    if (seen.has(node.id)) {
+      duplicates.push(node.id);
+    } else {
+      seen.add(node.id);
+    }
+  }
+  if (duplicates.length > 0) {
+    const sample = duplicates.slice(0, 5).join(', ');
+    throw new Error(
+      `CSV contains duplicate node IDs: ${sample}${
+        duplicates.length > 5 ? ` (+${duplicates.length - 5} more)` : ''
+      }.`
+    );
+  }
+
+  // Audit M4: graph validation before handing the result to the caller.
+  // Parent references, cycles, NaN branches — all caught here instead of
+  // blowing up deeper in the math engine on first use.
+  const validation = validateOwnershipGraph(allNodes);
+  if (!validation.valid) {
+    const first = validation.issues[0];
+    const summary = first ? `${first.code}: ${first.message}` : 'unknown issue';
+    throw new Error(
+      `CSV ownership graph is invalid (${validation.issues.length} issue${
+        validation.issues.length === 1 ? '' : 's'
+      }): ${summary}`
+    );
+  }
 
   return {
     workspaceId: createWorkspaceId(),
-    nodes: uniqueNodes,
+    nodes: allNodes,
     deskMaps,
     leaseholdUnit: createBlankLeaseholdUnit(),
     leaseholdAssignments: [],

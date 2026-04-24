@@ -614,4 +614,78 @@ describe('deskmap-coverage', () => {
       expect(canOwnerNodeHoldLease(node)).toBe(false);
     });
   });
+
+  describe('lease overlap surfacing (audit M5)', () => {
+    it('returns clipped-lease warnings on the summary', () => {
+      const owner = {
+        ...createBlankNode('node-1'),
+        grantee: 'Owner One',
+        fraction: '0.5',
+        initialFraction: '0.5',
+        linkedOwnerId: 'owner-1',
+      };
+      // Two overlapping leases for the same owner, each claiming 0.5 — the
+      // later one gets clipped because the owner only holds 0.5.
+      const linkedLeases = new Map<string, Lease[]>([
+        [
+          'owner-1',
+          [
+            createBlankLease('ws-1', 'owner-1', {
+              id: 'lease-early',
+              leaseName: 'Original Lease',
+              lessee: 'Acme',
+              royaltyRate: '1/4',
+              leasedInterest: '0.5',
+              effectiveDate: '2025-01-01',
+              status: 'Active',
+              jurisdiction: 'tx_fee',
+            }),
+            createBlankLease('ws-1', 'owner-1', {
+              id: 'lease-late',
+              leaseName: 'Top Lease',
+              lessee: 'Beta',
+              royaltyRate: '1/5',
+              leasedInterest: '0.5',
+              effectiveDate: '2026-03-30',
+              status: 'Active',
+              jurisdiction: 'tx_fee',
+            }),
+          ],
+        ],
+      ]);
+      const summary = calculateDeskMapCoverageSummary([owner], linkedLeases);
+      expect(summary.leaseOverlaps).toHaveLength(1);
+      expect(summary.leaseOverlaps[0]?.ownerGrantee).toBe('Owner One');
+      expect(summary.leaseOverlaps[0]?.overlap.leaseId).toBe('lease-late');
+    });
+
+    it('returns no overlaps when leases fit within the owner interest', () => {
+      const owner = {
+        ...createBlankNode('node-1'),
+        grantee: 'Owner Two',
+        fraction: '0.5',
+        initialFraction: '0.5',
+        linkedOwnerId: 'owner-2',
+      };
+      const linkedLeases = new Map<string, Lease[]>([
+        [
+          'owner-2',
+          [
+            createBlankLease('ws-1', 'owner-2', {
+              id: 'lease-only',
+              leaseName: 'Only Lease',
+              lessee: 'Solo',
+              royaltyRate: '3/16',
+              leasedInterest: '0.5',
+              effectiveDate: '2026-03-30',
+              status: 'Active',
+              jurisdiction: 'tx_fee',
+            }),
+          ],
+        ],
+      ]);
+      const summary = calculateDeskMapCoverageSummary([owner], linkedLeases);
+      expect(summary.leaseOverlaps).toEqual([]);
+    });
+  });
 });
