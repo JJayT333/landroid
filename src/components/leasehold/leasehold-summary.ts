@@ -71,6 +71,8 @@ export interface LeaseholdTractSummary {
   deskMapId: string;
   name: string;
   code: string;
+  unitCode: string | null;
+  unitName: string | null;
   tractId: string | null;
   grossAcres: string;
   pooledAcres: string;
@@ -131,6 +133,7 @@ export interface LeaseholdOrriSummary {
   id: string;
   payee: string;
   scope: LeaseholdOrri['scope'];
+  unitCode: string | null;
   deskMapId: string | null;
   tractName: string;
   burdenFraction: string;
@@ -166,6 +169,7 @@ export interface LeaseholdAssignmentSummary {
   assignor: string;
   assignee: string;
   scope: LeaseholdAssignment['scope'];
+  unitCode: string | null;
   deskMapId: string | null;
   tractName: string;
   workingInterestFraction: string;
@@ -501,6 +505,60 @@ function formatNpriSourceLabel(
       }`;
 }
 
+function unitRecordAppliesToDeskMap(
+  recordUnitCode: string | null | undefined,
+  deskMap: Pick<DeskMap, 'unitCode'>
+): boolean {
+  const deskMapUnitCode = deskMap.unitCode ?? null;
+  const normalizedRecordUnitCode = recordUnitCode ?? null;
+  return deskMapUnitCode
+    ? normalizedRecordUnitCode === deskMapUnitCode
+    : normalizedRecordUnitCode === null;
+}
+
+function orriAppliesToDeskMap(orri: LeaseholdOrri, deskMap: DeskMap): boolean {
+  return orri.scope === 'tract'
+    ? orri.deskMapId === deskMap.id
+    : unitRecordAppliesToDeskMap(orri.unitCode, deskMap);
+}
+
+function assignmentAppliesToDeskMap(
+  assignment: LeaseholdAssignment,
+  deskMap: DeskMap
+): boolean {
+  return assignment.scope === 'tract'
+    ? assignment.deskMapId === deskMap.id
+    : unitRecordAppliesToDeskMap(assignment.unitCode, deskMap);
+}
+
+function unitScopedTracts<T extends { scope: 'unit' | 'tract'; unitCode?: string | null }>(
+  record: T,
+  tracts: LeaseholdTractSummary[],
+  deskMapById: Map<string, DeskMap>
+): LeaseholdTractSummary[] {
+  if (record.scope !== 'unit') {
+    return [];
+  }
+
+  return tracts.filter((tract) => {
+    const deskMap = deskMapById.get(tract.deskMapId);
+    return deskMap ? unitRecordAppliesToDeskMap(record.unitCode, deskMap) : false;
+  });
+}
+
+function unitScopedName(
+  unitCode: string | null | undefined,
+  tracts: LeaseholdTractSummary[],
+  deskMapById: Map<string, DeskMap>
+): string {
+  const firstTract = tracts.find((tract) => {
+    const deskMap = deskMapById.get(tract.deskMapId);
+    return deskMap ? unitRecordAppliesToDeskMap(unitCode, deskMap) : false;
+  });
+  const firstDeskMap = firstTract ? deskMapById.get(firstTract.deskMapId) : null;
+  return firstDeskMap?.unitName ?? (unitCode ? `Unit ${unitCode}` : 'Unit-wide');
+}
+
 export function buildLeaseholdUnitSummary({
   deskMaps,
   nodes,
@@ -783,8 +841,8 @@ export function buildLeaseholdUnitSummary({
       d(0)
     );
     const totalNpriBurdenRate = floatingNpriBurdenRate.plus(fixedNpriBurdenRate);
-    const relevantOrris = leaseholdOrris.filter(
-      (orri) => orri.scope === 'unit' || orri.deskMapId === deskMap.id
+    const relevantOrris = leaseholdOrris.filter((orri) =>
+      orriAppliesToDeskMap(orri, deskMap)
     );
     const {
       nriBeforeOrriRate,
@@ -823,8 +881,8 @@ export function buildLeaseholdUnitSummary({
     const preWorkingInterestDecimal = preWorkingInterestRate.greaterThan(0)
       ? unitParticipation.times(preWorkingInterestRate)
       : d(0);
-    const relevantAssignments = leaseholdAssignments.filter(
-      (assignment) => assignment.scope === 'unit' || assignment.deskMapId === deskMap.id
+    const relevantAssignments = leaseholdAssignments.filter((assignment) =>
+      assignmentAppliesToDeskMap(assignment, deskMap)
     );
     const assignmentShare = relevantAssignments.reduce(
       (sum, assignment) =>
@@ -852,6 +910,8 @@ export function buildLeaseholdUnitSummary({
       deskMapId: deskMap.id,
       name: deskMap.name,
       code: deskMap.code,
+      unitCode: deskMap.unitCode ?? null,
+      unitName: deskMap.unitName ?? null,
       tractId: deskMap.tractId,
       grossAcres: tractGrossAcres.toString(),
       pooledAcres: tractPooledAcres.toString(),
@@ -903,16 +963,21 @@ export function buildLeaseholdUnitSummary({
     const tract = assignment.deskMapId
       ? tractSummaryById.get(assignment.deskMapId) ?? null
       : null;
+    const scopedTracts = unitScopedTracts(assignment, tracts, deskMapById);
+    const unitPreWorkingInterestDecimal = scopedTracts.reduce(
+      (sum, candidate) => sum.plus(d(candidate.preWorkingInterestDecimal)),
+      d(0)
+    );
     const includedInMath =
       assignment.scope === 'unit'
-        ? totalPreWorkingInterestDecimal.greaterThan(0)
+        ? unitPreWorkingInterestDecimal.greaterThan(0)
         : Boolean(tract);
     const workingInterestFraction = includedInMath
       ? parseInterestString(assignment.workingInterestFraction)
       : d(0);
     const unitDecimal = includedInMath
       ? assignment.scope === 'unit'
-        ? totalPreWorkingInterestDecimal.times(workingInterestFraction)
+        ? unitPreWorkingInterestDecimal.times(workingInterestFraction)
         : d(tract?.preWorkingInterestDecimal ?? '0').times(workingInterestFraction)
       : d(0);
 
@@ -921,13 +986,14 @@ export function buildLeaseholdUnitSummary({
       assignor: assignment.assignor,
       assignee: assignment.assignee,
       scope: assignment.scope,
+      unitCode: assignment.unitCode ?? null,
       deskMapId: assignment.deskMapId,
       tractName:
         assignment.scope === 'tract'
           ? tract?.name
             ?? deskMapById.get(assignment.deskMapId ?? '')?.name
             ?? 'Unassigned tract'
-          : 'Unit-wide',
+          : unitScopedName(assignment.unitCode, tracts, deskMapById),
       workingInterestFraction: assignment.workingInterestFraction,
       effectiveDate: assignment.effectiveDate,
       sourceDocNo: assignment.sourceDocNo,
@@ -941,15 +1007,16 @@ export function buildLeaseholdUnitSummary({
   );
   const orris = leaseholdOrris.map((orri) => {
     const tract = orri.deskMapId ? tractSummaryById.get(orri.deskMapId) ?? null : null;
+    const scopedTracts = unitScopedTracts(orri, tracts, deskMapById);
     const includedInMath =
       (
         orri.scope === 'unit'
-          ? tracts.some((candidate) => d(candidate.unitParticipation).greaterThan(0))
+          ? scopedTracts.some((candidate) => d(candidate.unitParticipation).greaterThan(0))
           : Boolean(tract)
       );
     const unitDecimal = includedInMath
       ? orri.scope === 'unit'
-        ? tracts.reduce(
+        ? scopedTracts.reduce(
             (sum, candidate) =>
               sum.plus(
                 d(candidate.unitParticipation).times(
@@ -967,11 +1034,12 @@ export function buildLeaseholdUnitSummary({
       id: orri.id,
       payee: orri.payee,
       scope: orri.scope,
+      unitCode: orri.unitCode ?? null,
       deskMapId: orri.deskMapId,
       tractName:
         orri.scope === 'tract'
           ? tract?.name ?? deskMapById.get(orri.deskMapId ?? '')?.name ?? 'Unassigned tract'
-          : 'Unit-wide',
+          : unitScopedName(orri.unitCode, tracts, deskMapById),
       burdenFraction: orri.burdenFraction,
       burdenBasis: orri.burdenBasis,
       effectiveDate: orri.effectiveDate,

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import OwnerDetailPanel from '../components/owners/OwnerDetailPanel';
 import { getOwnerLeaseDeskMapTargets } from '../components/owners/owner-lease-deskmap';
+import UnitFocusSelector from '../components/shared/UnitFocusSelector';
 import { useOwnerStore } from '../store/owner-store';
 import { useUIStore } from '../store/ui-store';
 import { useWorkspaceStore } from '../store/workspace-store';
@@ -10,6 +11,11 @@ import {
   type Lease,
   type Owner,
 } from '../types/owner';
+import {
+  filterDeskMapsByUnitCode,
+  findUnitOption,
+  resolveActiveUnitCode,
+} from '../utils/desk-map-units';
 
 type OwnerListSortMode =
   | 'name_asc'
@@ -178,12 +184,73 @@ export default function OwnerDatabaseView() {
   const removeDoc = useOwnerStore((state) => state.removeDoc);
   const nodes = useWorkspaceStore((state) => state.nodes);
   const deskMaps = useWorkspaceStore((state) => state.deskMaps);
+  const activeDeskMapId = useWorkspaceStore((state) => state.activeDeskMapId);
+  const activeUnitCode = useWorkspaceStore((state) => state.activeUnitCode);
   const setActiveDeskMap = useWorkspaceStore((state) => state.setActiveDeskMap);
   const setActiveNode = useWorkspaceStore((state) => state.setActiveNode);
   const [ownerSearchQuery, setOwnerSearchQuery] = useState('');
   const [ownerSortMode, setOwnerSortMode] = useState<OwnerListSortMode>('name_asc');
 
-  const ownerRows = useMemo(() => buildOwnerListRows(owners, leases), [leases, owners]);
+  const effectiveUnitCode = useMemo(
+    () => resolveActiveUnitCode(deskMaps, activeUnitCode, activeDeskMapId),
+    [activeDeskMapId, activeUnitCode, deskMaps]
+  );
+  const activeUnit = useMemo(
+    () => findUnitOption(deskMaps, effectiveUnitCode),
+    [deskMaps, effectiveUnitCode]
+  );
+  const focusedDeskMaps = useMemo(
+    () => filterDeskMapsByUnitCode(deskMaps, effectiveUnitCode),
+    [deskMaps, effectiveUnitCode]
+  );
+  const focusedOwnerIds = useMemo(() => {
+    const focusedNodeIds = new Set(focusedDeskMaps.flatMap((deskMap) => deskMap.nodeIds));
+    return new Set(
+      nodes.flatMap((node) =>
+        focusedNodeIds.has(node.id) && node.linkedOwnerId ? [node.linkedOwnerId] : []
+      )
+    );
+  }, [focusedDeskMaps, nodes]);
+  const unitOwners = useMemo(() => {
+    if (!effectiveUnitCode) {
+      return owners;
+    }
+
+    return owners.filter((owner) => {
+      const prospect = owner.prospect.trim();
+      return (
+        focusedOwnerIds.has(owner.id)
+        || prospect === activeUnit?.unitName
+        || prospect === effectiveUnitCode
+      );
+    });
+  }, [activeUnit?.unitName, effectiveUnitCode, focusedOwnerIds, owners]);
+  const unitLeases = useMemo(() => {
+    if (!effectiveUnitCode) {
+      return leases;
+    }
+
+    return leases.filter((lease) => {
+      const focusedTargets = getOwnerLeaseDeskMapTargets({
+        ownerId: lease.ownerId,
+        leaseId: lease.id,
+        nodes,
+        deskMaps: focusedDeskMaps,
+      });
+      if (focusedTargets.length > 0) {
+        return true;
+      }
+
+      const allTargets = getOwnerLeaseDeskMapTargets({
+        ownerId: lease.ownerId,
+        leaseId: lease.id,
+        nodes,
+        deskMaps,
+      });
+      return allTargets.length === 0;
+    });
+  }, [deskMaps, effectiveUnitCode, focusedDeskMaps, leases, nodes]);
+  const ownerRows = useMemo(() => buildOwnerListRows(unitOwners, unitLeases), [unitLeases, unitOwners]);
   const visibleOwnerRows = useMemo(
     () => sortAndFilterOwnerListRows(ownerRows, ownerSearchQuery, ownerSortMode),
     [ownerRows, ownerSearchQuery, ownerSortMode]
@@ -192,14 +259,14 @@ export default function OwnerDatabaseView() {
     ? visibleOwnerRows.some((row) => row.owner.id === selectedOwnerId)
     : false;
   const selectedOwner = selectedOwnerVisible
-    ? owners.find((owner) => owner.id === selectedOwnerId) ?? null
+    ? unitOwners.find((owner) => owner.id === selectedOwnerId) ?? null
     : null;
   const selectedOwnerLeases = useMemo(
     () =>
       selectedOwner
-        ? leases.filter((lease) => lease.ownerId === selectedOwner.id)
+        ? unitLeases.filter((lease) => lease.ownerId === selectedOwner.id)
         : [],
-    [leases, selectedOwner]
+    [selectedOwner, unitLeases]
   );
   const deskMapTargetsByLeaseId = useMemo(() => {
     if (!selectedOwner) {
@@ -213,11 +280,11 @@ export default function OwnerDatabaseView() {
           ownerId: selectedOwner.id,
           leaseId: lease.id,
           nodes,
-          deskMaps,
+          deskMaps: focusedDeskMaps,
         }),
       ])
     );
-  }, [deskMaps, nodes, selectedOwner, selectedOwnerLeases]);
+  }, [focusedDeskMaps, nodes, selectedOwner, selectedOwnerLeases]);
 
   useEffect(() => {
     if (visibleOwnerRows.length === 0) {
@@ -249,14 +316,21 @@ export default function OwnerDatabaseView() {
         <div className="px-4 py-4 border-b border-ledger-line bg-ledger flex items-center justify-between gap-3">
           <div>
             <div className="text-lg font-display font-bold text-ink">Owners</div>
-            <div className="text-xs text-ink-light">{owners.length} records</div>
+            <div className="text-xs text-ink-light">
+              {unitOwners.length}/{owners.length} records
+            </div>
           </div>
           <button
             type="button"
             disabled={!workspaceId}
             onClick={async () => {
               if (!workspaceId) return;
-              await addOwner(createBlankOwner(workspaceId, { name: 'New Owner' }));
+              await addOwner(
+                createBlankOwner(workspaceId, {
+                  name: 'New Owner',
+                  prospect: activeUnit?.unitName ?? '',
+                })
+              );
             }}
             className="px-3 py-2 rounded-lg text-xs font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors disabled:opacity-50"
           >
@@ -265,6 +339,8 @@ export default function OwnerDatabaseView() {
         </div>
 
         <div className="border-b border-ledger-line bg-parchment-dark/40 px-4 py-3">
+          <UnitFocusSelector />
+
           <label className="block">
             <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-light">
               Search
@@ -306,15 +382,15 @@ export default function OwnerDatabaseView() {
               </select>
             </label>
             <div className="rounded-lg border border-ledger-line bg-white px-3 py-2 text-xs text-ink-light">
-              Showing {visibleOwnerRows.length}/{owners.length}
+              Showing {visibleOwnerRows.length}/{unitOwners.length}
             </div>
           </div>
         </div>
 
         <div className="min-h-0 flex-1 overflow-auto">
-          {owners.length === 0 ? (
+          {unitOwners.length === 0 ? (
             <div className="px-4 py-6 text-sm text-ink-light">
-              No owner records yet. Create one here or from a desk map node.
+              No owner records are linked to this unit yet. Create one here or link one from a desk map node.
             </div>
           ) : visibleOwnerRows.length === 0 ? (
             <div className="px-4 py-6 text-sm text-ink-light">
@@ -390,7 +466,7 @@ export default function OwnerDatabaseView() {
             onUpdateDoc={updateDoc}
             onRemoveDoc={removeDoc}
           />
-        ) : owners.length > 0 && visibleOwnerRows.length === 0 ? (
+        ) : unitOwners.length > 0 && visibleOwnerRows.length === 0 ? (
           <div className="h-full rounded-xl border border-dashed border-ledger-line bg-parchment flex items-center justify-center">
             <div className="text-center px-6">
               <div className="text-xl font-display font-bold text-ink">

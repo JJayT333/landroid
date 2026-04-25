@@ -11,6 +11,7 @@ import { formatAsFraction } from '../fraction-display';
 import {
   executeConveyance,
   executeCreateNpri,
+  executeCreateRootNode,
   executeRebalance,
   executePredecessorInsert,
   executeAttachConveyance,
@@ -1055,6 +1056,121 @@ describe('executeDeleteBranch', () => {
   });
 });
 
+describe('executeCreateRootNode', () => {
+  it('appends a mineral orphan tree on an empty workspace', () => {
+    const result = executeCreateRootNode({
+      allNodes: [],
+      newNodeId: 'root-1',
+      initialFraction: '0.25',
+      form: { interestClass: 'mineral' },
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.data).toHaveLength(1);
+    const created = findNode(result.data, 'root-1');
+    expect(created.parentId).toBeNull();
+    expect(created.interestClass).toBe('mineral');
+    expect(d(created.initialFraction).toString()).toBe('0.25');
+    expect(d(created.fraction).toString()).toBe('0.25');
+    expect(result.audit.action).toBe('create_root_node');
+    expect(result.audit.affectedCount).toBe(1);
+    expect(validateOwnershipGraph(result.data).valid).toBe(true);
+  });
+
+  it('creates a floating NPRI root with no fixed basis', () => {
+    const result = executeCreateRootNode({
+      allNodes: [],
+      newNodeId: 'npri-root',
+      initialFraction: '0.125',
+      form: { interestClass: 'npri', royaltyKind: 'floating' },
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(findNode(result.data, 'npri-root')).toMatchObject({
+      interestClass: 'npri',
+      royaltyKind: 'floating',
+      fixedRoyaltyBasis: null,
+    });
+  });
+
+  it('defaults fixedRoyaltyBasis to burdened_branch for a fixed NPRI', () => {
+    const result = executeCreateRootNode({
+      allNodes: [],
+      newNodeId: 'npri-root',
+      initialFraction: '0.0625',
+      form: { interestClass: 'npri', royaltyKind: 'fixed' },
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(findNode(result.data, 'npri-root').fixedRoyaltyBasis).toBe('burdened_branch');
+  });
+
+  it('rejects a related/lease form', () => {
+    const result = executeCreateRootNode({
+      allNodes: [],
+      newNodeId: 'lease-1',
+      initialFraction: '1',
+      form: { type: 'related', interestClass: 'mineral' },
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.code).toBe('invalid_input');
+  });
+
+  it('rejects an initialFraction outside (0, 1]', () => {
+    const zero = executeCreateRootNode({
+      allNodes: [],
+      newNodeId: 'root-1',
+      initialFraction: '0',
+      form: { interestClass: 'mineral' },
+    });
+    expect(zero.ok).toBe(false);
+
+    const overOne = executeCreateRootNode({
+      allNodes: [],
+      newNodeId: 'root-2',
+      initialFraction: '1.5',
+      form: { interestClass: 'mineral' },
+    });
+    expect(overOne.ok).toBe(false);
+  });
+
+  it('rejects a duplicate id', () => {
+    const result = executeCreateRootNode({
+      allNodes: [makeNode('root-1', null, '0.5', '0.5')],
+      newNodeId: 'root-1',
+      initialFraction: '0.25',
+      form: { interestClass: 'mineral' },
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.code).toBe('conflicting_structure');
+  });
+
+  it('lets a new orphan tree land despite pre-existing unrelated graph issues', () => {
+    // A pre-existing node with fraction that already exceeds its initialFraction
+    // — an invalid state. Creating an unrelated orphan should not be blocked.
+    const brokenNode = makeNode('broken', null, '0.25', '0.9');
+    const result = executeCreateRootNode({
+      allNodes: [brokenNode],
+      newNodeId: 'fresh-root',
+      initialFraction: '0.5',
+      form: { interestClass: 'mineral' },
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.find((n) => n.id === 'fresh-root')).toBeDefined();
+    // the broken node is still present — we did not try to fix it, just allowed
+    // a new orphan alongside it.
+    expect(result.data.find((n) => n.id === 'broken')).toBeDefined();
+  });
+});
+
 describe('high precision chained conveyances', () => {
   it('preserves exact binary fractions through repeated half conveyances', () => {
     let nodes: OwnershipNode[] = [
@@ -1086,5 +1202,123 @@ describe('high precision chained conveyances', () => {
     expect(deepest.initialFraction).toBe('0.0009765625');
     expect(formatAsFraction(deepest.initialFraction)).toBe('1/1024');
     expect(validateOwnershipGraph(nodes).valid).toBe(true);
+  });
+});
+
+describe('root mineral total invariant (audit H6)', () => {
+  it('rejects a rebalance that would push root total above 1', () => {
+    // Two roots each at 0.5 — legal, totals to 1.0. Rebalancing one to 0.75
+    // would push the total to 1.25.
+    const nodes = [
+      { ...makeNode('root-a', null, '0.5', '0.5'), interestClass: 'mineral' as const },
+      { ...makeNode('root-b', null, '0.5', '0.5'), interestClass: 'mineral' as const },
+    ];
+    const result = executeRebalance({
+      allNodes: nodes,
+      nodeId: 'root-a',
+      newInitialFraction: '0.75',
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.code).toBe('invalid_graph');
+    expect(result.error.message).toMatch(/root mineral total/i);
+  });
+
+  it('rejects a predecessor insert that would push root total above 1', () => {
+    // One root at 0.6. Inserting a predecessor at 0.75 moves the root up
+    // (the new predecessor replaces root, totaling 0.75 — fine), but if we
+    // had another root at 0.6, the combined total would be 1.35.
+    const nodes = [
+      { ...makeNode('root-a', null, '0.6', '0.6'), interestClass: 'mineral' as const },
+      { ...makeNode('root-b', null, '0.6', '0.6'), interestClass: 'mineral' as const },
+    ];
+    const result = executePredecessorInsert({
+      allNodes: nodes,
+      activeNodeId: 'root-a',
+      activeNodeParentId: null,
+      newPredecessorId: 'pred-a',
+      newInitialFraction: '0.9',
+      form: { interestClass: 'mineral' },
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.code).toBe('invalid_graph');
+  });
+
+  it('allows a rebalance that decreases a root total that was already over 1', () => {
+    // Pre-existing over-100 state (1.5). Shrinking a root leaves the state
+    // still over 1 but better than before — allowed.
+    const nodes = [
+      { ...makeNode('root-a', null, '0.9', '0.9'), interestClass: 'mineral' as const },
+      { ...makeNode('root-b', null, '0.6', '0.6'), interestClass: 'mineral' as const },
+    ];
+    const result = executeRebalance({
+      allNodes: nodes,
+      nodeId: 'root-a',
+      newInitialFraction: '0.5',
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(rootOwnershipTotal(result.data).toFixed(9)).toBe('1.100000000');
+  });
+
+  it('allows rebalance that raises total but stays <= 1', () => {
+    const nodes = [
+      { ...makeNode('root-a', null, '0.25', '0.25'), interestClass: 'mineral' as const },
+    ];
+    const result = executeRebalance({
+      allNodes: nodes,
+      nodeId: 'root-a',
+      newInitialFraction: '0.9',
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(rootOwnershipTotal(result.data).toFixed(9)).toBe('0.900000000');
+  });
+
+  // executeAttachConveyance cannot structurally raise the root mineral total
+  // (the moved node always becomes a child, never gains a root). The guard is
+  // defensive parity with executeRebalance / executePredecessorInsert so a
+  // future change cannot violate H6 silently. These cases pin the guard's
+  // observable behaviour: a legal attach must still succeed, and an attach
+  // that moves a root must not false-reject when the pre-existing total was
+  // already over 1.
+  it('attach succeeds when total stays <= 1 (guard does not block valid moves)', () => {
+    const nodes: OwnershipNode[] = [
+      { ...makeNode('root-a', null, '0.5', '0.5'), interestClass: 'mineral' as const },
+      { ...makeNode('root-b', null, '0.5', '0.5'), interestClass: 'mineral' as const },
+    ];
+    const result = executeAttachConveyance({
+      allNodes: nodes,
+      activeNodeId: 'root-a',
+      attachParentId: 'root-b',
+      calcShare: '0.25',
+      form: createBlankNode('root-a', 'root-b'),
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    // root-a is no longer a root; only root-b contributes its remaining
+    // fraction (0.5 − 0.25 = 0.25).
+    expect(rootOwnershipTotal(result.data).toFixed(9)).toBe('0.250000000');
+  });
+
+  it('attach succeeds when pre-existing total > 1 and the move does not worsen it', () => {
+    // Pre-existing over-100 state. Attaching root-a under root-b removes
+    // root-a from the root set, so the new total is strictly lower.
+    const nodes: OwnershipNode[] = [
+      { ...makeNode('root-a', null, '0.9', '0.9'), interestClass: 'mineral' as const },
+      { ...makeNode('root-b', null, '0.6', '0.6'), interestClass: 'mineral' as const },
+    ];
+    const result = executeAttachConveyance({
+      allNodes: nodes,
+      activeNodeId: 'root-a',
+      attachParentId: 'root-b',
+      calcShare: '0.4',
+      form: createBlankNode('root-a', 'root-b'),
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    // root-b is the only remaining root with fraction 0.6 − 0.4 = 0.2.
+    expect(rootOwnershipTotal(result.data).toFixed(9)).toBe('0.200000000');
   });
 });

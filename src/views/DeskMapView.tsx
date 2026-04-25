@@ -476,6 +476,7 @@ export default function DeskMapView() {
   const removeNode = useWorkspaceStore((s) => s.removeNode);
   const addNode = useWorkspaceStore((s) => s.addNode);
   const createDeskMap = useWorkspaceStore((s) => s.createDeskMap);
+  const clearDeskMapNodes = useWorkspaceStore((s) => s.clearDeskMapNodes);
   const addNodeToActiveDeskMap = useWorkspaceStore((s) => s.addNodeToActiveDeskMap);
   const activeDeskMapId = useWorkspaceStore((s) => s.activeDeskMapId);
 
@@ -718,6 +719,21 @@ export default function DeskMapView() {
     setEditorRoute({ kind: 'node', nodeId: id });
   }, [addNode, addNodeToActiveDeskMap, createDeskMap, deskMaps.length, setActiveNode]);
 
+  const handleClearDeskMap = useCallback(() => {
+    if (!activeDeskMap) return;
+    if (visibleCardCount === 0) {
+      alert(`${activeDeskMap.name} is already clear.`);
+      return;
+    }
+
+    const confirmed = confirm(
+      `Clear ${activeDeskMap.name}?\n\nThis removes the ${visibleCardCount} visible card${visibleCardCount === 1 ? '' : 's'} from this Desk Map. Other tracts and owner records stay in the workspace.`
+    );
+    if (!confirmed) return;
+
+    clearDeskMapNodes(activeDeskMap.id);
+  }, [activeDeskMap, clearDeskMapNodes, visibleCardCount]);
+
   const cycleOwnerSearchMatch = useCallback((direction: 1 | -1) => {
     setOwnerSearchMatchIndex((currentIndex) => {
       if (ownerSearchMatches.length === 0) {
@@ -761,6 +777,17 @@ export default function DeskMapView() {
                 className="px-3 py-1.5 rounded-lg text-xs font-semibold text-leather hover:bg-leather/10 transition-colors"
               >
                 + Add Root
+              </button>
+            )}
+            {!toolbarCollapsed && (
+              <button
+                type="button"
+                onClick={handleClearDeskMap}
+                disabled={!activeDeskMap || visibleCardCount === 0}
+                className="rounded-lg border border-seal/30 px-3 py-1.5 text-xs font-semibold text-seal transition-colors hover:bg-seal/10 disabled:cursor-not-allowed disabled:opacity-40"
+                title="Clear all cards from the active Desk Map"
+              >
+                Clear Map
               </button>
             )}
             <span className="text-[10px] text-ink-light font-mono">
@@ -931,6 +958,48 @@ export default function DeskMapView() {
                 toneClassName={coverageTone(coverageSummary.unleasedOwnership)}
               />
             </div>
+            {d(coverageSummary.currentOwnership).greaterThan(1) && (
+              <div className="rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-2 text-[10px] leading-4 text-amber-950">
+                <div className="font-semibold uppercase tracking-wider">
+                  Over 100% mineral coverage
+                </div>
+                <div className="mt-1">
+                  Current cards contributing to the tract total:{' '}
+                  {coverageSummary.currentOwnershipContributors
+                    .slice(0, 6)
+                    .map((contributor) =>
+                      `${contributor.grantee} (${formatAsFraction(d(contributor.fraction))})`
+                    )
+                    .join(', ')}
+                  {coverageSummary.currentOwnershipContributors.length > 6
+                    ? `, +${coverageSummary.currentOwnershipContributors.length - 6} more`
+                    : ''}
+                  . This is warning-only while title is being reconciled.
+                </div>
+              </div>
+            )}
+            {coverageSummary.leaseOverlaps.length > 0 && (
+              <div
+                className="rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-2 text-[10px] leading-4 text-amber-950"
+                title="Audit M5: overlapping active leases on the same owner. Later leases are clipped by earlier ones until reconciled."
+              >
+                <div className="font-semibold uppercase tracking-wider">
+                  Lease overlap ({coverageSummary.leaseOverlaps.length})
+                </div>
+                <div className="mt-1">
+                  {coverageSummary.leaseOverlaps
+                    .slice(0, 3)
+                    .map(({ ownerGrantee, overlap }) =>
+                      `${ownerGrantee}: ${overlap.leaseName || overlap.lessee} clipped ${overlap.clippedFraction}`
+                    )
+                    .join('; ')}
+                  {coverageSummary.leaseOverlaps.length > 3
+                    ? `, +${coverageSummary.leaseOverlaps.length - 3} more`
+                    : ''}
+                  . Review the leasehold deck to reconcile.
+                </div>
+              </div>
+            )}
             <div className="flex flex-wrap gap-x-2 gap-y-1 text-[9px] text-ink-light font-mono">
               <span>{coverageSummary.currentOwnerCount} present owners</span>
               <span>{coverageSummary.linkedOwnerCount} linked</span>

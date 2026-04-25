@@ -13,6 +13,7 @@ import { useWorkspaceStore } from '../../store/workspace-store';
 import { formatAsFraction } from '../../engine/fraction-display';
 import { d } from '../../engine/decimal';
 import { savePdf, deletePdf } from '../../storage/pdf-store';
+import { assertFileSize, FILE_SIZE_LIMITS } from '../../utils/file-validation';
 import { getInterestClass, type OwnershipNode } from '../../types/node';
 import type { OwnerLinkOption } from '../owners/owner-link-options';
 
@@ -373,6 +374,7 @@ export default function NodeEditModal({
               setPdfError(null);
               setPdfSaving(true);
               try {
+                assertFileSize(file, FILE_SIZE_LIMITS.PDF, 'PDF');
                 const attachment = await savePdf(node.id, file);
                 updateNode(node.id, {
                   hasDoc: true,

@@ -33,10 +33,13 @@ The active codebase is currently centered around:
   - Local PDF companions used by the current runsheet workflow.
 - `/docs`
   - Active architecture notes, process docs, and phase-gate references.
-- `/PROJECT_CONTEXT.md` and `/AGENTS.md`
-  - Repository-level operating rules and architectural context.
+- `/AGENTS.md`, `/PROJECT_CONTEXT.md`, `/ARCHITECTURE.md`, `/TESTING.md`, `/SECURITY.md`
+  - Repository-level operating rules, domain context, implementation map,
+    validation guidance, and security assumptions.
 
 The repository root now serves as both the active app root and the coordination layer for repo-wide docs, launchers, and validation commands.
+
+See `/docs/README.md` for the documentation source-of-truth map.
 
 ## Core domain concepts
 Important domain concepts include:

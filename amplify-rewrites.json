@@ -1,0 +1,14 @@
+[
+  {
+    "source": "/api/ai/<*>",
+    "target": "https://REPLACE_WITH_FUNCTION_URL_HOST/<*>",
+    "status": "200",
+    "condition": null
+  },
+  {
+    "source": "</^[^.]+$|\\.(?!(css|gif|ico|jpg|js|png|txt|svg|woff|woff2|ttf|map|json|webp|wasm)$)([^.]+$)/>",
+    "target": "/index.html",
+    "status": "200",
+    "condition": null
+  }
+]

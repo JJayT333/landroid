@@ -226,6 +226,7 @@ function buildWorkspace(canvas: CanvasSaveData | null): LandroidFileData {
         assignor: 'Operator A',
         assignee: 'Unit Partner',
         scope: 'unit',
+        unitCode: null,
         deskMapId: null,
         workingInterestFraction: '1/2',
         effectiveDate: '2024-03-01',
@@ -238,6 +239,7 @@ function buildWorkspace(canvas: CanvasSaveData | null): LandroidFileData {
         id: 'orri-1',
         payee: 'Override Partners',
         scope: 'unit',
+        unitCode: null,
         deskMapId: null,
         burdenFraction: '1/32',
         burdenBasis: 'gross_8_8',
@@ -833,6 +835,7 @@ describe('workspace-persistence', () => {
         },
       ],
       activeDeskMapId: 'dm-unit-a',
+      activeUnitCode: 'A',
       instrumentTypes: [],
     };
     const file = new File([JSON.stringify(payload)], 'raven.landroid', {
@@ -853,6 +856,7 @@ describe('workspace-persistence', () => {
         unitCode: 'B',
       }),
     ]);
+    expect(imported.activeUnitCode).toBe('A');
   });
 
   it('loads pre-overhaul desk maps without unit fields and leaves them undefined', async () => {
@@ -886,11 +890,11 @@ describe('workspace-persistence', () => {
     expect(imported.deskMaps[0]).not.toHaveProperty('unitCode');
   });
 
-  it('drops malformed desk-map unit fields during import', async () => {
+  it('drops blank unit names but keeps arbitrary unit codes during import', async () => {
     const payload = {
       version: 6,
       workspaceId: 'ws-bad-unit',
-      projectName: 'Bad Unit Fields',
+      projectName: 'Additional Unit Fields',
       nodes: [createBlankNode('node-1')],
       deskMaps: [
         {
@@ -909,13 +913,14 @@ describe('workspace-persistence', () => {
       activeDeskMapId: 'dm-bad',
       instrumentTypes: [],
     };
-    const file = new File([JSON.stringify(payload)], 'bad-unit.landroid', {
+    const file = new File([JSON.stringify(payload)], 'additional-unit.landroid', {
       type: 'application/json',
     });
 
     const imported = await importLandroidFile(file);
 
     expect(imported.deskMaps[0]).not.toHaveProperty('unitName');
-    expect(imported.deskMaps[0]).not.toHaveProperty('unitCode');
+    expect(imported.deskMaps[0]?.unitCode).toBe('Z');
+    expect(imported.activeUnitCode).toBe('Z');
   });
 });

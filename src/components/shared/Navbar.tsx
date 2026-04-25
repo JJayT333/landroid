@@ -16,7 +16,10 @@ import {
   replacePdfWorkspaceData,
 } from '../../storage/workspace-persistence';
 import { importCSV } from '../../storage/csv-io';
+import { assertFileSize, FILE_SIZE_LIMITS } from '../../utils/file-validation';
 import { seedCombinatorialData } from '../../storage/seed-test-data';
+import { isHostedMode } from '../../utils/deploy-env';
+import HostedUserMenu from '../../auth/HostedUserMenu';
 
 const landroidLogoUrl = new URL('../../assets/branding/landroid-logo.png', import.meta.url).href;
 const ravenForestBackdropUrl = new URL('../../assets/branding/raven-forest-backdrop.png', import.meta.url).href;
@@ -125,6 +128,7 @@ export default function Navbar() {
       leaseholdOrris,
       leaseholdTransferOrderEntries,
       activeDeskMapId: state.activeDeskMapId,
+      activeUnitCode: state.activeUnitCode,
       instrumentTypes: state.instrumentTypes,
       ownerData: await useOwnerStore.getState().exportWorkspaceData(),
       pdfData: await exportPdfWorkspaceData(state.nodes),
@@ -158,6 +162,7 @@ export default function Navbar() {
 
     try {
       if (file.name.endsWith('.landroid')) {
+        assertFileSize(file, FILE_SIZE_LIMITS.LANDROID, '.landroid file');
         const data = await importLandroidFile(file);
         loadWorkspace(data);
         useCanvasStore.getState().loadCanvas(data.canvas ?? { nodes: [], edges: [] });
@@ -187,6 +192,7 @@ export default function Navbar() {
           ),
         ]);
       } else if (file.name.endsWith('.csv')) {
+        assertFileSize(file, FILE_SIZE_LIMITS.SPREADSHEET, 'CSV file');
         const text = await file.text();
         const result = importCSV(text);
         loadWorkspace(result);
@@ -316,6 +322,8 @@ export default function Navbar() {
               </div>
             )}
           </div>
+
+          {isHostedMode() && <HostedUserMenu />}
 
           <div ref={demoMenuRef} className="relative">
             <button

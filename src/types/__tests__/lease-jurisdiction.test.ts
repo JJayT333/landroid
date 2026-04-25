@@ -6,6 +6,8 @@ import {
   LEASE_STATUS_OPTIONS,
   createBlankLease,
   isInactiveLeaseStatus,
+  isTexasMathLease,
+  isTexasMathLeaseJurisdiction,
   normalizeLease,
   normalizeLeaseJurisdiction,
   normalizeLeaseStatus,
@@ -83,6 +85,21 @@ describe('lease jurisdiction discriminator', () => {
 
     it('exposes tx_fee as the documented default constant', () => {
       expect(DEFAULT_LEASE_JURISDICTION).toBe('tx_fee');
+    });
+
+    it('identifies only Texas fee/state leases as active math jurisdictions', () => {
+      expect(isTexasMathLeaseJurisdiction('tx_fee')).toBe(true);
+      expect(isTexasMathLeaseJurisdiction('tx_state')).toBe(true);
+      expect(isTexasMathLeaseJurisdiction('federal')).toBe(false);
+      expect(isTexasMathLeaseJurisdiction('private')).toBe(false);
+      expect(isTexasMathLeaseJurisdiction('tribal')).toBe(false);
+
+      expect(
+        isTexasMathLease(createBlankLease('ws-1', 'owner-1', { jurisdiction: 'tx_state' }))
+      ).toBe(true);
+      expect(
+        isTexasMathLease(createBlankLease('ws-1', 'owner-1', { jurisdiction: 'federal' }))
+      ).toBe(false);
     });
   });
 

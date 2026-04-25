@@ -119,4 +119,18 @@ describe('buildCombinatorialWorkspaceData', () => {
   it('project name includes Raven Forest', () => {
     expect(workspace.projectName).toMatch(/Raven Forest/);
   });
+
+  it('starts focused on Unit A and scopes unit-wide leasehold records by unit code', () => {
+    expect(workspace.activeUnitCode).toBe('A');
+    expect(
+      workspace.leaseholdAssignments
+        .filter((assignment) => assignment.scope === 'unit')
+        .every((assignment) => assignment.unitCode === 'A')
+    ).toBe(true);
+    expect(
+      workspace.leaseholdOrris
+        .filter((orri) => orri.scope === 'unit')
+        .map((orri) => orri.unitCode)
+    ).toEqual(['A', 'A', 'A', 'B']);
+  });
 });

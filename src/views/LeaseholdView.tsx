@@ -37,6 +37,12 @@ import {
   type LeaseholdTransferOrderReview,
 } from '../components/leasehold/leasehold-summary';
 import type { LeaseCoverageOverlap } from '../components/deskmap/deskmap-coverage';
+import UnitFocusSelector from '../components/shared/UnitFocusSelector';
+import {
+  filterDeskMapsByUnitCode,
+  findUnitOption,
+  resolveActiveUnitCode,
+} from '../utils/desk-map-units';
 
 function formatAcres(value: string) {
   const acres = d(value);
@@ -103,6 +109,13 @@ function compareLeaseholdGraphText(left: string, right: string) {
 
 function compareDecimalStringsDesc(left: string, right: string) {
   return d(right).comparedTo(d(left));
+}
+
+function unitScopedSummaryMatchesTract(
+  recordUnitCode: string | null | undefined,
+  tract: Pick<LeaseholdTractSummary, 'unitCode'>
+) {
+  return tract.unitCode ? recordUnitCode === tract.unitCode : !recordUnitCode;
 }
 
 function sortLeaseholdGraphLeaseSlices(leaseSlices: LeaseholdOwnerLeaseSummary[]) {
@@ -189,7 +202,12 @@ export function buildLeaseholdGraphTractDetail({
   const orris = unitSummary.orris
     .filter(
       (orri) =>
-        orri.includedInMath && (orri.scope === 'unit' || orri.deskMapId === tract.deskMapId)
+        orri.includedInMath
+        && (
+          orri.scope === 'tract'
+            ? orri.deskMapId === tract.deskMapId
+            : unitScopedSummaryMatchesTract(orri.unitCode, tract)
+        )
     )
     .sort((left, right) => {
       if (left.scope !== right.scope) {
@@ -208,7 +226,11 @@ export function buildLeaseholdGraphTractDetail({
     .filter(
       (assignment) =>
         assignment.includedInMath
-        && (assignment.scope === 'unit' || assignment.deskMapId === tract.deskMapId)
+        && (
+          assignment.scope === 'tract'
+            ? assignment.deskMapId === tract.deskMapId
+            : unitScopedSummaryMatchesTract(assignment.unitCode, tract)
+        )
     )
     .sort((left, right) => {
       if (left.scope !== right.scope) {
@@ -3510,6 +3532,8 @@ function LeaseholdDeck({
 
 export default function LeaseholdView() {
   const deskMaps = useWorkspaceStore((state) => state.deskMaps);
+  const activeDeskMapId = useWorkspaceStore((state) => state.activeDeskMapId);
+  const activeUnitCode = useWorkspaceStore((state) => state.activeUnitCode);
   const leaseholdUnit = useWorkspaceStore((state) => state.leaseholdUnit);
   const leaseholdAssignments = useWorkspaceStore((state) => state.leaseholdAssignments);
   const leaseholdOrris = useWorkspaceStore((state) => state.leaseholdOrris);
@@ -3540,22 +3564,41 @@ export default function LeaseholdView() {
   const owners = useOwnerStore((state) => state.owners);
   const leases = useOwnerStore((state) => state.leases);
   const [mode, setMode] = useState<LeaseholdMode>('overview');
+  const effectiveUnitCode = useMemo(
+    () => resolveActiveUnitCode(deskMaps, activeUnitCode, activeDeskMapId),
+    [activeDeskMapId, activeUnitCode, deskMaps]
+  );
+  const activeUnit = useMemo(
+    () => findUnitOption(deskMaps, effectiveUnitCode),
+    [deskMaps, effectiveUnitCode]
+  );
+  const focusedDeskMaps = useMemo(
+    () => filterDeskMapsByUnitCode(deskMaps, effectiveUnitCode),
+    [deskMaps, effectiveUnitCode]
+  );
 
   const summary = useMemo(
     () =>
       buildLeaseholdUnitSummary({
-        deskMaps,
+        deskMaps: focusedDeskMaps,
         nodes,
         owners,
         leases,
         leaseholdAssignments,
         leaseholdOrris,
       }),
-    [deskMaps, leaseholdAssignments, leaseholdOrris, leases, nodes, owners]
+    [focusedDeskMaps, leaseholdAssignments, leaseholdOrris, leases, nodes, owners]
+  );
+  const focusedNodeIds = useMemo(
+    () => new Set(focusedDeskMaps.flatMap((deskMap) => deskMap.nodeIds)),
+    [focusedDeskMaps]
   );
   const npriSummary = useMemo(() => {
     const trackedNpriNodes = nodes.filter(
-      (node) => isNpriNode(node) && d(node.fraction).greaterThan(0)
+      (node) =>
+        focusedNodeIds.has(node.id)
+        && isNpriNode(node)
+        && d(node.fraction).greaterThan(0)
     );
     const floatingCount = trackedNpriNodes.filter(
       (node) => node.royaltyKind === 'floating'
@@ -3566,7 +3609,7 @@ export default function LeaseholdView() {
       floatingCount,
       fixedCount: trackedNpriNodes.length - floatingCount,
     };
-  }, [nodes]);
+  }, [focusedNodeIds, nodes]);
   const isMapMode = mode === 'map';
 
   if (deskMaps.length === 0) {
@@ -3577,6 +3620,20 @@ export default function LeaseholdView() {
           <p className="text-sm text-ink-light">
             Add Desk Maps first so Leasehold can derive tract acreage and royalty coverage.
           </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (focusedDeskMaps.length === 0) {
+    return (
+      <div className="flex h-full items-center justify-center bg-canvas-bg p-5">
+        <div className="w-full max-w-2xl space-y-4 rounded-3xl border border-ledger-line bg-parchment p-6 text-center shadow-md">
+          <h2 className="text-2xl font-display font-bold text-ink">No tracts in this unit yet</h2>
+          <p className="text-sm text-ink-light">
+            Add a unit or create the first tract for the selected unit before reviewing leasehold math.
+          </p>
+          <UnitFocusSelector />
         </div>
       </div>
     );
@@ -3597,7 +3654,10 @@ export default function LeaseholdView() {
           {isMapMode ? (
             <div className="flex items-center justify-between gap-4 px-5 py-3">
               <h1 className="text-base font-display font-bold text-ink">Leasehold</h1>
-              <LeaseholdDeckModeToggle mode={mode} onChange={setMode} />
+              <div className="flex items-center gap-3">
+                <UnitFocusSelector />
+                <LeaseholdDeckModeToggle mode={mode} onChange={setMode} />
+              </div>
             </div>
           ) : (
             <div className="p-6">
@@ -3618,11 +3678,14 @@ export default function LeaseholdView() {
                 </div>
                 <div className="flex flex-col items-start gap-3">
                   <LeaseholdDeckModeToggle mode={mode} onChange={setMode} />
+                  <UnitFocusSelector />
                   <div className="rounded-2xl border border-gold/30 bg-gold/10 px-4 py-3 text-sm text-gold-950">
                     <div className="font-semibold">Current v1 assumption</div>
                     <div className="mt-1">
-                      Royalty, NPRI, ORRI, and WI payout decimals are acreage-weighted by pooled acres.
-                      Gross-acre NMA and pooled-acre participation acres are both shown so the tract view
+                      {activeUnit
+                        ? `${activeUnit.unitName} is isolated here; royalty, NPRI, ORRI, and WI payout decimals only use that unit's tracts.`
+                        : 'Royalty, NPRI, ORRI, and WI payout decimals are acreage-weighted by pooled acres.'}
+                      {' '}Gross-acre NMA and pooled-acre participation acres are both shown so the tract view
                       makes the base acreage explicit.
                     </div>
                   </div>
@@ -3710,10 +3773,18 @@ export default function LeaseholdView() {
             unit={leaseholdUnit}
             unitSummary={summary}
             unitUniqueLessees={summary.uniqueLessees}
-            assignments={leaseholdAssignments}
+            assignments={leaseholdAssignments.filter((assignment) =>
+              assignment.scope === 'tract'
+                ? focusedDeskMaps.some((deskMap) => deskMap.id === assignment.deskMapId)
+                : (assignment.unitCode ?? null) === effectiveUnitCode
+            )}
             assignmentSummaries={summary.assignments}
             npriSummaries={summary.npris}
-            orris={leaseholdOrris}
+            orris={leaseholdOrris.filter((orri) =>
+              orri.scope === 'tract'
+                ? focusedDeskMaps.some((deskMap) => deskMap.id === orri.deskMapId)
+                : (orri.unitCode ?? null) === effectiveUnitCode
+            )}
             orriSummaries={summary.orris}
             totalRoyaltyDecimal={summary.totalRoyaltyDecimal}
             totalNpriDecimal={summary.totalNpriDecimal}
@@ -3725,14 +3796,20 @@ export default function LeaseholdView() {
             overBurdenedTractCount={summary.overBurdenedTractCount}
             overFloatingNpriBurdenedTractCount={summary.overFloatingNpriBurdenedTractCount}
             transferOrderEntries={leaseholdTransferOrderEntries}
-            onAddAssignment={addLeaseholdAssignment}
+            onAddAssignment={(assignment) =>
+              addLeaseholdAssignment(
+                assignment?.scope === 'tract'
+                  ? assignment
+                  : { ...assignment, scope: 'unit', unitCode: effectiveUnitCode }
+              )
+            }
             onUpdateAssignment={updateLeaseholdAssignment}
             onRemoveAssignment={removeLeaseholdAssignment}
             onAddOrri={(focusDeskMapId) =>
               addLeaseholdOrri(
                 focusDeskMapId
                   ? { scope: 'tract', deskMapId: focusDeskMapId }
-                  : { scope: 'unit', deskMapId: null }
+                  : { scope: 'unit', unitCode: effectiveUnitCode, deskMapId: null }
               )
             }
             onUpdateOrri={updateLeaseholdOrri}

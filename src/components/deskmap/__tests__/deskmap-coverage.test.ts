@@ -243,6 +243,44 @@ describe('deskmap-coverage', () => {
     ]);
   });
 
+  // Audit M-2: malformed leasedInterest must surface as a coverage warning
+  // rather than silently coerce to zero. The strict parser refuses values like
+  // "1//8" that the lenient display-side parser would otherwise drop on the
+  // floor.
+  it('surfaces an overlap warning when a lease has a malformed leasedInterest', () => {
+    const result = allocateLeaseCoverage(
+      [
+        {
+          id: 'lease-malformed',
+          workspaceId: 'ws-1',
+          ownerId: 'owner-1',
+          leaseName: 'Garbage Lease',
+          lessee: 'Bad Data Inc.',
+          royaltyRate: '1/8',
+          leasedInterest: '1//8',
+          effectiveDate: '2026-03-01',
+          expirationDate: '',
+          status: 'Active',
+          docNo: '',
+          notes: '',
+          jurisdiction: 'tx_fee',
+          createdAt: '2026-03-01T00:00:00.000Z',
+          updatedAt: '2026-03-01T00:00:00.000Z',
+        },
+      ],
+      '0.5'
+    );
+
+    expect(result.allocations).toEqual([]);
+    expect(result.overlaps).toHaveLength(1);
+    expect(result.overlaps[0]).toMatchObject({
+      leaseId: 'lease-malformed',
+      requestedFraction: '1//8',
+      allocatedFraction: '0',
+      clippedFraction: 'malformed',
+    });
+  });
+
   it('returns no overlap warnings when active leases fit inside the owner share', () => {
     const result = allocateLeaseCoverage(
       [
@@ -311,6 +349,39 @@ describe('deskmap-coverage', () => {
         updatedAt: '2026-03-01T00:00:00.000Z',
       })
     ).toBe(false);
+  });
+
+  it('excludes non-Texas leases from active Texas math', () => {
+    expect(
+      isLeaseActive(
+        createBlankLease('ws-1', 'owner-1', {
+          status: 'Active',
+          jurisdiction: 'federal',
+        })
+      )
+    ).toBe(false);
+
+    const ownerOne = {
+      ...createBlankNode('node-1'),
+      grantee: 'Owner One',
+      fraction: '0.5',
+      initialFraction: '0.5',
+      linkedOwnerId: 'owner-1',
+    };
+    const federalLease = createBlankLease('ws-1', 'owner-1', {
+      id: 'lease-federal',
+      status: 'Active',
+      jurisdiction: 'federal',
+      leasedInterest: '0.5',
+    });
+
+    const summary = calculateDeskMapCoverageSummary(
+      [ownerOne],
+      new Map([['owner-1', [federalLease]]])
+    );
+
+    expect(summary.leasedOwnership).toBe('0');
+    expect(summary.unleasedOwnership).toBe('1');
   });
 
   it('prefers the most recently updated active lease', () => {
@@ -537,6 +608,10 @@ describe('deskmap-coverage', () => {
     expect(summary.currentOwnership).toBe('1.5');
     expect(summary.missingOwnership).toBe('-0.5');
     expect(summary.currentOwnerCount).toBe(2);
+    expect(summary.currentOwnershipContributors).toEqual([
+      { nodeId: 'node-1', grantee: 'Family One', fraction: '1' },
+      { nodeId: 'node-2', grantee: 'Family Two', fraction: '0.5' },
+    ]);
   });
 
   describe('canOwnerNodeHoldLease (mineral-only gate)', () => {
@@ -575,6 +650,80 @@ describe('deskmap-coverage', () => {
         linkedOwnerId: 'owner-1',
       };
       expect(canOwnerNodeHoldLease(node)).toBe(false);
+    });
+  });
+
+  describe('lease overlap surfacing (audit M5)', () => {
+    it('returns clipped-lease warnings on the summary', () => {
+      const owner = {
+        ...createBlankNode('node-1'),
+        grantee: 'Owner One',
+        fraction: '0.5',
+        initialFraction: '0.5',
+        linkedOwnerId: 'owner-1',
+      };
+      // Two overlapping leases for the same owner, each claiming 0.5 — the
+      // later one gets clipped because the owner only holds 0.5.
+      const linkedLeases = new Map<string, Lease[]>([
+        [
+          'owner-1',
+          [
+            createBlankLease('ws-1', 'owner-1', {
+              id: 'lease-early',
+              leaseName: 'Original Lease',
+              lessee: 'Acme',
+              royaltyRate: '1/4',
+              leasedInterest: '0.5',
+              effectiveDate: '2025-01-01',
+              status: 'Active',
+              jurisdiction: 'tx_fee',
+            }),
+            createBlankLease('ws-1', 'owner-1', {
+              id: 'lease-late',
+              leaseName: 'Top Lease',
+              lessee: 'Beta',
+              royaltyRate: '1/5',
+              leasedInterest: '0.5',
+              effectiveDate: '2026-03-30',
+              status: 'Active',
+              jurisdiction: 'tx_fee',
+            }),
+          ],
+        ],
+      ]);
+      const summary = calculateDeskMapCoverageSummary([owner], linkedLeases);
+      expect(summary.leaseOverlaps).toHaveLength(1);
+      expect(summary.leaseOverlaps[0]?.ownerGrantee).toBe('Owner One');
+      expect(summary.leaseOverlaps[0]?.overlap.leaseId).toBe('lease-late');
+    });
+
+    it('returns no overlaps when leases fit within the owner interest', () => {
+      const owner = {
+        ...createBlankNode('node-1'),
+        grantee: 'Owner Two',
+        fraction: '0.5',
+        initialFraction: '0.5',
+        linkedOwnerId: 'owner-2',
+      };
+      const linkedLeases = new Map<string, Lease[]>([
+        [
+          'owner-2',
+          [
+            createBlankLease('ws-1', 'owner-2', {
+              id: 'lease-only',
+              leaseName: 'Only Lease',
+              lessee: 'Solo',
+              royaltyRate: '3/16',
+              leasedInterest: '0.5',
+              effectiveDate: '2026-03-30',
+              status: 'Active',
+              jurisdiction: 'tx_fee',
+            }),
+          ],
+        ],
+      ]);
+      const summary = calculateDeskMapCoverageSummary([owner], linkedLeases);
+      expect(summary.leaseOverlaps).toEqual([]);
     });
   });
 });

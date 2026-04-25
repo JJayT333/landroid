@@ -86,14 +86,13 @@ export interface OwnershipNode {
 }
 
 /**
- * Pooled-unit grouping fields (`unitName`, `unitCode`) are optional and only
- * surfaced by the Raven Forest demo seed today. Real-world workspaces may not
- * carry them, so the DeskMap normalizer passes them through when present and
- * drops them otherwise — pre-overhaul `.landroid` files continue to load
- * cleanly. `unitCode` is intentionally narrowed to `'A' | 'B'`; broadening
- * comes with Phase 4+ scope work, not here.
+ * Pooled-unit grouping fields (`unitName`, `unitCode`) are optional. Real-world
+ * workspaces may not carry them, so the DeskMap normalizer passes them through
+ * when present and drops them otherwise. `unitCode` is a short stable grouping
+ * key, not a math enum; Raven Forest uses `A` and `B`, and future projects can
+ * add additional unit codes without a type/schema change.
  */
-export type DeskMapUnitCode = 'A' | 'B';
+export type DeskMapUnitCode = string;
 
 export interface DeskMap {
   id: string;
@@ -175,7 +174,8 @@ function normalizeFixedRoyaltyBasis(value: unknown): FixedRoyaltyBasis {
 }
 
 function normalizeUnitCode(value: unknown): DeskMapUnitCode | undefined {
-  return value === 'A' || value === 'B' ? value : undefined;
+  const normalized = normalizeText(value).replace(/\s+/g, ' ').slice(0, 64);
+  return normalized.length > 0 ? normalized : undefined;
 }
 
 function normalizeUnitName(value: unknown): string | undefined {

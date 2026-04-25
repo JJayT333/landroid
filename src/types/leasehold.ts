@@ -3,6 +3,7 @@ import {
   normalizeLeaseJurisdiction,
   type LeaseJurisdiction,
 } from './owner';
+import type { DeskMapUnitCode } from './node';
 
 export interface LeaseholdUnit {
   name: string;
@@ -46,6 +47,8 @@ export interface LeaseholdOrri {
   id: string;
   payee: string;
   scope: LeaseholdOrriScope;
+  /** Unit code for unit-wide burdens in multi-unit workspaces. */
+  unitCode?: DeskMapUnitCode | null;
   deskMapId: string | null;
   burdenFraction: string;
   burdenBasis: LeaseholdOrriBurdenBasis;
@@ -59,6 +62,8 @@ export interface LeaseholdAssignment {
   assignor: string;
   assignee: string;
   scope: LeaseholdAssignmentScope;
+  /** Unit code for unit-wide WI assignments in multi-unit workspaces. */
+  unitCode?: DeskMapUnitCode | null;
   deskMapId: string | null;
   workingInterestFraction: string;
   effectiveDate: string;
@@ -76,6 +81,20 @@ export interface LeaseholdTransferOrderEntry {
 
 function asString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
+}
+
+function normalizeUnitCode(
+  value: unknown,
+  options: { validUnitCodes?: Set<string> } = {}
+): DeskMapUnitCode | null {
+  const candidate = asString(value);
+  if (!candidate) {
+    return null;
+  }
+  if (options.validUnitCodes && !options.validUnitCodes.has(candidate)) {
+    return null;
+  }
+  return candidate;
 }
 
 function normalizeInterestScope(value: unknown): LeaseholdInterestScope {
@@ -137,6 +156,7 @@ export function createBlankLeaseholdOrri(
       overrides.id ?? `orri-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     payee: '',
     scope: 'unit',
+    unitCode: null,
     deskMapId: null,
     burdenFraction: '',
     burdenBasis: 'gross_8_8',
@@ -149,7 +169,7 @@ export function createBlankLeaseholdOrri(
 
 export function normalizeLeaseholdOrri(
   value: unknown,
-  options: { validDeskMapIds?: Set<string> } = {}
+  options: { validDeskMapIds?: Set<string>; validUnitCodes?: Set<string> } = {}
 ): LeaseholdOrri {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     return createBlankLeaseholdOrri();
@@ -159,6 +179,7 @@ export function normalizeLeaseholdOrri(
     id?: unknown;
     payee?: unknown;
     scope?: unknown;
+    unitCode?: unknown;
     deskMapId?: unknown;
     burdenFraction?: unknown;
     burdenBasis?: unknown;
@@ -177,6 +198,7 @@ export function normalizeLeaseholdOrri(
     id: asString(record.id) || undefined,
     payee: asString(record.payee),
     scope,
+    unitCode: scope === 'unit' ? normalizeUnitCode(record.unitCode, options) : null,
     deskMapId: scope === 'tract' ? validDeskMapId : null,
     burdenFraction: asString(record.burdenFraction),
     burdenBasis: normalizeOrriBurdenBasis(record.burdenBasis),
@@ -188,7 +210,7 @@ export function normalizeLeaseholdOrri(
 
 export function normalizeLeaseholdOrris(
   value: unknown,
-  options: { validDeskMapIds?: Set<string> } = {}
+  options: { validDeskMapIds?: Set<string>; validUnitCodes?: Set<string> } = {}
 ): LeaseholdOrri[] {
   if (!Array.isArray(value)) {
     return [];
@@ -212,6 +234,7 @@ export function createBlankLeaseholdAssignment(
     assignor: '',
     assignee: '',
     scope: 'unit',
+    unitCode: null,
     deskMapId: null,
     workingInterestFraction: '',
     effectiveDate: '',
@@ -223,7 +246,7 @@ export function createBlankLeaseholdAssignment(
 
 export function normalizeLeaseholdAssignment(
   value: unknown,
-  options: { validDeskMapIds?: Set<string> } = {}
+  options: { validDeskMapIds?: Set<string>; validUnitCodes?: Set<string> } = {}
 ): LeaseholdAssignment {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     return createBlankLeaseholdAssignment();
@@ -234,6 +257,7 @@ export function normalizeLeaseholdAssignment(
     assignor?: unknown;
     assignee?: unknown;
     scope?: unknown;
+    unitCode?: unknown;
     deskMapId?: unknown;
     workingInterestFraction?: unknown;
     effectiveDate?: unknown;
@@ -252,6 +276,7 @@ export function normalizeLeaseholdAssignment(
     assignor: asString(record.assignor),
     assignee: asString(record.assignee),
     scope,
+    unitCode: scope === 'unit' ? normalizeUnitCode(record.unitCode, options) : null,
     deskMapId: scope === 'tract' ? validDeskMapId : null,
     workingInterestFraction: asString(record.workingInterestFraction),
     effectiveDate: asString(record.effectiveDate),
@@ -262,7 +287,7 @@ export function normalizeLeaseholdAssignment(
 
 export function normalizeLeaseholdAssignments(
   value: unknown,
-  options: { validDeskMapIds?: Set<string> } = {}
+  options: { validDeskMapIds?: Set<string>; validUnitCodes?: Set<string> } = {}
 ): LeaseholdAssignment[] {
   if (!Array.isArray(value)) {
     return [];

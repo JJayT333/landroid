@@ -10,6 +10,7 @@ import {
   type ValidationIssue,
 } from '../engine/math-engine';
 import { createWorkspaceId } from '../utils/workspace-id';
+import { assertFileSize, FILE_SIZE_LIMITS } from '../utils/file-validation';
 import {
   normalizeDeskMap,
   normalizeOwnershipNode,
@@ -28,7 +29,12 @@ import {
   type LeaseholdTransferOrderEntry,
   type LeaseholdUnit,
 } from '../types/leasehold';
-import { normalizeLease, type OwnerDoc } from '../types/owner';
+import {
+  normalizeLease,
+  type ContactLog,
+  type Owner,
+  type OwnerDoc,
+} from '../types/owner';
 import {
   normalizeMapExternalReference,
   type MapAsset,
@@ -52,8 +58,8 @@ import type { MapWorkspaceData } from './map-persistence';
 import type { ResearchWorkspaceData } from './research-persistence';
 import type { CurativeWorkspaceData } from './curative-persistence';
 import { normalizeTitleIssues, type TitleIssue } from '../types/title-issue';
-
-const WORKSPACE_ID = 'default';
+import { resolveActiveUnitCode } from '../utils/desk-map-units';
+import { getWorkspaceDbKey } from './active-workspace-key';
 const PAGE_SIZE_ID_SET = new Set<PageSizeId>(
   PAGE_SIZE_DEFINITIONS.map((definition) => definition.id)
 );
@@ -68,6 +74,7 @@ export interface WorkspaceData {
   leaseholdOrris?: LeaseholdOrri[];
   leaseholdTransferOrderEntries?: LeaseholdTransferOrderEntry[];
   activeDeskMapId: string | null;
+  activeUnitCode?: string | null;
   instrumentTypes: string[];
 }
 
@@ -120,6 +127,63 @@ interface SerializedResearchQuestion extends ResearchQuestion {}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Audit M3: owner/contact normalization for .landroid import.
+ *
+ * The old import path spread raw owner/contact objects straight into
+ * replaceOwnerWorkspaceData, which meant a corrupt or malicious file could
+ * inject entries with missing IDs, non-string fields, or prototype-polluting
+ * shapes. Now every record is coerced through a shape-checked normalizer:
+ * records missing the required id are dropped, and string fields fall back
+ * to '' so downstream code can trust their type.
+ */
+function stringOr(value: unknown, fallback: string): string {
+  return typeof value === 'string' ? value : fallback;
+}
+
+function normalizeOwnerRecord(
+  raw: unknown,
+  workspaceId: string
+): Owner | null {
+  if (!isRecord(raw) || typeof raw.id !== 'string' || raw.id === '') return null;
+  const nowIso = new Date().toISOString();
+  return {
+    id: raw.id,
+    workspaceId: stringOr(raw.workspaceId, workspaceId),
+    name: stringOr(raw.name, ''),
+    entityType: stringOr(raw.entityType, ''),
+    county: stringOr(raw.county, ''),
+    prospect: stringOr(raw.prospect, ''),
+    mailingAddress: stringOr(raw.mailingAddress, ''),
+    email: stringOr(raw.email, ''),
+    phone: stringOr(raw.phone, ''),
+    notes: stringOr(raw.notes, ''),
+    createdAt: stringOr(raw.createdAt, nowIso),
+    updatedAt: stringOr(raw.updatedAt, nowIso),
+  };
+}
+
+function normalizeContactRecord(
+  raw: unknown,
+  workspaceId: string
+): ContactLog | null {
+  if (!isRecord(raw) || typeof raw.id !== 'string' || raw.id === '') return null;
+  if (typeof raw.ownerId !== 'string' || raw.ownerId === '') return null;
+  const nowIso = new Date().toISOString();
+  return {
+    id: raw.id,
+    workspaceId: stringOr(raw.workspaceId, workspaceId),
+    ownerId: raw.ownerId,
+    contactDate: stringOr(raw.contactDate, ''),
+    method: stringOr(raw.method, ''),
+    subject: stringOr(raw.subject, ''),
+    outcome: stringOr(raw.outcome, ''),
+    notes: stringOr(raw.notes, ''),
+    createdAt: stringOr(raw.createdAt, nowIso),
+    updatedAt: stringOr(raw.updatedAt, nowIso),
+  };
 }
 
 function readStringArray(value: unknown): string[] {
@@ -308,10 +372,18 @@ function normalizeWorkspaceDataRecord(
   const nodeIdSet = new Set(nodes.map((node) => node.id));
   const deskMaps = normalizeDeskMaps(value.deskMaps, nodeIdSet);
   const validDeskMapIds = new Set(deskMaps.map((deskMap) => deskMap.id));
+  const validUnitCodes = new Set(
+    deskMaps.flatMap((deskMap) => (deskMap.unitCode ? [deskMap.unitCode] : []))
+  );
   const activeDeskMapId =
     typeof value.activeDeskMapId === 'string' && validDeskMapIds.has(value.activeDeskMapId)
       ? value.activeDeskMapId
       : deskMaps[0]?.id ?? null;
+  const activeUnitCode = resolveActiveUnitCode(
+    deskMaps,
+    typeof value.activeUnitCode === 'string' ? value.activeUnitCode : null,
+    activeDeskMapId
+  );
 
   return {
     workspaceId: value.workspaceId ?? createWorkspaceId(),
@@ -321,12 +393,19 @@ function normalizeWorkspaceDataRecord(
     leaseholdUnit: normalizeLeaseholdUnit(value.leaseholdUnit),
     leaseholdAssignments: normalizeLeaseholdAssignments(value.leaseholdAssignments, {
       validDeskMapIds,
+      validUnitCodes,
     }),
-    leaseholdOrris: normalizeLeaseholdOrris(value.leaseholdOrris, { validDeskMapIds }),
+    leaseholdOrris: normalizeLeaseholdOrris(value.leaseholdOrris, {
+      validDeskMapIds,
+      validUnitCodes,
+    }),
     leaseholdTransferOrderEntries: normalizeLeaseholdTransferOrderEntries(
       value.leaseholdTransferOrderEntries
     ),
-    activeDeskMapId,
+    activeDeskMapId: activeUnitCode
+      ? deskMaps.find((deskMap) => deskMap.unitCode === activeUnitCode)?.id ?? activeDeskMapId
+      : activeDeskMapId,
+    activeUnitCode,
     instrumentTypes: readStringArray(value.instrumentTypes),
   };
 }
@@ -416,7 +495,7 @@ export function parsePersistedWorkspaceData(raw: string): WorkspaceData {
 
 export async function saveWorkspaceToDb(data: WorkspaceData): Promise<void> {
   await db.workspaces.put({
-    id: WORKSPACE_ID,
+    id: getWorkspaceDbKey(),
     projectName: data.projectName,
     data: JSON.stringify(data),
     savedAt: new Date().toISOString(),
@@ -424,7 +503,7 @@ export async function saveWorkspaceToDb(data: WorkspaceData): Promise<void> {
 }
 
 export async function loadWorkspaceFromDb(): Promise<WorkspaceLoadResult> {
-  const record = await db.workspaces.get(WORKSPACE_ID);
+  const record = await db.workspaces.get(getWorkspaceDbKey());
   if (!record) {
     return {
       status: 'missing',
@@ -612,6 +691,7 @@ export async function replacePdfWorkspaceData(
 // ── Import .landroid file ──────────────────────────────
 
 export async function importLandroidFile(file: File): Promise<LandroidFileData> {
+  assertFileSize(file, FILE_SIZE_LIMITS.LANDROID, '.landroid file');
   const text = await file.text();
   let parsed: unknown;
 
@@ -636,7 +716,11 @@ export async function importLandroidFile(file: File): Promise<LandroidFileData> 
   const ownerData =
     isRecord(parsed.ownerData)
       ? {
-          owners: Array.isArray(parsed.ownerData.owners) ? parsed.ownerData.owners : [],
+          owners: Array.isArray(parsed.ownerData.owners)
+            ? parsed.ownerData.owners
+                .map((raw) => normalizeOwnerRecord(raw, workspaceId))
+                .filter((owner): owner is Owner => owner !== null)
+            : [],
           leases: Array.isArray(parsed.ownerData.leases)
             ? parsed.ownerData.leases
                 .filter(
@@ -651,7 +735,11 @@ export async function importLandroidFile(file: File): Promise<LandroidFileData> 
                 )
                 .map((lease) => normalizeLease(lease, { workspaceId }))
             : [],
-          contacts: Array.isArray(parsed.ownerData.contacts) ? parsed.ownerData.contacts : [],
+          contacts: Array.isArray(parsed.ownerData.contacts)
+            ? parsed.ownerData.contacts
+                .map((raw) => normalizeContactRecord(raw, workspaceId))
+                .filter((contact): contact is ContactLog => contact !== null)
+            : [],
           docs: Array.isArray(parsed.ownerData.docs)
             ? parsed.ownerData.docs
                 .filter(

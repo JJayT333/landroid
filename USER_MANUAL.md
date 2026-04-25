@@ -53,7 +53,8 @@ If a render or lazy-load failure occurs, LANDroid now shows a reload screen with
 - Click a tab to switch tracts.
 - Double-click a tab name to rename it.
 - Click the `x` on the active tab to delete that tract tab.
-- `+ Add Tract` creates a new tract tab.
+- `+ Add Tract` creates a new tract tab. When the current workspace has unit groupings, the new tract is added to the active unit.
+- Raven Forest and other multi-unit workspaces show bold unit headings over the tract tabs.
 
 Deleting a tract tab does not delete the underlying nodes from the workspace. It only removes that tab container.
 Gross acres and tract descriptions now live on the tract record itself, but you edit those values from the `Leasehold` view instead of the Desk Map tab strip.
@@ -61,6 +62,7 @@ Gross acres and tract descriptions now live on the tract record itself, but you 
 ### Working with title cards
 - `+ Add Root` starts a new title chain in the active tract.
 - Use `+ Add Root` more than once when a tract starts from separate families or competing starting points.
+- `Clear Map` empties the active Desk Map after confirmation. Use it when a tract import went sideways and you want to rebuild that tract without deleting other tracts or owner records.
 - Temporary totals over `100%` are acceptable while you work farther back in title and reconcile the chain later.
 - Use the `Find Mineral Owner` box in the top-left toolbar to jump straight to a mineral-owner card by name, even if that owner lives on another tract tab. Matching results now appear as a clickable list beneath the search box.
 - Click a card to edit it.
@@ -97,6 +99,7 @@ If `Found in Chain` is temporarily over `100%`, LANDroid keeps that state visibl
 ### Important delete behavior
 Deleting a conveyance branch removes that branch and restores the deleted conveyed amount back to the original grantor or parent. This is safer than simply dropping the branch and losing the fraction.
 Deleting the only Desk Map lessee card tied to an owner lease also removes that lease from the owner record. If another Desk Map card still uses the same lease record, deleting one lessee card leaves the owner lease in place and only removes that card.
+Clearing a Desk Map removes the visible title cards and node-linked artifacts from that tract, but it keeps the project, other tracts, owner records, maps, research, and curative records that are not tied to those cleared nodes. If a node is shared with another Desk Map, LANDroid removes it from the cleared map without deleting the shared node record.
 
 ### Empty-state behavior
 If a tract has no cards yet, start with `+ Add Root` or load a `.landroid` or `.csv` file.
@@ -117,7 +120,8 @@ It now has three internal modes:
 - `Deck` for a card-based leasehold board that keeps ORRIs, WI / assignments, and transfer-order review off the Desk Map title tree
 
 ### What it does today
-- Treats the current workspace's Desk Maps as one provisional unit
+- Uses the `Unit Focus` selector to isolate one pooled unit at a time when the workspace has unit-tagged Desk Maps
+- Lets you add another unit from the selector; LANDroid creates a starter tract under that new unit so the group exists immediately
 - Lets you set unit name, operator / lessee, effective date, and a short unit description
 - Lets you set `gross acres`, `pooled acres`, and a short tract description for each Desk Map
 - Derives tract participation from pooled acres
@@ -126,9 +130,11 @@ It now has three internal modes:
 - Aggregates multiple active leases per owner instead of collapsing to one primary lease for the math
 - Calculates weighted tract royalty and total unit royalty from the active lease rates now on file
 - Tracks leasehold-side ORRIs at either unit or tract scope, with an explicit burden-basis field
+- Keeps unit-wide ORRIs scoped to the selected unit instead of letting Unit A burdens leak into Unit B
 - Calculates ORRI and pre-assignment NRI totals for gross `8/8`, working-interest, and net-revenue-interest ORRI burdens
 - Stacks multiple NRI-basis ORRIs one by one in effective-date order instead of flattening them into one combined carve
 - Tracks leasehold-side WI assignments at either unit or tract scope
+- Keeps unit-wide WI assignments scoped to the selected unit
 - Includes a full-size `Map` mode that keeps the title story and the payout story separate: Desk Map stays mineral/title, while Map shows the leased-side picture for the same tract
 - Uses `Unit -> Tract` as the overview shape, then expands the selected tract into owner branches with lease slices and branch-bound NPRIs, plus separate tract-level ORRI and WI branches
 - Includes a `Deck` mode that focuses on one tract at a time and shows the lessee-side cards beneath that leasehold estate, including retained WI and assignment cards
@@ -142,6 +148,7 @@ It now has three internal modes:
 ### Current assumptions
 - Desk Map remains the title source of truth
 - `Owners` remains the lease-record source of truth
+- Unit focus is driven by Desk Map unit tags; Owners filters to owners linked to the selected unit or manually tagged with that unit as the owner prospect
 - Pooled acres drive participation and payout decimals
 - The starter demo begins with pooled acres equal to gross acres on every tract for easier audit checks
 - Leasehold math now aggregates all active owner leases in effective-date order and caps the leased total at the owner's current fraction; a lease linked to a Desk Map lease card is treated as branch-scoped instead of applying to every tract for the same owner
@@ -155,6 +162,7 @@ It now has three internal modes:
 - Floating-NPRI over-carves do not block editing, but they now keep unit-focus payout review on `Hold` so the payout sheet cannot be treated as ready by mistake
 - Assignments remain outside Desk Map title math and are handled in the Leasehold deck/review surface
 - Unit focus is the editable payout-entry surface; tract focus stays read-only because those rows are partial tract slices rather than final unit payout rows
+- In multi-unit workspaces, the unit selector is the active math boundary. Switch units before reviewing payout rows, ORRIs, assignments, or owner lease records.
 - `Map` mode is the intended visual home for the leasehold hierarchy itself
 - `Deck` mode is the intended visual home for WI, assignments, transfer-order review, and later deeper payout workflows
 
@@ -162,11 +170,12 @@ It now has three internal modes:
 - `Demo Data ▾ → Combinatorial — Raven Forest` loads the sample fixture
 - 10 tracts in two pooled units — Raven Forest Unit A (C1–C5, Walker County) and Unit B (C6–C10, Walker/Montgomery line), reflecting the Sam Houston National Forest prospect
 - Unit A tracts are leased to Texas Energy Acquisitions LP at 1/8 royalty; Unit B tracts to Lone Star Minerals LLC at 3/16 royalty
+- Leasehold and Owners open with a unit selector so you can switch between Raven Forest Unit A and Unit B instead of reviewing the whole combinatorial sample as one combined unit
 - The DeskMap tab bar groups tracts under bold unit headings; tracts C3, C7, and C9 show an error-dot indicator for NPRI discrepancy, over-conveyance, and orphan-node warnings respectively
 - Every tract covers one or more of the combinatorial flavors (baseline splits, probate / heirship, fixed NPRI carves, floating NPRI carves, correction / release, royalty deeds, over-conveyance, lease overlap, kitchen sink) so the same workspace can exercise Desk Map, Leasehold, and Research surfaces without real project data
 - Owner-card grantee names stay unique across the fixture so it is easy to scan
 - Seeded title and lease PDFs show their filenames on the Desk Map cards
-- The demo starts with one unit, a small ORRI burden, and a starter WI assignment so the leasehold deck has a clean check number from the first load
+- The demo starts focused on Unit A. Unit-wide ORRIs and WI assignments carry a unit code so Unit A and Unit B leasehold math stay separated.
 - The demo loader resets Curative, Maps, and Research side workspaces so stale side records from previous work are not carried over
 - The tract descriptions are prefilled so you can see how the tab is meant to be used before entering your own data
 
@@ -232,6 +241,7 @@ Useful notes:
 ### Typical workflow
 - Create a new owner from the `Owners` tab, or open `Owner Record` from a node edit modal in `Desk Map`.
 - For a same owner in multiple tracts, link each tract's Desk Map branch to the existing owner record before creating branch-specific lease nodes.
+- Use `Unit Focus` to switch the owner list between Raven Forest Unit A, Unit B, or future units. New owners created while a unit is active are tagged with that unit as their prospect so they stay visible while you link them to Desk Map branches.
 - Use the left-side `Search` box and `Sort By` picker to cut long owner lists down by owner name, county, prospect, lease text, active lease count, or recent activity.
 - Use the `Info` tab for mailing/contact/prospect notes.
 - Use `Leases` and `Contacts` for working notes tied to that owner.
@@ -239,6 +249,7 @@ Useful notes:
 - Editing an existing lease in `Owners` now refreshes any linked Desk Map lease node and Runsheet lease row text that came from that lease record.
 - New lease edits now use a short status list (`Active`, `Expired`, `Released`, `Terminated`, `Inactive`, `Dead`) so active-lease math stays consistent; older custom status text still displays until you choose a canonical replacement.
 - Each saved lease card also shows `Desk Map Lease Node` buttons for the linked tract chains, so you can create or reopen the terminal lessee node from `Owners` without hunting for that owner in the tree first.
+- In a multi-unit workspace, those `Desk Map Lease Node` buttons only show targets inside the selected unit.
 - Deleting a lease from `Owners` clears the linked lease reference on Desk Map cards; deleting the only linked Desk Map lessee card removes that lease from `Owners`.
 
 ### Math safety
@@ -405,9 +416,39 @@ The Curative view also keeps the next broader company-readiness areas visible so
 - The permit-master decoder currently focuses on the core status and permit records, plus the surface and bottom-hole coordinate records when present. Other companion segment types are still staged and called out honestly instead of being treated as fully decoded.
 - The horizontal-permit decoder currently focuses on the published 360-character row layout for that family. It does not yet cross-link those rows to other RRC families inside LANDroid.
 - DBF and EBCDIC-heavy imports are no longer near-term roadmap work. They remain staged safely for later if that work becomes worth the time.
-- No AI provider, prompt system, or API proxy is active in this phase. The saved source/formula/project/question records are structured so a later AI layer can use them.
 
-## 10) Flowchart view
+## 10) Ask LANDroid AI
+
+`Ask LANDroid AI` is active for single-user local workflows.
+
+### Provider posture
+- Ollama is the default and preferred provider.
+- OpenAI and Anthropic are optional cloud providers.
+- Cloud provider keys are session-only and should be treated as sensitive.
+- Cloud AI may send project context to third-party providers; use it only when that is acceptable for the current project.
+
+### Live edits and rollback
+- AI can make live Desk Map and owner/lease edits in the current local workflow.
+- Before an AI mutation is applied, LANDroid captures rollback state for the latest AI change.
+- Use the AI back/rollback control if an AI edit takes the project in the wrong direction.
+- The rollback is a safety net, not a replacement for reviewing title/math changes.
+
+### Workbook row review
+- In the AI workbook panel, `Review rows` stages recognizable spreadsheet title rows from the full parsed workbook, including multiple tract tabs.
+- Common columns such as Instrument, Doc #, file date, instrument date, Grantor, Grantee, land description, remarks, and fraction map into editable node drafts.
+- LANDroid detects tract-style sheet names, such as `Tract 2 - 106.19 ac.`, and can create the matching Desk Map tracts before you start creating root nodes.
+- DOTO-style ownership rows inherit the source instrument, dates, document number, and land description from the controlling document row, then use the listed owner as the node grantee and keep exhibit/fraction notes in remarks.
+- The Instrument field uses the same dropdown as the normal node editor, so a new instrument type from the workbook can be added to the workspace list.
+- LANDroid suggests a parent when a row grantor matches an existing grantee on the selected tract.
+- Each staged row can be edited, created as a root on the selected tract, attached to a same-tract parent, or skipped.
+- Row creation uses the same Desk Map math actions as the normal editor, so bad fractions, invalid NPRI/mineral attachments, and over-capacity conveyances fail visibly instead of silently importing.
+
+### Practical AI habit
+- Let AI reduce typing and suggest structure.
+- Do not treat AI suggestions as final title opinions.
+- Review every imported row, attachment target, fraction, and NPRI/mineral classification before relying on the result.
+
+## 11) Flowchart view
 
 `Flowchart` is the presentation and print surface.
 
@@ -452,7 +493,7 @@ These settings are now included when you save a `.landroid` file.
 - Use horizontal and vertical spacing controls when the tree feels too cramped or too loose
 - Use browser print preview before final printing
 
-## 11) Files and persistence
+## 12) Files and persistence
 
 ### `.landroid` files
 These are the main workspace snapshot files. They now include:
@@ -460,6 +501,7 @@ These are the main workspace snapshot files. They now include:
 - tract tabs
 - tract gross acres and tract descriptions
 - active tract selection
+- active unit focus
 - instrument types
 - workspace owner records
 - workspace owner documents
@@ -484,7 +526,7 @@ Autosaved workspace loads now validate the ownership graph before hydration. If 
 - Save another `.landroid` file before printing or exporting deliverables
 - Keep dated backup copies when testing risky changes
 
-## 12) Precision and ownership math
+## 13) Precision and ownership math
 
 Recent ownership work improved how fractions are stored and displayed.
 
@@ -500,7 +542,7 @@ Recent ownership work improved how fractions are stored and displayed.
 - Parent/child relationships matter for recalculation
 - If something looks wrong, review the branch in Desk Map first, then confirm the chronology in Runsheet
 
-## 13) Recommended workflow
+## 14) Recommended workflow
 
 1. Launch the app from `LANDroid.command` or `LANDroid.bat`.
 2. Load an existing `.landroid` file or import a `.csv`.
@@ -511,13 +553,14 @@ Recent ownership work improved how fractions are stored and displayed.
 7. Add supporting prospect maps and exhibits in `Maps`.
 8. Track federal lease inventory, expirations, potential targets, source packets, and federal map evidence in `Federal Leasing` when that work is part of the project.
 9. Capture supporting sources, formulas, shared project records, saved questions, and any useful RRC data imports in `Research`.
-10. Review chronology and field quality in `Runsheet`.
-11. Export the runsheet if you need workbook output.
-12. Import the active tract into `Flowchart`.
-13. Adjust paper size, spacing, and fit settings.
-14. Print or save final backups.
+10. Use `Ask LANDroid AI` to reduce typing or stage spreadsheet rows, while reviewing each suggested title/math change.
+11. Review chronology and field quality in `Runsheet`.
+12. Export the runsheet if you need workbook output.
+13. Import the active tract into `Flowchart`.
+14. Adjust paper size, spacing, and fit settings.
+15. Print or save final backups.
 
-## 14) Troubleshooting
+## 15) Troubleshooting
 
 ### "The app opened, but I still see old work"
 - Load the correct `.landroid` file.
@@ -546,7 +589,7 @@ Recent ownership work improved how fractions are stored and displayed.
 - Save a separate `.landroid` snapshot before going back to real data.
 - Browser QA covers the combinatorial demo loader with Playwright, including visible PDF filenames on Desk Map cards, inline project-name editing, Federal Leasing lease/target/source/map/search tracking, and Research home surfacing. Deeper leasehold-branch coverage is temporarily skipped in the Playwright suite while the Raven Forest fixture is rebuilt.
 
-## 15) Practical habits for a new user
+## 16) Practical habits for a new user
 
 - Keep one tract tab per tract unless you have a strong reason not to.
 - Rename tabs early so the runsheet and flowchart stay easy to follow.
@@ -555,6 +598,7 @@ Recent ownership work improved how fractions are stored and displayed.
 - Use `Maps` for presentation-facing prospect maps and region storytelling.
 - Use `Federal Leasing` for federal lease inventory, expirations, potential targets, source packets, and federal map evidence.
 - Use `Research` as the source-of-truth shelf for laws, formulas, project notes, supporting records, map evidence, and questions you want to revisit.
+- Use `Ask LANDroid AI` for suggestions and data-entry speed, but still review the title consequences yourself.
 - Use `Runsheet` as your QA pass, not just `Desk Map`.
 - Save often, and keep milestone `.landroid` files.
 - Before deleting a branch, pause and confirm you really want the interest restored to the parent.

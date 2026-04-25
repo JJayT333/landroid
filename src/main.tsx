@@ -2,6 +2,9 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
 import RootErrorBoundary from './components/shared/RootErrorBoundary';
+import { AuthProvider } from './auth/AuthProvider';
+import LoginGate from './auth/LoginGate';
+import { isHostedMode } from './utils/deploy-env';
 import './theme/index.css';
 import { useMapStore } from './store/map-store';
 import { useOwnerStore } from './store/owner-store';
@@ -11,6 +14,7 @@ import { useWorkspaceStore } from './store/workspace-store';
 import { useCanvasStore } from './store/canvas-store';
 import { saveWorkspaceToDb, loadWorkspaceFromDb } from './storage/workspace-persistence';
 import { saveCanvasToDb, loadCanvasFromDb } from './storage/canvas-persistence';
+import { awaitWorkspaceKeyReady } from './storage/active-workspace-key';
 import {
   buildCanvasAutosavePayload,
   buildWorkspaceAutosavePayload,
@@ -22,6 +26,12 @@ import {
 
 // ── Auto-load saved workspace and canvas on startup ─────
 async function bootstrapApp() {
+  // Audit M-1: in hosted mode, the IndexedDB row key is namespaced by the
+  // Cognito ID-token `sub`. AuthProvider populates it; bootstrap waits so
+  // the first read uses the per-user key, not the legacy 'default' row.
+  // In local mode awaitWorkspaceKeyReady resolves at module load.
+  await awaitWorkspaceKeyReady();
+
   const [workspaceResult, canvasResult] = await Promise.all([
     loadWorkspaceFromDb(),
     loadCanvasFromDb(),
@@ -109,7 +119,15 @@ useCanvasStore.subscribe((state) => {
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <RootErrorBoundary>
-      <App />
+      {isHostedMode() ? (
+        <AuthProvider>
+          <LoginGate>
+            <App />
+          </LoginGate>
+        </AuthProvider>
+      ) : (
+        <App />
+      )}
     </RootErrorBoundary>
   </StrictMode>
 );

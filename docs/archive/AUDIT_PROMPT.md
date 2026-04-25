@@ -1,5 +1,10 @@
 # LANDroid Full Codebase Audit
 
+> ARCHIVED / HISTORICAL.
+> Do not use this as current implementation guidance. Current repo guidance
+> lives in `AGENTS.md`, `PROJECT_CONTEXT.md`, `ARCHITECTURE.md`,
+> `TESTING.md`, and `SECURITY.md`.
+
 > **Usage:** Paste this entire prompt into a new Claude Code session at the project root.
 > It will run 5 parallel audit agents, then synthesize findings into a single report.
 

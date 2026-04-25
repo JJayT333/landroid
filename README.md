@@ -1,51 +1,39 @@
 # LANDroid
 
-This repository root is now the active LANDroid application.
+LANDroid is a local-first React/Vite/TypeScript app for Texas oil-and-gas title,
+lease, ownership, research, and land workflow review.
+
+The repository root is the active application surface.
 
 ## Scope
 
-**Texas math remains Texas-only for now.** LANDroid currently calculates Texas fee and Texas state lease/title math only. `Federal Leasing` now gives federal/BLM lease inventory, expiration, target, source-packet, and map-evidence tracking its own reference workspace, backed by Research project records. Federal/BLM and private lease math remain **Phase 2** work behind a separate decision gate. See `PROJECT_CONTEXT.md` for details.
+Texas math is the active calculation baseline. LANDroid currently calculates
+Texas fee and Texas state lease/title math only. Federal/BLM and private records
+can be tracked as reference data in Federal Leasing and Research, but they must
+not affect Desk Map, Leasehold, payout, NPRI, ORRI, WI, or transfer-order math
+until the explicit Phase 2 federal/private math gate opens.
 
-## Quick start
+See `PROJECT_CONTEXT.md` and `docs/adr/0002-texas-only-active-math.md`.
+
+## Quick Start
 
 ### Launchers
+
 - macOS: `LANDroid.command`
 - Windows: `LANDroid.bat`
 
 ### Terminal
+
 ```bash
 cd /path/to/landroid
 npm install
 npm run dev
 ```
 
-Then open `http://localhost:5173/`.
-
-## Useful files
-- User manual: `USER_MANUAL.md`
-- Landman math reference: `LANDMAN-MATH-REFERENCE.md`
-- Continuation handoff: `CONTINUATION-PROMPT.md`
-- App entry: `src/main.tsx`
-- Main app shell: `src/App.tsx`
-- Demo branding assets: `src/assets/branding/`
-- Local PDF companion folder for runsheet exports: `TORS_Documents/`
-
-## Current surfaces
-- `Desk Map` for title-chain editing, ownership-versus-leasing coverage checks, multiple starting root families when title is still incomplete, existing-owner linking on unlinked mineral cards, branch-scoped leased-status flags on mineral-owner cards, separate terminal lessee nodes, visible PDF filename chips on cards with attachments, separate NPRI branches that do not reduce the mineral coverage totals, warning-only red branch highlights when NPRI burdens over-claim the branch/royalty bucket, and a mineral-owner search box with a clickable results list that can jump across tract tabs by owner name
-- `Leasehold` for acreage-first tract setup, pooled-participation review, unit metadata, dual gross-vs-pooled owner acreage outputs, branch-scoped Desk Map lease-card coverage, aggregated royalty calculations across active lease records, fixed-and-floating NPRI payout support with fixed-deed basis tracking (`burdened branch` vs `whole tract`), leasehold-side ORRI burden tracking across gross `8/8`, working-interest, and net-revenue-interest bases, a full-size `Map` mode that visualizes `Unit -> Tract -> Owner Branch / ORRI / WI -> Lease Slice / NPRI` without changing Desk Map title meaning, and a card-based internal `Deck` view with editable unit-level transfer-order rows layered on top of the derived review surface; floating-NPRI over-carves now keep unit-focus payout readiness on `Hold` while editing stays available
-- `Flowchart` for presentation and print layout
-- `Runsheet` for chronology review, export, and opening the same node or lease editor cards used in `Desk Map`
-- `Owners` for workspace-scoped owner, lease, contact, and document records, with lease edits flowing back into linked Desk Map and Runsheet lease nodes, a canonical Texas-baseline lease-status picker for new edits, direct buttons to create or reopen the linked Desk Map lease node from each saved lease card, existing-owner reuse for same-party multi-tract title, and local search/sort controls so long owner lists are easier to work
-- `Curative` for title issues and curative tracking: probate/heirship gaps, NPRI discrepancies, missing leases or ratifications, bad legal descriptions, liens, name mismatches, unrecorded assignments, over-conveyances, and title-opinion requirements can be prioritized, assigned, linked to tracts/branches/owners/leases, and kept warning-only until resolved
-- `Maps` for the featured-map workspace with supporting PDF/image/GeoJSON assets, linked regions, GeoJSON feature summaries, outside references, and links to Research sources or project records
-- `Federal Leasing` for reference-only federal/BLM lease tracking: current lease inventory, potential targets, expirations, next actions, source-packet status, legacy/MLRS serials, county/prospect notes, map evidence, and links back to Research sources and LANDroid objects without touching Texas math
-- `Research` for a source-of-truth home workspace with cross-library search, review queues, source records with review status, landman-readable formula cards, starter Texas formula scaffolds from `LANDMAN-MATH-REFERENCE.md`, saved questions, shared project records, map/import links, and a secondary advanced `Data Imports` area for RRC cataloging, imported files, readable table previews, and the existing permit decoders
-
-## Demo loaders
-- `Stress (100/150/500)` loads the Desk Map stress workspace with three tract-sized title trees, current owner/lease links, visible seeded PDF filenames, and fresh empty side workspaces for Curative/Maps/Research
-- `Leasehold (8 Tracts)` loads a separate eight-tract unit demo with clean `80`-acre-step gross and pooled acreage, clean half/quarter/eighth present-owner splits, one intentionally shared owner across two tracts, 100% branch-scoped lease coverage for every present owner at `1/8` royalty, a starter unit-wide ORRI burden, and starter WI assignments
+Open `http://localhost:5173/`.
 
 ## Validation
+
 ```bash
 npm run lint
 npm test
@@ -53,18 +41,66 @@ npm run build
 npm run test:e2e
 ```
 
-- `npm run test:e2e` uses Playwright Chromium and starts the local Vite server automatically.
-- Current browser coverage checks the refreshed demo loaders, visible Desk Map PDF filename chips, attach/replace lease PDF behavior, `.landroid` export/import preservation, same-owner multi-tract lease records, branch-scoped lessee-card deletion back to owner records, Curative create/edit/link/filter behavior, Research source/formula/project/question add/link/search behavior, Federal Leasing lease/target/source/map/search tracking, Research opening to the source workspace home, starter formula creation/search, Data Imports staying secondary, and stress-seed document badges.
+`npm run test:e2e` uses Playwright Chromium and starts the local Vite server
+automatically. Current e2e status is tracked in `TESTING.md`; as of the current
+handoff, 4 workflows are active and 5 are intentionally skipped pending retargeting.
 
-## Persistence notes
+## Key Docs
+
+| File | Purpose |
+| --- | --- |
+| `AGENTS.md` | Rules for AI coding agents working in this repo. |
+| `PROJECT_CONTEXT.md` | Domain, architecture, and scope invariants. |
+| `ARCHITECTURE.md` | Runtime stack, state ownership, module boundaries, and data flow. |
+| `TESTING.md` | Validation commands, known warnings, and test policy. |
+| `SECURITY.md` | Local-first security model, AI/key handling, and upload risks. |
+| `DEPLOYMENT_PLAN.md` | Hosted deployment architecture, security controls, and rollout phases. |
+| `DEPLOYMENT_GUIDE.md` | Step-by-step walkthrough for deploying to `landroid.abstractmapping.com` (Cognito + Amplify + Lambda AI proxy). |
+| `USER_MANUAL.md` | User-facing workflow guide. |
+| `LANDMAN-MATH-REFERENCE.md` | Landman-facing math formulas and review conventions. |
+| `ROADMAP.md` | Current, next, and later work. |
+| `CHANGELOG.md` | Completed meaningful changes. |
+| `CONTINUATION-PROMPT.md` | Short handoff for resuming the active workstream. |
+
+See `docs/README.md` for the full documentation map.
+
+## Current App Surfaces
+
+- `Desk Map`: title-chain editing and ownership review.
+- `Leasehold`: unit-focused acreage, lease, ORRI, WI, NPRI payout, and transfer-order review.
+- `Flowchart`: presentation and print layout.
+- `Runsheet`: chronology review and workbook export.
+- `Owners`: unit-filtered owner, lease, contact, and document records.
+- `Curative`: title issue and curative tracking.
+- `Maps`: project map assets, regions, and references.
+- `Federal Leasing`: reference-only federal/BLM lease tracking.
+- `Research`: source records, formulas, project records, saved questions, and RRC imports.
+- `Ask LANDroid AI`: local-first assistant workflows and workbook row review, with Ollama as the default provider.
+
+## Demo Data
+
+Use `Demo Data -> Combinatorial - Raven Forest` to load the current sample
+workspace. It starts on Raven Forest Unit A and separates Unit A and Unit B so
+Leasehold and Owners can be reviewed by unit. Older stress and 8-tract leasehold
+demos have been retired.
+
+## Persistence Notes
+
 - Browser autosave keeps the active workspace and flowchart canvas locally.
-- Saved workspace loads now validate the ownership graph before hydration instead of trusting malformed tree data.
-- If autosaved workspace or canvas data is corrupt, LANDroid now opens a safe fresh state and shows a startup warning instead of silently treating the bad record like an empty workspace.
-- `.landroid` exports now capture workspace data, flowchart canvas state, node PDF attachments, owner records, owner documents, curative title issues, map assets, and research sources/formulas/project records/questions/imports in one self-contained backup.
-- `.landroid` imports now fail clearly on malformed top-level payloads and invalid ownership graphs instead of partially loading junk data.
-- CSV imports create a fresh workspace and intentionally start with empty owner, curative, map, and research side records.
+- `.landroid` files are the main named backup/export format.
+- `.landroid` imports validate the top-level workspace graph before loading.
+- CSV imports create a fresh workspace and intentionally start with empty owner,
+  curative, map, and research side records.
 
-## Repo notes
+## Repo Notes
+
 - `dist/` is generated browser-ready output from `npm run build`.
 - `dist-node/` is generated TypeScript config output from the composite build.
 - `playwright-report/` and `test-results/` are generated by Playwright browser QA.
+
+## Hosted Deployment
+
+- Full walkthrough: `DEPLOYMENT_GUIDE.md` (AWS + GoDaddy, ~60 min first time).
+- Paste-ready Amplify rewrites: `amplify-rewrites.json`.
+- Post-deploy verification: `bash scripts/smoke-test-hosted.sh`.
+- Lambda AI proxy source: `backend/ai-proxy/`.

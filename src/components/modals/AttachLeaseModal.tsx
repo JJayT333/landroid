@@ -21,6 +21,7 @@ import { deriveCounty } from '../../utils/land';
 import { parseStrictInterestString } from '../../utils/interest-string';
 import { serialize } from '../../engine/decimal';
 import { savePdf } from '../../storage/pdf-store';
+import { assertFileSize, FILE_SIZE_LIMITS } from '../../utils/file-validation';
 import FormField from '../shared/FormField';
 import Modal from '../shared/Modal';
 import {
@@ -453,6 +454,15 @@ export default function AttachLeaseModal({
             onChange={(event) => {
               const file = event.target.files?.[0] ?? null;
               setSaveError(null);
+              if (file) {
+                try {
+                  assertFileSize(file, FILE_SIZE_LIMITS.PDF, 'Lease PDF');
+                } catch (err) {
+                  setSaveError(err instanceof Error ? err.message : 'File too large');
+                  event.target.value = '';
+                  return;
+                }
+              }
               setSelectedPdfFile(file);
               event.target.value = '';
             }}

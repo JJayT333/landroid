@@ -81,6 +81,7 @@ describe('autosave-change-detection', () => {
         },
       ],
       activeDeskMapId: 'dm-1',
+      activeUnitCode: null,
       instrumentTypes: ['Deed'],
     };
 

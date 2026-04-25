@@ -1,5 +1,9 @@
 # Audit Remediation Plan
 
+> ARCHIVED / HISTORICAL.
+> This plan predates the current root `AUDIT_REPORT.md` and `PATCH_PLAN.md`.
+> Use those files for active audit remediation status.
+
 This note merges:
 
 - the repo audit performed in-chat

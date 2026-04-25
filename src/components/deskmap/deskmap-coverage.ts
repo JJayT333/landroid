@@ -1,7 +1,12 @@
+import type Decimal from 'decimal.js';
 import { d } from '../../engine/decimal';
 import { isNpriNode, type OwnershipNode } from '../../types/node';
-import { isInactiveLeaseStatus, type Lease } from '../../types/owner';
-import { parseInterestString } from '../../utils/interest-string';
+import {
+  isInactiveLeaseStatus,
+  isTexasMathLease,
+  type Lease,
+} from '../../types/owner';
+import { parseStrictInterestString } from '../../utils/interest-string';
 import { isLeaseNode } from './deskmap-lease-node';
 
 export interface DeskMapPrimaryLeaseSummary {
@@ -27,6 +32,21 @@ export interface DeskMapCoverageSummary {
   currentOwnerCount: number;
   linkedOwnerCount: number;
   leasedOwnerCount: number;
+  currentOwnershipContributors: Array<{
+    nodeId: string;
+    grantee: string;
+    fraction: string;
+  }>;
+  /**
+   * Audit M5: surfaced lease overlap warnings so the Desk Map coverage card
+   * can call out top-lease or duplicated-lease scenarios. Populated per
+   * owner node; one entry per clipped lease. Empty array means no overlaps.
+   */
+  leaseOverlaps: Array<{
+    ownerNodeId: string;
+    ownerGrantee: string;
+    overlap: LeaseCoverageOverlap;
+  }>;
 }
 
 export interface LeaseCoverageAllocation {
@@ -67,7 +87,7 @@ function asLeaseText(value: string | null | undefined): string {
 }
 
 export function isLeaseActive(lease: Lease) {
-  return !isInactiveLeaseStatus(lease.status);
+  return !isInactiveLeaseStatus(lease.status) && isTexasMathLease(lease);
 }
 
 /**
@@ -147,9 +167,27 @@ export function allocateLeaseCoverage(
 
   for (const lease of activeLeases) {
     const leasedInterestText = asLeaseText(lease.leasedInterest).trim();
-    const requestedFraction = leasedInterestText.length > 0
-      ? parseInterestString(leasedInterestText)
-      : ownerFraction;
+    let requestedFraction: Decimal;
+    if (leasedInterestText.length > 0) {
+      // Strict parse: malformed leased-interest values must surface a coverage
+      // warning rather than silently coerce to zero (audit M-2). The lenient
+      // parser belongs on display paths only.
+      const parsed = parseStrictInterestString(leasedInterestText);
+      if (parsed === null) {
+        overlaps.push({
+          leaseId: lease.id,
+          leaseName: asLeaseText(lease.leaseName),
+          lessee: asLeaseText(lease.lessee),
+          requestedFraction: leasedInterestText,
+          allocatedFraction: '0',
+          clippedFraction: 'malformed',
+        });
+        continue;
+      }
+      requestedFraction = parsed;
+    } else {
+      requestedFraction = ownerFraction;
+    }
 
     // If earlier leases already exhausted the owner's share, any subsequent
     // lease is fully clipped: requested > 0, allocated = 0, clipped = requested.
@@ -242,14 +280,15 @@ export function calculateDeskMapCoverageSummary(
   let currentOwnerCount = 0;
   let linkedOwnerCount = 0;
   let leasedOwnerCount = 0;
+  const leaseOverlaps: DeskMapCoverageSummary['leaseOverlaps'] = [];
 
   nodes.forEach((node) => {
     if (node.type === 'related' || isNpriNode(node)) return;
     const remaining = d(node.fraction);
     if (!remaining.greaterThan(0)) return;
 
-    currentOwnerCount += 1;
-    currentOwnership = currentOwnership.plus(remaining);
+      currentOwnerCount += 1;
+      currentOwnership = currentOwnership.plus(remaining);
 
     if (node.linkedOwnerId) {
       linkedOwnerCount += 1;
@@ -260,11 +299,17 @@ export function calculateDeskMapCoverageSummary(
         node,
         leaseScopeIndex
       );
-      // Overlap warnings are discarded here — the desk-map coverage summary
-      // does not surface them today. The leasehold summary (`leasehold-summary.ts`)
-      // is the canonical consumer of per-owner overlap warnings and bubbles them
-      // up to the tract and unit level for the leasehold deck UI.
-      const { allocations } = allocateLeaseCoverage(ownerLeases, remaining.toString());
+      // Audit M5: overlap warnings used to be discarded here. We now keep
+      // them alongside allocations so the Desk Map coverage card can flag
+      // top-lease / duplicate-lease situations that need human review.
+      const { allocations, overlaps } = allocateLeaseCoverage(ownerLeases, remaining.toString());
+      for (const overlap of overlaps) {
+        leaseOverlaps.push({
+          ownerNodeId: node.id,
+          ownerGrantee: node.grantee || 'Unknown',
+          overlap,
+        });
+      }
 
       if (allocations.length > 0) {
         leasedOwnerCount += 1;
@@ -293,5 +338,16 @@ export function calculateDeskMapCoverageSummary(
     currentOwnerCount,
     linkedOwnerCount,
     leasedOwnerCount,
+    currentOwnershipContributors: nodes
+      .filter((node) => {
+        if (node.type === 'related' || isNpriNode(node)) return false;
+        return d(node.fraction).greaterThan(0);
+      })
+      .map((node) => ({
+        nodeId: node.id,
+        grantee: node.grantee || 'Unknown',
+        fraction: node.fraction,
+      })),
+    leaseOverlaps,
   };
 }

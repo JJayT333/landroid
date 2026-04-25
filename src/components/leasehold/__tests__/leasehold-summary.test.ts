@@ -1756,4 +1756,131 @@ describe('leasehold-summary', () => {
     expect(summary.tracts[0]?.leasedOwnership).toBe('0.25');
     expect(summary.tracts[1]?.leasedOwnership).toBe('0');
   });
+
+  it('keeps unit-wide ORRIs and assignments inside their tagged unit', () => {
+    const summary = buildLeaseholdUnitSummary({
+      deskMaps: [
+        {
+          id: 'dm-a',
+          name: 'A Tract',
+          code: 'A1',
+          tractId: 'A1',
+          grossAcres: '100',
+          pooledAcres: '100',
+          description: '',
+          nodeIds: ['owner-a', 'lease-a-node'],
+          unitName: 'Raven Forest Unit A',
+          unitCode: 'A',
+        },
+        {
+          id: 'dm-b',
+          name: 'B Tract',
+          code: 'B1',
+          tractId: 'B1',
+          grossAcres: '100',
+          pooledAcres: '100',
+          description: '',
+          nodeIds: ['owner-b', 'lease-b-node'],
+          unitName: 'Raven Forest Unit B',
+          unitCode: 'B',
+        },
+      ],
+      nodes: [
+        {
+          ...createBlankNode('owner-a', null),
+          grantee: 'A Owner',
+          linkedOwnerId: 'owner-a-record',
+          fraction: '1',
+          initialFraction: '1',
+        },
+        {
+          ...createBlankNode('lease-a-node', 'owner-a'),
+          type: 'related' as const,
+          relatedKind: 'lease' as const,
+          linkedLeaseId: 'lease-a',
+        },
+        {
+          ...createBlankNode('owner-b', null),
+          grantee: 'B Owner',
+          linkedOwnerId: 'owner-b-record',
+          fraction: '1',
+          initialFraction: '1',
+        },
+        {
+          ...createBlankNode('lease-b-node', 'owner-b'),
+          type: 'related' as const,
+          relatedKind: 'lease' as const,
+          linkedLeaseId: 'lease-b',
+        },
+      ],
+      owners: [
+        createBlankOwner('ws-1', { id: 'owner-a-record', name: 'A Owner' }),
+        createBlankOwner('ws-1', { id: 'owner-b-record', name: 'B Owner' }),
+      ],
+      leases: [
+        createBlankLease('ws-1', 'owner-a-record', {
+          id: 'lease-a',
+          lessee: 'Operator A',
+          royaltyRate: '1/8',
+          leasedInterest: '1',
+        }),
+        createBlankLease('ws-1', 'owner-b-record', {
+          id: 'lease-b',
+          lessee: 'Operator B',
+          royaltyRate: '1/8',
+          leasedInterest: '1',
+        }),
+      ],
+      leaseholdAssignments: [
+        {
+          id: 'assignment-a',
+          assignor: 'Operator A',
+          assignee: 'A WI Partner',
+          scope: 'unit',
+          unitCode: 'A',
+          deskMapId: null,
+          workingInterestFraction: '1/2',
+          effectiveDate: '2024-01-01',
+          sourceDocNo: 'ASG-A',
+          notes: '',
+        },
+      ],
+      leaseholdOrris: [
+        {
+          id: 'orri-a',
+          payee: 'A Override',
+          scope: 'unit',
+          unitCode: 'A',
+          deskMapId: null,
+          burdenFraction: '1/32',
+          burdenBasis: 'gross_8_8',
+          effectiveDate: '2024-01-01',
+          sourceDocNo: 'ORRI-A',
+          notes: '',
+        },
+      ],
+    });
+
+    const tractA = summary.tracts.find((tract) => tract.deskMapId === 'dm-a')!;
+    const tractB = summary.tracts.find((tract) => tract.deskMapId === 'dm-b')!;
+
+    expect(tractA.trackedAssignmentCount).toBe(1);
+    expect(tractA.trackedOrriCount).toBe(1);
+    expect(tractB.trackedAssignmentCount).toBe(0);
+    expect(tractB.trackedOrriCount).toBe(0);
+    expect(summary.assignments[0]).toEqual(
+      expect.objectContaining({
+        id: 'assignment-a',
+        unitCode: 'A',
+        tractName: 'Raven Forest Unit A',
+      })
+    );
+    expect(summary.orris[0]).toEqual(
+      expect.objectContaining({
+        id: 'orri-a',
+        unitCode: 'A',
+        tractName: 'Raven Forest Unit A',
+      })
+    );
+  });
 });

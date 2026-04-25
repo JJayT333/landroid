@@ -1,5 +1,10 @@
 # LANDroid Audit Report — 2026-03-31
 
+> ARCHIVED / HISTORICAL.
+> This audit predates later architecture, AI, Federal Leasing, and workflow
+> changes. Use the root `AUDIT_REPORT.md` and `PATCH_PLAN.md` for current
+> audit/remediation status.
+
 ## Executive Summary
 
 LANDroid is in **strong health** for a pre-release application. The math engine is well-architected with consistent Decimal.js usage, every mutation validates the full graph, and the type system is exceptionally clean (zero `any`, zero `@ts-ignore`). The biggest risks are: (1) a precision boundary in fraction display where `Decimal.toNumber()` drops to 64-bit float, (2) no Error Boundary so a lazy-load or render failure crashes the entire app, and (3) CSV import converts fractions through `Number()` which silently loses precision for complex ownership chains.
