@@ -174,6 +174,33 @@ describe('AI tools — read-only project queries', () => {
     expect(useOwnerStore.getState().leases).toEqual([]);
   });
 
+  // Audit L-4: explicit empty strings must be rejected so a model can't save
+  // a 0-royalty lease by passing royaltyRate=''. Missing keys remain valid
+  // (the user can fill them in later); the error only fires for explicit ''.
+  it('rejects explicit empty-string royaltyRate / leasedInterest from the AI', async () => {
+    const owner = { ...createBlankOwner('ws-1'), id: 'owner-1', name: 'Owner One' };
+    useOwnerStore.setState({ owners: [owner], leases: [] });
+
+    const emptyRoyalty = await runTool(landroidTools.createLease, {
+      ownerId: owner.id,
+      royaltyRate: '',
+    });
+    expect(emptyRoyalty).toMatchObject({
+      ok: false,
+      error: expect.stringContaining('royaltyRate cannot be an empty string'),
+    });
+
+    const emptyLeasedInterest = await runTool(landroidTools.createLease, {
+      ownerId: owner.id,
+      leasedInterest: '',
+    });
+    expect(emptyLeasedInterest).toMatchObject({
+      ok: false,
+      error: expect.stringContaining('leasedInterest cannot be an empty string'),
+    });
+    expect(useOwnerStore.getState().leases).toEqual([]);
+  });
+
   it('keeps non-Texas leases out of active AI lease creation and attachment', async () => {
     const owner = { ...createBlankOwner('ws-1'), id: 'owner-1', name: 'Owner One' };
     const mineralNode = {
@@ -242,4 +269,37 @@ describe('AI tools — read-only project queries', () => {
     });
     expect(useWorkspaceStore.getState().nodes).toHaveLength(1);
   });
+
+  // Audit M-3: deleteNode used to gate cascading deletes on a model-supplied
+  // boolean, which the model could just set on its own. Now the AI tool
+  // refuses cascades unconditionally; the user must perform them from the UI.
+  it('refuses to cascade-delete a node with descendants regardless of the AI', async () => {
+    const root = { ...createBlankNode('root-1'), interestClass: 'mineral' as const };
+    const child = {
+      ...createBlankNode('child-1'),
+      parentId: 'root-1',
+      interestClass: 'mineral' as const,
+    };
+    useWorkspaceStore.setState({
+      nodes: [root, child],
+      deskMaps: [deskMap({ id: 'dm-1', nodeIds: ['root-1', 'child-1'] })],
+      activeDeskMapId: 'dm-1',
+    });
+
+    const refused = await runTool(landroidTools.deleteNode, { nodeId: 'root-1' });
+    expect(refused).toMatchObject({
+      ok: false,
+      error: expect.stringContaining('Refusing cascading delete'),
+      descendantCount: 1,
+    });
+    // Workspace untouched.
+    expect(useWorkspaceStore.getState().nodes).toHaveLength(2);
+
+    const preview = await runTool(landroidTools.previewDeleteNode, { nodeId: 'root-1' });
+    expect(preview).toMatchObject({
+      descendantCount: 1,
+      cascadeRequiresUiApproval: true,
+    });
+  });
+
 });

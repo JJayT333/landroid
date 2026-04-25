@@ -10,6 +10,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { UserManager, type User } from 'oidc-client-ts';
 import { setIdToken, setUnauthorizedHandler } from './session';
+import { setActiveUserSub } from '../storage/active-workspace-key';
 
 interface AuthContextValue {
   user: User | null;
@@ -77,6 +78,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (cancelled) return;
       setUser(next);
       setIdToken(next?.id_token ?? null);
+      // Audit M-1: namespace IndexedDB on the Cognito sub claim. Setting
+      // the value (even null) flips the workspace-key ready promise so
+      // bootstrap can run; signed-out hosted users wait at LoginGate but
+      // the autosave subscription stays correctly scoped to whatever sub
+      // is current.
+      const sub = typeof next?.profile?.sub === 'string' ? next.profile.sub : null;
+      setActiveUserSub(sub);
     };
 
     (async () => {

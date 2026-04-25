@@ -59,8 +59,7 @@ import type { ResearchWorkspaceData } from './research-persistence';
 import type { CurativeWorkspaceData } from './curative-persistence';
 import { normalizeTitleIssues, type TitleIssue } from '../types/title-issue';
 import { resolveActiveUnitCode } from '../utils/desk-map-units';
-
-const WORKSPACE_ID = 'default';
+import { getWorkspaceDbKey } from './active-workspace-key';
 const PAGE_SIZE_ID_SET = new Set<PageSizeId>(
   PAGE_SIZE_DEFINITIONS.map((definition) => definition.id)
 );
@@ -496,7 +495,7 @@ export function parsePersistedWorkspaceData(raw: string): WorkspaceData {
 
 export async function saveWorkspaceToDb(data: WorkspaceData): Promise<void> {
   await db.workspaces.put({
-    id: WORKSPACE_ID,
+    id: getWorkspaceDbKey(),
     projectName: data.projectName,
     data: JSON.stringify(data),
     savedAt: new Date().toISOString(),
@@ -504,7 +503,7 @@ export async function saveWorkspaceToDb(data: WorkspaceData): Promise<void> {
 }
 
 export async function loadWorkspaceFromDb(): Promise<WorkspaceLoadResult> {
-  const record = await db.workspaces.get(WORKSPACE_ID);
+  const record = await db.workspaces.get(getWorkspaceDbKey());
   if (!record) {
     return {
       status: 'missing',

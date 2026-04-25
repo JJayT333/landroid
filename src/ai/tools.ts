@@ -573,7 +573,7 @@ export const landroidTools = {
 
   previewDeleteNode: tool({
     description:
-      'Read-only: count what would be removed if you deleted this node. Returns descendant count, total nodes that would be removed, and curative issues that would be detached. ALWAYS call this before deleteNode when the target has any children, so you can tell the user what they are about to lose before you ask them to confirm.',
+      'Read-only: count what would be removed if you deleted this node. Returns descendant count, total nodes that would be removed, and curative issues that would be detached. ALWAYS call this before deleteNode when the target has any children. If the count is non-zero you must NOT call deleteNode — the AI cannot perform cascading deletes; tell the user the totals and ask them to delete the branch from the Desk Map UI so they approve the cascade in person.',
     inputSchema: z.object({
       nodeId: z.string().min(1),
     }),
@@ -604,22 +604,20 @@ export const landroidTools = {
         descendantCount: descendantIds.size,
         totalNodesRemoved: allRemovedIds.size,
         affectedTitleIssueCount,
-        requiresConfirmCascade: descendantIds.size > 0,
+        // Audit M-3: the AI cannot cascade-delete. When this is true the user
+        // must perform the delete from the Desk Map UI in person.
+        cascadeRequiresUiApproval: descendantIds.size > 0,
       };
     },
   }),
 
   deleteNode: tool({
     description:
-      'Delete a node and every descendant beneath it. The parent\'s remaining fraction is restored by the deleted branch\'s initialFraction. Cascades into curative (linked title issues), map (linked assets/regions), and owner-store (linked leases) — all cleared. If the target has any descendants, you MUST first call previewDeleteNode, report the totals to the user, and pass `confirmCascade: true` here. Without that flag, cascading deletes are refused.',
+      'Delete a leaf node (one with NO descendants). The parent\'s remaining fraction is restored by the deleted branch\'s initialFraction. Cascades into curative (linked title issues), map (linked assets/regions), and owner-store (linked leases) — all cleared. If the target has any descendants, this tool refuses: cascading deletes must go through the UI (Desk Map → right-click → Delete branch) so the user explicitly approves the blast radius. Use previewDeleteNode first to check the descendant count.',
     inputSchema: z.object({
       nodeId: z.string().min(1),
-      confirmCascade: z
-        .boolean()
-        .optional()
-        .describe('Required to be true when the node has descendants. Set only after the user has seen a previewDeleteNode report and approved it.'),
     }),
-    execute: async ({ nodeId, confirmCascade }) => {
+    execute: async ({ nodeId }) => {
       const state = useWorkspaceStore.getState();
       const target = state.nodes.find((n) => n.id === nodeId);
       if (!target) {
@@ -629,7 +627,10 @@ export const landroidTools = {
           validation: summariseValidation(),
         };
       }
-      // Blast-radius guard — refuse cascading deletes the AI hasn't confirmed.
+      // Audit M-3: cascading deletes must not be gated by a model-supplied
+      // boolean. If this node has descendants, refuse unconditionally and
+      // direct the user to the UI, which surfaces a real confirmation dialog
+      // the human clicks. The AI can still delete true leaves.
       const descendantIds = new Set<string>();
       const queue = [nodeId];
       while (queue.length > 0) {
@@ -641,11 +642,11 @@ export const landroidTools = {
           }
         }
       }
-      if (descendantIds.size > 0 && !confirmCascade) {
+      if (descendantIds.size > 0) {
         return {
           ok: false,
           error:
-            `Refusing cascading delete — this node has ${descendantIds.size} descendant(s). Call previewDeleteNode, report the totals to the user, then call deleteNode again with confirmCascade: true.`,
+            `Refusing cascading delete — this node has ${descendantIds.size} descendant(s). Tell the user the blast radius (use previewDeleteNode for full counts) and ask them to delete the branch from the Desk Map UI (right-click → Delete branch) so they approve the cascade in person.`,
           descendantCount: descendantIds.size,
           validation: summariseValidation(),
         };
@@ -696,6 +697,22 @@ export const landroidTools = {
       const owner = useOwnerStore.getState().owners.find((o) => o.id === ownerId);
       if (!owner) {
         return { ok: false, error: `Owner ${ownerId} not found. Use listOwners or createOwner first.` };
+      }
+      // Audit L-4: distinguish "missing" (key omitted, treat as not specified)
+      // from "explicit empty string" (the model passed `''`, which the strict
+      // parser otherwise treats as Decimal(0) and silently saves a 0-royalty
+      // lease). Force the model to omit the key when it doesn't have a value.
+      if (rest.royaltyRate === '') {
+        return {
+          ok: false,
+          error: 'royaltyRate cannot be an empty string — omit the key entirely if not specified.',
+        };
+      }
+      if (rest.leasedInterest === '') {
+        return {
+          ok: false,
+          error: 'leasedInterest cannot be an empty string — omit the key entirely if not specified.',
+        };
       }
       if (typeof rest.royaltyRate === 'string' && parseStrictInterestString(rest.royaltyRate) === null) {
         return {

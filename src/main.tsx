@@ -14,6 +14,7 @@ import { useWorkspaceStore } from './store/workspace-store';
 import { useCanvasStore } from './store/canvas-store';
 import { saveWorkspaceToDb, loadWorkspaceFromDb } from './storage/workspace-persistence';
 import { saveCanvasToDb, loadCanvasFromDb } from './storage/canvas-persistence';
+import { awaitWorkspaceKeyReady } from './storage/active-workspace-key';
 import {
   buildCanvasAutosavePayload,
   buildWorkspaceAutosavePayload,
@@ -25,6 +26,12 @@ import {
 
 // ── Auto-load saved workspace and canvas on startup ─────
 async function bootstrapApp() {
+  // Audit M-1: in hosted mode, the IndexedDB row key is namespaced by the
+  // Cognito ID-token `sub`. AuthProvider populates it; bootstrap waits so
+  // the first read uses the per-user key, not the legacy 'default' row.
+  // In local mode awaitWorkspaceKeyReady resolves at module load.
+  await awaitWorkspaceKeyReady();
+
   const [workspaceResult, canvasResult] = await Promise.all([
     loadWorkspaceFromDb(),
     loadCanvasFromDb(),

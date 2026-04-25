@@ -243,6 +243,44 @@ describe('deskmap-coverage', () => {
     ]);
   });
 
+  // Audit M-2: malformed leasedInterest must surface as a coverage warning
+  // rather than silently coerce to zero. The strict parser refuses values like
+  // "1//8" that the lenient display-side parser would otherwise drop on the
+  // floor.
+  it('surfaces an overlap warning when a lease has a malformed leasedInterest', () => {
+    const result = allocateLeaseCoverage(
+      [
+        {
+          id: 'lease-malformed',
+          workspaceId: 'ws-1',
+          ownerId: 'owner-1',
+          leaseName: 'Garbage Lease',
+          lessee: 'Bad Data Inc.',
+          royaltyRate: '1/8',
+          leasedInterest: '1//8',
+          effectiveDate: '2026-03-01',
+          expirationDate: '',
+          status: 'Active',
+          docNo: '',
+          notes: '',
+          jurisdiction: 'tx_fee',
+          createdAt: '2026-03-01T00:00:00.000Z',
+          updatedAt: '2026-03-01T00:00:00.000Z',
+        },
+      ],
+      '0.5'
+    );
+
+    expect(result.allocations).toEqual([]);
+    expect(result.overlaps).toHaveLength(1);
+    expect(result.overlaps[0]).toMatchObject({
+      leaseId: 'lease-malformed',
+      requestedFraction: '1//8',
+      allocatedFraction: '0',
+      clippedFraction: 'malformed',
+    });
+  });
+
   it('returns no overlap warnings when active leases fit inside the owner share', () => {
     const result = allocateLeaseCoverage(
       [

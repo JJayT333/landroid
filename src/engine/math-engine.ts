@@ -863,6 +863,9 @@ export function executeAttachConveyance(params: AttachConveyanceParams): Result<
   const validation = validateCalcGraph(updatedNodes);
   if (!validation.valid) return err('invalid_graph', 'Attach would produce invalid ownership graph', validation.issues);
 
+  const rootTotalErr = assertRootTotalNotWorsened(nodes, updatedNodes);
+  if (rootTotalErr) return rootTotalErr;
+
   return ok(updatedNodes, {
     action: 'attach_conveyance',
     oldRootFraction: serialize(sourceRoot.initialFraction),

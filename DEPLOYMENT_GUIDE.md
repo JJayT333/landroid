@@ -114,10 +114,13 @@ Function → **Configuration → Environment variables → Edit → Add**:
 | `COGNITO_USER_POOL_ID` | `us-east-1_TWeBB7xvQ` |
 | `COGNITO_CLIENT_ID` | `6os4uiu0b46pf74nhbrm5gsg0v` |
 | `OPENAI_API_KEY` | paste your real OpenAI key here |
+| `USAGE_TABLE_NAME` | *(optional — see "Durable token ceiling" below)* |
 
 Save.
 
 > **Upgrade path:** for production, move `OPENAI_API_KEY` to AWS Secrets Manager and have the Lambda read it at cold-start. For POC, a plain env var is fine and much simpler.
+
+> **Durable token ceiling (audit M-4).** If `USAGE_TABLE_NAME` is unset the per-user daily 500k-token counter lives in process memory and resets every cold start. To make it durable, provision a DynamoDB table `landroid-ai-usage` with partition key `sub` (String), sort key `day` (String), enable TTL on the `ttl` attribute, and grant the Lambda role `dynamodb:UpdateItem` on it. Then set `USAGE_TABLE_NAME=landroid-ai-usage`. The handler will atomically `ADD` to a row keyed by `(sub, day)` with a 48-hour TTL. The fallback path keeps deploys working without the table.
 
 ### 2e. Memory, timeout, streaming
 

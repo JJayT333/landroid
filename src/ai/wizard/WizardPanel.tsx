@@ -8,7 +8,7 @@
  */
 import { useMemo, useState } from 'react';
 import {
-  parseWorkbook,
+  parseWorkbookInWorker,
   renderWorkbookForPrompt,
   type ParsedWorkbook,
 } from './parse-workbook';
@@ -74,7 +74,9 @@ export default function WizardPanel({
     try {
       assertFileSize(file, FILE_SIZE_LIMITS.SPREADSHEET, 'Spreadsheet');
       const buffer = await file.arrayBuffer();
-      const result = parseWorkbook(file.name, buffer);
+      // Audit L-2 / H2-full: parse off-thread so a malicious workbook can't
+      // pollute the main thread. The worker is terminated on completion.
+      const result = await parseWorkbookInWorker(file.name, buffer);
       setParsed(result);
       setStatus('parsed');
     } catch (err) {

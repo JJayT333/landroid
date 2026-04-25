@@ -1,3 +1,4 @@
+import type Decimal from 'decimal.js';
 import { d } from '../../engine/decimal';
 import { isNpriNode, type OwnershipNode } from '../../types/node';
 import {
@@ -5,7 +6,7 @@ import {
   isTexasMathLease,
   type Lease,
 } from '../../types/owner';
-import { parseInterestString } from '../../utils/interest-string';
+import { parseStrictInterestString } from '../../utils/interest-string';
 import { isLeaseNode } from './deskmap-lease-node';
 
 export interface DeskMapPrimaryLeaseSummary {
@@ -166,9 +167,27 @@ export function allocateLeaseCoverage(
 
   for (const lease of activeLeases) {
     const leasedInterestText = asLeaseText(lease.leasedInterest).trim();
-    const requestedFraction = leasedInterestText.length > 0
-      ? parseInterestString(leasedInterestText)
-      : ownerFraction;
+    let requestedFraction: Decimal;
+    if (leasedInterestText.length > 0) {
+      // Strict parse: malformed leased-interest values must surface a coverage
+      // warning rather than silently coerce to zero (audit M-2). The lenient
+      // parser belongs on display paths only.
+      const parsed = parseStrictInterestString(leasedInterestText);
+      if (parsed === null) {
+        overlaps.push({
+          leaseId: lease.id,
+          leaseName: asLeaseText(lease.leaseName),
+          lessee: asLeaseText(lease.lessee),
+          requestedFraction: leasedInterestText,
+          allocatedFraction: '0',
+          clippedFraction: 'malformed',
+        });
+        continue;
+      }
+      requestedFraction = parsed;
+    } else {
+      requestedFraction = ownerFraction;
+    }
 
     // If earlier leases already exhausted the owner's share, any subsequent
     // lease is fully clipped: requested > 0, allocated = 0, clipped = requested.

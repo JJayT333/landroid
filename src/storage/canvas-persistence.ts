@@ -6,8 +6,7 @@
 import db from './db';
 import type { CanvasSaveData } from '../store/canvas-store';
 import { normalizeCanvasSaveData } from './workspace-persistence';
-
-const CANVAS_ID = 'active-canvas';
+import { getCanvasDbKey } from './active-workspace-key';
 
 export interface CanvasLoadResult {
   status: 'missing' | 'loaded' | 'corrupt';
@@ -34,14 +33,14 @@ export function parsePersistedCanvasData(raw: string): CanvasSaveData {
 
 export async function saveCanvasToDb(data: CanvasSaveData): Promise<void> {
   await db.canvases.put({
-    id: CANVAS_ID,
+    id: getCanvasDbKey(),
     data: JSON.stringify(data),
     savedAt: new Date().toISOString(),
   });
 }
 
 export async function loadCanvasFromDb(): Promise<CanvasLoadResult> {
-  const record = await db.canvases.get(CANVAS_ID);
+  const record = await db.canvases.get(getCanvasDbKey());
   if (!record) {
     return {
       status: 'missing',

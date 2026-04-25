@@ -1,155 +1,90 @@
 /**
  * Deterministic xlsx/csv parsing for the AI wizard.
  *
- * Produces a compact, AI-friendly representation of a workbook: sheet names,
- * dimensions, and sampled rows. Cells are coerced to strings so the AI sees
- * exactly what the user sees. No interpretation happens here — that's the
- * AI's job.
+ * Two entry points:
+ *
+ *  - `parseWorkbook` — synchronous; runs in the calling thread. Used by
+ *    tests and by tools that don't need worker isolation.
+ *
+ *  - `parseWorkbookInWorker` — async; spawns a dedicated Web Worker so a
+ *    malicious workbook can't pollute the main thread (audit L-2 / H2-full
+ *    response to the unfixed `xlsx` advisories). Wraps the worker with a
+ *    30-second timeout; the worker is terminated on timeout, error, or
+ *    successful completion.
+ *
+ * Both entry points share the same parsing implementation in
+ * `./parse-workbook-impl`, so caps and behaviour are identical.
  */
-import * as XLSX from 'xlsx';
+export type {
+  ParsedSheet,
+  ParsedWorkbook,
+} from './parse-workbook-impl';
+export {
+  MAX_PARSE_BYTES,
+  MAX_SHEETS,
+  MAX_CELLS_PER_SHEET,
+  parseWorkbookSync as parseWorkbook,
+  renderWorkbookForPrompt,
+} from './parse-workbook-impl';
 
-export interface ParsedSheet {
-  name: string;
-  /** Full 2D array of string cells. Trailing empty rows trimmed. */
-  allRows: string[][];
-  /** Sampled rows used for AI prompts. Trailing empty rows trimmed. */
-  rows: string[][];
-  /** Full dimensions before any sampling. */
-  rawRowCount: number;
-  rawColCount: number;
-}
+import type { ParsedWorkbook } from './parse-workbook-impl';
+import type { ParseWorkerRequest, ParseWorkerResponse } from './parse-workbook.worker';
+// Vite resolves `?worker` to a Worker constructor at build time.
+// eslint-disable-next-line import/no-unresolved
+import ParseWorker from './parse-workbook.worker?worker';
 
-export interface ParsedWorkbook {
-  fileName: string;
-  sheets: ParsedSheet[];
-}
-
-const MAX_SAMPLE_ROWS = 150;
-const MAX_SAMPLE_COLS = 20;
+const PARSE_WORKER_TIMEOUT_MS = 30_000;
 
 /**
- * Audit H2 partial: hard guards around the xlsx parser.
+ * Parse a workbook in a dedicated Web Worker.
  *
- * Until we can move parsing into a Web Worker or swap in a safer parser, we
- * defensively cap what we hand to `xlsx`:
- *
- *   - `MAX_PARSE_BYTES` — 10 MB buffer cap. The UI file-size limit is 15 MB,
- *     but the parser is the known-vulnerable surface so we narrow harder here.
- *   - `MAX_SHEETS` — reject workbooks with an implausible sheet count
- *     (defense against zip-bomb / parser resource exhaustion).
- *   - `MAX_CELLS_PER_SHEET` — sheet-level cell-count ceiling from the sheet's
- *     declared `!ref` range. A sheet advertising a billion-cell range is
- *     rejected *before* we call `sheet_to_json`, which is where memory blows
- *     up.
- *
- * These are partial — a worker would be better — but close the easy abuse
- * paths today.
+ * The worker is single-shot: spawned for the call and terminated as soon
+ * as the response (or timeout / error) resolves. Callers do not need to
+ * track the worker lifecycle.
  */
-const MAX_PARSE_BYTES = 10 * 1024 * 1024;
-const MAX_SHEETS = 50;
-const MAX_CELLS_PER_SHEET = 500_000;
-
-function cellToString(value: unknown): string {
-  if (value === null || value === undefined) return '';
-  if (value instanceof Date) return value.toISOString().slice(0, 10);
-  if (typeof value === 'number') {
-    return Number.isFinite(value) ? String(value) : '';
-  }
-  return String(value).trim();
-}
-
-function trimTrailingEmpty(rows: string[][]): string[][] {
-  let last = rows.length;
-  while (last > 0 && rows[last - 1].every((c) => c === '')) last--;
-  return rows.slice(0, last);
-}
-
-/** Parse an ArrayBuffer as xlsx/csv and sample each sheet. */
-export function parseWorkbook(
+export async function parseWorkbookInWorker(
   fileName: string,
   buffer: ArrayBuffer
-): ParsedWorkbook {
-  if (buffer.byteLength > MAX_PARSE_BYTES) {
-    throw new Error(
-      `Workbook too large to parse safely (${(buffer.byteLength / (1024 * 1024)).toFixed(1)} MB; limit ${(MAX_PARSE_BYTES / (1024 * 1024)).toFixed(0)} MB). Save as CSV and try again.`
-    );
-  }
-  const workbook = XLSX.read(buffer, { type: 'array', cellDates: true });
-  if (workbook.SheetNames.length > MAX_SHEETS) {
-    throw new Error(
-      `Workbook has ${workbook.SheetNames.length} sheets; limit is ${MAX_SHEETS}. Split the file and import one section at a time.`
-    );
-  }
-  const sheets: ParsedSheet[] = workbook.SheetNames.map((name) => {
-    const worksheet = workbook.Sheets[name];
-    const range = XLSX.utils.decode_range(worksheet['!ref'] ?? 'A1:A1');
-    const rawRowCount = range.e.r - range.s.r + 1;
-    const rawColCount = range.e.c - range.s.c + 1;
-    const cellCount = rawRowCount * rawColCount;
-    if (cellCount > MAX_CELLS_PER_SHEET) {
-      throw new Error(
-        `Sheet "${name}" declares ${cellCount.toLocaleString()} cells; limit is ${MAX_CELLS_PER_SHEET.toLocaleString()}. Refuse to parse.`
-      );
-    }
-    const aoa = XLSX.utils.sheet_to_json(worksheet, {
-      header: 1,
-      defval: '',
-      raw: false,
-      blankrows: true,
-    }) as unknown[][];
-
-    const trimmed = trimTrailingEmpty(
-      aoa.map((row) =>
-        row.slice(0, MAX_SAMPLE_COLS).map(cellToString)
-      )
-    );
-    const sampled = trimmed.slice(0, MAX_SAMPLE_ROWS);
-
-    return {
-      name,
-      allRows: trimmed,
-      rows: sampled,
-      rawRowCount,
-      rawColCount,
+): Promise<ParsedWorkbook> {
+  const worker = new ParseWorker() as Worker;
+  return new Promise<ParsedWorkbook>((resolve, reject) => {
+    let settled = false;
+    const settle = (fn: () => void) => {
+      if (settled) return;
+      settled = true;
+      worker.terminate();
+      fn();
     };
-  });
-
-  return { fileName, sheets };
-}
-
-/** Render a parsed workbook as a compact text block for the AI prompt. */
-export function renderWorkbookForPrompt(parsed: ParsedWorkbook): string {
-  const parts: string[] = [];
-  parts.push(`# Workbook: ${parsed.fileName}`);
-  for (const sheet of parsed.sheets) {
-    parts.push(`\n## Sheet: ${sheet.name}`);
-    parts.push(
-      `(full size: ${sheet.rawRowCount} rows x ${sheet.rawColCount} cols; showing first ${sheet.rows.length})`
-    );
-    if (sheet.rows.length === 0) {
-      parts.push('(empty)');
-      continue;
-    }
-    for (let i = 0; i < sheet.rows.length; i++) {
-      const row = sheet.rows[i];
-      // Keep each row short: label columns by letter.
-      const cells = row
-        .map((c, idx) => {
-          if (!c) return '';
-          const colLetter = XLSX.utils.encode_col(idx);
-          return `${colLetter}="${c.replace(/\s+/g, ' ').slice(0, 60)}"`;
-        })
-        .filter(Boolean)
-        .join(' | ');
-      if (cells) parts.push(`row ${i + 1}: ${cells}`);
-    }
-    // Explicit truncation marker so the AI knows more rows exist and can tell
-    // the user rather than silently processing a partial workbook.
-    if (sheet.rawRowCount > sheet.rows.length) {
-      parts.push(
-        `[TRUNCATED: ${sheet.rawRowCount - sheet.rows.length} more row(s) not shown — tell the user before assuming you've seen the whole sheet.]`
+    const timer = setTimeout(() => {
+      settle(() =>
+        reject(
+          new Error(
+            `Workbook parsing timed out after ${PARSE_WORKER_TIMEOUT_MS / 1000}s. The file may be malformed or too complex; try saving as CSV and re-uploading.`
+          )
+        )
       );
-    }
-  }
-  return parts.join('\n');
+    }, PARSE_WORKER_TIMEOUT_MS);
+
+    worker.addEventListener('message', (event: MessageEvent<ParseWorkerResponse>) => {
+      clearTimeout(timer);
+      const response = event.data;
+      if (response.ok) {
+        settle(() => resolve(response.parsed));
+      } else {
+        settle(() => reject(new Error(response.error)));
+      }
+    });
+    worker.addEventListener('error', (event: ErrorEvent) => {
+      clearTimeout(timer);
+      settle(() =>
+        reject(new Error(event.message || 'Workbook parser worker crashed.'))
+      );
+    });
+
+    const request: ParseWorkerRequest = { fileName, buffer };
+    // Transfer the buffer into the worker so we don't pay the structured-clone
+    // copy cost for large files. The original ArrayBuffer becomes detached;
+    // callers shouldn't reuse it.
+    worker.postMessage(request, [buffer]);
+  });
 }

@@ -1275,4 +1275,50 @@ describe('root mineral total invariant (audit H6)', () => {
     if (!result.ok) return;
     expect(rootOwnershipTotal(result.data).toFixed(9)).toBe('0.900000000');
   });
+
+  // executeAttachConveyance cannot structurally raise the root mineral total
+  // (the moved node always becomes a child, never gains a root). The guard is
+  // defensive parity with executeRebalance / executePredecessorInsert so a
+  // future change cannot violate H6 silently. These cases pin the guard's
+  // observable behaviour: a legal attach must still succeed, and an attach
+  // that moves a root must not false-reject when the pre-existing total was
+  // already over 1.
+  it('attach succeeds when total stays <= 1 (guard does not block valid moves)', () => {
+    const nodes: OwnershipNode[] = [
+      { ...makeNode('root-a', null, '0.5', '0.5'), interestClass: 'mineral' as const },
+      { ...makeNode('root-b', null, '0.5', '0.5'), interestClass: 'mineral' as const },
+    ];
+    const result = executeAttachConveyance({
+      allNodes: nodes,
+      activeNodeId: 'root-a',
+      attachParentId: 'root-b',
+      calcShare: '0.25',
+      form: createBlankNode('root-a', 'root-b'),
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    // root-a is no longer a root; only root-b contributes its remaining
+    // fraction (0.5 − 0.25 = 0.25).
+    expect(rootOwnershipTotal(result.data).toFixed(9)).toBe('0.250000000');
+  });
+
+  it('attach succeeds when pre-existing total > 1 and the move does not worsen it', () => {
+    // Pre-existing over-100 state. Attaching root-a under root-b removes
+    // root-a from the root set, so the new total is strictly lower.
+    const nodes: OwnershipNode[] = [
+      { ...makeNode('root-a', null, '0.9', '0.9'), interestClass: 'mineral' as const },
+      { ...makeNode('root-b', null, '0.6', '0.6'), interestClass: 'mineral' as const },
+    ];
+    const result = executeAttachConveyance({
+      allNodes: nodes,
+      activeNodeId: 'root-a',
+      attachParentId: 'root-b',
+      calcShare: '0.4',
+      form: createBlankNode('root-a', 'root-b'),
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    // root-b is the only remaining root with fraction 0.6 − 0.4 = 0.2.
+    expect(rootOwnershipTotal(result.data).toFixed(9)).toBe('0.200000000');
+  });
 });

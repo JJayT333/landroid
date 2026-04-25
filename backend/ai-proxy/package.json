@@ -7,15 +7,18 @@
   "main": "dist/handler.js",
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
     "package": "npm run build && cd dist && zip -r ../lambda.zip . && cd .. && zip -g lambda.zip -j node_modules/aws-jwt-verify/dist/cjs/*.js 2>/dev/null || true",
     "bundle": "rm -rf dist lambda.zip && npm run build && cp package.json dist/ && cp -r node_modules dist/ && cd dist && zip -qr ../lambda.zip . && cd .. && ls -lh lambda.zip"
   },
   "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.1037.0",
     "aws-jwt-verify": "^5.0.0"
   },
   "devDependencies": {
     "@types/aws-lambda": "^8.10.145",
     "@types/node": "^20.14.0",
-    "typescript": "^5.4.5"
+    "typescript": "^5.4.5",
+    "vitest": "^4.1.5"
   }
 }
