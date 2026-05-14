@@ -10,6 +10,8 @@ single endpoint: `POST /chat/completions`. Hardcoded `gpt-4o-mini`.
 | `COGNITO_USER_POOL_ID` | Cognito console after pool creation |
 | `COGNITO_CLIENT_ID`    | App client ID on the same pool |
 | `OPENAI_API_KEY`       | Pasted once at deploy time; consider AWS Secrets Manager for rotation |
+| `USAGE_TABLE_NAME`     | DynamoDB table for durable daily token counts (`landroid-ai-usage` in the deploy guide) |
+| `ALLOW_IN_MEMORY_USAGE_STORE` | Local smoke-test escape hatch only; do not set in hosted deploys |
 
 ## Build and package
 
@@ -19,6 +21,11 @@ npm install
 npm run bundle   # produces lambda.zip
 ```
 
+Use `npm run bundle` or `npm run package` for deployable zips. The bundle includes
+`dist`, `package.json`, and runtime `node_modules`; a zip that only contains
+`handler.js` will fail because the handler imports helper modules and the DynamoDB
+SDK.
+
 ## Deploy (first time, console click-ops)
 
 1. Lambda console → **Create function** → Author from scratch
@@ -27,7 +34,7 @@ npm run bundle   # produces lambda.zip
    - Architecture: arm64
 2. Upload `lambda.zip` (Code → Upload from → .zip file)
 3. Runtime settings → Handler: `handler.handler`
-4. Configuration → Environment variables → add the three above
+4. Configuration → Environment variables → add the four above
 5. Configuration → Function URL → **Create**
    - Auth type: **NONE** (JWT is verified inside the handler)
    - Invoke mode: **RESPONSE_STREAM**

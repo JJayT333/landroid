@@ -1321,4 +1321,102 @@ describe('root mineral total invariant (audit H6)', () => {
     // root-b is the only remaining root with fraction 0.6 − 0.4 = 0.2.
     expect(rootOwnershipTotal(result.data).toFixed(9)).toBe('0.200000000');
   });
+
+  it('attach cannot worsen root initial mineral total across supported source shapes', () => {
+    const rootInitialMineralTotal = (nodes: OwnershipNode[]) =>
+      nodes.reduce(
+        (sum, node) =>
+          node.type !== 'related'
+          && node.parentId == null
+          && node.interestClass === 'mineral'
+            ? sum.plus(d(node.initialFraction))
+            : sum,
+        d(0)
+      );
+
+    const cases: Array<{
+      name: string;
+      nodes: OwnershipNode[];
+      activeNodeId: string;
+      attachParentId: string;
+      calcShare: string;
+    }> = [
+      {
+        name: 'root source becomes child',
+        nodes: [
+          { ...makeNode('root-a', null, '0.5', '0.5'), interestClass: 'mineral' as const },
+          { ...makeNode('root-b', null, '0.5', '0.5'), interestClass: 'mineral' as const },
+        ],
+        activeNodeId: 'root-a',
+        attachParentId: 'root-b',
+        calcShare: '0.25',
+      },
+      {
+        name: 'child source reparents across roots',
+        nodes: [
+          { ...makeNode('root-a', null, '0.5', '0.3'), interestClass: 'mineral' as const },
+          { ...makeNode('root-b', null, '0.5', '0.5'), interestClass: 'mineral' as const },
+          { ...makeNode('child-a', 'root-a', '0.2', '0.2'), interestClass: 'mineral' as const },
+        ],
+        activeNodeId: 'child-a',
+        attachParentId: 'root-b',
+        calcShare: '0.2',
+      },
+      {
+        name: 'unlinked source becomes child but was never counted as a root',
+        nodes: [
+          { ...makeNode('unlinked-a', 'unlinked', '0.25', '0.25'), interestClass: 'mineral' as const },
+          { ...makeNode('root-b', null, '0.5', '0.5'), interestClass: 'mineral' as const },
+        ],
+        activeNodeId: 'unlinked-a',
+        attachParentId: 'root-b',
+        calcShare: '0.2',
+      },
+      {
+        name: 'same-parent reattach only resizes a child',
+        nodes: [
+          { ...makeNode('root-a', null, '0.5', '0.3'), interestClass: 'mineral' as const },
+          { ...makeNode('child-a', 'root-a', '0.2', '0.2'), interestClass: 'mineral' as const },
+        ],
+        activeNodeId: 'child-a',
+        attachParentId: 'root-a',
+        calcShare: '0.1',
+      },
+    ];
+
+    for (const scenario of cases) {
+      const before = rootInitialMineralTotal(scenario.nodes);
+      const result = executeAttachConveyance({
+        allNodes: scenario.nodes,
+        activeNodeId: scenario.activeNodeId,
+        attachParentId: scenario.attachParentId,
+        calcShare: scenario.calcShare,
+        form: createBlankNode(scenario.activeNodeId, scenario.attachParentId),
+      });
+
+      expect(result.ok, scenario.name).toBe(true);
+      if (!result.ok) continue;
+      const after = rootInitialMineralTotal(result.data);
+      expect(after.lessThanOrEqualTo(before), scenario.name).toBe(true);
+    }
+  });
+
+  it('attach rejects mineral/NPRI interest-class mismatches before graph mutation', () => {
+    const nodes: OwnershipNode[] = [
+      { ...makeNode('mineral-root', null, '0.5', '0.5'), interestClass: 'mineral' as const },
+      { ...makeNode('npri-root', null, '0.25', '0.25'), interestClass: 'npri' as const },
+    ];
+
+    const result = executeAttachConveyance({
+      allNodes: nodes,
+      activeNodeId: 'npri-root',
+      attachParentId: 'mineral-root',
+      calcShare: '0.1',
+      form: createBlankNode('npri-root', 'mineral-root'),
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.code).toBe('interest_class_mismatch');
+  });
 });

@@ -21,7 +21,8 @@ npm run test:e2e
 | UI workflow change | `npm run lint`, targeted tests, `npm run build`, relevant e2e if available |
 | Import/export/persistence change | `npm run lint`, storage tests, `npm test`, and manual risk note |
 | AI tool/provider change | `npm run lint`, AI tests, relevant wizard/tool tests, and rollback check |
-| Release/checkpoint | full default commands |
+| Hosted AI proxy/deploy change | `npm run deploy:check`, `cd backend/ai-proxy && npm test && npx tsc -p tsconfig.json --noEmit`, plus root `npm test` if frontend policy changes |
+| Release/checkpoint | full default commands plus `npm run deploy:check` for hosted deploy candidates |
 
 ## Current Known Warnings
 

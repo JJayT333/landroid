@@ -56,6 +56,7 @@ handoff, 4 workflows are active and 5 are intentionally skipped pending retarget
 | `SECURITY.md` | Local-first security model, AI/key handling, and upload risks. |
 | `DEPLOYMENT_PLAN.md` | Hosted deployment architecture, security controls, and rollout phases. |
 | `DEPLOYMENT_GUIDE.md` | Step-by-step walkthrough for deploying to `landroid.abstractmapping.com` (Cognito + Amplify + Lambda AI proxy). |
+| `DEPLOY_TEST_CHECKLIST.md` | Preflight, AWS console, smoke-test, and go/no-go checklist for the test deploy. |
 | `USER_MANUAL.md` | User-facing workflow guide. |
 | `LANDMAN-MATH-REFERENCE.md` | Landman-facing math formulas and review conventions. |
 | `ROADMAP.md` | Current, next, and later work. |
@@ -101,6 +102,8 @@ demos have been retired.
 ## Hosted Deployment
 
 - Full walkthrough: `DEPLOYMENT_GUIDE.md` (AWS + GoDaddy, ~60 min first time).
+- Local hosted preflight: `npm run deploy:check`.
+- Test deploy checklist: `DEPLOY_TEST_CHECKLIST.md`.
 - Paste-ready Amplify rewrites: `amplify-rewrites.json`.
 - Post-deploy verification: `bash scripts/smoke-test-hosted.sh`.
 - Lambda AI proxy source: `backend/ai-proxy/`.

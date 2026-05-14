@@ -8,7 +8,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "test": "vitest run",
-    "package": "npm run build && cd dist && zip -r ../lambda.zip . && cd .. && zip -g lambda.zip -j node_modules/aws-jwt-verify/dist/cjs/*.js 2>/dev/null || true",
+    "package": "npm run bundle",
     "bundle": "rm -rf dist lambda.zip && npm run build && cp package.json dist/ && cp -r node_modules dist/ && cd dist && zip -qr ../lambda.zip . && cd .. && ls -lh lambda.zip"
   },
   "dependencies": {

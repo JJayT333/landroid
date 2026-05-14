@@ -9,7 +9,9 @@ file records the security assumptions future changes should preserve or revisit.
 - Workspace data is stored in browser IndexedDB and exported through `.landroid`
   files.
 - The user is assumed to control the local machine and browser profile.
-- Hosted or multi-user deployment is not yet the default security model.
+- Hosted deployment is a POC surface: Cognito gates the app, AI calls go
+  through the Lambda proxy, and workspace autosave remains browser IndexedDB
+  scoped by Cognito `sub` rather than a shared backend project database.
 
 ## Sensitive Data
 
@@ -30,8 +32,10 @@ Treat these as sensitive:
   storage.
 - Cloud provider use can send prompt context and project data to third parties.
   Use cloud AI only when that is acceptable for the current project.
-- A future hosted/cloud mode should use a backend proxy with server-held keys,
-  explicit redaction policy, and audit logging.
+- Hosted/cloud mode uses a backend proxy with server-held keys. Keep Cognito
+  JWT verification, server-side model policy, durable token-ceiling tracking,
+  and structured request logging covered by proxy tests before broadening
+  access.
 
 ## File Uploads
 

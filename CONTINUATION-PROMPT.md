@@ -5,151 +5,116 @@ Use this file to resume the active workstream in a new chat. Read it with
 
 ## Current Branch
 
-`codex/audit-project-end-to-end`
+`audit-verification-pre-aws`
 
 ## Current Workstream
 
-Audit remediation, professional repo-doc cleanup, AI workbook import hardening,
-Desk Map reset UX, multi-unit Raven Forest separation, and hosted deployment
-planning.
+Second-opinion audit verification and autonomous follow-up fixes for the
+pre-AWS remediation branch. The verification target was `f4a85ce`; the current
+branch head is `80acb19`, which adds `AUDIT_VERIFICATION_PROMPT.md`.
 
 ## Last Completed
 
-- Created `AUDIT_REPORT.md` and `PATCH_PLAN.md`.
-- Hardened AI rollback, cancel/status UX, provider timeout behavior, and session-only cloud-key handling.
-- Enforced Texas-only active lease math gates and stricter AI lease creation/attachment validation.
-- Added Desk Map over-100 contributor warnings.
-- Added first-pass spreadsheet `Review rows` staging/import workflow.
-- Hardened workbook row staging against the user's Elmore DOTO workbook format:
-  safer Grantor/Grantee header mapping, tract-tab detection, gross-acre
-  extraction, DOTO ownership-row context inheritance, title-interest expression
-  parsing, per-sheet Desk Map targeting, and Instrument dropdown reuse.
-- Added a confirmed `Clear Map` Desk Map action that empties the active tract,
-  removes node-linked artifacts for deleted cards, keeps other tracts and owner
-  records, and preserves node records that are still shared with another Desk Map.
-- Added project-scale unit focus for Raven Forest Unit A/B and future units:
-  Desk Map unit codes are no longer hardcoded to A/B, `.landroid` autosave/export
-  carries active unit focus, Leasehold computes only the focused unit, Owners
-  filters to the focused unit, and unit-wide ORRI/WI rows now carry `unitCode`.
-- Added `DEPLOYMENT_PLAN.md`, a staged AWS-hosted rollout plan for getting
-  LANDroid online safely with a backend boundary, Cognito auth, S3/RDS
-  persistence, server-side AI proxying, and a provider strategy that can later
-  support OpenAI, Anthropic, or Bedrock.
-- Added professional docs rails:
-  - `ARCHITECTURE.md`
-  - `TESTING.md`
-  - `SECURITY.md`
-  - `ROADMAP.md`
-  - `CHANGELOG.md`
-  - `docs/README.md`
-  - core ADRs under `docs/adr`
-- Shortened `README.md`, moved AI guidance into its own `USER_MANUAL.md` section,
-  added audit/patch-plan status notes, and marked archived docs as historical.
+- Wrote `AUDIT_VERIFICATION_REPORT.md` with per-finding verdicts:
+  7 confirmed, 4 partial, 0 disputed, 1 incidental finding.
+- Added attach-conveyance invariant coverage for root source, child source,
+  unlinked source, same-parent resize, and mineral/NPRI mismatch cases.
+- Added persistence DB-key tests proving workspace/canvas saves use active
+  per-user keys and do not silently load or migrate legacy `default` rows.
+- Added Lambda proxy handler integration tests for invalid Cognito JWT rejection
+  and successful streamed OpenAI forwarding with verified-sub body policy.
+- Changed `backend/ai-proxy` packaging so `npm run package` delegates to the
+  full `npm run bundle` path.
+- Made the AI proxy fail fast when `USAGE_TABLE_NAME` is missing unless the
+  explicit local-only `ALLOW_IN_MEMORY_USAGE_STORE=true` escape hatch is set.
+- Rebuilt `backend/ai-proxy/lambda.zip` locally; the ignored generated zip now
+  contains `handler.js`, `usage-store.js`, `request-policy.js`, `package.json`,
+  and `node_modules/@aws-sdk/client-dynamodb/package.json`.
+- Updated `DEPLOYMENT_GUIDE.md`, `backend/ai-proxy/README.md`, `TESTING.md`,
+  `SECURITY.md`, and `CHANGELOG.md` for the hosted proxy and IndexedDB
+  migration risks.
+- Added `DEPLOY_TEST_CHECKLIST.md`, `npm run deploy:check`,
+  `scripts/predeploy-check.sh`, and `scripts/render-amplify-rewrites.sh` so
+  repo-side deploy readiness and Amplify rewrite rendering can be checked
+  before touching AWS.
+- Corrected `scripts/smoke-test-hosted.sh` to verify Cognito JWKS at the
+  user-pool issuer URL instead of the Hosted UI domain.
 
-## Last Validation
+## Latest Validation
 
-Most recent full code validation before docs cleanup:
-
-- `npm run lint` - passed.
-- `npm test` - passed: 50 files, 380 tests. Known non-blocking Zustand persist warnings remain in AI settings tests.
-- `npm run build` - passed. Known large Vite chunk warning remains.
-- `npm run test:e2e` - passed active tests: 4 passed, 5 skipped.
-
-Docs cleanup validation:
-
-- `git diff --check -- '*.md' 'docs/**/*.md' 'tests/fixtures/**/*.md'` - passed.
-- No code paths changed in the docs cleanup slice, so code tests were not rerun
-  for that slice.
-
-Most recent workbook-import validation:
-
-- `npm test -- --run src/ai/wizard/__tests__/row-staging.test.ts src/ai/wizard/__tests__/parse-workbook.test.ts`
-  - passed: 2 files, 11 tests.
-- `npm test` - passed: 50 files, 384 tests. Known non-blocking Zustand
-  persist warnings remain in AI settings tests.
-- `npm run lint` - passed.
-- `git diff --check -- '*.md' 'docs/**/*.md' 'src/**/*.ts' 'src/**/*.tsx'` - passed.
-- `npm run build` - passed. Known large Vite chunk warning remains for
-  `AIPanel`.
-- Elmore sample parse was inspected locally with the workbook at
-  `/Users/abstractmapping/Downloads/LANDroid - Springhill/EDITED_DOTO_Runsheet_Elmore#1_Unit_2026_02-05 .xlsx`;
-  it detected 7 tract tabs and staged 238 rows.
-
-Most recent Desk Map reset validation:
-
-- `npm test -- --run src/store/__tests__/workspace-store.test.ts` - passed:
-  1 file, 6 tests.
-- `npm test -- --run src/store/__tests__/workspace-store.test.ts src/ai/wizard/__tests__/row-staging.test.ts`
-  - passed: 2 files, 14 tests.
-- `npm run lint` - passed.
-- `git diff --check -- '*.md' 'docs/**/*.md' 'src/**/*.ts' 'src/**/*.tsx'` - passed.
-- `npm run build` - passed. Known large Vite chunk warning remains for
-  `AIPanel`.
-
-Most recent multi-unit validation:
-
-- `npm test -- --run src/utils/__tests__/desk-map-units.test.ts src/store/__tests__/workspace-store.test.ts src/components/leasehold/__tests__/leasehold-summary.test.ts src/storage/__tests__/seed-test-data.test.ts src/storage/__tests__/workspace-persistence.test.ts src/storage/__tests__/autosave-change-detection.test.ts`
-  - passed: 6 files, 54 tests.
-- `npm run lint` - passed.
-- `git diff --check -- '*.md' 'docs/**/*.md' 'src/**/*.ts' 'src/**/*.tsx'`
+- `npm test -- --run src/engine/__tests__/math-engine.test.ts src/storage/__tests__/active-workspace-key.test.ts src/storage/__tests__/persistence-db-key.test.ts`
+  - passed: 3 files, 65 tests.
+- `npm test` from `backend/ai-proxy`
+  - passed: 3 files, 29 tests.
+- `npx tsc -p tsconfig.json --noEmit` from `backend/ai-proxy`
   - passed.
-- `npm test` - passed: 51 files, 393 tests. Known non-blocking Zustand
-  persist warnings remain in AI settings tests.
-- `npm run build` - passed. Known large Vite chunk warning remains for
-  `AIPanel`.
-- Playwright browser sanity check against `http://127.0.0.1:5174/` loaded the
-  Raven Forest combinatorial demo, switched Leasehold from Unit A to Unit B,
-  switched Owners back to Unit A, and reported no console/page errors.
-
-Most recent deployment-planning validation:
-
-- `git diff --check -- '*.md' 'docs/**/*.md' 'src/**/*.ts' 'src/**/*.tsx'`
+- `npm run lint`
   - passed.
-- No runtime code changed in the deployment-planning slice, so app tests were
-  not rerun for this doc-only update.
+- `npm run bundle` from `backend/ai-proxy`
+  - passed; produced a 21 MB ignored `lambda.zip`.
+- `unzip -l backend/ai-proxy/lambda.zip usage-store.js request-policy.js node_modules/@aws-sdk/client-dynamodb/package.json handler.js package.json`
+  - passed; all expected files present.
+- `git diff --check`
+  - passed.
+- `npm test`
+  - passed: 58 files, 460 tests. Known non-blocking `--localstorage-file`
+    warning still appears in settings-store tests.
+- `npm run deploy:check`
+  - passed; warned only that the repo template still contains
+    `REPLACE_WITH_FUNCTION_URL_HOST`, which is expected until the Lambda
+    Function URL host is known.
+- `bash scripts/render-amplify-rewrites.sh https://abc123.lambda-url.us-east-1.on.aws/`
+  - passed; rendered the expected `/api/ai/<*>` reverse-proxy rule and SPA
+    fallback rule.
+- `npm run build`
+  - passed; Vite reported the known non-blocking large chunk warning.
+- `npm run test:e2e`
+  - passed: 4 active Playwright tests, 5 intentionally skipped workflows.
+- `bash scripts/smoke-test-hosted.sh`
+  - failed because `landroid.abstractmapping.com` does not currently resolve;
+    Cognito issuer JWKS returned 200 after the script fix.
 
 ## Open Risks
 
-- `xlsx` remains vulnerable and needs containment, worker isolation, or replacement.
-- Batch `graftToParent` is still not atomic.
-- `.landroid` and CSV imports still need stricter size/shape/fraction validation.
-- Five Playwright workflows remain skipped.
-- AI live mutation approval/proposal UX is improved by rollback but not fully app-gated.
-- Spreadsheet row staging is improved for the Elmore DOTO sample but still needs
-  more real-workbook formats and browser-level workflow verification.
-- Unit focus now separates Raven Forest A/B in Leasehold and Owners, but
-  per-unit operator/effective-date metadata is still represented by the shared
-  leasehold defaults.
-- A true project-picker landing page needs a multi-workspace saved-project
-  index; current persistence still has one default autosave slot.
-- The new hosted deployment plan exists, but none of the required backend/auth/
-  storage/security implementation work has started yet.
+- No commit or push has been made.
+- `landroid.abstractmapping.com` is not live as of 2026-05-12; read-only smoke
+  testing returns `000` for root/API/fallback requests, and `dig +short
+  landroid.abstractmapping.com` returns no records.
+- AWS-side work remains manual: provision DynamoDB table `landroid-ai-usage`,
+  enable TTL on `ttl`, grant Lambda `dynamodb:UpdateItem`, set
+  `USAGE_TABLE_NAME`, leave `ALLOW_IN_MEMORY_USAGE_STORE` unset, and upload the
+  freshly bundled zip.
+- Legacy hosted IndexedDB data under `default` is intentionally not
+  auto-migrated; users must export/import `.landroid` snapshots manually to
+  avoid copying the wrong shared-browser data.
+- The `xlsx` package still has no upstream fix; current mitigation is caps plus
+  Web Worker isolation.
+- Five Playwright workflows remain intentionally skipped pending fixture retargeting.
+- Leasehold summary still has some lenient parser math call sites outside the
+  Desk Map coverage fix; review before broader hosted/data-import rollout.
 
 ## Local Noise / Uncommitted State
 
-- `.DS_Store` was already dirty before the audit/remediation work.
-- `dist/index.html` changed as a generated side effect of `npm run build`.
-- No GitHub checkpoint has been requested, so no commit or push has been made.
+- Source/docs/test changes are unstaged.
+- `AUDIT_VERIFICATION_REPORT.md` is a requested untracked report file.
+- `DEPLOY_TEST_CHECKLIST.md`, `scripts/predeploy-check.sh`, and
+  `scripts/render-amplify-rewrites.sh` are new untracked deploy-readiness files.
+- `backend/ai-proxy/src/__tests__/handler.test.ts` and
+  `src/storage/__tests__/persistence-db-key.test.ts` are new untracked test
+  files.
+- `backend/ai-proxy/lambda.zip` and `backend/ai-proxy/dist/` were regenerated
+  by `npm run bundle` but are ignored generated artifacts.
 
 ## Next Best Tasks
 
-- [x] Validate docs cleanup with `git diff --check`.
-- [x] Test and harden spreadsheet staging against the Elmore DOTO workbook sample.
-- [ ] Test spreadsheet staging against additional recurring workbook formats.
-- [ ] Browser-verify the workbook row-review flow with tract creation and same-tract attachment.
-- [ ] Browser-verify `Clear Map` from the Desk Map toolbar.
-- [x] Browser-verify Raven Forest Unit A/B switching in Leasehold and Owners.
-- [ ] Promote units to first-class metadata records if future units need separate operator/effective-date settings.
-- [ ] Design multi-project persistence before building the project picker landing page.
-- [ ] Execute Phase 0 of `DEPLOYMENT_PLAN.md` with hosted frontend, domain,
-  CloudFront/headers/WAF baseline, and environment separation.
-- [ ] Design and implement the backend boundary from `DEPLOYMENT_PLAN.md`
-  before exposing cloud AI or project persistence on the public internet.
-- [ ] Harden the `xlsx` read path.
-- [ ] Make batch graft/attach atomic.
-- [ ] Harden `.landroid` and CSV import paths.
-- [ ] Retarget or replace skipped e2e workflows.
+- [ ] Review and decide whether to stage the report plus autonomous fixes.
+- [ ] If creating a checkpoint, create/use a non-`main` branch, commit, and push.
+- [ ] Follow `DEPLOY_TEST_CHECKLIST.md` for the AWS test deploy sequence.
+- [ ] Provision the DynamoDB usage table and IAM grant before hosted user invites.
+- [ ] Upload the regenerated `backend/ai-proxy/lambda.zip` after the AWS table/env work.
+- [ ] Retarget or replace the skipped Playwright workflows.
+- [ ] Decide whether to add explicit Leasehold malformed-interest warnings beyond the Desk Map coverage path.
 
 ## Paste-Ready Resume Prompt
 
-> Resume work in `/Users/abstractmapping/projects/landroid` on branch `codex/audit-project-end-to-end`. First read `AGENTS.md`, `PROJECT_CONTEXT.md`, `docs/README.md`, and `CONTINUATION-PROMPT.md`. The repo now has professional docs rails (`ARCHITECTURE.md`, `TESTING.md`, `SECURITY.md`, `ROADMAP.md`, `CHANGELOG.md`, ADRs) plus `DEPLOYMENT_PLAN.md`, which lays out the secure AWS-hosted path: hosted frontend, Cognito auth, backend boundary, S3/RDS persistence, server-side AI proxying, and OpenAI/Anthropic/Bedrock provider options. Audit remediation has already improved AI rollback/key/jurisdiction/lease-validation/spreadsheet-staging safety. Desk Map has `Clear Map`; Raven Forest Unit A/B has active unit focus in Leasehold and Owners. Next likely task is deciding whether to execute deployment Phase 0/1 first or continue import hardening (`xlsx`, workbook browser verification, and atomic graft/attach). Keep Texas-only active math scope and do not modify generated `dist`/`dist-node` unless explicitly requested.
+> Resume work in `/Users/abstractmapping/projects/landroid` on branch `audit-verification-pre-aws`. First read `AGENTS.md`, `PROJECT_CONTEXT.md`, `docs/README.md`, and `CONTINUATION-PROMPT.md`. The current workstream is post-verification remediation plus pre-AWS test-deploy readiness. `AUDIT_VERIFICATION_REPORT.md` is the verification snapshot; follow-up fixes have added attach invariant tests, persistence key tests, proxy handler tests, safer Lambda packaging docs/scripts, `DEPLOY_TEST_CHECKLIST.md`, and hosted deployment warnings. `landroid.abstractmapping.com` did not resolve during the latest read-only smoke test, while Cognito issuer JWKS returned 200. Keep work inside the repo, do not commit to main, and do not auto-migrate legacy hosted `default` IndexedDB data.

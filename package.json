@@ -12,7 +12,8 @@
     "test:e2e:headed": "playwright test --headed",
     "test:watch": "vitest",
     "test:engine": "vitest run src/engine",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "deploy:check": "bash scripts/predeploy-check.sh"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.71",

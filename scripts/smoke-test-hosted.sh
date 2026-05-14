@@ -6,11 +6,16 @@
 #
 # Usage:  bash scripts/smoke-test-hosted.sh
 # Override: HOST=staging.example.com bash scripts/smoke-test-hosted.sh
+# Cognito override:
+#   COGNITO_REGION=us-east-1 COGNITO_USER_POOL_ID=us-east-1_... bash scripts/smoke-test-hosted.sh
 
 set -uo pipefail
 
 HOST="${HOST:-landroid.abstractmapping.com}"
 BASE="https://${HOST}"
+COGNITO_REGION="${COGNITO_REGION:-us-east-1}"
+COGNITO_USER_POOL_ID="${COGNITO_USER_POOL_ID:-us-east-1_TWeBB7xvQ}"
+COGNITO_JWKS="https://cognito-idp.${COGNITO_REGION}.amazonaws.com/${COGNITO_USER_POOL_ID}/.well-known/jwks.json"
 FAIL=0
 
 pass() { printf "  \033[32m✓\033[0m %s\n" "$1"; }
@@ -21,7 +26,7 @@ printf "\n== Smoke test: %s ==\n\n" "$BASE"
 
 # 1. Root loads, returns 200, serves HTML.
 printf "[1/5] Root page serves HTML\n"
-ROOT=$(curl -s -o /tmp/landroid-root.html -w "%{http_code}" "$BASE/" || echo "000")
+ROOT=$(curl -s -o /tmp/landroid-root.html -w "%{http_code}" "$BASE/" || true)
 if [[ "$ROOT" == "200" ]]; then
   pass "GET / → 200"
   if grep -q "LANDroid" /tmp/landroid-root.html; then
@@ -48,7 +53,7 @@ done
 printf "\n[3/5] /api/ai/* rejects unauthenticated requests\n"
 CODE=$(curl -s -o /tmp/landroid-ai.txt -w "%{http_code}" -X POST "$BASE/api/ai/chat/completions" \
   -H "content-type: application/json" \
-  -d '{"model":"gpt-4o-mini","messages":[{"role":"user","content":"ping"}]}' || echo "000")
+  -d '{"model":"gpt-4o-mini","messages":[{"role":"user","content":"ping"}]}' || true)
 case "$CODE" in
   401|403)
     pass "POST /api/ai/* → $CODE (auth enforced)"
@@ -67,21 +72,20 @@ esac
 
 # 4. SPA fallback serves index.html for unknown paths.
 printf "\n[4/5] SPA fallback for client-side routes\n"
-FALLBACK=$(curl -s -o /tmp/landroid-fallback.html -w "%{http_code}" "$BASE/some-deep-view-that-does-not-exist" || echo "000")
+FALLBACK=$(curl -s -o /tmp/landroid-fallback.html -w "%{http_code}" "$BASE/some-deep-view-that-does-not-exist" || true)
 if [[ "$FALLBACK" == "200" ]] && grep -q "LANDroid" /tmp/landroid-fallback.html; then
   pass "unknown path → index.html"
 else
   fail "unknown path → $FALLBACK (SPA catch-all rewrite not wired)"
 fi
 
-# 5. Cognito domain is reachable.
-printf "\n[5/5] Cognito hosted UI reachable\n"
-COGNITO_HOST="us-east-1twebb7xvq.auth.us-east-1.amazoncognito.com"
-COGNITO=$(curl -s -o /dev/null -w "%{http_code}" "https://${COGNITO_HOST}/.well-known/jwks.json" || echo "000")
+# 5. Cognito user-pool issuer is reachable.
+printf "\n[5/5] Cognito user-pool JWKS reachable\n"
+COGNITO=$(curl -s -o /dev/null -w "%{http_code}" "$COGNITO_JWKS" || true)
 if [[ "$COGNITO" == "200" ]]; then
   pass "Cognito JWKS endpoint → 200"
 else
-  fail "Cognito JWKS endpoint → $COGNITO (pool domain wrong or region mismatch)"
+  fail "Cognito JWKS endpoint → ${COGNITO:-000} (pool ID or region mismatch)"
 fi
 
 printf "\n"

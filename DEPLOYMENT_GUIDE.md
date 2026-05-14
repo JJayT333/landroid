@@ -89,6 +89,11 @@ npm run bundle
 # produces backend/ai-proxy/lambda.zip
 ```
 
+`npm run bundle` is the only supported packaging command for the hosted proxy. It rebuilds
+`dist`, copies `package.json`, and includes the runtime `node_modules` tree so imports such
+as `usage-store.js`, `request-policy.js`, and `@aws-sdk/client-dynamodb` are present in
+the uploaded zip.
+
 ### 2b. Create the Lambda
 
 1. AWS console → **Lambda** (us-east-1) → **Create function**.
@@ -103,7 +108,7 @@ npm run bundle
 1. Function → **Code** tab → **Upload from** → `.zip file` → select `backend/ai-proxy/lambda.zip`.
 2. After upload, **Runtime settings → Edit** → Handler: `handler.handler` → Save.
 
-> **If you already uploaded an earlier `lambda.zip`:** the handler has since been updated to fix the daily-ceiling tracking and add structured logging. Re-run `cd backend/ai-proxy && npm run bundle` to get a fresh zip, then re-upload here. CloudWatch logs will not show the new `evt: "request"` lines until this re-upload is complete.
+> **If you already uploaded an earlier `lambda.zip`:** re-run `cd backend/ai-proxy && npm run bundle` and re-upload the fresh zip. Older zips are missing the current helper modules and DynamoDB client dependency; deploying one can crash the proxy on first request before any CloudWatch `evt: "request"` line appears.
 
 ### 2d. Environment variables
 
@@ -114,13 +119,13 @@ Function → **Configuration → Environment variables → Edit → Add**:
 | `COGNITO_USER_POOL_ID` | `us-east-1_TWeBB7xvQ` |
 | `COGNITO_CLIENT_ID` | `6os4uiu0b46pf74nhbrm5gsg0v` |
 | `OPENAI_API_KEY` | paste your real OpenAI key here |
-| `USAGE_TABLE_NAME` | *(optional — see "Durable token ceiling" below)* |
+| `USAGE_TABLE_NAME` | `landroid-ai-usage` |
 
 Save.
 
 > **Upgrade path:** for production, move `OPENAI_API_KEY` to AWS Secrets Manager and have the Lambda read it at cold-start. For POC, a plain env var is fine and much simpler.
 
-> **Durable token ceiling (audit M-4).** If `USAGE_TABLE_NAME` is unset the per-user daily 500k-token counter lives in process memory and resets every cold start. To make it durable, provision a DynamoDB table `landroid-ai-usage` with partition key `sub` (String), sort key `day` (String), enable TTL on the `ttl` attribute, and grant the Lambda role `dynamodb:UpdateItem` on it. Then set `USAGE_TABLE_NAME=landroid-ai-usage`. The handler will atomically `ADD` to a row keyed by `(sub, day)` with a 48-hour TTL. The fallback path keeps deploys working without the table.
+> **Durable token ceiling (audit M-4).** For hosted deploys, provision a DynamoDB table `landroid-ai-usage` with partition key `sub` (String), sort key `day` (String), enable TTL on the `ttl` attribute, and grant the Lambda role `dynamodb:UpdateItem` on it before inviting users. Then set `USAGE_TABLE_NAME=landroid-ai-usage`. The handler atomically `ADD`s to `(sub, day)` with a 48-hour TTL. The proxy now fails fast if `USAGE_TABLE_NAME` is missing; only local smoke tests may opt into the in-memory fallback with `ALLOW_IN_MEMORY_USAGE_STORE=true`.
 
 ### 2e. Memory, timeout, streaming
 
@@ -151,7 +156,7 @@ Function → **Configuration → Function URL → Create function URL**:
 
 1. AWS console → **AWS Amplify** → **Create new app** → **Host web app**.
 2. Source: **GitHub**. Authorize and pick `JJayT333/landroid`.
-3. Branch: **`codex/landroid-checkpoint-2026-04-21`** (the branch that's already pushed with all the deployment wiring). You can switch to `main` later once you've merged.
+3. Branch: **`audit-verification-pre-aws`** for the test deploy. You can switch to `main` later once this branch is merged.
 
 ### 3b. Build settings
 
@@ -173,7 +178,18 @@ Save and deploy. First build takes ~3 minutes.
 
 ### 3d. API rewrite to Lambda
 
-After the first deploy, Amplify app → **Hosting → Rewrites and redirects → Manage rewrites** → open the **JSON editor** and paste the contents of [`amplify-rewrites.json`](./amplify-rewrites.json) from this repo, then replace `REPLACE_WITH_FUNCTION_URL_HOST` with your Lambda Function URL host (e.g., `abc123xyz.lambda-url.us-east-1.on.aws` — no `https://`, no trailing slash).
+After the first deploy, Amplify app → **Hosting → Rewrites and redirects → Manage rewrites** → open the **JSON editor** and paste rendered rewrite JSON.
+
+From the repo root, render a paste-ready copy with:
+
+```bash
+bash scripts/render-amplify-rewrites.sh <lambda-function-url-host-or-url>
+```
+
+The helper accepts the full Function URL or just the host and strips `https://`
+plus any trailing path. It replaces `REPLACE_WITH_FUNCTION_URL_HOST` in
+[`amplify-rewrites.json`](./amplify-rewrites.json) with a host such as
+`abc123xyz.lambda-url.us-east-1.on.aws`.
 
 The JSON encodes two rules, in order:
 
@@ -248,6 +264,15 @@ If any step fails, check in order:
 - **AI returns 401:** the Lambda env vars `COGNITO_USER_POOL_ID` / `COGNITO_CLIENT_ID` don't match the pool you logged into.
 - **CSP error in DevTools console:** review `customHttp.yml` and adjust the `connect-src` directive.
 
+### Hosted IndexedDB migration note
+
+Hosted autosave rows are keyed by Cognito `sub` (`user-<sub>`). Older hosted
+builds saved to the legacy `default` row. LANDroid does **not** auto-migrate
+that row because a shared browser profile may have mixed data from more than
+one invited user. If a tester needs legacy hosted data, open the old build,
+export a `.landroid` file, sign into the new build as the intended user, and
+import that file manually.
+
 ---
 
 ## Step 6 — Everyday workflow
@@ -268,9 +293,9 @@ These are intentional trade-offs to keep the first deploy cheap and small. They 
 | Limit | Why it exists | When to address |
 | --- | --- | --- |
 | Single Cognito user pool, no groups/roles | Simplicity | When you need admin vs. user distinction |
-| No per-project data isolation — browser IndexedDB only | Backend DB isn't built yet | Before two users share data |
+| Per-user browser IndexedDB only; no shared backend project database | Backend DB isn't built yet | Before users need cross-device or shared-project data |
 | OpenAI key in Lambda env var, not Secrets Manager | One moving part, not two | When you want rotation |
-| Daily token ceiling is per-Lambda-instance (in-memory); a cold start resets it | No DynamoDB yet | When budgets must be durable across cold starts |
+| Daily token ceiling depends on the DynamoDB usage table and `USAGE_TABLE_NAME` env var | Lambda allows in-memory fallback only when explicitly enabled for local smoke tests | Before any hosted user invite |
 | File uploads still stored in IndexedDB | No S3 yet | When files are big or shared |
 | AI mutating tools **disabled** in hosted mode — enforced at the `streamText` tool filter (`readOnlyLandroidTools` in `src/ai/tools.ts`), test `read-only-tools.test.ts` | Approval boundary not yet built | When the proposal/approval UI ships |
 | Audit log is CloudWatch JSON lines only (one per request) | No DynamoDB ledger yet | Before multi-user |
@@ -284,9 +309,12 @@ Before you push to Amplify, you can smoke-test the code changes without any AWS:
 
 ```bash
 npm install
-npm run lint     # tsc strict pass
+npm run deploy:check
+npm run lint       # tsc strict pass
 npm test -- --run
-npm run build    # vite production build
+npm run build      # vite production build
 ```
 
-All four should succeed before triggering an Amplify deploy.
+All local checks should succeed before triggering an Amplify deploy. Use
+[`DEPLOY_TEST_CHECKLIST.md`](./DEPLOY_TEST_CHECKLIST.md) for the full preflight,
+AWS console, smoke-test, and manual acceptance sequence.

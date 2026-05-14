@@ -2,9 +2,10 @@
  * LANDroid AI proxy — Lambda Function URL, response streaming.
  *
  * - Verifies the Cognito ID token on Authorization: Bearer.
- * - Enforces a per-user daily token-count ceiling. Backed by DynamoDB when
- *   `USAGE_TABLE_NAME` is set (audit M-4); falls back to an in-memory
- *   counter otherwise (cold-start resets, fine for first-deploy bootstrap).
+ * - Enforces a per-user daily token-count ceiling. Hosted deploys must set
+ *   `USAGE_TABLE_NAME` for DynamoDB-backed durability (audit M-4). The
+ *   in-memory store is available only when explicitly enabled for local smoke
+ *   tests with `ALLOW_IN_MEMORY_USAGE_STORE=true`.
  * - Forwards OpenAI-compatible /chat/completions to OpenAI with the server-held key.
  * - Streams the response body byte-for-byte back to the client.
  *
@@ -61,17 +62,25 @@ const verifier = CognitoJwtVerifier.create({
   clientId: COGNITO_CLIENT_ID,
 });
 
-// Audit M-4: durable per-user daily counter. DDB-backed when
-// USAGE_TABLE_NAME is configured; in-memory fallback so first-deploy
-// without the table provisioned still functions.
-const usageStore: UsageStore = process.env.USAGE_TABLE_NAME
-  ? new DynamoDbUsageStore({ tableName: process.env.USAGE_TABLE_NAME })
-  : new InMemoryUsageStore();
+const usageStore: UsageStore = createUsageStore();
 
 function requireEnv(name: string): string {
   const value = process.env[name];
   if (!value) throw new Error(`Missing env: ${name}`);
   return value;
+}
+
+function createUsageStore(): UsageStore {
+  const tableName = process.env.USAGE_TABLE_NAME;
+  if (tableName) {
+    return new DynamoDbUsageStore({ tableName });
+  }
+  if (process.env.ALLOW_IN_MEMORY_USAGE_STORE === 'true') {
+    return new InMemoryUsageStore();
+  }
+  throw new Error(
+    'Missing env: USAGE_TABLE_NAME. Provision DynamoDB usage tracking for hosted deploys, or set ALLOW_IN_MEMORY_USAGE_STORE=true only for local smoke tests.'
+  );
 }
 
 function today(): string {

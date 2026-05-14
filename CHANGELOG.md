@@ -3,6 +3,25 @@
 This file records meaningful project changes so `CONTINUATION-PROMPT.md` can
 stay short.
 
+## 2026-05-10
+
+- Added the second-opinion audit verification report for the pre-AWS remediation
+  branch, with per-finding verdicts and deployment-risk caveats.
+- Hardened the follow-up audit fixes: added attach-invariant edge coverage,
+  persistence DB-key coverage for Cognito-sub namespacing, and Lambda proxy
+  handler tests for Cognito JWT rejection plus streamed OpenAI forwarding.
+- Updated hosted deployment docs so `npm run bundle` is the supported Lambda
+  packaging path, stale zips are called out as crash-prone, DynamoDB usage
+  tracking is required before invited hosted use, and legacy `default` IndexedDB
+  data requires manual export/import instead of automatic migration.
+- Made the AI proxy fail fast when `USAGE_TABLE_NAME` is missing unless the
+  explicit local-only `ALLOW_IN_MEMORY_USAGE_STORE=true` escape hatch is set.
+- Added `DEPLOY_TEST_CHECKLIST.md`, `npm run deploy:check`, and rewrite-render
+  helper scripts so the pre-AWS branch can be checked locally before touching
+  AWS console settings.
+- Corrected the hosted smoke test to check Cognito JWKS at the user-pool issuer
+  URL instead of the Hosted UI domain.
+
 ## 2026-04-21
 
 - Added `DEPLOYMENT_PLAN.md`, a staged AWS-hosted rollout plan covering secure
