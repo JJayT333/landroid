@@ -20,6 +20,9 @@ Use this map to decide which Markdown file to read or update.
 | `ROADMAP.md` | Short priority map. | Strategic priorities change. |
 | `CHANGELOG.md` | Completed meaningful work. | A meaningful feature, fix, or docs rail lands. |
 | `CONTINUATION-PROMPT.md` | Current short handoff. | Before switching chats or after meaningful work. |
+| `FULL_AUDIT_COORDINATION.md` | Shared scope, personas, and report format for the parallel Codex/Claude audit. | Audit scope, branch names, required personas, or report template changes. |
+| `CODEX_FULL_AUDIT_PROMPT.md` | Paste-ready prompt for the Codex full audit branch. | Codex audit instructions change. |
+| `CLAUDE_FULL_AUDIT_PROMPT.md` | Paste-ready prompt for the Claude full audit branch. | Claude audit instructions change. |
 | `AUDIT_REPORT.md` | Point-in-time adversarial audit snapshot. | Usually do not edit except to add status/snapshot notes. |
 | `PATCH_PLAN.md` | Audit remediation status and sequence. | Remediation status changes. |
 

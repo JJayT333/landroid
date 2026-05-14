@@ -3,6 +3,19 @@
 This file records meaningful project changes so `CONTINUATION-PROMPT.md` can
 stay short.
 
+## 2026-05-14
+
+- Deployed the trusted test POC to `https://landroid.abstractmapping.com` via
+  Amplify, Lambda Function URL rewrites, Cognito, and DynamoDB-backed AI usage
+  tracking; hosted smoke checks passed after custom-domain activation.
+- Added parallel full-audit coordination docs and paste-ready prompts for Codex
+  and Claude Code so both tools can audit the same baseline independently and
+  write comparison-ready reports.
+- Expanded the audit brief to capture improvement ideas, additions, fixes,
+  redundancies, mapping/document database readiness, AI PDF-to-ArcGIS-traverse
+  workflow planning, and possible 3D Desk Map exploration as a separate
+  opportunity backlog.
+
 ## 2026-05-10
 
 - Added the second-opinion audit verification report for the pre-AWS remediation

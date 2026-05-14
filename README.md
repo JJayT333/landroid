@@ -62,6 +62,7 @@ handoff, 4 workflows are active and 5 are intentionally skipped pending retarget
 | `ROADMAP.md` | Current, next, and later work. |
 | `CHANGELOG.md` | Completed meaningful changes. |
 | `CONTINUATION-PROMPT.md` | Short handoff for resuming the active workstream. |
+| `FULL_AUDIT_COORDINATION.md` | Shared scope and output contract for the parallel Codex/Claude full audit. |
 
 See `docs/README.md` for the full documentation map.
 
