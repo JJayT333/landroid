@@ -95,16 +95,13 @@ export interface OwnershipNode {
 
   // Attachment
   /**
-   * v7 single-PDF-per-node flags. Kept in the type for one release so the
-   * v8 → v7 rollback path stays intact; new code reads {@link attachments}
-   * instead. These two fields are dropped in Phase A4.
-   */
-  hasDoc: boolean;
-  docFileName: string;
-  /**
    * v8 multi-doc attachments cache. Source of truth lives in Dexie
    * (`documents` + `document_attachments`); this array is the
    * denormalized render cache. See {@link NodeAttachmentSummary}.
+   *
+   * Replaced the v7 `hasDoc: boolean` + `docFileName: string` pair in
+   * Phase A4c. Rollback path is the still-present read-only v7 `pdfs`
+   * Dexie table.
    */
   attachments: NodeAttachmentSummary[];
   linkedOwnerId: string | null;
@@ -355,8 +352,6 @@ export function createBlankNode(id: string, parentId: string | null = null): Own
     isDeceased: false,
     obituary: '',
     graveyardLink: '',
-    hasDoc: false,
-    docFileName: '',
     attachments: [],
     linkedOwnerId: null,
     linkedLeaseId: null,
@@ -406,8 +401,6 @@ export function normalizeOwnershipNode(
     isDeceased: node.isDeceased === true,
     obituary: normalizeText(node.obituary),
     graveyardLink: normalizeText(node.graveyardLink),
-    hasDoc: node.hasDoc === true,
-    docFileName: normalizeText(node.docFileName),
     attachments: normalizeAttachmentSummaries(node.attachments),
     linkedOwnerId: node.linkedOwnerId ?? null,
     linkedLeaseId: node.linkedLeaseId ?? null,

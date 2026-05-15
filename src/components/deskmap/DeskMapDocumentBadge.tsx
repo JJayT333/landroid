@@ -1,12 +1,18 @@
 import type { OwnershipNode } from '../../types/node';
 
+/**
+ * Single-chip render preserved for A4c. The Phase B work in the design
+ * doc converts this into a multi-chip row driven by `attachments[]`.
+ * Until then, the label prefers the first attachment's filename, falling
+ * back to the `docNo`-derived placeholder for legacy / hydration-not-yet-
+ * complete cases.
+ */
 export function getDeskMapDocumentLabel(
-  node: Pick<OwnershipNode, 'hasDoc' | 'docFileName' | 'docNo'>
+  node: Pick<OwnershipNode, 'attachments' | 'docNo'>
 ): string | null {
-  if (!node.hasDoc) return null;
-  if (node.docFileName) return node.docFileName;
-  if (node.docNo) return `${node.docNo}.pdf`;
-  return 'PDF attached';
+  const first = node.attachments[0];
+  if (first) return first.fileName || (node.docNo ? `${node.docNo}.pdf` : 'PDF attached');
+  return null;
 }
 
 export default function DeskMapDocumentBadge({
@@ -14,7 +20,7 @@ export default function DeskMapDocumentBadge({
   tone = 'leather',
   onViewPdf,
 }: {
-  node: Pick<OwnershipNode, 'id' | 'hasDoc' | 'docFileName' | 'docNo'>;
+  node: Pick<OwnershipNode, 'id' | 'attachments' | 'docNo'>;
   tone?: 'leather' | 'emerald' | 'amber';
   onViewPdf: (nodeId: string) => void;
 }) {

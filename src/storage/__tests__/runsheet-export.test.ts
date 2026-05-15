@@ -12,7 +12,14 @@ function buildNode(
   return {
     ...createBlankNode(id),
     instrument: 'Warranty Deed',
-    hasDoc: true,
+    attachments: [
+      {
+        docId: `doc-${id}`,
+        attachmentId: `att-${id}`,
+        fileName: `${id}.pdf`,
+        kind: 'deed',
+      },
+    ],
     vol: '12',
     page: '34',
     docNo: '20260001',
@@ -71,7 +78,7 @@ describe('runsheet-export', () => {
   it('does not create document hyperlinks for blank doc numbers or missing PDFs', async () => {
     const workbook = await buildRunsheetWorkbook([
       buildNode('node-no-doc-no', { docNo: '' }),
-      buildNode('node-no-pdf', { hasDoc: false }),
+      buildNode('node-no-pdf', { attachments: [] }),
     ]);
 
     const sheet = workbook.Sheets.Leasehold;

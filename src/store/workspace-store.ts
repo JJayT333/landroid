@@ -8,7 +8,6 @@ import { create } from 'zustand';
 import { buildLeaseNode, isLeaseNode } from '../components/deskmap/deskmap-lease-node';
 import { useCurativeStore } from './curative-store';
 import { useMapStore } from './map-store';
-import { deletePdf } from '../storage/pdf-store';
 import {
   deleteDoc,
   listAttachmentsForNodes,
@@ -16,6 +15,29 @@ import {
   renameDoc,
   saveDoc,
 } from '../storage/document-store';
+
+/**
+ * Cascade-delete every document attached to the removed nodes. Fired
+ * after a `removeNode` / `clearDeskMapNodes` set so the v8 `documents`
+ * and `document_attachments` rows don't leak when their owner node
+ * disappears.
+ *
+ * Fire-and-forget: errors are logged but don't roll back the in-memory
+ * state change (matches the pre-v8 `void deletePdf(nodeId)` pattern).
+ */
+function cascadeDeleteDocsForRemovedNodes(
+  removedNodes: ReadonlyArray<{ attachments: ReadonlyArray<{ docId: string }> }>
+): void {
+  const docIds = new Set<string>();
+  for (const node of removedNodes) {
+    for (const a of node.attachments) docIds.add(a.docId);
+  }
+  for (const docId of docIds) {
+    void deleteDoc(docId).catch((err) => {
+      console.warn(`[workspace-store] cascade deleteDoc(${docId}) failed:`, err);
+    });
+  }
+}
 import type { OwnershipNode, DeskMap, NodeAttachmentSummary } from '../types/node';
 import { normalizeDeskMap, normalizeOwnershipNode } from '../types/node';
 import type { DocumentKind } from '../types/document';
@@ -586,6 +608,7 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
 
     const deletedIds = [...deleteCandidates];
     const deletedIdSet = new Set(deletedIds);
+    const removedNodes = state.nodes.filter((node) => deletedIdSet.has(node.id));
 
     set({
       nodes: state.nodes.filter((node) => !deletedIdSet.has(node.id)),
@@ -612,8 +635,8 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
       lastError: null,
     });
 
+    cascadeDeleteDocsForRemovedNodes(removedNodes);
     for (const nodeId of deletedIds) {
-      void deletePdf(nodeId);
       void useMapStore.getState().unlinkNode(nodeId);
       useCurativeStore.getState().unlinkNode(nodeId);
     }
@@ -961,9 +984,8 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
     }
 
     const remainingIds = new Set(result.data.map((node) => node.id));
-    const removedIds = state.nodes
-      .filter((node) => !remainingIds.has(node.id))
-      .map((node) => node.id);
+    const removedNodes = state.nodes.filter((node) => !remainingIds.has(node.id));
+    const removedIds = removedNodes.map((node) => node.id);
     set({
       nodes: result.data.map((node) => normalizeOwnershipNode(node)),
       deskMaps: state.deskMaps.map((dm) => ({
@@ -977,8 +999,8 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
       lastAudit: result.audit,
       lastError: null,
     });
+    cascadeDeleteDocsForRemovedNodes(removedNodes);
     for (const removedId of removedIds) {
-      void deletePdf(removedId);
       void useMapStore.getState().unlinkNode(removedId);
       useCurativeStore.getState().unlinkNode(removedId);
     }
@@ -1160,8 +1182,8 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
     const byNodeId = await listAttachmentsForNodes(state.workspaceId, nodeIds);
     if (byNodeId.size === 0) {
       // No documents touched anything in this workspace — leave the
-      // existing in-memory attachments[] alone so legacy hasDoc-driven
-      // flows still render until A4c lands.
+      // existing in-memory attachments[] alone so a transient Dexie
+      // read miss doesn't blank the badges for an already-loaded view.
       return;
     }
     set((current) => ({

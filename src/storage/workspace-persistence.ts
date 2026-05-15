@@ -655,19 +655,51 @@ export async function downloadLandroidFile(data: LandroidFileData) {
 export async function exportPdfWorkspaceData(
   nodes: OwnershipNode[]
 ): Promise<PdfWorkspaceData> {
-  const nodeIds = [
-    ...new Set(
-      nodes
-        .filter((node) => node.hasDoc)
-        .map((node) => node.id)
-    ),
-  ];
-  const pdfs = (
-    await Promise.all(nodeIds.map((nodeId) => db.pdfs.get(nodeId)))
-  ).filter(
-    (pdf): pdf is PdfAttachment => Boolean(pdf && pdf.blob.size > 0)
-  );
+  // Phase 5: read from the v8 `documents` + `document_attachments`
+  // tables. The v8 `.landroid` shape (added in A5) will serialize
+  // documents directly; for now we keep emitting v7-compatible
+  // `pdfs: PdfAttachment[]` so existing .landroid round-trips still work.
+  // Each node contributes its first attachment (single-doc UX is still
+  // the only path in A4; Phase B's multi-doc surface plus A5's v8
+  // export are where multi-attachment-per-node lands properly).
+  const nodeIds = nodes.map((node) => node.id);
+  if (nodeIds.length === 0) return { pdfs: [] };
 
+  const attachments = await db.document_attachments
+    .where('entityKind')
+    .equals('node')
+    .and((row) => nodeIds.includes(row.entityId))
+    .toArray();
+  if (attachments.length === 0) return { pdfs: [] };
+
+  // Pick the lowest-position attachment per node for the v7-shape export.
+  const firstByNode = new Map<string, typeof attachments[number]>();
+  for (const a of attachments) {
+    const existing = firstByNode.get(a.entityId);
+    if (!existing || a.position < existing.position) {
+      firstByNode.set(a.entityId, a);
+    }
+  }
+
+  const docIds = [...new Set([...firstByNode.values()].map((a) => a.docId))];
+  const docs = await db.documents.bulkGet(docIds);
+  const docById = new Map<string, NonNullable<typeof docs[number]>>();
+  for (const doc of docs) {
+    if (doc && doc.blob.size > 0) docById.set(doc.docId, doc);
+  }
+
+  const pdfs: PdfAttachment[] = [];
+  for (const [nodeId, attachment] of firstByNode) {
+    const doc = docById.get(attachment.docId);
+    if (!doc) continue;
+    pdfs.push({
+      nodeId,
+      fileName: doc.fileName,
+      mimeType: doc.mimeType,
+      blob: doc.blob,
+      createdAt: attachment.createdAt,
+    });
+  }
   return { pdfs };
 }
 
@@ -946,24 +978,13 @@ export async function importLandroidFile(file: File): Promise<LandroidFileData> 
             : [],
         }
       : { pdfs: [] };
-  const pdfFileNameByNodeId = new Map(
-    pdfData.pdfs.map((pdf) => [pdf.nodeId, pdf.fileName] as const)
-  );
-  const pdfNodeIds = new Set(pdfFileNameByNodeId.keys());
-  const nodes = core.nodes.map((node) => {
-    if (node.hasDoc && !pdfNodeIds.has(node.id)) {
-      return { ...node, hasDoc: false, docFileName: '' };
-    }
-
-    if (node.hasDoc && !node.docFileName) {
-      return {
-        ...node,
-        docFileName: pdfFileNameByNodeId.get(node.id) ?? '',
-      };
-    }
-
-    return node;
-  });
+  // Phase 5: the v7 `hasDoc`/`docFileName` reconciliation against the
+  // imported `pdfData.pdfs` array is dropped here. v7 `.landroid` files
+  // populate the legacy `pdfs` Dexie table via `replacePdfWorkspaceData`;
+  // the workspace-store `hydrateNodeAttachments` action then refills
+  // `node.attachments[]` from the v8 tables. Properly migrating v7
+  // imports into v8 documents/document_attachments is A5.
+  const nodes = core.nodes;
 
   const curativeData =
     isRecord(parsed.curativeData)

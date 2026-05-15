@@ -6,7 +6,10 @@ import { createBlankLease } from '../../types/owner';
 const mocks = vi.hoisted(() => ({
   unlinkDeskMap: vi.fn(),
   unlinkNode: vi.fn(),
-  deletePdf: vi.fn(),
+  // Default to a resolved promise so the cascade-delete helper's `.catch`
+  // doesn't trip on `undefined`. Individual tests can override with
+  // `mockRejectedValueOnce` if they need to exercise the error path.
+  deleteDoc: vi.fn(async () => undefined),
   unlinkCurativeNode: vi.fn(),
 }));
 
@@ -19,8 +22,15 @@ vi.mock('../map-store', () => ({
   },
 }));
 
-vi.mock('../../storage/pdf-store', () => ({
-  deletePdf: mocks.deletePdf,
+vi.mock('../../storage/document-store', () => ({
+  // Phase 5: workspace-store cascade-deletes docs via document-store.
+  // Other document-store functions land on `attachDocToNode` etc. and
+  // are exercised in `workspace-store-doc-actions.test.ts`.
+  deleteDoc: mocks.deleteDoc,
+  saveDoc: vi.fn(),
+  renameDoc: vi.fn(),
+  reorderAttachments: vi.fn(),
+  listAttachmentsForNodes: vi.fn(),
 }));
 
 vi.mock('../curative-store', () => ({
@@ -322,12 +332,28 @@ describe('workspace-store', () => {
       grantee: 'Root Owner',
       initialFraction: '1',
       fraction: '0.5',
+      attachments: [
+        {
+          docId: 'doc-root-1',
+          attachmentId: 'att-root-1',
+          fileName: 'root.pdf',
+          kind: 'deed' as const,
+        },
+      ],
     };
     const child = {
       ...createBlankNode('child-1', 'root-1'),
       grantee: 'Child Owner',
       initialFraction: '0.5',
       fraction: '0.5',
+      attachments: [
+        {
+          docId: 'doc-child-1',
+          attachmentId: 'att-child-1',
+          fileName: 'child.pdf',
+          kind: 'obit' as const,
+        },
+      ],
     };
     const otherRoot = {
       ...createBlankNode('root-2', null),
@@ -420,8 +446,10 @@ describe('workspace-store', () => {
     expect(state.leaseholdTransferOrderEntries).toEqual([
       expect.objectContaining({ sourceRowId: 'assignment-other' }),
     ]);
-    expect(mocks.deletePdf).toHaveBeenCalledWith('root-1');
-    expect(mocks.deletePdf).toHaveBeenCalledWith('child-1');
+    // Phase 5: cascade-delete now targets `documents` by docId, not the
+    // legacy `pdfs` table by nodeId.
+    expect(mocks.deleteDoc).toHaveBeenCalledWith('doc-root-1');
+    expect(mocks.deleteDoc).toHaveBeenCalledWith('doc-child-1');
     expect(mocks.unlinkNode).toHaveBeenCalledWith('root-1');
     expect(mocks.unlinkNode).toHaveBeenCalledWith('child-1');
     expect(mocks.unlinkCurativeNode).toHaveBeenCalledWith('root-1');
@@ -472,7 +500,7 @@ describe('workspace-store', () => {
     expect(state.deskMaps.find((deskMap) => deskMap.id === 'dm-2')?.nodeIds).toEqual([
       'shared-root',
     ]);
-    expect(mocks.deletePdf).not.toHaveBeenCalled();
+    expect(mocks.deleteDoc).not.toHaveBeenCalled();
     expect(mocks.unlinkNode).not.toHaveBeenCalled();
   });
 

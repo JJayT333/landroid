@@ -12,7 +12,6 @@ import InstrumentSelect from '../shared/InstrumentSelect';
 import { useWorkspaceStore } from '../../store/workspace-store';
 import { formatAsFraction } from '../../engine/fraction-display';
 import { d } from '../../engine/decimal';
-import { savePdf, deletePdf } from '../../storage/pdf-store';
 import { assertFileSize, FILE_SIZE_LIMITS } from '../../utils/file-validation';
 import { getInterestClass, type OwnershipNode } from '../../types/node';
 import type { OwnerLinkOption } from '../owners/owner-link-options';
@@ -45,7 +44,11 @@ export default function NodeEditModal({
   const updateNode = useWorkspaceStore((s) => s.updateNode);
   const rebalance = useWorkspaceStore((s) => s.rebalance);
   const nodes = useWorkspaceStore((s) => s.nodes);
+  const attachDocToNode = useWorkspaceStore((s) => s.attachDocToNode);
+  const detachDocFromNode = useWorkspaceStore((s) => s.detachDocFromNode);
   const pdfInputRef = useRef<HTMLInputElement>(null);
+  // Phase 5: A4c keeps the single-doc UX; Phase B turns this into a list.
+  const firstAttachment = node.attachments[0] ?? null;
 
   const [form, setForm] = useState({
     instrument: node.instrument,
@@ -375,11 +378,13 @@ export default function NodeEditModal({
               setPdfSaving(true);
               try {
                 assertFileSize(file, FILE_SIZE_LIMITS.PDF, 'PDF');
-                const attachment = await savePdf(node.id, file);
-                updateNode(node.id, {
-                  hasDoc: true,
-                  docFileName: attachment.fileName,
-                });
+                // A4c: single-doc UX preserved — if an attachment already
+                // exists, replace it by detaching the old one first. The
+                // workspace-store action keeps `node.attachments[]` in sync.
+                if (firstAttachment) {
+                  await detachDocFromNode(node.id, firstAttachment.attachmentId);
+                }
+                await attachDocToNode(node.id, file);
                 e.target.value = '';
               } catch (uploadError) {
                 setPdfError(
@@ -393,12 +398,13 @@ export default function NodeEditModal({
             }}
           />
           <div className="flex flex-wrap items-center gap-2">
-            {node.hasDoc ? (
+            {firstAttachment ? (
               <>
                 <span className="min-w-0 max-w-full rounded-md border border-ledger-line bg-ledger px-2 py-1 text-xs text-ink">
                   <span className="font-semibold">Attached:</span>{' '}
                   <span className="font-mono break-all">
-                    {node.docFileName || (node.docNo ? `${node.docNo}.pdf` : 'PDF')}
+                    {firstAttachment.fileName
+                      || (node.docNo ? `${node.docNo}.pdf` : 'PDF')}
                   </span>
                 </span>
                 <button
@@ -412,8 +418,7 @@ export default function NodeEditModal({
                   type="button"
                   onClick={async () => {
                     setPdfError(null);
-                    await deletePdf(node.id);
-                    updateNode(node.id, { hasDoc: false, docFileName: '' });
+                    await detachDocFromNode(node.id, firstAttachment.attachmentId);
                   }}
                   className="px-3 py-1.5 rounded-lg text-xs text-seal hover:bg-seal/10 transition-colors"
                 >
@@ -431,7 +436,7 @@ export default function NodeEditModal({
               </button>
             )}
           </div>
-          {node.hasDoc && (
+          {firstAttachment && (
             <button
               type="button"
               disabled={pdfSaving}

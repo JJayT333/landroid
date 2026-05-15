@@ -260,7 +260,8 @@ export default function OwnershipNodeEditorModals({
         <PdfViewerModal
           nodeId={pdfViewNode.id}
           fileNameHint={
-            pdfViewNode.docFileName || (pdfViewNode.docNo ? `${pdfViewNode.docNo}.pdf` : null)
+            pdfViewNode.attachments[0]?.fileName
+            || (pdfViewNode.docNo ? `${pdfViewNode.docNo}.pdf` : null)
           }
           onClose={() => onSetPdfViewNodeId(null)}
         />

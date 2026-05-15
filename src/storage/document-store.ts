@@ -1,8 +1,7 @@
 /**
  * Document CRUD for Phase 5 (see ADR 0004). Replaces the v7 single-PDF
- * `pdf-store.ts` surface. All callers should migrate to these helpers;
- * `pdf-store.ts` will become a thin shim in Phase A3 and is retired one
- * version after that.
+ * `pdf-store.ts` surface (deleted in A4c). The v7 `pdfs` Dexie table is
+ * kept read-only for one rollback version.
  *
  * Conventions:
  *   - Documents and attachments are written together when a doc is saved.

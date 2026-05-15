@@ -145,7 +145,9 @@ function rawNodeToOwnership(raw: RawNode): OwnershipNode {
     isDeceased: Boolean(raw.isDeceased),
     obituary: raw.obituary ?? '',
     graveyardLink: raw.graveyardLink ?? '',
-    hasDoc: Boolean(raw.docData),
+    // Phase 5: CSV imports never carry the document blob, so they cannot
+    // populate `attachments[]`. The `docNo` column above still flows
+    // through for the runsheet/title-card display.
   };
 }
 

@@ -42,8 +42,14 @@ describe('AI undo snapshots', () => {
     const { captureSnapshot } = await import('../undo-store');
     const node = {
       ...createBlankNode('node-1'),
-      hasDoc: true,
-      docFileName: 'instrument.pdf',
+      attachments: [
+        {
+          docId: 'doc-undo',
+          attachmentId: 'att-undo',
+          fileName: 'instrument.pdf',
+          kind: 'deed' as const,
+        },
+      ],
     };
     const pdfData = {
       pdfs: [

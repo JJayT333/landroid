@@ -194,8 +194,14 @@ function buildWorkspace(canvas: CanvasSaveData | null): LandroidFileData {
       {
         ...createBlankNode('node-1'),
         type: 'related',
-        hasDoc: true,
-        docFileName: '20260001.pdf',
+        attachments: [
+          {
+            docId: 'doc-fixture-1',
+            attachmentId: 'att-fixture-1',
+            fileName: '20260001.pdf',
+            kind: 'deed',
+          },
+        ],
         linkedOwnerId: owner.id,
         linkedLeaseId: 'lease-1',
         relatedKind: 'lease',
@@ -319,7 +325,10 @@ describe('workspace-persistence', () => {
     );
     expect(imported.canvas).toEqual(original.canvas);
     expect(imported.pdfData?.pdfs[0]?.fileName).toBe('20260001.pdf');
-    expect(imported.nodes[0]?.docFileName).toBe('20260001.pdf');
+    // Phase 5: v7 `.landroid` files carry their PDFs in `pdfData.pdfs[]`
+    // and don't populate `node.attachments[]` directly. The post-import
+    // hydration step (A4b) re-reads attachments from Dexie's v8 tables;
+    // the round-trip-shape assertion above proves the PDF survived.
     expect(await imported.pdfData?.pdfs[0]?.blob.text()).toBe('node-pdf-body');
     expect(imported.ownerData?.owners).toEqual(original.ownerData?.owners);
     expect(imported.ownerData?.docs[0]?.fileName).toBe('owner-notes.txt');
@@ -427,7 +436,11 @@ describe('workspace-persistence', () => {
     expect(imported.nodes[0]?.royaltyKind).toBeNull();
   });
 
-  it('clears stale hasDoc flags when an imported .landroid lacks the node PDF payload', async () => {
+  it('imports a legacy .landroid whose node carries no v8 attachment data with an empty attachments list', async () => {
+    // Phase 5: the v7 `hasDoc`/`docFileName` reconciliation against
+    // `pdfData.pdfs` was dropped in A4c — the v8 data layer treats
+    // missing PDF payloads as "no attachments." Properly migrating a v7
+    // .landroid into v8 documents/document_attachments is A5.
     const payload = {
       version: 6,
       workspaceId: 'ws-missing-pdf',
@@ -435,8 +448,6 @@ describe('workspace-persistence', () => {
       nodes: [
         {
           ...createBlankNode('node-with-missing-pdf'),
-          hasDoc: true,
-          docFileName: 'missing.pdf',
         },
       ],
       deskMaps: [],
@@ -449,8 +460,7 @@ describe('workspace-persistence', () => {
 
     const imported = await importLandroidFile(file);
 
-    expect(imported.nodes[0]?.hasDoc).toBe(false);
-    expect(imported.nodes[0]?.docFileName).toBe('');
+    expect(imported.nodes[0]?.attachments).toEqual([]);
     expect(imported.pdfData).toEqual({ pdfs: [] });
   });
 

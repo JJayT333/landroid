@@ -16,7 +16,6 @@ import { useResearchStore } from '../store/research-store';
 import { buildLeaseNode, isLeaseNode } from '../components/deskmap/deskmap-lease-node';
 import type { OwnerWorkspaceData } from './owner-persistence';
 import { createBundledDeskMapPdfFile } from './bundled-deskmap-pdfs';
-import { savePdf } from './pdf-store';
 import type { DeskMap, OwnershipNode } from '../types/node';
 import { createBlankNode } from '../types/node';
 import { createBlankLease, createBlankOwner } from '../types/owner';
@@ -60,16 +59,10 @@ interface PdfMapping {
   fileName: string;
 }
 
-function markNodePdfMetadata(
-  nodes: OwnershipNode[],
-  nodeId: string,
-  fileName: string
-): void {
-  const node = nodes.find((candidate) => candidate.id === nodeId);
-  if (!node) return;
-  node.hasDoc = true;
-  node.docFileName = fileName;
-}
+// Phase 5: PDFs no longer require a pre-flight node flag. The
+// workspace-store `attachDocToNode` action fills in `node.attachments[]`
+// on success; failed attaches leave it empty, which is what the badge
+// path expects.
 
 function countyFromLandDesc(landDesc: string): string {
   const match = landDesc.match(/([A-Za-z .'-]+?)\s+County\b/i);
@@ -769,12 +762,12 @@ async function attachPdf(nodeId: string, fileName: string): Promise<boolean> {
       `${nodeId}:${fileName}`,
       fileName
     );
-    const attachment = await savePdf(nodeId, file);
-    useWorkspaceStore.getState().updateNode(nodeId, {
-      hasDoc: true,
-      docFileName: attachment.fileName,
-    });
-    return true;
+    // Phase 5: route through the workspace-store action so the v8
+    // document tables and `node.attachments[]` cache stay in sync.
+    const summary = await useWorkspaceStore
+      .getState()
+      .attachDocToNode(nodeId, file, { fileName });
+    return summary !== null;
   } catch (err) {
     console.warn(`[seed] Failed to attach ${fileName}:`, err);
     return false;
@@ -812,11 +805,6 @@ export async function seedTestData(): Promise<{ nodeCount: number; pdfCount: num
     finalizedNodes,
     'Elmore Title Examination'
   );
-
-  // Mark nodes that will have PDFs
-  for (const mapping of pdfMappings) {
-    markNodePdfMetadata(nodes, mapping.nodeId, mapping.fileName);
-  }
 
   // Create desk map
   const dmId = `dm-seed-${Date.now()}`;
@@ -860,14 +848,10 @@ export async function seedTestData(): Promise<{ nodeCount: number; pdfCount: num
     }
   }
 
-  if (failedPdfNodeIds.length > 0) {
-    for (const failedNodeId of failedPdfNodeIds) {
-      useWorkspaceStore.getState().updateNode(failedNodeId, {
-        hasDoc: false,
-        docFileName: '',
-      });
-    }
-  }
+  // Phase 5: no failed-PDF cleanup needed — `attachDocToNode` only
+  // populates `node.attachments[]` on success, so a failure leaves the
+  // node already in the empty-attachments state the UI expects.
+  void failedPdfNodeIds;
 
   return { nodeCount: nodes.length, pdfCount };
 }
@@ -946,7 +930,6 @@ class StressBuilder {
     if (this.pdfIdx >= DEMO_PDFS.length) return;
     const node = this.nodes.find((n) => n.id === nodeId);
     if (node) {
-      markNodePdfMetadata(this.nodes, nodeId, DEMO_PDFS[this.pdfIdx]);
       this.pdfMappings.push({ nodeId, fileName: DEMO_PDFS[this.pdfIdx++] });
     }
   }
@@ -2316,14 +2299,9 @@ export async function seedCombinatorialData(): Promise<{
     }
   }
 
-  if (failedPdfNodeIds.length > 0) {
-    for (const failedNodeId of failedPdfNodeIds) {
-      useWorkspaceStore.getState().updateNode(failedNodeId, {
-        hasDoc: false,
-        docFileName: '',
-      });
-    }
-  }
+  // Phase 5: no failed-PDF cleanup needed; see the equivalent comment in
+  // the Elmore seed above.
+  void failedPdfNodeIds;
 
   console.log(
     `[combinatorial] Built ${workspace.nodes.length} nodes, attached ${pdfCount} PDFs, ${workspace.deskMaps.length} desk maps`

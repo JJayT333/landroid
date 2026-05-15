@@ -48,7 +48,7 @@ async function bootstrapApp() {
     ]);
     // Phase 5: pull `node.attachments[]` from Dexie's `documents` +
     // `document_attachments` tables after the workspace state lands.
-    // Safe to fail; the legacy hasDoc/docFileName fields still render.
+    // Safe to fail; the rest of the workspace still renders.
     await useWorkspaceStore.getState().hydrateNodeAttachments().catch(() => {});
   } else {
     useWorkspaceStore.getState().setHydrated();

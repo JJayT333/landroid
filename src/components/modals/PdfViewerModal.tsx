@@ -1,12 +1,16 @@
 /**
  * PDF viewer modal — displays an attached PDF in an iframe.
  *
- * Loads the PDF blob from IndexedDB, creates an object URL,
- * and renders it inline. Cleans up the URL on unmount.
+ * Phase 5: keyed externally by `nodeId` for backward compatibility with
+ * the Desk Map / NodeEditModal callback chain, but resolves the first
+ * attached document on the node and loads the blob from the v8
+ * `documents` table. Phase B will switch the prop to `docId` so a
+ * multi-chip surface can target any attachment.
  */
 import { useEffect, useState } from 'react';
 import Modal from '../shared/Modal';
-import { getPdf } from '../../storage/pdf-store';
+import { getDocBlob, getDocMeta } from '../../storage/document-store';
+import { useWorkspaceStore } from '../../store/workspace-store';
 
 interface PdfViewerModalProps {
   nodeId: string;
@@ -19,6 +23,9 @@ export default function PdfViewerModal({
   fileNameHint,
   onClose,
 }: PdfViewerModalProps) {
+  const docId = useWorkspaceStore(
+    (state) => state.nodes.find((n) => n.id === nodeId)?.attachments[0]?.docId
+  );
   const [objectUrl, setObjectUrl] = useState<string | null>(null);
   const [fileName, setFileName] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -33,18 +40,25 @@ export default function PdfViewerModal({
 
     (async () => {
       try {
-        const attachment = await getPdf(nodeId);
-
-        if (!attachment || attachment.blob.size === 0) {
+        if (!docId) {
+          throw new Error(
+            'No PDF attachment was found for this title card. Reattach the recorded instrument before relying on View PDF.'
+          );
+        }
+        const [blob, meta] = await Promise.all([
+          getDocBlob(docId),
+          getDocMeta(docId),
+        ]);
+        if (!blob || blob.size === 0) {
           throw new Error(
             'No PDF attachment was found for this title card. Reattach the recorded instrument before relying on View PDF.'
           );
         }
 
         if (cancelled) return;
-        url = URL.createObjectURL(attachment.blob);
+        url = URL.createObjectURL(blob);
         setObjectUrl(url);
-        setFileName(attachment.fileName);
+        setFileName(meta?.fileName ?? fileNameHint ?? '');
       } catch (loadError) {
         if (cancelled) return;
         setError(
@@ -59,7 +73,7 @@ export default function PdfViewerModal({
       cancelled = true;
       if (url) URL.revokeObjectURL(url);
     };
-  }, [fileNameHint, nodeId]);
+  }, [docId, fileNameHint, nodeId]);
 
   return (
     <Modal open onClose={onClose} title={fileName || fileNameHint || 'View PDF'} wide>

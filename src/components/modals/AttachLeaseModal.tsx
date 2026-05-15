@@ -20,7 +20,6 @@ import {
 import { deriveCounty } from '../../utils/land';
 import { parseStrictInterestString } from '../../utils/interest-string';
 import { serialize } from '../../engine/decimal';
-import { savePdf } from '../../storage/pdf-store';
 import { assertFileSize, FILE_SIZE_LIMITS } from '../../utils/file-validation';
 import FormField from '../shared/FormField';
 import Modal from '../shared/Modal';
@@ -60,6 +59,10 @@ export default function AttachLeaseModal({
     (state) => state.addNodeToActiveDeskMap
   );
   const updateNode = useWorkspaceStore((state) => state.updateNode);
+  const attachDocToNode = useWorkspaceStore((state) => state.attachDocToNode);
+  const detachDocFromNode = useWorkspaceStore(
+    (state) => state.detachDocFromNode
+  );
 
   const ownerWorkspaceId = useOwnerStore((state) => state.workspaceId);
   const owners = useOwnerStore((state) => state.owners);
@@ -255,7 +258,7 @@ export default function AttachLeaseModal({
       const leaseNodeId =
         existingLeaseNode?.id ??
         `node-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-      let leaseNode = buildLeaseNode({
+      const leaseNode = buildLeaseNode({
         id: leaseNodeId,
         parentNode: {
           ...parentNode,
@@ -264,14 +267,6 @@ export default function AttachLeaseModal({
         lease: leaseRecord,
         existingNode: existingLeaseNode,
       });
-      if (selectedPdfFile) {
-        const attachment = await savePdf(leaseNodeId, selectedPdfFile);
-        leaseNode = {
-          ...leaseNode,
-          hasDoc: true,
-          docFileName: attachment.fileName,
-        };
-      }
 
       if (existingLease) {
         await updateLease(existingLease.id, leaseRecord);
@@ -284,6 +279,18 @@ export default function AttachLeaseModal({
       } else {
         addNode(leaseNode);
         addNodeToActiveDeskMap(leaseNode.id);
+      }
+
+      if (selectedPdfFile) {
+        // A4c: route the PDF through the workspace-store action so the
+        // v8 document tables and `node.attachments[]` cache both stay in
+        // sync. Replace any existing attachment (single-doc UX preserved
+        // for A4; Phase B's multi-doc surface will keep both).
+        const existingAttachment = existingLeaseNode?.attachments[0];
+        if (existingAttachment) {
+          await detachDocFromNode(leaseNodeId, existingAttachment.attachmentId);
+        }
+        await attachDocToNode(leaseNodeId, selectedPdfFile, { kind: 'lease' });
       }
 
       onSaved?.(leaseNode.id);
@@ -468,11 +475,11 @@ export default function AttachLeaseModal({
             }}
           />
           <div className="flex flex-wrap items-center gap-2">
-            {existingLeaseNode?.hasDoc && !selectedPdfFile && (
+            {existingLeaseNode?.attachments[0] && !selectedPdfFile && (
               <span className="min-w-0 max-w-full rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs text-emerald-900">
                 <span className="font-semibold">Current:</span>{' '}
                 <span className="font-mono break-all">
-                  {existingLeaseNode.docFileName ||
+                  {existingLeaseNode.attachments[0].fileName ||
                     (existingLeaseNode.docNo ? `${existingLeaseNode.docNo}.pdf` : 'PDF')}
                 </span>
               </span>
@@ -489,7 +496,9 @@ export default function AttachLeaseModal({
               onClick={() => pdfInputRef.current?.click()}
               className="px-3 py-1.5 rounded-lg text-xs font-semibold text-emerald-800 hover:bg-emerald-100 border border-emerald-200 transition-colors disabled:opacity-60"
             >
-              {existingLeaseNode?.hasDoc || selectedPdfFile ? 'Replace PDF' : 'Attach PDF'}
+              {existingLeaseNode?.attachments[0] || selectedPdfFile
+                ? 'Replace PDF'
+                : 'Attach PDF'}
             </button>
             {selectedPdfFile && (
               <button

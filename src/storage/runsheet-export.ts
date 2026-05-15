@@ -39,7 +39,9 @@ const RUNSHEET_COLUMN_WIDTHS: ColInfo[] = [
 
 function buildImagePath(node: OwnershipNode) {
   const docNo = node.docNo.trim();
-  return node.hasDoc && docNo ? `TORS_Documents\\${docNo}.pdf` : '';
+  // Phase 5: a node "has a document" when its v8 attachments[] is
+  // non-empty. The legacy `hasDoc` flag was dropped in A4c.
+  return node.attachments.length > 0 && docNo ? `TORS_Documents\\${docNo}.pdf` : '';
 }
 
 function sanitizeFileNamePart(value: string) {
