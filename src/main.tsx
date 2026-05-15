@@ -15,6 +15,7 @@ import { useCanvasStore } from './store/canvas-store';
 import { saveWorkspaceToDb, loadWorkspaceFromDb } from './storage/workspace-persistence';
 import { saveCanvasToDb, loadCanvasFromDb } from './storage/canvas-persistence';
 import { awaitWorkspaceKeyReady } from './storage/active-workspace-key';
+import { runPostV8BackupIfNeeded } from './storage/post-v8-backup';
 import {
   buildCanvasAutosavePayload,
   buildWorkspaceAutosavePayload,
@@ -31,6 +32,15 @@ async function bootstrapApp() {
   // the first read uses the per-user key, not the legacy 'default' row.
   // In local mode awaitWorkspaceKeyReady resolves at module load.
   await awaitWorkspaceKeyReady();
+
+  // Phase 5 / A5b: one-shot v7 `.landroid` backup the first time the user
+  // boots into a v8 schema. The Dexie v7→v8 migration is non-destructive
+  // (the v7 `pdfs` table is preserved), so reading it post-`db.open()` is
+  // safe. Tracked via a localStorage flag so a refresh doesn't redownload.
+  // Errors are warnings, never blocking.
+  await runPostV8BackupIfNeeded().catch((err) => {
+    console.warn('[landroid] post-v8 backup hook failed:', err);
+  });
 
   const [workspaceResult, canvasResult] = await Promise.all([
     loadWorkspaceFromDb(),
