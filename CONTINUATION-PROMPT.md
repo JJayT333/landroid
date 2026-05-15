@@ -42,41 +42,62 @@ multi-doc-per-entity refactor. See
   to read/write `attachments[]`. Cascade-delete docs in
   `workspace-store.removeNode` / `clearDeskMapNodes` via
   `document-store.deleteDoc`. `pdf-store.ts` deleted (zero importers).
+- `8a8859f` — A5a: `.landroid` v8 export shape + v7→v8 import dispatch.
+  `exportLandroidFile` writes `version: 8` and `documentData`; dropped
+  legacy `pdfData` from the file payload and from `LandroidFileData`.
+  New `exportDocumentWorkspaceData` / `replaceDocumentWorkspaceData` read
+  and write the v8 tables for `.landroid` and AI-undo paths. `Navbar`
+  and `undo-store` migrated; the AI undo path now re-runs
+  `hydrateNodeAttachments` after a snapshot restore. v7 import is
+  migrated inline through `migratePdfsToDocuments`.
+- `f8939cd` — A5b: one-shot v7 `.landroid` backup hook in
+  `src/storage/post-v8-backup.ts`. Fires once after `db.open()` via a
+  `localStorage` flag (`landroid:postV8BackupComplete`), iterates every
+  workspace, downloads one v7-shape `.landroid` per workspace that had
+  PDFs at upgrade time. Pure helpers + dependency injection for testing.
+  Wired into `main.tsx`. 15 unit tests.
 
-**Phase A is complete.** The v7 single-PDF-per-node data model is gone
-from the type system, the data layer, and every reader/writer. Validation
-after every commit: `npm run lint`, `npm test`, `npm run build` all green.
-Test suite at 506 tests; the pre-existing
+**Phase 5 data layer is complete.** The v7 single-PDF-per-node model is
+gone from the type system, the data layer, every reader/writer, the
+`.landroid` file format, and the AI-undo path. The v7 → v8 schema
+upgrade has both an in-Dexie migration (non-destructive) and a
+downloadable v7 `.landroid` backup safety net. Validation after every
+commit: `npm run lint`, `npm test`, `npm run build` all green.
+Test suite at 523 tests; the pre-existing
 `src/engine/__tests__/tree-layout.test.ts` sandbox-path failure on the
 `elkjs/lib/elk-worker.min.js?url` import is unrelated to Phase 5 and
 existed on the base commit `665fc3a`.
 
 ### What's Left
 
-**A5 (next):** close the file-format and backup gaps.
+**Phase B (next):** UI surface for multi-doc attachments.
+- `DeskMapDocumentBadge` becomes `DeskMapDocumentChips` — a row of chips,
+  4 visible + `+N more` overflow. Each chip click opens its own doc.
+- `PdfViewerModal` switches prop from `nodeId` to `docId` so a multi-
+  chip surface can target any attachment directly.
+- Node-edit, lease, and NPRI modals get an attachments section: list +
+  add + rename + remove + reorder.
+- Phase 6 modal focus-trap work can ride along on the same modal edits.
 
-- **Auto-`.landroid` v7 backup hook.** Fires once after the v8 Dexie
-  upgrade lands via a `localStorage` flag (`landroid:postV8BackupComplete`).
-  Reads the still-present read-only v7 `pdfs` table and the `workspaces`
-  table, builds a v7-shape `.landroid` blob, triggers a download. Idempotent;
-  safe to fail.
-- **`workspace-persistence` v8 export shape.** Bump the `version` field
-  to 8 and serialize `documents` + `document_attachments` directly
-  (currently `exportPdfWorkspaceData` reads v8 tables but emits v7-shape
-  `PdfAttachment[]`).
-- **v7 → v8 import dispatch.** Dispatch on `payload.version` in
-  `importLandroidFile`: `version === 7` runs the inline migration
-  (synthesize `docId`s, attach as `entityKind: 'node'` at `position: 0`,
-  populate `node.attachments[]`), `version === 8` loads directly. Missing
-  / unknown version → clear error. Closes the open "v7 export writes
-  `version: 7` but import doesn't dispatch on version" gap.
-- Depth-range normalize-and-warn lives in this pass too: import
-  surfaces a Phase 3-style warning when a record carries a
-  non-`'all_depths'` value, normalizing it to `'all_depths'` for math
-  while preserving the raw value in workspace metadata.
+**Phase D (later):** `seed-test-data.ts` migration to call the v8
+attach actions instead of the existing single-doc seed pathway.
 
-**After A5:** Phase B begins — multi-chip Desk Map UI, modal attachments
-section, single-PDF UX retires.
+**Phase E (later):** add the multi-chip Playwright spec from the design
+doc and unskip the four remaining workflows (`.landroid` round-trip,
+branch-scoped lease delete, curative linkage, research linkage) against
+the new schema.
+
+**Phase F (later):** doc rail update —
+`CHANGELOG.md`, `USER_MANUAL.md` Desk Map PDF chip section,
+`SECURITY.md` hosted-blocked tool list (when AI doc-mutating tools
+land), and `TESTING.md`.
+
+**Depth-range import normalize-and-warn (deferred):** the design doc
+specified that a `.landroid` carrying a non-`'all_depths'` value
+surfaces a Phase 3-style warning. Today the per-record normalizer
+silently coerces unknown values to `'all_depths'`; adding a warning
+collector at `importLandroidFile` is a clean follow-up but is not
+load-bearing for any current build (no Phase 8 producer exists yet).
 
 ### Hard Guardrails Still In Force
 
