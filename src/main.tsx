@@ -2,6 +2,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
 import RootErrorBoundary from './components/shared/RootErrorBoundary';
+import { ConfirmationProvider } from './components/shared/ConfirmationProvider';
 import { AuthProvider } from './auth/AuthProvider';
 import LoginGate from './auth/LoginGate';
 import { isHostedMode } from './utils/deploy-env';
@@ -136,11 +137,15 @@ createRoot(document.getElementById('root')!).render(
       {isHostedMode() ? (
         <AuthProvider>
           <LoginGate>
-            <App />
+            <ConfirmationProvider>
+              <App />
+            </ConfirmationProvider>
           </LoginGate>
         </AuthProvider>
       ) : (
-        <App />
+        <ConfirmationProvider>
+          <App />
+        </ConfirmationProvider>
       )}
     </RootErrorBoundary>
   </StrictMode>

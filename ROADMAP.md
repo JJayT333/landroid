@@ -5,6 +5,10 @@ session handoff lives in `CONTINUATION-PROMPT.md`.
 
 ## Now
 
+- Review/checkpoint Phase 5 document/PDF persistence and Phase 6 safety cleanup
+  from `codex/phase-5-doc-storage-wrap-2026-05-15`.
+- Add a design-only ArcGIS canonical layer map from `docs/gis-data-catalog.md`
+  if the user wants the next Arc-focused pass.
 - Test spreadsheet row staging against additional recurring workbook formats.
 - Refine column aliases and row-review UX from real import feedback beyond the
   Elmore DOTO sample.
@@ -17,16 +21,10 @@ session handoff lives in `CONTINUATION-PROMPT.md`.
 - Execute Phase 0/1 of `DEPLOYMENT_PLAN.md`: hosted frontend, backend boundary,
   auth, cloud save path, and server-side AI proxy before any broad internet
   exposure.
-- Checkpoint the hosted-hardening branch after local validation.
-- Design the document/PDF persistence foundation before durable backend or
-  fixture expansion work.
-- Retarget the remaining four skipped Playwright workflows after the
-  document/PDF schema and Raven Forest fixture direction settle.
 - Design the project picker landing page after adding a real multi-workspace
   saved-project index instead of the current single autosave slot.
 - Promote unit metadata to first-class records if future units need separate
   operator/effective-date settings beyond current Desk Map unit tags.
-- Clean up the AI settings test storage warning.
 - Improve AI mutation approval/proposal UX without losing the user's desired
   single-user local workflow speed.
 - Add a persistent import ledger for staged spreadsheet rows.

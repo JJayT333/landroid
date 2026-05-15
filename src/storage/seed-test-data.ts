@@ -16,6 +16,7 @@ import { useResearchStore } from '../store/research-store';
 import { buildLeaseNode, isLeaseNode } from '../components/deskmap/deskmap-lease-node';
 import type { OwnerWorkspaceData } from './owner-persistence';
 import { createBundledDeskMapPdfFile } from './bundled-deskmap-pdfs';
+import type { DocumentKind } from '../types/document';
 import type { DeskMap, OwnershipNode } from '../types/node';
 import { createBlankNode } from '../types/node';
 import { createBlankLease, createBlankOwner } from '../types/owner';
@@ -57,6 +58,7 @@ function makeNode(
 interface PdfMapping {
   nodeId: string;
   fileName: string;
+  kind?: DocumentKind;
 }
 
 // Phase 5: PDFs no longer require a pre-flight node flag. The
@@ -756,7 +758,11 @@ function buildTestNodes(): { nodes: OwnershipNode[]; pdfMappings: PdfMapping[] }
 
 // ── Store a bundled PDF sample in IDB ───────────────────
 
-async function attachPdf(nodeId: string, fileName: string): Promise<boolean> {
+async function attachPdf(
+  nodeId: string,
+  fileName: string,
+  kind: DocumentKind = 'other'
+): Promise<boolean> {
   try {
     const file = await createBundledDeskMapPdfFile(
       `${nodeId}:${fileName}`,
@@ -766,7 +772,7 @@ async function attachPdf(nodeId: string, fileName: string): Promise<boolean> {
     // document tables and `node.attachments[]` cache stay in sync.
     const summary = await useWorkspaceStore
       .getState()
-      .attachDocToNode(nodeId, file, { fileName });
+      .attachDocToNode(nodeId, file, { fileName, kind });
     return summary !== null;
   } catch (err) {
     console.warn(`[seed] Failed to attach ${fileName}:`, err);
@@ -840,7 +846,7 @@ export async function seedTestData(): Promise<{ nodeCount: number; pdfCount: num
   let pdfCount = 0;
   const failedPdfNodeIds: string[] = [];
   for (const mapping of pdfMappings) {
-    const ok = await attachPdf(mapping.nodeId, mapping.fileName);
+    const ok = await attachPdf(mapping.nodeId, mapping.fileName, mapping.kind);
     if (ok) {
       pdfCount++;
     } else {
@@ -926,11 +932,21 @@ class StressBuilder {
   nextId(): string { return `stress-${++this.seq}`; }
   nextDocNo(): string { return `ST-${++this.docSeq}`; }
 
-  assignPdf(nodeId: string): void {
+  assignPdf(nodeId: string, kind: DocumentKind = 'other'): void {
     if (this.pdfIdx >= DEMO_PDFS.length) return;
     const node = this.nodes.find((n) => n.id === nodeId);
     if (node) {
-      this.pdfMappings.push({ nodeId, fileName: DEMO_PDFS[this.pdfIdx++] });
+      this.pdfMappings.push({
+        nodeId,
+        fileName: DEMO_PDFS[this.pdfIdx++],
+        kind,
+      });
+    }
+  }
+
+  addNamedPdf(nodeId: string, fileName: string, kind: DocumentKind): void {
+    if (this.nodes.some((node) => node.id === nodeId)) {
+      this.pdfMappings.push({ nodeId, fileName, kind });
     }
   }
 
@@ -1000,6 +1016,35 @@ class StressBuilder {
 
 function getTractNodes(nodes: OwnershipNode[], landDesc: string): OwnershipNode[] {
   return nodes.filter((node) => node.landDesc === landDesc);
+}
+
+function addNaturalMultiDocSeedMappings(builder: StressBuilder): void {
+  const targetCodes = new Set(['C2', 'C5', 'C10']);
+  const attachedNodeIds = new Set(builder.pdfMappings.map((mapping) => mapping.nodeId));
+
+  for (const tract of COMBINATORIAL_TRACTS) {
+    if (!targetCodes.has(tract.code)) continue;
+    const target = builder.nodes.find(
+      (node) =>
+        node.landDesc === tract.landDesc
+        && node.type === 'conveyance'
+        && node.interestClass === 'mineral'
+        && node.parentId !== null
+        && /deed/i.test(node.instrument)
+        && !attachedNodeIds.has(node.id)
+    );
+    if (!target) continue;
+
+    const baseName = `${tract.code}-${target.docNo}`;
+    builder.addNamedPdf(target.id, `${baseName}-deed.pdf`, 'deed');
+    builder.addNamedPdf(target.id, `${baseName}-obituary.pdf`, 'obit');
+    builder.addNamedPdf(
+      target.id,
+      `${baseName}-affidavit-of-heirship.pdf`,
+      'affidavit'
+    );
+    attachedNodeIds.add(target.id);
+  }
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -2081,6 +2126,7 @@ export function buildCombinatorialWorkspaceData(): {
   for (const tract of COMBINATORIAL_TRACTS) {
     buildCombinatorialTract(builder, leaseOverrides, tract);
   }
+  addNaturalMultiDocSeedMappings(builder);
 
   const finalizedNodes = finalizeGeneratedNodes(builder.nodes, { humorousDeaths: false });
   const { nodes, ownerData } = buildSeedOwnerWorkspaceData(
@@ -2291,7 +2337,7 @@ export async function seedCombinatorialData(): Promise<{
   let pdfCount = 0;
   const failedPdfNodeIds: string[] = [];
   for (const mapping of workspace.pdfMappings) {
-    const ok = await attachPdf(mapping.nodeId, mapping.fileName);
+    const ok = await attachPdf(mapping.nodeId, mapping.fileName, mapping.kind);
     if (ok) {
       pdfCount++;
     } else {

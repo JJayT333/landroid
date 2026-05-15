@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import FormField from '../shared/FormField';
+import { useConfirmation } from '../shared/ConfirmationProvider';
 import type { Owner } from '../../types/owner';
 
 interface OwnerInfoTabProps {
@@ -13,6 +14,7 @@ export default function OwnerInfoTab({
   onSave,
   onDelete,
 }: OwnerInfoTabProps) {
+  const { confirm: requestConfirmation } = useConfirmation();
   const [form, setForm] = useState({
     name: owner.name,
     entityType: owner.entityType,
@@ -83,9 +85,13 @@ export default function OwnerInfoTab({
         <button
           type="button"
           onClick={async () => {
-            if (!confirm(`Delete ${owner.name || 'this owner'} and all linked owner records?`)) {
-              return;
-            }
+            const confirmed = await requestConfirmation({
+              title: 'Delete Owner?',
+              message: `Delete ${owner.name || 'this owner'} and all linked owner records?`,
+              confirmLabel: 'Delete Owner',
+              tone: 'danger',
+            });
+            if (!confirmed) return;
             await onDelete();
           }}
           className="px-3 py-2 rounded-lg text-xs font-semibold text-seal hover:bg-seal/10 transition-colors"

@@ -43,8 +43,8 @@ npm run test:e2e
 
 `npm run test:e2e` uses Playwright Chromium and starts the local Vite server
 automatically. Current e2e status is tracked in `TESTING.md`; as of the current
-handoff, 5 workflows are active and 4 are intentionally skipped until the
-document/PDF persistence refactor and fixture retargeting settle.
+handoff, all 10 Playwright workflows are active after the document/PDF
+persistence refactor and fixture retargeting.
 
 ## Key Docs
 
@@ -90,6 +90,8 @@ In local mode, use `Demo Data -> Combinatorial - Raven Forest` to load the
 current sample workspace. It starts on Raven Forest Unit A and separates Unit A
 and Unit B so Leasehold and Owners can be reviewed by unit. Hosted mode hides
 the demo loader so a signed-in workspace cannot be overwritten by a fixture.
+Local demo loading still replaces the active workspace, so it requires the
+typed phrase `LOAD DEMO` before it runs.
 Older stress and 8-tract leasehold demos have been retired.
 
 ## Persistence Notes
@@ -99,6 +101,8 @@ Older stress and 8-tract leasehold demos have been retired.
 - `.landroid` imports validate the top-level workspace graph before loading.
 - CSV imports create a fresh workspace and intentionally start with empty owner,
   curative, map, and research side records.
+- `.landroid` and CSV loads require the typed phrase `LOAD WORKSPACE` because
+  they replace the active browser workspace.
 
 ## Repo Notes
 

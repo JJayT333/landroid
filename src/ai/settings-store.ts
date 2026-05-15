@@ -16,10 +16,7 @@ import { createJSONStorage, persist } from 'zustand/middleware';
  * without env setup.
  */
 function resolvePersistStorage(): Storage {
-  // Feature-check by method shape, not truthiness — Node 25+ exposes a
-  // localStorage property whose methods are undefined unless a backing file
-  // is configured, which otherwise blows up with "setItem is not a function".
-  const ls = typeof globalThis !== 'undefined' ? globalThis.localStorage : undefined;
+  const ls = typeof window !== 'undefined' ? window.localStorage : undefined;
   if (ls && typeof ls.setItem === 'function' && typeof ls.getItem === 'function') {
     return ls;
   }

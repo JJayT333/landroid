@@ -853,15 +853,25 @@ describe('workspace-persistence', () => {
     );
   });
 
-  it('rejects missing-parent ownership graphs in persisted workspace data', () => {
-    const invalidWorkspace = JSON.stringify({
-      workspaceId: 'ws-invalid',
-      projectName: 'Persisted Invalid',
+  it('allows warning-only ownership review states in persisted workspace data', () => {
+    const warningOnlyWorkspace = JSON.stringify({
+      workspaceId: 'ws-warning-only',
+      projectName: 'Persisted Warning Only',
       nodes: [
         {
           ...createBlankNode('orphan', 'missing-parent'),
           fraction: '0.250000000',
           initialFraction: '0.250000000',
+        },
+        {
+          ...createBlankNode('root'),
+          fraction: '0.750000000',
+          initialFraction: '1.000000000',
+        },
+        {
+          ...createBlankNode('child-a', 'root'),
+          fraction: '0',
+          initialFraction: '0.500000000',
         },
       ],
       deskMaps: [],
@@ -869,9 +879,12 @@ describe('workspace-persistence', () => {
       instrumentTypes: [],
     });
 
-    expect(() => parsePersistedWorkspaceData(invalidWorkspace)).toThrow(
-      'Invalid saved workspace: invalid ownership graph'
-    );
+    const parsed = parsePersistedWorkspaceData(warningOnlyWorkspace);
+    expect(parsed.nodes.map((node) => node.id)).toEqual([
+      'orphan',
+      'root',
+      'child-a',
+    ]);
   });
 
   it('rejects corrupt persisted canvas data', () => {

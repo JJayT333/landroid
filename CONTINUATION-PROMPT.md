@@ -5,98 +5,115 @@ Use this file to resume the active workstream in a new chat. Read it with
 
 ## Current Branch
 
-Current local branch: `claude/goofy-yonath-75583f` (Claude worktree, descended
-from `codex/hosted-hardening-2026-05-14`). Phase 5 commits land here and PR
-into `codex/hosted-hardening-2026-05-14`.
+Current checkpoint branch: `codex/phase-5-doc-storage-wrap-2026-05-15`,
+created from `claude/phase-5-document-refactor-2026-05-15`, which descended
+from `codex/hosted-hardening-2026-05-14`. The PR target remains
+`codex/hosted-hardening-2026-05-14`, not `main`.
 
 Do not commit directly to `main`.
 
 ## Phase 5 Status (Document/PDF Persistence Refactor)
 
-Six commits landed on this branch implementing the data layer for the
-multi-doc-per-entity refactor. See
-`docs/adr/0004-multi-doc-per-entity-persistence.md` and
-`docs/phase-5-document-refactor.md` for the design contract.
+This branch wraps the Phase 5 document/PDF persistence work plus the Phase 6
+UX/accessibility and low-blast-radius hardening cleanup.
 
-- `4bcc2c5` — ADR 0004 + design doc.
-- `d92338b` — A1: `DepthRange` schema hook on `OwnershipNode`, `Lease`,
-  `LeaseholdOrri`, `LeaseholdAssignment` with normalizers, defensive
-  comments at math entry points, 20 unit tests.
-- `31e9dc4` — A2: Dexie v8 bump with new `documents` +
-  `document_attachments` tables, pure `migratePdfsToDocuments` /
-  `buildNodeWorkspaceIndex` helpers, `document-store.ts` CRUD, sha-256
-  `blob-hash.ts`, 15 migration unit tests. Old `pdfs` table left
-  read-only for one rollback version.
-- `c4445fa` — A3: `OwnershipNode.attachments[]` (`NodeAttachmentSummary[]`)
-  added additively, 8 unit tests.
-- `ff4a194` — A4a: workspace-store actions (`attachDocToNode`,
-  `detachDocFromNode`, `renameDocOnNode`, `reorderNodeAttachments`) with
-  10 hoisted-mock unit tests.
-- `3522c75` — A4b: `document-store.listAttachmentsForNodes` bulk read,
-  `workspace-store.hydrateNodeAttachments` action, wired into `main.tsx`
-  and `Navbar.tsx` after workspace load. 3 unit tests.
-- `193c0d6` — A4c: drop `hasDoc` / `docFileName` from `OwnershipNode`;
-  migrate `DeskMapDocumentBadge`, `runsheet-export`, `csv-io`, the three
-  modals (`NodeEditModal`, `AttachLeaseModal`, `OwnershipNodeEditorModals`),
-  `PdfViewerModal`, `seed-test-data`, and `workspace-persistence` export
-  to read/write `attachments[]`. Cascade-delete docs in
-  `workspace-store.removeNode` / `clearDeskMapNodes` via
-  `document-store.deleteDoc`. `pdf-store.ts` deleted (zero importers).
-- `8a8859f` — A5a: `.landroid` v8 export shape + v7→v8 import dispatch.
-  `exportLandroidFile` writes `version: 8` and `documentData`; dropped
-  legacy `pdfData` from the file payload and from `LandroidFileData`.
-  New `exportDocumentWorkspaceData` / `replaceDocumentWorkspaceData` read
-  and write the v8 tables for `.landroid` and AI-undo paths. `Navbar`
-  and `undo-store` migrated; the AI undo path now re-runs
-  `hydrateNodeAttachments` after a snapshot restore. v7 import is
-  migrated inline through `migratePdfsToDocuments`.
-- `f8939cd` — A5b: one-shot v7 `.landroid` backup hook in
-  `src/storage/post-v8-backup.ts`. Fires once after `db.open()` via a
-  `localStorage` flag (`landroid:postV8BackupComplete`), iterates every
-  workspace, downloads one v7-shape `.landroid` per workspace that had
-  PDFs at upgrade time. Pure helpers + dependency injection for testing.
-  Wired into `main.tsx`. 15 unit tests.
+Completed:
 
-**Phase 5 data layer is complete.** The v7 single-PDF-per-node model is
-gone from the type system, the data layer, every reader/writer, the
-`.landroid` file format, and the AI-undo path. The v7 → v8 schema
-upgrade has both an in-Dexie migration (non-destructive) and a
-downloadable v7 `.landroid` backup safety net. Validation after every
-commit: `npm run lint`, `npm test`, `npm run build` all green.
-Test suite at 523 tests; the pre-existing
-`src/engine/__tests__/tree-layout.test.ts` sandbox-path failure on the
-`elkjs/lib/elk-worker.min.js?url` import is unrelated to Phase 5 and
-existed on the base commit `665fc3a`.
+- Phase A-C: v8 `documents` + `document_attachments`, document-store CRUD,
+  sha-256 hashing, node attachment summaries, workspace-store document actions,
+  v8 `.landroid` export/import with v7 dispatch, and the post-v8 one-shot v7
+  backup hook.
+- Phase B UI: `DeskMapDocumentChips`, shared `AttachmentsSection` in
+  `NodeEditModal`, document-open callback chain, and shared modal focus trap.
+- Phase D: `seed-test-data.ts` now gives selected Raven Forest conveying nodes
+  the natural Texas deed + obituary + affidavit of heirship pattern through the
+  new v8 attach actions.
+- Phase E: Playwright coverage is restored against v8. The suite includes
+  multi-document chip opening by `attachmentId`, the retargeted combinatorial
+  demo chip workflow, v8 `.landroid` round-trip, branch-scoped lease delete,
+  curative linkage, and research linkage.
+- Phase F: doc rail updated in `CHANGELOG.md`, `USER_MANUAL.md`,
+  `SECURITY.md`, `TESTING.md`, this continuation prompt, `docs/README.md`,
+  ADR 0004, and `docs/phase-5-document-refactor.md`.
+- Phase 6 UX/accessibility cleanup continued: app-level native `confirm()` /
+  `alert()` calls have been replaced with the shared LANDroid
+  confirmation/alert modal; workspace-replacing demo, `.landroid`, and CSV
+  loads now require typed confirmation; Flowchart `Clear` uses the shared modal;
+  and primary navigation, Desk Map tract tabs, owner tabs, Research sections,
+  Federal Leasing tabs, and shared form controls expose clearer labels or
+  active-state ARIA. The remaining `alert(1)` strings are security-test fixture
+  data only.
+- New workspace IDs now use `crypto.randomUUID()` with the existing `ws-`
+  prefix; a timestamp/random fallback remains for runtimes without
+  `randomUUID`.
+- Hosted persistence keying now stays locked while signed out; workspace/canvas
+  persistence no longer falls back to the local `default` rows unless the app is
+  actually in local mode.
+- Workspace persistence now treats supported title-review states
+  (`missing_parent`, `over_allocated_branch`, `under_allocated_branch`) as
+  warning-only for autosave/`.landroid` load, while still rejecting hard-invalid
+  graph issues such as negative fractions, cycles, and related nodes with
+  ownership fractions.
+
+Final Phase 5 / Phase 6A close-out validation:
+
+- `npm test -- src/components/deskmap/__tests__/deskmap-document-chips.test.tsx src/store/__tests__/workspace-store-doc-actions.test.ts src/storage/__tests__/workspace-persistence.test.ts` passed: 3 files, 38 tests.
+- `npm run lint` passed.
+- `npm test -- src/ai/wizard/__tests__/parse-workbook.test.ts` passed: 1 file,
+  6 tests, after making the hostile-range guard test deterministic.
+- `npm test -- src/storage/__tests__/workspace-persistence.test.ts` passed: 1
+  file, 15 tests, including warning-only title review state persistence.
+- `npm run test:e2e -- -g "landroid export/import|deleting a branch-scoped"`
+  passed: 2 Playwright workflows.
+- `npm test` passed: 67 files, 574 tests. Known/intentional noise at that
+  point: one post-v8 backup error-path log and the AI settings local-storage
+  warning, which Phase 6C later removed.
+- `npm run build` passed. Known Vite dynamic-import/chunk-size warnings remain.
+- `npm run test:e2e` passed: 10 Playwright workflows.
+- Phase 6B validation:
+  - `npm run lint` passed.
+  - `npm test -- src/components/shared/__tests__/confirmation-provider.test.ts`
+    passed: 1 file, 3 tests.
+  - `npm run test:e2e -- -g "combinatorial demo loads|landroid export/import"`
+    passed: 2 Playwright workflows after updating the typed-confirmation flow.
+  - `npm test` passed: 68 files, 577 tests. Known/intentional noise at that
+    point: the post-v8 backup error-path log and the AI settings local-storage
+    warning, which Phase 6C later removed.
+  - `npm run build` passed. Known Vite dynamic-import/chunk-size warnings remain.
+  - `npm run test:e2e` passed: 10 Playwright workflows.
+  - `git diff --check` passed.
+
+Final checkpoint validation on
+`codex/phase-5-doc-storage-wrap-2026-05-15`:
+
+- `npm run lint` passed.
+- `npm test` passed: 69 files, 579 tests. Known/intentional noise remains one
+  post-v8 backup error-path log.
+- `npm run build` passed. Known Vite dynamic-import/chunk-size warnings remain.
+- `npm run test:e2e` passed: 10 Playwright workflows.
+- `git diff --check` passed.
+- Phase 6C validation:
+  - `npm test -- src/utils/__tests__/workspace-id.test.ts` passed: 1 file, 2
+    tests.
+  - `npm test -- src/storage/__tests__/active-workspace-key.test.ts src/storage/__tests__/persistence-db-key.test.ts`
+    passed: 2 files, 8 tests.
+  - `npm test -- src/ai/__tests__/settings-store.test.ts` passed: 1 file, 7
+    tests, without the previous local-storage warning.
+  - `npm run lint` passed.
+  - `npm test` passed: 69 files, 579 tests. Known/intentional noise remains the
+    post-v8 backup error-path log.
+  - `npm run build` passed. Known Vite dynamic-import/chunk-size warnings remain.
+  - `npm run test:e2e` passed: 10 Playwright workflows.
+  - `git diff --check` passed.
 
 ### What's Left
 
-**Phase B is complete.** Multi-doc UI shipped in commit `7346987`:
-chips, shared AttachmentsSection, docId callback chain, modal focus
-trap. See the commit message for the full breakdown.
-
-**Phase D (next):** `seed-test-data.ts` migration to seed the
-Combinatorial — Raven Forest fixture with multi-doc test data through
-the new v8 attach actions. Today the seed still seeds one PDF per node
-via the workspace-store `attachDocToNode` action; Phase D should add
-deliberate multi-attachment nodes (deed + obit + affidavit pattern)
-so the chips UI has something realistic to show in dev.
-
-**Phase E (later):** Playwright work.
-- Add the multi-chip spec from the design doc: attach 3 PDFs to one
-  node, click each chip, verify each opens the correct PDF in
-  `PdfViewerModal`.
-- Unskip the four remaining workflows against the new v8 schema:
-  `.landroid` round-trip, branch-scoped lease delete, curative
-  linkage, research linkage.
-- Confirm the existing "combinatorial demo loads with desk-map cards
-  and PDF badges" workflow still passes against `DeskMapDocumentChips`
-  (the badge selector will need to be updated to match the new chip
-  markup).
-
-**Phase F (later):** doc rail update —
-`CHANGELOG.md`, `USER_MANUAL.md` Desk Map PDF chip section,
-`SECURITY.md` hosted-blocked tool list (when AI doc-mutating tools
-land), and `TESTING.md`.
+- Run `git diff --check` and `git status` immediately before final handoff or
+  checkpoint.
+- Check `git status` and keep generated Playwright artifacts ignored.
+- Push branch `codex/phase-5-doc-storage-wrap-2026-05-15` to origin.
+- Open or update a draft PR targeting `codex/hosted-hardening-2026-05-14` when
+  the user wants the GitHub PR step.
 
 **Depth-range import normalize-and-warn (deferred):** the design doc
 specified that a `.landroid` carrying a non-`'all_depths'` value
@@ -159,12 +176,10 @@ into a dedicated project.
 
 ## Current Workstream
 
-The parallel full-audit pass is complete and the hosted hardening implementation
-track has begun. Phases 1, 2, and 3 are implemented locally on the current
-branch. Phase 4 restored one high-value browser workflow, and this branch is now
-in wrap/checkpoint mode. Do not continue the remaining PDF/export/import/fixture
-browser retargeting before the document/PDF persistence refactor and two-unit
-fixture direction settle.
+The current branch is the Phase 5 document/PDF persistence workstream. Hosted
+hardening remains the parent branch context, but this branch now carries the v8
+document schema, multi-document UI, Raven Forest seed migration, restored
+Playwright workflows, and docs close-out.
 
 The next workstream should be incremental and phase-based:
 
@@ -172,9 +187,9 @@ The next workstream should be incremental and phase-based:
    needs the new Amplify env var before the next hosted build.**
 2. Hosted data-loss and AI read-only safety. **Implemented locally.**
 3. Leasehold strict parsing and warning surfacing. **Implemented locally.**
-4. Restore skipped browser workflow coverage. **Partial; remaining four deferred.**
+4. Restore skipped browser workflow coverage. **Complete on the Phase 5 branch.**
 5. Design document/PDF persistence foundations before durable backend work.
-   **Next major workstream after this branch is checkpointed.**
+   **Implemented on the Phase 5 branch; Tier 2 document features remain deferred.**
 6. UX/accessibility cleanup for destructive actions and modal/form basics.
 7. Docs and handoff alignment after behavior changes.
 
@@ -242,11 +257,28 @@ The next workstream should be incremental and phase-based:
   handoff for the Phase 4 partial.
 - Captured the sequencing decision after the document-refactor/fixture brainstorm:
   finish/checkpoint hosted hardening first, then start Phase 5 document/PDF
-  persistence on a fresh branch, then design/implement the two-unit Raven Forest
-  fixture and retarget the remaining skipped Playwright workflows against the new
-  schema/fixture.
+  persistence on a fresh branch. Superseded by this Phase 5 branch: the v8
+  document schema, small multi-doc Raven Forest seed migration, and deferred
+  Playwright workflow retargeting are now complete.
+- Completed Phase 5 D/E/F close-out on
+  `claude/phase-5-document-refactor-2026-05-15`: realistic multi-document seed
+  data, `attachmentId` chip selectors, restored Playwright workflows, and docs
+  rail alignment.
+- Continued Phase 6B UX/accessibility cleanup on the same branch: typed
+  confirmations for workspace-replacing demo/import loads, shared confirmation
+  for Flowchart `Clear`, and accessible labels/active-state ARIA for the primary
+  nav, tract/owner/Federal Leasing tabs, Research section nav, and shared form
+  controls.
+- Continued Phase 6C low-blast-radius hardening: new workspace IDs are now
+  generated with `crypto.randomUUID()` and still carry the `ws-` prefix.
+- Added the hosted null-sub persistence guard so hosted signed-out state cannot
+  read or write the local `default` workspace/canvas rows.
+- Removed the recurring AI settings unit-test local-storage warning by avoiding
+  a Node-only `globalThis.localStorage` probe.
+- Created `ARC_REVIEW_PROMPT.md` as the paste-ready handoff for an external
+  checker or ArcGIS-focused follow-up.
 
-## Latest Validation
+## Historical Hosted-Hardening Validation
 
 Phase 1 validation performed on `codex/hosted-hardening-2026-05-14`:
 
@@ -301,8 +333,8 @@ Final hosted-hardening wrap validation performed on
 - `npm test` in `backend/ai-proxy` passed: 3 files, 38 tests.
 - `npx tsc -p tsconfig.json --noEmit` in `backend/ai-proxy` passed.
 - `npm run lint` passed.
-- `npm test` passed: 60 files, 469 tests. The known AI settings local-storage
-  warning remains.
+- `npm test` passed: 60 files, 469 tests. The AI settings local-storage warning
+  seen here was later removed in Phase 6C on the Phase 5 branch.
 - `npm run build` passed. The known Vite large-chunk warning remains.
 - `npm run test:e2e` passed: 5 active Playwright tests, 4 skipped.
 
@@ -319,17 +351,14 @@ Final hosted-hardening wrap validation performed on
   malformed-input warnings are fixed locally but not deployed yet.
 - The AI undo/back button is intentional and already exists as a single-level
   snapshot. Do not remove it.
-- Four Playwright workflows remain skipped and are intentionally deferred until
-  after document/PDF persistence and fixture retargeting: `.landroid` round-trip,
-  branch-scoped lease delete, curative linkage, and research linkage.
-- PDF attachments are still keyed by `nodeId` only. A future durable backend
-  needs workspace-scoped document IDs, content hashes, and document/entity links.
-- `.landroid` export writes `version: 7`, but import does not dispatch on version.
+- `workspace-store.detachDocFromNode` currently deletes the underlying document
+  after detaching from a node. That matches today's single-attachment UI usage,
+  but a future shared-document UI should revisit detach-only semantics.
 - Hosted null-sub persistence falls back to local `default` keys in helpers; the
   LoginGate usually prevents this, but persistence functions do not enforce it.
 - `workspace-id.ts` uses `Date.now()` plus `Math.random()`.
-- Native `confirm`/`alert`, weak modal focus trapping, missing label association,
-  and missing active nav/tab ARIA remain UX/accessibility cleanup items.
+- Missing label association and missing active nav/tab ARIA remain
+  UX/accessibility cleanup items.
 
 ## Hardening Plan
 
@@ -422,19 +451,18 @@ Validation:
 
 Goal: restore confidence in high-value user workflows before broader beta.
 
-Status: partial. The leasehold/PDF branch-awareness workflow is restored on this
-branch. The remaining four skipped workflows are PDF/export/import/fixture-heavy
-and should wait until Phase 5 document/PDF persistence and the new two-unit Raven
-Forest fixture direction settle.
+Status: complete on the Phase 5 branch. The old skipped workflows were
+retargeted after the document/PDF persistence refactor and now run against the
+v8 schema.
 
 Tasks:
 
 - [x] Retarget leasehold seed/PDF filenames/branch awareness to the current
   combinatorial Raven Forest fixture.
-- [ ] Retarget `.landroid` export/import with PDFs after the document refactor.
-- [ ] Retarget branch-scoped lease delete after fixture retargeting.
-- [ ] Retarget curative linkage after fixture retargeting.
-- [ ] Retarget research linkage after fixture retargeting.
+- [x] Retarget `.landroid` export/import with PDFs after the document refactor.
+- [x] Retarget branch-scoped lease delete after fixture retargeting.
+- [x] Retarget curative linkage after fixture retargeting.
+- [x] Retarget research linkage after fixture retargeting.
 
 Validation:
 
@@ -445,21 +473,19 @@ Validation:
 
 Goal: prepare the app for real project data and a future durable backend.
 
-Status: next major workstream after checkpointing this hosted-hardening branch.
-Start it on a fresh non-main branch with a design doc/ADR first; do not implement
-the document refactor inside this hosted-hardening branch unless explicitly
-requested.
+Status: implemented on `claude/phase-5-document-refactor-2026-05-15`.
 
 Tasks:
 
-- Add workspace-scoped document IDs.
-- Support multiple documents per node/entity.
-- Track content hash, byte length, MIME type, and original filename.
-- Add document/entity links for nodes, owners, leases, map assets, map regions,
-  and research records.
-- Make `.landroid` import dispatch on `version`.
-- Switch workspace IDs to `crypto.randomUUID()`.
-- Add hosted null-sub persistence guard.
+- [x] Add workspace-scoped document IDs.
+- [x] Support multiple documents per node/entity at the schema level; node UI is
+      surfaced in Phase 5 and owner/lease/curative/research UI remains deferred.
+- [x] Track content hash, byte length, MIME type, and original filename.
+- [x] Add document/entity links for nodes, with the polymorphic schema reserved
+      for owners, leases, curative, and research records.
+- [x] Make `.landroid` import dispatch on `version`.
+- [x] Switch workspace IDs to `crypto.randomUUID()`.
+- [x] Add hosted null-sub persistence guard.
 
 Validation:
 
@@ -474,12 +500,12 @@ Goal: reduce destructive surprises and improve keyboard/screen-reader basics.
 
 Tasks:
 
-- Replace native `confirm`/`alert` in destructive flows with shared modal/toast
+- [x] Replace native `confirm`/`alert` in app flows with shared modal/toast
   patterns.
-- Add typed confirmation for workspace-wiping actions.
-- Add modal focus trap and return-focus behavior.
-- Add associated labels or accessible names for form controls.
-- Add active nav/tab ARIA where appropriate.
+- [x] Add typed confirmation for workspace-wiping actions.
+- [x] Add modal focus trap and return-focus behavior.
+- [x] Add associated labels or accessible names for form controls.
+- [x] Add active nav/tab ARIA where appropriate.
 
 Validation:
 
@@ -516,9 +542,8 @@ There are two backend tracks:
 
 Do not start S3/DynamoDB workspace sync until hosted auth/proxy safety,
 hosted data-loss prevention, and leasehold parsing are deployed or otherwise
-accepted as stable, and the document/PDF persistence design exists. The remaining
-skipped browser workflows should be retargeted after the document schema and
-fixture direction settle.
+accepted as stable, and the Phase 5 document/PDF persistence branch is reviewed
+and merged.
 
 Likely durable backend shape, when ready:
 
@@ -547,18 +572,15 @@ document backend foundation and 2D evidence traceability are solid.
 
 ## Local Noise / Uncommitted State
 
-Active uncommitted Phase 1, Phase 2, Phase 3, and Phase 4 partial
-implementation/docs are present on
-`codex/hosted-hardening-2026-05-14`. They include frontend Cognito config,
-backend proxy policy/handler/tests, hosted smoke/deploy config, hosted demo
-menu hiding, AI hosted/undo tool-policy split, leasehold strict parsing/input
-warnings, the restored leasehold/PDF branch-awareness Playwright workflow, and
-docs listed under "Last Completed".
+The checkpoint branch is intended to carry the current source/docs changes as a
+single reviewable snapshot. Before any further work, check `git status` and do
+not mix unrelated ArcGIS implementation into this checkpoint.
 
-Intentional uncommitted local files from the prior audit/handoff work:
-
-- `AUDIT_REPORT_CODEX_FULL_2026-05-14.md`
-- `AUDIT_COMPARISON_CODEX_CLAUDE_2026-05-14.md`
+Local source-asset note: the user has a Dropbox archive named `AAAAIIII.zip`
+containing the current federal/private shapefiles. Treat it as local reference
+material only. Do not copy it into the repo, import/process it, build ArcGIS
+export/sync, or start federal/private math from it unless the user explicitly
+opens that project.
 
 Generated artifacts remain ignored and should not be hand-edited:
 
@@ -571,21 +593,20 @@ Generated artifacts remain ignored and should not be hand-edited:
 
 ## Next Best Tasks
 
-- [ ] Start a new chat.
-- [ ] Read `AGENTS.md`, `PROJECT_CONTEXT.md`, `docs/README.md`, and this file.
-- [ ] Check current git status and preserve intentional audit artifacts plus
-      active Phase 1/2/3 and Phase 4 partial implementation changes.
-- [ ] If deploying this branch, add `VITE_COGNITO_USER_POOL_ID` in Amplify first.
-- [ ] Checkpoint/wrap the hosted-hardening branch.
-- [ ] Start Phase 5 document/PDF persistence on a fresh non-main branch only after
-      the checkpoint; begin with `docs/phase-5-document-refactor.md` and
-      `docs/adr/0004-multi-doc-per-entity-persistence.md`.
-- [ ] Defer the remaining four skipped browser workflows until after the document
-      schema and two-unit fixture direction settle.
+- [ ] Start a new chat if needed.
+- [ ] Read `AGENTS.md`, `PROJECT_CONTEXT.md`, `docs/README.md`,
+      `CONTINUATION-PROMPT.md`, and `ARC_REVIEW_PROMPT.md`.
+- [ ] Confirm the current branch is
+      `codex/phase-5-doc-storage-wrap-2026-05-15`.
+- [ ] Run or review final validation results for this branch.
+- [ ] If opening a PR, target `codex/hosted-hardening-2026-05-14`.
+- [ ] For ArcGIS follow-up, start with a design/canonical-layer map using
+      `docs/gis-data-catalog.md`; do not import raw GIS packages or build ArcGIS
+      REST sync unless explicitly requested.
 - [ ] Keep leasehold warning-only landman review states intact unless the product
       decision explicitly changes.
 - [ ] Keep each phase small, validated, and documented.
 
 ## Paste-Ready Resume Prompt
 
-> Resume work in `/Users/abstractmapping/projects/landroid`. First read `AGENTS.md`, `PROJECT_CONTEXT.md`, `docs/README.md`, and `CONTINUATION-PROMPT.md`. Use the non-main branch `codex/hosted-hardening-2026-05-14` if checkpointing this work. The completed audit artifacts are `AUDIT_REPORT_CODEX_FULL_2026-05-14.md` and `AUDIT_COMPARISON_CODEX_CLAUDE_2026-05-14.md`. Phases 1, 2, and 3 hosted hardening are implemented locally and validated; Phase 4 restored the leasehold/PDF branch-awareness Playwright workflow, leaving four PDF/export/import/fixture-heavy workflows skipped by design. Do not continue retargeting those four before the Phase 5 document/PDF persistence refactor and two-unit fixture direction settle. If the hosted-hardening branch is already checkpointed, start Phase 5 on a fresh non-main branch with `docs/phase-5-document-refactor.md` and `docs/adr/0004-multi-doc-per-entity-persistence.md` before implementation. Keep leasehold warning-only landman review states intact unless the product decision explicitly changes. Run relevant validation after each change group and update `CONTINUATION-PROMPT.md` before handing off.
+> Resume work in `/Users/abstractmapping/projects/landroid`. First read `AGENTS.md`, `PROJECT_CONTEXT.md`, `docs/README.md`, `CONTINUATION-PROMPT.md`, and `ARC_REVIEW_PROMPT.md`. Continue on `codex/phase-5-doc-storage-wrap-2026-05-15`; do not branch from `main`, and do not modify `codex/hosted-hardening-2026-05-14` directly. The PR target is `codex/hosted-hardening-2026-05-14`. This branch wraps Phase 5 document/PDF persistence, Desk Map multi-document chips, v8 `.landroid` document round-trip, restored Playwright workflows, Phase 6 confirmation/accessibility cleanup, workspace ID hardening, hosted persistence-key guard, AI settings test warning cleanup, and GIS reference docs. If doing ArcGIS follow-up, start design-only with a canonical layer map using `docs/gis-data-catalog.md`; do not import raw GIS packages, copy local geodata into the repo, build ArcGIS REST sync, start OCR/AI extraction, add federal/private math, or automate title updates unless explicitly requested. Run relevant validation after each change group and update `CONTINUATION-PROMPT.md` before handing off.

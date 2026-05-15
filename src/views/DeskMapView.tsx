@@ -38,6 +38,7 @@ import {
 import ConveyModal from '../components/modals/ConveyModal';
 import PredecessorModal from '../components/modals/PredecessorModal';
 import AttachDocModal from '../components/modals/AttachDocModal';
+import { useConfirmation } from '../components/shared/ConfirmationProvider';
 import OwnershipNodeEditorModals from '../components/shared/OwnershipNodeEditorModals';
 import {
   createBlankNode,
@@ -468,6 +469,7 @@ export default function DeskMapView() {
   const setPendingNodeEditorRoute = useUIStore((state) => state.setPendingNodeEditorRoute);
   const leases = useOwnerStore((state) => state.leases);
   const removeLeaseRecord = useOwnerStore((state) => state.removeLease);
+  const { confirm: requestConfirmation, alert: showAlert } = useConfirmation();
   const nodes = useWorkspaceStore((s) => s.nodes);
   const deskMaps = useWorkspaceStore((s) => s.deskMaps);
   const activeNodeId = useWorkspaceStore((s) => s.activeNodeId);
@@ -656,9 +658,19 @@ export default function DeskMapView() {
     setAttachDocParentId(id);
   }, []);
 
-  const handleDelete = useCallback((id: string) => {
+  const handleDelete = useCallback(async (id: string) => {
     const node = nodeById.get(id) ?? null;
     const leaseDeletionPlan = planDeskMapLeaseDeletion(nodes, id);
+    const title = leaseDeletionPlan.leaseId
+      ? 'Delete Lessee Card?'
+      : node?.type === 'related'
+      ? 'Delete Related Node?'
+      : 'Delete Node?';
+    const confirmLabel = leaseDeletionPlan.leaseId
+      ? 'Delete Lessee Card'
+      : node?.type === 'related'
+      ? 'Delete Related Node'
+      : 'Delete Node';
     const message = leaseDeletionPlan.leaseId
       ? leaseDeletionPlan.removeOwnerLeaseRecord
         ? 'Delete this lessee card and remove the linked lease from the owner record?'
@@ -667,34 +679,44 @@ export default function DeskMapView() {
       ? 'Delete this related node? Any attached related records beneath it will also be removed.'
       : 'Delete this node? Its branch will be removed, and any conveyed amount will be restored to the grantor.';
 
-    if (confirm(message)) {
-      void (async () => {
-        try {
-          if (leaseDeletionPlan.leaseId && leaseDeletionPlan.removeOwnerLeaseRecord) {
-            await removeLeaseRecord(leaseDeletionPlan.leaseId);
-          }
-          // Snapshot pre-delete state so we can detect a silent failure
-          // (the store sets `lastError` instead of throwing for math/graph
-          // rejections). If the node is still present afterwards, surface
-          // the actual error to the user instead of leaving them puzzled.
-          const beforeIds = new Set(
-            useWorkspaceStore.getState().nodes.map((n) => n.id)
-          );
-          removeNode(id);
-          const after = useWorkspaceStore.getState();
-          const stillPresent = after.nodes.some((n) => n.id === id);
-          if (stillPresent && beforeIds.has(id)) {
-            const reason = after.lastError ?? 'Delete was rejected by the ownership-graph validator.';
-            console.error('[DeskMap delete] failed:', reason);
-            alert(`Could not delete this node.\n\n${reason}`);
-          }
-        } catch (deleteError) {
-          console.error(deleteError);
-          alert('Delete failed. The card was left in place so owner data stays consistent.');
-        }
-      })();
+    const confirmed = await requestConfirmation({
+      title,
+      message,
+      confirmLabel,
+      tone: 'danger',
+    });
+    if (!confirmed) return;
+
+    try {
+      if (leaseDeletionPlan.leaseId && leaseDeletionPlan.removeOwnerLeaseRecord) {
+        await removeLeaseRecord(leaseDeletionPlan.leaseId);
+      }
+      // Snapshot pre-delete state so we can detect a silent failure
+      // (the store sets `lastError` instead of throwing for math/graph
+      // rejections). If the node is still present afterwards, surface
+      // the actual error to the user instead of leaving them puzzled.
+      const beforeIds = new Set(
+        useWorkspaceStore.getState().nodes.map((n) => n.id)
+      );
+      removeNode(id);
+      const after = useWorkspaceStore.getState();
+      const stillPresent = after.nodes.some((n) => n.id === id);
+      if (stillPresent && beforeIds.has(id)) {
+        const reason = after.lastError ?? 'Delete was rejected by the ownership-graph validator.';
+        console.error('[DeskMap delete] failed:', reason);
+        await showAlert({
+          title: 'Could Not Delete Node',
+          message: `Could not delete this node.\n\n${reason}`,
+        });
+      }
+    } catch (deleteError) {
+      console.error(deleteError);
+      await showAlert({
+        title: 'Delete Failed',
+        message: 'Delete failed. The card was left in place so owner data stays consistent.',
+      });
     }
-  }, [nodeById, nodes, removeLeaseRecord, removeNode]);
+  }, [nodeById, nodes, removeLeaseRecord, removeNode, requestConfirmation, showAlert]);
 
   const handleViewDoc = useCallback((id: string) => {
     setPdfViewDocId(id);
@@ -719,20 +741,26 @@ export default function DeskMapView() {
     setEditorRoute({ kind: 'node', nodeId: id });
   }, [addNode, addNodeToActiveDeskMap, createDeskMap, deskMaps.length, setActiveNode]);
 
-  const handleClearDeskMap = useCallback(() => {
+  const handleClearDeskMap = useCallback(async () => {
     if (!activeDeskMap) return;
     if (visibleCardCount === 0) {
-      alert(`${activeDeskMap.name} is already clear.`);
+      await showAlert({
+        title: 'Desk Map Already Clear',
+        message: `${activeDeskMap.name} is already clear.`,
+      });
       return;
     }
 
-    const confirmed = confirm(
-      `Clear ${activeDeskMap.name}?\n\nThis removes the ${visibleCardCount} visible card${visibleCardCount === 1 ? '' : 's'} from this Desk Map. Other tracts and owner records stay in the workspace.`
-    );
+    const confirmed = await requestConfirmation({
+      title: `Clear ${activeDeskMap.name}?`,
+      message: `This removes the ${visibleCardCount} visible card${visibleCardCount === 1 ? '' : 's'} from this Desk Map. Other tracts and owner records stay in the workspace.`,
+      confirmLabel: 'Clear Desk Map',
+      tone: 'danger',
+    });
     if (!confirmed) return;
 
     clearDeskMapNodes(activeDeskMap.id);
-  }, [activeDeskMap, clearDeskMapNodes, visibleCardCount]);
+  }, [activeDeskMap, clearDeskMapNodes, requestConfirmation, showAlert, visibleCardCount]);
 
   const cycleOwnerSearchMatch = useCallback((direction: 1 | -1) => {
     setOwnerSearchMatchIndex((currentIndex) => {

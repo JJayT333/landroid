@@ -1,6 +1,7 @@
 /**
  * Shared form field — text or date input with label.
  */
+import { useId } from 'react';
 
 interface FormFieldProps {
   label: string;
@@ -8,6 +9,7 @@ interface FormFieldProps {
   onChange: (v: string) => void;
   type?: 'text' | 'date';
   className?: string;
+  id?: string;
 }
 
 export default function FormField({
@@ -16,13 +18,21 @@ export default function FormField({
   onChange,
   type = 'text',
   className = '',
+  id,
 }: FormFieldProps) {
+  const generatedId = useId();
+  const inputId = id ?? generatedId;
+
   return (
     <div className={className}>
-      <label className="text-[10px] text-ink-light uppercase tracking-wider block mb-1">
+      <label
+        htmlFor={inputId}
+        className="text-[10px] text-ink-light uppercase tracking-wider block mb-1"
+      >
         {label}
       </label>
       <input
+        id={inputId}
         type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}

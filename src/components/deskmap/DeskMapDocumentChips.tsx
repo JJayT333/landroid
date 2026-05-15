@@ -83,6 +83,9 @@ export default function DeskMapDocumentChips({
           <button
             key={attachment.attachmentId}
             type="button"
+            data-attachment-id={attachment.attachmentId}
+            data-doc-id={attachment.docId}
+            data-document-kind={attachment.kind}
             onClick={(event) => {
               event.stopPropagation();
               onViewDoc(attachment.docId);

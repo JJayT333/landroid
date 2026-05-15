@@ -24,11 +24,11 @@ npm run test:e2e
 | Hosted AI proxy/deploy change | `npm run deploy:check`, `cd backend/ai-proxy && npm test && npx tsc -p tsconfig.json --noEmit`, plus root `npm test` if frontend policy changes; run `bash scripts/smoke-test-hosted.sh` when network/AWS access is available |
 | Release/checkpoint | full default commands plus `npm run deploy:check` for hosted deploy candidates |
 
+For hosted persistence-key changes, include
+`npm test -- src/storage/__tests__/active-workspace-key.test.ts src/storage/__tests__/persistence-db-key.test.ts`.
+
 ## Current Known Warnings
 
-- AI settings tests may emit Zustand persist warnings because test storage is not
-  browser `localStorage`. Treat this as known noise until the storage mock is
-  cleaned up.
 - Vite may warn about chunks larger than 500 kB, especially AI/workbook chunks.
   That is not currently a blocking failure.
 - `npm audit --omit=dev` currently reports high-severity `xlsx` issues with no
@@ -38,11 +38,17 @@ npm run test:e2e
 
 As of the current handoff:
 
-- 5 Playwright workflows are active.
-- 4 workflows are intentionally skipped until the document/PDF persistence
-  refactor and fixture retargeting settle.
+- 10 Playwright workflows are active.
+- No Phase 5 Playwright workflows remain intentionally skipped.
+- Browser coverage includes multi-document Desk Map chips opening the correct
+  PDF by `attachmentId`, v8 `.landroid` export/import document round-trip,
+  branch-scoped lease deletion through the shared confirmation modal, curative
+  linkage, research linkage, federal leasing, and Research home surfacing.
+- The combinatorial demo loader and `.landroid` import workflow now exercise
+  typed destructive confirmations before replacing the active workspace.
 
-Do not describe skipped workflows as verified in user-facing docs.
+Do not describe a workflow as verified unless it is active in
+`tests/e2e/landroid-workflows.spec.ts` and has passed locally or in CI.
 
 ## Fixture Policy
 

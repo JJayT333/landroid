@@ -36,9 +36,16 @@ Treat these as sensitive:
   JWT verification, server-side model policy, durable token-ceiling tracking,
   request body caps, body-field allowlisting, and structured request logging
   covered by proxy tests before broadening access.
+- Hosted browser persistence is keyed by the Cognito `sub` claim. Signed-out
+  hosted state must not read or write the local `default` workspace/canvas rows;
+  the persistence key helpers now stay locked until a real `sub` is available.
 - Hosted AI currently receives only `readOnlyLandroidTools`; `HOSTED_BLOCKED_TOOL_NAMES`
   also excludes persisted-focus tools such as `setActiveDeskMap` until an
   approval boundary exists.
+- Phase 5 added document persistence and UI, but no AI document-mutating tools.
+  If tools such as `saveDoc`, `deleteDoc`, `renameDoc`, `attachDocToEntity`, or
+  `detachDocFromEntity` land later, add them to `HOSTED_BLOCKED_TOOL_NAMES`
+  in the same change set.
 - The hosted AI proxy currently uses a Lambda Function URL with auth type
   `NONE`; the security boundary is handler-side Cognito ID-token verification.
   Function URL CORS reduces accidental browser misuse but is not a stolen-token

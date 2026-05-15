@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import FormField from '../components/shared/FormField';
+import { useConfirmation } from '../components/shared/ConfirmationProvider';
 import LeaseDocumentModal from '../components/modals/LeaseDocumentModal';
 import { getFederalLeaseDocument } from '../storage/federal-lease-seed';
 import {
@@ -310,6 +311,7 @@ export default function FederalLeasingView() {
   const setActiveDeskMap = useWorkspaceStore((state) => state.setActiveDeskMap);
   const setActiveNode = useWorkspaceStore((state) => state.setActiveNode);
   const setView = useUIStore((state) => state.setView);
+  const { confirm: requestConfirmation } = useConfirmation();
 
   const [tab, setTab] = useState<FederalLeasingTab>('inventory');
   const [search, setSearch] = useState('');
@@ -603,11 +605,20 @@ export default function FederalLeasingView() {
           </div>
 
           <div className="border-b border-ledger-line bg-parchment-dark/40 px-3 py-3">
-            <div className="grid gap-2">
+            <div
+              role="tablist"
+              aria-label="Federal leasing sections"
+              className="grid gap-2"
+            >
               {FEDERAL_LEASING_TABS.map((candidate) => (
                 <button
                   key={candidate.id}
                   type="button"
+                  role="tab"
+                  id={`federal-leasing-${candidate.id}-tab`}
+                  aria-selected={tab === candidate.id}
+                  aria-controls={`federal-leasing-${candidate.id}-panel`}
+                  tabIndex={tab === candidate.id ? 0 : -1}
                   onClick={() => setTab(candidate.id)}
                   className={`rounded-lg border px-3 py-2 text-left transition-colors ${
                     tab === candidate.id
@@ -643,6 +654,7 @@ export default function FederalLeasingView() {
                   key={record.id}
                   type="button"
                   onClick={() => setSelectedRecordId(record.id)}
+                  aria-current={selectedRecordId === record.id ? 'true' : undefined}
                   className={`w-full border-b border-ledger-line px-4 py-3 text-left transition-colors ${
                     selectedRecordId === record.id ? 'bg-leather/10' : 'hover:bg-ledger'
                   }`}
@@ -679,7 +691,12 @@ export default function FederalLeasingView() {
           </div>
         </aside>
 
-        <section className="min-h-0 overflow-auto rounded-xl border border-ledger-line bg-parchment shadow-sm">
+        <section
+          id={`federal-leasing-${tab}-panel`}
+          role="tabpanel"
+          aria-labelledby={`federal-leasing-${tab}-tab`}
+          className="min-h-0 overflow-auto rounded-xl border border-ledger-line bg-parchment shadow-sm"
+        >
           {selectedRecord ? (
             <div className="space-y-4 p-4">
               <div className="flex flex-wrap items-start justify-between gap-3 border-b border-ledger-line pb-4">
@@ -746,7 +763,13 @@ export default function FederalLeasingView() {
                   <button
                     type="button"
                     onClick={async () => {
-                      if (!confirm('Delete this federal leasing record?')) return;
+                      const confirmed = await requestConfirmation({
+                        title: 'Delete Federal Leasing Record?',
+                        message: 'Delete this federal leasing record?',
+                        confirmLabel: 'Delete Record',
+                        tone: 'danger',
+                      });
+                      if (!confirmed) return;
                       await removeProjectRecord(selectedRecord.id);
                     }}
                     className="rounded-lg border border-seal/30 px-3 py-2 text-xs font-semibold text-seal transition-colors hover:bg-seal/10"

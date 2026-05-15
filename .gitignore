@@ -12,3 +12,8 @@ test-results/
 tests/fixtures/ai-wizard/**/*.zip
 tests/fixtures/ai-wizard/**/*.tif
 tests/fixtures/ai-wizard/**/*.tiff
+
+# Local GIS source packages are large reference data, not repo artifacts.
+/local-gis-source/
+/*.ppkx
+/*.ppkx*.zip

@@ -71,7 +71,8 @@ export default function Modal({ open, onClose, title, children, wide }: ModalPro
     const dialog = dialogRef.current;
     if (dialog) {
       const focusables = getFocusable(dialog);
-      const target = focusables[0] ?? dialog;
+      const requested = dialog.querySelector<HTMLElement>('[data-autofocus="true"]');
+      const target = requested ?? focusables[0] ?? dialog;
       target.focus();
     }
 

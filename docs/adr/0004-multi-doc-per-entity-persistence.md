@@ -2,9 +2,9 @@
 
 ## Status
 
-Proposed for Phase 5 (document/PDF persistence refactor). Pending implementation
-on `codex/hosted-hardening-2026-05-14` (or the next active hardening branch)
-after design sign-off.
+Accepted and implemented for Phase 5 on
+`claude/phase-5-document-refactor-2026-05-15`, targeting
+`codex/hosted-hardening-2026-05-14`.
 
 ## Context
 
@@ -23,10 +23,9 @@ order, and a related curative letter can all sit on the same chain step. The
 audit (`AUDIT_REPORT_CODEX_FULL_2026-05-14.md`, finding F5) called out the
 node-only PDF key as a persistence risk before durable-backend work.
 
-The fixture refactor (PRs 2 + 3 — the two-unit Raven Forest rebuild) is built
-around heavy multi-document coverage. That fixture cannot land cleanly until
-the schema supports multi-doc attachments. This ADR is therefore the design
-gate for that follow-on work.
+The Raven Forest fixture and Playwright workflows now exercise
+multi-document coverage on representative conveying nodes. This ADR remains
+the source of truth for that persistence shape.
 
 ## Decision
 
@@ -42,21 +41,22 @@ schema covers all future attachment targets without another migration.
    `entityKind: 'node'`; the other kinds are reserved for follow-on UI without
    migration.
 3. `OwnershipNode` drops `hasDoc` / `docFileName`. A small denormalized
-   `attachments: { docId; fileName; kind }[]` lives on the node for fast Desk
-   Map badge render; the source of truth remains Dexie.
+   `attachments: { docId; attachmentId; fileName; kind }[]` lives on the node
+   for fast Desk Map chip render; the source of truth remains Dexie.
 4. `.landroid` export bumps to **v8**. Import dispatches on `version`:
    v7 migrates inline (synthesize `docId`s, generate node attachments at
    `position: 0`); v8 loads directly. This also closes the open
    `CONTINUATION-PROMPT.md` gap that v7 export writes a version field but
    import does not dispatch on it.
-5. Dexie migration synthesizes a `docId` for every existing `pdfs` row, writes
-   `documents` and `document_attachments`, and triggers an auto-`.landroid`
-   v7 export download as the first step of the upgrade. The old `pdfs` table
-   is retained read-only for one rollback version, then removed in a follow-on
-   schema version.
+5. Dexie migration synthesizes a `docId` for every existing `pdfs` row and
+   writes `documents` plus `document_attachments`. A one-shot post-open backup
+   hook downloads v7-shape `.landroid` files for workspaces that had legacy
+   PDFs. The old `pdfs` table is retained read-only for one rollback version,
+   then removed in a follow-on schema version.
 6. Hosted-mode AI tools that mutate document state (`saveDoc`, `deleteDoc`,
    `renameDoc`, `attachDocToEntity`, `detachDocFromEntity`) join
-   `HOSTED_BLOCKED_TOOL_NAMES` from day one.
+   `HOSTED_BLOCKED_TOOL_NAMES` from day one if and when those tools are
+   introduced. Phase 5 added no AI document-mutating tools.
 7. Content-hash dedup logic is **not** implemented this pass. `contentHash`
    is computed and stored so dedup can land later without another migration.
 
@@ -73,11 +73,10 @@ one denormalized array), one new `.landroid` schema version (v8) with v7
 inline migration. The old `pdfs` table sticks around read-only for one
 version to preserve a rollback path.
 
-**UI.** Desk Map badge becomes a row of chips (4 visible + `+N more`
-overflow). Node-edit, lease, and NPRI modals get an attachments section.
-`PdfViewerModal` keys on `docId` instead of `nodeId`. Phase 6 modal
-focus-trap work consolidates into these modal edits when it is cheap, to
-avoid touching the same modals twice.
+**UI.** Desk Map badge became a row of chips (4 visible + `+N more`
+overflow). The node edit modal uses the shared `AttachmentsSection` for add,
+open, rename, remove, and reorder. `PdfViewerModal` keys on `docId` instead of
+`nodeId`. The shared modal focus trap landed with these modal edits.
 
 **Round-trip compatibility.** v7 `.landroid` files in the wild become a
 permanent compatibility surface, not a one-time migration. Import must

@@ -4,6 +4,7 @@ import DrillingPermitMasterDecoderPanel from '../components/research/DrillingPer
 import HorizontalDrillingDecoderPanel from '../components/research/HorizontalDrillingDecoderPanel';
 import PendingDrillingDecoderPanel from '../components/research/PendingDrillingDecoderPanel';
 import RrcDelimitedPreviewTable from '../components/research/RrcDelimitedPreviewTable';
+import { useConfirmation } from '../components/shared/ConfirmationProvider';
 import FormField from '../components/shared/FormField';
 import { RRC_DATASET_CATALOG } from '../data/rrc-datasets';
 import { buildRrcDelimitedTextPreview } from '../research/rrc-delimited-text';
@@ -337,6 +338,7 @@ export default function ResearchView() {
   const addQuestion = useResearchStore((state) => state.addQuestion);
   const updateQuestion = useResearchStore((state) => state.updateQuestion);
   const removeQuestion = useResearchStore((state) => state.removeQuestion);
+  const { confirm: requestConfirmation } = useConfirmation();
 
   const deskMaps = useWorkspaceStore((state) => state.deskMaps);
   const nodes = useWorkspaceStore((state) => state.nodes);
@@ -1255,7 +1257,11 @@ export default function ResearchView() {
           </div>
         </div>
 
-        <div className="flex-1 overflow-auto">
+        <div
+          role="navigation"
+          aria-label="Research sections"
+          className="flex-1 overflow-auto"
+        >
           {RESEARCH_SECTIONS.map((item) => {
             const count =
               item.id === 'home'
@@ -1274,6 +1280,7 @@ export default function ResearchView() {
                 key={item.id}
                 type="button"
                 onClick={() => setSection(item.id)}
+                aria-current={section === item.id ? 'page' : undefined}
                 className={`w-full border-b border-ledger-line px-4 py-3 text-left transition-colors ${
                   section === item.id ? 'bg-leather/10' : 'hover:bg-ledger'
                 }`}
@@ -1598,7 +1605,13 @@ export default function ResearchView() {
               onDelete={
                 selectedSource
                   ? async () => {
-                      if (!confirm('Delete this research source?')) return;
+                      const confirmed = await requestConfirmation({
+                        title: 'Delete Research Source?',
+                        message: 'Delete this research source?',
+                        confirmLabel: 'Delete Source',
+                        tone: 'danger',
+                      });
+                      if (!confirmed) return;
                       await removeSource(selectedSource.id);
                     }
                   : undefined
@@ -1828,7 +1841,13 @@ export default function ResearchView() {
               onDelete={
                 selectedFormula
                   ? async () => {
-                      if (!confirm('Delete this research formula?')) return;
+                      const confirmed = await requestConfirmation({
+                        title: 'Delete Research Formula?',
+                        message: 'Delete this research formula?',
+                        confirmLabel: 'Delete Formula',
+                        tone: 'danger',
+                      });
+                      if (!confirmed) return;
                       await removeFormula(selectedFormula.id);
                     }
                   : undefined
@@ -1991,7 +2010,13 @@ export default function ResearchView() {
               onDelete={
                 selectedProjectRecord
                   ? async () => {
-                      if (!confirm('Delete this project record?')) return;
+                      const confirmed = await requestConfirmation({
+                        title: 'Delete Project Record?',
+                        message: 'Delete this project record?',
+                        confirmLabel: 'Delete Project Record',
+                        tone: 'danger',
+                      });
+                      if (!confirmed) return;
                       await removeProjectRecord(selectedProjectRecord.id);
                     }
                   : undefined
@@ -2329,7 +2354,13 @@ export default function ResearchView() {
               onDelete={
                 selectedQuestion
                   ? async () => {
-                      if (!confirm('Delete this saved question?')) return;
+                      const confirmed = await requestConfirmation({
+                        title: 'Delete Saved Question?',
+                        message: 'Delete this saved question?',
+                        confirmLabel: 'Delete Question',
+                        tone: 'danger',
+                      });
+                      if (!confirmed) return;
                       await removeQuestion(selectedQuestion.id);
                     }
                   : undefined
@@ -2590,7 +2621,13 @@ export default function ResearchView() {
                             <button
                               type="button"
                               onClick={async () => {
-                                if (!confirm('Delete this imported research file?')) return;
+                                const confirmed = await requestConfirmation({
+                                  title: 'Delete Imported Research File?',
+                                  message: 'Delete this imported research file?',
+                                  confirmLabel: 'Delete Import',
+                                  tone: 'danger',
+                                });
+                                if (!confirmed) return;
                                 await removeImport(selectedImport.id);
                               }}
                               className="px-3 py-1.5 rounded-lg text-xs font-semibold text-seal hover:bg-seal/10 transition-colors"

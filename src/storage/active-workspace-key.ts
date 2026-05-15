@@ -8,7 +8,8 @@
  * claim so two distinct invited users on the same browser profile cannot
  * read or write each other's IndexedDB rows. The hosted bootstrap defers
  * until AuthProvider calls `setActiveUserSub` so the first read uses the
- * correct namespaced key.
+ * correct namespaced key. Hosted signed-out state must never fall back to the
+ * local default row; persistence remains unavailable until a real `sub` exists.
  */
 import { isHostedMode } from '../utils/deploy-env';
 
@@ -24,9 +25,8 @@ const readyPromise = new Promise<void>((resolve) => {
 let resolved = false;
 
 // Local mode is "ready" the moment this module loads — there is no auth
-// step to wait on. Hosted mode flips ready on the first setActiveUserSub
-// call, even when the value is null (signed-out hosted users wait at the
-// LoginGate; bootstrap doesn't need to run).
+// step to wait on. Hosted mode flips ready only once a real Cognito `sub`
+// exists, so signed-out users cannot accidentally touch the local default row.
 if (!isHostedMode()) {
   resolved = true;
   resolveReady();
@@ -34,7 +34,7 @@ if (!isHostedMode()) {
 
 export function setActiveUserSub(sub: string | null): void {
   activeUserSub = sub;
-  if (!resolved) {
+  if (!resolved && (!isHostedMode() || Boolean(sub))) {
     resolved = true;
     resolveReady();
   }
@@ -53,12 +53,19 @@ export function awaitWorkspaceKeyReady(): Promise<void> {
   return readyPromise;
 }
 
+function requireHostedUserSub(): string {
+  if (activeUserSub) return activeUserSub;
+  throw new Error(
+    'Hosted persistence is unavailable until the authenticated user sub is set.'
+  );
+}
+
 export function getWorkspaceDbKey(): string {
-  if (isHostedMode() && activeUserSub) return `user-${activeUserSub}`;
+  if (isHostedMode()) return `user-${requireHostedUserSub()}`;
   return DEFAULT_WORKSPACE_KEY;
 }
 
 export function getCanvasDbKey(): string {
-  if (isHostedMode() && activeUserSub) return `user-${activeUserSub}-canvas`;
+  if (isHostedMode()) return `user-${requireHostedUserSub()}-canvas`;
   return DEFAULT_CANVAS_KEY;
 }

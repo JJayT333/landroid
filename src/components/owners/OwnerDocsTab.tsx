@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import AssetPreviewModal from '../modals/AssetPreviewModal';
 import OwnerDocEditModal from '../modals/OwnerDocEditModal';
+import { useConfirmation } from '../shared/ConfirmationProvider';
 import type { Lease, OwnerDoc } from '../../types/owner';
 import { createBlankOwnerDoc } from '../../types/owner';
 
@@ -32,6 +33,7 @@ export default function OwnerDocsTab({
   onUpdate,
   onRemove,
 }: OwnerDocsTabProps) {
+  const { confirm: requestConfirmation } = useConfirmation();
   const inputRef = useRef<HTMLInputElement>(null);
   const [previewDoc, setPreviewDoc] = useState<OwnerDoc | null>(null);
   const [editingDoc, setEditingDoc] = useState<OwnerDoc | null>(null);
@@ -117,9 +119,13 @@ export default function OwnerDocsTab({
                   <button
                     type="button"
                     onClick={async () => {
-                      if (!confirm('Delete this document?')) {
-                        return;
-                      }
+                      const confirmed = await requestConfirmation({
+                        title: 'Delete Owner Document?',
+                        message: 'Delete this document?',
+                        confirmLabel: 'Delete Document',
+                        tone: 'danger',
+                      });
+                      if (!confirmed) return;
                       await onRemove(doc.id);
                     }}
                     className="px-3 py-1.5 rounded-lg text-xs font-semibold text-seal hover:bg-seal/10 transition-colors"

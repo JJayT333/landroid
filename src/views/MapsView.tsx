@@ -3,6 +3,7 @@ import AssetPreviewModal from '../components/modals/AssetPreviewModal';
 import MapAssetModal from '../components/modals/MapAssetModal';
 import MapReferenceModal from '../components/modals/MapReferenceModal';
 import MapRegionModal from '../components/modals/MapRegionModal';
+import { useConfirmation } from '../components/shared/ConfirmationProvider';
 import { parseGeoJsonSummary, type GeoJsonSummary } from '../maps/geojson-summary';
 import { assertFileSize, limitForExtension } from '../utils/file-validation';
 import { useMapStore } from '../store/map-store';
@@ -321,6 +322,7 @@ export default function MapsView() {
   const leases = useOwnerStore((state) => state.leases);
   const researchSources = useResearchStore((state) => state.sources);
   const researchProjectRecords = useResearchStore((state) => state.projectRecords);
+  const { confirm: requestConfirmation, alert: showAlert } = useConfirmation();
 
   const [mode, setMode] = useState<ViewMode>('present');
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
@@ -497,7 +499,10 @@ export default function MapsView() {
               setEditingAssetId(asset.id);
             }
           } catch (err) {
-            alert(err instanceof Error ? err.message : 'Upload failed');
+            await showAlert({
+              title: 'Upload Failed',
+              message: err instanceof Error ? err.message : 'Upload failed',
+            });
           }
           event.target.value = '';
         }}
@@ -605,9 +610,13 @@ export default function MapsView() {
                     <button
                       type="button"
                       onClick={async () => {
-                        if (!confirm('Delete this map asset and its linked regions/references?')) {
-                          return;
-                        }
+                        const confirmed = await requestConfirmation({
+                          title: 'Delete Map Asset?',
+                          message: 'Delete this map asset and its linked regions/references?',
+                          confirmLabel: 'Delete Asset',
+                          tone: 'danger',
+                        });
+                        if (!confirmed) return;
                         await removeAsset(selectedAsset.id);
                       }}
                       className="px-3 py-1.5 rounded-lg text-xs font-semibold text-seal hover:bg-seal/10 transition-colors"
@@ -816,9 +825,13 @@ export default function MapsView() {
                           <button
                             type="button"
                             onClick={async () => {
-                              if (!confirm('Delete this region and its linked references?')) {
-                                return;
-                              }
+                              const confirmed = await requestConfirmation({
+                                title: 'Delete Map Region?',
+                                message: 'Delete this region and its linked references?',
+                                confirmLabel: 'Delete Region',
+                                tone: 'danger',
+                              });
+                              if (!confirmed) return;
                               await removeRegion(selectedRegion.id);
                             }}
                             className="px-3 py-1.5 rounded-lg text-xs font-semibold text-seal hover:bg-seal/10 transition-colors"
@@ -921,9 +934,13 @@ export default function MapsView() {
                                     <button
                                       type="button"
                                       onClick={async () => {
-                                        if (!confirm('Delete this reference link?')) {
-                                          return;
-                                        }
+                                        const confirmed = await requestConfirmation({
+                                          title: 'Delete Reference Link?',
+                                          message: 'Delete this reference link?',
+                                          confirmLabel: 'Delete Link',
+                                          tone: 'danger',
+                                        });
+                                        if (!confirmed) return;
                                         await removeReference(reference.id);
                                       }}
                                       className="px-2 py-1 rounded text-xs font-semibold text-seal hover:bg-seal/10 transition-colors"

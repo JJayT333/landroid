@@ -20,6 +20,7 @@ Use this map to decide which Markdown file to read or update.
 | `ROADMAP.md` | Short priority map. | Strategic priorities change. |
 | `CHANGELOG.md` | Completed meaningful work. | A meaningful feature, fix, or docs rail lands. |
 | `CONTINUATION-PROMPT.md` | Current short handoff. | Before switching chats or after meaningful work. |
+| `ARC_REVIEW_PROMPT.md` | Paste-ready review prompt for external/ArcGIS follow-up. | The document-storage or GIS handoff changes. |
 | `FULL_AUDIT_COORDINATION.md` | Shared scope, personas, and report format for the parallel Codex/Claude audit. | Audit scope, branch names, required personas, or report template changes. |
 | `CODEX_FULL_AUDIT_PROMPT.md` | Paste-ready prompt for the Codex full audit branch. | Codex audit instructions change. |
 | `CLAUDE_FULL_AUDIT_PROMPT.md` | Paste-ready prompt for the Claude full audit branch. | Claude audit instructions change. |
@@ -36,10 +37,13 @@ Current ADRs:
 - `docs/adr/0001-local-first-browser-app.md`
 - `docs/adr/0002-texas-only-active-math.md`
 - `docs/adr/0003-ai-local-first-provider-policy.md`
+- `docs/adr/0004-multi-doc-per-entity-persistence.md`
 
 ## Architecture Notes
 
 - `docs/architecture/rrc-import-readability.md`: RRC import/decode strategy.
+- `docs/gis-data-catalog.md`: Local Raven Forest GIS package inventory and
+  import-readiness notes.
 
 ## Archive
 

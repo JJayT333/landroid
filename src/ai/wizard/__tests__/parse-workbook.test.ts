@@ -1,8 +1,20 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as XLSX from 'xlsx';
 import { parseWorkbook, renderWorkbookForPrompt } from '../parse-workbook';
+
+vi.mock('xlsx', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('xlsx')>();
+  return {
+    ...actual,
+    read: vi.fn(actual.read),
+  };
+});
+
+afterEach(() => {
+  vi.mocked(XLSX.read).mockClear();
+});
 
 function loadFixture(name: string): ArrayBuffer {
   const buf = readFileSync(
@@ -74,17 +86,19 @@ describe('parseWorkbook — audit H2 partial guards', () => {
   });
 
   it('rejects a sheet whose declared range exceeds the cell-count cap', () => {
-    // Craft a sheet with just a sentinel cell at a huge address so the declared
-    // !ref is enormous (>500k cells) while the actual file stays small.
+    // Mock the parser output instead of serializing a huge sparse workbook:
+    // xlsx.write expands the declared range and can dominate the test runtime.
     const sheet: XLSX.WorkSheet = {
       A1: { t: 's', v: 'start' },
       ZZ10000: { t: 's', v: 'end' },
       '!ref': 'A1:ZZ10000',
     };
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, sheet, 'huge');
-    const out = XLSX.write(workbook, { type: 'array', bookType: 'xlsx' }) as ArrayBuffer;
-    expect(() => parseWorkbook('huge-range.xlsx', out)).toThrow(
+    vi.mocked(XLSX.read).mockReturnValueOnce({
+      SheetNames: ['huge'],
+      Sheets: { huge: sheet },
+    } as XLSX.WorkBook);
+
+    expect(() => parseWorkbook('huge-range.xlsx', new ArrayBuffer(8))).toThrow(
       /declares .* cells/i
     );
   });

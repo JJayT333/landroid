@@ -353,6 +353,16 @@ function describeValidationIssue(issue: ValidationIssue | undefined): string {
   return `${issue.code}${nodeLabel}`;
 }
 
+const WORKSPACE_REVIEW_ISSUE_CODES = new Set([
+  'missing_parent',
+  'over_allocated_branch',
+  'under_allocated_branch',
+]);
+
+function isBlockingWorkspaceValidationIssue(issue: ValidationIssue): boolean {
+  return !WORKSPACE_REVIEW_ISSUE_CODES.has(issue.code);
+}
+
 function assertValidOwnershipGraph(
   nodes: OwnershipNode[],
   context: string
@@ -367,9 +377,10 @@ function assertValidOwnershipGraph(
   });
 
   const validation = validateOwnershipGraph(nodes);
-  if (!validation.valid) {
+  const blockingIssues = validation.issues.filter(isBlockingWorkspaceValidationIssue);
+  if (blockingIssues.length > 0) {
     throw new Error(
-      `${context}: invalid ownership graph (${describeValidationIssue(validation.issues[0])})`
+      `${context}: invalid ownership graph (${describeValidationIssue(blockingIssues[0])})`
     );
   }
 

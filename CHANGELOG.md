@@ -3,6 +3,49 @@
 This file records meaningful project changes so `CONTINUATION-PROMPT.md` can
 stay short.
 
+## 2026-05-15
+
+- Completed Phase 5 document/PDF persistence on
+  `claude/phase-5-document-refactor-2026-05-15`: Dexie v8 `documents` and
+  `document_attachments`, node attachment summaries, workspace-store document
+  actions, v8 `.landroid` export/import, v7 import migration, and a one-shot
+  legacy-PDF backup hook.
+- Replaced the old single-PDF Desk Map badge model with multi-document chips
+  and a shared node-modal attachments section for add, open, rename, remove,
+  and reorder.
+- Seeded Raven Forest with realistic Texas multi-document examples on selected
+  conveying nodes (deed, obituary, and affidavit of heirship), so the chip UI
+  and browser tests exercise the new v8 path.
+- Restored Phase 5 Playwright coverage: multi-document chip opening by
+  `attachmentId`, v8 `.landroid` round-trip, branch-scoped lease deletion,
+  curative linkage, research linkage, and the retargeted combinatorial demo
+  chip workflow.
+- Began Phase 6A UX cleanup by replacing app-level native `confirm()` /
+  `alert()` calls with a shared LANDroid confirmation/alert modal, including
+  Desk Map deletes, Clear Map, tract-tab deletes, owner deletes, map deletes,
+  curative deletes, research deletes, federal leasing deletes, upload errors,
+  and import errors.
+- Continued Phase 6 UX/accessibility cleanup: workspace-replacing demo,
+  `.landroid`, and CSV loads now require a typed confirmation phrase; Flowchart
+  `Clear` uses the shared confirmation modal; and primary navigation, Desk Map
+  tract tabs, owner tabs, Research sections, Federal Leasing tabs, and shared
+  form controls expose clearer labels or active-state ARIA.
+- Switched newly generated workspace IDs to `crypto.randomUUID()` while keeping
+  the existing `ws-` prefix and a legacy fallback for runtimes without
+  `randomUUID`.
+- Hardened hosted IndexedDB keying so signed-out hosted state no longer falls
+  back to the local `default` workspace/canvas rows; persistence unlocks only
+  after a real Cognito `sub` is available.
+- Removed the recurring AI settings unit-test local-storage warning by avoiding
+  Node's warning-prone `globalThis.localStorage` probe outside browser contexts.
+- Added `ARC_REVIEW_PROMPT.md` and expanded `docs/gis-data-catalog.md` with a
+  design-only ArcGIS review scope for canonical layer mapping, stable IDs,
+  attachment relationships, and import warnings.
+- Tightened workspace persistence validation so warning-only title review states
+  that LANDroid itself supports, such as temporary over/under allocation and
+  orphan-style missing-parent review nodes, can round-trip through autosave and
+  `.landroid` import while hard-invalid graphs still fail.
+
 ## 2026-05-14
 
 - Deployed the trusted test POC to `https://landroid.abstractmapping.com` via

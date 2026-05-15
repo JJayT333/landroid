@@ -38,6 +38,7 @@ The top bar has eight view buttons:
 The top bar also has:
 - `File ▾` with `Save workspace` (exports a `.landroid` snapshot) and `Load workspace` (imports a `.landroid` or `.csv` file)
 - Local mode only: `Demo Data ▾` with the `Combinatorial — Raven Forest` sample fixture for exercising Desk Map, Leasehold, and Federal Leasing surfaces without real project data. Hosted mode hides this menu so signed-in project data cannot be overwritten by a fixture.
+- Loading demo data requires typing `LOAD DEMO`; loading a `.landroid` or `.csv` file requires typing `LOAD WORKSPACE`, because each action replaces the active browser workspace.
 
 The current project name appears in the top bar and is editable inline — click the name, type a new one, and press `Enter` to commit or `Esc` to cancel. Local autosave still uses browser storage, but `Save` now captures workspace data, flowchart canvas state, owner records, owner documents, curative title issues, map assets, and Research sources, formulas, project records, saved questions, and imports in the exported `.landroid` file.
 The top-left brand area can also carry a custom logo for demo or prospect-specific presentation.
@@ -82,7 +83,8 @@ Gross acres and tract descriptions now live on the tract record itself, but you 
   - a small gold dot in the card header marks any card that still retains mineral interest
 - The mineral-owner card stays part of the main title tree and does not turn into a separate lessor card.
 - The attached green lessee node is the lease-side view. It is terminal in Desk Map, holds the lease terms and metadata, and stays linked back to the same owner record so Desk Map and `Owners` use the same lease data.
-- Any Desk Map card with an attached PDF shows a PDF chip and filename on the card face, including title cards, lessee cards, NPRI cards, and related document chips.
+- Any Desk Map card with attached PDFs shows document chips on the card face, including title cards, lessee cards, NPRI cards, and related-document chips. Up to four chips are visible at once; if a card has more, a `+N more` chip expands the rest.
+- Click any document chip to open that exact PDF. The node edit modal also has an `Attached Documents` section where you can add, open, rename, remove, and reorder the PDFs on that card.
 - NPRI nodes render as their own amber royalty cards. They can convey within the NPRI branch, but they stay separate from the mineral-owner coverage totals.
 
 ### Coverage totals
@@ -100,6 +102,8 @@ If `Found in Chain` is temporarily over `100%`, LANDroid keeps that state visibl
 Deleting a conveyance branch removes that branch and restores the deleted conveyed amount back to the original grantor or parent. This is safer than simply dropping the branch and losing the fraction.
 Deleting the only Desk Map lessee card tied to an owner lease also removes that lease from the owner record. If another Desk Map card still uses the same lease record, deleting one lessee card leaves the owner lease in place and only removes that card.
 Clearing a Desk Map removes the visible title cards and node-linked artifacts from that tract, but it keeps the project, other tracts, owner records, maps, research, and curative records that are not tied to those cleared nodes. If a node is shared with another Desk Map, LANDroid removes it from the cleared map without deleting the shared node record.
+Destructive actions now open a LANDroid confirmation modal instead of a browser pop-up, so you can cancel with the button, `Esc`, or by closing the modal before the action runs.
+Workspace-replacing actions use the same modal but keep the final button disabled until you type the displayed phrase.
 
 ### Empty-state behavior
 If a tract has no cards yet, start with `+ Add Root` or load a `.landroid` or `.csv` file.
@@ -180,7 +184,7 @@ It now has three internal modes:
 - The DeskMap tab bar groups tracts under bold unit headings; tracts C3, C7, and C9 show an error-dot indicator for NPRI discrepancy, over-conveyance, and orphan-node warnings respectively
 - Every tract covers one or more of the combinatorial flavors (baseline splits, probate / heirship, fixed NPRI carves, floating NPRI carves, correction / release, royalty deeds, over-conveyance, lease overlap, kitchen sink) so the same workspace can exercise Desk Map, Leasehold, and Research surfaces without real project data
 - Owner-card grantee names stay unique across the fixture so it is easy to scan
-- Seeded title and lease PDFs show their filenames on the Desk Map cards
+- Seeded title and lease PDFs show their filenames on the Desk Map cards. Representative conveying nodes in C2, C5, and C10 also include a natural Texas deed + obituary + affidavit of heirship pattern so the multi-document chip behavior is visible in the demo.
 - The demo starts focused on Unit A. Unit-wide ORRIs and WI assignments carry a unit code so Unit A and Unit B leasehold math stay separated.
 - The demo loader resets Curative, Maps, and Research side workspaces so stale side records from previous work are not carried over
 - The tract descriptions are prefilled so you can see how the tab is meant to be used before entering your own data
@@ -520,12 +524,12 @@ These are the main workspace snapshot files. They now include:
 - flowchart spacing settings
 
 ### `.csv` import
-CSV import loads workspace data, resets the flowchart canvas, and starts a fresh empty owner/curative/maps/research side workspace so you can re-import and relink cleanly. `.landroid` export/import carries node PDF attachments; if an older backup says a title card has a PDF but does not include the attachment payload, LANDroid clears the PDF flag instead of substituting an unrelated document.
-When a PDF payload is present, LANDroid preserves the stored PDF filename so Desk Map can show what is attached instead of only saying that a PDF exists.
+CSV import loads workspace data, resets the flowchart canvas, and starts a fresh empty owner/curative/maps/research side workspace so you can re-import and relink cleanly. `.landroid` export/import carries node document attachments, including multiple PDFs on the same title card. Older v7 `.landroid` files are migrated into the current multi-document attachment shape during import.
+When PDF payloads are present, LANDroid preserves the stored filenames so Desk Map can show exactly what is attached instead of only saying that a PDF exists.
 
 ### Local browser storage
 The app also uses browser storage for local autosave. This is convenient, but it is not a substitute for named backups.
-Autosaved workspace loads now validate the ownership graph before hydration. If the saved workspace or flowchart canvas is corrupt, LANDroid shows a startup warning and falls back to a safe fresh state instead of quietly loading invalid data.
+Autosaved workspace loads now validate the ownership graph before hydration. Warning-only title review states, such as temporary over/under allocation or orphan-style review nodes, can still be reopened. If the saved workspace or flowchart canvas is hard-corrupt, LANDroid shows a startup warning and falls back to a safe fresh state instead of quietly loading invalid data.
 
 ### Recommended backup habit
 - Save a `.landroid` file before major edits
@@ -593,7 +597,7 @@ Recent ownership work improved how fractions are stored and displayed.
 ### "I want to test without touching real work"
 - In local mode, use `Demo Data ▾ → Combinatorial — Raven Forest` to load sample tract data. Hosted mode hides demo loading to protect signed-in workspaces.
 - Save a separate `.landroid` snapshot before going back to real data.
-- Browser QA covers the combinatorial demo loader with Playwright, including visible PDF filenames on Desk Map cards, leasehold branch-aware lease slices, inline project-name editing, Federal Leasing lease/target/source/map/search tracking, and Research home surfacing. Four deeper workflows remain temporarily skipped until document/PDF persistence and the Raven Forest fixture retargeting settle.
+- Browser QA covers the combinatorial demo loader with Playwright, including visible multi-document PDF chips on Desk Map cards, chip-to-modal PDF opening, v8 `.landroid` round-trip, branch-scoped lease deletion, curative and research linkage, leasehold branch-aware lease slices, inline project-name editing, Federal Leasing lease/target/source/map/search tracking, and Research home surfacing.
 
 ## 16) Practical habits for a new user
 

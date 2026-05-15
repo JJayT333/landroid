@@ -4,7 +4,7 @@
  * Reads/writes the instrument type list from the workspace store so
  * user-added types persist and appear in future uses.
  */
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useId } from 'react';
 import { useWorkspaceStore } from '../../store/workspace-store';
 
 interface InstrumentSelectProps {
@@ -28,6 +28,10 @@ export default function InstrumentSelect({
   const [customMode, setCustomMode] = useState(false);
   const [customValue, setCustomValue] = useState('');
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const buttonId = useId();
+  const menuId = useId();
+  const filterInputId = useId();
+  const customInputId = useId();
 
   // Close on outside click
   useEffect(() => {
@@ -65,13 +69,19 @@ export default function InstrumentSelect({
 
   return (
     <div ref={wrapperRef} className="relative">
-      <label className="text-[10px] text-ink-light uppercase tracking-wider block mb-1">
+      <label
+        htmlFor={buttonId}
+        className="text-[10px] text-ink-light uppercase tracking-wider block mb-1"
+      >
         {label}
       </label>
       <button
+        id={buttonId}
         type="button"
         disabled={disabled}
         onClick={() => { setOpen(!open); setFilter(''); }}
+        aria-expanded={open}
+        aria-controls={open ? menuId : undefined}
         className="w-full px-3 py-1.5 rounded-lg border border-ledger-line bg-parchment text-ink text-sm text-left focus:ring-2 focus:ring-leather focus:border-leather outline-none flex items-center justify-between disabled:bg-leather/10 disabled:opacity-70"
       >
         <span className={value ? 'text-ink' : 'text-ink-light'}>{value || 'Select...'}</span>
@@ -79,10 +89,17 @@ export default function InstrumentSelect({
       </button>
 
       {open && (
-        <div className="absolute z-50 mt-1 w-full bg-parchment border border-ledger-line rounded-lg shadow-xl max-h-60 overflow-y-auto">
+        <div
+          id={menuId}
+          className="absolute z-50 mt-1 w-full bg-parchment border border-ledger-line rounded-lg shadow-xl max-h-60 overflow-y-auto"
+        >
           {/* Search filter */}
           <div className="p-2 border-b border-ledger-line">
+            <label htmlFor={filterInputId} className="sr-only">
+              Search instrument types
+            </label>
             <input
+              id={filterInputId}
               type="text"
               placeholder="Search..."
               value={filter}
@@ -114,7 +131,11 @@ export default function InstrumentSelect({
           <div className="border-t border-ledger-line p-2">
             {customMode ? (
               <div className="flex gap-1">
+                <label htmlFor={customInputId} className="sr-only">
+                  New instrument type
+                </label>
                 <input
+                  id={customInputId}
                   type="text"
                   placeholder="New type..."
                   value={customValue}

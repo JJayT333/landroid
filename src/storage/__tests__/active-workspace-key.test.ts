@@ -55,16 +55,25 @@ describe('active-workspace-key (audit M-1)', () => {
     expect(mod.getCanvasDbKey()).toBe('user-user-abc-canvas');
   });
 
-  it('hosted mode: a null sub still flips ready (signed-out users wait at LoginGate)', async () => {
+  it('hosted mode: a null sub does not unlock default-row persistence', async () => {
     const mod = await loadModule(true);
 
+    let resolvedFlag = false;
+    void mod.awaitWorkspaceKeyReady().then(() => {
+      resolvedFlag = true;
+    });
+
     mod.setActiveUserSub(null);
-    await expect(mod.awaitWorkspaceKeyReady()).resolves.toBeUndefined();
-    // Without a sub, fall back to the legacy key — the row exists for
-    // backward-compat with pre-namespacing data; the user will be at the
-    // sign-in wall anyway.
-    expect(mod.getWorkspaceDbKey()).toBe('default');
-    expect(mod.getCanvasDbKey()).toBe('active-canvas');
+    await Promise.resolve();
+    expect(resolvedFlag).toBe(false);
+    expect(() => mod.getWorkspaceDbKey()).toThrow(/authenticated user sub/);
+    expect(() => mod.getCanvasDbKey()).toThrow(/authenticated user sub/);
+
+    mod.setActiveUserSub('user-after-login');
+    await mod.awaitWorkspaceKeyReady();
+    expect(resolvedFlag).toBe(true);
+    expect(mod.getWorkspaceDbKey()).toBe('user-user-after-login');
+    expect(mod.getCanvasDbKey()).toBe('user-user-after-login-canvas');
   });
 
   it('hosted mode: distinct subs map to distinct keys (multi-user isolation)', async () => {

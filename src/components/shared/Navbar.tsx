@@ -20,6 +20,7 @@ import { assertFileSize, FILE_SIZE_LIMITS } from '../../utils/file-validation';
 import { seedCombinatorialData } from '../../storage/seed-test-data';
 import { isHostedMode } from '../../utils/deploy-env';
 import HostedUserMenu from '../../auth/HostedUserMenu';
+import { useConfirmation } from './ConfirmationProvider';
 import { shouldShowDemoDataMenu } from './navbar-policy';
 
 const landroidLogoUrl = new URL('../../assets/branding/landroid-logo.png', import.meta.url).href;
@@ -37,9 +38,13 @@ const views: { id: ViewMode; label: string }[] = [
   { id: 'research', label: 'Research' },
 ];
 
+const LOAD_DEMO_CONFIRMATION_TEXT = 'LOAD DEMO';
+const LOAD_WORKSPACE_CONFIRMATION_TEXT = 'LOAD WORKSPACE';
+
 export default function Navbar() {
   const hostedMode = isHostedMode();
   const showDemoDataMenu = shouldShowDemoDataMenu(hostedMode);
+  const { alert: showAlert, confirm: requestConfirmation } = useConfirmation();
   const view = useUIStore((s) => s.view);
   const setView = useUIStore((s) => s.setView);
   const projectName = useWorkspaceStore((s) => s.projectName);
@@ -105,6 +110,18 @@ export default function Navbar() {
 
   const handleCombinatorial = async () => {
     setDemoMenuOpen(false);
+    const confirmed = await requestConfirmation({
+      title: 'Load Combinatorial Demo?',
+      message:
+        'This replaces the current workspace with the Raven Forest demo fixture. Save first if you need to keep the current workspace.',
+      confirmLabel: 'Load Demo Data',
+      tone: 'danger',
+      requiredConfirmationText: LOAD_DEMO_CONFIRMATION_TEXT,
+      typedConfirmationHelp:
+        'The demo loader overwrites the active local workspace in this browser session.',
+    });
+    if (!confirmed) return;
+
     setSeedLoading(true);
     try {
       const { nodeCount, pdfCount } = await seedCombinatorialData();
@@ -163,12 +180,25 @@ export default function Navbar() {
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+    const input = e.currentTarget;
+    const file = input.files?.[0];
     if (!file) return;
 
     try {
       if (file.name.endsWith('.landroid')) {
         assertFileSize(file, FILE_SIZE_LIMITS.LANDROID, '.landroid file');
+        const confirmed = await requestConfirmation({
+          title: `Load ${file.name}?`,
+          message:
+            'This replaces the current workspace with the selected .landroid file. Save first if you need to keep the current workspace.',
+          confirmLabel: 'Replace Workspace',
+          tone: 'danger',
+          requiredConfirmationText: LOAD_WORKSPACE_CONFIRMATION_TEXT,
+          typedConfirmationHelp:
+            'The selected .landroid file will replace the active workspace in this browser session.',
+        });
+        if (!confirmed) return;
+
         const data = await importLandroidFile(file);
         loadWorkspace(data);
         useCanvasStore.getState().loadCanvas(data.canvas ?? { nodes: [], edges: [] });
@@ -207,6 +237,18 @@ export default function Navbar() {
           .catch(() => {});
       } else if (file.name.endsWith('.csv')) {
         assertFileSize(file, FILE_SIZE_LIMITS.SPREADSHEET, 'CSV file');
+        const confirmed = await requestConfirmation({
+          title: `Load ${file.name}?`,
+          message:
+            'This imports the CSV into a fresh LANDroid workspace. Save first if you need to keep the current workspace.',
+          confirmLabel: 'Replace Workspace',
+          tone: 'danger',
+          requiredConfirmationText: LOAD_WORKSPACE_CONFIRMATION_TEXT,
+          typedConfirmationHelp:
+            'The selected CSV will replace the active workspace in this browser session.',
+        });
+        if (!confirmed) return;
+
         const text = await file.text();
         const result = importCSV(text);
         loadWorkspace(result);
@@ -218,17 +260,26 @@ export default function Navbar() {
           useCurativeStore.getState().setWorkspace(result.workspaceId),
         ]);
       } else {
-        alert('Unsupported file type. Use .landroid or .csv files.');
+        await showAlert({
+          title: 'Unsupported File Type',
+          message: 'Unsupported file type. Use .landroid or .csv files.',
+        });
       }
     } catch (err) {
-      alert(`Import failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      await showAlert({
+        title: 'Import Failed',
+        message: `Import failed: ${err instanceof Error ? err.message : 'Unknown error'}`,
+      });
+    } finally {
+      input.value = '';
     }
-
-    e.target.value = '';
   };
 
   return (
-    <nav className="no-print flex items-center justify-between px-4 py-2 bg-ink text-parchment border-b border-leather">
+    <nav
+      aria-label="Primary"
+      className="no-print flex items-center justify-between px-4 py-2 bg-ink text-parchment border-b border-leather"
+    >
       <div className="flex min-w-0 items-center gap-3">
         <div className="flex h-11 w-[4.25rem] shrink-0 items-center justify-center overflow-hidden rounded-xl border border-parchment/15 bg-parchment/5 px-1.5 shadow-lg">
           <img
@@ -285,7 +336,9 @@ export default function Navbar() {
           {views.map((v) => (
             <button
               key={v.id}
+              type="button"
               onClick={() => setView(v.id)}
+              aria-current={view === v.id ? 'page' : undefined}
               className={`
                 px-4 py-1.5 rounded-lg text-sm font-medium transition-colors
                 ${view === v.id

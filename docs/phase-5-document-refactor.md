@@ -4,6 +4,17 @@ Companion to `docs/adr/0004-multi-doc-per-entity-persistence.md`. This doc
 captures the implementation plan, schema shape, phase order, validation, and
 the depth-range ride-along.
 
+## Implementation Status
+
+Implemented on `claude/phase-5-document-refactor-2026-05-15`, targeting
+`codex/hosted-hardening-2026-05-14`. Phases A-C delivered the v8 document
+tables, node attachment summaries, workspace-store actions, UI chips, modal
+attachments section, v7/v8 `.landroid` handling, and post-v8 backup hook.
+Phases D-E added realistic multi-document Raven Forest seed data and restored
+the deferred Playwright workflows against the v8 schema. Phase F is the docs
+rail that keeps this file, ADR 0004, the manual, testing, security, changelog,
+and continuation handoff aligned.
+
 ## Goal
 
 Any node can carry zero, one, or many document attachments, each independently
@@ -31,11 +42,11 @@ split:
 
 | # | Decision | Value |
 | --- | --- | --- |
-| 1 | Hosted-mode blocking on `saveDoc` / `deleteDoc` / `renameDoc` / `attachDocToEntity` / `detachDocFromEntity` | Blocked from day one (`HOSTED_BLOCKED_TOOL_NAMES`). |
+| 1 | Hosted-mode blocking on `saveDoc` / `deleteDoc` / `renameDoc` / `attachDocToEntity` / `detachDocFromEntity` | Block from day one (`HOSTED_BLOCKED_TOOL_NAMES`) when those tools are introduced. Phase 5 added no AI doc-mutating tools. |
 | 2 | `kind` enum tagging on every attachment | `deed \| lease \| obit \| affidavit \| probate \| related \| other`. |
 | 3 | Owner-side doc UI unification | Deferred. Schema supports `entityKind: 'owner'`; no UI this pass. |
 | 4 | Chip overflow limit on Desk Map cards | 4 visible + `+N more` inline expand. |
-| 5 | Auto-export v7 `.landroid` to user download before Dexie upgrade | Yes — first step of the migration hook. |
+| 5 | Auto-export v7 `.landroid` safety copy | Yes — one-shot post-v8-open backup hook for workspaces that had legacy PDFs. |
 
 ## Schema
 
@@ -77,8 +88,8 @@ This pass only writes `entityKind: 'node'` rows.
 
 - Drop `hasDoc: boolean` and `docFileName: string`
   ([src/types/node.ts:66-67](../src/types/node.ts)).
-- Add `attachments: { docId: string; fileName: string; kind: string }[]` —
-  denormalized for fast badge render. Source of truth remains Dexie.
+- Add `attachments: { docId: string; attachmentId: string; fileName: string; kind: string }[]` —
+  denormalized for fast chip render. Source of truth remains Dexie.
 - `createBlankNode` initializes `attachments: []`.
 - `normalizeOwnershipNode` migrates legacy `hasDoc/docFileName` rows by
   reading the new Dexie tables (or leaving `attachments` empty if the Dexie
@@ -90,8 +101,8 @@ This pass only writes `entityKind: 'node'` rows.
 
 1. Dexie version bump (v7 → v8). Add `documents` and `document_attachments`
    tables alongside the existing `pdfs` (which stays read-only).
-2. Auto-export hook: before the v8 upgrade runs, trigger a `.landroid` v7
-   download into the user's Downloads folder so a rollback path exists.
+2. Auto-export hook: after v8 open, trigger one v7-shape `.landroid` download
+   per workspace that had legacy PDFs so a rollback path exists.
 3. Migration: for every `pdfs` row, generate a `docId`, write a `documents`
    row with `kind: 'other'` (best default with no source signal),
    `contentHash` computed, and a `document_attachments` row with
@@ -107,9 +118,7 @@ This pass only writes `entityKind: 'node'` rows.
    - `getDocBlob(docId)`
    - `getDocMeta(docId)`
    - `reorderAttachments(entityKind, entityId, orderedAttachmentIds)`
-5. Thin shim in `src/storage/pdf-store.ts` that delegates to the new
-   document-store, with a `console.warn` for stale callers. Retired in a
-   later release.
+5. Retire `src/storage/pdf-store.ts` once all callers use `document-store`.
 6. `src/types/node.ts`: drop `hasDoc` / `docFileName`, add `attachments[]`.
    Update `createBlankNode` and `normalizeOwnershipNode`.
 7. Apply the depth-range hook (§ Depth-Range Schema Hook below) inside this
@@ -123,9 +132,9 @@ This pass only writes `entityKind: 'node'` rows.
 - `PdfViewerModal` keys on `docId` instead of `nodeId`.
 - `DeskMapView.handleViewPdf` becomes `handleViewDoc(docId)`;
   `pdfViewNodeId` state becomes `pdfViewDocId`.
-- Node-edit, lease, and NPRI modals each get an attachments section: list +
-  add + rename + remove + reorder. Same UI primitive across all three so the
-  pattern is reusable when owner/curative/research surfaces light up.
+- The node edit modal gets a shared attachments section: list + add + rename +
+  remove + reorder. The same UI primitive is reusable when owner/curative/
+  research surfaces light up.
 - If Phase 6 modal focus-trap is cheap on the modals touched in this phase,
   do it here so the modals are only edited once.
 
@@ -140,14 +149,16 @@ This pass only writes `entityKind: 'node'` rows.
   - v7 → migrate inline to v8 (synthesize `docId`s, generate
     `document_attachments` rows with `entityKind: 'node'`, `position: 0`).
   - v8 → load directly.
-  - Closes the open `CONTINUATION-PROMPT.md` gap: *"`.landroid` export
-    writes `version: 7`, but import does not dispatch on version."*
+  - Closed the old `CONTINUATION-PROMPT.md` gap where legacy `.landroid`
+    handling lacked version-aware import dispatch.
 
 ### Phase D — Seed migration (~0.5 day)
 
 - Update `src/storage/seed-test-data.ts` so Combinatorial — Raven Forest
-  seeds through `document-store` and writes `attachments[]`.
-- No new fixture in this PR. The two-unit Raven Forest rebuild is PR 3.
+  seeds through the v8 workspace-store document actions and writes
+  `attachments[]`.
+- Add realistic Texas multi-document examples on representative conveying
+  nodes: deed + obituary + affidavit of heirship.
 
 ### Phase E — Tests (interleaved, ~0.5 day net)
 
@@ -159,18 +170,19 @@ This pass only writes `entityKind: 'node'` rows.
 - `.landroid` v7 import round-trip test against a captured v7 fixture;
   verify v8 shape after import.
 - `.landroid` v8 round-trip test.
-- New Playwright spec: attach 3 PDFs to one node, click each chip, verify
-  each opens the right PDF in `PdfViewerModal`.
-- Existing Playwright `combinatorial demo loads with desk-map cards and
-  PDF badges` must pass after seed migration.
+- New Playwright coverage: click the seeded deed / obituary / affidavit chips
+  by `attachmentId` and verify each opens the right PDF in `PdfViewerModal`.
+- Existing Playwright `combinatorial demo loads with desk-map cards and PDF
+  chips` is retargeted to `DeskMapDocumentChips`.
+- Previously deferred `.landroid` round-trip, branch-scoped lease delete,
+  curative linkage, and research linkage workflows are active against v8.
 - Depth-range tests: see § Depth-Range Schema Hook acceptance below.
 
 ### Phase F — Docs (~0.25 day)
 
-- This doc + ADR 0004 (this commit).
-- After implementation lands: update `CHANGELOG.md`, `USER_MANUAL.md` (Desk
-  Map PDF chip section), `SECURITY.md` (hosted-blocked tool list),
-  `TESTING.md`, `CONTINUATION-PROMPT.md`.
+- Keep this doc, ADR 0004, `CHANGELOG.md`, `USER_MANUAL.md` (Desk Map PDF
+  chip section), `SECURITY.md`, `TESTING.md`, and `CONTINUATION-PROMPT.md`
+  aligned with the implemented v8 behavior.
 
 ## Depth-Range Schema Hook
 
@@ -248,19 +260,9 @@ and split this into a Phase 8 dedicated depth-severance project.**
 
 ## PR Sequence
 
-This is **PR 1** of a three-PR sequence. Each PR is independently
-reviewable and rollback-safe.
-
-- **PR 1 — Phase 5 document refactor + depth-range schema hook.** (This
-  work.) No fixture changes. No new Playwrights for the two-unit fixture
-  yet.
-- **PR 2 — Two-unit Raven Forest fixture design doc** at
-  `docs/test-fixtures/two-unit-ten-tract.md`. Design only, no code.
-- **PR 3 — Two-unit fixture implementation + retargeted skipped
-  Playwrights.** Built against the new doc schema from PR 1.
-
-The four skipped Playwrights (`.landroid` round-trip, branch-scoped lease
-delete, curative linkage, research linkage) stay skipped until PR 3.
+This Phase 5 branch now includes the document refactor, the small
+multi-document seed migration, and the retargeted Playwright workflows. Larger
+future fixture redesigns should still land as their own reviewable projects.
 
 ## Validation Per Phase
 
@@ -288,8 +290,10 @@ attached.
   `version` indefinitely.
 - **Codex concurrency on the same branch.** Confirmed clear before Phase
   A; re-confirm if a checkpoint happens before any phase.
-- **Skipped Playwrights stay unguarded** during Phase 5. Tight unit
-  coverage on the doc-store changes mitigates.
+- **Playwright coverage drift.** The restored workflows now guard v8 document
+  chips, export/import, branch-scoped lease delete, curative linkage, and
+  research linkage. Keep selectors tied to stable semantics such as
+  `attachmentId`.
 - **AI hosted read-only filtering** — the new doc-mutating tools must go
   into `HOSTED_BLOCKED_TOOL_NAMES` from day one (audit F2 lineage).
 - **Phase 6 modal focus-trap.** Consolidating into Phase 5 modal edits is
@@ -307,12 +311,12 @@ working days.
 - [x] Codex file ownership confirmed clear on the active branch.
 - [x] Five defaults confirmed as written.
 - [x] Depth-range hook scope confirmed as written.
-- [ ] ADR 0004 reviewed and signed off.
-- [ ] This design doc reviewed and signed off.
-- [ ] Phase A begins only after both sign-offs.
+- [x] ADR 0004 reviewed and signed off.
+- [x] This design doc reviewed and signed off.
+- [x] Phase A began only after both sign-offs.
 
 ## Final Instruction
 
-Per AGENTS.md "report-only until aligned" — no source code edits, no
-commits, no pushes before sign-off on this design doc and ADR 0004. Phase A
-begins only after both are signed.
+Historical note: implementation proceeded after sign-off on this design doc and
+ADR 0004. Future follow-ons should continue to use AGENTS.md and
+PROJECT_CONTEXT.md as the operating baseline.

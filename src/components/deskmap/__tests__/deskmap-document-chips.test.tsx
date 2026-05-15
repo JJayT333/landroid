@@ -69,6 +69,9 @@ describe('DeskMapDocumentChips render output', () => {
     );
     expect(html).toContain('1.pdf');
     expect(html).toContain('2.pdf');
+    expect(html).toContain('data-attachment-id="a1"');
+    expect(html).toContain('data-doc-id="d1"');
+    expect(html).toContain('data-document-kind="deed"');
     expect(html).not.toContain('more');
     expect(html).not.toContain('show fewer');
   });
