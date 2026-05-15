@@ -273,6 +273,9 @@ function normalizeDeskMaps(
         // them when absent, so the pass-through is safe for backward compat.
         unitName: candidate.unitName,
         unitCode: candidate.unitCode,
+        // ArcGIS / external-system links (Phase 5 ride-along). Same
+        // pattern — `normalizeDeskMap` drops the field when absent.
+        externalRefs: candidate.externalRefs,
       }),
     ];
   });

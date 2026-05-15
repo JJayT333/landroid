@@ -12,6 +12,8 @@
  * later — no further migration needed.
  */
 
+import type { ExternalRef } from './external-ref';
+
 export const DOCUMENT_KIND_OPTIONS = [
   'deed',
   'lease',
@@ -53,6 +55,12 @@ export interface DocumentRecord {
   kind: DocumentKind;
   createdAt: string;
   updatedAt: string;
+  /**
+   * External-system references (ArcGIS, file paths, deep-link URLs).
+   * Schema hook only — no current consumer; see
+   * `src/types/external-ref.ts`.
+   */
+  externalRefs?: ExternalRef[];
 }
 
 export interface DocumentAttachment {

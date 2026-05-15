@@ -9,6 +9,10 @@ import {
   isDocumentKind,
   type DocumentKind,
 } from './document';
+import {
+  normalizeExternalRefs,
+  type ExternalRef,
+} from './external-ref';
 
 export type ConveyanceMode = 'fraction' | 'fixed' | 'all';
 export type SplitBasis = 'initial' | 'remaining' | 'whole';
@@ -150,6 +154,12 @@ export interface DeskMap {
   nodeIds: string[];
   unitName?: string;
   unitCode?: DeskMapUnitCode;
+  /**
+   * External-system references — ArcGIS feature IDs for the tract
+   * polygon, file/URL deep-links, etc. Schema hook only; no current
+   * consumer. See `src/types/external-ref.ts`.
+   */
+  externalRefs?: ExternalRef[];
 }
 
 function normalizeText(value: unknown): string {
@@ -280,7 +290,13 @@ export function normalizeDeskMap(
     Partial<
       Omit<
         DeskMap,
-        'grossAcres' | 'pooledAcres' | 'description' | 'nodeIds' | 'unitName' | 'unitCode'
+        | 'grossAcres'
+        | 'pooledAcres'
+        | 'description'
+        | 'nodeIds'
+        | 'unitName'
+        | 'unitCode'
+        | 'externalRefs'
       >
     > & {
       grossAcres?: unknown;
@@ -289,11 +305,13 @@ export function normalizeDeskMap(
       nodeIds?: unknown;
       unitName?: unknown;
       unitCode?: unknown;
+      externalRefs?: unknown;
     },
   fallbackName = 'Untitled Tract'
 ): DeskMap {
   const unitName = normalizeUnitName(deskMap.unitName);
   const unitCode = normalizeUnitCode(deskMap.unitCode);
+  const externalRefs = normalizeExternalRefs(deskMap.externalRefs);
 
   const base: DeskMap = {
     id: deskMap.id,
@@ -321,6 +339,9 @@ export function normalizeDeskMap(
   }
   if (unitCode !== undefined) {
     base.unitCode = unitCode;
+  }
+  if (externalRefs !== undefined) {
+    base.externalRefs = externalRefs;
   }
 
   return base;

@@ -99,6 +99,47 @@ silently coerces unknown values to `'all_depths'`; adding a warning
 collector at `importLandroidFile` is a clean follow-up but is not
 load-bearing for any current build (no Phase 8 producer exists yet).
 
+### Deferred Phase 5 Scope Items (from the brainstorm follow-up)
+
+Schema hooks that are **already landed**:
+
+- `depthRange` on `OwnershipNode` / `Lease` / `LeaseholdOrri` /
+  `LeaseholdAssignment` (commit `d92338b`).
+- `externalRefs?: ExternalRef[]` on `DeskMap` and `DocumentRecord`
+  (Tier 1 follow-up commit; see `src/types/external-ref.ts`). ArcGIS
+  identity rule lives in the file's docstring: LANDroid UUID + ArcGIS
+  GlobalID are the business link; ObjectID is convenience-only.
+- `SourceCitation` type defined in `src/types/source-citation.ts`. No
+  record carries `citations[]` yet — the shape exists so future
+  consumers (curative issues, leasehold warnings, AI extraction,
+  attorney review packets) have a canonical import target.
+
+Hooks **intentionally deferred** until their feature work begins (all
+addable later as optional fields without a Dexie migration or
+`.landroid` version bump):
+
+- **`SourceCitation[]` on records** — attaching `citations?:` to
+  curative issues, leasehold warnings, etc. is feature work, not Phase
+  5 schema. Add when the first consumer needs it.
+- **`ReviewStatus` / `ReviewFields`** — the brainstorm itself flagged
+  "be careful with this one." Curative `TitleIssue` already has
+  `status` + `priority`; attaching `reviewStatus?` to documents and
+  packets waits until the attorney-review workflow is designed.
+- **`ExtractionMetadata`** on `DocumentRecord` — optional field, no
+  consumer today, defer until extraction work starts.
+- **`ReviewPacketManifest`** — schema already supports it (stable
+  doc IDs, entity links, kind tags, round-trip). Type definition
+  lands when packet export starts.
+- **ArcGIS Level 1 export** (CSV/GeoJSON with `LAND_TRACT_ID` /
+  `LAND_UNIT_ID` / etc.) and **Level 2 click-through** — feature work,
+  not schema. Phase 6/7 per the brainstorm roadmap.
+
+**Guardrail kept in force**: if implementation of any deferred item
+starts expanding into ArcGIS REST sync, an ArcGIS plugin, an attorney
+portal, comments/redlines, OCR/AI extraction, depth-aware math, payout
+changes, or automatic title updates from documents — stop and split
+into a dedicated project.
+
 ### Hard Guardrails Still In Force
 
 - No edits to `src/engine/math-engine.ts`,
