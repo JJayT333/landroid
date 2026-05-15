@@ -5,9 +5,86 @@ Use this file to resume the active workstream in a new chat. Read it with
 
 ## Current Branch
 
-Current local branch: `codex/hosted-hardening-2026-05-14`
+Current local branch: `claude/goofy-yonath-75583f` (Claude worktree, descended
+from `codex/hosted-hardening-2026-05-14`). Phase 5 commits land here and PR
+into `codex/hosted-hardening-2026-05-14`.
 
 Do not commit directly to `main`.
+
+## Phase 5 Status (Document/PDF Persistence Refactor)
+
+Six commits landed on this branch implementing the data layer for the
+multi-doc-per-entity refactor. See
+`docs/adr/0004-multi-doc-per-entity-persistence.md` and
+`docs/phase-5-document-refactor.md` for the design contract.
+
+- `4bcc2c5` — ADR 0004 + design doc.
+- `d92338b` — A1: `DepthRange` schema hook on `OwnershipNode`, `Lease`,
+  `LeaseholdOrri`, `LeaseholdAssignment` with normalizers, defensive
+  comments at math entry points, 20 unit tests.
+- `31e9dc4` — A2: Dexie v8 bump with new `documents` +
+  `document_attachments` tables, pure `migratePdfsToDocuments` /
+  `buildNodeWorkspaceIndex` helpers, `document-store.ts` CRUD, sha-256
+  `blob-hash.ts`, 15 migration unit tests. Old `pdfs` table left
+  read-only for one rollback version.
+- `c4445fa` — A3: `OwnershipNode.attachments[]` (`NodeAttachmentSummary[]`)
+  added additively, 8 unit tests.
+- `ff4a194` — A4a: workspace-store actions (`attachDocToNode`,
+  `detachDocFromNode`, `renameDocOnNode`, `reorderNodeAttachments`) with
+  10 hoisted-mock unit tests.
+- `3522c75` — A4b: `document-store.listAttachmentsForNodes` bulk read,
+  `workspace-store.hydrateNodeAttachments` action, wired into `main.tsx`
+  and `Navbar.tsx` after workspace load. 3 unit tests.
+
+Validation after every commit: `npm run lint`, `npm test`, `npm run build`
+all green. Test suite at 505 tests; the pre-existing
+`src/engine/__tests__/tree-layout.test.ts` sandbox-path failure on the
+`elkjs/lib/elk-worker.min.js?url` import is unrelated to Phase 5 and
+existed on the base commit `665fc3a`.
+
+### What's Left in Phase A
+
+**A4c (next):** retire the legacy `hasDoc` / `docFileName` fields. Touches:
+
+- `DeskMapDocumentBadge.tsx` — render from `attachments[]` (currently reads
+  `node.hasDoc` and `node.docFileName`).
+- `runsheet-export.ts:42` — read `attachments.length > 0`.
+- `csv-io.ts:148` — drop the `hasDoc` write.
+- `workspace-persistence.ts` — drop the `hasDoc`/`docFileName`
+  reconciliation logic (lines 661, 954–965). `exportPdfWorkspaceData`
+  is left at v7 shape for one release (A5 introduces v8 export/import).
+- `NodeEditModal.tsx`, `AttachLeaseModal.tsx`,
+  `OwnershipNodeEditorModals.tsx` — replace `savePdf`/`deletePdf` +
+  `updateNode({ hasDoc, docFileName })` with the workspace-store
+  `attachDocToNode` / `detachDocFromNode` actions; read
+  `node.attachments[0]` instead of `node.docFileName`.
+- `seed-test-data.ts` — call workspace-store actions (or `document-store`
+  directly with a synthesized `workspaceId`) instead of `savePdf`.
+- `workspace-store.removeNode` lines 571, 936 — replace `deletePdf` with
+  a cascade call that deletes the documents tied to the removed node IDs.
+- `OwnershipNode` interface — drop `hasDoc` and `docFileName` from the
+  type, the blank factory, and `normalizeOwnershipNode`.
+- `pdf-store.ts` — replace with a thin shim that warns + delegates, or
+  delete if zero callers remain.
+
+Carry the `Pick<OwnershipNode, 'hasDoc' | 'docFileName' | …>` references
+along with the badge rewrite.
+
+**A5 (deferred):** auto-`.landroid` v7 backup hook (fires once via
+`localStorage` flag after the v8 upgrade), and `workspace-persistence`
+v8 export/import dispatch — closes the open "v7 export writes
+`version: 7` but import does not dispatch on version" gap.
+
+### Hard Guardrails Still In Force
+
+- No edits to `src/engine/math-engine.ts`,
+  `src/components/leasehold/leasehold-summary.ts`,
+  `src/components/deskmap/deskmap-coverage.ts`, or
+  `src/storage/seed-test-data.ts` beyond a defensive comment — if depth
+  severance work pulls me there, split into Phase 8.
+- New doc-mutating AI tools (when they land) must be in
+  `HOSTED_BLOCKED_TOOL_NAMES` from the first commit that introduces them.
+- Texas-only active math.
 
 ## Current Workstream
 
