@@ -43,7 +43,8 @@ npm run test:e2e
 
 `npm run test:e2e` uses Playwright Chromium and starts the local Vite server
 automatically. Current e2e status is tracked in `TESTING.md`; as of the current
-handoff, 4 workflows are active and 5 are intentionally skipped pending retargeting.
+handoff, 5 workflows are active and 4 are intentionally skipped until the
+document/PDF persistence refactor and fixture retargeting settle.
 
 ## Key Docs
 
@@ -79,12 +80,17 @@ See `docs/README.md` for the full documentation map.
 - `Research`: source records, formulas, project records, saved questions, and RRC imports.
 - `Ask LANDroid AI`: local-first assistant workflows and workbook row review, with Ollama as the default provider.
 
+Leasehold math strictly validates legacy/imported lease royalty, ORRI burden, and
+WI assignment fractions; malformed non-blank values are treated as 0 and surfaced
+as input warnings in the leasehold focus that they affect.
+
 ## Demo Data
 
-Use `Demo Data -> Combinatorial - Raven Forest` to load the current sample
-workspace. It starts on Raven Forest Unit A and separates Unit A and Unit B so
-Leasehold and Owners can be reviewed by unit. Older stress and 8-tract leasehold
-demos have been retired.
+In local mode, use `Demo Data -> Combinatorial - Raven Forest` to load the
+current sample workspace. It starts on Raven Forest Unit A and separates Unit A
+and Unit B so Leasehold and Owners can be reviewed by unit. Hosted mode hides
+the demo loader so a signed-in workspace cannot be overwritten by a fixture.
+Older stress and 8-tract leasehold demos have been retired.
 
 ## Persistence Notes
 

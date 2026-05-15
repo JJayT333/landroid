@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { MAX_REQUEST_BODY_BYTES } from '../request-policy.js';
 
 type LambdaUrlEvent = {
   requestContext: { http: { method: string; path: string } };
@@ -18,6 +19,7 @@ type TestResponseStream = {
 type HandlerFn = (event: LambdaUrlEvent, responseStream: TestResponseStream, context: unknown) => Promise<void>;
 
 const verifyToken = vi.fn<(token: string) => Promise<{ sub: string }>>();
+const trackUsageMock = vi.fn<(sub: string, day: string, tokens: number) => Promise<number>>();
 
 function makeStream(): TestResponseStream {
   return {
@@ -80,6 +82,15 @@ async function loadHandler(): Promise<HandlerFn> {
     },
   }));
 
+  vi.doMock('../usage-store.js', () => ({
+    DynamoDbUsageStore: class {
+      trackUsage = trackUsageMock;
+    },
+    InMemoryUsageStore: class {
+      trackUsage = trackUsageMock;
+    },
+  }));
+
   const mod = await import('../handler.js');
   return mod.handler as HandlerFn;
 }
@@ -87,11 +98,14 @@ async function loadHandler(): Promise<HandlerFn> {
 describe('handler integration', () => {
   beforeEach(() => {
     verifyToken.mockReset();
+    trackUsageMock.mockReset();
+    trackUsageMock.mockResolvedValue(2_068);
     vi.spyOn(console, 'log').mockImplementation(() => undefined);
   });
 
   afterEach(() => {
     vi.doUnmock('aws-jwt-verify');
+    vi.doUnmock('../usage-store.js');
     vi.unstubAllEnvs();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
@@ -108,6 +122,7 @@ describe('handler integration', () => {
     await handler(chatEvent({ messages: [] }, 'bad-token'), stream, {});
 
     expect(verifyToken).toHaveBeenCalledWith('bad-token');
+    expect(trackUsageMock).not.toHaveBeenCalled();
     expect(fetchMock).not.toHaveBeenCalled();
     expect(stream.metadata?.statusCode).toBe(401);
     expect(bodyText(stream)).toContain('Invalid or expired token');
@@ -124,6 +139,40 @@ describe('handler integration', () => {
     installAwsLambdaStub();
 
     await expect(import('../handler.js')).rejects.toThrow(/USAGE_TABLE_NAME/);
+  });
+
+  it('rejects malformed JSON before charging usage or calling upstream OpenAI', async () => {
+    verifyToken.mockResolvedValue({ sub: 'cognito-sub-123' });
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const handler = await loadHandler();
+    const stream = makeStream();
+    const event = chatEvent({ messages: [] });
+    event.body = '{not json';
+
+    await handler(event, stream, {});
+
+    expect(trackUsageMock).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(stream.metadata?.statusCode).toBe(400);
+    expect(bodyText(stream)).toContain('Body must be JSON');
+  });
+
+  it('rejects oversized request bodies before charging usage or calling upstream OpenAI', async () => {
+    verifyToken.mockResolvedValue({ sub: 'cognito-sub-123' });
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const handler = await loadHandler();
+    const stream = makeStream();
+    const event = chatEvent({ messages: [] });
+    event.body = 'x'.repeat(MAX_REQUEST_BODY_BYTES + 1);
+
+    await handler(event, stream, {});
+
+    expect(trackUsageMock).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(stream.metadata?.statusCode).toBe(413);
+    expect(bodyText(stream)).toContain('Request body is too large');
   });
 
   it('pins the verified sub onto the OpenAI body and streams the upstream response', async () => {
@@ -165,6 +214,7 @@ describe('handler integration', () => {
     expect(stream.ended).toBe(true);
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(trackUsageMock).toHaveBeenCalledTimes(1);
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toBe('https://api.openai.com/v1/chat/completions');
     expect(init.headers).toMatchObject({
@@ -177,5 +227,20 @@ describe('handler integration', () => {
       max_tokens: 2048,
       user: 'cognito-sub-123',
     });
+    expect(outbound).not.toHaveProperty('store');
+  });
+
+  it('maps upstream OpenAI auth failures to proxy errors instead of browser sign-out statuses', async () => {
+    verifyToken.mockResolvedValue({ sub: 'cognito-sub-123' });
+    const fetchMock = vi.fn(async () => new Response('bad server key', { status: 401 }));
+    vi.stubGlobal('fetch', fetchMock);
+    const handler = await loadHandler();
+    const stream = makeStream();
+
+    await handler(chatEvent({ messages: [{ role: 'user', content: 'hello' }] }), stream, {});
+
+    expect(trackUsageMock).toHaveBeenCalledTimes(1);
+    expect(stream.metadata?.statusCode).toBe(502);
+    expect(bodyText(stream)).toContain('Upstream AI provider authentication failed');
   });
 });

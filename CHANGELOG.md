@@ -11,6 +11,26 @@ stay short.
 - Added parallel full-audit coordination docs and paste-ready prompts for Codex
   and Claude Code so both tools can audit the same baseline independently and
   write comparison-ready reports.
+- Began hosted hardening implementation: frontend Cognito auth now derives the
+  user-pool issuer/metadata from `VITE_COGNITO_USER_POOL_ID` while keeping
+  Hosted UI auth endpoints, CSP allows the Cognito issuer host, hosted smoke
+  checks verify metadata plus JWKS, and the AI proxy now caps request bodies,
+  parses JSON before usage tracking, allowlists forwarded OpenAI-compatible
+  fields, and maps upstream provider auth failures to proxy errors.
+- Continued hosted hardening: hosted mode now hides the Demo Data loader, and AI
+  tool policy now separates undo-mutating tools from hosted-blocked tools so
+  `setActiveDeskMap` remains undo-neutral locally but is not exposed in hosted
+  read-only mode.
+- Continued the hosted hardening track with leasehold strict parsing: imported
+  or legacy malformed lease royalty, ORRI burden, and WI assignment fractions
+  now surface as leasehold input warnings and are treated as 0 instead of being
+  silently coerced or clamped.
+- Began Phase 4 browser coverage restoration by retargeting the leasehold/PDF
+  branch-awareness Playwright workflow to the current 10-tract Raven Forest
+  combinatorial fixture.
+- Deferred the remaining four skipped PDF/export/import/fixture-heavy Playwright
+  workflows until after the document/PDF persistence refactor and fixture
+  retargeting, so the hosted-hardening branch can be checkpointed cleanly.
 - Expanded the audit brief to capture improvement ideas, additions, fixes,
   redundancies, mapping/document database readiness, AI PDF-to-ArcGIS-traverse
   workflow planning, and possible 3D Desk Map exploration as a separate

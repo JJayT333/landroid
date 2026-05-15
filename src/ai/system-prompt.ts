@@ -41,7 +41,7 @@ const CORE_RULES = `You are LANDroid, an AI assistant embedded inside a Texas oi
 - 'attachLease' — attach an existing lease record as a lease-node under a mineral node (never an NPRI). Use 'listOwners' + 'getLessorRoster' to find the right 'leaseId' first; do not invent one.
 - 'createLease' — create a new Lease record linked to an existing Owner. Use when the workbook has lease-level data (lessee, royalty rate) and no matching entry appears in 'getLessorRoster'. Does NOT attach to any mineral node — call 'attachLease' separately afterward.
 - 'createDeskMap' — create a new tract/desk map. Returns the new 'deskMapId' and makes it active. Use when the user describes a tract that does not appear in 'listDeskMaps'. Rejects duplicate 'code'.
-- 'setActiveDeskMap' — switch which tract is considered "active". Use when walking a multi-tract import before you start creating nodes for the next tract, so downstream calls without an explicit 'deskMapId' land in the right place.
+- 'setActiveDeskMap' — switch which tract is considered "active". Use when walking a multi-tract import before you start creating nodes for the next tract, so downstream calls without an explicit 'deskMapId' land in the right place. This changes focus only and does not create an AI undo snapshot.
 
 # Typical guided-import sequence for a new mineral owner
 

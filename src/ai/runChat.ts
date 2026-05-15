@@ -8,7 +8,7 @@
 import { streamText, stepCountIs, type ModelMessage } from 'ai';
 import { resolveModel } from './client';
 import { LANDROID_SYSTEM_PROMPT } from './system-prompt';
-import { landroidTools, MUTATING_TOOL_NAMES, readOnlyLandroidTools } from './tools';
+import { landroidTools, readOnlyLandroidTools, UNDO_MUTATING_TOOL_NAMES } from './tools';
 import { useAISettingsStore } from './settings-store';
 import { captureSnapshot, useAIUndoStore } from './undo-store';
 import { isHostedMode } from '../utils/deploy-env';
@@ -96,7 +96,7 @@ export async function runChatTurn(
           toolName: part.toolName,
           input: part.input,
         });
-        if (MUTATING_TOOL_NAMES.has(part.toolName)) {
+        if (UNDO_MUTATING_TOOL_NAMES.has(part.toolName)) {
           mutated = true;
           commitMutationSnapshot();
         }
@@ -110,7 +110,7 @@ export async function runChatTurn(
           input: pending?.input ?? null,
           output: part.output ?? null,
         };
-        if (MUTATING_TOOL_NAMES.has(call.toolName)) {
+        if (UNDO_MUTATING_TOOL_NAMES.has(call.toolName)) {
           mutated = true;
           commitMutationSnapshot();
         }

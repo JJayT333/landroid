@@ -17,11 +17,15 @@ session handoff lives in `CONTINUATION-PROMPT.md`.
 - Execute Phase 0/1 of `DEPLOYMENT_PLAN.md`: hosted frontend, backend boundary,
   auth, cloud save path, and server-side AI proxy before any broad internet
   exposure.
+- Checkpoint the hosted-hardening branch after local validation.
+- Design the document/PDF persistence foundation before durable backend or
+  fixture expansion work.
+- Retarget the remaining four skipped Playwright workflows after the
+  document/PDF schema and Raven Forest fixture direction settle.
 - Design the project picker landing page after adding a real multi-workspace
   saved-project index instead of the current single autosave slot.
 - Promote unit metadata to first-class records if future units need separate
   operator/effective-date settings beyond current Desk Map unit tags.
-- Retarget or replace the five skipped Playwright workflows.
 - Clean up the AI settings test storage warning.
 - Improve AI mutation approval/proposal UX without losing the user's desired
   single-user local workflow speed.

@@ -37,7 +37,7 @@ The top bar has eight view buttons:
 
 The top bar also has:
 - `File ▾` with `Save workspace` (exports a `.landroid` snapshot) and `Load workspace` (imports a `.landroid` or `.csv` file)
-- `Demo Data ▾` with the `Combinatorial — Raven Forest` sample fixture for exercising Desk Map, Leasehold, and Federal Leasing surfaces without real project data
+- Local mode only: `Demo Data ▾` with the `Combinatorial — Raven Forest` sample fixture for exercising Desk Map, Leasehold, and Federal Leasing surfaces without real project data. Hosted mode hides this menu so signed-in project data cannot be overwritten by a fixture.
 
 The current project name appears in the top bar and is editable inline — click the name, type a new one, and press `Enter` to commit or `Esc` to cancel. Local autosave still uses browser storage, but `Save` now captures workspace data, flowchart canvas state, owner records, owner documents, curative title issues, map assets, and Research sources, formulas, project records, saved questions, and imports in the exported `.landroid` file.
 The top-left brand area can also carry a custom logo for demo or prospect-specific presentation.
@@ -135,6 +135,9 @@ It now has three internal modes:
 - Stacks multiple NRI-basis ORRIs one by one in effective-date order instead of flattening them into one combined carve
 - Tracks leasehold-side WI assignments at either unit or tract scope
 - Keeps unit-wide WI assignments scoped to the selected unit
+- Surfaces malformed non-blank lease royalty, ORRI burden, and WI assignment
+  fractions as leasehold input warnings; those invalid entries are treated as
+  0 in math until corrected
 - Includes a full-size `Map` mode that keeps the title story and the payout story separate: Desk Map stays mineral/title, while Map shows the leased-side picture for the same tract
 - Uses `Unit -> Tract` as the overview shape, then expands the selected tract into owner branches with lease slices and branch-bound NPRIs, plus separate tract-level ORRI and WI branches
 - Includes a `Deck` mode that focuses on one tract at a time and shows the lessee-side cards beneath that leasehold estate, including retained WI and assignment cards
@@ -159,6 +162,9 @@ It now has three internal modes:
 - NPRI over-claim situations remain warning-only for title-building. Desk Map highlights the affected branch in red; Leasehold still calculates the visible payout rows so the discrepancy can be reviewed and corrected later.
 - The first WI slice tracks retained and assigned WI and now shows the resulting transfer-order review decimals; the first saved payout-entry layer is unit-focus metadata only, not an editable decimal engine
 - WI over-assignment is currently warning-only instead of hard-blocked; retained WI is clamped at zero until the split is corrected
+- Blank optional leasehold economic fields still behave as 0 while editing, but
+  malformed non-blank values are warning-visible and excluded as 0 instead of
+  being silently clamped
 - Floating-NPRI over-carves do not block editing, but they now keep unit-focus payout review on `Hold` so the payout sheet cannot be treated as ready by mistake
 - Assignments remain outside Desk Map title math and are handled in the Leasehold deck/review surface
 - Unit focus is the editable payout-entry surface; tract focus stays read-only because those rows are partial tract slices rather than final unit payout rows
@@ -167,7 +173,7 @@ It now has three internal modes:
 - `Deck` mode is the intended visual home for WI, assignments, transfer-order review, and later deeper payout workflows
 
 ### Demo workspace
-- `Demo Data ▾ → Combinatorial — Raven Forest` loads the sample fixture
+- In local mode, `Demo Data ▾ → Combinatorial — Raven Forest` loads the sample fixture. Hosted mode hides the demo loader.
 - 10 tracts in two pooled units — Raven Forest Unit A (C1–C5, Walker County) and Unit B (C6–C10, Walker/Montgomery line), reflecting the Sam Houston National Forest prospect
 - Unit A tracts are leased to Texas Energy Acquisitions LP at 1/8 royalty; Unit B tracts to Lone Star Minerals LLC at 3/16 royalty
 - Leasehold and Owners open with a unit selector so you can switch between Raven Forest Unit A and Unit B instead of reviewing the whole combinatorial sample as one combined unit
@@ -585,9 +591,9 @@ Recent ownership work improved how fractions are stored and displayed.
 - Confirm the affected records have both a document number and an attached PDF. Rows without both are exported without fake hyperlinks.
 
 ### "I want to test without touching real work"
-- Use `Demo Data ▾ → Combinatorial — Raven Forest` to load sample tract data.
+- In local mode, use `Demo Data ▾ → Combinatorial — Raven Forest` to load sample tract data. Hosted mode hides demo loading to protect signed-in workspaces.
 - Save a separate `.landroid` snapshot before going back to real data.
-- Browser QA covers the combinatorial demo loader with Playwright, including visible PDF filenames on Desk Map cards, inline project-name editing, Federal Leasing lease/target/source/map/search tracking, and Research home surfacing. Deeper leasehold-branch coverage is temporarily skipped in the Playwright suite while the Raven Forest fixture is rebuilt.
+- Browser QA covers the combinatorial demo loader with Playwright, including visible PDF filenames on Desk Map cards, leasehold branch-aware lease slices, inline project-name editing, Federal Leasing lease/target/source/map/search tracking, and Research home surfacing. Four deeper workflows remain temporarily skipped until document/PDF persistence and the Raven Forest fixture retargeting settle.
 
 ## 16) Practical habits for a new user
 

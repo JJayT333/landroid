@@ -633,10 +633,8 @@ describe('leasehold-summary', () => {
   });
 
   it('treats a blank lease royalty as 0% — NRI equals full leased WI', () => {
-    // Behavior pin: parseInterestString('') returns 0, so a lease with a missing royalty
-    // contributes 0 to the royalty burden and the lessee retains the full leased WI.
-    // This prevents silent NaN but also means data-entry omissions are invisible —
-    // the "missing royalty" warning surface is a separate piece of work (see audit finding #9).
+    // Behavior pin: blank optional interest inputs still parse as 0 without raising a
+    // malformed-input warning. Non-blank malformed values are covered below.
     const summary = buildLeaseholdUnitSummary({
       deskMaps: [
         {
@@ -685,7 +683,97 @@ describe('leasehold-summary', () => {
     expect(summary.tracts[0]?.preWorkingInterestDecimal).toBe('1');
     expect(summary.preWorkingInterestDecimal).toBe('1');
     expect(summary.retainedWorkingInterestDecimal).toBe('1');
+    expect(summary.inputWarningCount).toBe(0);
+    expect(summary.tracts[0]?.inputWarnings).toEqual([]);
     expect(Number.isFinite(Number(summary.tracts[0]?.preWorkingInterestDecimal))).toBe(true);
+  });
+
+  it('surfaces malformed lease royalty, ORRI burden, and WI assignment inputs as warnings', () => {
+    const summary = buildLeaseholdUnitSummary({
+      deskMaps: [
+        {
+          id: 'dm-1',
+          name: 'Tract 1',
+          code: 'T1',
+          tractId: 'T1',
+          grossAcres: '100',
+          pooledAcres: '100',
+          description: '',
+          nodeIds: ['n1', 'l1'],
+        },
+      ],
+      nodes: [
+        {
+          ...createBlankNode('n1', null),
+          grantee: 'A Owner',
+          linkedOwnerId: 'owner-1',
+          fraction: '1',
+          initialFraction: '1',
+        },
+        {
+          ...createBlankNode('l1', 'n1'),
+          type: 'related' as const,
+          relatedKind: 'lease' as const,
+        },
+      ],
+      owners: [createBlankOwner('ws-1', { id: 'owner-1', name: 'A Owner' })],
+      leases: [
+        createBlankLease('ws-1', 'owner-1', {
+          id: 'lease-1',
+          leaseName: 'Bad Royalty Lease',
+          lessee: 'Operator A',
+          royaltyRate: '2',
+          leasedInterest: '1',
+        }),
+      ],
+      leaseholdAssignments: [
+        {
+          id: 'assignment-1',
+          assignor: 'Operator A',
+          assignee: 'Assignee A',
+          scope: 'unit',
+          deskMapId: null,
+          workingInterestFraction: '5/4',
+          effectiveDate: '2024-03-01',
+          sourceDocNo: 'ASG-1',
+          notes: '',
+        },
+      ],
+      leaseholdOrris: [
+        {
+          id: 'orri-1',
+          payee: 'Override A',
+          scope: 'unit',
+          deskMapId: null,
+          burdenFraction: '1/0',
+          burdenBasis: 'gross_8_8',
+          effectiveDate: '2024-02-01',
+          sourceDocNo: 'ORRI-1',
+          notes: '',
+        },
+      ],
+    });
+
+    expect(summary.inputWarningCount).toBe(3);
+    expect(summary.inputWarnings.map((warning) => warning.id)).toEqual([
+      'lease:lease-1:royaltyRate',
+      'orri:orri-1:burdenFraction',
+      'assignment:assignment-1:workingInterestFraction',
+    ]);
+    expect(summary.inputWarnings.map((warning) => warning.value)).toEqual(['2', '1/0', '5/4']);
+    expect(summary.inputWarnings.every((warning) =>
+      warning.message.includes('treated as 0 in leasehold math')
+    )).toBe(true);
+    expect(summary.tracts[0]?.inputWarnings.map((warning) => warning.id)).toEqual(
+      summary.inputWarnings.map((warning) => warning.id)
+    );
+    expect(summary.totalRoyaltyDecimal).toBe('0');
+    expect(summary.totalOrriDecimal).toBe('0');
+    expect(summary.totalAssignedWorkingInterestDecimal).toBe('0');
+    expect(summary.orris[0]?.unitDecimal).toBe('0');
+    expect(summary.assignments[0]?.unitDecimal).toBe('0');
+    expect(summary.preWorkingInterestDecimal).toBe('1');
+    expect(summary.retainedWorkingInterestDecimal).toBe('1');
   });
 
   it('clamps over-burdened NRI base and pre-WI at zero when ORRIs exceed the leased WI', () => {

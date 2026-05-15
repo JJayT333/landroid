@@ -8,8 +8,9 @@
  *   - Mutating: thin wrappers over workspace-store actions that change
  *     project data. Each returns { ok, ...ids, validation } so the model
  *     can see whether the move broke the ownership graph and self-correct.
- *     Every mutating tool name MUST also be listed in MUTATING_TOOL_NAMES
- *     (bottom of file) so runChat.ts can commit an undo snapshot.
+ *     Tools that should create an AI undo snapshot are listed in
+ *     UNDO_MUTATING_TOOL_NAMES. Tools blocked from hosted read-only mode are
+ *     listed in HOSTED_BLOCKED_TOOL_NAMES.
  */
 import { tool } from 'ai';
 import { z } from 'zod';
@@ -881,11 +882,11 @@ export const landroidTools = {
 };
 
 /**
- * Names of tools that mutate workspace state. Consumed by `runChat.ts` to
- * decide whether to commit the pre-turn snapshot for undo AND to filter
- * the tool set handed to the model in hosted mode.
+ * Names of tools whose live mutations should commit the pre-turn snapshot for
+ * single-level AI undo. Focus-only tools intentionally stay out of this set so
+ * switching context does not burn the user's undo slot.
  */
-export const MUTATING_TOOL_NAMES: ReadonlySet<string> = new Set([
+export const UNDO_MUTATING_TOOL_NAMES: ReadonlySet<string> = new Set([
   'createRootNode',
   'convey',
   'createNpri',
@@ -902,10 +903,21 @@ export const MUTATING_TOOL_NAMES: ReadonlySet<string> = new Set([
 ]);
 
 /**
+ * Names blocked from hosted read-only mode. This is broader than
+ * UNDO_MUTATING_TOOL_NAMES because tools such as setActiveDeskMap persist active
+ * workspace focus through autosave, even though they should not consume the AI
+ * undo slot in local authoring flows.
+ */
+export const HOSTED_BLOCKED_TOOL_NAMES: ReadonlySet<string> = new Set([
+  ...UNDO_MUTATING_TOOL_NAMES,
+  'setActiveDeskMap',
+]);
+
+/**
  * Read-only subset of `landroidTools`. Used by hosted mode until the
- * proposal/approval boundary (AUDIT CB-4) ships. The model can still answer
- * questions and compute summaries but cannot alter workspace state.
+ * proposal/approval boundary ships. The model can still answer questions and
+ * compute summaries but cannot alter workspace state or persisted focus.
  */
 export const readOnlyLandroidTools: Partial<typeof landroidTools> = Object.fromEntries(
-  Object.entries(landroidTools).filter(([name]) => !MUTATING_TOOL_NAMES.has(name))
+  Object.entries(landroidTools).filter(([name]) => !HOSTED_BLOCKED_TOOL_NAMES.has(name))
 ) as Partial<typeof landroidTools>;

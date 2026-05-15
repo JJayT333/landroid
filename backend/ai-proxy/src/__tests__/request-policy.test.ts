@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
+  ALLOWED_OPENAI_CHAT_BODY_FIELDS,
   applyBodyPolicy,
+  bodyByteLength,
   decodeBody,
   estimateInputTokens,
   extractBearer,
   HARDCODED_MODEL,
   MAX_OUTPUT_TOKENS,
+  MAX_REQUEST_BODY_BYTES,
   parseJsonBody,
   routeMatches,
 } from '../request-policy.js';
@@ -54,6 +57,22 @@ describe('decodeBody', () => {
   it('returns empty string for missing body', () => {
     expect(decodeBody(undefined, false)).toBe('');
     expect(decodeBody(undefined, true)).toBe('');
+  });
+});
+
+describe('bodyByteLength', () => {
+  it('measures UTF-8 request bodies before parsing', () => {
+    expect(bodyByteLength('hello', false)).toBe(5);
+    expect(bodyByteLength(undefined, false)).toBe(0);
+  });
+
+  it('measures decoded bytes for base64 request bodies', () => {
+    const encoded = Buffer.from('{"x":1}').toString('base64');
+    expect(bodyByteLength(encoded, true)).toBe(7);
+  });
+
+  it('documents the explicit proxy request cap', () => {
+    expect(MAX_REQUEST_BODY_BYTES).toBe(256 * 1024);
   });
 });
 
@@ -107,6 +126,50 @@ describe('applyBodyPolicy', () => {
     expect(
       applyBodyPolicy({ max_tokens: 'not-a-number' as unknown as number }, 'sub').max_tokens
     ).toBe(MAX_OUTPUT_TOKENS);
+  });
+
+  it('defaults max_tokens to the cap when supplied value is non-finite or non-positive', () => {
+    expect(applyBodyPolicy({ max_tokens: Number.NaN }, 'sub').max_tokens).toBe(MAX_OUTPUT_TOKENS);
+    expect(applyBodyPolicy({ max_tokens: -1 }, 'sub').max_tokens).toBe(MAX_OUTPUT_TOKENS);
+    expect(applyBodyPolicy({ max_tokens: 0 }, 'sub').max_tokens).toBe(MAX_OUTPUT_TOKENS);
+  });
+
+  it('allowlists OpenAI-compatible fields and drops arbitrary client fields', () => {
+    const out = applyBodyPolicy(
+      {
+        messages: [],
+        stream: true,
+        stream_options: { include_usage: true },
+        tools: [],
+        tool_choice: 'auto',
+        store: true,
+        metadata: { caseId: 'should-not-pass-through' },
+        max_completion_tokens: 99_999,
+        extra_body: { arbitrary: true },
+      },
+      'sub'
+    );
+
+    expect(out).toMatchObject({
+      messages: [],
+      stream: true,
+      stream_options: { include_usage: true },
+      tools: [],
+      tool_choice: 'auto',
+      model: HARDCODED_MODEL,
+      max_tokens: MAX_OUTPUT_TOKENS,
+      user: 'sub',
+    });
+    expect(out).not.toHaveProperty('store');
+    expect(out).not.toHaveProperty('metadata');
+    expect(out).not.toHaveProperty('max_completion_tokens');
+    expect(out).not.toHaveProperty('extra_body');
+  });
+
+  it('keeps the allowlist intentionally narrow', () => {
+    expect(ALLOWED_OPENAI_CHAT_BODY_FIELDS.has('messages')).toBe(true);
+    expect(ALLOWED_OPENAI_CHAT_BODY_FIELDS.has('metadata')).toBe(false);
+    expect(ALLOWED_OPENAI_CHAT_BODY_FIELDS.has('store')).toBe(false);
   });
 
   it('does not mutate the input body', () => {

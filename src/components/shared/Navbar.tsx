@@ -20,6 +20,7 @@ import { assertFileSize, FILE_SIZE_LIMITS } from '../../utils/file-validation';
 import { seedCombinatorialData } from '../../storage/seed-test-data';
 import { isHostedMode } from '../../utils/deploy-env';
 import HostedUserMenu from '../../auth/HostedUserMenu';
+import { shouldShowDemoDataMenu } from './navbar-policy';
 
 const landroidLogoUrl = new URL('../../assets/branding/landroid-logo.png', import.meta.url).href;
 const ravenForestBackdropUrl = new URL('../../assets/branding/raven-forest-backdrop.png', import.meta.url).href;
@@ -37,6 +38,8 @@ const views: { id: ViewMode; label: string }[] = [
 ];
 
 export default function Navbar() {
+  const hostedMode = isHostedMode();
+  const showDemoDataMenu = shouldShowDemoDataMenu(hostedMode);
   const view = useUIStore((s) => s.view);
   const setView = useUIStore((s) => s.setView);
   const projectName = useWorkspaceStore((s) => s.projectName);
@@ -323,39 +326,41 @@ export default function Navbar() {
             )}
           </div>
 
-          {isHostedMode() && <HostedUserMenu />}
+          {hostedMode && <HostedUserMenu />}
 
-          <div ref={demoMenuRef} className="relative">
-            <button
-              type="button"
-              onClick={() => {
-                setDemoMenuOpen((open) => !open);
-                setFileMenuOpen(false);
-              }}
-              disabled={seedLoading}
-              aria-haspopup="menu"
-              aria-expanded={demoMenuOpen}
-              className="px-3 py-1.5 rounded-lg text-xs font-medium text-gold/80 hover:text-gold hover:bg-gold/10 transition-colors disabled:opacity-50"
-            >
-              {seedLoading ? 'Loading…' : 'Demo Data ▾'}
-            </button>
-            {demoMenuOpen && (
-              <div
-                role="menu"
-                className="absolute right-0 z-20 mt-1 w-56 overflow-hidden rounded-lg border border-leather bg-ink shadow-xl"
+          {showDemoDataMenu && (
+            <div ref={demoMenuRef} className="relative">
+              <button
+                type="button"
+                onClick={() => {
+                  setDemoMenuOpen((open) => !open);
+                  setFileMenuOpen(false);
+                }}
+                disabled={seedLoading}
+                aria-haspopup="menu"
+                aria-expanded={demoMenuOpen}
+                className="px-3 py-1.5 rounded-lg text-xs font-medium text-gold/80 hover:text-gold hover:bg-gold/10 transition-colors disabled:opacity-50"
               >
-                <button
-                  type="button"
-                  role="menuitem"
-                  onClick={handleCombinatorial}
-                  disabled={seedLoading}
-                  className="block w-full px-3 py-2 text-left text-xs text-parchment/80 hover:bg-ink-light/40 hover:text-parchment disabled:opacity-50"
+                {seedLoading ? 'Loading…' : 'Demo Data ▾'}
+              </button>
+              {demoMenuOpen && (
+                <div
+                  role="menu"
+                  className="absolute right-0 z-20 mt-1 w-56 overflow-hidden rounded-lg border border-leather bg-ink shadow-xl"
                 >
-                  Combinatorial — Raven Forest
-                </button>
-              </div>
-            )}
-          </div>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={handleCombinatorial}
+                    disabled={seedLoading}
+                    className="block w-full px-3 py-2 text-left text-xs text-parchment/80 hover:bg-ink-light/40 hover:text-parchment disabled:opacity-50"
+                  >
+                    Combinatorial — Raven Forest
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 

@@ -9,6 +9,7 @@
  */
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { UserManager, type User } from 'oidc-client-ts';
+import { buildCognitoConfig } from './cognito-config';
 import { setIdToken, setUnauthorizedHandler } from './session';
 import { setActiveUserSub } from '../storage/active-workspace-key';
 
@@ -23,32 +24,7 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 function readConfig() {
-  const domain = import.meta.env.VITE_COGNITO_DOMAIN;
-  const clientId = import.meta.env.VITE_COGNITO_CLIENT_ID;
-  const redirectUri = import.meta.env.VITE_COGNITO_REDIRECT_URI ?? window.location.origin + '/';
-  if (!domain || !clientId) {
-    throw new Error(
-      'Missing Cognito config. Set VITE_COGNITO_DOMAIN and VITE_COGNITO_CLIENT_ID in the hosted build.'
-    );
-  }
-  return {
-    authority: `https://${domain}`,
-    client_id: clientId,
-    redirect_uri: redirectUri,
-    post_logout_redirect_uri: redirectUri,
-    response_type: 'code',
-    scope: 'openid email',
-    metadata: {
-      authorization_endpoint: `https://${domain}/oauth2/authorize`,
-      token_endpoint: `https://${domain}/oauth2/token`,
-      userinfo_endpoint: `https://${domain}/oauth2/userInfo`,
-      end_session_endpoint: `https://${domain}/logout?client_id=${clientId}&logout_uri=${encodeURIComponent(
-        redirectUri
-      )}`,
-      issuer: `https://${domain}`,
-      jwks_uri: `https://${domain}/.well-known/jwks.json`,
-    },
-  };
+  return buildCognitoConfig(import.meta.env, window.location.origin);
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {

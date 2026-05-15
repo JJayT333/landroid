@@ -1,10 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { MUTATING_TOOL_NAMES, landroidTools, readOnlyLandroidTools } from '../tools';
+import {
+  HOSTED_BLOCKED_TOOL_NAMES,
+  landroidTools,
+  readOnlyLandroidTools,
+  UNDO_MUTATING_TOOL_NAMES,
+} from '../tools';
 
 describe('readOnlyLandroidTools (hosted-mode guard)', () => {
-  it('contains no tool whose name is in MUTATING_TOOL_NAMES', () => {
+  it('contains no tool whose name is blocked in hosted mode', () => {
     const exposed = Object.keys(readOnlyLandroidTools);
-    const leaked = exposed.filter((name) => MUTATING_TOOL_NAMES.has(name));
+    const leaked = exposed.filter((name) => HOSTED_BLOCKED_TOOL_NAMES.has(name));
     expect(leaked).toEqual([]);
   });
 
@@ -15,14 +20,27 @@ describe('readOnlyLandroidTools (hosted-mode guard)', () => {
     }
   });
 
-  it('covers every non-mutating tool (no accidental read-only drops)', () => {
+  it('covers every non-blocked tool (no accidental read-only drops)', () => {
     const expected = Object.keys(landroidTools).filter(
-      (name) => !MUTATING_TOOL_NAMES.has(name)
+      (name) => !HOSTED_BLOCKED_TOOL_NAMES.has(name)
     );
     expect(Object.keys(readOnlyLandroidTools).sort()).toEqual(expected.sort());
   });
 
-  it('MUTATING_TOOL_NAMES is non-empty (sanity)', () => {
-    expect(MUTATING_TOOL_NAMES.size).toBeGreaterThan(0);
+  it('keeps setActiveDeskMap out of hosted tools without burning the AI undo slot', () => {
+    expect(UNDO_MUTATING_TOOL_NAMES.has('setActiveDeskMap')).toBe(false);
+    expect(HOSTED_BLOCKED_TOOL_NAMES.has('setActiveDeskMap')).toBe(true);
+    expect(readOnlyLandroidTools).not.toHaveProperty('setActiveDeskMap');
+    expect(landroidTools).toHaveProperty('setActiveDeskMap');
+  });
+
+  it('hosted blocked tools include every undo-mutating tool', () => {
+    for (const name of UNDO_MUTATING_TOOL_NAMES) {
+      expect(HOSTED_BLOCKED_TOOL_NAMES.has(name)).toBe(true);
+    }
+  });
+
+  it('UNDO_MUTATING_TOOL_NAMES is non-empty (sanity)', () => {
+    expect(UNDO_MUTATING_TOOL_NAMES.size).toBeGreaterThan(0);
   });
 });

@@ -343,6 +343,9 @@ Before internet exposure:
 - add CSRF protection if cookie sessions are used
 - otherwise prefer bearer-token auth with backend validation
 - add origin checks and CORS restrictions
+- treat CORS as a browser guard only; stolen-token replay needs server-side
+  controls such as a stronger edge/API boundary, short token lifetime, and usage
+  limits
 
 ## 5.7 Auditability
 

@@ -21,7 +21,7 @@ npm run test:e2e
 | UI workflow change | `npm run lint`, targeted tests, `npm run build`, relevant e2e if available |
 | Import/export/persistence change | `npm run lint`, storage tests, `npm test`, and manual risk note |
 | AI tool/provider change | `npm run lint`, AI tests, relevant wizard/tool tests, and rollback check |
-| Hosted AI proxy/deploy change | `npm run deploy:check`, `cd backend/ai-proxy && npm test && npx tsc -p tsconfig.json --noEmit`, plus root `npm test` if frontend policy changes |
+| Hosted AI proxy/deploy change | `npm run deploy:check`, `cd backend/ai-proxy && npm test && npx tsc -p tsconfig.json --noEmit`, plus root `npm test` if frontend policy changes; run `bash scripts/smoke-test-hosted.sh` when network/AWS access is available |
 | Release/checkpoint | full default commands plus `npm run deploy:check` for hosted deploy candidates |
 
 ## Current Known Warnings
@@ -38,9 +38,9 @@ npm run test:e2e
 
 As of the current handoff:
 
-- 4 Playwright workflows are active.
-- 5 workflows are intentionally skipped while they are retargeted to the current
-  Combinatorial - Raven Forest fixture.
+- 5 Playwright workflows are active.
+- 4 workflows are intentionally skipped until the document/PDF persistence
+  refactor and fixture retargeting settle.
 
 Do not describe skipped workflows as verified in user-facing docs.
 
@@ -60,6 +60,7 @@ For graph, tree, ownership, math, or recalculation logic, tests should cover:
 - no cycles
 - valid parent references
 - expected warning-only states
+- strict parser warning surfacing for malformed non-blank economic inputs
 - predecessor insert and recalculation
 - attach/graft and recalculation
 - rebalance and recalculation

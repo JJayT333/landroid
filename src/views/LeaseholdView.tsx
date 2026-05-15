@@ -23,12 +23,13 @@ import {
 } from '../types/leasehold';
 import { useOwnerStore } from '../store/owner-store';
 import { useWorkspaceStore } from '../store/workspace-store';
-import { parseInterestString, parseStrictInterestString } from '../utils/interest-string';
+import { parseStrictInterestString } from '../utils/interest-string';
 import {
   buildLeaseholdTransferOrderReview,
   buildLeaseholdUnitSummary,
   type LeaseholdAssignmentSummary,
   type LeaseholdDecimalRow,
+  type LeaseholdInputWarning,
   type LeaseholdNpriSummary,
   type LeaseholdOrriSummary,
   type LeaseholdOwnerLeaseSummary,
@@ -58,6 +59,10 @@ function formatPercent(value: string) {
 
 function formatDecimalValue(value: string) {
   return d(value).toFixed(8);
+}
+
+function parseVisibleLeaseholdFraction(value: string) {
+  return parseStrictInterestString(value) ?? d(0);
 }
 
 function normalizeGrossAcreInput(value: string) {
@@ -288,6 +293,38 @@ function SummaryCard({
       </div>
       <div className="mt-2 text-2xl font-display font-bold text-ink">{value}</div>
       <div className="mt-1 text-xs text-ink-light">{detail}</div>
+    </div>
+  );
+}
+
+function LeaseholdInputWarningPanel({
+  warnings,
+}: {
+  warnings: LeaseholdInputWarning[];
+}) {
+  if (warnings.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="rounded-2xl border border-seal/30 bg-seal/10 px-4 py-3 text-sm text-seal">
+      <div className="font-semibold">
+        {warnings.length} malformed economic input{warnings.length === 1 ? '' : 's'} need review
+      </div>
+      <ul className="mt-2 space-y-1 text-xs leading-5">
+        {warnings.slice(0, 4).map((warning) => (
+          <li key={warning.id}>
+            <span className="font-semibold">{warning.fieldLabel}</span>
+            {' '}
+            on {warning.sourceLabel}: {warning.value || 'blank'}.
+          </li>
+        ))}
+      </ul>
+      {warnings.length > 4 && (
+        <div className="mt-2 text-xs">
+          Plus {warnings.length - 4} more input{warnings.length - 4 === 1 ? '' : 's'}.
+        </div>
+      )}
     </div>
   );
 }
@@ -903,6 +940,11 @@ function LeaseholdGraphUnitCard({
           <span className="rounded-full border border-emerald-200 bg-white/80 px-2 py-0.5 text-[10px] text-emerald-900">
             NPRI {formatPercent(unitSummary.totalNpriDecimal)}
           </span>
+          {unitSummary.inputWarningCount > 0 && (
+            <span className="rounded-full border border-seal/25 bg-seal/10 px-2 py-0.5 text-[10px] text-seal">
+              Input warnings ({unitSummary.inputWarningCount})
+            </span>
+          )}
         </div>
       </div>
     </div>
@@ -920,7 +962,8 @@ function LeaseholdGraphOverviewTractCard({
 }) {
   const hasWarnings =
     tract.overAssigned || tract.overBurdened || tract.overFloatingNpriBurdened
-    || tract.leaseOverlaps.length > 0;
+    || tract.leaseOverlaps.length > 0
+    || tract.inputWarnings.length > 0;
 
   return (
     <button
@@ -3243,6 +3286,9 @@ function LeaseholdDeck({
   const activeLeaseOverlaps: LeaseCoverageOverlap[] = focusedTract
     ? focusedTract.leaseOverlaps
     : unitSummary.tracts.flatMap((tract) => tract.leaseOverlaps);
+  const activeInputWarnings = focusedTract
+    ? focusedTract.inputWarnings
+    : unitSummary.inputWarnings;
   const activeRetainedHolder = activeLessees[0] || unit.operator;
   const focusCoverageDetail = focusedTract
     ? `${formatPercent(focusedTract.unitParticipation)} participation x ${formatPercent(focusedTract.leasedOwnership)} leased ownership for ${focusedTract.code}.`
@@ -3338,6 +3384,12 @@ function LeaseholdDeck({
             detail={activeOverAssigned ? 'At least one focused tract is over-assigned' : 'Remaining WI after assignments'}
           />
         </div>
+
+        {activeInputWarnings.length > 0 && (
+          <div className="mt-4">
+            <LeaseholdInputWarningPanel warnings={activeInputWarnings} />
+          </div>
+        )}
       </section>
 
       <section className="rounded-3xl border border-ledger-line bg-parchment/95 p-5 shadow-md">
@@ -3493,7 +3545,7 @@ function LeaseholdDeck({
                       ? {
                           label: 'This tract',
                           decimal: d(focusedTract.preWorkingInterestDecimal)
-                            .times(parseInterestString(assignment.workingInterestFraction))
+                            .times(parseVisibleLeaseholdFraction(assignment.workingInterestFraction))
                             .toString(),
                         }
                       : null

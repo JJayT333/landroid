@@ -34,8 +34,15 @@ Treat these as sensitive:
   Use cloud AI only when that is acceptable for the current project.
 - Hosted/cloud mode uses a backend proxy with server-held keys. Keep Cognito
   JWT verification, server-side model policy, durable token-ceiling tracking,
-  and structured request logging covered by proxy tests before broadening
-  access.
+  request body caps, body-field allowlisting, and structured request logging
+  covered by proxy tests before broadening access.
+- Hosted AI currently receives only `readOnlyLandroidTools`; `HOSTED_BLOCKED_TOOL_NAMES`
+  also excludes persisted-focus tools such as `setActiveDeskMap` until an
+  approval boundary exists.
+- The hosted AI proxy currently uses a Lambda Function URL with auth type
+  `NONE`; the security boundary is handler-side Cognito ID-token verification.
+  Function URL CORS reduces accidental browser misuse but is not a stolen-token
+  replay defense.
 
 ## File Uploads
 
@@ -51,6 +58,9 @@ Known risk:
 - The production `xlsx` dependency has unresolved high-severity advisories.
   Keep workbook parsing local, add size/timeout containment, and replace or
   isolate the read path when practical.
+- Imported or legacy lease royalty, ORRI burden, and WI assignment fractions are
+  strict-parsed before leasehold math. Malformed non-blank values must stay
+  warning-visible and treated as 0 until corrected, not silently clamped.
 
 ## Browser Security
 
@@ -61,6 +71,7 @@ At minimum, review:
 - `style-src`
 - `font-src`
 - `connect-src` for Ollama and cloud AI endpoints
+- Cognito Hosted UI plus user-pool issuer metadata/JWKS endpoints
 - `img-src` / `media-src` for document previews
 
 Do not assume local-first safety carries over to hosted deployments.

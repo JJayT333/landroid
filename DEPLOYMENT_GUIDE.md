@@ -173,6 +173,7 @@ Amplify auto-detects Vite. The `amplify.yml` committed at repo root will be used
 | `VITE_COGNITO_DOMAIN` | `us-east-1twebb7xvq.auth.us-east-1.amazoncognito.com` |
 | `VITE_COGNITO_CLIENT_ID` | `6os4uiu0b46pf74nhbrm5gsg0v` |
 | `VITE_COGNITO_REDIRECT_URI` | `https://landroid.abstractmapping.com/` |
+| `VITE_COGNITO_USER_POOL_ID` | `us-east-1_TWeBB7xvQ` |
 
 Save and deploy. First build takes ~3 minutes.
 
@@ -246,7 +247,7 @@ Automated pass first:
 bash scripts/smoke-test-hosted.sh
 ```
 
-This checks the root page loads, security headers are applied, `/api/ai/*` rejects unauthenticated requests (NOT returning 200 or 404), the SPA catch-all works, and the Cognito JWKS endpoint responds. Any failure points to a specific remediation in the output.
+This checks the root page loads, security headers are applied, `/api/ai/*` rejects unauthenticated requests (NOT returning 200 or 404), the SPA catch-all works, and the Cognito user-pool OIDC metadata plus JWKS endpoints respond. Any failure points to a specific remediation in the output.
 
 Then manual end-to-end:
 
@@ -262,6 +263,7 @@ If any step fails, check in order:
 - **Login redirect fails with "Invalid request":** the `redirect_uri` in Cognito pool settings must exactly match `VITE_COGNITO_REDIRECT_URI`.
 - **AI panel shows "Not found":** the `/api/ai/*` rewrite rule is missing or the Function URL is wrong.
 - **AI returns 401:** the Lambda env vars `COGNITO_USER_POOL_ID` / `COGNITO_CLIENT_ID` don't match the pool you logged into.
+- **AI returns 502 with an upstream authentication message:** the browser session is fine; check the Lambda `OPENAI_API_KEY` server env var.
 - **CSP error in DevTools console:** review `customHttp.yml` and adjust the `connect-src` directive.
 
 ### Hosted IndexedDB migration note
@@ -296,8 +298,10 @@ These are intentional trade-offs to keep the first deploy cheap and small. They 
 | Per-user browser IndexedDB only; no shared backend project database | Backend DB isn't built yet | Before users need cross-device or shared-project data |
 | OpenAI key in Lambda env var, not Secrets Manager | One moving part, not two | When you want rotation |
 | Daily token ceiling depends on the DynamoDB usage table and `USAGE_TABLE_NAME` env var | Lambda allows in-memory fallback only when explicitly enabled for local smoke tests | Before any hosted user invite |
+| Lambda Function URL auth type is `NONE` | The handler verifies Cognito ID tokens server-side; Function URL CORS is only a browser control and does not prevent stolen-token replay | Before broader exposure, place the proxy behind a stronger edge/API boundary or add equivalent server-side replay controls |
 | File uploads still stored in IndexedDB | No S3 yet | When files are big or shared |
-| AI mutating tools **disabled** in hosted mode — enforced at the `streamText` tool filter (`readOnlyLandroidTools` in `src/ai/tools.ts`), test `read-only-tools.test.ts` | Approval boundary not yet built | When the proposal/approval UI ships |
+| Demo Data hidden in hosted mode | Prevents fixture loading from overwriting a signed-in IndexedDB workspace | Replace with typed confirmation only if hosted demo workflows become necessary |
+| AI mutating and persisted-focus tools **disabled** in hosted mode — enforced at the `streamText` tool filter (`readOnlyLandroidTools` / `HOSTED_BLOCKED_TOOL_NAMES` in `src/ai/tools.ts`), test `read-only-tools.test.ts` | Approval boundary not yet built | When the proposal/approval UI ships |
 | Audit log is CloudWatch JSON lines only (one per request) | No DynamoDB ledger yet | Before multi-user |
 | No MIME-sniff on uploads — extension + size caps only | Single-user trust model | Before broader exposure |
 

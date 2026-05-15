@@ -28,9 +28,8 @@ async function openApp(page: Page) {
 /**
  * Load the combinatorial demo through the Navbar's Demo Data dropdown.
  * The leasehold and stress demos were retired in Phase 3 — only the
- * combinatorial fixture remains, and all deep leasehold-specific
- * assertions below are skipped until Phase 4 rebuilds them against the
- * new 10-tract Raven Forest fixture.
+ * combinatorial fixture remains. Phase 4 is rebuilding the deeper workflow
+ * assertions against the current 10-tract Raven Forest fixture.
  */
 async function loadCombinatorialDemo(page: Page) {
   await page.getByRole('button', { name: /Demo Data/ }).click();
@@ -174,16 +173,48 @@ test('project name is inline-editable from the Navbar', async ({ page }) => {
   expect(browserErrors).toEqual([]);
 });
 
-test.skip('leasehold seed keeps PDF filenames visible and owner leases branch-aware', async ({
+test('leasehold seed keeps PDF filenames visible and owner leases branch-aware', async ({
   page,
 }) => {
-  // PHASE 3: the 8-tract leasehold demo was retired along with the stress
-  // fixture. Phase 4 rebuilds the same assertions against the new 10-tract
-  // Raven Forest combinatorial fixture (unit grouping + same-owner lease
-  // coverage). Until then this test is skipped.
   const browserErrors = collectBrowserErrors(page);
   await openApp(page);
   await loadCombinatorialDemo(page);
+
+  await expect(page.getByText('Raven Forest Unit A').first()).toBeVisible();
+  await expect(page.getByText('Raven Forest Unit B').first()).toBeVisible();
+  await expect(page.getByText('C10 — Kitchen Sink').first()).toBeVisible();
+  await expect(
+    page.locator('[title="View attached PDF: 09-6968.pdf"]').first()
+  ).toBeVisible();
+  await expect(page.getByRole('button', { name: 'PDF 09-6968.pdf' })).toBeVisible();
+  await expect(page.getByText('Lessor: Charlotte Whitaker')).toBeVisible();
+  await expect(
+    page.getByText('Lease: C1 — Baseline Splits — Charlotte Whitaker Lease')
+  ).toBeVisible();
+
+  await page.getByRole('button', { name: 'Leasehold' }).click();
+  await expect(
+    page.getByText(/Raven Forest Unit A is isolated here/)
+  ).toBeVisible();
+  await expect(page.getByText('Texas Energy Acquisitions LP').first()).toBeVisible();
+
+  await page.getByRole('button', { name: 'Map', exact: true }).click();
+  await expect(page.getByText('Leasehold Map').first()).toBeVisible();
+  await page.getByRole('button', { name: /C1 C1 — Baseline Splits/ }).click();
+  await expect(page.getByText('Tract Focus').first()).toBeVisible();
+  await expect(
+    page.getByText('C1 — Baseline Splits — Olivia Whitaker Lease')
+  ).toBeVisible();
+  await expect(page.getByText(/Doc# ST-10072/)).toBeVisible();
+  await expect(
+    page.getByText('C1 — Baseline Splits — Paul Whitaker Lease')
+  ).toBeVisible();
+  await expect(page.getByText(/Doc# ST-10073/)).toBeVisible();
+  await expect(
+    page.getByText('C1 — Baseline Splits — Peter Whitaker Lease')
+  ).toBeVisible();
+  await expect(page.getByText(/Doc# ST-10074/)).toBeVisible();
+
   expect(browserErrors).toEqual([]);
 });
 

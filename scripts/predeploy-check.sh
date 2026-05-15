@@ -47,7 +47,8 @@ has_file "backend/ai-proxy/src/handler.ts"
 printf "\n[2/6] Frontend build guard\n"
 if grep -q "VITE_COGNITO_DOMAIN" "$ROOT/amplify.yml" \
   && grep -q "VITE_COGNITO_CLIENT_ID" "$ROOT/amplify.yml" \
-  && grep -q "VITE_COGNITO_REDIRECT_URI" "$ROOT/amplify.yml"; then
+  && grep -q "VITE_COGNITO_REDIRECT_URI" "$ROOT/amplify.yml" \
+  && grep -q "VITE_COGNITO_USER_POOL_ID" "$ROOT/amplify.yml"; then
   pass "amplify.yml requires Cognito build env vars"
 else
   fail "amplify.yml does not guard required Cognito env vars"

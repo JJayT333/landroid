@@ -9,12 +9,32 @@
 
 export const HARDCODED_MODEL = 'gpt-4o-mini';
 export const MAX_OUTPUT_TOKENS = 2048;
+export const MAX_REQUEST_BODY_BYTES = 256 * 1024;
 export const DAILY_TOKEN_CEILING = 500_000;
 // Rough tokens-per-character ratio for English text. Used to size-estimate
 // the request before forwarding so we can enforce the daily ceiling on a
 // real number instead of the completion-tokens header that OpenAI doesn't
 // actually emit. Deliberately slightly generous (3.5 vs ~4) to over-count.
 export const CHARS_PER_TOKEN = 3.5;
+export const ALLOWED_OPENAI_CHAT_BODY_FIELDS = new Set([
+  'messages',
+  'temperature',
+  'top_p',
+  'frequency_penalty',
+  'presence_penalty',
+  'response_format',
+  'stop',
+  'seed',
+  'reasoning_effort',
+  'verbosity',
+  'tools',
+  'tool_choice',
+  'stream',
+  'stream_options',
+  'max_tokens',
+  'model',
+  'user',
+]);
 
 export function routeMatches(method: string, path: string): boolean {
   return method === 'POST' && path.endsWith('/chat/completions');
@@ -38,6 +58,11 @@ export function decodeBody(body: string | undefined, isBase64Encoded: boolean | 
   return body;
 }
 
+export function bodyByteLength(body: string | undefined, isBase64Encoded: boolean | undefined): number {
+  if (!body) return 0;
+  return Buffer.byteLength(body, isBase64Encoded ? 'base64' : 'utf8');
+}
+
 export function estimateInputTokens(rawBody: string): number {
   return Math.ceil(rawBody.length / CHARS_PER_TOKEN) + MAX_OUTPUT_TOKENS;
 }
@@ -54,9 +79,17 @@ export function applyBodyPolicy(
   body: Record<string, unknown>,
   sub: string
 ): Record<string, unknown> {
-  const out: Record<string, unknown> = { ...body };
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(body)) {
+    if (ALLOWED_OPENAI_CHAT_BODY_FIELDS.has(key) && value !== undefined) {
+      out[key] = value;
+    }
+  }
   out.model = HARDCODED_MODEL;
-  const requested = typeof out.max_tokens === 'number' ? out.max_tokens : MAX_OUTPUT_TOKENS;
+  const requested =
+    typeof body.max_tokens === 'number' && Number.isFinite(body.max_tokens) && body.max_tokens > 0
+      ? Math.floor(body.max_tokens)
+      : MAX_OUTPUT_TOKENS;
   out.max_tokens = Math.min(requested, MAX_OUTPUT_TOKENS);
   out.user = sub;
   return out;

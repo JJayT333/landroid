@@ -99,6 +99,7 @@ Build environment variables:
 VITE_COGNITO_DOMAIN=us-east-1twebb7xvq.auth.us-east-1.amazoncognito.com
 VITE_COGNITO_CLIENT_ID=6os4uiu0b46pf74nhbrm5gsg0v
 VITE_COGNITO_REDIRECT_URI=https://landroid.abstractmapping.com/
+VITE_COGNITO_USER_POOL_ID=us-east-1_TWeBB7xvQ
 ```
 
 Generate paste-ready rewrites after Lambda gives you the Function URL:
@@ -148,5 +149,6 @@ Do not invite additional testers if any of these are true:
 - `/api/ai/*` returns 200 without a token.
 - Lambda logs show `Missing env: USAGE_TABLE_NAME`.
 - DynamoDB usage rows are not being written after an AI call.
+- Cognito user-pool metadata or JWKS smoke checks fail.
 - Cognito redirects to an `Invalid request` page.
 - Amplify rewrites still contain `REPLACE_WITH_FUNCTION_URL_HOST`.

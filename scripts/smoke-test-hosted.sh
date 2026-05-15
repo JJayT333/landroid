@@ -15,6 +15,7 @@ HOST="${HOST:-landroid.abstractmapping.com}"
 BASE="https://${HOST}"
 COGNITO_REGION="${COGNITO_REGION:-us-east-1}"
 COGNITO_USER_POOL_ID="${COGNITO_USER_POOL_ID:-us-east-1_TWeBB7xvQ}"
+COGNITO_METADATA="https://cognito-idp.${COGNITO_REGION}.amazonaws.com/${COGNITO_USER_POOL_ID}/.well-known/openid-configuration"
 COGNITO_JWKS="https://cognito-idp.${COGNITO_REGION}.amazonaws.com/${COGNITO_USER_POOL_ID}/.well-known/jwks.json"
 FAIL=0
 
@@ -79,8 +80,15 @@ else
   fail "unknown path → $FALLBACK (SPA catch-all rewrite not wired)"
 fi
 
-# 5. Cognito user-pool issuer is reachable.
-printf "\n[5/5] Cognito user-pool JWKS reachable\n"
+# 5. Cognito user-pool issuer metadata is reachable.
+printf "\n[5/5] Cognito user-pool metadata reachable\n"
+COGNITO_META=$(curl -s -o /dev/null -w "%{http_code}" "$COGNITO_METADATA" || true)
+if [[ "$COGNITO_META" == "200" ]]; then
+  pass "Cognito OIDC metadata endpoint → 200"
+else
+  fail "Cognito OIDC metadata endpoint → ${COGNITO_META:-000} (pool ID or region mismatch)"
+fi
+
 COGNITO=$(curl -s -o /dev/null -w "%{http_code}" "$COGNITO_JWKS" || true)
 if [[ "$COGNITO" == "200" ]]; then
   pass "Cognito JWKS endpoint → 200"

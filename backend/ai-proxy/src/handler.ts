@@ -22,7 +22,9 @@ import {
 } from './usage-store.js';
 import {
   DAILY_TOKEN_CEILING,
+  MAX_REQUEST_BODY_BYTES,
   applyBodyPolicy,
+  bodyByteLength,
   decodeBody,
   estimateInputTokens,
   extractBearer,
@@ -138,9 +140,28 @@ export const handler = awslambda.streamifyResponse(
       }
       userSub = payload.sub;
 
+      const requestBodyBytes = bodyByteLength(event.body, event.isBase64Encoded);
+      if (requestBodyBytes > MAX_REQUEST_BODY_BYTES) {
+        logEvent({
+          evt: 'reject',
+          reason: 'body_too_large',
+          user: payload.sub,
+          requestBodyBytes,
+          limit: MAX_REQUEST_BODY_BYTES,
+          status: 413,
+        });
+        return jsonError(responseStream, 413, 'Request body is too large.');
+      }
+
       const rawBody = decodeBody(event.body, event.isBase64Encoded);
 
-      const estimatedTokens = estimateInputTokens(rawBody);
+      const parsed = parseJsonBody(rawBody);
+      if (!parsed.ok) {
+        logEvent({ evt: 'reject', reason: 'bad_json', user: payload.sub, status: 400 });
+        return jsonError(responseStream, 400, 'Body must be JSON.');
+      }
+      const body = applyBodyPolicy(parsed.body, payload.sub);
+      const estimatedTokens = estimateInputTokens(JSON.stringify(body));
       const ceilingCheck = await trackUsage(payload.sub, estimatedTokens);
       if (!ceilingCheck.underCeiling) {
         logEvent({
@@ -154,13 +175,6 @@ export const handler = awslambda.streamifyResponse(
         return jsonError(responseStream, 429, 'Daily token ceiling reached. Try again tomorrow.');
       }
 
-      const parsed = parseJsonBody(rawBody);
-      if (!parsed.ok) {
-        logEvent({ evt: 'reject', reason: 'bad_json', user: payload.sub, status: 400 });
-        return jsonError(responseStream, 400, 'Body must be JSON.');
-      }
-      const body = applyBodyPolicy(parsed.body, payload.sub);
-
       const upstream = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -172,13 +186,19 @@ export const handler = awslambda.streamifyResponse(
 
       if (!upstream.ok) {
         const errText = await upstream.text();
+        const status = upstream.status === 401 || upstream.status === 403 ? 502 : upstream.status;
+        const message =
+          upstream.status === 401 || upstream.status === 403
+            ? 'Upstream AI provider authentication failed at the proxy.'
+            : `Upstream error: ${errText.slice(0, 500)}`;
         logEvent({
           evt: 'upstream_error',
           user: payload.sub,
           upstreamStatus: upstream.status,
+          status,
           bodyPrefix: errText.slice(0, 200),
         });
-        return jsonError(responseStream, upstream.status, `Upstream error: ${errText.slice(0, 500)}`);
+        return jsonError(responseStream, status, message);
       }
 
       const framed = awslambda.HttpResponseStream.from(responseStream, {
