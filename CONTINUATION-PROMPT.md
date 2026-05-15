@@ -70,22 +70,28 @@ existed on the base commit `665fc3a`.
 
 ### What's Left
 
-**Phase B (next):** UI surface for multi-doc attachments.
-- `DeskMapDocumentBadge` becomes `DeskMapDocumentChips` — a row of chips,
-  4 visible + `+N more` overflow. Each chip click opens its own doc.
-- `PdfViewerModal` switches prop from `nodeId` to `docId` so a multi-
-  chip surface can target any attachment directly.
-- Node-edit, lease, and NPRI modals get an attachments section: list +
-  add + rename + remove + reorder.
-- Phase 6 modal focus-trap work can ride along on the same modal edits.
+**Phase B is complete.** Multi-doc UI shipped in commit `7346987`:
+chips, shared AttachmentsSection, docId callback chain, modal focus
+trap. See the commit message for the full breakdown.
 
-**Phase D (later):** `seed-test-data.ts` migration to call the v8
-attach actions instead of the existing single-doc seed pathway.
+**Phase D (next):** `seed-test-data.ts` migration to seed the
+Combinatorial — Raven Forest fixture with multi-doc test data through
+the new v8 attach actions. Today the seed still seeds one PDF per node
+via the workspace-store `attachDocToNode` action; Phase D should add
+deliberate multi-attachment nodes (deed + obit + affidavit pattern)
+so the chips UI has something realistic to show in dev.
 
-**Phase E (later):** add the multi-chip Playwright spec from the design
-doc and unskip the four remaining workflows (`.landroid` round-trip,
-branch-scoped lease delete, curative linkage, research linkage) against
-the new schema.
+**Phase E (later):** Playwright work.
+- Add the multi-chip spec from the design doc: attach 3 PDFs to one
+  node, click each chip, verify each opens the correct PDF in
+  `PdfViewerModal`.
+- Unskip the four remaining workflows against the new v8 schema:
+  `.landroid` round-trip, branch-scoped lease delete, curative
+  linkage, research linkage.
+- Confirm the existing "combinatorial demo loads with desk-map cards
+  and PDF badges" workflow still passes against `DeskMapDocumentChips`
+  (the badge selector will need to be updated to match the new chip
+  markup).
 
 **Phase F (later):** doc rail update —
 `CHANGELOG.md`, `USER_MANUAL.md` Desk Map PDF chip section,
