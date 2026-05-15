@@ -5,6 +5,10 @@ import {
   normalizeDepthRange,
   type DepthRange,
 } from './depth-range';
+import {
+  isDocumentKind,
+  type DocumentKind,
+} from './document';
 
 export type ConveyanceMode = 'fraction' | 'fixed' | 'all';
 export type SplitBasis = 'initial' | 'remaining' | 'whole';
@@ -32,6 +36,27 @@ export type FixedRoyaltyBasis = 'burdened_branch' | 'whole_tract' | null;
  * `LANDMAN-MATH-REFERENCE.md` → "NPRI handling".
  */
 export type RoyaltyKind = 'fixed' | 'floating' | null;
+
+/**
+ * Denormalized cache of every document currently attached to a node
+ * (Phase 5 / ADR 0004). The source of truth is the Dexie
+ * `document_attachments` + `documents` pair — this array exists so Desk
+ * Map cards can render chips without a per-node async read.
+ *
+ * Workspace-store actions keep this array in sync with Dexie writes
+ * (`attachDocToNode`, `detachDocFromNode`, `renameDocOnNode`,
+ * `reorderNodeAttachments`); workspace load repopulates it from Dexie.
+ */
+export interface NodeAttachmentSummary {
+  /** Stable UUID matching the underlying `DocumentRecord.docId`. */
+  docId: string;
+  /** Matching `DocumentAttachment.attachmentId`. */
+  attachmentId: string;
+  /** Cached for badge rendering. */
+  fileName: string;
+  /** Cached for the chip-color / type-tag UI. */
+  kind: DocumentKind;
+}
 
 export interface OwnershipNode {
   id: string;
@@ -69,8 +94,19 @@ export interface OwnershipNode {
   graveyardLink: string;
 
   // Attachment
+  /**
+   * v7 single-PDF-per-node flags. Kept in the type for one release so the
+   * v8 → v7 rollback path stays intact; new code reads {@link attachments}
+   * instead. These two fields are dropped in Phase A4.
+   */
   hasDoc: boolean;
   docFileName: string;
+  /**
+   * v8 multi-doc attachments cache. Source of truth lives in Dexie
+   * (`documents` + `document_attachments`); this array is the
+   * denormalized render cache. See {@link NodeAttachmentSummary}.
+   */
+  attachments: NodeAttachmentSummary[];
   linkedOwnerId: string | null;
   linkedLeaseId: string | null;
   relatedKind: RelatedNodeKind | null;
@@ -185,6 +221,32 @@ function normalizeFixedRoyaltyBasis(value: unknown): FixedRoyaltyBasis {
   return null;
 }
 
+function normalizeAttachmentSummary(value: unknown): NodeAttachmentSummary | null {
+  if (!value || typeof value !== 'object') return null;
+  const raw = value as {
+    docId?: unknown;
+    attachmentId?: unknown;
+    fileName?: unknown;
+    kind?: unknown;
+  };
+  if (typeof raw.docId !== 'string' || raw.docId === '') return null;
+  if (typeof raw.attachmentId !== 'string' || raw.attachmentId === '') return null;
+  return {
+    docId: raw.docId,
+    attachmentId: raw.attachmentId,
+    fileName: typeof raw.fileName === 'string' ? raw.fileName : '',
+    kind: isDocumentKind(raw.kind) ? raw.kind : 'other',
+  };
+}
+
+function normalizeAttachmentSummaries(value: unknown): NodeAttachmentSummary[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((entry) => {
+    const normalized = normalizeAttachmentSummary(entry);
+    return normalized ? [normalized] : [];
+  });
+}
+
 function normalizeUnitCode(value: unknown): DeskMapUnitCode | undefined {
   const normalized = normalizeText(value).replace(/\s+/g, ' ').slice(0, 64);
   return normalized.length > 0 ? normalized : undefined;
@@ -295,6 +357,7 @@ export function createBlankNode(id: string, parentId: string | null = null): Own
     graveyardLink: '',
     hasDoc: false,
     docFileName: '',
+    attachments: [],
     linkedOwnerId: null,
     linkedLeaseId: null,
     relatedKind: null,
@@ -345,6 +408,7 @@ export function normalizeOwnershipNode(
     graveyardLink: normalizeText(node.graveyardLink),
     hasDoc: node.hasDoc === true,
     docFileName: normalizeText(node.docFileName),
+    attachments: normalizeAttachmentSummaries(node.attachments),
     linkedOwnerId: node.linkedOwnerId ?? null,
     linkedLeaseId: node.linkedLeaseId ?? null,
     relatedKind: normalizeRelatedKind(node.relatedKind),
