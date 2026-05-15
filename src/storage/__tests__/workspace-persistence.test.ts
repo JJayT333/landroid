@@ -268,13 +268,28 @@ function buildWorkspace(canvas: CanvasSaveData | null): LandroidFileData {
     activeDeskMapId: 'dm-1',
     instrumentTypes: ['Deed'],
     canvas,
-    pdfData: {
-      pdfs: [
+    documentData: {
+      documents: [
         {
-          nodeId: 'node-1',
+          docId: 'doc-fixture-1',
+          workspaceId: 'ws-1',
           fileName: '20260001.pdf',
           mimeType: 'application/pdf',
+          byteLength: 13,
+          contentHash: 'fixture-hash',
           blob: new Blob(['node-pdf-body'], { type: 'application/pdf' }),
+          kind: 'deed',
+          createdAt: '2026-04-01T00:00:00.000Z',
+          updatedAt: '2026-04-01T00:00:00.000Z',
+        },
+      ],
+      attachments: [
+        {
+          attachmentId: 'att-fixture-1',
+          docId: 'doc-fixture-1',
+          entityKind: 'node',
+          entityId: 'node-1',
+          position: 0,
           createdAt: '2026-04-01T00:00:00.000Z',
         },
       ],
@@ -324,12 +339,17 @@ describe('workspace-persistence', () => {
       original.leaseholdTransferOrderEntries
     );
     expect(imported.canvas).toEqual(original.canvas);
-    expect(imported.pdfData?.pdfs[0]?.fileName).toBe('20260001.pdf');
-    // Phase 5: v7 `.landroid` files carry their PDFs in `pdfData.pdfs[]`
-    // and don't populate `node.attachments[]` directly. The post-import
-    // hydration step (A4b) re-reads attachments from Dexie's v8 tables;
-    // the round-trip-shape assertion above proves the PDF survived.
-    expect(await imported.pdfData?.pdfs[0]?.blob.text()).toBe('node-pdf-body');
+    expect(imported.documentData?.documents[0]?.fileName).toBe('20260001.pdf');
+    expect(await imported.documentData?.documents[0]?.blob.text()).toBe(
+      'node-pdf-body'
+    );
+    expect(imported.documentData?.attachments[0]).toMatchObject({
+      attachmentId: 'att-fixture-1',
+      docId: 'doc-fixture-1',
+      entityKind: 'node',
+      entityId: 'node-1',
+      position: 0,
+    });
     expect(imported.ownerData?.owners).toEqual(original.ownerData?.owners);
     expect(imported.ownerData?.docs[0]?.fileName).toBe('owner-notes.txt');
     expect(await imported.ownerData?.docs[0]?.blob.text()).toBe('owner-doc-body');
@@ -418,7 +438,7 @@ describe('workspace-persistence', () => {
       questions: [],
     });
     expect(imported.curativeData).toEqual({ titleIssues: [] });
-    expect(imported.pdfData).toEqual({ pdfs: [] });
+    expect(imported.documentData).toEqual({ documents: [], attachments: [] });
     expect(imported.leaseholdUnit).toEqual({
       name: '',
       description: '',
@@ -436,11 +456,7 @@ describe('workspace-persistence', () => {
     expect(imported.nodes[0]?.royaltyKind).toBeNull();
   });
 
-  it('imports a legacy .landroid whose node carries no v8 attachment data with an empty attachments list', async () => {
-    // Phase 5: the v7 `hasDoc`/`docFileName` reconciliation against
-    // `pdfData.pdfs` was dropped in A4c — the v8 data layer treats
-    // missing PDF payloads as "no attachments." Properly migrating a v7
-    // .landroid into v8 documents/document_attachments is A5.
+  it('imports a legacy v6 .landroid with no PDF payload as empty documentData', async () => {
     const payload = {
       version: 6,
       workspaceId: 'ws-missing-pdf',
@@ -461,7 +477,60 @@ describe('workspace-persistence', () => {
     const imported = await importLandroidFile(file);
 
     expect(imported.nodes[0]?.attachments).toEqual([]);
-    expect(imported.pdfData).toEqual({ pdfs: [] });
+    expect(imported.documentData).toEqual({ documents: [], attachments: [] });
+  });
+
+  it('migrates a v7 .landroid PDF payload inline into v8 documents + attachments', async () => {
+    const v7Pdf = {
+      nodeId: 'node-v7',
+      fileName: 'oldfile.pdf',
+      mimeType: 'application/pdf',
+      blob: { base64: btoa('v7-blob-body'), mimeType: 'application/pdf' },
+      createdAt: '2025-12-01T00:00:00.000Z',
+    };
+    const payload = {
+      version: 7,
+      workspaceId: 'ws-v7',
+      projectName: 'Legacy v7',
+      nodes: [createBlankNode('node-v7')],
+      deskMaps: [],
+      activeDeskMapId: null,
+      instrumentTypes: [],
+      pdfData: { pdfs: [v7Pdf] },
+    };
+    const file = new File([JSON.stringify(payload)], 'legacy.landroid', {
+      type: 'application/json',
+    });
+
+    const imported = await importLandroidFile(file);
+
+    expect(imported.documentData?.documents).toHaveLength(1);
+    expect(imported.documentData?.documents[0]).toMatchObject({
+      workspaceId: 'ws-v7',
+      fileName: 'oldfile.pdf',
+      mimeType: 'application/pdf',
+      kind: 'other',
+    });
+    expect(await imported.documentData?.documents[0]?.blob.text()).toBe(
+      'v7-blob-body'
+    );
+    expect(imported.documentData?.attachments).toHaveLength(1);
+    expect(imported.documentData?.attachments[0]).toMatchObject({
+      entityKind: 'node',
+      entityId: 'node-v7',
+      position: 0,
+      docId: imported.documentData?.documents[0]?.docId,
+    });
+  });
+
+  it('writes version 8 in the export payload', async () => {
+    const original = buildWorkspace(buildCanvas());
+    const blob = await exportLandroidFile(original);
+    const parsed = JSON.parse(await blob.text());
+    expect(parsed.version).toBe(8);
+    // The legacy v7 `pdfData` slot is gone in v8.
+    expect(parsed.pdfData).toBeUndefined();
+    expect(parsed.documentData).toBeDefined();
   });
 
   it('normalizes legacy imported leases that predate royalty and leased-interest fields', async () => {

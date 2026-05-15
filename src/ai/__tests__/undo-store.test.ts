@@ -7,19 +7,19 @@ import { useOwnerStore } from '../../store/owner-store';
 import { useWorkspaceStore } from '../../store/workspace-store';
 
 const persistenceMocks = vi.hoisted(() => ({
-  exportPdfWorkspaceData: vi.fn(),
-  replacePdfWorkspaceData: vi.fn(),
+  exportDocumentWorkspaceData: vi.fn(),
+  replaceDocumentWorkspaceData: vi.fn(),
 }));
 
 vi.mock('../../storage/workspace-persistence', () => ({
-  exportPdfWorkspaceData: persistenceMocks.exportPdfWorkspaceData,
-  replacePdfWorkspaceData: persistenceMocks.replacePdfWorkspaceData,
+  exportDocumentWorkspaceData: persistenceMocks.exportDocumentWorkspaceData,
+  replaceDocumentWorkspaceData: persistenceMocks.replaceDocumentWorkspaceData,
 }));
 
 describe('AI undo snapshots', () => {
   beforeEach(() => {
-    persistenceMocks.exportPdfWorkspaceData.mockReset();
-    persistenceMocks.replacePdfWorkspaceData.mockReset();
+    persistenceMocks.exportDocumentWorkspaceData.mockReset();
+    persistenceMocks.replaceDocumentWorkspaceData.mockReset();
 
     useWorkspaceStore.setState({
       workspaceId: 'ws-1',
@@ -38,7 +38,7 @@ describe('AI undo snapshots', () => {
     useMapStore.setState({ mapAssets: [], mapRegions: [], mapReferences: [] });
   });
 
-  it('captures node PDF workspace data alongside store state', async () => {
+  it('captures node document workspace data alongside store state', async () => {
     const { captureSnapshot } = await import('../undo-store');
     const node = {
       ...createBlankNode('node-1'),
@@ -51,23 +51,41 @@ describe('AI undo snapshots', () => {
         },
       ],
     };
-    const pdfData = {
-      pdfs: [
+    const documentData = {
+      documents: [
         {
-          nodeId: node.id,
+          docId: 'doc-undo',
+          workspaceId: 'ws-1',
           fileName: 'instrument.pdf',
           mimeType: 'application/pdf',
+          byteLength: 3,
+          contentHash: 'hash-stub',
           blob: new Blob(['pdf'], { type: 'application/pdf' }),
+          kind: 'deed' as const,
+          createdAt: '2026-04-19T00:00:00.000Z',
+          updatedAt: '2026-04-19T00:00:00.000Z',
+        },
+      ],
+      attachments: [
+        {
+          attachmentId: 'att-undo',
+          docId: 'doc-undo',
+          entityKind: 'node' as const,
+          entityId: node.id,
+          position: 0,
           createdAt: '2026-04-19T00:00:00.000Z',
         },
       ],
     };
-    persistenceMocks.exportPdfWorkspaceData.mockResolvedValue(pdfData);
+    persistenceMocks.exportDocumentWorkspaceData.mockResolvedValue(documentData);
     useWorkspaceStore.setState({ nodes: [node] });
 
     const snapshot = await captureSnapshot('before AI');
 
-    expect(persistenceMocks.exportPdfWorkspaceData).toHaveBeenCalledWith([node]);
-    expect(snapshot?.pdf).toBe(pdfData);
+    expect(persistenceMocks.exportDocumentWorkspaceData).toHaveBeenCalledWith(
+      'ws-1',
+      [node]
+    );
+    expect(snapshot?.documents).toBe(documentData);
   });
 });
