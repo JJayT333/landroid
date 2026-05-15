@@ -1,3 +1,6 @@
+// Depth severance is not yet modeled; this module assumes
+// `depthRange: 'all_depths'` on every node, lease, ORRI, and WI assignment.
+// See `src/types/depth-range.ts` for the Phase 8 attachment point.
 import { d } from '../../engine/decimal';
 import {
   isNpriNode,

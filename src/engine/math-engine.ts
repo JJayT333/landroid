@@ -10,6 +10,10 @@
  *   3. executePredecessorInsert — insert a node between parent and child
  *   4. executeAttachConveyance  — move subtree to a new parent
  *   5. executeDeleteBranch — remove a branch and restore the parent's conveyed amount
+ *
+ * Depth severance is not yet modeled; every function in this module assumes
+ * `depthRange: 'all_depths'` on every record. See `src/types/depth-range.ts`
+ * for the Phase 8 attachment point.
  */
 import { Decimal } from 'decimal.js';
 import { d, clamp, serialize } from './decimal';

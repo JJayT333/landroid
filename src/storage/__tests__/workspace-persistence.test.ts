@@ -232,6 +232,7 @@ function buildWorkspace(canvas: CanvasSaveData | null): LandroidFileData {
         effectiveDate: '2024-03-01',
         sourceDocNo: 'ASG-1',
         notes: 'Starter WI split',
+        depthRange: 'all_depths',
       },
     ],
     leaseholdOrris: [
@@ -246,6 +247,7 @@ function buildWorkspace(canvas: CanvasSaveData | null): LandroidFileData {
         effectiveDate: '2024-02-01',
         sourceDocNo: 'ORRI-1',
         notes: 'Starter override',
+        depthRange: 'all_depths',
       },
     ],
     leaseholdTransferOrderEntries: [

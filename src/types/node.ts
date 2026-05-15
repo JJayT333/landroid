@@ -1,5 +1,11 @@
 /** Core domain types for ownership nodes and desk maps. */
 
+import {
+  DEFAULT_DEPTH_RANGE,
+  normalizeDepthRange,
+  type DepthRange,
+} from './depth-range';
+
 export type ConveyanceMode = 'fraction' | 'fixed' | 'all';
 export type SplitBasis = 'initial' | 'remaining' | 'whole';
 export type NodeType = 'conveyance' | 'related';
@@ -80,6 +86,12 @@ export interface OwnershipNode {
    * - `null` means not applicable (mineral nodes and floating NPRIs)
    */
   fixedRoyaltyBasis: FixedRoyaltyBasis;
+
+  /**
+   * Depth-range discriminator. See {@link DepthRange}. Defaults to
+   * `'all_depths'`; Phase 8 (depth severance) will extend the union.
+   */
+  depthRange: DepthRange;
 
   // UI state
   isCollapsed: boolean;
@@ -289,6 +301,7 @@ export function createBlankNode(id: string, parentId: string | null = null): Own
     interestClass: 'mineral',
     royaltyKind: null,
     fixedRoyaltyBasis: null,
+    depthRange: DEFAULT_DEPTH_RANGE,
     isCollapsed: false,
   };
 }
@@ -338,6 +351,7 @@ export function normalizeOwnershipNode(
     interestClass,
     royaltyKind,
     fixedRoyaltyBasis,
+    depthRange: normalizeDepthRange(node.depthRange),
     isCollapsed: node.isCollapsed === true,
   };
 }

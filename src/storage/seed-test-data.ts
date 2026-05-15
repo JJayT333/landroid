@@ -2135,6 +2135,7 @@ export function buildCombinatorialWorkspaceData(): {
       effectiveDate: '2024-02-01',
       sourceDocNo: 'CB-ORRI-1',
       notes: 'Unit A gross 8/8 ORRI covering every Unit A tract.',
+      depthRange: 'all_depths',
     },
     {
       id: 'combinatorial-orri-2',
@@ -2147,6 +2148,7 @@ export function buildCombinatorialWorkspaceData(): {
       effectiveDate: '2024-02-15',
       sourceDocNo: 'CB-ORRI-2',
       notes: 'Unit A NRI-basis ORRI for stacking-order review.',
+      depthRange: 'all_depths',
     },
     {
       id: 'combinatorial-orri-3',
@@ -2159,6 +2161,7 @@ export function buildCombinatorialWorkspaceData(): {
       effectiveDate: '2024-03-01',
       sourceDocNo: 'CB-ORRI-3',
       notes: 'Unit A WI-basis ORRI.',
+      depthRange: 'all_depths',
     },
     {
       id: 'combinatorial-orri-3b',
@@ -2171,6 +2174,7 @@ export function buildCombinatorialWorkspaceData(): {
       effectiveDate: '2024-03-15',
       sourceDocNo: 'CB-ORRI-3B',
       notes: 'Unit B gross 8/8 ORRI covering every Unit B tract.',
+      depthRange: 'all_depths',
     },
     {
       id: 'combinatorial-orri-4',
@@ -2183,6 +2187,7 @@ export function buildCombinatorialWorkspaceData(): {
       effectiveDate: '2024-04-10',
       sourceDocNo: 'CB-ORRI-4',
       notes: 'Tract-scope gross 8/8 ORRI on Tract 6 (royalty-deed flavor).',
+      depthRange: 'all_depths',
     },
     {
       id: 'combinatorial-orri-5',
@@ -2195,6 +2200,7 @@ export function buildCombinatorialWorkspaceData(): {
       effectiveDate: '2024-05-20',
       sourceDocNo: 'CB-ORRI-5',
       notes: 'Tract-scope NRI-basis ORRI on Tract 10 (kitchen sink).',
+      depthRange: 'all_depths',
     },
   ];
 
@@ -2211,6 +2217,7 @@ export function buildCombinatorialWorkspaceData(): {
       effectiveDate: '2024-03-01',
       sourceDocNo: 'CB-ASG-1',
       notes: 'Unit A 50% working-interest assignment to Caprock Resources.',
+      depthRange: 'all_depths',
     },
     {
       id: 'combinatorial-assignment-2',
@@ -2223,6 +2230,7 @@ export function buildCombinatorialWorkspaceData(): {
       effectiveDate: '2024-04-01',
       sourceDocNo: 'CB-ASG-2',
       notes: 'Tract-scope 25% WI assignment on Tract 6.',
+      depthRange: 'all_depths',
     },
     {
       id: 'combinatorial-assignment-3',
@@ -2235,6 +2243,7 @@ export function buildCombinatorialWorkspaceData(): {
       effectiveDate: '2024-05-01',
       sourceDocNo: 'CB-ASG-3',
       notes: 'Tract-scope 12.5% WI assignment on Tract 10 (kitchen sink).',
+      depthRange: 'all_depths',
     },
   ];
 

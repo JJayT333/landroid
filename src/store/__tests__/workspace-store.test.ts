@@ -373,6 +373,7 @@ describe('workspace-store', () => {
           effectiveDate: '',
           sourceDocNo: '',
           notes: '',
+          depthRange: 'all_depths',
         },
       ],
       leaseholdOrris: [
@@ -386,6 +387,7 @@ describe('workspace-store', () => {
           effectiveDate: '',
           sourceDocNo: '',
           notes: '',
+          depthRange: 'all_depths',
         },
       ],
       leaseholdTransferOrderEntries: [

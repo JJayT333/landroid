@@ -3,6 +3,11 @@ import {
   normalizeLeaseJurisdiction,
   type LeaseJurisdiction,
 } from './owner';
+import {
+  DEFAULT_DEPTH_RANGE,
+  normalizeDepthRange,
+  type DepthRange,
+} from './depth-range';
 import type { DeskMapUnitCode } from './node';
 
 export interface LeaseholdUnit {
@@ -55,6 +60,11 @@ export interface LeaseholdOrri {
   effectiveDate: string;
   sourceDocNo: string;
   notes: string;
+  /**
+   * Depth-range discriminator. See {@link DepthRange}. Defaults to
+   * `'all_depths'`; Phase 8 (depth severance) will extend the union.
+   */
+  depthRange: DepthRange;
 }
 
 export interface LeaseholdAssignment {
@@ -69,6 +79,11 @@ export interface LeaseholdAssignment {
   effectiveDate: string;
   sourceDocNo: string;
   notes: string;
+  /**
+   * Depth-range discriminator. See {@link DepthRange}. Defaults to
+   * `'all_depths'`; Phase 8 (depth severance) will extend the union.
+   */
+  depthRange: DepthRange;
 }
 
 export interface LeaseholdTransferOrderEntry {
@@ -163,6 +178,7 @@ export function createBlankLeaseholdOrri(
     effectiveDate: '',
     sourceDocNo: '',
     notes: '',
+    depthRange: DEFAULT_DEPTH_RANGE,
     ...overrides,
   };
 }
@@ -186,6 +202,7 @@ export function normalizeLeaseholdOrri(
     effectiveDate?: unknown;
     sourceDocNo?: unknown;
     notes?: unknown;
+    depthRange?: unknown;
   };
   const scope = normalizeInterestScope(record.scope);
   const candidateDeskMapId = asString(record.deskMapId);
@@ -205,6 +222,7 @@ export function normalizeLeaseholdOrri(
     effectiveDate: asString(record.effectiveDate),
     sourceDocNo: asString(record.sourceDocNo),
     notes: asString(record.notes),
+    depthRange: normalizeDepthRange(record.depthRange),
   });
 }
 
@@ -240,6 +258,7 @@ export function createBlankLeaseholdAssignment(
     effectiveDate: '',
     sourceDocNo: '',
     notes: '',
+    depthRange: DEFAULT_DEPTH_RANGE,
     ...overrides,
   };
 }
@@ -263,6 +282,7 @@ export function normalizeLeaseholdAssignment(
     effectiveDate?: unknown;
     sourceDocNo?: unknown;
     notes?: unknown;
+    depthRange?: unknown;
   };
   const scope = normalizeInterestScope(record.scope);
   const candidateDeskMapId = asString(record.deskMapId);
@@ -282,6 +302,7 @@ export function normalizeLeaseholdAssignment(
     effectiveDate: asString(record.effectiveDate),
     sourceDocNo: asString(record.sourceDocNo),
     notes: asString(record.notes),
+    depthRange: normalizeDepthRange(record.depthRange),
   });
 }
 

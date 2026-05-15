@@ -1,3 +1,6 @@
+// Depth severance is not yet modeled; this allocator assumes
+// `depthRange: 'all_depths'` on every node and lease. See
+// `src/types/depth-range.ts` for the Phase 8 attachment point.
 import type Decimal from 'decimal.js';
 import { d } from '../../engine/decimal';
 import { isNpriNode, type OwnershipNode } from '../../types/node';

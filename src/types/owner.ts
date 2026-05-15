@@ -1,3 +1,9 @@
+import {
+  DEFAULT_DEPTH_RANGE,
+  normalizeDepthRange,
+  type DepthRange,
+} from './depth-range';
+
 export interface Owner {
   id: string;
   workspaceId: string;
@@ -151,6 +157,11 @@ export interface Lease {
    * for every existing record; Phase 2 will key federal/BLM behaviors off this.
    */
   jurisdiction: LeaseJurisdiction;
+  /**
+   * Depth-range discriminator. See {@link DepthRange}. Defaults to
+   * `'all_depths'`; Phase 8 (depth severance) will extend the union.
+   */
+  depthRange: DepthRange;
   createdAt: string;
   updatedAt: string;
 }
@@ -248,6 +259,7 @@ export function createBlankLease(
     docNo: '',
     notes: '',
     jurisdiction: DEFAULT_LEASE_JURISDICTION,
+    depthRange: DEFAULT_DEPTH_RANGE,
     createdAt: overrides.createdAt ?? now,
     updatedAt: overrides.updatedAt ?? now,
     ...overrides,
@@ -257,6 +269,7 @@ export function createBlankLease(
   // Coerce jurisdiction even when overrides supplies a junk value, so a stray
   // import that hands us {jurisdiction: 'fee'} or undefined still lands on tx_fee.
   lease.jurisdiction = normalizeLeaseJurisdiction(lease.jurisdiction);
+  lease.depthRange = normalizeDepthRange(lease.depthRange);
   lease.status = normalizeLeaseStatus(lease.status);
   return lease;
 }
@@ -284,6 +297,7 @@ export function normalizeLease(
     docNo: asString(lease.docNo),
     notes: asString(lease.notes),
     jurisdiction: normalizeLeaseJurisdiction(lease.jurisdiction),
+    depthRange: normalizeDepthRange(lease.depthRange),
     createdAt: asString(lease.createdAt) || normalized.createdAt,
     updatedAt: asString(lease.updatedAt) || normalized.updatedAt,
   };

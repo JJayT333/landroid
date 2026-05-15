@@ -155,6 +155,7 @@ describe('view helpers', () => {
           effectiveDate: '2024-03-01',
           sourceDocNo: 'ASG-1',
           notes: '',
+          depthRange: 'all_depths',
         },
       ],
       leaseholdOrris: [
@@ -168,6 +169,7 @@ describe('view helpers', () => {
           effectiveDate: '2024-02-01',
           sourceDocNo: 'ORRI-1',
           notes: '',
+          depthRange: 'all_depths',
         },
       ],
     });

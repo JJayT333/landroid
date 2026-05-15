@@ -31,6 +31,7 @@ describe('deskmap-coverage', () => {
           jurisdiction: 'tx_fee',
           createdAt: '2026-03-30T00:00:00.000Z',
           updatedAt: '2026-03-30T00:00:00.000Z',
+          depthRange: 'all_depths',
         }],
       ],
     ]);
@@ -140,6 +141,7 @@ describe('deskmap-coverage', () => {
           jurisdiction: 'tx_fee',
           createdAt: '2026-03-01T00:00:00.000Z',
           updatedAt: '2026-03-01T00:00:00.000Z',
+          depthRange: 'all_depths',
         },
         {
           id: 'lease-2',
@@ -157,6 +159,7 @@ describe('deskmap-coverage', () => {
           jurisdiction: 'tx_fee',
           createdAt: '2026-04-01T00:00:00.000Z',
           updatedAt: '2026-04-01T00:00:00.000Z',
+          depthRange: 'all_depths',
         },
       ],
       '0.5'
@@ -204,6 +207,7 @@ describe('deskmap-coverage', () => {
           jurisdiction: 'tx_fee',
           createdAt: '2026-01-01T00:00:00.000Z',
           updatedAt: '2026-01-01T00:00:00.000Z',
+          depthRange: 'all_depths',
         },
         {
           id: 'lease-b',
@@ -221,6 +225,7 @@ describe('deskmap-coverage', () => {
           jurisdiction: 'tx_fee',
           createdAt: '2026-06-01T00:00:00.000Z',
           updatedAt: '2026-06-01T00:00:00.000Z',
+          depthRange: 'all_depths',
         },
       ],
       '0.5'
@@ -266,6 +271,7 @@ describe('deskmap-coverage', () => {
           jurisdiction: 'tx_fee',
           createdAt: '2026-03-01T00:00:00.000Z',
           updatedAt: '2026-03-01T00:00:00.000Z',
+          depthRange: 'all_depths',
         },
       ],
       '0.5'
@@ -300,6 +306,7 @@ describe('deskmap-coverage', () => {
           jurisdiction: 'tx_fee',
           createdAt: '2026-03-01T00:00:00.000Z',
           updatedAt: '2026-03-01T00:00:00.000Z',
+          depthRange: 'all_depths',
         },
       ],
       '0.5'
@@ -327,6 +334,7 @@ describe('deskmap-coverage', () => {
         jurisdiction: 'tx_fee',
         createdAt: '2026-03-01T00:00:00.000Z',
         updatedAt: '2026-03-01T00:00:00.000Z',
+        depthRange: 'all_depths',
       })
     ).toBe(true);
 
@@ -347,6 +355,7 @@ describe('deskmap-coverage', () => {
         jurisdiction: 'tx_fee',
         createdAt: '2026-03-01T00:00:00.000Z',
         updatedAt: '2026-03-01T00:00:00.000Z',
+        depthRange: 'all_depths',
       })
     ).toBe(false);
   });
@@ -402,6 +411,7 @@ describe('deskmap-coverage', () => {
         jurisdiction: 'tx_fee',
         createdAt: '2026-03-29T00:00:00.000Z',
         updatedAt: '2026-03-29T00:00:00.000Z',
+        depthRange: 'all_depths',
       },
       {
         id: 'lease-new',
@@ -419,6 +429,7 @@ describe('deskmap-coverage', () => {
         jurisdiction: 'tx_fee',
         createdAt: '2026-03-30T00:00:00.000Z',
         updatedAt: '2026-03-30T00:00:00.000Z',
+        depthRange: 'all_depths',
       },
       {
         id: 'lease-expired',
@@ -436,6 +447,7 @@ describe('deskmap-coverage', () => {
         jurisdiction: 'tx_fee',
         createdAt: '2026-04-01T00:00:00.000Z',
         updatedAt: '2026-04-01T00:00:00.000Z',
+        depthRange: 'all_depths',
       },
     ]);
 
@@ -459,6 +471,7 @@ describe('deskmap-coverage', () => {
         notes: '',
         createdAt: '2026-03-29T00:00:00.000Z',
         updatedAt: '2026-03-29T00:00:00.000Z',
+        depthRange: 'all_depths',
       } as Lease,
     ]);
 
@@ -489,6 +502,7 @@ describe('deskmap-coverage', () => {
           jurisdiction: 'tx_fee',
           createdAt: '2026-03-30T00:00:00.000Z',
           updatedAt: '2026-03-30T00:00:00.000Z',
+          depthRange: 'all_depths',
         }],
       ],
     ]);
@@ -528,6 +542,7 @@ describe('deskmap-coverage', () => {
             jurisdiction: 'tx_fee',
             createdAt: '2026-03-01T00:00:00.000Z',
             updatedAt: '2026-03-01T00:00:00.000Z',
+            depthRange: 'all_depths',
           },
           {
             id: 'lease-2',
@@ -545,6 +560,7 @@ describe('deskmap-coverage', () => {
             jurisdiction: 'tx_fee',
             createdAt: '2026-04-01T00:00:00.000Z',
             updatedAt: '2026-04-01T00:00:00.000Z',
+            depthRange: 'all_depths',
           },
         ],
       ],

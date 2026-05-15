@@ -143,6 +143,7 @@ describe('leasehold-summary', () => {
           effectiveDate: '2024-03-01',
           sourceDocNo: 'ASG-1',
           notes: '',
+          depthRange: 'all_depths',
         },
         {
           id: 'assignment-tract',
@@ -154,6 +155,7 @@ describe('leasehold-summary', () => {
           effectiveDate: '2024-03-15',
           sourceDocNo: 'ASG-2',
           notes: '',
+          depthRange: 'all_depths',
         },
       ],
       leaseholdOrris: [
@@ -167,6 +169,7 @@ describe('leasehold-summary', () => {
           effectiveDate: '2024-01-01',
           sourceDocNo: 'ORRI-1',
           notes: '',
+          depthRange: 'all_depths',
         },
         {
           id: 'orri-tract',
@@ -178,6 +181,7 @@ describe('leasehold-summary', () => {
           effectiveDate: '2024-01-02',
           sourceDocNo: 'ORRI-2',
           notes: '',
+          depthRange: 'all_depths',
         },
         {
           id: 'orri-unit-wi',
@@ -189,6 +193,7 @@ describe('leasehold-summary', () => {
           effectiveDate: '2024-01-03',
           sourceDocNo: 'ORRI-3',
           notes: '',
+          depthRange: 'all_depths',
         },
         {
           id: 'orri-tract-nri',
@@ -200,6 +205,7 @@ describe('leasehold-summary', () => {
           effectiveDate: '2024-01-04',
           sourceDocNo: 'ORRI-4',
           notes: '',
+          depthRange: 'all_depths',
         },
       ],
     });
@@ -449,6 +455,7 @@ describe('leasehold-summary', () => {
             effectiveDate: '2024-01-01',
             sourceDocNo: 'ORRI-WI',
             notes: '',
+            depthRange: 'all_depths',
           },
         ],
       });
@@ -737,6 +744,7 @@ describe('leasehold-summary', () => {
           effectiveDate: '2024-03-01',
           sourceDocNo: 'ASG-1',
           notes: '',
+          depthRange: 'all_depths',
         },
       ],
       leaseholdOrris: [
@@ -750,6 +758,7 @@ describe('leasehold-summary', () => {
           effectiveDate: '2024-02-01',
           sourceDocNo: 'ORRI-1',
           notes: '',
+          depthRange: 'all_depths',
         },
       ],
     });
@@ -831,6 +840,7 @@ describe('leasehold-summary', () => {
           effectiveDate: '2024-01-01',
           sourceDocNo: 'ORRI-G',
           notes: '',
+          depthRange: 'all_depths',
         },
         {
           id: 'orri-wi',
@@ -842,6 +852,7 @@ describe('leasehold-summary', () => {
           effectiveDate: '2024-01-02',
           sourceDocNo: 'ORRI-W',
           notes: '',
+          depthRange: 'all_depths',
         },
         {
           id: 'orri-nri',
@@ -853,6 +864,7 @@ describe('leasehold-summary', () => {
           effectiveDate: '2024-01-03',
           sourceDocNo: 'ORRI-N',
           notes: '',
+          depthRange: 'all_depths',
         },
       ],
     });
@@ -933,6 +945,7 @@ describe('leasehold-summary', () => {
           effectiveDate: '2024-01-01',
           sourceDocNo: 'ORRI-G',
           notes: '',
+          depthRange: 'all_depths',
         },
         {
           id: 'orri-wi',
@@ -944,6 +957,7 @@ describe('leasehold-summary', () => {
           effectiveDate: '2024-01-02',
           sourceDocNo: 'ORRI-W',
           notes: '',
+          depthRange: 'all_depths',
         },
         {
           id: 'orri-nri',
@@ -955,6 +969,7 @@ describe('leasehold-summary', () => {
           effectiveDate: '2024-01-03',
           sourceDocNo: 'ORRI-N',
           notes: '',
+          depthRange: 'all_depths',
         },
       ],
     });
@@ -1024,6 +1039,7 @@ describe('leasehold-summary', () => {
           effectiveDate: '2024-01-01',
           sourceDocNo: 'ORRI-NA',
           notes: '',
+          depthRange: 'all_depths',
         },
         {
           id: 'orri-nri-b',
@@ -1035,6 +1051,7 @@ describe('leasehold-summary', () => {
           effectiveDate: '2024-01-02',
           sourceDocNo: 'ORRI-NB',
           notes: '',
+          depthRange: 'all_depths',
         },
       ],
     });
@@ -1115,6 +1132,7 @@ describe('leasehold-summary', () => {
           effectiveDate: '2024-01-01',
           sourceDocNo: 'ORRI-NA',
           notes: '',
+          depthRange: 'all_depths',
         },
         {
           id: 'orri-nri-b',
@@ -1126,6 +1144,7 @@ describe('leasehold-summary', () => {
           effectiveDate: '2024-01-02',
           sourceDocNo: 'ORRI-NB',
           notes: '',
+          depthRange: 'all_depths',
         },
       ],
     });
@@ -1467,6 +1486,7 @@ describe('leasehold-summary', () => {
           effectiveDate: '2024-01-05',
           sourceDocNo: 'ORRI-NRI',
           notes: '',
+          depthRange: 'all_depths',
         },
       ],
     });
@@ -1633,6 +1653,7 @@ describe('leasehold-summary', () => {
           effectiveDate: '2024-03-01',
           sourceDocNo: 'ASG-1',
           notes: '',
+          depthRange: 'all_depths',
         },
         {
           id: 'assignment-tract',
@@ -1644,6 +1665,7 @@ describe('leasehold-summary', () => {
           effectiveDate: '2024-03-15',
           sourceDocNo: 'ASG-2',
           notes: '',
+          depthRange: 'all_depths',
         },
       ],
       leaseholdOrris: [],
@@ -1931,6 +1953,7 @@ describe('leasehold-summary', () => {
           effectiveDate: '2024-01-01',
           sourceDocNo: 'ASG-A',
           notes: '',
+          depthRange: 'all_depths',
         },
       ],
       leaseholdOrris: [
@@ -1945,6 +1968,7 @@ describe('leasehold-summary', () => {
           effectiveDate: '2024-01-01',
           sourceDocNo: 'ORRI-A',
           notes: '',
+          depthRange: 'all_depths',
         },
       ],
     });
