@@ -1,5 +1,11 @@
 /**
- * Accessible modal shell — backdrop, escape-to-close, click-outside-to-close.
+ * Accessible modal shell — backdrop, escape-to-close, click-outside-to-close,
+ * focus trap, and return-focus on close.
+ *
+ * Phase 5 / B4: closes the audit F8 modal-focus gap. Tab and Shift+Tab
+ * cycle focus within the dialog so keyboard users can't accidentally
+ * land on the page underneath. On close, focus returns to whichever
+ * element opened the dialog.
  */
 import { useEffect, useRef, type ReactNode } from 'react';
 
@@ -11,9 +17,36 @@ interface ModalProps {
   wide?: boolean;
 }
 
+/**
+ * Selector for elements that should participate in the Tab cycle.
+ * Mirrors the WAI-ARIA Authoring Practices guidance — buttons, links,
+ * form fields, anything with a non-negative tabindex, plus inputs that
+ * may have a `disabled` attribute (which we explicitly exclude).
+ */
+const FOCUSABLE_SELECTOR = [
+  'a[href]',
+  'area[href]',
+  'input:not([disabled]):not([type="hidden"])',
+  'select:not([disabled])',
+  'textarea:not([disabled])',
+  'button:not([disabled])',
+  'iframe',
+  'object',
+  'embed',
+  '[tabindex]:not([tabindex="-1"])',
+  '[contenteditable="true"]',
+].join(',');
+
+function getFocusable(container: HTMLElement): HTMLElement[] {
+  return Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR))
+    .filter((el) => !el.hasAttribute('aria-hidden') && el.offsetParent !== null);
+}
+
 export default function Modal({ open, onClose, title, children, wide }: ModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
 
+  // Escape-to-close.
   useEffect(() => {
     if (!open) return;
     const handleKey = (e: KeyboardEvent) => {
@@ -23,9 +56,66 @@ export default function Modal({ open, onClose, title, children, wide }: ModalPro
     return () => document.removeEventListener('keydown', handleKey);
   }, [open, onClose]);
 
-  // Focus trap: focus the dialog when it opens
+  // Capture the previously-focused element and move focus into the
+  // dialog on open. Restore focus on close.
   useEffect(() => {
-    if (open) dialogRef.current?.focus();
+    if (!open) return;
+    previousFocusRef.current =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+
+    // Defer the focus call so the dialog has actually mounted and is
+    // visible in the focus tree. The dialog itself is the fallback when
+    // it has no focusable children (rare — usually buttons are inside).
+    const dialog = dialogRef.current;
+    if (dialog) {
+      const focusables = getFocusable(dialog);
+      const target = focusables[0] ?? dialog;
+      target.focus();
+    }
+
+    return () => {
+      const previous = previousFocusRef.current;
+      if (previous && document.body.contains(previous)) {
+        previous.focus();
+      }
+      previousFocusRef.current = null;
+    };
+  }, [open]);
+
+  // Tab / Shift+Tab focus cycle.
+  useEffect(() => {
+    if (!open) return;
+    const handleTab = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab') return;
+      const dialog = dialogRef.current;
+      if (!dialog) return;
+      const focusables = getFocusable(dialog);
+      if (focusables.length === 0) {
+        // No focusable inside — keep focus pinned to the dialog itself.
+        e.preventDefault();
+        dialog.focus();
+        return;
+      }
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      const active = document.activeElement;
+
+      if (e.shiftKey) {
+        if (active === first || !dialog.contains(active)) {
+          e.preventDefault();
+          last.focus();
+        }
+      } else {
+        if (active === last || !dialog.contains(active)) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    };
+    document.addEventListener('keydown', handleTab);
+    return () => document.removeEventListener('keydown', handleTab);
   }, [open]);
 
   if (!open) return null;

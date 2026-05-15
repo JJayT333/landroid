@@ -1,31 +1,30 @@
 /**
- * PDF viewer modal — displays an attached PDF in an iframe.
+ * PDF viewer modal — displays a stored document in an iframe.
  *
- * Phase 5: keyed externally by `nodeId` for backward compatibility with
- * the Desk Map / NodeEditModal callback chain, but resolves the first
- * attached document on the node and loads the blob from the v8
- * `documents` table. Phase B will switch the prop to `docId` so a
- * multi-chip surface can target any attachment.
+ * Phase 5 / B2: keyed by `docId`. The caller (chips, modal "View PDF"
+ * buttons, multi-chip rows) resolves which document to show before
+ * opening the modal. `nodeId`-based callers are gone after B2.
  */
 import { useEffect, useState } from 'react';
 import Modal from '../shared/Modal';
 import { getDocBlob, getDocMeta } from '../../storage/document-store';
-import { useWorkspaceStore } from '../../store/workspace-store';
 
 interface PdfViewerModalProps {
-  nodeId: string;
+  docId: string;
+  /**
+   * Optional filename shown in the title while the blob loads. The
+   * modal falls back to `getDocMeta(docId)` so the hint is purely a
+   * visual smoothing aid and can be omitted.
+   */
   fileNameHint?: string | null;
   onClose: () => void;
 }
 
 export default function PdfViewerModal({
-  nodeId,
+  docId,
   fileNameHint,
   onClose,
 }: PdfViewerModalProps) {
-  const docId = useWorkspaceStore(
-    (state) => state.nodes.find((n) => n.id === nodeId)?.attachments[0]?.docId
-  );
   const [objectUrl, setObjectUrl] = useState<string | null>(null);
   const [fileName, setFileName] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -64,7 +63,7 @@ export default function PdfViewerModal({
         setError(
           loadError instanceof Error
             ? loadError.message
-            : 'No PDF found for this node.'
+            : 'No PDF found for this document.'
         );
       }
     })();
@@ -73,7 +72,7 @@ export default function PdfViewerModal({
       cancelled = true;
       if (url) URL.revokeObjectURL(url);
     };
-  }, [docId, fileNameHint, nodeId]);
+  }, [docId, fileNameHint]);
 
   return (
     <Modal open onClose={onClose} title={fileName || fileNameHint || 'View PDF'} wide>

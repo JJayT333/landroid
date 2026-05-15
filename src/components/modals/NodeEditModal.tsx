@@ -5,20 +5,20 @@
  * executeRebalance which cascades to ALL descendants. If only metadata
  * changes, it's a simple updateNode with no cascade.
  */
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import Modal from '../shared/Modal';
 import FormField from '../shared/FormField';
 import InstrumentSelect from '../shared/InstrumentSelect';
+import AttachmentsSection from '../shared/AttachmentsSection';
 import { useWorkspaceStore } from '../../store/workspace-store';
 import { formatAsFraction } from '../../engine/fraction-display';
 import { d } from '../../engine/decimal';
-import { assertFileSize, FILE_SIZE_LIMITS } from '../../utils/file-validation';
 import { getInterestClass, type OwnershipNode } from '../../types/node';
 import type { OwnerLinkOption } from '../owners/owner-link-options';
 
 interface NodeEditModalProps {
   node: OwnershipNode;
-  onViewPdf?: (nodeId: string) => void;
+  onViewDoc?: (docId: string) => void;
   linkedOwnerName?: string | null;
   ownerLinkOptions?: OwnerLinkOption[];
   leaseStatusText?: string | null;
@@ -32,7 +32,7 @@ interface NodeEditModalProps {
 export default function NodeEditModal({
   node,
   onClose,
-  onViewPdf,
+  onViewDoc,
   linkedOwnerName,
   ownerLinkOptions = [],
   leaseStatusText,
@@ -44,11 +44,6 @@ export default function NodeEditModal({
   const updateNode = useWorkspaceStore((s) => s.updateNode);
   const rebalance = useWorkspaceStore((s) => s.rebalance);
   const nodes = useWorkspaceStore((s) => s.nodes);
-  const attachDocToNode = useWorkspaceStore((s) => s.attachDocToNode);
-  const detachDocFromNode = useWorkspaceStore((s) => s.detachDocFromNode);
-  const pdfInputRef = useRef<HTMLInputElement>(null);
-  // Phase 5: A4c keeps the single-doc UX; Phase B turns this into a list.
-  const firstAttachment = node.attachments[0] ?? null;
 
   const [form, setForm] = useState({
     instrument: node.instrument,
@@ -71,8 +66,6 @@ export default function NodeEditModal({
   });
 
   const [error, setError] = useState<string | null>(null);
-  const [pdfError, setPdfError] = useState<string | null>(null);
-  const [pdfSaving, setPdfSaving] = useState(false);
   const [ownerLinkDraftId, setOwnerLinkDraftId] = useState('');
 
   const initialChanged = form.initialFraction !== node.initialFraction;
@@ -361,96 +354,12 @@ export default function NodeEditModal({
           )}
         </fieldset>
 
-        {/* PDF attachment */}
+        {/* Document attachments (Phase 5 / B3 — multi-doc surface) */}
         <fieldset className="space-y-2">
           <legend className="text-xs font-semibold text-ink-light uppercase tracking-wider mb-2">
-            Attached PDF
+            Attached Documents
           </legend>
-          <input
-            ref={pdfInputRef}
-            type="file"
-            accept=".pdf"
-            className="hidden"
-            onChange={async (e) => {
-              const file = e.target.files?.[0];
-              if (!file) return;
-              setPdfError(null);
-              setPdfSaving(true);
-              try {
-                assertFileSize(file, FILE_SIZE_LIMITS.PDF, 'PDF');
-                // A4c: single-doc UX preserved — if an attachment already
-                // exists, replace it by detaching the old one first. The
-                // workspace-store action keeps `node.attachments[]` in sync.
-                if (firstAttachment) {
-                  await detachDocFromNode(node.id, firstAttachment.attachmentId);
-                }
-                await attachDocToNode(node.id, file);
-                e.target.value = '';
-              } catch (uploadError) {
-                setPdfError(
-                  uploadError instanceof Error
-                    ? uploadError.message
-                    : 'PDF attachment failed. Please try again.'
-                );
-              } finally {
-                setPdfSaving(false);
-              }
-            }}
-          />
-          <div className="flex flex-wrap items-center gap-2">
-            {firstAttachment ? (
-              <>
-                <span className="min-w-0 max-w-full rounded-md border border-ledger-line bg-ledger px-2 py-1 text-xs text-ink">
-                  <span className="font-semibold">Attached:</span>{' '}
-                  <span className="font-mono break-all">
-                    {firstAttachment.fileName
-                      || (node.docNo ? `${node.docNo}.pdf` : 'PDF')}
-                  </span>
-                </span>
-                <button
-                  type="button"
-                  onClick={() => onViewPdf?.(node.id)}
-                  className="px-3 py-1.5 rounded-lg text-xs font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors"
-                >
-                  View PDF
-                </button>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    setPdfError(null);
-                    await detachDocFromNode(node.id, firstAttachment.attachmentId);
-                  }}
-                  className="px-3 py-1.5 rounded-lg text-xs text-seal hover:bg-seal/10 transition-colors"
-                >
-                  Remove
-                </button>
-              </>
-            ) : (
-              <button
-                type="button"
-                disabled={pdfSaving}
-                onClick={() => pdfInputRef.current?.click()}
-                className="px-3 py-1.5 rounded-lg text-xs font-semibold text-leather hover:bg-leather/10 border border-ledger-line transition-colors"
-              >
-                {pdfSaving ? 'Attaching...' : 'Attach PDF'}
-              </button>
-            )}
-          </div>
-          {firstAttachment && (
-            <button
-              type="button"
-              disabled={pdfSaving}
-              onClick={() => pdfInputRef.current?.click()}
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold text-leather hover:bg-leather/10 border border-ledger-line transition-colors disabled:opacity-60"
-            >
-              {pdfSaving ? 'Attaching...' : 'Replace PDF'}
-            </button>
-          )}
-          {pdfError && (
-            <div className="rounded-lg border border-seal/30 bg-seal/10 px-3 py-2 text-xs text-seal">
-              {pdfError}
-            </div>
-          )}
+          <AttachmentsSection node={node} onViewDoc={onViewDoc} />
         </fieldset>
 
         {canManageOwner && (

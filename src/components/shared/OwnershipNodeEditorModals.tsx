@@ -26,8 +26,14 @@ interface OwnershipNodeEditorModalsProps {
   onSetRoute: (route: NodeEditorRoute | null) => void;
   npriParentId: string | null;
   onSetNpriParentId: (nodeId: string | null) => void;
-  pdfViewNodeId: string | null;
-  onSetPdfViewNodeId: (nodeId: string | null) => void;
+  /**
+   * docId of the document currently being viewed in `PdfViewerModal`,
+   * or `null` when nothing is open. Phase 5 B2 renamed this from
+   * `pdfViewNodeId` so multi-chip surfaces can target a specific
+   * attachment, not just the node's first one.
+   */
+  pdfViewDocId: string | null;
+  onSetPdfViewDocId: (docId: string | null) => void;
 }
 
 export default function OwnershipNodeEditorModals({
@@ -35,8 +41,8 @@ export default function OwnershipNodeEditorModals({
   onSetRoute,
   npriParentId,
   onSetNpriParentId,
-  pdfViewNodeId,
-  onSetPdfViewNodeId,
+  pdfViewDocId,
+  onSetPdfViewDocId,
 }: OwnershipNodeEditorModalsProps) {
   const setView = useUIStore((state) => state.setView);
   const owners = useOwnerStore((state) => state.owners);
@@ -81,8 +87,6 @@ export default function OwnershipNodeEditorModals({
   const leaseParent =
     route?.kind === 'lease' ? nodeById.get(route.parentNodeId) ?? null : null;
   const npriParent = npriParentId ? nodeById.get(npriParentId) ?? null : null;
-  const pdfViewNode = pdfViewNodeId ? nodeById.get(pdfViewNodeId) ?? null : null;
-
   useEffect(() => {
     if (route?.kind === 'node' && !editNode) {
       onSetRoute(null);
@@ -98,11 +102,17 @@ export default function OwnershipNodeEditorModals({
     }
   }, [npriParent, npriParentId, onSetNpriParentId]);
 
-  useEffect(() => {
-    if (pdfViewNodeId && !pdfViewNode) {
-      onSetPdfViewNodeId(null);
+  // Lookup the cached filename hint for the doc currently being viewed.
+  // The PdfViewerModal also does its own `getDocMeta` so this is purely
+  // a visual smoothing aid during blob load.
+  const pdfViewFileHint = useMemo(() => {
+    if (!pdfViewDocId) return null;
+    for (const node of nodes) {
+      const match = node.attachments.find((a) => a.docId === pdfViewDocId);
+      if (match) return match.fileName || null;
     }
-  }, [onSetPdfViewNodeId, pdfViewNode, pdfViewNodeId]);
+    return null;
+  }, [pdfViewDocId, nodes]);
 
   const leaseStatusText = useMemo(() => {
     if (!editNode || editNode.type === 'related' || !editNode.linkedOwnerId) {
@@ -230,9 +240,9 @@ export default function OwnershipNodeEditorModals({
           onManageLease={handleManageLease}
           onManageNpri={handleManageNpri}
           onClose={() => onSetRoute(null)}
-          onViewPdf={(nodeId) => {
+          onViewDoc={(docId) => {
             onSetRoute(null);
-            onSetPdfViewNodeId(nodeId);
+            onSetPdfViewDocId(docId);
           }}
         />
       )}
@@ -256,14 +266,11 @@ export default function OwnershipNodeEditorModals({
         />
       )}
 
-      {pdfViewNode && (
+      {pdfViewDocId && (
         <PdfViewerModal
-          nodeId={pdfViewNode.id}
-          fileNameHint={
-            pdfViewNode.attachments[0]?.fileName
-            || (pdfViewNode.docNo ? `${pdfViewNode.docNo}.pdf` : null)
-          }
-          onClose={() => onSetPdfViewNodeId(null)}
+          docId={pdfViewDocId}
+          fileNameHint={pdfViewFileHint}
+          onClose={() => onSetPdfViewDocId(null)}
         />
       )}
     </>

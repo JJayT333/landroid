@@ -4,7 +4,7 @@ import { d } from '../../engine/decimal';
 import { useWorkspaceStore } from '../../store/workspace-store';
 import type { OwnershipNode } from '../../types/node';
 import type { NpriBranchDiscrepancy } from '../../engine/math-engine';
-import DeskMapDocumentBadge from './DeskMapDocumentBadge';
+import DeskMapDocumentChips from './DeskMapDocumentChips';
 
 interface DeskMapNpriCardProps {
   node: OwnershipNode;
@@ -15,7 +15,7 @@ interface DeskMapNpriCardProps {
   onPrecede: (nodeId: string) => void;
   onAttachDoc: (nodeId: string) => void;
   onDelete: (nodeId: string) => void;
-  onViewPdf: (nodeId: string) => void;
+  onViewDoc: (docId: string) => void;
 }
 
 function DeskMapNpriCard({
@@ -27,7 +27,7 @@ function DeskMapNpriCard({
   onPrecede,
   onAttachDoc,
   onDelete,
-  onViewPdf,
+  onViewDoc,
 }: DeskMapNpriCardProps) {
   const isActive = useWorkspaceStore((state) => state.activeNodeId === node.id);
   const remaining = d(node.fraction);
@@ -108,7 +108,7 @@ function DeskMapNpriCard({
               {node.remarks}
             </div>
           )}
-          <DeskMapDocumentBadge node={node} tone="amber" onViewPdf={onViewPdf} />
+          <DeskMapDocumentChips node={node} tone="amber" onViewDoc={onViewDoc} />
           {hasDiscrepancy && discrepancy && (
             <div className="rounded-md border border-seal/25 bg-seal/10 px-2 py-1.5 text-[10px] leading-4 text-seal">
               <div className="font-semibold">{discrepancyLabel}</div>
@@ -170,7 +170,7 @@ function DeskMapNpriCard({
                     <div className="text-[9px] text-amber-900/75 truncate">{doc.remarks}</div>
                   )}
                 </div>
-                <DeskMapDocumentBadge node={doc} tone="amber" onViewPdf={onViewPdf} />
+                <DeskMapDocumentChips node={doc} tone="amber" onViewDoc={onViewDoc} />
               </div>
             ))}
           </div>
@@ -227,7 +227,7 @@ function deskMapNpriCardPropsAreEqual(
     previous.onPrecede === next.onPrecede &&
     previous.onAttachDoc === next.onAttachDoc &&
     previous.onDelete === next.onDelete &&
-    previous.onViewPdf === next.onViewPdf
+    previous.onViewDoc === next.onViewDoc
   );
 }
 

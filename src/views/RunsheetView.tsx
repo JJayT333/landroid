@@ -52,7 +52,7 @@ export default function RunsheetView() {
   const [tractFilter, setTractFilter] = useState<TractFilter>('all');
   const [editorRoute, setEditorRoute] = useState<NodeEditorRoute | null>(null);
   const [npriParentId, setNpriParentId] = useState<string | null>(null);
-  const [pdfViewNodeId, setPdfViewNodeId] = useState<string | null>(null);
+  const [pdfViewDocId, setPdfViewDocId] = useState<string | null>(null);
 
   const tractOptions = useMemo(
     () =>
@@ -242,8 +242,8 @@ export default function RunsheetView() {
         onSetRoute={setEditorRoute}
         npriParentId={npriParentId}
         onSetNpriParentId={setNpriParentId}
-        pdfViewNodeId={pdfViewNodeId}
-        onSetPdfViewNodeId={setPdfViewNodeId}
+        pdfViewDocId={pdfViewDocId}
+        onSetPdfViewDocId={setPdfViewDocId}
       />
     </div>
   );

@@ -13,7 +13,7 @@ import { useWorkspaceStore } from '../../store/workspace-store';
 import type { OwnershipNode } from '../../types/node';
 import { isNpriNode } from '../../types/node';
 import type { DeskMapPrimaryLeaseSummary } from './deskmap-coverage';
-import DeskMapDocumentBadge from './DeskMapDocumentBadge';
+import DeskMapDocumentChips from './DeskMapDocumentChips';
 import { isLeaseNode } from './deskmap-lease-node';
 
 interface DeskMapCardProps {
@@ -28,7 +28,7 @@ interface DeskMapCardProps {
   onPrecede: (nodeId: string) => void;
   onAttachDoc: (nodeId: string) => void;
   onDelete: (nodeId: string) => void;
-  onViewPdf: (nodeId: string) => void;
+  onViewDoc: (docId: string) => void;
 }
 
 function DeskMapCard({
@@ -43,7 +43,7 @@ function DeskMapCard({
   onPrecede,
   onAttachDoc,
   onDelete,
-  onViewPdf,
+  onViewDoc,
 }: DeskMapCardProps) {
   const isActive = useWorkspaceStore((state) => state.activeNodeId === node.id);
   const initial = d(node.initialFraction);
@@ -167,7 +167,7 @@ function DeskMapCard({
               <span className="ml-1 text-[10px] text-seal font-normal">(deceased)</span>
             )}
           </div>
-          <DeskMapDocumentBadge node={node} onViewPdf={onViewPdf} />
+          <DeskMapDocumentChips node={node} onViewDoc={onViewDoc} />
           {hasNpriDiscrepancy && (
             <div className="mt-2 rounded-md border border-seal/25 bg-seal/10 px-2 py-1.5 text-[10px] leading-4 text-seal">
               NPRI burden discrepancy on this branch. Review the red NPRI card
@@ -207,7 +207,7 @@ function DeskMapCard({
                 doc={doc}
                 onEdit={onEdit}
                 onDelete={onDelete}
-                onViewPdf={onViewPdf}
+                onViewDoc={onViewDoc}
               />
             ))}
           </div>
@@ -241,7 +241,7 @@ function deskMapCardPropsAreEqual(
     previous.onPrecede === next.onPrecede &&
     previous.onAttachDoc === next.onAttachDoc &&
     previous.onDelete === next.onDelete &&
-    previous.onViewPdf === next.onViewPdf
+    previous.onViewDoc === next.onViewDoc
   );
 }
 
@@ -253,12 +253,12 @@ function RelatedDocChip({
   doc,
   onEdit,
   onDelete,
-  onViewPdf,
+  onViewDoc,
 }: {
   doc: OwnershipNode;
   onEdit: (id: string) => void;
   onDelete: (id: string) => void;
-  onViewPdf: (id: string) => void;
+  onViewDoc: (id: string) => void;
 }) {
   // Lease chips render in emerald (lessee = green) so the leased relationship
   // is visible beneath the still-blue lessor card. Other related docs keep the
@@ -287,7 +287,7 @@ function RelatedDocChip({
         {doc.remarks && (
           <div className="text-[9px] text-ink-light truncate">{doc.remarks}</div>
         )}
-        <DeskMapDocumentBadge node={doc} onViewPdf={onViewPdf} />
+        <DeskMapDocumentChips node={doc} onViewDoc={onViewDoc} />
       </div>
       <button
         onClick={(e) => {

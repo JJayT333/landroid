@@ -62,7 +62,7 @@ interface TreeBranchProps {
   onPrecede: (id: string) => void;
   onAttachDoc: (id: string) => void;
   onDelete: (id: string) => void;
-  onViewPdf: (id: string) => void;
+  onViewDoc: (id: string) => void;
 }
 
 function TreeBranchComponent({
@@ -77,7 +77,7 @@ function TreeBranchComponent({
   onPrecede,
   onAttachDoc,
   onDelete,
-  onViewPdf,
+  onViewDoc,
 }: TreeBranchProps) {
   const leaseNode = isLeaseNode(tree.node);
   const npriNode = isNpriNode(tree.node);
@@ -90,7 +90,7 @@ function TreeBranchComponent({
           onEdit={onEdit}
           onAttachDoc={onAttachDoc}
           onDelete={onDelete}
-          onViewPdf={onViewPdf}
+          onViewDoc={onViewDoc}
         />
       ) : npriNode ? (
         <DeskMapNpriCard
@@ -102,7 +102,7 @@ function TreeBranchComponent({
           onPrecede={onPrecede}
           onAttachDoc={onAttachDoc}
           onDelete={onDelete}
-          onViewPdf={onViewPdf}
+          onViewDoc={onViewDoc}
         />
       ) : (
         <DeskMapCard
@@ -119,7 +119,7 @@ function TreeBranchComponent({
           onPrecede={onPrecede}
           onAttachDoc={onAttachDoc}
           onDelete={onDelete}
-          onViewPdf={onViewPdf}
+          onViewDoc={onViewDoc}
         />
       )}
 
@@ -139,7 +139,7 @@ function TreeBranchComponent({
               onPrecede={onPrecede}
               onAttachDoc={onAttachDoc}
               onDelete={onDelete}
-              onViewPdf={onViewPdf}
+              onViewDoc={onViewDoc}
             />
           ))}
         </div>
@@ -165,7 +165,7 @@ function treeBranchPropsAreEqual(
     previous.onPrecede === next.onPrecede &&
     previous.onAttachDoc === next.onAttachDoc &&
     previous.onDelete === next.onDelete &&
-    previous.onViewPdf === next.onViewPdf
+    previous.onViewDoc === next.onViewDoc
   );
 }
 
@@ -485,7 +485,7 @@ export default function DeskMapView() {
   const [precedeNodeId, setPrecedeNodeId] = useState<string | null>(null);
   const [attachDocParentId, setAttachDocParentId] = useState<string | null>(null);
   const [npriParentId, setNpriParentId] = useState<string | null>(null);
-  const [pdfViewNodeId, setPdfViewNodeId] = useState<string | null>(null);
+  const [pdfViewDocId, setPdfViewDocId] = useState<string | null>(null);
   const [ownerSearchQuery, setOwnerSearchQuery] = useState('');
   const [ownerSearchMatchIndex, setOwnerSearchMatchIndex] = useState(0);
   // Phase 7 polish: collapsible toolbar so the canvas stays unobstructed once
@@ -696,8 +696,8 @@ export default function DeskMapView() {
     }
   }, [nodeById, nodes, removeLeaseRecord, removeNode]);
 
-  const handleViewPdf = useCallback((id: string) => {
-    setPdfViewNodeId(id);
+  const handleViewDoc = useCallback((id: string) => {
+    setPdfViewDocId(id);
   }, []);
 
   const handleAddRoot = useCallback(() => {
@@ -1048,7 +1048,7 @@ export default function DeskMapView() {
                   onPrecede={handlePrecede}
                   onAttachDoc={handleAttachDoc}
                   onDelete={handleDelete}
-                  onViewPdf={handleViewPdf}
+                  onViewDoc={handleViewDoc}
                 />
               ))}
             </div>
@@ -1060,8 +1060,8 @@ export default function DeskMapView() {
           onSetRoute={setEditorRoute}
           npriParentId={npriParentId}
           onSetNpriParentId={setNpriParentId}
-          pdfViewNodeId={pdfViewNodeId}
-          onSetPdfViewNodeId={setPdfViewNodeId}
+          pdfViewDocId={pdfViewDocId}
+          onSetPdfViewDocId={setPdfViewDocId}
         />
 
         {/* Convey modal */}
