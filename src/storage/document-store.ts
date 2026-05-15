@@ -258,6 +258,68 @@ export async function listDocsForNode(
 }
 
 /**
+ * Bulk-fetch the `(attachmentId, docId, fileName, kind, position)`
+ * summaries for every node in `nodeIds`, scoped to a single workspace.
+ * Used by the workspace-store to hydrate `node.attachments[]` on load.
+ *
+ * Returns a `Map` keyed by nodeId. Nodes with no attachments are simply
+ * absent from the map (callers should treat missing as empty).
+ */
+export async function listAttachmentsForNodes(
+  workspaceId: string,
+  nodeIds: ReadonlyArray<string>
+): Promise<
+  Map<
+    string,
+    Array<Pick<DocumentAttachment, 'attachmentId' | 'docId' | 'position'> &
+      Pick<DocumentRecord, 'fileName' | 'kind'>>
+  >
+> {
+  const result = new Map<
+    string,
+    Array<Pick<DocumentAttachment, 'attachmentId' | 'docId' | 'position'> &
+      Pick<DocumentRecord, 'fileName' | 'kind'>>
+  >();
+  if (nodeIds.length === 0) return result;
+
+  // Dexie equalsAnyOf lets us bulk-fetch attachments without N round-trips.
+  const attachments = await db.document_attachments
+    .where('entityKind')
+    .equals('node')
+    .and((a) => nodeIds.includes(a.entityId))
+    .toArray();
+  if (attachments.length === 0) return result;
+
+  const docIds = [...new Set(attachments.map((a) => a.docId))];
+  const docs = await db.documents.bulkGet(docIds);
+  const docById = new Map<string, DocumentRecord>();
+  for (const doc of docs) {
+    if (doc && doc.workspaceId === workspaceId) {
+      docById.set(doc.docId, doc);
+    }
+  }
+
+  for (const a of attachments) {
+    const doc = docById.get(a.docId);
+    if (!doc) continue;
+    const list = result.get(a.entityId) ?? [];
+    list.push({
+      attachmentId: a.attachmentId,
+      docId: a.docId,
+      position: a.position,
+      fileName: doc.fileName,
+      kind: doc.kind,
+    });
+    result.set(a.entityId, list);
+  }
+
+  for (const list of result.values()) {
+    list.sort((x, y) => x.position - y.position);
+  }
+  return result;
+}
+
+/**
  * Reorder the attachments for one entity to match `orderedAttachmentIds`.
  * IDs not currently attached to this entity are ignored. Missing IDs are
  * appended at the end in their existing order.

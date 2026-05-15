@@ -11,6 +11,7 @@ import { useMapStore } from './map-store';
 import { deletePdf } from '../storage/pdf-store';
 import {
   deleteDoc,
+  listAttachmentsForNodes,
   reorderAttachments,
   renameDoc,
   saveDoc,
@@ -201,6 +202,13 @@ interface WorkspaceState {
     nodeId: string,
     orderedAttachmentIds: ReadonlyArray<string>
   ) => Promise<void>;
+  /**
+   * Re-read attachment metadata from Dexie and refresh every node's
+   * `attachments[]` cache. Call after `loadWorkspace` (initial boot,
+   * `.landroid` import) so chips render with the current data.
+   * No-op when there are no nodes in state.
+   */
+  hydrateNodeAttachments: () => Promise<void>;
   setHydrated: () => void;
   setStartupWarning: (message: string | null) => void;
   loadWorkspace: (data: {
@@ -1142,6 +1150,34 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
       nodes: current.nodes.map((n) =>
         n.id === nodeId ? { ...n, attachments: reordered } : n
       ),
+    }));
+  },
+
+  hydrateNodeAttachments: async () => {
+    const state = get();
+    if (state.nodes.length === 0) return;
+    const nodeIds = state.nodes.map((n) => n.id);
+    const byNodeId = await listAttachmentsForNodes(state.workspaceId, nodeIds);
+    if (byNodeId.size === 0) {
+      // No documents touched anything in this workspace — leave the
+      // existing in-memory attachments[] alone so legacy hasDoc-driven
+      // flows still render until A4c lands.
+      return;
+    }
+    set((current) => ({
+      nodes: current.nodes.map((node) => {
+        const fresh = byNodeId.get(node.id);
+        if (!fresh) return node;
+        return {
+          ...node,
+          attachments: fresh.map((entry) => ({
+            docId: entry.docId,
+            attachmentId: entry.attachmentId,
+            fileName: entry.fileName,
+            kind: entry.kind,
+          })),
+        };
+      }),
     }));
   },
 

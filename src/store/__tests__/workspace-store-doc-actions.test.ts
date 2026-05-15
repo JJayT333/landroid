@@ -11,6 +11,7 @@ const docMocks = vi.hoisted(() => ({
   deleteDoc: vi.fn(),
   renameDoc: vi.fn(),
   reorderAttachments: vi.fn(),
+  listAttachmentsForNodes: vi.fn(),
 }));
 
 const otherMocks = vi.hoisted(() => ({
@@ -25,6 +26,7 @@ vi.mock('../../storage/document-store', () => ({
   deleteDoc: docMocks.deleteDoc,
   renameDoc: docMocks.renameDoc,
   reorderAttachments: docMocks.reorderAttachments,
+  listAttachmentsForNodes: docMocks.listAttachmentsForNodes,
 }));
 
 vi.mock('../map-store', () => ({
@@ -355,6 +357,76 @@ describe('workspace-store document actions (Phase 5)', () => {
         .getState()
         .reorderNodeAttachments('missing', ['a1']);
       expect(docMocks.reorderAttachments).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('hydrateNodeAttachments', () => {
+    it('replaces in-memory attachments with the order returned from Dexie', async () => {
+      // listAttachmentsForNodes is responsible for sorting by position
+      // (covered by its own tests). The store action trusts that order and
+      // does not re-sort.
+      seed([{ id: 'node-1' }, { id: 'node-2' }]);
+      docMocks.listAttachmentsForNodes.mockResolvedValue(
+        new Map([
+          [
+            'node-1',
+            [
+              {
+                attachmentId: 'att-1a',
+                docId: 'doc-1a',
+                position: 0,
+                fileName: 'a.pdf',
+                kind: 'deed',
+              },
+              {
+                attachmentId: 'att-1b',
+                docId: 'doc-1b',
+                position: 1,
+                fileName: 'b.pdf',
+                kind: 'obit',
+              },
+            ],
+          ],
+        ])
+      );
+
+      await useWorkspaceStore.getState().hydrateNodeAttachments();
+
+      expect(docMocks.listAttachmentsForNodes).toHaveBeenCalledWith(
+        'ws-test',
+        ['node-1', 'node-2']
+      );
+      const [n1, n2] = useWorkspaceStore.getState().nodes;
+      expect(n1.attachments.map((a) => a.attachmentId)).toEqual([
+        'att-1a',
+        'att-1b',
+      ]);
+      expect(n1.attachments[0].fileName).toBe('a.pdf');
+      expect(n1.attachments[0].kind).toBe('deed');
+      expect(n2.attachments).toEqual([]);
+    });
+
+    it('is a no-op when there are no nodes', async () => {
+      seed([]);
+      await useWorkspaceStore.getState().hydrateNodeAttachments();
+      expect(docMocks.listAttachmentsForNodes).not.toHaveBeenCalled();
+    });
+
+    it('leaves existing attachments alone when Dexie returns an empty map', async () => {
+      const preExisting = [
+        {
+          docId: 'd1',
+          attachmentId: 'a1',
+          fileName: '1.pdf',
+          kind: 'deed' as const,
+        },
+      ];
+      seed([{ id: 'node-1', attachments: preExisting }]);
+      docMocks.listAttachmentsForNodes.mockResolvedValue(new Map());
+      await useWorkspaceStore.getState().hydrateNodeAttachments();
+      expect(useWorkspaceStore.getState().nodes[0].attachments).toEqual(
+        preExisting
+      );
     });
   });
 });

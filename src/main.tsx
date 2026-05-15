@@ -46,6 +46,10 @@ async function bootstrapApp() {
       useResearchStore.getState().setWorkspace(workspaceResult.data.workspaceId),
       useCurativeStore.getState().setWorkspace(workspaceResult.data.workspaceId),
     ]);
+    // Phase 5: pull `node.attachments[]` from Dexie's `documents` +
+    // `document_attachments` tables after the workspace state lands.
+    // Safe to fail; the legacy hasDoc/docFileName fields still render.
+    await useWorkspaceStore.getState().hydrateNodeAttachments().catch(() => {});
   } else {
     useWorkspaceStore.getState().setHydrated();
     const workspaceId = useWorkspaceStore.getState().workspaceId;
