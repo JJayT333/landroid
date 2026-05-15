@@ -35,45 +35,48 @@ multi-doc-per-entity refactor. See
 - `3522c75` — A4b: `document-store.listAttachmentsForNodes` bulk read,
   `workspace-store.hydrateNodeAttachments` action, wired into `main.tsx`
   and `Navbar.tsx` after workspace load. 3 unit tests.
+- `193c0d6` — A4c: drop `hasDoc` / `docFileName` from `OwnershipNode`;
+  migrate `DeskMapDocumentBadge`, `runsheet-export`, `csv-io`, the three
+  modals (`NodeEditModal`, `AttachLeaseModal`, `OwnershipNodeEditorModals`),
+  `PdfViewerModal`, `seed-test-data`, and `workspace-persistence` export
+  to read/write `attachments[]`. Cascade-delete docs in
+  `workspace-store.removeNode` / `clearDeskMapNodes` via
+  `document-store.deleteDoc`. `pdf-store.ts` deleted (zero importers).
 
-Validation after every commit: `npm run lint`, `npm test`, `npm run build`
-all green. Test suite at 505 tests; the pre-existing
+**Phase A is complete.** The v7 single-PDF-per-node data model is gone
+from the type system, the data layer, and every reader/writer. Validation
+after every commit: `npm run lint`, `npm test`, `npm run build` all green.
+Test suite at 506 tests; the pre-existing
 `src/engine/__tests__/tree-layout.test.ts` sandbox-path failure on the
 `elkjs/lib/elk-worker.min.js?url` import is unrelated to Phase 5 and
 existed on the base commit `665fc3a`.
 
-### What's Left in Phase A
+### What's Left
 
-**A4c (next):** retire the legacy `hasDoc` / `docFileName` fields. Touches:
+**A5 (next):** close the file-format and backup gaps.
 
-- `DeskMapDocumentBadge.tsx` — render from `attachments[]` (currently reads
-  `node.hasDoc` and `node.docFileName`).
-- `runsheet-export.ts:42` — read `attachments.length > 0`.
-- `csv-io.ts:148` — drop the `hasDoc` write.
-- `workspace-persistence.ts` — drop the `hasDoc`/`docFileName`
-  reconciliation logic (lines 661, 954–965). `exportPdfWorkspaceData`
-  is left at v7 shape for one release (A5 introduces v8 export/import).
-- `NodeEditModal.tsx`, `AttachLeaseModal.tsx`,
-  `OwnershipNodeEditorModals.tsx` — replace `savePdf`/`deletePdf` +
-  `updateNode({ hasDoc, docFileName })` with the workspace-store
-  `attachDocToNode` / `detachDocFromNode` actions; read
-  `node.attachments[0]` instead of `node.docFileName`.
-- `seed-test-data.ts` — call workspace-store actions (or `document-store`
-  directly with a synthesized `workspaceId`) instead of `savePdf`.
-- `workspace-store.removeNode` lines 571, 936 — replace `deletePdf` with
-  a cascade call that deletes the documents tied to the removed node IDs.
-- `OwnershipNode` interface — drop `hasDoc` and `docFileName` from the
-  type, the blank factory, and `normalizeOwnershipNode`.
-- `pdf-store.ts` — replace with a thin shim that warns + delegates, or
-  delete if zero callers remain.
+- **Auto-`.landroid` v7 backup hook.** Fires once after the v8 Dexie
+  upgrade lands via a `localStorage` flag (`landroid:postV8BackupComplete`).
+  Reads the still-present read-only v7 `pdfs` table and the `workspaces`
+  table, builds a v7-shape `.landroid` blob, triggers a download. Idempotent;
+  safe to fail.
+- **`workspace-persistence` v8 export shape.** Bump the `version` field
+  to 8 and serialize `documents` + `document_attachments` directly
+  (currently `exportPdfWorkspaceData` reads v8 tables but emits v7-shape
+  `PdfAttachment[]`).
+- **v7 → v8 import dispatch.** Dispatch on `payload.version` in
+  `importLandroidFile`: `version === 7` runs the inline migration
+  (synthesize `docId`s, attach as `entityKind: 'node'` at `position: 0`,
+  populate `node.attachments[]`), `version === 8` loads directly. Missing
+  / unknown version → clear error. Closes the open "v7 export writes
+  `version: 7` but import doesn't dispatch on version" gap.
+- Depth-range normalize-and-warn lives in this pass too: import
+  surfaces a Phase 3-style warning when a record carries a
+  non-`'all_depths'` value, normalizing it to `'all_depths'` for math
+  while preserving the raw value in workspace metadata.
 
-Carry the `Pick<OwnershipNode, 'hasDoc' | 'docFileName' | …>` references
-along with the badge rewrite.
-
-**A5 (deferred):** auto-`.landroid` v7 backup hook (fires once via
-`localStorage` flag after the v8 upgrade), and `workspace-persistence`
-v8 export/import dispatch — closes the open "v7 export writes
-`version: 7` but import does not dispatch on version" gap.
+**After A5:** Phase B begins — multi-chip Desk Map UI, modal attachments
+section, single-PDF UX retires.
 
 ### Hard Guardrails Still In Force
 
