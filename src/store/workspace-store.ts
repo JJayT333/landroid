@@ -9,8 +9,15 @@ import { buildLeaseNode, isLeaseNode } from '../components/deskmap/deskmap-lease
 import { useCurativeStore } from './curative-store';
 import { useMapStore } from './map-store';
 import { deletePdf } from '../storage/pdf-store';
-import type { OwnershipNode, DeskMap } from '../types/node';
+import {
+  deleteDoc,
+  reorderAttachments,
+  renameDoc,
+  saveDoc,
+} from '../storage/document-store';
+import type { OwnershipNode, DeskMap, NodeAttachmentSummary } from '../types/node';
 import { normalizeDeskMap, normalizeOwnershipNode } from '../types/node';
+import type { DocumentKind } from '../types/document';
 import {
   createBlankLeaseholdAssignment,
   createBlankLeaseholdTransferOrderEntry,
@@ -164,6 +171,36 @@ interface WorkspaceState {
   clearLinkedLease: (leaseId: string) => void;
   syncLeaseNodesFromRecord: (lease: Lease) => void;
   addNodeToActiveDeskMap: (nodeId: string) => void;
+
+  // Document attachments (Phase 5 / ADR 0004)
+  /**
+   * Attach a file to `nodeId` as a new document. Persists through the
+   * document-store and appends a summary to the node's `attachments[]`
+   * cache. Returns the newly-created summary so callers can show the
+   * fresh chip without re-reading.
+   */
+  attachDocToNode: (
+    nodeId: string,
+    file: File | Blob,
+    options?: { fileName?: string; kind?: DocumentKind }
+  ) => Promise<NodeAttachmentSummary | null>;
+  /**
+   * Remove one attachment from a node. The underlying document blob is
+   * deleted as well — A4 still mirrors the v7 "one doc per node" UX, so
+   * cascade-delete keeps blob lifetime simple. Phase B (multi-doc UI)
+   * will switch to detach-only semantics.
+   */
+  detachDocFromNode: (nodeId: string, attachmentId: string) => Promise<void>;
+  /** Rename a document. Updates every node's `attachments[]` cache. */
+  renameDocOnNode: (docId: string, newFileName: string) => Promise<void>;
+  /**
+   * Reorder a node's attachments. Persists through the document-store
+   * and reflects the new order in the node's `attachments[]` cache.
+   */
+  reorderNodeAttachments: (
+    nodeId: string,
+    orderedAttachmentIds: ReadonlyArray<string>
+  ) => Promise<void>;
   setHydrated: () => void;
   setStartupWarning: (message: string | null) => void;
   loadWorkspace: (data: {
@@ -1011,6 +1048,102 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
         ),
       };
     }),
+
+  attachDocToNode: async (nodeId, file, options) => {
+    const state = get();
+    const node = state.nodes.find((n) => n.id === nodeId);
+    if (!node) return null;
+    const fileName =
+      options?.fileName?.trim()
+      || (file instanceof File ? file.name : 'document.pdf');
+    const { document, attachment } = await saveDoc({
+      workspaceId: state.workspaceId,
+      file,
+      fileName,
+      kind: options?.kind,
+      entityKind: 'node',
+      entityId: nodeId,
+    });
+    const summary: NodeAttachmentSummary = {
+      docId: document.docId,
+      attachmentId: attachment.attachmentId,
+      fileName: document.fileName,
+      kind: document.kind,
+    };
+    set((current) => ({
+      nodes: current.nodes.map((n) =>
+        n.id === nodeId ? { ...n, attachments: [...n.attachments, summary] } : n
+      ),
+    }));
+    return summary;
+  },
+
+  detachDocFromNode: async (nodeId, attachmentId) => {
+    const state = get();
+    const node = state.nodes.find((n) => n.id === nodeId);
+    if (!node) return;
+    const target = node.attachments.find((a) => a.attachmentId === attachmentId);
+    if (!target) return;
+    // Single-doc UX preserved for A4: cascade-delete the underlying blob.
+    // Phase B's multi-doc work will switch this to detach-only semantics
+    // (the blob lives on if it's attached anywhere else).
+    await deleteDoc(target.docId);
+    set((current) => ({
+      nodes: current.nodes.map((n) =>
+        n.id === nodeId
+          ? {
+              ...n,
+              attachments: n.attachments.filter(
+                (a) => a.attachmentId !== attachmentId
+              ),
+            }
+          : n
+      ),
+    }));
+  },
+
+  renameDocOnNode: async (docId, newFileName) => {
+    const trimmed = newFileName.trim();
+    if (!trimmed) return;
+    await renameDoc(docId, trimmed);
+    set((current) => ({
+      nodes: current.nodes.map((n) =>
+        n.attachments.some((a) => a.docId === docId)
+          ? {
+              ...n,
+              attachments: n.attachments.map((a) =>
+                a.docId === docId ? { ...a, fileName: trimmed } : a
+              ),
+            }
+          : n
+      ),
+    }));
+  },
+
+  reorderNodeAttachments: async (nodeId, orderedAttachmentIds) => {
+    const state = get();
+    const node = state.nodes.find((n) => n.id === nodeId);
+    if (!node) return;
+    await reorderAttachments('node', nodeId, orderedAttachmentIds);
+    const byId = new Map(node.attachments.map((a) => [a.attachmentId, a] as const));
+    const seen = new Set<string>();
+    const reordered: NodeAttachmentSummary[] = [];
+    for (const id of orderedAttachmentIds) {
+      const found = byId.get(id);
+      if (found && !seen.has(id)) {
+        reordered.push(found);
+        seen.add(id);
+      }
+    }
+    for (const a of node.attachments) {
+      if (!seen.has(a.attachmentId)) reordered.push(a);
+    }
+    set((current) => ({
+      nodes: current.nodes.map((n) =>
+        n.id === nodeId ? { ...n, attachments: reordered } : n
+      ),
+    }));
+  },
 
   setHydrated: () => set({ _hydrated: true }),
   setStartupWarning: (startupWarning) => set({ startupWarning }),
