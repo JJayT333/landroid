@@ -24,11 +24,12 @@ Then open `http://localhost:5173/`.
 
 ## 2) Main navigation
 
-The top bar has eight view buttons:
+The top bar has view buttons for the active work surfaces:
 - `Desk Map`
 - `Leasehold`
 - `Flowchart`
 - `Runsheet`
+- `Documents`
 - `Owners`
 - `Curative`
 - `Maps`
@@ -191,7 +192,9 @@ It now has three internal modes:
 
 ## 4) Runsheet view
 
-`Runsheet` is the review and audit table.
+`Runsheet` is the title chronology review and audit table. The broader
+document room now lives in `Documents`; the `Runsheet / Mineral Title` document
+view is the saved mineral-title lens over that registry.
 
 ### What it shows
 - Instruments from the current workspace
@@ -238,7 +241,48 @@ Useful notes:
 - The workbook includes the `TORS_Documents\{docNo}.pdf` path formula structure.
 - If you want those links to resolve outside LANDroid, keep the `TORS_Documents` folder alongside the workbook.
 
-## 5) Owners view
+## 5) Documents view
+
+`Documents` is the flat registry of document records known to the current
+LANDroid workspace.
+
+### What it shows
+- One row per saved document in the v8 document store
+- Saved views for `All`, `Inbox / Needs review`, `Runsheet / Mineral Title`,
+  `Leasehold`, `Curative`, `Research`, `GIS / Map Support`,
+  `Federal Reference`, `Unlinked`, `Missing metadata`, `Duplicates`, and
+  `Needs OCR`
+- Compact filters for document kind, tract, linked/unlinked state, date range,
+  and text search
+- Linked entity summaries for node attachments, with a jump back to `Desk Map`
+- Duplicate warnings when more than one document shares the same `contentHash`
+- Missing metadata warnings for title-opinion packet readiness
+
+### Metadata editing
+Select a document row to edit:
+- display title
+- document area
+- document kind and instrument type
+- county, instrument number, volume, and page
+- effective and recording dates
+- grantor and grantee / lessor / lessee
+- source reference and notes
+- OCR status marker
+
+Phase 7A does not run OCR, call Dropbox, import ArcGIS attachments, query AI
+over documents, or update title/math automatically.
+
+### Packet preview
+The right panel previews a packet from:
+- the current filter
+- selected rows, or the highlighted row when nothing is checked
+- the `Runsheet / Mineral Title` saved view
+
+The preview shows document count, total size, missing metadata count, duplicate
+count, and a manifest order. `Manifest JSON` downloads a metadata manifest only;
+it does not package or export the PDFs yet.
+
+## 6) Owners view
 
 `Owners` keeps workspace-scoped owner records separate from the title-chain math while still letting you link one primary owner record to a title node.
 
@@ -271,7 +315,7 @@ Useful notes:
 - Loading a `.landroid` file restores owner records and owner docs from that file.
 - Loading a `.csv` creates a fresh workspace and clears owner records for that imported workspace unless you later add them.
 
-## 6) Curative view
+## 7) Curative view
 
 `Curative` is the title issue and curative tracker. It is meant for the real-world problems a Texas landman needs to keep visible while the title chain is still being cleaned up.
 
@@ -318,7 +362,7 @@ The Curative view also keeps the next broader company-readiness areas visible so
 - Loading a `.csv` starts a fresh workspace and clears curative records for that imported workspace.
 - If a linked owner, lease, branch, or tract is deleted, LANDroid keeps the issue but clears the broken link so the issue itself is not silently lost.
 
-## 7) Maps view
+## 8) Maps view
 
 `Maps` is now the map-first workspace for the current project.
 
@@ -348,7 +392,7 @@ The Curative view also keeps the next broader company-readiness areas visible so
 - ArcGIS Pro is not embedded in the app.
 - The practical short-term path is to bring ArcGIS outputs into LANDroid as exported PDF, image, or GeoJSON artifacts, then link those artifacts back to the sources and project records that explain them.
 
-## 8) Federal Leasing view
+## 9) Federal Leasing view
 
 `Federal Leasing` is the first-class workspace for federal/BLM lease inventory, expiration tracking, potential leasing targets, source packets, and map evidence. It uses the same saved project-record backbone as `Research`, so a federal lease created here still appears in Research project records and exports in the same `.landroid` file.
 
@@ -372,7 +416,7 @@ The Curative view also keeps the next broader company-readiness areas visible so
 - No federal royalty math, ONRR reporting, payout math, BLM calculation behavior, CA/TPF math, or tribal lease workflow is active here.
 - Research remains the source library and cross-record hub; Federal Leasing is the working board for the federal lease inventory itself.
 
-## 9) Research view
+## 10) Research view
 
 `Research` is now the source-of-truth workspace for project sources, formulas, shared project records, saved questions, and advanced data imports. It opens to a home view with cross-library search, a review queue, and quick actions before you dive into any one record type.
 
@@ -427,7 +471,7 @@ The Curative view also keeps the next broader company-readiness areas visible so
 - The horizontal-permit decoder currently focuses on the published 360-character row layout for that family. It does not yet cross-link those rows to other RRC families inside LANDroid.
 - DBF and EBCDIC-heavy imports are no longer near-term roadmap work. They remain staged safely for later if that work becomes worth the time.
 
-## 10) Ask LANDroid AI
+## 11) Ask LANDroid AI
 
 `Ask LANDroid AI` is active for single-user local workflows.
 
@@ -458,7 +502,7 @@ The Curative view also keeps the next broader company-readiness areas visible so
 - Do not treat AI suggestions as final title opinions.
 - Review every imported row, attachment target, fraction, and NPRI/mineral classification before relying on the result.
 
-## 11) Flowchart view
+## 12) Flowchart view
 
 `Flowchart` is the presentation and print surface.
 
@@ -503,7 +547,7 @@ These settings are now included when you save a `.landroid` file.
 - Use horizontal and vertical spacing controls when the tree feels too cramped or too loose
 - Use browser print preview before final printing
 
-## 12) Files and persistence
+## 13) Files and persistence
 
 ### `.landroid` files
 These are the main workspace snapshot files. They now include:
@@ -515,6 +559,7 @@ These are the main workspace snapshot files. They now include:
 - instrument types
 - workspace owner records
 - workspace owner documents
+- document registry metadata, content hashes, and entity links
 - workspace curative title issues
 - workspace map assets
 - workspace Research sources, formulas, project records, saved questions, and imports
@@ -524,7 +569,7 @@ These are the main workspace snapshot files. They now include:
 - flowchart spacing settings
 
 ### `.csv` import
-CSV import loads workspace data, resets the flowchart canvas, and starts a fresh empty owner/curative/maps/research side workspace so you can re-import and relink cleanly. `.landroid` export/import carries node document attachments, including multiple PDFs on the same title card. Older v7 `.landroid` files are migrated into the current multi-document attachment shape during import.
+CSV import loads workspace data, resets the flowchart canvas, and starts a fresh empty owner/curative/maps/research side workspace so you can re-import and relink cleanly. `.landroid` export/import carries node document attachments and registry metadata, including multiple PDFs on the same title card. Older v7 `.landroid` files are migrated into the current multi-document attachment shape during import.
 When PDF payloads are present, LANDroid preserves the stored filenames so Desk Map can show exactly what is attached instead of only saying that a PDF exists.
 
 ### Local browser storage
@@ -536,7 +581,7 @@ Autosaved workspace loads now validate the ownership graph before hydration. War
 - Save another `.landroid` file before printing or exporting deliverables
 - Keep dated backup copies when testing risky changes
 
-## 13) Precision and ownership math
+## 14) Precision and ownership math
 
 Recent ownership work improved how fractions are stored and displayed.
 
@@ -552,7 +597,7 @@ Recent ownership work improved how fractions are stored and displayed.
 - Parent/child relationships matter for recalculation
 - If something looks wrong, review the branch in Desk Map first, then confirm the chronology in Runsheet
 
-## 14) Recommended workflow
+## 15) Recommended workflow
 
 1. Launch the app from `LANDroid.command` or `LANDroid.bat`.
 2. Load an existing `.landroid` file or import a `.csv`.
@@ -570,7 +615,7 @@ Recent ownership work improved how fractions are stored and displayed.
 14. Adjust paper size, spacing, and fit settings.
 15. Print or save final backups.
 
-## 15) Troubleshooting
+## 16) Troubleshooting
 
 ### "The app opened, but I still see old work"
 - Load the correct `.landroid` file.
@@ -599,7 +644,7 @@ Recent ownership work improved how fractions are stored and displayed.
 - Save a separate `.landroid` snapshot before going back to real data.
 - Browser QA covers the combinatorial demo loader with Playwright, including visible multi-document PDF chips on Desk Map cards, chip-to-modal PDF opening, v8 `.landroid` round-trip, branch-scoped lease deletion, curative and research linkage, leasehold branch-aware lease slices, inline project-name editing, Federal Leasing lease/target/source/map/search tracking, and Research home surfacing.
 
-## 16) Practical habits for a new user
+## 17) Practical habits for a new user
 
 - Keep one tract tab per tract unless you have a strong reason not to.
 - Rename tabs early so the runsheet and flowchart stay easy to follow.

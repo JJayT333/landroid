@@ -223,6 +223,50 @@ test('multi-document chips open the correct seeded PDFs by attachment id', async
   expect(browserErrors).toEqual([]);
 });
 
+test('document registry edits metadata and previews a selected packet', async ({
+  page,
+}) => {
+  const browserErrors = collectBrowserErrors(page);
+
+  await openApp(page);
+  await loadCombinatorialDemo(page);
+
+  await page.getByRole('button', { name: 'Documents' }).click();
+  const documentsShell = page.locator('main').first();
+  await expect(page.getByRole('heading', { name: 'Documents' })).toBeVisible();
+  await expect(page.getByText(/145 docs/)).toBeVisible({ timeout: 45_000 });
+  await page.getByRole('button', { name: 'Runsheet / Mineral Title' }).click();
+
+  const firstCheckbox = documentsShell.locator('tbody input[type="checkbox"]').first();
+  const firstDocumentRow = firstCheckbox.locator('xpath=ancestor::tr[1]');
+  await expect(firstCheckbox).toBeVisible();
+  await expect(firstDocumentRow).toBeVisible();
+  await firstDocumentRow.click();
+
+  await fillInput(documentsShell, 'Display title', 'Registry packet smoke deed');
+  await selectExact(documentsShell, 'Area', 'Runsheet / Mineral Title');
+  await fillInput(documentsShell, 'County', 'Walker');
+  await fillInput(documentsShell, 'Instrument no.', 'DOC-REG-001');
+  await fillInput(documentsShell, 'Grantor', 'Registry Grantor');
+  await fillInput(documentsShell, 'Grantee / lessor / lessee', 'Registry Grantee');
+  await page.getByRole('button', { name: 'Save' }).click();
+  await expect(page.getByText('Metadata saved.')).toBeVisible();
+
+  await expect(page.getByText('Registry packet smoke deed').first()).toBeVisible();
+  await page.getByLabel('Select Registry packet smoke deed').check();
+  await page.getByRole('button', { name: 'Packet: Selected' }).click();
+
+  const packetSection = documentsShell.locator('section').filter({
+    hasText: 'Packet Preview',
+  });
+  await expect(packetSection.getByText('Registry packet smoke deed')).toBeVisible();
+  await expect(packetSection.getByRole('button', { name: 'Manifest JSON' })).toBeEnabled();
+  await expect(page.getByText('Linked Entities')).toBeVisible();
+  await expect(page.getByText('Duplicate Status')).toBeVisible();
+
+  expect(browserErrors).toEqual([]);
+});
+
 test('project name is inline-editable from the Navbar', async ({ page }) => {
   const browserErrors = collectBrowserErrors(page);
 

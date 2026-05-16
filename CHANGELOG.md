@@ -5,6 +5,12 @@ stay short.
 
 ## 2026-05-16
 
+- Built the Phase 7A document registry MVP on
+  `codex/document-registry-build-2026-05-16`: added a `Documents` navigation
+  surface, flat saved-view filters, editable document metadata, linked-node
+  display, duplicate surfacing by `contentHash`, and a packet manifest preview
+  from the current filter, selected/highlighted rows, or the
+  `Runsheet / Mineral Title` view.
 - Added `docs/document-database-roadmap.md` to pivot the next workstream from
   ArcGIS mapping toward a first-class LANDroid document registry, with Dropbox
   or local folders treated as optional raw-file vaults rather than the only

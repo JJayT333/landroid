@@ -8,6 +8,7 @@ export type ViewMode =
   | 'chart'
   | 'leasehold'
   | 'master'
+  | 'documents'
   | 'flowchart'
   | 'owners'
   | 'curative'

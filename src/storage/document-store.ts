@@ -17,8 +17,11 @@ import db from './db';
 import { sha256HexOfBlob } from './blob-hash';
 import {
   DEFAULT_DOCUMENT_KIND,
+  normalizeDocumentArea,
   normalizeDocumentKind,
+  normalizeDocumentOcrStatus,
   type DocumentAttachment,
+  type DocumentArea,
   type DocumentEntityKind,
   type DocumentKind,
   type DocumentRecord,
@@ -26,10 +29,32 @@ import {
 
 export type {
   DocumentAttachment,
+  DocumentArea,
   DocumentEntityKind,
   DocumentKind,
   DocumentRecord,
 } from '../types/document';
+
+export type DocumentMetadataPatch = Partial<
+  Pick<
+    DocumentRecord,
+    | 'displayTitle'
+    | 'documentArea'
+    | 'instrumentType'
+    | 'county'
+    | 'instrumentNumber'
+    | 'volume'
+    | 'page'
+    | 'effectiveDate'
+    | 'recordingDate'
+    | 'grantor'
+    | 'grantee'
+    | 'notes'
+    | 'sourceReference'
+    | 'ocrStatus'
+    | 'kind'
+  >
+>;
 
 /** Inputs for saving a brand-new document attached to an entity. */
 export interface SaveDocumentInput {
@@ -54,6 +79,79 @@ function nowIso(): string {
   return new Date().toISOString();
 }
 
+function cleanText(value: string | undefined): string | undefined {
+  if (value === undefined) return undefined;
+  return value.trim();
+}
+
+function defaultAreaForKind(kind: DocumentKind): DocumentArea {
+  if (kind === 'lease') return 'leasehold';
+  if (
+    kind === 'deed'
+    || kind === 'obit'
+    || kind === 'affidavit'
+    || kind === 'probate'
+    || kind === 'related'
+  ) {
+    return 'runsheet_mineral_title';
+  }
+  return 'inbox';
+}
+
+function normalizeMetadataPatch(
+  patch: DocumentMetadataPatch
+): DocumentMetadataPatch {
+  const normalized: DocumentMetadataPatch = {};
+
+  if (patch.displayTitle !== undefined) {
+    normalized.displayTitle = cleanText(patch.displayTitle);
+  }
+  if (patch.documentArea !== undefined) {
+    normalized.documentArea = normalizeDocumentArea(patch.documentArea);
+  }
+  if (patch.instrumentType !== undefined) {
+    normalized.instrumentType = cleanText(patch.instrumentType);
+  }
+  if (patch.county !== undefined) {
+    normalized.county = cleanText(patch.county);
+  }
+  if (patch.instrumentNumber !== undefined) {
+    normalized.instrumentNumber = cleanText(patch.instrumentNumber);
+  }
+  if (patch.volume !== undefined) {
+    normalized.volume = cleanText(patch.volume);
+  }
+  if (patch.page !== undefined) {
+    normalized.page = cleanText(patch.page);
+  }
+  if (patch.effectiveDate !== undefined) {
+    normalized.effectiveDate = cleanText(patch.effectiveDate);
+  }
+  if (patch.recordingDate !== undefined) {
+    normalized.recordingDate = cleanText(patch.recordingDate);
+  }
+  if (patch.grantor !== undefined) {
+    normalized.grantor = cleanText(patch.grantor);
+  }
+  if (patch.grantee !== undefined) {
+    normalized.grantee = cleanText(patch.grantee);
+  }
+  if (patch.notes !== undefined) {
+    normalized.notes = cleanText(patch.notes);
+  }
+  if (patch.sourceReference !== undefined) {
+    normalized.sourceReference = cleanText(patch.sourceReference);
+  }
+  if (patch.ocrStatus !== undefined) {
+    normalized.ocrStatus = normalizeDocumentOcrStatus(patch.ocrStatus);
+  }
+  if (patch.kind !== undefined) {
+    normalized.kind = normalizeDocumentKind(patch.kind);
+  }
+
+  return normalized;
+}
+
 /**
  * Save a new document + create the first attachment for it on `entityId`.
  * Position is appended to the end of any existing attachments for that
@@ -72,6 +170,7 @@ export async function saveDoc(
   const docId = newId();
   const attachmentId = newId();
   const createdAt = nowIso();
+  const kind = normalizeDocumentKind(input.kind ?? DEFAULT_DOCUMENT_KIND);
 
   const document: DocumentRecord = {
     docId,
@@ -81,7 +180,9 @@ export async function saveDoc(
     byteLength: blob.size,
     contentHash,
     blob,
-    kind: normalizeDocumentKind(input.kind ?? DEFAULT_DOCUMENT_KIND),
+    kind,
+    documentArea: defaultAreaForKind(kind),
+    ocrStatus: 'not_started',
     createdAt,
     updatedAt: createdAt,
   };
@@ -183,6 +284,53 @@ export async function setDocKind(docId: string, kind: DocumentKind): Promise<voi
     kind: normalizeDocumentKind(kind),
     updatedAt: nowIso(),
   });
+}
+
+/**
+ * Update Phase 7A registry metadata. The blob, workspace scope, hash, and
+ * byte length stay immutable; this only changes human-reviewed fields.
+ */
+export async function updateDocMetadata(
+  docId: string,
+  patch: DocumentMetadataPatch
+): Promise<void> {
+  const updates = normalizeMetadataPatch(patch);
+  if (Object.keys(updates).length === 0) return;
+  await db.documents.update(docId, {
+    ...updates,
+    updatedAt: nowIso(),
+  });
+}
+
+/**
+ * Read every document in a workspace plus any attachment links that point
+ * at those docs. Blob payloads are omitted so the registry can scan quickly.
+ */
+export async function listDocumentRegistryData(
+  workspaceId: string
+): Promise<{
+  documents: Array<Omit<DocumentRecord, 'blob'>>;
+  attachments: DocumentAttachment[];
+}> {
+  const docs = await db.documents.where('workspaceId').equals(workspaceId).toArray();
+  const documents = docs.map((doc) => {
+    const { blob: _blob, ...meta } = doc;
+    return meta;
+  });
+  if (documents.length === 0) {
+    return { documents, attachments: [] };
+  }
+
+  const docIds = documents.map((doc) => doc.docId);
+  const attachments = await db.document_attachments
+    .where('docId')
+    .anyOf(docIds)
+    .toArray();
+
+  return {
+    documents,
+    attachments,
+  };
 }
 
 /**

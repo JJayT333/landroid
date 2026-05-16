@@ -31,6 +31,7 @@ const views: { id: ViewMode; label: string }[] = [
   { id: 'leasehold', label: 'Leasehold' },
   { id: 'flowchart', label: 'Flowchart' },
   { id: 'master', label: 'Runsheet' },
+  { id: 'documents', label: 'Documents' },
   { id: 'owners', label: 'Owners' },
   { id: 'curative', label: 'Curative' },
   { id: 'maps', label: 'Maps' },
@@ -322,8 +323,8 @@ export default function Navbar() {
         </div>
       </div>
 
-      <div className="flex items-center gap-4">
-        <div className="flex gap-1">
+      <div className="flex min-w-0 items-center gap-4">
+        <div className="flex min-w-0 gap-1 overflow-x-auto">
           <div className="flex items-center pr-2">
             <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-parchment/15 bg-parchment/10 p-1 shadow-md">
               <img
@@ -340,7 +341,7 @@ export default function Navbar() {
               onClick={() => setView(v.id)}
               aria-current={view === v.id ? 'page' : undefined}
               className={`
-                px-4 py-1.5 rounded-lg text-sm font-medium transition-colors
+                shrink-0 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors
                 ${view === v.id
                   ? 'bg-leather text-parchment'
                   : 'text-parchment/70 hover:text-parchment hover:bg-ink-light/30'}

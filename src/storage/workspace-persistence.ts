@@ -5,10 +5,13 @@ import db, { type PdfAttachment } from './db';
 import { deserializeBlob, serializeBlob, type SerializedBlob } from './blob-serialization';
 import {
   isDocumentEntityKind,
+  isDocumentArea,
+  isDocumentOcrStatus,
   normalizeDocumentKind,
   type DocumentAttachment,
   type DocumentRecord,
 } from '../types/document';
+import { normalizeExternalRefs } from '../types/external-ref';
 import {
   migratePdfsToDocuments,
   type DocumentMigrationDeps,
@@ -688,6 +691,35 @@ function deserializeDocumentData(value: unknown): DocumentWorkspaceData {
           contentHash: typeof raw.contentHash === 'string' ? raw.contentHash : '',
           blob,
           kind: normalizeDocumentKind(raw.kind),
+          displayTitle:
+            typeof raw.displayTitle === 'string' ? raw.displayTitle : undefined,
+          documentArea: isDocumentArea(raw.documentArea)
+            ? raw.documentArea
+            : undefined,
+          instrumentType:
+            typeof raw.instrumentType === 'string' ? raw.instrumentType : undefined,
+          county: typeof raw.county === 'string' ? raw.county : undefined,
+          instrumentNumber:
+            typeof raw.instrumentNumber === 'string'
+              ? raw.instrumentNumber
+              : undefined,
+          volume: typeof raw.volume === 'string' ? raw.volume : undefined,
+          page: typeof raw.page === 'string' ? raw.page : undefined,
+          effectiveDate:
+            typeof raw.effectiveDate === 'string' ? raw.effectiveDate : undefined,
+          recordingDate:
+            typeof raw.recordingDate === 'string' ? raw.recordingDate : undefined,
+          grantor: typeof raw.grantor === 'string' ? raw.grantor : undefined,
+          grantee: typeof raw.grantee === 'string' ? raw.grantee : undefined,
+          notes: typeof raw.notes === 'string' ? raw.notes : undefined,
+          sourceReference:
+            typeof raw.sourceReference === 'string'
+              ? raw.sourceReference
+              : undefined,
+          ocrStatus: isDocumentOcrStatus(raw.ocrStatus)
+            ? raw.ocrStatus
+            : undefined,
+          externalRefs: normalizeExternalRefs(raw.externalRefs),
           createdAt: typeof raw.createdAt === 'string' ? raw.createdAt : now,
           updatedAt: typeof raw.updatedAt === 'string' ? raw.updatedAt : now,
         },

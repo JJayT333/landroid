@@ -27,6 +27,27 @@ export type DocumentKind = (typeof DOCUMENT_KIND_OPTIONS)[number];
 
 export const DEFAULT_DOCUMENT_KIND: DocumentKind = 'other';
 
+export const DOCUMENT_AREA_OPTIONS = [
+  'inbox',
+  'runsheet_mineral_title',
+  'leasehold',
+  'curative',
+  'research',
+  'gis_map_support',
+  'federal_reference',
+] as const;
+export type DocumentArea = (typeof DOCUMENT_AREA_OPTIONS)[number];
+
+export const DEFAULT_DOCUMENT_AREA: DocumentArea = 'inbox';
+
+export const DOCUMENT_OCR_STATUS_OPTIONS = [
+  'not_started',
+  'not_needed',
+  'complete',
+  'failed',
+] as const;
+export type DocumentOcrStatus = (typeof DOCUMENT_OCR_STATUS_OPTIONS)[number];
+
 export const DOCUMENT_ENTITY_KINDS = [
   'node',
   'owner',
@@ -53,6 +74,24 @@ export interface DocumentRecord {
   blob: Blob;
   /** Document-type tag (deed/lease/obit/etc.). */
   kind: DocumentKind;
+  /** Registry title. Defaults to `fileName` when blank. */
+  displayTitle?: string;
+  /** Saved-view area for the document registry. */
+  documentArea?: DocumentArea;
+  /** Registry metadata. Optional so v8 rows do not need a migration. */
+  instrumentType?: string;
+  county?: string;
+  instrumentNumber?: string;
+  volume?: string;
+  page?: string;
+  effectiveDate?: string;
+  recordingDate?: string;
+  grantor?: string;
+  grantee?: string;
+  notes?: string;
+  sourceReference?: string;
+  /** OCR tracking hook only. Phase 7A does not extract text. */
+  ocrStatus?: DocumentOcrStatus;
   createdAt: string;
   updatedAt: string;
   /**
@@ -83,6 +122,28 @@ export function isDocumentKind(value: unknown): value is DocumentKind {
 
 export function normalizeDocumentKind(value: unknown): DocumentKind {
   return isDocumentKind(value) ? value : DEFAULT_DOCUMENT_KIND;
+}
+
+export function isDocumentArea(value: unknown): value is DocumentArea {
+  return (
+    typeof value === 'string'
+    && (DOCUMENT_AREA_OPTIONS as readonly string[]).includes(value)
+  );
+}
+
+export function normalizeDocumentArea(value: unknown): DocumentArea {
+  return isDocumentArea(value) ? value : DEFAULT_DOCUMENT_AREA;
+}
+
+export function isDocumentOcrStatus(value: unknown): value is DocumentOcrStatus {
+  return (
+    typeof value === 'string'
+    && (DOCUMENT_OCR_STATUS_OPTIONS as readonly string[]).includes(value)
+  );
+}
+
+export function normalizeDocumentOcrStatus(value: unknown): DocumentOcrStatus {
+  return isDocumentOcrStatus(value) ? value : 'not_started';
 }
 
 export function isDocumentEntityKind(value: unknown): value is DocumentEntityKind {

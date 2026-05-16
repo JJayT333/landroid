@@ -1,6 +1,8 @@
 # Document Database Roadmap
 
-Status: planning baseline after Phase 5 document/PDF persistence.
+Status: Phase 7A registry MVP implemented on
+`codex/document-registry-build-2026-05-16`; later OCR, import manifests,
+Dropbox/API mapping, ArcGIS import, and AI query remain future phases.
 
 ## Decision
 
@@ -42,9 +44,18 @@ Phase 5 already created the right base:
 - multi-document Desk Map chips
 - shared attachment UI in the node edit modal
 
-That is enough for local document-backed title review. It is not yet a full
-document database because documents are still mostly attachments, not first-
-class searchable records.
+Phase 7A added the first document-registry surface:
+
+- `Documents` navigation view
+- saved-view filters for document areas and review states
+- editable registry metadata on `DocumentRecord`
+- linked-node display from `document_attachments`
+- duplicate surfacing from `contentHash`
+- packet manifest preview from the current filter, selected/highlighted rows,
+  or the `Runsheet / Mineral Title` saved view
+
+This is enough for local document-backed title review before OCR. It is still
+not the durable backend or full text/AI document database.
 
 ## Target Model
 
@@ -117,11 +128,14 @@ Goal: make documents first-class records before OCR.
 
 In scope:
 
-- document library/index view
+- document library/index view — implemented as `Documents`
 - metadata editing for instrument type, recording fields, dates, county,
-  parties, notes, and source references
-- duplicate surfacing from `contentHash`
-- filters by kind, entity link, tract, owner, lease, date, and missing metadata
+  parties, notes, and source references — implemented locally
+- duplicate surfacing from `contentHash` — implemented
+- filters by document area, kind, node link, tract, date, text, missing
+  metadata, unlinked docs, duplicate docs, and OCR-needed marker — implemented
+- packet manifest preview — implemented as JSON manifest download only, not PDF
+  packaging
 - no OCR or AI mutation
 
 ### Phase 7B — Entity-Link Expansion

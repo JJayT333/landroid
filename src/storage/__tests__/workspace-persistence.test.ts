@@ -279,6 +279,20 @@ function buildWorkspace(canvas: CanvasSaveData | null): LandroidFileData {
           contentHash: 'fixture-hash',
           blob: new Blob(['node-pdf-body'], { type: 'application/pdf' }),
           kind: 'deed',
+          displayTitle: 'Recorded Mineral Deed',
+          documentArea: 'runsheet_mineral_title',
+          instrumentType: 'Mineral Deed',
+          county: 'Elmore',
+          instrumentNumber: '20260001',
+          volume: '120',
+          page: '44',
+          effectiveDate: '2026-03-01',
+          recordingDate: '2026-04-01',
+          grantor: 'Pat Doe',
+          grantee: 'Acme Minerals LLC',
+          notes: 'Registry metadata round-trip fixture',
+          sourceReference: 'TORS packet A',
+          ocrStatus: 'not_needed',
           createdAt: '2026-04-01T00:00:00.000Z',
           updatedAt: '2026-04-01T00:00:00.000Z',
         },
@@ -340,6 +354,22 @@ describe('workspace-persistence', () => {
     );
     expect(imported.canvas).toEqual(original.canvas);
     expect(imported.documentData?.documents[0]?.fileName).toBe('20260001.pdf');
+    expect(imported.documentData?.documents[0]).toMatchObject({
+      displayTitle: 'Recorded Mineral Deed',
+      documentArea: 'runsheet_mineral_title',
+      instrumentType: 'Mineral Deed',
+      county: 'Elmore',
+      instrumentNumber: '20260001',
+      volume: '120',
+      page: '44',
+      effectiveDate: '2026-03-01',
+      recordingDate: '2026-04-01',
+      grantor: 'Pat Doe',
+      grantee: 'Acme Minerals LLC',
+      notes: 'Registry metadata round-trip fixture',
+      sourceReference: 'TORS packet A',
+      ocrStatus: 'not_needed',
+    });
     expect(await imported.documentData?.documents[0]?.blob.text()).toBe(
       'node-pdf-body'
     );

@@ -5,10 +5,10 @@ session handoff lives in `CONTINUATION-PROMPT.md`.
 
 ## Now
 
-- Checkpoint the document-database direction from
-  `codex/document-database-roadmap-2026-05-16`.
-- Start Phase 7A from `docs/document-database-roadmap.md`: make documents
-  first-class searchable registry records before mapping/import expansion.
+- Validate and review the Phase 7A document registry MVP from
+  `codex/document-registry-build-2026-05-16`: flat document index, saved
+  views, metadata editing, duplicate surfacing, linked-node display, and packet
+  manifest preview.
 - Keep ArcGIS work design-only for now; `docs/gis-data-catalog.md` remains the
   source inventory for a later canonical layer map.
 - Test spreadsheet row staging against additional recurring workbook formats.
@@ -20,6 +20,8 @@ session handoff lives in `CONTINUATION-PROMPT.md`.
 
 ## Next
 
+- Harden document packet export after the registry is reviewed: ZIP/PDF
+  packaging, CSV load file, and stricter packet-readiness checks.
 - Expand entity document links beyond Desk Map nodes: owners, leases, curative
   issues, and research records.
 - Add import-manifest previews for large document sources such as ArcGIS

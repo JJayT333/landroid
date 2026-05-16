@@ -10,6 +10,7 @@ import DeskMapView from './views/DeskMapView';
 const FlowchartView = lazy(() => import('./views/FlowchartView'));
 const LeaseholdView = lazy(() => import('./views/LeaseholdView'));
 const RunsheetView = lazy(() => import('./views/RunsheetView'));
+const DocumentsView = lazy(() => import('./views/DocumentsView'));
 const OwnerDatabaseView = lazy(() => import('./views/OwnerDatabaseView'));
 const CurativeView = lazy(() => import('./views/CurativeView'));
 const MapsView = lazy(() => import('./views/MapsView'));
@@ -92,6 +93,18 @@ export default function App() {
             }
           >
             <RunsheetView />
+          </Suspense>
+        )}
+        {view === 'documents' && (
+          <Suspense
+            fallback={
+              <PlaceholderView
+                name="Loading Documents"
+                description="Preparing the document registry."
+              />
+            }
+          >
+            <DocumentsView />
           </Suspense>
         )}
         {view === 'owners' && (

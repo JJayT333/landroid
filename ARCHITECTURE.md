@@ -22,6 +22,8 @@ summarizes how the app is put together and where changes should live.
 - `src/App.tsx`: top-level app shell and view switching.
 - `src/components/shared/Navbar.tsx`: file actions, demo loading, navigation,
   and project-name editing.
+- `src/views/DocumentsView.tsx`: Phase 7A document registry surface over the
+  local v8 document tables.
 
 ## State Ownership
 
@@ -37,6 +39,9 @@ summarizes how the app is put together and where changes should live.
 - `canvas-store`: flowchart nodes, edges, viewport, and print/layout settings.
 - `ai/settings-store`: AI provider/model settings; cloud keys are session-only.
 - `ai/undo-store`: latest AI rollback snapshot.
+- Document blobs and entity links are persisted through `src/storage/document-store.ts`.
+  Registry filtering, duplicate surfacing, linked-entity summaries, and packet
+  manifest previews live in pure helpers under `src/documents`.
 
 ## Data Flow
 
@@ -103,6 +108,9 @@ Future policy work is tracked in `PATCH_PLAN.md`.
 
 - Desk Map is the title-tree source of truth.
 - Owners is the owner/lease record source of truth.
+- Documents is the first-class registry for saved workspace document records.
+  Runsheet document review is a saved mineral-title view over that registry,
+  not a separate storage model.
 - Leasehold consumes Desk Map and Owners data for review outputs.
 - Unit focus is driven by Desk Map `unitCode` / `unitName` fields. Leasehold
   filters its tract set by active unit, and unit-wide ORRI/WI records carry a
