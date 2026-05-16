@@ -69,6 +69,19 @@ Known risk:
   strict-parsed before leasehold math. Malformed non-blank values must stay
   warning-visible and treated as 0 until corrected, not silently clamped.
 
+## Document Database / OCR Planning
+
+- Phase 7 planning treats LANDroid as the document registry and query index;
+  Dropbox, local folders, or later object storage are raw-file vault options,
+  not substitutes for structured metadata, entity links, hashes, OCR status,
+  and citations.
+- OCR text is sensitive because it can expose full title instruments, owner
+  names, lease economics, and legal descriptions. Do not send documents or OCR
+  text to cloud OCR or cloud AI without an explicit provider/security decision.
+- AI document query should be read-only by default and return cited source
+  references. Automatic title updates from OCR or AI remain out of scope until
+  separately designed.
+
 ## Browser Security
 
 If LANDroid is deployed beyond localhost, define a real content-security policy.

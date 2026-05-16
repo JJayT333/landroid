@@ -5,12 +5,30 @@ Use this file to resume the active workstream in a new chat. Read it with
 
 ## Current Branch
 
-Current checkpoint branch: `codex/phase-5-doc-storage-wrap-2026-05-15`,
-created from `claude/phase-5-document-refactor-2026-05-15`, which descended
-from `codex/hosted-hardening-2026-05-14`. The PR target remains
+Current checkpoint branch: `codex/document-database-roadmap-2026-05-16`,
+created from `codex/phase-5-doc-storage-wrap-2026-05-15`, which was created
+from `claude/phase-5-document-refactor-2026-05-15` and descends from
+`codex/hosted-hardening-2026-05-14`. The PR target remains
 `codex/hosted-hardening-2026-05-14`, not `main`.
 
 Do not commit directly to `main`.
+
+## Document Database Direction
+
+The next preferred workstream is document storage/search, not ArcGIS mapping.
+Use `docs/document-database-roadmap.md` as the current design baseline.
+
+Decision recorded:
+
+- LANDroid should become the structured, queryable document registry.
+- Dropbox/local folders can remain raw-file vaults or backup/sync locations,
+  but folder storage alone cannot provide title-aware metadata, entity links,
+  OCR status, duplicate hashes, source citations, or AI answers grounded to
+  exact source records.
+- Phase 7A should start with a document library/index view, document metadata,
+  duplicate surfacing from `contentHash`, and filters. OCR, AI extraction,
+  Dropbox sync, ArcGIS attachment import, and automatic title updates remain
+  separate later phases.
 
 ## Phase 5 Status (Document/PDF Persistence Refactor)
 
@@ -106,14 +124,21 @@ Final checkpoint validation on
   - `npm run test:e2e` passed: 10 Playwright workflows.
   - `git diff --check` passed.
 
+Document database roadmap checkpoint validation on
+`codex/document-database-roadmap-2026-05-16`:
+
+- `git diff --check` passed.
+- `npm run lint` passed.
+
 ### What's Left
 
 - Run `git diff --check` and `git status` immediately before final handoff or
   checkpoint.
 - Check `git status` and keep generated Playwright artifacts ignored.
-- Push branch `codex/phase-5-doc-storage-wrap-2026-05-15` to origin.
 - Open or update a draft PR targeting `codex/hosted-hardening-2026-05-14` when
   the user wants the GitHub PR step.
+- Start Phase 7A from `docs/document-database-roadmap.md`: document library,
+  metadata editing, duplicate surfacing, and filters.
 
 **Depth-range import normalize-and-warn (deferred):** the design doc
 specified that a `.landroid` carrying a non-`'all_depths'` value
@@ -176,22 +201,24 @@ into a dedicated project.
 
 ## Current Workstream
 
-The current branch is the Phase 5 document/PDF persistence workstream. Hosted
-hardening remains the parent branch context, but this branch now carries the v8
-document schema, multi-document UI, Raven Forest seed migration, restored
-Playwright workflows, and docs close-out.
+The current branch is a planning checkpoint that pivots from the completed
+Phase 5 document/PDF persistence foundation toward Phase 7A document registry
+work. Hosted hardening remains the parent branch context, but this branch now
+carries the v8 document schema, multi-document UI, Raven Forest seed migration,
+restored Playwright workflows, docs close-out, and a document-database roadmap.
 
 The next workstream should be incremental and phase-based:
 
-1. Hosted auth and proxy boundary hardening. **Implemented locally; deploy still
-   needs the new Amplify env var before the next hosted build.**
-2. Hosted data-loss and AI read-only safety. **Implemented locally.**
-3. Leasehold strict parsing and warning surfacing. **Implemented locally.**
-4. Restore skipped browser workflow coverage. **Complete on the Phase 5 branch.**
-5. Design document/PDF persistence foundations before durable backend work.
-   **Implemented on the Phase 5 branch; Tier 2 document features remain deferred.**
-6. UX/accessibility cleanup for destructive actions and modal/form basics.
-7. Docs and handoff alignment after behavior changes.
+1. Phase 7A document registry: document library/index view, metadata editing,
+   duplicate surfacing from `contentHash`, and filters.
+2. Phase 7B entity-link expansion: attach existing documents to owners, leases,
+   curative issues, and research records.
+3. Phase 7C import manifests: preview ArcGIS attachment tables, Dropbox/local
+   folders, and selected source packets before importing or linking anything.
+4. Phase 7D OCR/text index: store extracted text separately from original
+   documents, with status/warnings and keyword search first.
+5. Phase 7E AI document query: cited, read-only answers grounded to `docId`,
+   page/passage, and entity links.
 
 ## Last Completed
 

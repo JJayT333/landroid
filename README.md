@@ -63,6 +63,7 @@ persistence refactor and fixture retargeting.
 | `ROADMAP.md` | Current, next, and later work. |
 | `CHANGELOG.md` | Completed meaningful changes. |
 | `CONTINUATION-PROMPT.md` | Short handoff for resuming the active workstream. |
+| `docs/document-database-roadmap.md` | Phase 7 document registry, OCR/search, storage-vault, and AI-query direction. |
 | `FULL_AUDIT_COORDINATION.md` | Shared scope and output contract for the parallel Codex/Claude full audit. |
 
 See `docs/README.md` for the full documentation map.
@@ -98,6 +99,10 @@ Older stress and 8-tract leasehold demos have been retired.
 
 - Browser autosave keeps the active workspace and flowchart canvas locally.
 - `.landroid` files are the main named backup/export format.
+- Phase 5 stores document blobs, metadata, content hashes, and attachments in
+  the local workspace database. Phase 7 planning treats LANDroid as the
+  queryable document registry, with Dropbox/local folders or later object
+  storage as optional raw-file vaults rather than the only database.
 - `.landroid` imports validate the top-level workspace graph before loading.
 - CSV imports create a fresh workspace and intentionally start with empty owner,
   curative, map, and research side records.

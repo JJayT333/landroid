@@ -42,6 +42,8 @@ Current ADRs:
 ## Architecture Notes
 
 - `docs/architecture/rrc-import-readability.md`: RRC import/decode strategy.
+- `docs/document-database-roadmap.md`: Phase 7 document registry, OCR/search,
+  storage-vault, and AI-query direction.
 - `docs/gis-data-catalog.md`: Local Raven Forest GIS package inventory and
   import-readiness notes.
 

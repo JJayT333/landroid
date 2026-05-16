@@ -3,6 +3,17 @@
 This file records meaningful project changes so `CONTINUATION-PROMPT.md` can
 stay short.
 
+## 2026-05-16
+
+- Added `docs/document-database-roadmap.md` to pivot the next workstream from
+  ArcGIS mapping toward a first-class LANDroid document registry, with Dropbox
+  or local folders treated as optional raw-file vaults rather than the only
+  database.
+- Updated roadmap, security notes, docs map, README, and continuation handoff
+  for Phase 7A: document library/index, metadata, duplicate surfacing, entity
+  links, import manifests, OCR/text indexing, and cited read-only AI document
+  query.
+
 ## 2026-05-15
 
 - Completed Phase 5 document/PDF persistence on
