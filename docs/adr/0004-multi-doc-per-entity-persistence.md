@@ -20,8 +20,9 @@ the future.
 Real-world Texas title work routinely attaches multiple documents to a single
 conveying node: a deed, an obituary, an affidavit of heirship, a probate
 order, and a related curative letter can all sit on the same chain step. The
-audit (`AUDIT_REPORT_CODEX_FULL_2026-05-14.md`, finding F5) called out the
-node-only PDF key as a persistence risk before durable-backend work.
+audit (`docs/archive/audits/AUDIT_REPORT_CODEX_FULL_2026-05-14.md`, finding
+F5) called out the node-only PDF key as a persistence risk before
+durable-backend work.
 
 The Raven Forest fixture and Playwright workflows now exercise
 multi-document coverage on representative conveying nodes. This ADR remains

@@ -6,10 +6,10 @@ It focuses on the features that exist today, the safest day-to-day workflow, and
 ## 1) Quick start
 
 ### Launchers
-- macOS: `LANDroid.command`
+- macOS: double-click `LANDroid.command`
 - Windows: `LANDroid.bat`
 
-Both launchers start the local Vite dev server on port `5173`, open the app in your default browser, and reuse the same project folder as the working directory.
+Both launchers start the local Vite dev server on port `5173`, open the app in your default browser, and reuse the same project folder as the working directory. On a fresh GitHub ZIP, `LANDroid.command` installs npm dependencies before starting the app.
 
 ### Manual start
 If you prefer the terminal:
@@ -622,6 +622,18 @@ Recent ownership work improved how fractions are stored and displayed.
 - If you just imported a `.csv`, re-import the active tract into `Flowchart`.
 - If you just imported a `.csv`, remember that owner records, map assets, and research imports start empty for that imported workspace.
 - If you just imported a `.csv`, remember that curative title issues start empty too.
+
+### "`LANDroid.command` will not open after extracting the GitHub ZIP"
+- Make sure Node.js/npm is installed first. The launcher needs npm to install the project dependencies that GitHub ZIPs do not include.
+- If macOS blocks the downloaded script, open Terminal in the extracted folder and run:
+
+```bash
+chmod +x LANDroid.command
+xattr -dr com.apple.quarantine .
+./LANDroid.command
+```
+
+- Leave the Terminal window open on first launch. Dependency installation can take a few minutes, and any startup error will print there.
 
 ### "The flowchart is empty"
 - Make sure the active tract has title cards.

@@ -30,13 +30,14 @@ Expected:
 
 ## 2. Git Checkpoint
 
-Deploy from a non-`main` branch. For this workstream, use:
+Deploy from a non-`main` branch. Before touching AWS, checkpoint the exact
+source and docs changes that support the deploy:
 
 ```bash
 git status
-git add AUDIT_VERIFICATION_REPORT.md CHANGELOG.md CONTINUATION-PROMPT.md DEPLOYMENT_GUIDE.md DEPLOY_TEST_CHECKLIST.md SECURITY.md TESTING.md backend/ai-proxy src scripts package.json
-git commit -m "fix(audit): harden pre-AWS test deploy readiness"
-git push origin audit-verification-pre-aws
+git add CHANGELOG.md CONTINUATION-PROMPT.md DEPLOYMENT_GUIDE.md DEPLOY_TEST_CHECKLIST.md SECURITY.md TESTING.md backend/ai-proxy src scripts package.json
+git commit -m "chore(deploy): checkpoint test deploy readiness"
+git push origin <your-branch>
 ```
 
 Do not include generated `dist`, `dist-node`, or ignored Lambda build output in

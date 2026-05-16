@@ -2,7 +2,7 @@
 
 Date: 2026-04-19  
 Repository: `/Users/abstractmapping/projects/landroid`  
-Source audit: `/Users/abstractmapping/projects/landroid/AUDIT_REPORT.md`
+Source audit: `/Users/abstractmapping/projects/landroid/docs/archive/audits/AUDIT_REPORT.md`
 
 This plan orders remediation in the smallest safe sequence, prioritizing
 blast-radius reduction before broader cleanup. It is now a living checklist:

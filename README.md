@@ -19,8 +19,18 @@ See `PROJECT_CONTEXT.md` and `docs/adr/0002-texas-only-active-math.md`.
 
 ### Launchers
 
-- macOS: `LANDroid.command`
+- macOS: double-click `LANDroid.command`. On a fresh GitHub ZIP, the launcher
+  installs dependencies first, then starts LANDroid and opens the browser.
 - Windows: `LANDroid.bat`
+
+If macOS blocks the downloaded ZIP script, open Terminal in the extracted
+folder and run:
+
+```bash
+chmod +x LANDroid.command
+xattr -dr com.apple.quarantine .
+./LANDroid.command
+```
 
 ### Terminal
 
@@ -61,10 +71,10 @@ persistence refactor, fixture retargeting, and document-registry smoke path.
 | `USER_MANUAL.md` | User-facing workflow guide. |
 | `LANDMAN-MATH-REFERENCE.md` | Landman-facing math formulas and review conventions. |
 | `ROADMAP.md` | Current, next, and later work. |
+| `IDEAS.md` | Brainstorming inbox for ideas that are not yet roadmap commitments. |
 | `CHANGELOG.md` | Completed meaningful changes. |
 | `CONTINUATION-PROMPT.md` | Short handoff for resuming the active workstream. |
 | `docs/document-database-roadmap.md` | Phase 7 document registry, OCR/search, storage-vault, and AI-query direction. |
-| `FULL_AUDIT_COORDINATION.md` | Shared scope and output contract for the parallel Codex/Claude full audit. |
 
 See `docs/README.md` for the full documentation map.
 

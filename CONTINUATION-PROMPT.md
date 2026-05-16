@@ -15,7 +15,8 @@ Do not commit directly to `main`.
 
 ## Current Workstream
 
-Phase 7A document registry MVP is implemented.
+Phase 7A document registry MVP is implemented. A follow-up launcher polish pass
+also hardened `LANDroid.command` for fresh GitHub ZIP downloads.
 
 LANDroid now treats Runsheet as a saved mineral-title view over the broader
 document registry rather than a separate storage model. Dropbox/local folders
@@ -43,6 +44,17 @@ Implemented in this branch:
 Explicitly not implemented: OCR, Dropbox API sync, ArcGIS import, AI document
 query, federal/private math, and automatic title updates.
 
+Follow-up launcher/docs change:
+
+- `LANDroid.command` now checks for Node.js/npm, installs npm dependencies on
+  first run when `node_modules/.bin/vite` is missing, and keeps the Terminal
+  window open with a clear startup error.
+- README and user manual troubleshooting now call out the GitHub ZIP flow,
+  macOS quarantine/execute-bit fixes, and the first-run dependency install.
+- `IDEAS.md` is now the lightweight idea inbox. The docs map marks stale
+  audit/report/prompt files as archived historical context under
+  `docs/archive/`.
+
 ## Latest Validation
 
 Completed on `codex/document-registry-build-2026-05-16`:
@@ -64,6 +76,11 @@ Completed on `codex/document-registry-build-2026-05-16`:
 Run `git diff --check` and `git status` immediately before final handoff or
 checkpoint.
 
+Latest launcher-docs validation after this follow-up:
+
+- `bash -n LANDroid.command` passed.
+- `git diff --check` passed.
+
 ## Open Risks And Assumptions
 
 - Packet export is intentionally a preview plus JSON manifest, not a ZIP/PDF
@@ -75,6 +92,8 @@ checkpoint.
 - Duplicate detection uses existing `contentHash`; it does not perform fuzzy
   matching or OCR text comparison.
 - Existing Vite build warnings are unchanged and non-blocking.
+- A fresh GitHub ZIP still requires Node.js/npm to already be installed; the
+  launcher can install project dependencies, but not Node itself.
 
 ## Likely Next Steps
 

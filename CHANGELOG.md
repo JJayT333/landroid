@@ -5,6 +5,12 @@ stay short.
 
 ## 2026-05-16
 
+- Added `IDEAS.md` as a lightweight brainstorming inbox and archived stale
+  audit/prompt files under `docs/archive/` so the repo root stays focused on
+  active guidance.
+- Hardened the macOS ZIP launcher so `LANDroid.command` checks for Node/npm,
+  installs npm dependencies on the first run from a fresh GitHub download, and
+  keeps the Terminal window open with a clear error if startup fails.
 - Built the Phase 7A document registry MVP on
   `codex/document-registry-build-2026-05-16`: added a `Documents` navigation
   surface, flat saved-view filters, editable document metadata, linked-node

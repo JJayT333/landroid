@@ -18,15 +18,9 @@ Use this map to decide which Markdown file to read or update.
 | `USER_MANUAL.md` | User-facing app workflow guide. | User-visible behavior changes. |
 | `LANDMAN-MATH-REFERENCE.md` | Landman-facing math formulas and conventions. | Calculation semantics or warning/blocking behavior changes. |
 | `ROADMAP.md` | Short priority map. | Strategic priorities change. |
+| `IDEAS.md` | Low-friction idea inbox and brainstorming parking lot. | A new idea is worth remembering but is not yet approved roadmap scope. |
 | `CHANGELOG.md` | Completed meaningful work. | A meaningful feature, fix, or docs rail lands. |
 | `CONTINUATION-PROMPT.md` | Current short handoff. | Before switching chats or after meaningful work. |
-| `ARC_REVIEW_PROMPT.md` | Paste-ready review prompt for external/ArcGIS follow-up. | The document-storage or GIS handoff changes. |
-| `FULL_AUDIT_COORDINATION.md` | Shared scope, personas, and report format for the parallel Codex/Claude audit. | Audit scope, branch names, required personas, or report template changes. |
-| `CODEX_FULL_AUDIT_PROMPT.md` | Paste-ready prompt for the Codex full audit branch. | Codex audit instructions change. |
-| `CLAUDE_FULL_AUDIT_PROMPT.md` | Paste-ready prompt for the Claude full audit branch. | Claude audit instructions change. |
-| `CODEX_DOCUMENT_REGISTRY_BUILD_PROMPT.md` | Paste-ready prompt for the Codex document-registry build branch. | Parallel document-registry build instructions change. |
-| `CLAUDE_DOCUMENT_REGISTRY_BUILD_PROMPT.md` | Paste-ready prompt for the Claude document-registry build branch. | Parallel document-registry build instructions change. |
-| `AUDIT_REPORT.md` | Point-in-time adversarial audit snapshot. | Usually do not edit except to add status/snapshot notes. |
 | `PATCH_PLAN.md` | Audit remediation status and sequence. | Remediation status changes. |
 
 ## Architecture Decision Records
@@ -54,3 +48,7 @@ Current ADRs:
 Files under `docs/archive` are historical. They may explain why older choices
 were made, but they are not current implementation guidance unless an active doc
 explicitly says so.
+
+- `docs/archive/audits/`: point-in-time audit reports and verification reports.
+- `docs/archive/prompts/`: paste-ready prompts and coordination briefs for
+  completed or paused external/parallel review workstreams.
