@@ -55,6 +55,8 @@ npm run test:e2e
 automatically. Current e2e status is tracked in `TESTING.md`; as of the current
 handoff, all 11 Playwright workflows are active after the document/PDF
 persistence refactor, fixture retargeting, and document-registry smoke path.
+GitHub Actions also runs lint, unit tests, build, and Playwright e2e on pushes
+and pull requests.
 
 ## Key Docs
 

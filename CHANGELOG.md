@@ -5,6 +5,8 @@ stay short.
 
 ## 2026-05-16
 
+- Added GitHub Actions CI for push, pull request, and manual runs, covering
+  TypeScript lint/typecheck, unit tests, production build, and Playwright e2e.
 - Added `IDEAS.md` as a lightweight brainstorming inbox and archived stale
   audit/prompt files under `docs/archive/` so the repo root stays focused on
   active guidance.

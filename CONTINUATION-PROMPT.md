@@ -54,6 +54,8 @@ Follow-up launcher/docs change:
 - `IDEAS.md` is now the lightweight idea inbox. The docs map marks stale
   audit/report/prompt files as archived historical context under
   `docs/archive/`.
+- GitHub Actions CI now runs lint/typecheck, unit tests, build, and Playwright
+  e2e on push, pull request, and manual dispatch.
 
 ## Latest Validation
 

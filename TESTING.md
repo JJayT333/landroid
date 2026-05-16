@@ -11,6 +11,14 @@ npm run build
 npm run test:e2e
 ```
 
+## GitHub Actions
+
+`.github/workflows/ci.yml` runs on push, pull request, and manual dispatch.
+The `quality` job installs with `npm ci`, then runs `npm run lint`,
+`npm test`, and `npm run build`. The separate `e2e` job installs Playwright
+Chromium and runs `npm run test:e2e`, uploading the Playwright report when
+the job finishes.
+
 ## When To Run What
 
 | Change Type | Minimum Validation |

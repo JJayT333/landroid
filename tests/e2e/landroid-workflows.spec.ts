@@ -10,12 +10,17 @@ function escapeRegExp(value: string) {
 function collectBrowserErrors(page: Page) {
   const errors: string[] = [];
 
+  const isKnownNonAppNoise = (text: string) =>
+    text.includes('Failed to resolve module specifier "/@react-refresh"');
+
   page.on('pageerror', (error) => {
-    errors.push(error.message);
+    if (!isKnownNonAppNoise(error.message)) {
+      errors.push(error.message);
+    }
   });
 
   page.on('console', (message) => {
-    if (message.type() === 'error') {
+    if (message.type() === 'error' && !isKnownNonAppNoise(message.text())) {
       errors.push(message.text());
     }
   });
