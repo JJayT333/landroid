@@ -24,10 +24,11 @@ Then open `http://localhost:5173/`.
 
 ## 2) Main navigation
 
-The top bar has eight view buttons:
+The top bar has ten view buttons:
 - `Desk Map`
 - `Leasehold`
 - `Flowchart`
+- `Documents`
 - `Runsheet`
 - `Owners`
 - `Curative`
@@ -189,9 +190,91 @@ It now has three internal modes:
 - The demo loader resets Curative, Maps, and Research side workspaces so stale side records from previous work are not carried over
 - The tract descriptions are prefilled so you can see how the tab is meant to be used before entering your own data
 
+## 3a) Documents view
+
+`Documents` is the workspace's flat document registry. Every PDF that has
+ever been attached to a node lives here, plus any project-support,
+leasehold, curative, research, GIS/map-support, or federal-reference
+files you've added to the registry.
+
+### Layout
+
+- **Left rail (saved views)** — preset filters that mirror the seven
+  filing populations a landman cares about, plus three computed views:
+  - `All Documents`
+  - `Mineral Title` (deeds, obits, affidavits, probate)
+  - `Project Support`
+  - `Leasehold` (oil-and-gas leases, ratifications)
+  - `Curative` (curative letters, releases)
+  - `Research` (sources, abstracts, packets)
+  - `GIS / Map Support` (plats, mapped exhibits)
+  - `Federal Reference` (BLM/federal — does not feed Texas math)
+  - `Other` (uncategorized)
+  - `Unlinked` — no attachment to any entity
+  - `Duplicates` — same content hash as another file
+  - `Missing Metadata` — instrument type, county, recording reference,
+    date, or parties not filled in yet
+- **Center** — search, kind, tract, link-state, and date filters on top
+  of a dense table. The table shows display title, filename, byte size,
+  best date, area, kind, the most useful instrument metadata, the first
+  linked entity, and a status badge (Missing / Duplicate / Ready). Click
+  a row to load it into the inspector; click the checkbox to highlight
+  it for a packet.
+- **Right rail (inspector)** — metadata editor for the selected
+  document, the entity-link list, warnings (duplicates, missing
+  metadata), and the title-opinion packet preview.
+
+### Metadata editing
+
+The inspector lets you set:
+- Display title (defaults to filename when blank)
+- Area (mineral title, leasehold, etc.) and kind (deed, lease, obit…)
+- Instrument type (free-form, e.g. "Mineral Deed")
+- County and state
+- Volume, page, instrument number
+- Instrument and recording dates
+- Grantor, grantee, lessor, lessee
+- Source reference (Dropbox path, packet label, URL)
+- Notes
+
+Saving updates the document record and bumps `updatedAt`. The blob and
+content hash are never modified by this flow.
+
+### Entity links
+
+The `Linked Entities` panel shows every node (or other entity, when
+those surfaces start writing attachments) that points at this document.
+The `Desk Map` button on a node link takes you to that node with the
+Desk Map view active. Title-math behavior is unchanged.
+
+### Title-Opinion Packet preview
+
+Use the `Packet source` toggle in the header to choose between the
+`Current filter` (every row that's visible) and `Highlighted` (the
+checkbox-selected rows; falls back to the active row when nothing is
+selected). The right rail then shows:
+- total docs, total bytes, unique content hashes
+- unlinked, duplicate, and missing-metadata warning counts
+- a numbered preview of up to the first 50 docs
+
+The `Manifest JSON` button downloads a cover-sheet manifest with every
+selected doc's filename, area, kind, recording fields, parties, source
+reference, content hash, byte size, link summaries, and warnings. A
+manifest is the only export format today; ZIP and cover-sheet PDF are
+future work.
+
+### Out of scope
+
+This view does not run OCR, talk to Dropbox, import ArcGIS attachment
+tables, or change any title math.
+
 ## 4) Runsheet view
 
-`Runsheet` is the review and audit table.
+`Runsheet` is the chronological lens over the same document/instrument
+set as the `Documents → Mineral Title` saved view. Use `Documents` for
+metadata editing, filtering across areas, duplicate review, and packet
+preview; use `Runsheet` when you want a flat chronological table with
+workbook export.
 
 ### What it shows
 - Instruments from the current workspace

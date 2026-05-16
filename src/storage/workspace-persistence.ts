@@ -4,9 +4,11 @@
 import db, { type PdfAttachment } from './db';
 import { deserializeBlob, serializeBlob, type SerializedBlob } from './blob-serialization';
 import {
+  isDocumentArea,
   isDocumentEntityKind,
   normalizeDocumentKind,
   type DocumentAttachment,
+  type DocumentParties,
   type DocumentRecord,
 } from '../types/document';
 import {
@@ -660,6 +662,57 @@ function isDocumentAttachmentRow(value: unknown): value is DocumentAttachment {
   );
 }
 
+function readOptionalString(raw: Record<string, unknown>, key: string): string | undefined {
+  const value = raw[key];
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  return trimmed === '' ? undefined : trimmed;
+}
+
+function readDocumentParties(value: unknown): DocumentParties | undefined {
+  if (!isRecord(value)) return undefined;
+  const out: DocumentParties = {};
+  for (const key of ['grantor', 'grantee', 'lessor', 'lessee', 'notes'] as const) {
+    const v = (value as Record<string, unknown>)[key];
+    if (typeof v === 'string' && v.trim() !== '') {
+      out[key] = v.trim();
+    }
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
+/**
+ * Apply Phase 7A registry metadata (area, instrument identifiers,
+ * parties, dates, source ref, notes) to a freshly-deserialized
+ * document record. Unknown / blank fields are dropped so the resulting
+ * row never carries empty-string clutter.
+ */
+function assignDocumentRegistryFields(
+  doc: DocumentRecord,
+  raw: SerializedDocumentRecord
+): void {
+  const rec = raw as unknown as Record<string, unknown>;
+  if (isDocumentArea(rec.area)) doc.area = rec.area;
+  for (const key of [
+    'displayTitle',
+    'instrumentType',
+    'county',
+    'state',
+    'instrumentDate',
+    'recordingDate',
+    'volume',
+    'page',
+    'instrumentNumber',
+    'notes',
+    'sourceRef',
+  ] as const) {
+    const value = readOptionalString(rec, key);
+    if (value !== undefined) (doc as unknown as Record<string, unknown>)[key] = value;
+  }
+  const parties = readDocumentParties(rec.parties);
+  if (parties) doc.parties = parties;
+}
+
 function deserializeDocumentData(value: unknown): DocumentWorkspaceData {
   if (!isRecord(value)) return { documents: [], attachments: [] };
 
@@ -678,20 +731,20 @@ function deserializeDocumentData(value: unknown): DocumentWorkspaceData {
       );
       if (blob.size === 0) return [];
       const now = new Date().toISOString();
-      return [
-        {
-          docId: raw.docId,
-          workspaceId: raw.workspaceId,
-          fileName: typeof raw.fileName === 'string' ? raw.fileName : '',
-          mimeType: typeof raw.mimeType === 'string' ? raw.mimeType : 'application/pdf',
-          byteLength: typeof raw.byteLength === 'number' ? raw.byteLength : blob.size,
-          contentHash: typeof raw.contentHash === 'string' ? raw.contentHash : '',
-          blob,
-          kind: normalizeDocumentKind(raw.kind),
-          createdAt: typeof raw.createdAt === 'string' ? raw.createdAt : now,
-          updatedAt: typeof raw.updatedAt === 'string' ? raw.updatedAt : now,
-        },
-      ];
+      const next: DocumentRecord = {
+        docId: raw.docId,
+        workspaceId: raw.workspaceId,
+        fileName: typeof raw.fileName === 'string' ? raw.fileName : '',
+        mimeType: typeof raw.mimeType === 'string' ? raw.mimeType : 'application/pdf',
+        byteLength: typeof raw.byteLength === 'number' ? raw.byteLength : blob.size,
+        contentHash: typeof raw.contentHash === 'string' ? raw.contentHash : '',
+        blob,
+        kind: normalizeDocumentKind(raw.kind),
+        createdAt: typeof raw.createdAt === 'string' ? raw.createdAt : now,
+        updatedAt: typeof raw.updatedAt === 'string' ? raw.updatedAt : now,
+      };
+      assignDocumentRegistryFields(next, raw);
+      return [next];
     }
   );
 

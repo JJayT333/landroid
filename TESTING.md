@@ -27,6 +27,12 @@ npm run test:e2e
 For hosted persistence-key changes, include
 `npm test -- src/storage/__tests__/active-workspace-key.test.ts src/storage/__tests__/persistence-db-key.test.ts`.
 
+For document-registry (Phase 7A) changes, include
+`npm test -- src/documents/__tests__/registry.test.ts src/storage/__tests__/workspace-persistence.test.ts`.
+The registry helpers are pure; the persistence test covers the v8
+`.landroid` round-trip of the optional metadata fields (`area`,
+instrument identifiers, parties, source ref, notes).
+
 ## Current Known Warnings
 
 - Vite may warn about chunks larger than 500 kB, especially AI/workbook chunks.

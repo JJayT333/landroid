@@ -13,6 +13,39 @@ stay short.
   for Phase 7A: document library/index, metadata, duplicate surfacing, entity
   links, import manifests, OCR/text indexing, and cited read-only AI document
   query.
+- Phase 7A document registry build (this branch,
+  `claude/document-registry-build-2026-05-16`):
+  - New `Documents` view — flat workspace-scoped registry over the existing
+    Dexie v8 `documents` + `document_attachments` tables. Dense table +
+    inspector + saved-view rail; Runsheet now becomes a saved-view lens over
+    the same registry instead of a separate silo.
+  - Optional `area` taxonomy on every document with seven filing
+    populations — Mineral Title, Project Support, Leasehold, Curative,
+    Research, GIS / Map Support, Federal Reference — plus `other`. When
+    unset, area is derived from `kind` so legacy v8 files still group.
+  - Optional metadata fields: `displayTitle`, `instrumentType`, `county`,
+    `state`, `instrumentDate`, `recordingDate`, `volume`, `page`,
+    `instrumentNumber`, nested `parties`, `notes`, `sourceRef`. All
+    additive — no Dexie version bump.
+  - Saved views: All, the seven area views, Other, Unlinked, Duplicates,
+    Missing Metadata. Free-text query searches title/parties/recording
+    fields/notes/source ref. Kind, tract, link state, and date-range
+    filters layer on top.
+  - Duplicate grouping by `contentHash` and per-row missing-metadata
+    detection (instrument type, county, recording reference, date,
+    parties).
+  - Inspector edits metadata in-place via `updateDocMetadata`. Save
+    persists through the document store; the underlying blob, hash, and
+    identity are never touched.
+  - Title-Opinion Packet preview built from the current filter or the
+    highlighted rows: total docs, total bytes, unique content hashes,
+    unlinked count, duplicate count, missing-metadata count, and an
+    inline numbered preview. Manifest JSON download includes parties,
+    recording fields, source refs, and link summaries.
+  - `.landroid` v8 export/import round-trip Phase 7A metadata fields.
+    OCR, Dropbox API auth, ArcGIS attachment import, AI document query,
+    federal/private math, and automatic title updates remain out of
+    scope.
 
 ## 2026-05-15
 

@@ -13,7 +13,8 @@ export type ViewMode =
   | 'curative'
   | 'maps'
   | 'federalLeasing'
-  | 'research';
+  | 'research'
+  | 'documents';
 export type ModalMode =
   | null
   | 'edit'

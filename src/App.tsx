@@ -15,6 +15,7 @@ const CurativeView = lazy(() => import('./views/CurativeView'));
 const MapsView = lazy(() => import('./views/MapsView'));
 const FederalLeasingView = lazy(() => import('./views/FederalLeasingView'));
 const ResearchView = lazy(() => import('./views/ResearchView'));
+const DocumentRegistryView = lazy(() => import('./views/DocumentRegistryView'));
 const AIToggleButton = lazy(() => import('./ai/AIToggleButton'));
 
 function PlaceholderView({
@@ -152,6 +153,18 @@ export default function App() {
             }
           >
             <ResearchView />
+          </Suspense>
+        )}
+        {view === 'documents' && (
+          <Suspense
+            fallback={
+              <PlaceholderView
+                name="Loading Documents"
+                description="Preparing the document registry."
+              />
+            }
+          >
+            <DocumentRegistryView />
           </Suspense>
         )}
       </main>

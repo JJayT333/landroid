@@ -30,6 +30,7 @@ const views: { id: ViewMode; label: string }[] = [
   { id: 'chart', label: 'Desk Map' },
   { id: 'leasehold', label: 'Leasehold' },
   { id: 'flowchart', label: 'Flowchart' },
+  { id: 'documents', label: 'Documents' },
   { id: 'master', label: 'Runsheet' },
   { id: 'owners', label: 'Owners' },
   { id: 'curative', label: 'Curative' },

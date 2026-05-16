@@ -1017,4 +1017,77 @@ describe('workspace-persistence', () => {
     expect(imported.deskMaps[0]?.unitCode).toBe('Z');
     expect(imported.activeUnitCode).toBe('Z');
   });
+
+  it('round-trips Phase 7A registry metadata on documents', async () => {
+    const original = buildWorkspace(null);
+    original.documentData = {
+      documents: [
+        {
+          docId: 'doc-meta-1',
+          workspaceId: 'ws-1',
+          fileName: 'mineral-deed.pdf',
+          mimeType: 'application/pdf',
+          byteLength: 5,
+          contentHash: 'hash-meta',
+          blob: new Blob(['hello'], { type: 'application/pdf' }),
+          kind: 'deed',
+          createdAt: '2026-04-01T00:00:00.000Z',
+          updatedAt: '2026-04-01T00:00:00.000Z',
+          area: 'mineral_title',
+          displayTitle: 'Mineral Deed (Smith → Jones)',
+          instrumentType: 'Mineral Deed',
+          county: 'Loving',
+          state: 'TX',
+          instrumentDate: '2024-06-01',
+          recordingDate: '2024-06-04',
+          volume: '450',
+          page: '188',
+          instrumentNumber: '2024-0001',
+          parties: {
+            grantor: 'John Smith',
+            grantee: 'Jane Jones',
+            lessor: '',
+            lessee: '',
+            notes: 'et ux',
+          },
+          notes: 'Verified against county index.',
+          sourceRef: 'Dropbox/Tract-1/deed.pdf',
+        },
+      ],
+      attachments: [
+        {
+          attachmentId: 'att-meta-1',
+          docId: 'doc-meta-1',
+          entityKind: 'node',
+          entityId: 'node-1',
+          position: 0,
+          createdAt: '2026-04-01T00:00:00.000Z',
+        },
+      ],
+    };
+
+    const blob = await exportLandroidFile(original);
+    const file = new File([await blob.text()], 'registry.landroid', {
+      type: 'application/json',
+    });
+    const imported = await importLandroidFile(file);
+    const doc = imported.documentData?.documents[0];
+    expect(doc?.area).toBe('mineral_title');
+    expect(doc?.displayTitle).toBe('Mineral Deed (Smith → Jones)');
+    expect(doc?.instrumentType).toBe('Mineral Deed');
+    expect(doc?.county).toBe('Loving');
+    expect(doc?.state).toBe('TX');
+    expect(doc?.instrumentDate).toBe('2024-06-01');
+    expect(doc?.recordingDate).toBe('2024-06-04');
+    expect(doc?.volume).toBe('450');
+    expect(doc?.page).toBe('188');
+    expect(doc?.instrumentNumber).toBe('2024-0001');
+    expect(doc?.parties).toEqual({
+      grantor: 'John Smith',
+      grantee: 'Jane Jones',
+      notes: 'et ux',
+    });
+    expect(doc?.notes).toBe('Verified against county index.');
+    expect(doc?.sourceRef).toBe('Dropbox/Tract-1/deed.pdf');
+  });
 });

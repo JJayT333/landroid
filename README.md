@@ -73,7 +73,14 @@ See `docs/README.md` for the full documentation map.
 - `Desk Map`: title-chain editing and ownership review.
 - `Leasehold`: unit-focused acreage, lease, ORRI, WI, NPRI payout, and transfer-order review.
 - `Flowchart`: presentation and print layout.
-- `Runsheet`: chronology review and workbook export.
+- `Documents`: flat title-document registry over the v8 document schema with
+  saved-view filters (Mineral Title, Project Support, Leasehold, Curative,
+  Research, GIS/Map Support, Federal Reference, Unlinked, Duplicates, Missing
+  Metadata), in-place metadata editing, entity-link display, duplicate
+  grouping by content hash, and a title-opinion packet preview with manifest
+  export.
+- `Runsheet`: chronological lens over the same document/instrument set as the
+  registry's Mineral Title saved view, with workbook export.
 - `Owners`: unit-filtered owner, lease, contact, and document records.
 - `Curative`: title issue and curative tracking.
 - `Maps`: project map assets, regions, and references.
@@ -100,9 +107,11 @@ Older stress and 8-tract leasehold demos have been retired.
 - Browser autosave keeps the active workspace and flowchart canvas locally.
 - `.landroid` files are the main named backup/export format.
 - Phase 5 stores document blobs, metadata, content hashes, and attachments in
-  the local workspace database. Phase 7 planning treats LANDroid as the
-  queryable document registry, with Dropbox/local folders or later object
-  storage as optional raw-file vaults rather than the only database.
+  the local workspace database. Phase 7A surfaces those rows in the
+  `Documents` registry view with optional area/instrument/parties/recording
+  metadata, all round-tripped through `.landroid`. Dropbox/local folders or
+  later object storage are positioned as optional raw-file vaults rather
+  than the only database.
 - `.landroid` imports validate the top-level workspace graph before loading.
 - CSV imports create a fresh workspace and intentionally start with empty owner,
   curative, map, and research side records.

@@ -17,10 +17,13 @@ import db from './db';
 import { sha256HexOfBlob } from './blob-hash';
 import {
   DEFAULT_DOCUMENT_KIND,
+  isDocumentArea,
   normalizeDocumentKind,
+  type DocumentArea,
   type DocumentAttachment,
   type DocumentEntityKind,
   type DocumentKind,
+  type DocumentParties,
   type DocumentRecord,
 } from '../types/document';
 
@@ -30,6 +33,44 @@ export type {
   DocumentKind,
   DocumentRecord,
 } from '../types/document';
+
+/**
+ * Fields the registry inspector can edit. `kind` is editable so a
+ * migrated `'other'` row can be re-tagged. `parties` is shape-checked
+ * but otherwise stored as supplied.
+ */
+export interface DocumentMetadataPatch {
+  kind?: DocumentKind;
+  area?: DocumentArea;
+  displayTitle?: string;
+  instrumentType?: string;
+  county?: string;
+  state?: string;
+  instrumentDate?: string;
+  recordingDate?: string;
+  volume?: string;
+  page?: string;
+  instrumentNumber?: string;
+  parties?: DocumentParties;
+  notes?: string;
+  sourceRef?: string;
+}
+
+function cleanString(value: string | undefined): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  return trimmed === '' ? '' : trimmed;
+}
+
+function normalizeParties(value: DocumentParties | undefined): DocumentParties | undefined {
+  if (!value || typeof value !== 'object') return undefined;
+  const out: DocumentParties = {};
+  for (const key of ['grantor', 'grantee', 'lessor', 'lessee', 'notes'] as const) {
+    const trimmed = cleanString(value[key]);
+    if (trimmed !== undefined && trimmed !== '') out[key] = trimmed;
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
+}
 
 /** Inputs for saving a brand-new document attached to an entity. */
 export interface SaveDocumentInput {
@@ -182,6 +223,85 @@ export async function setDocKind(docId: string, kind: DocumentKind): Promise<voi
   await db.documents.update(docId, {
     kind: normalizeDocumentKind(kind),
     updatedAt: nowIso(),
+  });
+}
+
+/**
+ * Apply a metadata patch to a document. Only the keys present in
+ * `patch` are written. Empty strings clear the corresponding field;
+ * `undefined` leaves it untouched. The blob, hash, and identity fields
+ * are never modified by this call.
+ *
+ * Used by the document registry inspector. Title-math behavior is
+ * unaffected — all updated fields are display/filter metadata.
+ */
+export async function updateDocMetadata(
+  docId: string,
+  patch: DocumentMetadataPatch
+): Promise<void> {
+  const next: Partial<DocumentRecord> = { updatedAt: nowIso() };
+  if (patch.kind !== undefined) next.kind = normalizeDocumentKind(patch.kind);
+  if (patch.area !== undefined) {
+    next.area = isDocumentArea(patch.area) ? patch.area : undefined;
+  }
+  for (const key of [
+    'displayTitle',
+    'instrumentType',
+    'county',
+    'state',
+    'instrumentDate',
+    'recordingDate',
+    'volume',
+    'page',
+    'instrumentNumber',
+    'notes',
+    'sourceRef',
+  ] as const) {
+    if (patch[key] !== undefined) next[key] = cleanString(patch[key]);
+  }
+  if (patch.parties !== undefined) next.parties = normalizeParties(patch.parties);
+  await db.documents.update(docId, next);
+}
+
+/**
+ * Return every document in a workspace, blob omitted, with its
+ * attachments joined in. Used by the document registry view.
+ *
+ * Reading attachments back from `document_attachments` per render lets
+ * the registry surface every entity link (node/owner/lease/curative/
+ * research) without re-deriving them in the workspace store.
+ */
+export async function listWorkspaceDocuments(
+  workspaceId: string
+): Promise<
+  Array<{
+    document: Omit<DocumentRecord, 'blob'>;
+    attachments: DocumentAttachment[];
+  }>
+> {
+  const docs = await db.documents
+    .where('workspaceId')
+    .equals(workspaceId)
+    .toArray();
+  if (docs.length === 0) return [];
+
+  const docIds = docs.map((doc) => doc.docId);
+  const attachments = await db.document_attachments
+    .where('docId')
+    .anyOf(docIds)
+    .toArray();
+  const attachmentsByDocId = new Map<string, DocumentAttachment[]>();
+  for (const attachment of attachments) {
+    const list = attachmentsByDocId.get(attachment.docId) ?? [];
+    list.push(attachment);
+    attachmentsByDocId.set(attachment.docId, list);
+  }
+
+  return docs.map((doc) => {
+    const { blob: _blob, ...meta } = doc;
+    const attached = attachmentsByDocId.get(doc.docId) ?? [];
+    attached.sort((a, b) => a.position - b.position);
+    return { document: meta, attachments: attached };
   });
 }
 

@@ -5,13 +5,94 @@ Use this file to resume the active workstream in a new chat. Read it with
 
 ## Current Branch
 
-Current checkpoint branch: `codex/document-database-roadmap-2026-05-16`,
-created from `codex/phase-5-doc-storage-wrap-2026-05-15`, which was created
-from `claude/phase-5-document-refactor-2026-05-15` and descends from
+Active branch: `claude/document-registry-build-2026-05-16`. This is the
+Claude parallel build of the Phase 7A document registry, sibling to
+`codex/document-registry-build-2026-05-16`. Both descend from
+`codex/document-database-roadmap-2026-05-16`, which descends from
+`codex/phase-5-doc-storage-wrap-2026-05-15`,
+`claude/phase-5-document-refactor-2026-05-15`, and
 `codex/hosted-hardening-2026-05-14`. The PR target remains
 `codex/hosted-hardening-2026-05-14`, not `main`.
 
 Do not commit directly to `main`.
+
+## Phase 7A Document Registry (this branch)
+
+Implemented:
+
+- New `Documents` view (`src/views/DocumentRegistryView.tsx`) — flat,
+  workspace-scoped registry over the existing Dexie v8 `documents` +
+  `document_attachments` tables. Dense table + saved-view rail +
+  inspector. No Dexie schema change.
+- Optional `area: DocumentArea` on `DocumentRecord` with the seven
+  filing populations the landman uses (mineral title, project support,
+  leasehold, curative, research, GIS/map support, federal reference)
+  plus `other`. Defaults derive from `kind` via
+  `deriveDocumentArea()` so legacy v8 documents stay sortable.
+- Optional metadata fields on `DocumentRecord`: `displayTitle`,
+  `instrumentType`, `county`, `state`, `instrumentDate`,
+  `recordingDate`, `volume`, `page`, `instrumentNumber`, nested
+  `parties` (`grantor` / `grantee` / `lessor` / `lessee` / `notes`),
+  `notes`, `sourceRef`. Title math is unaffected — all of these are
+  metadata for filtering, the inspector, and the packet manifest.
+- `document-store` additions: `updateDocMetadata(docId, patch)` and
+  `listWorkspaceDocuments(workspaceId)`. Pure helpers live in
+  `src/documents/registry.ts` (`buildRegistryRows`,
+  `filterRegistryRows`, `buildPacketPreview`, `buildPacketManifest`,
+  saved-view table) — Dexie-free and unit-tested.
+- `.landroid` v8 export/import round-trips the new fields via the
+  existing `documentData` serializer plus a small deserializer guard.
+  No new schema version.
+- Saved views: All, the seven area views, Other, Unlinked, Duplicates,
+  Missing Metadata. Free-text query searches title, parties, recording
+  fields, notes, and source ref. Kind, tract (DeskMap), link state, and
+  date-range filters layer on top.
+- Duplicates surfaced from `contentHash`; missing-metadata detection
+  covers instrument type, county, recording reference (instrument
+  number OR volume/page), date (instrument or recording), and parties.
+- Title-Opinion Packet preview: source = current filter or highlighted
+  rows. Shows total docs, total bytes, unique content hashes, unlinked
+  count, duplicate count, missing-metadata count, and a numbered
+  preview. `Manifest JSON` downloads a cover-sheet manifest with
+  parties, recording fields, source refs, link summaries, hashes, and
+  per-row warnings. ZIP/cover-sheet PDF export are future work.
+- Runsheet stays as a separate chronological view; the Documents
+  `Mineral Title` saved view is the metadata-rich lens over the same
+  set of documents.
+
+Validation:
+
+- `npm run lint` passed.
+- `npm test`: 575 of 576 tests pass. The one failure is the
+  pre-existing `tree-layout.test.ts` ELK worker sandbox issue (no
+  tests actually run; reproduced on HEAD before this branch's work).
+- `npm test -- src/documents src/storage/__tests__/workspace-persistence.test.ts`:
+  31 tests passed (15 new registry tests + workspace-persistence
+  including the new metadata round-trip).
+- `npm run build` passed; expected Vite "chunks larger than 500 kB"
+  warnings remain.
+
+Out of scope (guardrails kept):
+
+- No OCR.
+- No Dropbox API auth or sync.
+- No ArcGIS attachment import or raw GIS package ingest.
+- No AI document query, and no document-mutating AI tools.
+- No federal/private math.
+- No automatic title updates.
+- No Texas math change.
+
+Next best tasks if continuing this branch:
+
+- Add Playwright coverage for the `Documents` view (saved-view
+  switching, metadata edit + save, manifest download).
+- Extend the inspector to write `entityKind: 'owner' | 'lease' |
+  'curative' | 'research'` attachments — the schema already supports
+  them.
+- Wire a `Build packet…` flow that previews ZIP contents (still no ZIP
+  dependency added today).
+- Treat Dropbox file IDs as `externalRefs` on `DocumentRecord` when the
+  Dropbox-mapping phase opens; do not depend on paths alone.
 
 ## Document Database Direction
 
