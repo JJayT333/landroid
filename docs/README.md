@@ -24,6 +24,8 @@ Use this map to decide which Markdown file to read or update.
 | `FULL_AUDIT_COORDINATION.md` | Shared scope, personas, and report format for the parallel Codex/Claude audit. | Audit scope, branch names, required personas, or report template changes. |
 | `CODEX_FULL_AUDIT_PROMPT.md` | Paste-ready prompt for the Codex full audit branch. | Codex audit instructions change. |
 | `CLAUDE_FULL_AUDIT_PROMPT.md` | Paste-ready prompt for the Claude full audit branch. | Claude audit instructions change. |
+| `CODEX_DOCUMENT_REGISTRY_BUILD_PROMPT.md` | Paste-ready prompt for the Codex document-registry build branch. | Parallel document-registry build instructions change. |
+| `CLAUDE_DOCUMENT_REGISTRY_BUILD_PROMPT.md` | Paste-ready prompt for the Claude document-registry build branch. | Parallel document-registry build instructions change. |
 | `AUDIT_REPORT.md` | Point-in-time adversarial audit snapshot. | Usually do not edit except to add status/snapshot notes. |
 | `PATCH_PLAN.md` | Audit remediation status and sequence. | Remediation status changes. |
 
