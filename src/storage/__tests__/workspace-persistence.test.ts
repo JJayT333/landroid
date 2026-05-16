@@ -280,19 +280,33 @@ function buildWorkspace(canvas: CanvasSaveData | null): LandroidFileData {
           blob: new Blob(['node-pdf-body'], { type: 'application/pdf' }),
           kind: 'deed',
           displayTitle: 'Recorded Mineral Deed',
-          documentArea: 'runsheet_mineral_title',
+          area: 'runsheet_mineral_title',
           instrumentType: 'Mineral Deed',
           county: 'Elmore',
+          state: 'TX',
           instrumentNumber: '20260001',
           volume: '120',
           page: '44',
-          effectiveDate: '2026-03-01',
+          instrumentDate: '2026-03-01',
           recordingDate: '2026-04-01',
-          grantor: 'Pat Doe',
-          grantee: 'Acme Minerals LLC',
+          parties: {
+            grantor: 'Pat Doe',
+            grantee: 'Acme Minerals LLC',
+            lessor: 'Pat Doe',
+            lessee: 'Acme Operating LLC',
+            notes: 'et ux',
+          },
           notes: 'Registry metadata round-trip fixture',
-          sourceReference: 'TORS packet A',
+          sourceRef: 'TORS packet A',
           ocrStatus: 'not_needed',
+          externalRefs: [
+            {
+              system: 'file',
+              externalId: 'dbx-file-1',
+              path: '/Raven/20260001.pdf',
+              label: 'Dropbox vault copy',
+            },
+          ],
           createdAt: '2026-04-01T00:00:00.000Z',
           updatedAt: '2026-04-01T00:00:00.000Z',
         },
@@ -356,19 +370,33 @@ describe('workspace-persistence', () => {
     expect(imported.documentData?.documents[0]?.fileName).toBe('20260001.pdf');
     expect(imported.documentData?.documents[0]).toMatchObject({
       displayTitle: 'Recorded Mineral Deed',
-      documentArea: 'runsheet_mineral_title',
+      area: 'runsheet_mineral_title',
       instrumentType: 'Mineral Deed',
       county: 'Elmore',
+      state: 'TX',
       instrumentNumber: '20260001',
       volume: '120',
       page: '44',
-      effectiveDate: '2026-03-01',
+      instrumentDate: '2026-03-01',
       recordingDate: '2026-04-01',
-      grantor: 'Pat Doe',
-      grantee: 'Acme Minerals LLC',
+      parties: {
+        grantor: 'Pat Doe',
+        grantee: 'Acme Minerals LLC',
+        lessor: 'Pat Doe',
+        lessee: 'Acme Operating LLC',
+        notes: 'et ux',
+      },
       notes: 'Registry metadata round-trip fixture',
-      sourceReference: 'TORS packet A',
+      sourceRef: 'TORS packet A',
       ocrStatus: 'not_needed',
+      externalRefs: [
+        {
+          system: 'file',
+          externalId: 'dbx-file-1',
+          path: '/Raven/20260001.pdf',
+          label: 'Dropbox vault copy',
+        },
+      ],
     });
     expect(await imported.documentData?.documents[0]?.blob.text()).toBe(
       'node-pdf-body'
@@ -484,6 +512,84 @@ describe('workspace-persistence', () => {
     expect(imported.nodes[0]?.relatedKind).toBeNull();
     expect(imported.nodes[0]?.interestClass).toBe('mineral');
     expect(imported.nodes[0]?.royaltyKind).toBeNull();
+  });
+
+  it('imports legacy document registry field names into the canonical shape', async () => {
+    const legacyPayload = {
+      version: 8,
+      workspaceId: 'ws-legacy-docs',
+      projectName: 'Legacy Document Workspace',
+      nodes: [createBlankNode('node-1')],
+      deskMaps: [],
+      activeDeskMapId: null,
+      instrumentTypes: ['Deed'],
+      documentData: {
+        documents: [
+          {
+            docId: 'doc-legacy-1',
+            workspaceId: 'ws-legacy-docs',
+            fileName: 'legacy.pdf',
+            mimeType: 'application/pdf',
+            byteLength: 6,
+            contentHash: 'legacy-hash',
+            blob: { mimeType: 'application/pdf', base64: 'bGVnYWN5' },
+            kind: 'deed',
+            displayTitle: 'Legacy Deed',
+            documentArea: 'runsheet_mineral_title',
+            effectiveDate: '2024-05-01',
+            recordingDate: '2024-05-02',
+            grantor: 'Legacy Grantor',
+            grantee: 'Legacy Grantee',
+            sourceReference: 'Old packet label',
+            externalRefs: [
+              {
+                system: 'arcgis',
+                externalId: 'global-1',
+                label: 'Arc attachment',
+              },
+            ],
+            createdAt: '2024-05-02T00:00:00.000Z',
+            updatedAt: '2024-05-02T00:00:00.000Z',
+          },
+        ],
+        attachments: [
+          {
+            attachmentId: 'att-legacy-1',
+            docId: 'doc-legacy-1',
+            entityKind: 'node',
+            entityId: 'node-1',
+            position: 0,
+            createdAt: '2024-05-02T00:00:00.000Z',
+          },
+        ],
+      },
+    };
+    const file = new File([JSON.stringify(legacyPayload)], 'legacy-docs.landroid', {
+      type: 'application/json',
+    });
+
+    const imported = await importLandroidFile(file);
+    const doc = imported.documentData?.documents[0];
+
+    expect(doc).toMatchObject({
+      area: 'runsheet_mineral_title',
+      instrumentDate: '2024-05-01',
+      sourceRef: 'Old packet label',
+      parties: {
+        grantor: 'Legacy Grantor',
+        grantee: 'Legacy Grantee',
+      },
+      externalRefs: [
+        {
+          system: 'arcgis',
+          externalId: 'global-1',
+          label: 'Arc attachment',
+        },
+      ],
+    });
+    expect(doc?.documentArea).toBeUndefined();
+    expect(doc?.sourceReference).toBeUndefined();
+    expect(await doc?.blob.text()).toBe('legacy');
   });
 
   it('imports a legacy v6 .landroid with no PDF payload as empty documentData', async () => {

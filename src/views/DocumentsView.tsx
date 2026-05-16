@@ -23,6 +23,9 @@ import {
   DOCUMENT_AREA_OPTIONS,
   DOCUMENT_KIND_OPTIONS,
   DOCUMENT_OCR_STATUS_OPTIONS,
+  getDocumentInstrumentDate,
+  getDocumentParties,
+  getDocumentSourceRef,
   normalizeDocumentOcrStatus,
   type DocumentArea,
   type DocumentKind,
@@ -39,19 +42,23 @@ interface RegistryData {
 
 interface MetadataDraft {
   displayTitle: string;
-  documentArea: DocumentArea;
+  area: DocumentArea;
   kind: DocumentKind;
   instrumentType: string;
   county: string;
+  state: string;
   instrumentNumber: string;
   volume: string;
   page: string;
-  effectiveDate: string;
+  instrumentDate: string;
   recordingDate: string;
   grantor: string;
   grantee: string;
+  lessor: string;
+  lessee: string;
+  partyNotes: string;
   notes: string;
-  sourceReference: string;
+  sourceRef: string;
   ocrStatus: DocumentOcrStatus;
 }
 
@@ -68,26 +75,31 @@ function formatBytes(bytes: number): string {
 }
 
 function displayDate(doc: RegistryDocument): string {
-  return doc.recordingDate || doc.effectiveDate || doc.createdAt.slice(0, 10);
+  return doc.recordingDate || getDocumentInstrumentDate(doc) || doc.createdAt.slice(0, 10);
 }
 
 function draftFromRow(row: DocumentRegistryRow): MetadataDraft {
   const doc = row.document;
+  const parties = getDocumentParties(doc);
   return {
     displayTitle: doc.displayTitle ?? row.displayTitle,
-    documentArea: row.resolvedArea,
+    area: row.resolvedArea,
     kind: doc.kind,
     instrumentType: doc.instrumentType ?? '',
     county: doc.county ?? '',
+    state: doc.state ?? '',
     instrumentNumber: doc.instrumentNumber ?? '',
     volume: doc.volume ?? '',
     page: doc.page ?? '',
-    effectiveDate: doc.effectiveDate ?? '',
+    instrumentDate: getDocumentInstrumentDate(doc),
     recordingDate: doc.recordingDate ?? '',
-    grantor: doc.grantor ?? '',
-    grantee: doc.grantee ?? '',
+    grantor: parties.grantor ?? '',
+    grantee: parties.grantee ?? '',
+    lessor: parties.lessor ?? '',
+    lessee: parties.lessee ?? '',
+    partyNotes: parties.notes ?? '',
     notes: doc.notes ?? '',
-    sourceReference: doc.sourceReference ?? '',
+    sourceRef: getDocumentSourceRef(doc),
     ocrStatus: normalizeDocumentOcrStatus(doc.ocrStatus),
   };
 }
@@ -180,6 +192,10 @@ function TextAreaField({
       />
     </label>
   );
+}
+
+function formatOcrStatus(status: DocumentOcrStatus | undefined): string {
+  return normalizeDocumentOcrStatus(status).replace(/_/g, ' ');
 }
 
 export default function DocumentsView() {
@@ -334,7 +350,29 @@ export default function DocumentsView() {
     setSaving(true);
     setStatusMessage(null);
     try {
-      const patch: DocumentMetadataPatch = { ...draft };
+      const patch: DocumentMetadataPatch = {
+        displayTitle: draft.displayTitle,
+        area: draft.area,
+        kind: draft.kind,
+        instrumentType: draft.instrumentType,
+        county: draft.county,
+        state: draft.state,
+        instrumentNumber: draft.instrumentNumber,
+        volume: draft.volume,
+        page: draft.page,
+        instrumentDate: draft.instrumentDate,
+        recordingDate: draft.recordingDate,
+        parties: {
+          grantor: draft.grantor,
+          grantee: draft.grantee,
+          lessor: draft.lessor,
+          lessee: draft.lessee,
+          notes: draft.partyNotes,
+        },
+        notes: draft.notes,
+        sourceRef: draft.sourceRef,
+        ocrStatus: draft.ocrStatus,
+      };
       await updateDocMetadata(activeRow.document.docId, patch);
       setStatusMessage('Metadata saved.');
       setReloadToken((token) => token + 1);
@@ -369,9 +407,52 @@ export default function DocumentsView() {
         .map((deskMap) => ({ value: deskMap.id, label: deskMap.name })),
     [deskMaps]
   );
+  const viewCounts = useMemo(() => {
+    const counts = new Map<DocumentRegistryViewId, number>();
+    for (const view of DOCUMENT_REGISTRY_VIEWS) {
+      counts.set(view.id, filterDocumentRegistryRows(rows, { view: view.id }).length);
+    }
+    return counts;
+  }, [rows]);
+  const activeSavedView = useMemo(
+    () => DOCUMENT_REGISTRY_VIEWS.find((view) => view.id === viewFilter),
+    [viewFilter]
+  );
 
   return (
     <div className="flex h-full min-h-0 bg-parchment text-ink">
+      <aside className="hidden w-60 shrink-0 border-r border-ledger-line bg-ledger md:flex md:flex-col">
+        <div className="border-b border-ledger-line px-4 py-3">
+          <h3 className="text-sm font-display font-bold text-ink">Saved Views</h3>
+        </div>
+        <nav className="min-h-0 flex-1 overflow-y-auto p-2" aria-label="Document saved views">
+          {DOCUMENT_REGISTRY_VIEWS.map((view) => (
+            <button
+              key={view.id}
+              type="button"
+              onClick={() => setViewFilter(view.id)}
+              aria-pressed={viewFilter === view.id}
+              className={`mb-1 flex w-full items-center justify-between gap-2 rounded-md px-3 py-2 text-left text-xs font-semibold ${
+                viewFilter === view.id
+                  ? 'bg-leather text-parchment'
+                  : 'text-ink-light hover:bg-parchment hover:text-ink'
+              }`}
+            >
+              <span className="min-w-0 truncate">{view.label}</span>
+              <span
+                aria-hidden="true"
+                className={`rounded px-1.5 py-0.5 font-mono text-[10px] ${
+                  viewFilter === view.id
+                    ? 'bg-parchment/20 text-parchment'
+                    : 'bg-parchment-dark text-ink-light'
+                }`}
+              >
+                {viewCounts.get(view.id) ?? 0}
+              </span>
+            </button>
+          ))}
+        </nav>
+      </aside>
       <section className="flex min-w-0 flex-1 flex-col">
         <header className="border-b border-ledger-line bg-ledger px-4 py-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -426,7 +507,13 @@ export default function DocumentsView() {
         </header>
 
         <div className="border-b border-ledger-line bg-parchment px-4 py-3">
-          <div className="mb-3 flex gap-2 overflow-x-auto pb-1">
+          <div className="mb-3 flex items-center justify-between gap-3 text-xs text-ink-light">
+            <span>
+              Saved view: <strong className="text-ink">{activeSavedView?.label ?? 'All'}</strong>
+            </span>
+            <span>{filteredRows.length} visible</span>
+          </div>
+          <div className="mb-3 flex gap-2 overflow-x-auto pb-1 md:hidden">
             {DOCUMENT_REGISTRY_VIEWS.map((view) => (
               <button
                 key={view.id}
@@ -537,6 +624,11 @@ export default function DocumentsView() {
               {!loading && filteredRows.map((row) => {
                 const selected = selectedDocIdSet.has(row.document.docId);
                 const active = activeDocId === row.document.docId;
+                const rowParties = getDocumentParties(row.document);
+                const partyLine =
+                  [rowParties.grantor, rowParties.grantee].filter(Boolean).join(' to ')
+                  || [rowParties.lessor, rowParties.lessee].filter(Boolean).join(' to ')
+                  || 'No parties';
                 return (
                   <tr
                     key={row.document.docId}
@@ -582,7 +674,7 @@ export default function DocumentsView() {
                         {[row.document.county, row.document.instrumentNumber].filter(Boolean).join(' | ') || 'No county/reference'}
                       </div>
                       <div className="truncate text-ink-light">
-                        {[row.document.grantor, row.document.grantee].filter(Boolean).join(' to ') || 'No parties'}
+                        {partyLine}
                       </div>
                     </td>
                     <td className="max-w-[14rem] px-3 py-2 align-top text-xs">
@@ -616,6 +708,12 @@ export default function DocumentsView() {
                             Needs OCR
                           </span>
                         )}
+                        {!row.needsOcr
+                          && normalizeDocumentOcrStatus(row.document.ocrStatus) === 'unknown' && (
+                            <span className="rounded bg-parchment-dark px-2 py-1 text-ink-light">
+                              OCR unknown
+                            </span>
+                          )}
                         {row.missingMetadata.length === 0
                           && row.duplicateDocIds.length === 0
                           && !row.needsOcr && (
@@ -680,6 +778,10 @@ export default function DocumentsView() {
                   <div className="text-[10px] uppercase tracking-wider text-ink-light">Updated</div>
                   <div className="font-mono">{activeRow.document.updatedAt.slice(0, 10)}</div>
                 </div>
+                <div>
+                  <div className="text-[10px] uppercase tracking-wider text-ink-light">OCR</div>
+                  <div className="font-mono">{formatOcrStatus(activeRow.document.ocrStatus)}</div>
+                </div>
               </div>
             )}
           </section>
@@ -706,8 +808,8 @@ export default function DocumentsView() {
                 <div className="grid grid-cols-2 gap-2">
                   <SelectField
                     label="Area"
-                    value={draft.documentArea}
-                    onChange={(value) => updateDraft('documentArea', value)}
+                    value={draft.area}
+                    onChange={(value) => updateDraft('area', value)}
                     options={DOCUMENT_AREA_OPTIONS.map((area) => ({
                       value: area,
                       label: DOCUMENT_AREA_LABELS[area],
@@ -735,51 +837,73 @@ export default function DocumentsView() {
                     onChange={(value) => updateDraft('county', value)}
                   />
                   <TextField
+                    label="State"
+                    value={draft.state}
+                    onChange={(value) => updateDraft('state', value)}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <TextField
                     label="Instrument no."
                     value={draft.instrumentNumber}
                     onChange={(value) => updateDraft('instrumentNumber', value)}
                   />
-                </div>
-                <div className="grid grid-cols-2 gap-2">
                   <TextField
                     label="Volume"
                     value={draft.volume}
                     onChange={(value) => updateDraft('volume', value)}
                   />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
                   <TextField
                     label="Page"
                     value={draft.page}
                     onChange={(value) => updateDraft('page', value)}
                   />
-                </div>
-                <div className="grid grid-cols-2 gap-2">
                   <TextField
-                    label="Effective"
+                    label="Instrument"
                     type="date"
-                    value={draft.effectiveDate}
-                    onChange={(value) => updateDraft('effectiveDate', value)}
-                  />
-                  <TextField
-                    label="Recorded"
-                    type="date"
-                    value={draft.recordingDate}
-                    onChange={(value) => updateDraft('recordingDate', value)}
+                    value={draft.instrumentDate}
+                    onChange={(value) => updateDraft('instrumentDate', value)}
                   />
                 </div>
+                <TextField
+                  label="Recorded"
+                  type="date"
+                  value={draft.recordingDate}
+                  onChange={(value) => updateDraft('recordingDate', value)}
+                />
                 <TextField
                   label="Grantor"
                   value={draft.grantor}
                   onChange={(value) => updateDraft('grantor', value)}
                 />
                 <TextField
-                  label="Grantee / lessor / lessee"
+                  label="Grantee"
                   value={draft.grantee}
                   onChange={(value) => updateDraft('grantee', value)}
                 />
+                <div className="grid grid-cols-2 gap-2">
+                  <TextField
+                    label="Lessor"
+                    value={draft.lessor}
+                    onChange={(value) => updateDraft('lessor', value)}
+                  />
+                  <TextField
+                    label="Lessee"
+                    value={draft.lessee}
+                    onChange={(value) => updateDraft('lessee', value)}
+                  />
+                </div>
                 <TextField
-                  label="Source reference"
-                  value={draft.sourceReference}
-                  onChange={(value) => updateDraft('sourceReference', value)}
+                  label="Party notes"
+                  value={draft.partyNotes}
+                  onChange={(value) => updateDraft('partyNotes', value)}
+                />
+                <TextField
+                  label="Source ref"
+                  value={draft.sourceRef}
+                  onChange={(value) => updateDraft('sourceRef', value)}
                 />
                 <SelectField
                   label="OCR status"
@@ -874,7 +998,7 @@ export default function DocumentsView() {
                 Manifest JSON
               </button>
             </div>
-            <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+            <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
               <div className="rounded-lg border border-ledger-line bg-parchment px-3 py-2">
                 <div className="text-[10px] uppercase tracking-wider text-ink-light">Docs</div>
                 <div className="text-lg font-bold">{packetPreview.rows.length}</div>
@@ -884,6 +1008,10 @@ export default function DocumentsView() {
                 <div className="text-lg font-bold">{formatBytes(packetPreview.totalBytes)}</div>
               </div>
               <div className="rounded-lg border border-ledger-line bg-parchment px-3 py-2">
+                <div className="text-[10px] uppercase tracking-wider text-ink-light">Unique</div>
+                <div className="text-lg font-bold">{packetPreview.uniqueContentHashCount}</div>
+              </div>
+              <div className="rounded-lg border border-ledger-line bg-parchment px-3 py-2">
                 <div className="text-[10px] uppercase tracking-wider text-ink-light">Missing</div>
                 <div className="text-lg font-bold">{packetPreview.missingMetadataCount}</div>
               </div>
@@ -891,7 +1019,52 @@ export default function DocumentsView() {
                 <div className="text-[10px] uppercase tracking-wider text-ink-light">Duplicates</div>
                 <div className="text-lg font-bold">{packetPreview.duplicateDocCount}</div>
               </div>
+              <div className="rounded-lg border border-ledger-line bg-parchment px-3 py-2">
+                <div className="text-[10px] uppercase tracking-wider text-ink-light">Unlinked</div>
+                <div className="text-lg font-bold">{packetPreview.unlinkedCount}</div>
+              </div>
+              <div className="rounded-lg border border-ledger-line bg-parchment px-3 py-2">
+                <div className="text-[10px] uppercase tracking-wider text-ink-light">Needs OCR</div>
+                <div className="text-lg font-bold">{packetPreview.needsOcrCount}</div>
+              </div>
+              <div className="rounded-lg border border-ledger-line bg-parchment px-3 py-2">
+                <div className="text-[10px] uppercase tracking-wider text-ink-light">Ready</div>
+                <div className="text-lg font-bold">{packetPreview.readyDocCount}</div>
+              </div>
             </div>
+            {packetPreview.areaCounts.length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-1 text-[11px] font-semibold">
+                {packetPreview.areaCounts.map((entry) => (
+                  <span
+                    key={entry.area}
+                    className="rounded bg-parchment px-2 py-1 text-ink-light"
+                  >
+                    {entry.label}: {entry.count}
+                  </span>
+                ))}
+              </div>
+            )}
+            {packetPreview.warningCount > 0 && (
+              <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                <div className="font-semibold">Packet warnings</div>
+                <div className="mt-1">
+                  {[
+                    packetPreview.missingMetadataCount
+                      ? `${packetPreview.missingMetadataCount} missing metadata`
+                      : '',
+                    packetPreview.duplicateDocCount
+                      ? `${packetPreview.duplicateDocCount} duplicate hash`
+                      : '',
+                    packetPreview.unlinkedCount
+                      ? `${packetPreview.unlinkedCount} unlinked`
+                      : '',
+                    packetPreview.needsOcrCount
+                      ? `${packetPreview.needsOcrCount} needs OCR`
+                      : '',
+                  ].filter(Boolean).join(' | ')}
+                </div>
+              </div>
+            )}
             <div className="mt-3 max-h-48 overflow-y-auto rounded-lg border border-ledger-line bg-parchment">
               {packetPreview.rows.length === 0 ? (
                 <p className="px-3 py-4 text-sm text-ink-light">No packet documents.</p>
@@ -902,7 +1075,18 @@ export default function DocumentsView() {
                       <span className="mr-2 font-mono text-xs text-ink-light">
                         {index + 1}.
                       </span>
-                      {row.displayTitle}
+                      <span>{row.displayTitle}</span>
+                      <div className="mt-1 flex flex-wrap gap-x-2 gap-y-1 text-[11px] text-ink-light">
+                        <span>{DOCUMENT_AREA_LABELS[row.resolvedArea]}</span>
+                        {getDocumentSourceRef(row.document) && (
+                          <span>{getDocumentSourceRef(row.document)}</span>
+                        )}
+                        {row.missingMetadata.length > 0 && (
+                          <span>Missing {row.missingMetadata.length}</span>
+                        )}
+                        {row.duplicateDocIds.length > 0 && <span>Duplicate</span>}
+                        {row.needsOcr && <span>Needs OCR</span>}
+                      </div>
                     </li>
                   ))}
                 </ol>

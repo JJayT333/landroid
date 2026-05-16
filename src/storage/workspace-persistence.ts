@@ -4,10 +4,15 @@
 import db, { type PdfAttachment } from './db';
 import { deserializeBlob, serializeBlob, type SerializedBlob } from './blob-serialization';
 import {
+  getDocumentAreaMetadata,
+  getDocumentInstrumentDate,
+  getDocumentParties,
+  getDocumentSourceRef,
   isDocumentEntityKind,
   isDocumentArea,
   isDocumentOcrStatus,
   normalizeDocumentKind,
+  normalizeDocumentParties,
   type DocumentAttachment,
   type DocumentRecord,
 } from '../types/document';
@@ -170,6 +175,12 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  */
 function stringOr(value: unknown, fallback: string): string {
   return typeof value === 'string' ? value : fallback;
+}
+
+function optionalString(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  return trimmed ? trimmed : undefined;
 }
 
 function normalizeOwnerRecord(
@@ -636,13 +647,55 @@ async function serializeDocumentData(
   if (!documentData) return undefined;
   return {
     documents: await Promise.all(
-      documentData.documents.map(async (doc) => ({
-        ...doc,
-        blob: await serializeBlob(doc.blob),
-      }))
+      documentData.documents.map(serializeDocumentRecord)
     ),
     attachments: [...documentData.attachments],
   };
+}
+
+async function serializeDocumentRecord(
+  doc: DocumentRecord
+): Promise<SerializedDocumentRecord> {
+  const area = getDocumentAreaMetadata(doc);
+  const instrumentDate = getDocumentInstrumentDate(doc);
+  const sourceRef = getDocumentSourceRef(doc);
+  const parties = normalizeDocumentParties(getDocumentParties(doc));
+  const externalRefs = normalizeExternalRefs(doc.externalRefs);
+  const serialized: SerializedDocumentRecord = {
+    docId: doc.docId,
+    workspaceId: doc.workspaceId,
+    fileName: doc.fileName,
+    mimeType: doc.mimeType,
+    byteLength: doc.byteLength,
+    contentHash: doc.contentHash,
+    kind: normalizeDocumentKind(doc.kind),
+    createdAt: doc.createdAt,
+    updatedAt: doc.updatedAt,
+    blob: await serializeBlob(doc.blob),
+  };
+
+  if (area) serialized.area = area;
+  for (const key of [
+    'displayTitle',
+    'instrumentType',
+    'county',
+    'state',
+    'instrumentNumber',
+    'volume',
+    'page',
+    'recordingDate',
+    'notes',
+  ] as const) {
+    const value = optionalString(doc[key]);
+    if (value !== undefined) serialized[key] = value;
+  }
+  if (instrumentDate) serialized.instrumentDate = instrumentDate;
+  if (parties) serialized.parties = parties;
+  if (sourceRef) serialized.sourceRef = sourceRef;
+  if (isDocumentOcrStatus(doc.ocrStatus)) serialized.ocrStatus = doc.ocrStatus;
+  if (externalRefs !== undefined) serialized.externalRefs = externalRefs;
+
+  return serialized;
 }
 
 function isDocumentRecordRow(value: unknown): value is SerializedDocumentRecord {
@@ -663,6 +716,57 @@ function isDocumentAttachmentRow(value: unknown): value is DocumentAttachment {
   );
 }
 
+function assignDocumentRegistryFields(
+  doc: DocumentRecord,
+  raw: SerializedDocumentRecord
+): void {
+  const rec = raw as unknown as Record<string, unknown>;
+  const area = isDocumentArea(rec.area)
+    ? rec.area
+    : isDocumentArea(rec.documentArea)
+      ? rec.documentArea
+      : undefined;
+  if (area) doc.area = area;
+
+  for (const key of [
+    'displayTitle',
+    'instrumentType',
+    'county',
+    'state',
+    'instrumentNumber',
+    'volume',
+    'page',
+    'recordingDate',
+    'notes',
+  ] as const) {
+    const value = optionalString(rec[key]);
+    if (value !== undefined) doc[key] = value;
+  }
+
+  const instrumentDate =
+    optionalString(rec.instrumentDate) ?? optionalString(rec.effectiveDate);
+  if (instrumentDate) doc.instrumentDate = instrumentDate;
+
+  const sourceRef =
+    optionalString(rec.sourceRef) ?? optionalString(rec.sourceReference);
+  if (sourceRef) doc.sourceRef = sourceRef;
+
+  const parties = normalizeDocumentParties(rec.parties) ?? normalizeDocumentParties({
+    grantor: rec.grantor,
+    grantee: rec.grantee,
+  });
+  if (parties) doc.parties = parties;
+
+  if (isDocumentOcrStatus(rec.ocrStatus)) {
+    doc.ocrStatus = rec.ocrStatus;
+  }
+
+  const externalRefs = normalizeExternalRefs(rec.externalRefs);
+  if (externalRefs !== undefined) {
+    doc.externalRefs = externalRefs;
+  }
+}
+
 function deserializeDocumentData(value: unknown): DocumentWorkspaceData {
   if (!isRecord(value)) return { documents: [], attachments: [] };
 
@@ -681,49 +785,20 @@ function deserializeDocumentData(value: unknown): DocumentWorkspaceData {
       );
       if (blob.size === 0) return [];
       const now = new Date().toISOString();
-      return [
-        {
-          docId: raw.docId,
-          workspaceId: raw.workspaceId,
-          fileName: typeof raw.fileName === 'string' ? raw.fileName : '',
-          mimeType: typeof raw.mimeType === 'string' ? raw.mimeType : 'application/pdf',
-          byteLength: typeof raw.byteLength === 'number' ? raw.byteLength : blob.size,
-          contentHash: typeof raw.contentHash === 'string' ? raw.contentHash : '',
-          blob,
-          kind: normalizeDocumentKind(raw.kind),
-          displayTitle:
-            typeof raw.displayTitle === 'string' ? raw.displayTitle : undefined,
-          documentArea: isDocumentArea(raw.documentArea)
-            ? raw.documentArea
-            : undefined,
-          instrumentType:
-            typeof raw.instrumentType === 'string' ? raw.instrumentType : undefined,
-          county: typeof raw.county === 'string' ? raw.county : undefined,
-          instrumentNumber:
-            typeof raw.instrumentNumber === 'string'
-              ? raw.instrumentNumber
-              : undefined,
-          volume: typeof raw.volume === 'string' ? raw.volume : undefined,
-          page: typeof raw.page === 'string' ? raw.page : undefined,
-          effectiveDate:
-            typeof raw.effectiveDate === 'string' ? raw.effectiveDate : undefined,
-          recordingDate:
-            typeof raw.recordingDate === 'string' ? raw.recordingDate : undefined,
-          grantor: typeof raw.grantor === 'string' ? raw.grantor : undefined,
-          grantee: typeof raw.grantee === 'string' ? raw.grantee : undefined,
-          notes: typeof raw.notes === 'string' ? raw.notes : undefined,
-          sourceReference:
-            typeof raw.sourceReference === 'string'
-              ? raw.sourceReference
-              : undefined,
-          ocrStatus: isDocumentOcrStatus(raw.ocrStatus)
-            ? raw.ocrStatus
-            : undefined,
-          externalRefs: normalizeExternalRefs(raw.externalRefs),
-          createdAt: typeof raw.createdAt === 'string' ? raw.createdAt : now,
-          updatedAt: typeof raw.updatedAt === 'string' ? raw.updatedAt : now,
-        },
-      ];
+      const doc: DocumentRecord = {
+        docId: raw.docId,
+        workspaceId: raw.workspaceId,
+        fileName: typeof raw.fileName === 'string' ? raw.fileName : '',
+        mimeType: typeof raw.mimeType === 'string' ? raw.mimeType : 'application/pdf',
+        byteLength: typeof raw.byteLength === 'number' ? raw.byteLength : blob.size,
+        contentHash: typeof raw.contentHash === 'string' ? raw.contentHash : '',
+        blob,
+        kind: normalizeDocumentKind(raw.kind),
+        createdAt: typeof raw.createdAt === 'string' ? raw.createdAt : now,
+        updatedAt: typeof raw.updatedAt === 'string' ? raw.updatedAt : now,
+      };
+      assignDocumentRegistryFields(doc, raw);
+      return [doc];
     }
   );
 

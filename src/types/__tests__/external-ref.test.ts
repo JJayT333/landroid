@@ -81,6 +81,12 @@ describe('normalizeExternalRef', () => {
     ).toEqual({ system: 'url', url: 'https://example.com/tract/1' });
   });
 
+  it('accepts a path-only file ref', () => {
+    expect(
+      normalizeExternalRef({ system: 'file', path: '/vault/deed.pdf' })
+    ).toEqual({ system: 'file', path: '/vault/deed.pdf' });
+  });
+
   it('trims string identifiers', () => {
     const normalized = normalizeExternalRef({
       system: 'arcgis',

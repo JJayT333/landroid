@@ -17,6 +17,11 @@ import db from './db';
 import { sha256HexOfBlob } from './blob-hash';
 import {
   DEFAULT_DOCUMENT_KIND,
+  getDocumentAreaMetadata,
+  getDocumentInstrumentDate,
+  getDocumentParties,
+  getDocumentSourceRef,
+  normalizeDocumentParties,
   normalizeDocumentArea,
   normalizeDocumentKind,
   normalizeDocumentOcrStatus,
@@ -24,6 +29,8 @@ import {
   type DocumentArea,
   type DocumentEntityKind,
   type DocumentKind,
+  type DocumentOcrStatus,
+  type DocumentParties,
   type DocumentRecord,
 } from '../types/document';
 
@@ -32,29 +39,37 @@ export type {
   DocumentArea,
   DocumentEntityKind,
   DocumentKind,
+  DocumentOcrStatus,
+  DocumentParties,
   DocumentRecord,
 } from '../types/document';
 
-export type DocumentMetadataPatch = Partial<
-  Pick<
-    DocumentRecord,
-    | 'displayTitle'
-    | 'documentArea'
-    | 'instrumentType'
-    | 'county'
-    | 'instrumentNumber'
-    | 'volume'
-    | 'page'
-    | 'effectiveDate'
-    | 'recordingDate'
-    | 'grantor'
-    | 'grantee'
-    | 'notes'
-    | 'sourceReference'
-    | 'ocrStatus'
-    | 'kind'
-  >
->;
+export interface DocumentMetadataPatch {
+  displayTitle?: string;
+  area?: DocumentArea;
+  /** Legacy Phase 7A field accepted for compatibility. */
+  documentArea?: DocumentArea;
+  kind?: DocumentKind;
+  instrumentType?: string;
+  county?: string;
+  state?: string;
+  instrumentNumber?: string;
+  volume?: string;
+  page?: string;
+  instrumentDate?: string;
+  /** Legacy Phase 7A field accepted for compatibility. */
+  effectiveDate?: string;
+  recordingDate?: string;
+  parties?: DocumentParties;
+  /** Legacy Phase 7A fields accepted for compatibility. */
+  grantor?: string;
+  grantee?: string;
+  notes?: string;
+  sourceRef?: string;
+  /** Legacy Phase 7A field accepted for compatibility. */
+  sourceReference?: string;
+  ocrStatus?: DocumentOcrStatus;
+}
 
 /** Inputs for saving a brand-new document attached to an entity. */
 export interface SaveDocumentInput {
@@ -106,14 +121,18 @@ function normalizeMetadataPatch(
   if (patch.displayTitle !== undefined) {
     normalized.displayTitle = cleanText(patch.displayTitle);
   }
-  if (patch.documentArea !== undefined) {
-    normalized.documentArea = normalizeDocumentArea(patch.documentArea);
+  const area = patch.area ?? patch.documentArea;
+  if (area !== undefined) {
+    normalized.area = normalizeDocumentArea(area);
   }
   if (patch.instrumentType !== undefined) {
     normalized.instrumentType = cleanText(patch.instrumentType);
   }
   if (patch.county !== undefined) {
     normalized.county = cleanText(patch.county);
+  }
+  if (patch.state !== undefined) {
+    normalized.state = cleanText(patch.state);
   }
   if (patch.instrumentNumber !== undefined) {
     normalized.instrumentNumber = cleanText(patch.instrumentNumber);
@@ -124,23 +143,30 @@ function normalizeMetadataPatch(
   if (patch.page !== undefined) {
     normalized.page = cleanText(patch.page);
   }
-  if (patch.effectiveDate !== undefined) {
-    normalized.effectiveDate = cleanText(patch.effectiveDate);
+  const instrumentDate = patch.instrumentDate ?? patch.effectiveDate;
+  if (instrumentDate !== undefined) {
+    normalized.instrumentDate = cleanText(instrumentDate);
   }
   if (patch.recordingDate !== undefined) {
     normalized.recordingDate = cleanText(patch.recordingDate);
   }
-  if (patch.grantor !== undefined) {
-    normalized.grantor = cleanText(patch.grantor);
-  }
-  if (patch.grantee !== undefined) {
-    normalized.grantee = cleanText(patch.grantee);
+  if (
+    patch.parties !== undefined
+    || patch.grantor !== undefined
+    || patch.grantee !== undefined
+  ) {
+    normalized.parties = normalizeDocumentParties({
+      ...(patch.parties ?? {}),
+      ...(patch.grantor !== undefined ? { grantor: patch.grantor } : {}),
+      ...(patch.grantee !== undefined ? { grantee: patch.grantee } : {}),
+    });
   }
   if (patch.notes !== undefined) {
     normalized.notes = cleanText(patch.notes);
   }
-  if (patch.sourceReference !== undefined) {
-    normalized.sourceReference = cleanText(patch.sourceReference);
+  const sourceRef = patch.sourceRef ?? patch.sourceReference;
+  if (sourceRef !== undefined) {
+    normalized.sourceRef = cleanText(sourceRef);
   }
   if (patch.ocrStatus !== undefined) {
     normalized.ocrStatus = normalizeDocumentOcrStatus(patch.ocrStatus);
@@ -148,6 +174,23 @@ function normalizeMetadataPatch(
   if (patch.kind !== undefined) {
     normalized.kind = normalizeDocumentKind(patch.kind);
   }
+
+  return normalized;
+}
+
+function normalizeStoredDocumentMeta(
+  meta: Omit<DocumentRecord, 'blob'>
+): Omit<DocumentRecord, 'blob'> {
+  const normalized = { ...meta };
+  const area = getDocumentAreaMetadata(meta);
+  const instrumentDate = getDocumentInstrumentDate(meta);
+  const sourceRef = getDocumentSourceRef(meta);
+  const parties = normalizeDocumentParties(getDocumentParties(meta));
+
+  if (area) normalized.area = area;
+  if (instrumentDate) normalized.instrumentDate = instrumentDate;
+  if (sourceRef) normalized.sourceRef = sourceRef;
+  if (parties) normalized.parties = parties;
 
   return normalized;
 }
@@ -181,7 +224,7 @@ export async function saveDoc(
     contentHash,
     blob,
     kind,
-    documentArea: defaultAreaForKind(kind),
+    area: defaultAreaForKind(kind),
     ocrStatus: 'not_started',
     createdAt,
     updatedAt: createdAt,
@@ -315,7 +358,7 @@ export async function listDocumentRegistryData(
   const docs = await db.documents.where('workspaceId').equals(workspaceId).toArray();
   const documents = docs.map((doc) => {
     const { blob: _blob, ...meta } = doc;
-    return meta;
+    return normalizeStoredDocumentMeta(meta);
   });
   if (documents.length === 0) {
     return { documents, attachments: [] };
@@ -356,7 +399,7 @@ export async function getDocMeta(
   const doc = await db.documents.get(docId);
   if (!doc) return undefined;
   const { blob: _blob, ...meta } = doc;
-  return meta;
+  return normalizeStoredDocumentMeta(meta);
 }
 
 /**
@@ -388,7 +431,7 @@ export async function listDocsForEntity(
     const doc = docById.get(attachment.docId);
     if (!doc) return [];
     const { blob: _blob, ...meta } = doc;
-    return [{ attachment, document: meta }];
+    return [{ attachment, document: normalizeStoredDocumentMeta(meta) }];
   });
 }
 

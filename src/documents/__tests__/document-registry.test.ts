@@ -66,9 +66,11 @@ describe('document registry rows', () => {
           instrumentType: 'Mineral Deed',
           county: 'Tyler',
           instrumentNumber: '20260001',
-          effectiveDate: '2026-01-01',
-          grantor: 'Grantor LLC',
-          grantee: 'Grantee LP',
+          instrumentDate: '2026-01-01',
+          parties: {
+            grantor: 'Grantor LLC',
+            grantee: 'Grantee LP',
+          },
         }),
         doc({ docId: 'doc-2', fileName: 'copy.pdf', contentHash: 'same' }),
       ],
@@ -92,7 +94,7 @@ describe('document registry rows', () => {
     const rows = buildDocumentRegistryRows({
       documents: [
         doc({ docId: 'doc-linked', kind: 'deed' }),
-        doc({ docId: 'doc-unlinked', kind: 'lease', documentArea: 'leasehold' }),
+        doc({ docId: 'doc-unlinked', kind: 'lease', area: 'leasehold' }),
       ],
       attachments: [attachment({ docId: 'doc-linked' })],
       nodes: [node],
@@ -120,16 +122,23 @@ describe('document registry rows', () => {
         doc({
           docId: 'doc-1',
           displayTitle: 'Recorded Deed',
-          documentArea: 'runsheet_mineral_title',
+          area: 'runsheet_mineral_title',
           instrumentType: 'Mineral Deed',
           county: 'Tyler',
           instrumentNumber: '20260001',
           recordingDate: '2026-02-01',
-          grantor: 'Grantor LLC',
-          grantee: 'Grantee LP',
+          parties: {
+            grantor: 'Grantor LLC',
+            grantee: 'Grantee LP',
+          },
           ocrStatus: 'not_needed',
         }),
-        doc({ docId: 'doc-2', fileName: 'missing.pdf', contentHash: 'hash-2' }),
+        doc({
+          docId: 'doc-2',
+          fileName: 'missing.pdf',
+          contentHash: 'hash-2',
+          ocrStatus: 'failed',
+        }),
       ],
       attachments: [attachment()],
       nodes: [node],
@@ -138,22 +147,63 @@ describe('document registry rows', () => {
 
     const preview = buildPacketPreview(rows);
     expect(preview.totalBytes).toBe(2048);
+    expect(preview.uniqueContentHashCount).toBe(2);
     expect(preview.missingMetadataCount).toBe(1);
     expect(preview.needsOcrCount).toBe(1);
     expect(preview.unlinkedCount).toBe(1);
+    expect(preview.readyDocCount).toBe(1);
 
     const manifest = buildPacketManifest(rows);
     const deedManifest = manifest.find((entry) => entry.docId === 'doc-1');
     expect(deedManifest).toMatchObject({
       docId: 'doc-1',
       displayTitle: 'Recorded Deed',
-      documentArea: 'runsheet_mineral_title',
+      area: 'runsheet_mineral_title',
+      parties: {
+        grantor: 'Grantor LLC',
+        grantee: 'Grantee LP',
+      },
       linkedEntities: [
         expect.objectContaining({
           entityKind: 'node',
           entityId: 'node-1',
         }),
       ],
+    });
+  });
+
+  it('reads legacy Phase 7A field names without marking unknown OCR as needed', () => {
+    const rows = buildDocumentRegistryRows({
+      documents: [
+        doc({
+          docId: 'doc-legacy',
+          documentArea: 'leasehold',
+          effectiveDate: '2025-10-01',
+          sourceReference: 'Dropbox/legacy/deed.pdf',
+          grantor: 'Legacy Grantor',
+          grantee: 'Legacy Grantee',
+          instrumentType: 'Assignment',
+          county: 'Tyler',
+          instrumentNumber: 'L-1',
+        }),
+      ],
+      attachments: [],
+      nodes: [],
+      deskMaps: [],
+    });
+
+    expect(rows[0].resolvedArea).toBe('leasehold');
+    expect(rows[0].searchText).toContain('dropbox/legacy/deed.pdf');
+    expect(rows[0].searchText).toContain('legacy grantor');
+    expect(rows[0].needsOcr).toBe(false);
+    expect(buildPacketManifest(rows)[0]).toMatchObject({
+      area: 'leasehold',
+      instrumentDate: '2025-10-01',
+      sourceRef: 'Dropbox/legacy/deed.pdf',
+      parties: {
+        grantor: 'Legacy Grantor',
+        grantee: 'Legacy Grantee',
+      },
     });
   });
 });

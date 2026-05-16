@@ -44,8 +44,9 @@ As of the current handoff:
 - Browser coverage includes multi-document Desk Map chips opening the correct
   PDF by `attachmentId`, v8 `.landroid` export/import document round-trip,
   branch-scoped lease deletion through the shared confirmation modal, curative
-  linkage, research linkage, the document registry metadata/packet smoke path,
-  federal leasing, and Research home surfacing.
+  linkage, research linkage, the document registry saved-view rail,
+  canonical metadata, and packet-preview smoke path, federal leasing, and
+  Research home surfacing.
 - The combinatorial demo loader and `.landroid` import workflow now exercise
   typed destructive confirmations before replacing the active workspace.
 

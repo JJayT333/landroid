@@ -3,9 +3,18 @@ import type {
   DocumentArea,
   DocumentAttachment,
   DocumentKind,
+  DocumentParties,
   DocumentRecord,
 } from '../types/document';
-import { normalizeDocumentArea, normalizeDocumentOcrStatus } from '../types/document';
+import {
+  DOCUMENT_AREA_OPTIONS,
+  documentNeedsOcr,
+  getDocumentAreaMetadata,
+  getDocumentInstrumentDate,
+  getDocumentParties,
+  getDocumentSourceRef,
+  normalizeDocumentArea,
+} from '../types/document';
 
 export type RegistryDocument = Omit<DocumentRecord, 'blob'>;
 
@@ -95,10 +104,14 @@ export interface DocumentRegistryFilters {
 export interface PacketPreview {
   rows: DocumentRegistryRow[];
   totalBytes: number;
+  uniqueContentHashCount: number;
   missingMetadataCount: number;
   duplicateDocCount: number;
   unlinkedCount: number;
   needsOcrCount: number;
+  readyDocCount: number;
+  warningCount: number;
+  areaCounts: Array<{ area: DocumentArea; label: string; count: number }>;
 }
 
 function clean(value: string | undefined): string {
@@ -124,12 +137,13 @@ export function getDocumentDisplayTitle(doc: RegistryDocument): string {
 }
 
 export function getDocumentResolvedArea(doc: RegistryDocument): DocumentArea {
-  if (doc.documentArea) return normalizeDocumentArea(doc.documentArea);
+  const explicitArea = getDocumentAreaMetadata(doc);
+  if (explicitArea) return normalizeDocumentArea(explicitArea);
   return defaultAreaForKind(doc.kind);
 }
 
 function docDateValue(doc: RegistryDocument): string {
-  return clean(doc.recordingDate) || clean(doc.effectiveDate) || doc.createdAt;
+  return clean(doc.recordingDate) || getDocumentInstrumentDate(doc) || doc.createdAt;
 }
 
 function datePasses(value: string, from: string | undefined, to: string | undefined) {
@@ -229,19 +243,36 @@ function buildLinkedEntitySummaries(
 
 function metadataMissing(doc: RegistryDocument): string[] {
   const missing: string[] = [];
+  const parties = getDocumentParties(doc);
   if (!getDocumentDisplayTitle(doc)) missing.push('title');
   if (!clean(doc.instrumentType)) missing.push('instrument type');
   if (!clean(doc.county)) missing.push('county');
   if (!clean(doc.instrumentNumber) && !(clean(doc.volume) && clean(doc.page))) {
     missing.push('recording reference');
   }
-  if (!clean(doc.effectiveDate) && !clean(doc.recordingDate)) {
+  if (!getDocumentInstrumentDate(doc) && !clean(doc.recordingDate)) {
     missing.push('date');
   }
-  if (!clean(doc.grantor) && !clean(doc.grantee)) {
+  if (!hasAnyParty(parties)) {
     missing.push('parties');
   }
   return missing;
+}
+
+function hasAnyParty(parties: DocumentParties): boolean {
+  return Boolean(parties.grantor || parties.grantee || parties.lessor || parties.lessee);
+}
+
+function formatParties(parties: DocumentParties): string {
+  const grantorGrantee = [parties.grantor, parties.grantee]
+    .map(clean)
+    .filter(Boolean)
+    .join(' to ');
+  if (grantorGrantee) return grantorGrantee;
+  return [parties.lessor, parties.lessee]
+    .map(clean)
+    .filter(Boolean)
+    .join(' to ');
 }
 
 function buildDuplicateMap(documents: RegistryDocument[]): Map<string, string[]> {
@@ -290,7 +321,7 @@ export function buildDocumentRegistryRows(input: {
       const displayTitle = getDocumentDisplayTitle(document);
       const resolvedArea = getDocumentResolvedArea(document);
       const missingMetadata = metadataMissing(document);
-      const ocrStatus = normalizeDocumentOcrStatus(document.ocrStatus);
+      const parties = getDocumentParties(document);
       const searchText = [
         displayTitle,
         document.fileName,
@@ -301,12 +332,24 @@ export function buildDocumentRegistryRows(input: {
         document.instrumentNumber,
         document.volume,
         document.page,
-        document.effectiveDate,
+        getDocumentInstrumentDate(document),
         document.recordingDate,
-        document.grantor,
-        document.grantee,
+        document.state,
+        parties.grantor,
+        parties.grantee,
+        parties.lessor,
+        parties.lessee,
+        parties.notes,
+        formatParties(parties),
         document.notes,
-        document.sourceReference,
+        getDocumentSourceRef(document),
+        ...(document.externalRefs ?? []).flatMap((ref) => [
+          ref.system,
+          ref.externalId,
+          ref.label,
+          ref.url,
+          ref.path,
+        ]),
         ...linkedEntities.flatMap((entity) => [entity.label, entity.detail]),
       ]
         .filter(Boolean)
@@ -320,7 +363,7 @@ export function buildDocumentRegistryRows(input: {
         linkedEntities,
         duplicateDocIds: duplicateByDocId.get(document.docId) ?? [],
         missingMetadata,
-        needsOcr: ocrStatus !== 'complete' && ocrStatus !== 'not_needed',
+        needsOcr: documentNeedsOcr(document),
         searchText,
       };
     })
@@ -367,13 +410,37 @@ export function filterDocumentRegistryRows(
 }
 
 export function buildPacketPreview(rows: DocumentRegistryRow[]): PacketPreview {
+  const uniqueHashes = new Set(
+    rows.map((row) => clean(row.document.contentHash)).filter(Boolean)
+  );
+  const areaCounts = DOCUMENT_AREA_OPTIONS.map((area) => ({
+    area,
+    label: DOCUMENT_AREA_LABELS[area],
+    count: rows.filter((row) => row.resolvedArea === area).length,
+  })).filter((entry) => entry.count > 0);
+  const missingMetadataCount = rows.filter((row) => row.missingMetadata.length > 0).length;
+  const duplicateDocCount = rows.filter((row) => row.duplicateDocIds.length > 0).length;
+  const unlinkedCount = rows.filter((row) => row.linkedEntities.length === 0).length;
+  const needsOcrCount = rows.filter((row) => row.needsOcr).length;
+  const warningCount =
+    missingMetadataCount + duplicateDocCount + unlinkedCount + needsOcrCount;
   return {
     rows,
     totalBytes: rows.reduce((total, row) => total + row.document.byteLength, 0),
-    missingMetadataCount: rows.filter((row) => row.missingMetadata.length > 0).length,
-    duplicateDocCount: rows.filter((row) => row.duplicateDocIds.length > 0).length,
-    unlinkedCount: rows.filter((row) => row.linkedEntities.length === 0).length,
-    needsOcrCount: rows.filter((row) => row.needsOcr).length,
+    uniqueContentHashCount: uniqueHashes.size,
+    missingMetadataCount,
+    duplicateDocCount,
+    unlinkedCount,
+    needsOcrCount,
+    readyDocCount: rows.filter(
+      (row) =>
+        row.missingMetadata.length === 0
+        && row.duplicateDocIds.length === 0
+        && row.linkedEntities.length > 0
+        && !row.needsOcr
+    ).length,
+    warningCount,
+    areaCounts,
   };
 }
 
@@ -383,20 +450,28 @@ export function buildPacketManifest(rows: DocumentRegistryRow[]) {
     docId: row.document.docId,
     fileName: row.document.fileName,
     displayTitle: row.displayTitle,
-    documentArea: row.resolvedArea,
+    area: row.resolvedArea,
     kind: row.document.kind,
     byteLength: row.document.byteLength,
     contentHash: row.document.contentHash,
     instrumentType: row.document.instrumentType ?? '',
     county: row.document.county ?? '',
+    state: row.document.state ?? '',
     instrumentNumber: row.document.instrumentNumber ?? '',
     volume: row.document.volume ?? '',
     page: row.document.page ?? '',
-    effectiveDate: row.document.effectiveDate ?? '',
+    instrumentDate: getDocumentInstrumentDate(row.document),
     recordingDate: row.document.recordingDate ?? '',
-    grantor: row.document.grantor ?? '',
-    grantee: row.document.grantee ?? '',
-    sourceReference: row.document.sourceReference ?? '',
+    parties: {
+      grantor: getDocumentParties(row.document).grantor ?? '',
+      grantee: getDocumentParties(row.document).grantee ?? '',
+      lessor: getDocumentParties(row.document).lessor ?? '',
+      lessee: getDocumentParties(row.document).lessee ?? '',
+      notes: getDocumentParties(row.document).notes ?? '',
+    },
+    notes: row.document.notes ?? '',
+    sourceRef: getDocumentSourceRef(row.document),
+    externalRefs: row.document.externalRefs ?? [],
     linkedEntities: row.linkedEntities.map((entity) => ({
       attachmentId: entity.attachmentId,
       entityKind: entity.entityKind,

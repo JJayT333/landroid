@@ -5,6 +5,13 @@ stay short.
 
 ## 2026-05-16
 
+- Implemented Phase 7A.5 document storage/registry reconciliation on
+  `codex/document-storage-reconciliation-2026-05-16`: canonicalized document
+  metadata around `area`, `sourceRef`, and structured `parties`, kept legacy
+  field-name import/read compatibility, preserved file-path `externalRefs`,
+  made `Needs OCR` count only explicit OCR-needed statuses, moved saved views
+  into a left rail, enriched packet preview details, and strengthened helper,
+  storage, and Playwright coverage.
 - Added `IDEAS.md` as a lightweight brainstorming inbox and archived stale
   audit/prompt files under `docs/archive/` so the repo root stays focused on
   active guidance.

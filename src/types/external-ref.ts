@@ -44,6 +44,8 @@ export interface ExternalRef {
   layerUrl?: string;
   /** Generic deep-link URL (for `system === 'url'` or click-through). */
   url?: string;
+  /** Generic file-vault path or local path display value. */
+  path?: string;
   /** Human-readable label shown in UI. */
   label?: string;
   /** ISO timestamp of last successful sync, when applicable. */
@@ -87,6 +89,7 @@ export function normalizeExternalRef(value: unknown): ExternalRef | null {
     layerName?: unknown;
     layerUrl?: unknown;
     url?: unknown;
+    path?: unknown;
     label?: unknown;
     lastSyncedAt?: unknown;
   };
@@ -107,6 +110,8 @@ export function normalizeExternalRef(value: unknown): ExternalRef | null {
   if (layerUrl !== undefined) ref.layerUrl = layerUrl;
   const url = asOptionalString(raw.url);
   if (url !== undefined) ref.url = url;
+  const path = asOptionalString(raw.path);
+  if (path !== undefined) ref.path = path;
   const label = asOptionalString(raw.label);
   if (label !== undefined) ref.label = label;
   const lastSyncedAt = asOptionalString(raw.lastSyncedAt);
@@ -118,7 +123,8 @@ export function normalizeExternalRef(value: unknown): ExternalRef | null {
     ref.externalId !== undefined
     || ref.globalId !== undefined
     || ref.objectId !== undefined
-    || ref.url !== undefined;
+    || ref.url !== undefined
+    || ref.path !== undefined;
   if (!hasIdentifier) return null;
 
   return ref;

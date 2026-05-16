@@ -234,6 +234,9 @@ test('document registry edits metadata and previews a selected packet', async ({
   await page.getByRole('button', { name: 'Documents' }).click();
   const documentsShell = page.locator('main').first();
   await expect(page.getByRole('heading', { name: 'Documents' })).toBeVisible();
+  await expect(
+    page.getByRole('navigation', { name: 'Document saved views' })
+  ).toBeVisible();
   await expect(page.getByText(/145 docs/)).toBeVisible({ timeout: 45_000 });
   await page.getByRole('button', { name: 'Runsheet / Mineral Title' }).click();
 
@@ -246,9 +249,14 @@ test('document registry edits metadata and previews a selected packet', async ({
   await fillInput(documentsShell, 'Display title', 'Registry packet smoke deed');
   await selectExact(documentsShell, 'Area', 'Runsheet / Mineral Title');
   await fillInput(documentsShell, 'County', 'Walker');
+  await fillInput(documentsShell, 'State', 'TX');
   await fillInput(documentsShell, 'Instrument no.', 'DOC-REG-001');
+  await fillInput(documentsShell, 'Instrument', '2026-05-16');
   await fillInput(documentsShell, 'Grantor', 'Registry Grantor');
-  await fillInput(documentsShell, 'Grantee / lessor / lessee', 'Registry Grantee');
+  await fillInput(documentsShell, 'Grantee', 'Registry Grantee');
+  await fillInput(documentsShell, 'Lessor', 'Registry Lessor');
+  await fillInput(documentsShell, 'Lessee', 'Registry Lessee');
+  await fillInput(documentsShell, 'Source ref', 'E2E packet source');
   await page.getByRole('button', { name: 'Save' }).click();
   await expect(page.getByText('Metadata saved.')).toBeVisible();
 
@@ -260,6 +268,9 @@ test('document registry edits metadata and previews a selected packet', async ({
     hasText: 'Packet Preview',
   });
   await expect(packetSection.getByText('Registry packet smoke deed')).toBeVisible();
+  await expect(packetSection.getByText('Unique')).toBeVisible();
+  await expect(packetSection.getByText('Ready')).toBeVisible();
+  await expect(packetSection.getByText('E2E packet source')).toBeVisible();
   await expect(packetSection.getByRole('button', { name: 'Manifest JSON' })).toBeEnabled();
   await expect(page.getByText('Linked Entities')).toBeVisible();
   await expect(page.getByText('Duplicate Status')).toBeVisible();

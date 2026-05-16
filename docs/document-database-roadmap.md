@@ -1,8 +1,10 @@
 # Document Database Roadmap
 
 Status: Phase 7A registry MVP implemented on
-`codex/document-registry-build-2026-05-16`; later OCR, import manifests,
-Dropbox/API mapping, ArcGIS import, and AI query remain future phases.
+`codex/document-registry-build-2026-05-16`; Phase 7A.5 reconciliation is
+implemented on `codex/document-storage-reconciliation-2026-05-16`. Later OCR,
+import manifests, Dropbox/API mapping, ArcGIS import, and AI query remain
+future phases.
 
 ## Decision
 
@@ -53,6 +55,19 @@ Phase 7A added the first document-registry surface:
 - duplicate surfacing from `contentHash`
 - packet manifest preview from the current filter, selected/highlighted rows,
   or the `Runsheet / Mineral Title` saved view
+
+Phase 7A.5 reconciles the Codex MVP with the reference schema direction:
+
+- canonical `DocumentRecord` metadata fields are `area`, `sourceRef`, and
+  `parties`
+- legacy Phase 7A field names still import and read correctly:
+  `documentArea`, `sourceReference`, `effectiveDate`, `grantor`, and `grantee`
+- `externalRefs` preserve supported external IDs, URLs, and file paths as
+  metadata hooks only
+- `Needs OCR` is honest: only documents explicitly marked `not_started` or
+  `failed` are counted as needing OCR
+- the registry uses a left saved-view rail and a richer packet preview, but
+  still exports a JSON manifest only
 
 This is enough for local document-backed title review before OCR. It is still
 not the durable backend or full text/AI document database.
@@ -130,12 +145,14 @@ In scope:
 
 - document library/index view — implemented as `Documents`
 - metadata editing for instrument type, recording fields, dates, county,
-  parties, notes, and source references — implemented locally
+  parties, notes, and source refs — implemented locally with canonical
+  `area`, `sourceRef`, and `parties` names
 - duplicate surfacing from `contentHash` — implemented
 - filters by document area, kind, node link, tract, date, text, missing
   metadata, unlinked docs, duplicate docs, and OCR-needed marker — implemented
 - packet manifest preview — implemented as JSON manifest download only, not PDF
-  packaging
+  packaging; Phase 7A.5 adds unique hash, warning, area, and source-ref preview
+  detail
 - no OCR or AI mutation
 
 ### Phase 7B — Entity-Link Expansion

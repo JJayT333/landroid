@@ -6,24 +6,26 @@ Keep long history in `CHANGELOG.md`.
 
 ## Current Branch
 
-Current checkpoint branch: `codex/document-registry-build-2026-05-16`.
+Current checkpoint branch: `codex/document-storage-reconciliation-2026-05-16`.
 
-This branch was created from `codex/document-database-roadmap-2026-05-16`.
-The PR target remains `codex/hosted-hardening-2026-05-14`, not `main`.
+This branch was created from `origin/codex/document-registry-build-2026-05-16`
+after confirming `codex/github-actions-ci-2026-05-16` was the separate CI
+branch. The PR target remains `codex/hosted-hardening-2026-05-14`, not `main`.
 
 Do not commit directly to `main`.
 
 ## Current Workstream
 
-Phase 7A document registry MVP is implemented. A follow-up launcher polish pass
-also hardened `LANDroid.command` for fresh GitHub ZIP downloads.
+Phase 7A.5 document storage/registry reconciliation is implemented on top of
+the Codex Phase 7A registry branch. A prior launcher polish pass also hardened
+`LANDroid.command` for fresh GitHub ZIP downloads.
 
 LANDroid now treats Runsheet as a saved mineral-title view over the broader
 document registry rather than a separate storage model. Dropbox/local folders
 remain future raw-file vault options; LANDroid keeps its own document copy,
 metadata, entity links, content hashes, and packet-preview state.
 
-Implemented in this branch:
+Implemented through Phase 7A:
 
 - `Documents` navigation surface backed by existing Dexie v8 `documents` and
   `document_attachments` tables.
@@ -41,6 +43,19 @@ Implemented in this branch:
   or Runsheet/Mineral Title view, plus JSON manifest download.
 - `.landroid` round-trip preservation for the optional registry metadata.
 
+Phase 7A.5 reconciles storage and registry metadata:
+
+- New writes and packet manifests use canonical `area`, `sourceRef`, and
+  structured `parties`.
+- Legacy field names still import/read correctly: `documentArea`,
+  `sourceReference`, `effectiveDate`, `grantor`, and `grantee`.
+- `externalRefs` preserve supported external IDs, URLs, and file paths.
+- `Needs OCR` only counts documents explicitly marked `not_started` or
+  `failed`; unknown legacy rows are not claimed as needing OCR.
+- The Documents surface now has a left saved-view rail and richer packet
+  preview counts for unique hashes, warnings, area mix, source refs, and
+  ready rows.
+
 Explicitly not implemented: OCR, Dropbox API sync, ArcGIS import, AI document
 query, federal/private math, and automatic title updates.
 
@@ -57,36 +72,33 @@ Follow-up launcher/docs change:
 
 ## Latest Validation
 
-Completed on `codex/document-registry-build-2026-05-16`:
+Completed on `codex/document-storage-reconciliation-2026-05-16`:
 
-- `npm test -- src/documents/__tests__/document-registry.test.ts src/storage/__tests__/workspace-persistence.test.ts`
-  passed: 2 files, 18 tests.
+- `npm test -- src/types/__tests__/external-ref.test.ts src/documents/__tests__/document-registry.test.ts src/storage/__tests__/workspace-persistence.test.ts`
+  passed: 3 files, 37 tests.
 - `npm run lint` passed.
-- `npm test` passed: 70 files, 582 tests. Known intentional noise remains the
+- `npm test` passed: 70 files, 585 tests. Known intentional noise remains the
   post-v8 backup error-path log.
 - `npm run build` passed. Known Vite dynamic-import and chunk-size warnings
   remain.
-- `npm run test:e2e` passed: 11 Playwright workflows.
+- First `npm run test:e2e` attempt hit a stale reused Vite server on
+  `127.0.0.1:5173`; after stopping that listener, rerun passed: 11 Playwright
+  workflows.
 - In-app Browser smoke passed for loading the Raven Forest demo, opening
-  Documents, using the Runsheet saved view, selecting a row, switching packet
-  preview to Selected, and checking console warnings/errors. Browser screenshot
-  capture timed out, so the rendered record is the DOM/interaction/log pass
-  plus Playwright coverage.
-
-Run `git diff --check` and `git status` immediately before final handoff or
-checkpoint.
-
-Latest launcher-docs validation after this follow-up:
-
-- `bash -n LANDroid.command` passed.
+  Documents, seeing the left saved-view rail, switching to the
+  Runsheet/Mineral Title view, checking packet preview metrics, and checking
+  browser console errors.
 - `git diff --check` passed.
+- `git status --short --branch` showed only the Phase 7A.5 source/docs/test
+  changes on `codex/document-storage-reconciliation-2026-05-16`.
 
 ## Open Risks And Assumptions
 
 - Packet export is intentionally a preview plus JSON manifest, not a ZIP/PDF
   production package.
-- Metadata is user-maintained in Phase 7A. No OCR or automatic title updates
-  should be inferred from registry edits.
+- Metadata is user-maintained in Phase 7A/7A.5. No OCR or automatic title
+  updates should be inferred from registry edits.
+- `Needs OCR` is a manual status marker until a real OCR/text layer exists.
 - Linked-entity display is node-focused. Owner, lease, curative, research, and
   GIS attachment UI should be a separate small phase.
 - Duplicate detection uses existing `contentHash`; it does not perform fuzzy
@@ -108,9 +120,11 @@ Latest launcher-docs validation after this follow-up:
 ## Paste-Ready Next Chat Prompt
 
 Resume in `/Users/abstractmapping/projects/landroid` on branch
-`codex/document-registry-build-2026-05-16`. Read `AGENTS.md`,
+`codex/document-storage-reconciliation-2026-05-16`. Read `AGENTS.md`,
 `PROJECT_CONTEXT.md`, `docs/README.md`, and `CONTINUATION-PROMPT.md` first.
-Phase 7A document registry MVP is implemented and validated; continue with
-review, polish, or the next explicitly requested phase without adding OCR,
-Dropbox sync, ArcGIS import, AI document query, federal/private math, or
-automatic title updates.
+Phase 7A.5 reconciles the document registry around canonical
+`area`/`sourceRef`/`parties`, legacy import compatibility, preserved
+`externalRefs`, honest Needs OCR semantics, a left saved-view rail, and richer
+packet preview. Continue with review, polish, or the next explicitly requested
+phase without adding OCR, Dropbox sync, ArcGIS import, AI document query,
+federal/private math, or automatic title updates.

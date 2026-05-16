@@ -74,6 +74,15 @@ one denormalized array), one new `.landroid` schema version (v8) with v7
 inline migration. The old `pdfs` table sticks around read-only for one
 version to preserve a rollback path.
 
+**Registry metadata names.** Phase 7A.5 keeps v8 as the persisted schema
+version but standardizes registry metadata on `area`, `sourceRef`, and
+`parties`. Import/read paths remain compatible with the first Phase 7A names
+(`documentArea`, `sourceReference`, `effectiveDate`, `grantor`, and `grantee`)
+so existing `.landroid` files and IndexedDB rows continue to load. `externalRefs`
+remain optional metadata hooks and now preserve supported file-path references.
+This does not introduce OCR, Dropbox sync, ArcGIS import, AI document query, or
+title/math mutation from documents.
+
 **UI.** Desk Map badge became a row of chips (4 visible + `+N more`
 overflow). The node edit modal uses the shared `AttachmentsSection` for add,
 open, rename, remove, and reorder. `PdfViewerModal` keys on `docId` instead of

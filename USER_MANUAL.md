@@ -248,10 +248,10 @@ LANDroid workspace.
 
 ### What it shows
 - One row per saved document in the v8 document store
-- Saved views for `All`, `Inbox / Needs review`, `Runsheet / Mineral Title`,
-  `Leasehold`, `Curative`, `Research`, `GIS / Map Support`,
-  `Federal Reference`, `Unlinked`, `Missing metadata`, `Duplicates`, and
-  `Needs OCR`
+- A left saved-view rail for `All`, `Inbox / Needs review`,
+  `Runsheet / Mineral Title`, `Leasehold`, `Curative`, `Research`,
+  `GIS / Map Support`, `Federal Reference`, `Unlinked`, `Missing metadata`,
+  `Duplicates`, and `Needs OCR`
 - Compact filters for document kind, tract, linked/unlinked state, date range,
   and text search
 - Linked entity summaries for node attachments, with a jump back to `Desk Map`
@@ -263,14 +263,20 @@ Select a document row to edit:
 - display title
 - document area
 - document kind and instrument type
-- county, instrument number, volume, and page
-- effective and recording dates
-- grantor and grantee / lessor / lessee
-- source reference and notes
-- OCR status marker
+- county, state, instrument number, volume, and page
+- instrument and recording dates
+- structured parties: grantor, grantee, lessor, lessee, and party notes
+- source ref and notes
+- OCR status marker; `Needs OCR` is shown only when the row is explicitly
+  marked `not started` or `failed`
 
-Phase 7A does not run OCR, call Dropbox, import ArcGIS attachments, query AI
-over documents, or update title/math automatically.
+Current exports/imports use canonical document metadata names (`area`,
+`sourceRef`, and `parties`) while still accepting the earlier Phase 7A field
+names (`documentArea`, `sourceReference`, `effectiveDate`, `grantor`, and
+`grantee`). `externalRefs` are preserved as metadata hooks only.
+
+Phase 7A/7A.5 does not run OCR, call Dropbox, import ArcGIS attachments, query
+AI over documents, or update title/math automatically.
 
 ### Packet preview
 The right panel previews a packet from:
@@ -278,9 +284,11 @@ The right panel previews a packet from:
 - selected rows, or the highlighted row when nothing is checked
 - the `Runsheet / Mineral Title` saved view
 
-The preview shows document count, total size, missing metadata count, duplicate
-count, and a manifest order. `Manifest JSON` downloads a metadata manifest only;
-it does not package or export the PDFs yet.
+The preview shows document count, total size, unique content hashes, missing
+metadata count, duplicate count, unlinked count, explicit Needs OCR count, ready
+count, area mix, warning summary, source refs, and manifest order. `Manifest
+JSON` downloads a metadata manifest only; it does not package or export the PDFs
+yet.
 
 ## 6) Owners view
 

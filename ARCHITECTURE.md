@@ -40,8 +40,9 @@ summarizes how the app is put together and where changes should live.
 - `ai/settings-store`: AI provider/model settings; cloud keys are session-only.
 - `ai/undo-store`: latest AI rollback snapshot.
 - Document blobs and entity links are persisted through `src/storage/document-store.ts`.
-  Registry filtering, duplicate surfacing, linked-entity summaries, and packet
-  manifest previews live in pure helpers under `src/documents`.
+  Registry filtering, duplicate surfacing, canonical area/source-ref/parties
+  reconciliation, linked-entity summaries, and packet manifest previews live in
+  pure helpers under `src/documents`.
 
 ## Data Flow
 
@@ -110,7 +111,9 @@ Future policy work is tracked in `PATCH_PLAN.md`.
 - Owners is the owner/lease record source of truth.
 - Documents is the first-class registry for saved workspace document records.
   Runsheet document review is a saved mineral-title view over that registry,
-  not a separate storage model.
+  not a separate storage model. Document metadata uses canonical `area`,
+  `sourceRef`, and `parties` fields while import/read paths continue to accept
+  the earlier Phase 7A names for compatibility.
 - Leasehold consumes Desk Map and Owners data for review outputs.
 - Unit focus is driven by Desk Map `unitCode` / `unitName` fields. Leasehold
   filters its tract set by active unit, and unit-wide ORRI/WI records carry a
