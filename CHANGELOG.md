@@ -5,6 +5,11 @@ stay short.
 
 ## 2026-05-16
 
+- Added Phase 7A.6 packet export hardening on
+  `codex/document-packet-export-2026-05-16`: packet preview now downloads a
+  native-file ZIP with `manifest.json`, `manifest.csv`, and stored documents in
+  packet order, with helper and Playwright coverage for download behavior and
+  missing-blob failure.
 - Implemented Phase 7A.5 document storage/registry reconciliation on
   `codex/document-storage-reconciliation-2026-05-16`: canonicalized document
   metadata around `area`, `sourceRef`, and structured `parties`, kept legacy

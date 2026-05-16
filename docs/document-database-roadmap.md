@@ -2,9 +2,10 @@
 
 Status: Phase 7A registry MVP implemented on
 `codex/document-registry-build-2026-05-16`; Phase 7A.5 reconciliation is
-implemented on `codex/document-storage-reconciliation-2026-05-16`. Later OCR,
-import manifests, Dropbox/API mapping, ArcGIS import, and AI query remain
-future phases.
+implemented on `codex/document-storage-reconciliation-2026-05-16`; Phase 7A.6
+packet ZIP export is in progress on `codex/document-packet-export-2026-05-16`.
+Later OCR, import manifests, Dropbox/API mapping, ArcGIS import, and AI query
+remain future phases.
 
 ## Decision
 
@@ -66,8 +67,10 @@ Phase 7A.5 reconciles the Codex MVP with the reference schema direction:
   metadata hooks only
 - `Needs OCR` is honest: only documents explicitly marked `not_started` or
   `failed` are counted as needing OCR
-- the registry uses a left saved-view rail and a richer packet preview, but
-  still exports a JSON manifest only
+- the registry uses a left saved-view rail and a richer packet preview
+- Phase 7A.6 adds a local packet ZIP export with native stored files,
+  `manifest.json`, and `manifest.csv`; missing stored blobs fail the export
+  rather than producing an incomplete packet
 
 This is enough for local document-backed title review before OCR. It is still
 not the durable backend or full text/AI document database.
@@ -150,9 +153,10 @@ In scope:
 - duplicate surfacing from `contentHash` — implemented
 - filters by document area, kind, node link, tract, date, text, missing
   metadata, unlinked docs, duplicate docs, and OCR-needed marker — implemented
-- packet manifest preview — implemented as JSON manifest download only, not PDF
-  packaging; Phase 7A.5 adds unique hash, warning, area, and source-ref preview
-  detail
+- packet manifest preview — implemented with JSON manifest download; Phase
+  7A.5 adds unique hash, warning, area, and source-ref preview detail; Phase
+  7A.6 adds native-file ZIP export with JSON/CSV manifests, but not PDF assembly
+  or saved packet sets
 - no OCR or AI mutation
 
 ### Phase 7B — Entity-Link Expansion

@@ -275,8 +275,8 @@ Current exports/imports use canonical document metadata names (`area`,
 names (`documentArea`, `sourceReference`, `effectiveDate`, `grantor`, and
 `grantee`). `externalRefs` are preserved as metadata hooks only.
 
-Phase 7A/7A.5 does not run OCR, call Dropbox, import ArcGIS attachments, query
-AI over documents, or update title/math automatically.
+Phase 7A does not run OCR, call Dropbox, import ArcGIS attachments, query AI
+over documents, or update title/math automatically.
 
 ### Packet preview
 The right panel previews a packet from:
@@ -286,9 +286,12 @@ The right panel previews a packet from:
 
 The preview shows document count, total size, unique content hashes, missing
 metadata count, duplicate count, unlinked count, explicit Needs OCR count, ready
-count, area mix, warning summary, source refs, and manifest order. `Manifest
-JSON` downloads a metadata manifest only; it does not package or export the PDFs
-yet.
+count, area mix, warning summary, source refs, and manifest order.
+
+`Manifest JSON` downloads a metadata-only manifest. `Packet ZIP` downloads a
+local ZIP package with the native document files under `documents/`, plus
+`manifest.json` and `manifest.csv`. If a packet row is missing its stored
+document file, the ZIP export fails instead of creating an incomplete package.
 
 ## 6) Owners view
 

@@ -272,6 +272,12 @@ test('document registry edits metadata and previews a selected packet', async ({
   await expect(packetSection.getByText('Ready')).toBeVisible();
   await expect(packetSection.getByText('E2E packet source')).toBeVisible();
   await expect(packetSection.getByRole('button', { name: 'Manifest JSON' })).toBeEnabled();
+  const packetZipDownload = page.waitForEvent('download');
+  await packetSection.getByRole('button', { name: 'Packet ZIP' }).click();
+  const download = await packetZipDownload;
+  expect(download.suggestedFilename()).toMatch(
+    /^landroid-document-packet-.+-\d{4}-\d{2}-\d{2}\.zip$/
+  );
   await expect(page.getByText('Linked Entities')).toBeVisible();
   await expect(page.getByText('Duplicate Status')).toBeVisible();
 

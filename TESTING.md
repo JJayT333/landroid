@@ -20,7 +20,7 @@ npm run test:e2e
 | Engine/math/store change | `npm run lint`, targeted tests, then `npm test` |
 | UI workflow change | `npm run lint`, targeted tests, `npm run build`, relevant e2e if available |
 | Import/export/persistence change | `npm run lint`, storage tests, `npm test`, and manual risk note |
-| Document registry or packet-preview change | `npm run lint`, `npm test -- src/documents/__tests__/document-registry.test.ts`, storage round-trip tests when metadata shape changes, and browser smoke for navigation/inspector changes |
+| Document registry or packet-preview/export change | `npm run lint`, `npm test -- src/documents/__tests__/document-registry.test.ts src/documents/__tests__/packet-export.test.ts`, storage round-trip tests when metadata shape changes, and browser smoke for navigation/inspector/download changes |
 | AI tool/provider change | `npm run lint`, AI tests, relevant wizard/tool tests, and rollback check |
 | Hosted AI proxy/deploy change | `npm run deploy:check`, `cd backend/ai-proxy && npm test && npx tsc -p tsconfig.json --noEmit`, plus root `npm test` if frontend policy changes; run `bash scripts/smoke-test-hosted.sh` when network/AWS access is available |
 | Release/checkpoint | full default commands plus `npm run deploy:check` for hosted deploy candidates |
@@ -45,8 +45,8 @@ As of the current handoff:
   PDF by `attachmentId`, v8 `.landroid` export/import document round-trip,
   branch-scoped lease deletion through the shared confirmation modal, curative
   linkage, research linkage, the document registry saved-view rail,
-  canonical metadata, and packet-preview smoke path, federal leasing, and
-  Research home surfacing.
+  canonical metadata, packet-preview smoke path, and packet ZIP download,
+  federal leasing, and Research home surfacing.
 - The combinatorial demo loader and `.landroid` import workflow now exercise
   typed destructive confirmations before replacing the active workspace.
 

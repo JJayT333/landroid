@@ -86,7 +86,7 @@ See `docs/README.md` for the full documentation map.
 - `Runsheet`: chronology review and workbook export.
 - `Documents`: flat document registry with a saved-view rail, canonical
   area/source-ref/parties metadata, duplicate surfacing, linked-node display,
-  and packet manifest preview.
+  and packet preview/export.
 - `Owners`: unit-filtered owner, lease, contact, and document records.
 - `Curative`: title issue and curative tracking.
 - `Maps`: project map assets, regions, and references.
@@ -116,8 +116,10 @@ Older stress and 8-tract leasehold demos have been retired.
   workspace database. Phase 7A/7A.5 adds the `Documents` registry so LANDroid
   can edit canonical document metadata, group documents by saved view/area,
   preserve external file references, surface duplicate hashes, and preview
-  title-opinion packet manifests. Dropbox/local folders or later object storage
-  remain optional raw-file vaults rather than the only database.
+  title-opinion packet manifests. Phase 7A.6 adds a local packet ZIP export
+  with native document files, `manifest.json`, and `manifest.csv`. Dropbox/local
+  folders or later object storage remain optional raw-file vaults rather than
+  the only database.
 - `.landroid` imports validate the top-level workspace graph before loading.
 - CSV imports create a fresh workspace and intentionally start with empty owner,
   curative, map, and research side records.

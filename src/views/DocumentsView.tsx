@@ -13,6 +13,11 @@ import {
   type RegistryDocument,
 } from '../documents/document-registry';
 import {
+  buildPacketZip,
+  packetZipFileName,
+} from '../documents/packet-export';
+import {
+  getDocBlob,
   listDocumentRegistryData,
   updateDocMetadata,
   type DocumentMetadataPatch,
@@ -224,7 +229,9 @@ export default function DocumentsView() {
   const [draft, setDraft] = useState<MetadataDraft | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [exportingPacket, setExportingPacket] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [packetStatusMessage, setPacketStatusMessage] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
 
   const nodeAttachmentSignature = useMemo(
@@ -399,6 +406,28 @@ export default function DocumentsView() {
     anchor.click();
     URL.revokeObjectURL(url);
   }, [packetRows]);
+
+  const downloadPacketZip = useCallback(async () => {
+    if (packetRows.length === 0) return;
+    setExportingPacket(true);
+    setPacketStatusMessage(null);
+    try {
+      const blob = await buildPacketZip(packetRows, getDocBlob, { projectName });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = packetZipFileName(projectName);
+      anchor.click();
+      URL.revokeObjectURL(url);
+      setPacketStatusMessage(`Packet ZIP exported (${packetRows.length} docs).`);
+    } catch (error) {
+      setPacketStatusMessage(
+        error instanceof Error ? error.message : 'Packet ZIP export failed.'
+      );
+    } finally {
+      setExportingPacket(false);
+    }
+  }, [packetRows, projectName]);
 
   const tractOptions = useMemo(
     () =>
@@ -989,15 +1018,30 @@ export default function DocumentsView() {
           <section className="py-4">
             <div className="flex items-center justify-between gap-3">
               <h4 className="text-sm font-bold text-ink">Packet Preview</h4>
-              <button
-                type="button"
-                onClick={downloadManifest}
-                disabled={packetPreview.rows.length === 0}
-                className="rounded-lg border border-ledger-line px-3 py-1.5 text-xs font-semibold text-leather hover:bg-leather/10 disabled:opacity-50"
-              >
-                Manifest JSON
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={downloadManifest}
+                  disabled={packetPreview.rows.length === 0}
+                  className="rounded-lg border border-ledger-line px-3 py-1.5 text-xs font-semibold text-leather hover:bg-leather/10 disabled:opacity-50"
+                >
+                  Manifest JSON
+                </button>
+                <button
+                  type="button"
+                  onClick={downloadPacketZip}
+                  disabled={packetPreview.rows.length === 0 || exportingPacket}
+                  className="rounded-lg border border-leather bg-leather px-3 py-1.5 text-xs font-semibold text-parchment hover:bg-leather-dark disabled:opacity-50"
+                >
+                  {exportingPacket ? 'Building...' : 'Packet ZIP'}
+                </button>
+              </div>
             </div>
+            {packetStatusMessage && (
+              <p className="mt-2 text-xs font-semibold text-ink-light">
+                {packetStatusMessage}
+              </p>
+            )}
             <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
               <div className="rounded-lg border border-ledger-line bg-parchment px-3 py-2">
                 <div className="text-[10px] uppercase tracking-wider text-ink-light">Docs</div>
