@@ -55,7 +55,7 @@ function makeNode(
 // Maps nodeId → filename in TORS_Documents/
 // We'll attach a handful of PDFs to specific nodes.
 
-interface PdfMapping {
+export interface PdfMapping {
   nodeId: string;
   fileName: string;
   kind?: DocumentKind;
@@ -122,7 +122,7 @@ function hasPositiveFraction(node: OwnershipNode): boolean {
   return node.type !== 'related' && Number(node.fraction) > 0;
 }
 
-function buildSeedOwnerWorkspaceData(
+export function buildSeedOwnerWorkspaceData(
   workspaceId: string,
   nodes: OwnershipNode[],
   projectName: string,
@@ -372,7 +372,7 @@ function buildGeneratedRemark(
   return `${node.grantor} conveyed ${node.initialFraction} of the whole tract to ${node.grantee} in ${county} County. ${punchline}`;
 }
 
-function finalizeGeneratedNodes(
+export function finalizeGeneratedNodes(
   nodes: OwnershipNode[],
   { humorousDeaths }: { humorousDeaths: boolean }
 ): OwnershipNode[] {
@@ -758,7 +758,7 @@ function buildTestNodes(): { nodes: OwnershipNode[]; pdfMappings: PdfMapping[] }
 
 // ── Store a bundled PDF sample in IDB ───────────────────
 
-async function attachPdf(
+export async function attachPdf(
   nodeId: string,
   fileName: string,
   kind: DocumentKind = 'other'
@@ -780,7 +780,7 @@ async function attachPdf(
   }
 }
 
-async function resetWorkspaceSideStores(
+export async function resetWorkspaceSideStores(
   workspaceId: string,
   ownerData: OwnerWorkspaceData
 ) {
@@ -866,7 +866,7 @@ export async function seedTestData(): Promise<{ nodeCount: number; pdfCount: num
 // Demo instrument palette + PDF pool (shared by the combinatorial seed)
 // ═══════════════════════════════════════════════════════════
 
-const DEMO_INSTRUMENT_TYPES = [
+export const DEMO_INSTRUMENT_TYPES = [
   'Patent', 'Warranty Deed', 'Mineral Deed', 'Royalty Deed',
   'Special Warranty Deed', 'Oil & Gas Lease', 'Probate', 'Affidavit of Heirship',
   'Surface Use Agreement',
@@ -874,7 +874,7 @@ const DEMO_INSTRUMENT_TYPES = [
   'Will', 'Order',
 ];
 
-const DEMO_PDFS = [
+export const DEMO_PDFS = [
   '09-4292.pdf', '09-6968.pdf', '10-5146.pdf', '10-5147.pdf', '10-6043.pdf',
   '10-6044.pdf', '11-2474.pdf', '11-3054.pdf', '11-4768.pdf', '11-769.pdf',
   '20-519-CP4.pdf', '2013000463.pdf', '2013003629.pdf', '2014001940.pdf',
