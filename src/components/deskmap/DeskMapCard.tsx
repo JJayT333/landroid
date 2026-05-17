@@ -15,6 +15,12 @@ import { isNpriNode } from '../../types/node';
 import type { DeskMapPrimaryLeaseSummary } from './deskmap-coverage';
 import DeskMapDocumentChips from './DeskMapDocumentChips';
 import { isLeaseNode } from './deskmap-lease-node';
+import { FormulaTooltip } from '../leasehold/FormulaTooltip';
+import {
+  grantedFractionFormula,
+  ofWholeFractionFormula,
+  remainingFractionFormula,
+} from './deskmap-formulas';
 
 interface DeskMapCardProps {
   node: OwnershipNode;
@@ -180,11 +186,19 @@ function DeskMapCard({
         <div className="px-3 py-2 border-t border-ledger-line bg-ledger space-y-0.5">
           <div className="flex items-center justify-between gap-2">
             <span className="text-ink-light text-[10px] uppercase tracking-wider shrink-0">Granted</span>
-            <span className="text-sm font-mono font-semibold text-leather">{grantedFrac}</span>
+            <span className="text-sm font-mono font-semibold text-leather">
+              <FormulaTooltip content={grantedFractionFormula(node, parentInitialFraction)}>
+                {grantedFrac}
+              </FormulaTooltip>
+            </span>
           </div>
           <div className="flex items-center justify-between gap-2">
             <span className="text-ink-light text-[10px] uppercase tracking-wider shrink-0">Of Whole</span>
-            <span className="text-sm font-mono font-semibold text-ink">{ofWholeFrac}</span>
+            <span className="text-sm font-mono font-semibold text-ink">
+              <FormulaTooltip content={ofWholeFractionFormula(node)}>
+                {ofWholeFrac}
+              </FormulaTooltip>
+            </span>
           </div>
           {hasConveyedSome && (
             <div className="flex items-center justify-between gap-2">
@@ -192,7 +206,13 @@ function DeskMapCard({
                 {isFullyConveyed ? 'Conveyed All' : 'Remaining'}
               </span>
               <span className={`text-sm font-mono font-semibold ${isFullyConveyed ? 'text-ink-light' : 'text-seal'}`}>
-                {isFullyConveyed ? '\u2014' : remainingFrac}
+                {isFullyConveyed ? (
+                  '\u2014'
+                ) : (
+                  <FormulaTooltip content={remainingFractionFormula(node)}>
+                    {remainingFrac}
+                  </FormulaTooltip>
+                )}
               </span>
             </div>
           )}

@@ -18,6 +18,13 @@ import {
 import DeskMapCard from '../components/deskmap/DeskMapCard';
 import DeskMapLeaseCard from '../components/deskmap/DeskMapLeaseCard';
 import DeskMapNpriCard from '../components/deskmap/DeskMapNpriCard';
+import { FormulaTooltip } from '../components/leasehold/FormulaTooltip';
+import {
+  coverageFoundInChainFormula,
+  coverageLeasedFormula,
+  coverageLinkedOwnersFormula,
+  leaseOverlapClippedFormula,
+} from '../components/deskmap/deskmap-formulas';
 import { planDeskMapLeaseDeletion } from '../components/deskmap/deskmap-lease-delete';
 import { isLeaseNode } from '../components/deskmap/deskmap-lease-node';
 import {
@@ -438,22 +445,26 @@ function CoverageCard({
   fraction,
   detail,
   toneClassName,
+  formula,
 }: {
   label: string;
   fraction: string;
   detail: string;
   toneClassName: string;
+  formula?: import('../components/leasehold/FormulaTooltip').FormulaContent;
 }) {
+  const value = formatAsFraction(d(fraction));
+  const pct = formatCoveragePercent(fraction);
   return (
     <div className={`rounded-md border px-2 py-1.5 ${toneClassName}`}>
       <div className="text-[9px] font-semibold uppercase tracking-wider leading-tight">
         {label}
       </div>
       <div className="mt-1 text-xs font-semibold font-mono">
-        {formatAsFraction(d(fraction))}
+        {formula ? <FormulaTooltip content={formula}>{value}</FormulaTooltip> : value}
       </div>
       <div className="text-[9px] mt-0.5 opacity-80">
-        {formatCoveragePercent(fraction)}
+        {formula ? <FormulaTooltip content={formula}>{pct}</FormulaTooltip> : pct}
       </div>
       <div className="text-[9px] mt-1 opacity-80 leading-tight">
         {detail}
@@ -964,6 +975,7 @@ export default function DeskMapView() {
                   balancedLabel: 'Balanced at 100%',
                 })}
                 toneClassName={coverageTone(coverageSummary.missingOwnership)}
+                formula={coverageFoundInChainFormula(coverageSummary)}
               />
               <CoverageCard
                 label="Linked Owners"
@@ -974,6 +986,7 @@ export default function DeskMapView() {
                   balancedLabel: 'All current owners linked',
                 })}
                 toneClassName={coverageTone(coverageSummary.unlinkedOwnership)}
+                formula={coverageLinkedOwnersFormula(coverageSummary)}
               />
               <CoverageCard
                 label="Leased"
@@ -984,6 +997,7 @@ export default function DeskMapView() {
                   balancedLabel: 'Fully leased',
                 })}
                 toneClassName={coverageTone(coverageSummary.unleasedOwnership)}
+                formula={coverageLeasedFormula(coverageSummary)}
               />
             </div>
             {d(coverageSummary.currentOwnership).greaterThan(1) && (
@@ -1017,10 +1031,17 @@ export default function DeskMapView() {
                 <div className="mt-1">
                   {coverageSummary.leaseOverlaps
                     .slice(0, 3)
-                    .map(({ ownerGrantee, overlap }) =>
-                      `${ownerGrantee}: ${overlap.leaseName || overlap.lessee} clipped ${overlap.clippedFraction}`
-                    )
-                    .join('; ')}
+                    .map(({ ownerGrantee, overlap }, i, arr) => (
+                      <span key={overlap.leaseId}>
+                        {ownerGrantee}: {overlap.leaseName || overlap.lessee} clipped{' '}
+                        <FormulaTooltip
+                          content={leaseOverlapClippedFormula(ownerGrantee, overlap)}
+                        >
+                          {overlap.clippedFraction}
+                        </FormulaTooltip>
+                        {i < arr.length - 1 ? '; ' : ''}
+                      </span>
+                    ))}
                   {coverageSummary.leaseOverlaps.length > 3
                     ? `, +${coverageSummary.leaseOverlaps.length - 3} more`
                     : ''}

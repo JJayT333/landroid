@@ -5,6 +5,12 @@ import { useWorkspaceStore } from '../../store/workspace-store';
 import type { OwnershipNode } from '../../types/node';
 import type { NpriBranchDiscrepancy } from '../../engine/math-engine';
 import DeskMapDocumentChips from './DeskMapDocumentChips';
+import { FormulaTooltip } from '../leasehold/FormulaTooltip';
+import {
+  npriDiscrepancyFormula,
+  npriInitialFractionFormula,
+  remainingFractionFormula,
+} from './deskmap-formulas';
 
 interface DeskMapNpriCardProps {
   node: OwnershipNode;
@@ -113,9 +119,19 @@ function DeskMapNpriCard({
             <div className="rounded-md border border-seal/25 bg-seal/10 px-2 py-1.5 text-[10px] leading-4 text-seal">
               <div className="font-semibold">{discrepancyLabel}</div>
               <div>
-                Total {formatAsFraction(d(discrepancy.totalBurden))}; capacity{' '}
-                {formatAsFraction(d(discrepancy.capacity))}; over by{' '}
-                {formatAsFraction(d(discrepancy.excess))}.
+                Total{' '}
+                <FormulaTooltip content={npriDiscrepancyFormula(discrepancy)}>
+                  {formatAsFraction(d(discrepancy.totalBurden))}
+                </FormulaTooltip>
+                ; capacity{' '}
+                <FormulaTooltip content={npriDiscrepancyFormula(discrepancy)}>
+                  {formatAsFraction(d(discrepancy.capacity))}
+                </FormulaTooltip>
+                ; over by{' '}
+                <FormulaTooltip content={npriDiscrepancyFormula(discrepancy)}>
+                  {formatAsFraction(d(discrepancy.excess))}
+                </FormulaTooltip>
+                .
               </div>
             </div>
           )}
@@ -131,7 +147,9 @@ function DeskMapNpriCard({
                   : 'Of Burdened Branch'}
             </span>
             <span className="text-sm font-mono font-semibold text-amber-950">
-              {formatAsFraction(initial)}
+              <FormulaTooltip content={npriInitialFractionFormula(node)}>
+                {formatAsFraction(initial)}
+              </FormulaTooltip>
             </span>
           </div>
           {hasConveyedSome && (
@@ -140,7 +158,9 @@ function DeskMapNpriCard({
                 Remaining
               </span>
               <span className="text-sm font-mono font-semibold text-amber-900">
-                {formatAsFraction(remaining)}
+                <FormulaTooltip content={remainingFractionFormula(node)}>
+                  {formatAsFraction(remaining)}
+                </FormulaTooltip>
               </span>
             </div>
           )}
