@@ -23,6 +23,8 @@ import {
 } from '../workspace-persistence';
 import { parsePersistedCanvasData } from '../canvas-persistence';
 
+const TEST_PDF_BODY = '%PDF-1.7\n% LANDroid test PDF\n';
+
 function buildCanvas(): CanvasSaveData {
   return {
     nodes: [
@@ -194,8 +196,14 @@ function buildWorkspace(canvas: CanvasSaveData | null): LandroidFileData {
       {
         ...createBlankNode('node-1'),
         type: 'related',
-        hasDoc: true,
-        docFileName: '20260001.pdf',
+        attachments: [
+          {
+            docId: 'doc-fixture-1',
+            attachmentId: 'att-fixture-1',
+            fileName: '20260001.pdf',
+            kind: 'deed',
+          },
+        ],
         linkedOwnerId: owner.id,
         linkedLeaseId: 'lease-1',
         relatedKind: 'lease',
@@ -226,11 +234,13 @@ function buildWorkspace(canvas: CanvasSaveData | null): LandroidFileData {
         assignor: 'Operator A',
         assignee: 'Unit Partner',
         scope: 'unit',
+        unitCode: null,
         deskMapId: null,
         workingInterestFraction: '1/2',
         effectiveDate: '2024-03-01',
         sourceDocNo: 'ASG-1',
         notes: 'Starter WI split',
+        depthRange: 'all_depths',
       },
     ],
     leaseholdOrris: [
@@ -238,12 +248,14 @@ function buildWorkspace(canvas: CanvasSaveData | null): LandroidFileData {
         id: 'orri-1',
         payee: 'Override Partners',
         scope: 'unit',
+        unitCode: null,
         deskMapId: null,
         burdenFraction: '1/32',
         burdenBasis: 'gross_8_8',
         effectiveDate: '2024-02-01',
         sourceDocNo: 'ORRI-1',
         notes: 'Starter override',
+        depthRange: 'all_depths',
       },
     ],
     leaseholdTransferOrderEntries: [
@@ -258,13 +270,43 @@ function buildWorkspace(canvas: CanvasSaveData | null): LandroidFileData {
     activeDeskMapId: 'dm-1',
     instrumentTypes: ['Deed'],
     canvas,
-    pdfData: {
-      pdfs: [
+    documentData: {
+      documents: [
         {
-          nodeId: 'node-1',
+          docId: 'doc-fixture-1',
+          workspaceId: 'ws-1',
           fileName: '20260001.pdf',
           mimeType: 'application/pdf',
-          blob: new Blob(['node-pdf-body'], { type: 'application/pdf' }),
+          byteLength: TEST_PDF_BODY.length,
+          contentHash: 'fixture-hash',
+          blob: new Blob([TEST_PDF_BODY], { type: 'application/pdf' }),
+          kind: 'deed',
+          displayTitle: 'Recorded Mineral Deed',
+          documentArea: 'runsheet_mineral_title',
+          instrumentType: 'Mineral Deed',
+          county: 'Elmore',
+          instrumentNumber: '20260001',
+          volume: '120',
+          page: '44',
+          effectiveDate: '2026-03-01',
+          recordingDate: '2026-04-01',
+          grantor: 'Pat Doe',
+          grantee: 'Acme Minerals LLC',
+          notes: 'Registry metadata round-trip fixture',
+          sourceReference: 'TORS packet A',
+          ocrStatus: 'not_needed',
+          createdAt: '2026-04-01T00:00:00.000Z',
+          updatedAt: '2026-04-01T00:00:00.000Z',
+        },
+      ],
+      attachments: [
+        {
+          attachmentId: 'att-fixture-1',
+          workspaceId: 'ws-1',
+          docId: 'doc-fixture-1',
+          entityKind: 'node',
+          entityId: 'node-1',
+          position: 0,
           createdAt: '2026-04-01T00:00:00.000Z',
         },
       ],
@@ -314,9 +356,32 @@ describe('workspace-persistence', () => {
       original.leaseholdTransferOrderEntries
     );
     expect(imported.canvas).toEqual(original.canvas);
-    expect(imported.pdfData?.pdfs[0]?.fileName).toBe('20260001.pdf');
-    expect(imported.nodes[0]?.docFileName).toBe('20260001.pdf');
-    expect(await imported.pdfData?.pdfs[0]?.blob.text()).toBe('node-pdf-body');
+    expect(imported.documentData?.documents[0]?.fileName).toBe('20260001.pdf');
+    expect(imported.documentData?.documents[0]).toMatchObject({
+      displayTitle: 'Recorded Mineral Deed',
+      documentArea: 'runsheet_mineral_title',
+      instrumentType: 'Mineral Deed',
+      county: 'Elmore',
+      instrumentNumber: '20260001',
+      volume: '120',
+      page: '44',
+      effectiveDate: '2026-03-01',
+      recordingDate: '2026-04-01',
+      grantor: 'Pat Doe',
+      grantee: 'Acme Minerals LLC',
+      notes: 'Registry metadata round-trip fixture',
+      sourceReference: 'TORS packet A',
+      ocrStatus: 'not_needed',
+    });
+    expect(await imported.documentData?.documents[0]?.blob.text()).toBe(TEST_PDF_BODY);
+    expect(imported.documentData?.attachments[0]).toMatchObject({
+      attachmentId: 'att-fixture-1',
+      workspaceId: 'ws-1',
+      docId: 'doc-fixture-1',
+      entityKind: 'node',
+      entityId: 'node-1',
+      position: 0,
+    });
     expect(imported.ownerData?.owners).toEqual(original.ownerData?.owners);
     expect(imported.ownerData?.docs[0]?.fileName).toBe('owner-notes.txt');
     expect(await imported.ownerData?.docs[0]?.blob.text()).toBe('owner-doc-body');
@@ -405,7 +470,7 @@ describe('workspace-persistence', () => {
       questions: [],
     });
     expect(imported.curativeData).toEqual({ titleIssues: [] });
-    expect(imported.pdfData).toEqual({ pdfs: [] });
+    expect(imported.documentData).toEqual({ documents: [], attachments: [] });
     expect(imported.leaseholdUnit).toEqual({
       name: '',
       description: '',
@@ -423,7 +488,7 @@ describe('workspace-persistence', () => {
     expect(imported.nodes[0]?.royaltyKind).toBeNull();
   });
 
-  it('clears stale hasDoc flags when an imported .landroid lacks the node PDF payload', async () => {
+  it('imports a legacy v6 .landroid with no PDF payload as empty documentData', async () => {
     const payload = {
       version: 6,
       workspaceId: 'ws-missing-pdf',
@@ -431,8 +496,6 @@ describe('workspace-persistence', () => {
       nodes: [
         {
           ...createBlankNode('node-with-missing-pdf'),
-          hasDoc: true,
-          docFileName: 'missing.pdf',
         },
       ],
       deskMaps: [],
@@ -445,9 +508,107 @@ describe('workspace-persistence', () => {
 
     const imported = await importLandroidFile(file);
 
-    expect(imported.nodes[0]?.hasDoc).toBe(false);
-    expect(imported.nodes[0]?.docFileName).toBe('');
-    expect(imported.pdfData).toEqual({ pdfs: [] });
+    expect(imported.nodes[0]?.attachments).toEqual([]);
+    expect(imported.documentData).toEqual({ documents: [], attachments: [] });
+  });
+
+  it('migrates a v7 .landroid PDF payload inline into v8 documents + attachments', async () => {
+    const v7Pdf = {
+      nodeId: 'node-v7',
+      fileName: 'oldfile.pdf',
+      mimeType: 'application/pdf',
+      blob: { base64: btoa(TEST_PDF_BODY), mimeType: 'application/pdf' },
+      createdAt: '2025-12-01T00:00:00.000Z',
+    };
+    const payload = {
+      version: 7,
+      workspaceId: 'ws-v7',
+      projectName: 'Legacy v7',
+      nodes: [createBlankNode('node-v7')],
+      deskMaps: [],
+      activeDeskMapId: null,
+      instrumentTypes: [],
+      pdfData: { pdfs: [v7Pdf] },
+    };
+    const file = new File([JSON.stringify(payload)], 'legacy.landroid', {
+      type: 'application/json',
+    });
+
+    const imported = await importLandroidFile(file);
+
+    expect(imported.documentData?.documents).toHaveLength(1);
+    expect(imported.documentData?.documents[0]).toMatchObject({
+      workspaceId: 'ws-v7',
+      fileName: 'oldfile.pdf',
+      mimeType: 'application/pdf',
+      kind: 'other',
+    });
+    expect(await imported.documentData?.documents[0]?.blob.text()).toBe(TEST_PDF_BODY);
+    expect(imported.documentData?.attachments).toHaveLength(1);
+    expect(imported.documentData?.attachments[0]).toMatchObject({
+      entityKind: 'node',
+      entityId: 'node-v7',
+      workspaceId: 'ws-v7',
+      position: 0,
+      docId: imported.documentData?.documents[0]?.docId,
+    });
+  });
+
+  it('rejects v8 document blobs that claim PDF MIME without PDF bytes', async () => {
+    const payload = {
+      version: 8,
+      workspaceId: 'ws-bad-doc',
+      projectName: 'Bad Document',
+      nodes: [createBlankNode('node-bad-doc')],
+      deskMaps: [],
+      activeDeskMapId: null,
+      instrumentTypes: [],
+      documentData: {
+        documents: [
+          {
+            docId: 'doc-bad',
+            workspaceId: 'ws-bad-doc',
+            fileName: 'evil.pdf',
+            mimeType: 'application/pdf',
+            byteLength: 31,
+            contentHash: 'bad',
+            blob: {
+              base64: btoa('<script>alert("owned")</script>'),
+              mimeType: 'application/pdf',
+            },
+            kind: 'deed',
+            createdAt: '2026-05-17T00:00:00.000Z',
+            updatedAt: '2026-05-17T00:00:00.000Z',
+          },
+        ],
+        attachments: [
+          {
+            attachmentId: 'att-bad',
+            workspaceId: 'ws-bad-doc',
+            docId: 'doc-bad',
+            entityKind: 'node',
+            entityId: 'node-bad-doc',
+            position: 0,
+            createdAt: '2026-05-17T00:00:00.000Z',
+          },
+        ],
+      },
+    };
+    const file = new File([JSON.stringify(payload)], 'bad.landroid', {
+      type: 'application/json',
+    });
+
+    await expect(importLandroidFile(file)).rejects.toThrow(/valid PDF file/i);
+  });
+
+  it('writes version 8 in the export payload', async () => {
+    const original = buildWorkspace(buildCanvas());
+    const blob = await exportLandroidFile(original);
+    const parsed = JSON.parse(await blob.text());
+    expect(parsed.version).toBe(8);
+    // The legacy v7 `pdfData` slot is gone in v8.
+    expect(parsed.pdfData).toBeUndefined();
+    expect(parsed.documentData).toBeDefined();
   });
 
   it('normalizes legacy imported leases that predate royalty and leased-interest fields', async () => {
@@ -748,8 +909,8 @@ describe('workspace-persistence', () => {
       nodes: [
         {
           ...createBlankNode('a', 'b'),
-          fraction: '-0.250000000',
-          initialFraction: '-0.250000000',
+          fraction: '0.250000000',
+          initialFraction: '0.250000000',
         },
         {
           ...createBlankNode('b', 'a'),
@@ -770,15 +931,83 @@ describe('workspace-persistence', () => {
     );
   });
 
-  it('rejects missing-parent ownership graphs in persisted workspace data', () => {
-    const invalidWorkspace = JSON.stringify({
-      workspaceId: 'ws-invalid',
-      projectName: 'Persisted Invalid',
+  it('rejects malformed persisted node fractions before graph validation', async () => {
+    const invalidPayload = {
+      version: 5,
+      workspaceId: 'ws-invalid-fraction',
+      projectName: 'Invalid Fraction',
+      nodes: [
+        {
+          ...createBlankNode('node-bad'),
+          fraction: 'not-a-number',
+          initialFraction: '1',
+        },
+      ],
+      deskMaps: [],
+      activeDeskMapId: null,
+      instrumentTypes: [],
+    };
+    const file = new File(
+      [JSON.stringify(invalidPayload)],
+      'invalid-fraction.landroid',
+      { type: 'application/json' }
+    );
+
+    await expect(importLandroidFile(file)).rejects.toThrow(/invalid fraction/i);
+  });
+
+  it('rejects explicit invalid imported lease jurisdictions', async () => {
+    const invalidPayload = {
+      version: 5,
+      workspaceId: 'ws-invalid-lease',
+      projectName: 'Invalid Lease Jurisdiction',
+      nodes: [createBlankNode('node-1')],
+      deskMaps: [],
+      activeDeskMapId: null,
+      instrumentTypes: [],
+      ownerData: {
+        owners: [],
+        leases: [
+          {
+            id: 'lease-1',
+            ownerId: 'owner-1',
+            jurisdiction: 'blm',
+          },
+        ],
+        contacts: [],
+        docs: [],
+      },
+    };
+    const file = new File(
+      [JSON.stringify(invalidPayload)],
+      'invalid-lease-jurisdiction.landroid',
+      { type: 'application/json' }
+    );
+
+    await expect(importLandroidFile(file)).rejects.toThrow(
+      /invalid lease jurisdiction/i
+    );
+  });
+
+  it('allows warning-only ownership review states in persisted workspace data', () => {
+    const warningOnlyWorkspace = JSON.stringify({
+      workspaceId: 'ws-warning-only',
+      projectName: 'Persisted Warning Only',
       nodes: [
         {
           ...createBlankNode('orphan', 'missing-parent'),
           fraction: '0.250000000',
           initialFraction: '0.250000000',
+        },
+        {
+          ...createBlankNode('root'),
+          fraction: '0.750000000',
+          initialFraction: '1.000000000',
+        },
+        {
+          ...createBlankNode('child-a', 'root'),
+          fraction: '0',
+          initialFraction: '0.500000000',
         },
       ],
       deskMaps: [],
@@ -786,9 +1015,12 @@ describe('workspace-persistence', () => {
       instrumentTypes: [],
     });
 
-    expect(() => parsePersistedWorkspaceData(invalidWorkspace)).toThrow(
-      'Invalid saved workspace: invalid ownership graph'
-    );
+    const parsed = parsePersistedWorkspaceData(warningOnlyWorkspace);
+    expect(parsed.nodes.map((node) => node.id)).toEqual([
+      'orphan',
+      'root',
+      'child-a',
+    ]);
   });
 
   it('rejects corrupt persisted canvas data', () => {
@@ -833,6 +1065,7 @@ describe('workspace-persistence', () => {
         },
       ],
       activeDeskMapId: 'dm-unit-a',
+      activeUnitCode: 'A',
       instrumentTypes: [],
     };
     const file = new File([JSON.stringify(payload)], 'raven.landroid', {
@@ -853,6 +1086,7 @@ describe('workspace-persistence', () => {
         unitCode: 'B',
       }),
     ]);
+    expect(imported.activeUnitCode).toBe('A');
   });
 
   it('loads pre-overhaul desk maps without unit fields and leaves them undefined', async () => {
@@ -886,11 +1120,11 @@ describe('workspace-persistence', () => {
     expect(imported.deskMaps[0]).not.toHaveProperty('unitCode');
   });
 
-  it('drops malformed desk-map unit fields during import', async () => {
+  it('drops blank unit names but keeps arbitrary unit codes during import', async () => {
     const payload = {
       version: 6,
       workspaceId: 'ws-bad-unit',
-      projectName: 'Bad Unit Fields',
+      projectName: 'Additional Unit Fields',
       nodes: [createBlankNode('node-1')],
       deskMaps: [
         {
@@ -909,13 +1143,14 @@ describe('workspace-persistence', () => {
       activeDeskMapId: 'dm-bad',
       instrumentTypes: [],
     };
-    const file = new File([JSON.stringify(payload)], 'bad-unit.landroid', {
+    const file = new File([JSON.stringify(payload)], 'additional-unit.landroid', {
       type: 'application/json',
     });
 
     const imported = await importLandroidFile(file);
 
     expect(imported.deskMaps[0]).not.toHaveProperty('unitName');
-    expect(imported.deskMaps[0]).not.toHaveProperty('unitCode');
+    expect(imported.deskMaps[0]?.unitCode).toBe('Z');
+    expect(imported.activeUnitCode).toBe('Z');
   });
 });

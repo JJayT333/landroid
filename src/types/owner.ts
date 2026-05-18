@@ -1,3 +1,9 @@
+import {
+  DEFAULT_DEPTH_RANGE,
+  normalizeDepthRange,
+  type DepthRange,
+} from './depth-range';
+
 export interface Owner {
   id: string;
   workspaceId: string;
@@ -47,6 +53,10 @@ export const LEASE_JURISDICTION_OPTIONS = [
   'tribal',
 ] as const;
 export type LeaseJurisdiction = (typeof LEASE_JURISDICTION_OPTIONS)[number];
+export const TEXAS_MATH_LEASE_JURISDICTIONS: readonly LeaseJurisdiction[] = [
+  'tx_fee',
+  'tx_state',
+];
 
 /**
  * Default jurisdiction for any lease that does not carry one — every existing
@@ -84,13 +94,33 @@ function toNormalizedLeaseStatusText(value: unknown): string {
 }
 
 export function normalizeLeaseJurisdiction(value: unknown): LeaseJurisdiction {
+  if (value === undefined || value === null) {
+    return DEFAULT_LEASE_JURISDICTION;
+  }
   if (typeof value === 'string') {
-    const candidate = value.trim() as LeaseJurisdiction;
+    const trimmed = value.trim();
+    if (trimmed.length === 0) {
+      return DEFAULT_LEASE_JURISDICTION;
+    }
+    const candidate = trimmed as LeaseJurisdiction;
     if ((LEASE_JURISDICTION_OPTIONS as readonly string[]).includes(candidate)) {
       return candidate;
     }
   }
-  return DEFAULT_LEASE_JURISDICTION;
+  throw new Error(`Invalid lease jurisdiction: ${String(value)}`);
+}
+
+export function isTexasMathLeaseJurisdiction(value: unknown): boolean {
+  if (value === undefined || value === null) {
+    return true;
+  }
+  if (typeof value === 'string' && value.trim().length === 0) {
+    return true;
+  }
+  return (
+    typeof value === 'string'
+    && TEXAS_MATH_LEASE_JURISDICTIONS.includes(value.trim() as LeaseJurisdiction)
+  );
 }
 
 export function isLeaseStatusOption(value: string): value is LeaseStatus {
@@ -119,6 +149,10 @@ export function isInactiveLeaseStatus(value: unknown): boolean {
   return INACTIVE_LEASE_STATUS_TEXT.has(normalized);
 }
 
+export function isTexasMathLease(lease: Pick<Lease, 'jurisdiction'>): boolean {
+  return isTexasMathLeaseJurisdiction(lease.jurisdiction);
+}
+
 export interface Lease {
   id: string;
   workspaceId: string;
@@ -137,6 +171,11 @@ export interface Lease {
    * for every existing record; Phase 2 will key federal/BLM behaviors off this.
    */
   jurisdiction: LeaseJurisdiction;
+  /**
+   * Depth-range discriminator. See {@link DepthRange}. Defaults to
+   * `'all_depths'`; Phase 8 (depth severance) will extend the union.
+   */
+  depthRange: DepthRange;
   createdAt: string;
   updatedAt: string;
 }
@@ -234,15 +273,17 @@ export function createBlankLease(
     docNo: '',
     notes: '',
     jurisdiction: DEFAULT_LEASE_JURISDICTION,
+    depthRange: DEFAULT_DEPTH_RANGE,
     createdAt: overrides.createdAt ?? now,
     updatedAt: overrides.updatedAt ?? now,
     ...overrides,
   };
   lease.workspaceId = workspaceId;
   lease.ownerId = ownerId;
-  // Coerce jurisdiction even when overrides supplies a junk value, so a stray
-  // import that hands us {jurisdiction: 'fee'} or undefined still lands on tx_fee.
+  // Missing legacy data defaults to tx_fee; explicit junk now throws so imports
+  // cannot silently become Texas math records.
   lease.jurisdiction = normalizeLeaseJurisdiction(lease.jurisdiction);
+  lease.depthRange = normalizeDepthRange(lease.depthRange);
   lease.status = normalizeLeaseStatus(lease.status);
   return lease;
 }
@@ -270,6 +311,7 @@ export function normalizeLease(
     docNo: asString(lease.docNo),
     notes: asString(lease.notes),
     jurisdiction: normalizeLeaseJurisdiction(lease.jurisdiction),
+    depthRange: normalizeDepthRange(lease.depthRange),
     createdAt: asString(lease.createdAt) || normalized.createdAt,
     updatedAt: asString(lease.updatedAt) || normalized.updatedAt,
   };

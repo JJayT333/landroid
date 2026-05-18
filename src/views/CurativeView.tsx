@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import FormField from '../components/shared/FormField';
 import FractionDisplay from '../components/shared/FractionDisplay';
+import { useConfirmation } from '../components/shared/ConfirmationProvider';
 import { useCurativeStore } from '../store/curative-store';
 import { useOwnerStore } from '../store/owner-store';
 import { useUIStore } from '../store/ui-store';
@@ -317,6 +318,7 @@ export default function CurativeView() {
   const owners = useOwnerStore((state) => state.owners);
   const leases = useOwnerStore((state) => state.leases);
   const setView = useUIStore((state) => state.setView);
+  const { confirm: requestConfirmation } = useConfirmation();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('active');
@@ -635,7 +637,13 @@ export default function CurativeView() {
                   <button
                     type="button"
                     onClick={async () => {
-                      if (!confirm('Delete this curative issue?')) return;
+                      const confirmed = await requestConfirmation({
+                        title: 'Delete Curative Issue?',
+                        message: 'Delete this curative issue?',
+                        confirmLabel: 'Delete Issue',
+                        tone: 'danger',
+                      });
+                      if (!confirmed) return;
                       await removeIssue(issueForPanel.id);
                     }}
                     className="rounded-lg px-3 py-2 text-xs font-semibold text-seal transition-colors hover:bg-seal/10"

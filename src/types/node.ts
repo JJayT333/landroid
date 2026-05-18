@@ -1,5 +1,20 @@
 /** Core domain types for ownership nodes and desk maps. */
 
+import {
+  DEFAULT_DEPTH_RANGE,
+  normalizeDepthRange,
+  type DepthRange,
+} from './depth-range';
+import {
+  isDocumentKind,
+  type DocumentKind,
+} from './document';
+import {
+  normalizeExternalRefs,
+  type ExternalRef,
+} from './external-ref';
+import { Decimal } from '../engine/decimal';
+
 export type ConveyanceMode = 'fraction' | 'fixed' | 'all';
 export type SplitBasis = 'initial' | 'remaining' | 'whole';
 export type NodeType = 'conveyance' | 'related';
@@ -26,6 +41,27 @@ export type FixedRoyaltyBasis = 'burdened_branch' | 'whole_tract' | null;
  * `LANDMAN-MATH-REFERENCE.md` → "NPRI handling".
  */
 export type RoyaltyKind = 'fixed' | 'floating' | null;
+
+/**
+ * Denormalized cache of every document currently attached to a node
+ * (Phase 5 / ADR 0004). The source of truth is the Dexie
+ * `document_attachments` + `documents` pair — this array exists so Desk
+ * Map cards can render chips without a per-node async read.
+ *
+ * Workspace-store actions keep this array in sync with Dexie writes
+ * (`attachDocToNode`, `detachDocFromNode`, `renameDocOnNode`,
+ * `reorderNodeAttachments`); workspace load repopulates it from Dexie.
+ */
+export interface NodeAttachmentSummary {
+  /** Stable UUID matching the underlying `DocumentRecord.docId`. */
+  docId: string;
+  /** Matching `DocumentAttachment.attachmentId`. */
+  attachmentId: string;
+  /** Cached for badge rendering. */
+  fileName: string;
+  /** Cached for the chip-color / type-tag UI. */
+  kind: DocumentKind;
+}
 
 export interface OwnershipNode {
   id: string;
@@ -63,8 +99,16 @@ export interface OwnershipNode {
   graveyardLink: string;
 
   // Attachment
-  hasDoc: boolean;
-  docFileName: string;
+  /**
+   * v8 multi-doc attachments cache. Source of truth lives in Dexie
+   * (`documents` + `document_attachments`); this array is the
+   * denormalized render cache. See {@link NodeAttachmentSummary}.
+   *
+   * Replaced the v7 `hasDoc: boolean` + `docFileName: string` pair in
+   * Phase A4c. Rollback path is the still-present read-only v7 `pdfs`
+   * Dexie table.
+   */
+  attachments: NodeAttachmentSummary[];
   linkedOwnerId: string | null;
   linkedLeaseId: string | null;
   relatedKind: RelatedNodeKind | null;
@@ -81,19 +125,24 @@ export interface OwnershipNode {
    */
   fixedRoyaltyBasis: FixedRoyaltyBasis;
 
+  /**
+   * Depth-range discriminator. See {@link DepthRange}. Defaults to
+   * `'all_depths'`; Phase 8 (depth severance) will extend the union.
+   */
+  depthRange: DepthRange;
+
   // UI state
   isCollapsed: boolean;
 }
 
 /**
- * Pooled-unit grouping fields (`unitName`, `unitCode`) are optional and only
- * surfaced by the Raven Forest demo seed today. Real-world workspaces may not
- * carry them, so the DeskMap normalizer passes them through when present and
- * drops them otherwise — pre-overhaul `.landroid` files continue to load
- * cleanly. `unitCode` is intentionally narrowed to `'A' | 'B'`; broadening
- * comes with Phase 4+ scope work, not here.
+ * Pooled-unit grouping fields (`unitName`, `unitCode`) are optional. Real-world
+ * workspaces may not carry them, so the DeskMap normalizer passes them through
+ * when present and drops them otherwise. `unitCode` is a short stable grouping
+ * key, not a math enum; Raven Forest uses `A` and `B`, and future projects can
+ * add additional unit codes without a type/schema change.
  */
-export type DeskMapUnitCode = 'A' | 'B';
+export type DeskMapUnitCode = string;
 
 export interface DeskMap {
   id: string;
@@ -106,6 +155,12 @@ export interface DeskMap {
   nodeIds: string[];
   unitName?: string;
   unitCode?: DeskMapUnitCode;
+  /**
+   * External-system references — ArcGIS feature IDs for the tract
+   * polygon, file/URL deep-links, etc. Schema hook only; no current
+   * consumer. See `src/types/external-ref.ts`.
+   */
+  externalRefs?: ExternalRef[];
 }
 
 function normalizeText(value: unknown): string {
@@ -118,17 +173,39 @@ function normalizeText(value: unknown): string {
   return '';
 }
 
-function normalizeDecimalInput(value: unknown, fallback: string): string {
+function normalizeDecimalInput(
+  value: unknown,
+  fallback: string,
+  fieldName: string
+): string {
+  if (value === undefined || value === null) {
+    return fallback;
+  }
+
   if (typeof value === 'number') {
-    return Number.isFinite(value) ? value.toString() : fallback;
+    if (!Number.isFinite(value) || value < 0) {
+      throw new Error(`Invalid ${fieldName}: ${String(value)}`);
+    }
+    return value.toString();
   }
 
   if (typeof value === 'string') {
     const trimmed = value.trim();
-    return trimmed.length > 0 ? trimmed : fallback;
+    if (trimmed.length === 0) {
+      return fallback;
+    }
+    try {
+      const parsed = new Decimal(trimmed);
+      if (!parsed.isFinite() || parsed.isNegative()) {
+        throw new Error();
+      }
+      return trimmed;
+    } catch {
+      throw new Error(`Invalid ${fieldName}: ${trimmed}`);
+    }
   }
 
-  return fallback;
+  throw new Error(`Invalid ${fieldName}: ${String(value)}`);
 }
 
 function normalizeNodeType(value: unknown): NodeType {
@@ -174,8 +251,35 @@ function normalizeFixedRoyaltyBasis(value: unknown): FixedRoyaltyBasis {
   return null;
 }
 
+function normalizeAttachmentSummary(value: unknown): NodeAttachmentSummary | null {
+  if (!value || typeof value !== 'object') return null;
+  const raw = value as {
+    docId?: unknown;
+    attachmentId?: unknown;
+    fileName?: unknown;
+    kind?: unknown;
+  };
+  if (typeof raw.docId !== 'string' || raw.docId === '') return null;
+  if (typeof raw.attachmentId !== 'string' || raw.attachmentId === '') return null;
+  return {
+    docId: raw.docId,
+    attachmentId: raw.attachmentId,
+    fileName: typeof raw.fileName === 'string' ? raw.fileName : '',
+    kind: isDocumentKind(raw.kind) ? raw.kind : 'other',
+  };
+}
+
+function normalizeAttachmentSummaries(value: unknown): NodeAttachmentSummary[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((entry) => {
+    const normalized = normalizeAttachmentSummary(entry);
+    return normalized ? [normalized] : [];
+  });
+}
+
 function normalizeUnitCode(value: unknown): DeskMapUnitCode | undefined {
-  return value === 'A' || value === 'B' ? value : undefined;
+  const normalized = normalizeText(value).replace(/\s+/g, ' ').slice(0, 64);
+  return normalized.length > 0 ? normalized : undefined;
 }
 
 function normalizeUnitName(value: unknown): string | undefined {
@@ -209,7 +313,13 @@ export function normalizeDeskMap(
     Partial<
       Omit<
         DeskMap,
-        'grossAcres' | 'pooledAcres' | 'description' | 'nodeIds' | 'unitName' | 'unitCode'
+        | 'grossAcres'
+        | 'pooledAcres'
+        | 'description'
+        | 'nodeIds'
+        | 'unitName'
+        | 'unitCode'
+        | 'externalRefs'
       >
     > & {
       grossAcres?: unknown;
@@ -218,11 +328,13 @@ export function normalizeDeskMap(
       nodeIds?: unknown;
       unitName?: unknown;
       unitCode?: unknown;
+      externalRefs?: unknown;
     },
   fallbackName = 'Untitled Tract'
 ): DeskMap {
   const unitName = normalizeUnitName(deskMap.unitName);
   const unitCode = normalizeUnitCode(deskMap.unitCode);
+  const externalRefs = normalizeExternalRefs(deskMap.externalRefs);
 
   const base: DeskMap = {
     id: deskMap.id,
@@ -250,6 +362,9 @@ export function normalizeDeskMap(
   }
   if (unitCode !== undefined) {
     base.unitCode = unitCode;
+  }
+  if (externalRefs !== undefined) {
+    base.externalRefs = externalRefs;
   }
 
   return base;
@@ -281,14 +396,14 @@ export function createBlankNode(id: string, parentId: string | null = null): Own
     isDeceased: false,
     obituary: '',
     graveyardLink: '',
-    hasDoc: false,
-    docFileName: '',
+    attachments: [],
     linkedOwnerId: null,
     linkedLeaseId: null,
     relatedKind: null,
     interestClass: 'mineral',
     royaltyKind: null,
     fixedRoyaltyBasis: null,
+    depthRange: DEFAULT_DEPTH_RANGE,
     isCollapsed: false,
   };
 }
@@ -319,25 +434,37 @@ export function normalizeOwnershipNode(
     grantee: normalizeText(node.grantee),
     landDesc: normalizeText(node.landDesc),
     remarks: normalizeText(node.remarks),
-    fraction: normalizeDecimalInput(node.fraction, '0'),
-    initialFraction: normalizeDecimalInput(node.initialFraction, '0'),
+    fraction: normalizeDecimalInput(node.fraction, '0', `fraction for node ${node.id}`),
+    initialFraction: normalizeDecimalInput(
+      node.initialFraction,
+      '0',
+      `initialFraction for node ${node.id}`
+    ),
     parentId: typeof node.parentId === 'string' ? node.parentId : null,
     conveyanceMode: normalizeConveyanceMode(node.conveyanceMode),
     splitBasis,
-    numerator: normalizeDecimalInput(node.numerator, '0'),
-    denominator: normalizeDecimalInput(node.denominator, '1'),
-    manualAmount: normalizeDecimalInput(node.manualAmount, '0'),
+    numerator: normalizeDecimalInput(node.numerator, '0', `numerator for node ${node.id}`),
+    denominator: normalizeDecimalInput(
+      node.denominator,
+      '1',
+      `denominator for node ${node.id}`
+    ),
+    manualAmount: normalizeDecimalInput(
+      node.manualAmount,
+      '0',
+      `manualAmount for node ${node.id}`
+    ),
     isDeceased: node.isDeceased === true,
     obituary: normalizeText(node.obituary),
     graveyardLink: normalizeText(node.graveyardLink),
-    hasDoc: node.hasDoc === true,
-    docFileName: normalizeText(node.docFileName),
+    attachments: normalizeAttachmentSummaries(node.attachments),
     linkedOwnerId: node.linkedOwnerId ?? null,
     linkedLeaseId: node.linkedLeaseId ?? null,
     relatedKind: normalizeRelatedKind(node.relatedKind),
     interestClass,
     royaltyKind,
     fixedRoyaltyBasis,
+    depthRange: normalizeDepthRange(node.depthRange),
     isCollapsed: node.isCollapsed === true,
   };
 }

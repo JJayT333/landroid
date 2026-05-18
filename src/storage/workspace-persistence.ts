@@ -2,7 +2,28 @@
  * Workspace persistence — auto-save to IndexedDB, export/import .landroid files.
  */
 import db, { type PdfAttachment } from './db';
-import { deserializeBlob, serializeBlob, type SerializedBlob } from './blob-serialization';
+import {
+  deserializeBlob,
+  deserializePdfBlob,
+  emptyPdfBlob,
+  serializeBlob,
+  type SerializedBlob,
+} from './blob-serialization';
+import { PDF_MIME_TYPE } from '../utils/pdf-validation';
+import {
+  isDocumentEntityKind,
+  isDocumentArea,
+  isDocumentOcrStatus,
+  normalizeDocumentKind,
+  type DocumentAttachment,
+  type DocumentRecord,
+} from '../types/document';
+import { normalizeExternalRefs } from '../types/external-ref';
+import {
+  migratePdfsToDocuments,
+  type DocumentMigrationDeps,
+} from './document-migration';
+import { sha256HexOfBlob } from './blob-hash';
 import { PAGE_SIZE_DEFINITIONS } from '../engine/flowchart-pages';
 import { Decimal } from '../engine/decimal';
 import {
@@ -10,6 +31,7 @@ import {
   type ValidationIssue,
 } from '../engine/math-engine';
 import { createWorkspaceId } from '../utils/workspace-id';
+import { assertFileSize, FILE_SIZE_LIMITS } from '../utils/file-validation';
 import {
   normalizeDeskMap,
   normalizeOwnershipNode,
@@ -28,7 +50,12 @@ import {
   type LeaseholdTransferOrderEntry,
   type LeaseholdUnit,
 } from '../types/leasehold';
-import { normalizeLease, type OwnerDoc } from '../types/owner';
+import {
+  normalizeLease,
+  type ContactLog,
+  type Owner,
+  type OwnerDoc,
+} from '../types/owner';
 import {
   normalizeMapExternalReference,
   type MapAsset,
@@ -52,8 +79,8 @@ import type { MapWorkspaceData } from './map-persistence';
 import type { ResearchWorkspaceData } from './research-persistence';
 import type { CurativeWorkspaceData } from './curative-persistence';
 import { normalizeTitleIssues, type TitleIssue } from '../types/title-issue';
-
-const WORKSPACE_ID = 'default';
+import { resolveActiveUnitCode } from '../utils/desk-map-units';
+import { getWorkspaceDbKey } from './active-workspace-key';
 const PAGE_SIZE_ID_SET = new Set<PageSizeId>(
   PAGE_SIZE_DEFINITIONS.map((definition) => definition.id)
 );
@@ -68,16 +95,28 @@ export interface WorkspaceData {
   leaseholdOrris?: LeaseholdOrri[];
   leaseholdTransferOrderEntries?: LeaseholdTransferOrderEntry[];
   activeDeskMapId: string | null;
+  activeUnitCode?: string | null;
   instrumentTypes: string[];
 }
 
 export interface LandroidFileData extends WorkspaceData {
   canvas?: CanvasSaveData | null;
-  pdfData?: PdfWorkspaceData;
+  /**
+   * v8 document payload (Phase 5 / ADR 0004). v7 imports are migrated
+   * inline by {@link importLandroidFile} so callers never see a
+   * `pdfData`-only file — by the time the import resolves, the v8 shape
+   * is what the rest of the app consumes.
+   */
+  documentData?: DocumentWorkspaceData;
   ownerData?: OwnerWorkspaceData;
   mapData?: MapWorkspaceData;
   researchData?: ResearchWorkspaceData;
   curativeData?: CurativeWorkspaceData;
+}
+
+export interface DocumentWorkspaceData {
+  documents: DocumentRecord[];
+  attachments: DocumentAttachment[];
 }
 
 export interface WorkspaceLoadResult {
@@ -95,6 +134,10 @@ export interface PdfWorkspaceData {
 }
 
 interface SerializedPdfAttachment extends Omit<PdfAttachment, 'blob'> {
+  blob: SerializedBlob;
+}
+
+interface SerializedDocumentRecord extends Omit<DocumentRecord, 'blob'> {
   blob: SerializedBlob;
 }
 
@@ -122,6 +165,63 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+/**
+ * Audit M3: owner/contact normalization for .landroid import.
+ *
+ * The old import path spread raw owner/contact objects straight into
+ * replaceOwnerWorkspaceData, which meant a corrupt or malicious file could
+ * inject entries with missing IDs, non-string fields, or prototype-polluting
+ * shapes. Now every record is coerced through a shape-checked normalizer:
+ * records missing the required id are dropped, and string fields fall back
+ * to '' so downstream code can trust their type.
+ */
+function stringOr(value: unknown, fallback: string): string {
+  return typeof value === 'string' ? value : fallback;
+}
+
+function normalizeOwnerRecord(
+  raw: unknown,
+  workspaceId: string
+): Owner | null {
+  if (!isRecord(raw) || typeof raw.id !== 'string' || raw.id === '') return null;
+  const nowIso = new Date().toISOString();
+  return {
+    id: raw.id,
+    workspaceId: stringOr(raw.workspaceId, workspaceId),
+    name: stringOr(raw.name, ''),
+    entityType: stringOr(raw.entityType, ''),
+    county: stringOr(raw.county, ''),
+    prospect: stringOr(raw.prospect, ''),
+    mailingAddress: stringOr(raw.mailingAddress, ''),
+    email: stringOr(raw.email, ''),
+    phone: stringOr(raw.phone, ''),
+    notes: stringOr(raw.notes, ''),
+    createdAt: stringOr(raw.createdAt, nowIso),
+    updatedAt: stringOr(raw.updatedAt, nowIso),
+  };
+}
+
+function normalizeContactRecord(
+  raw: unknown,
+  workspaceId: string
+): ContactLog | null {
+  if (!isRecord(raw) || typeof raw.id !== 'string' || raw.id === '') return null;
+  if (typeof raw.ownerId !== 'string' || raw.ownerId === '') return null;
+  const nowIso = new Date().toISOString();
+  return {
+    id: raw.id,
+    workspaceId: stringOr(raw.workspaceId, workspaceId),
+    ownerId: raw.ownerId,
+    contactDate: stringOr(raw.contactDate, ''),
+    method: stringOr(raw.method, ''),
+    subject: stringOr(raw.subject, ''),
+    outcome: stringOr(raw.outcome, ''),
+    notes: stringOr(raw.notes, ''),
+    createdAt: stringOr(raw.createdAt, nowIso),
+    updatedAt: stringOr(raw.updatedAt, nowIso),
+  };
+}
+
 function readStringArray(value: unknown): string[] {
   return Array.isArray(value)
     ? value.filter((entry): entry is string => typeof entry === 'string')
@@ -144,6 +244,27 @@ function deserializeSerializedBlob(
   }
 
   return new Blob([], { type: fallbackMimeType });
+}
+
+function deserializeSerializedPdfBlob(
+  serialized: unknown,
+  label: string
+): Blob {
+  if (
+    isRecord(serialized) &&
+    typeof serialized.base64 === 'string' &&
+    typeof serialized.mimeType === 'string'
+  ) {
+    return deserializePdfBlob(
+      {
+        base64: serialized.base64,
+        mimeType: serialized.mimeType,
+      },
+      label
+    );
+  }
+
+  return emptyPdfBlob();
 }
 
 function isPageSizeId(value: unknown): value is PageSizeId {
@@ -183,6 +304,9 @@ function normalizeDeskMaps(
         // them when absent, so the pass-through is safe for backward compat.
         unitName: candidate.unitName,
         unitCode: candidate.unitCode,
+        // ArcGIS / external-system links (Phase 5 ride-along). Same
+        // pattern — `normalizeDeskMap` drops the field when absent.
+        externalRefs: candidate.externalRefs,
       }),
     ];
   });
@@ -260,6 +384,16 @@ function describeValidationIssue(issue: ValidationIssue | undefined): string {
   return `${issue.code}${nodeLabel}`;
 }
 
+const WORKSPACE_REVIEW_ISSUE_CODES = new Set([
+  'missing_parent',
+  'over_allocated_branch',
+  'under_allocated_branch',
+]);
+
+function isBlockingWorkspaceValidationIssue(issue: ValidationIssue): boolean {
+  return !WORKSPACE_REVIEW_ISSUE_CODES.has(issue.code);
+}
+
 function assertValidOwnershipGraph(
   nodes: OwnershipNode[],
   context: string
@@ -274,9 +408,10 @@ function assertValidOwnershipGraph(
   });
 
   const validation = validateOwnershipGraph(nodes);
-  if (!validation.valid) {
+  const blockingIssues = validation.issues.filter(isBlockingWorkspaceValidationIssue);
+  if (blockingIssues.length > 0) {
     throw new Error(
-      `${context}: invalid ownership graph (${describeValidationIssue(validation.issues[0])})`
+      `${context}: invalid ownership graph (${describeValidationIssue(blockingIssues[0])})`
     );
   }
 
@@ -308,10 +443,18 @@ function normalizeWorkspaceDataRecord(
   const nodeIdSet = new Set(nodes.map((node) => node.id));
   const deskMaps = normalizeDeskMaps(value.deskMaps, nodeIdSet);
   const validDeskMapIds = new Set(deskMaps.map((deskMap) => deskMap.id));
+  const validUnitCodes = new Set(
+    deskMaps.flatMap((deskMap) => (deskMap.unitCode ? [deskMap.unitCode] : []))
+  );
   const activeDeskMapId =
     typeof value.activeDeskMapId === 'string' && validDeskMapIds.has(value.activeDeskMapId)
       ? value.activeDeskMapId
       : deskMaps[0]?.id ?? null;
+  const activeUnitCode = resolveActiveUnitCode(
+    deskMaps,
+    typeof value.activeUnitCode === 'string' ? value.activeUnitCode : null,
+    activeDeskMapId
+  );
 
   return {
     workspaceId: value.workspaceId ?? createWorkspaceId(),
@@ -321,12 +464,19 @@ function normalizeWorkspaceDataRecord(
     leaseholdUnit: normalizeLeaseholdUnit(value.leaseholdUnit),
     leaseholdAssignments: normalizeLeaseholdAssignments(value.leaseholdAssignments, {
       validDeskMapIds,
+      validUnitCodes,
     }),
-    leaseholdOrris: normalizeLeaseholdOrris(value.leaseholdOrris, { validDeskMapIds }),
+    leaseholdOrris: normalizeLeaseholdOrris(value.leaseholdOrris, {
+      validDeskMapIds,
+      validUnitCodes,
+    }),
     leaseholdTransferOrderEntries: normalizeLeaseholdTransferOrderEntries(
       value.leaseholdTransferOrderEntries
     ),
-    activeDeskMapId,
+    activeDeskMapId: activeUnitCode
+      ? deskMaps.find((deskMap) => deskMap.unitCode === activeUnitCode)?.id ?? activeDeskMapId
+      : activeDeskMapId,
+    activeUnitCode,
     instrumentTypes: readStringArray(value.instrumentTypes),
   };
 }
@@ -416,7 +566,7 @@ export function parsePersistedWorkspaceData(raw: string): WorkspaceData {
 
 export async function saveWorkspaceToDb(data: WorkspaceData): Promise<void> {
   await db.workspaces.put({
-    id: WORKSPACE_ID,
+    id: getWorkspaceDbKey(),
     projectName: data.projectName,
     data: JSON.stringify(data),
     savedAt: new Date().toISOString(),
@@ -424,7 +574,7 @@ export async function saveWorkspaceToDb(data: WorkspaceData): Promise<void> {
 }
 
 export async function loadWorkspaceFromDb(): Promise<WorkspaceLoadResult> {
-  const record = await db.workspaces.get(WORKSPACE_ID);
+  const record = await db.workspaces.get(getWorkspaceDbKey());
   if (!record) {
     return {
       status: 'missing',
@@ -477,7 +627,12 @@ async function serializeOwnerData(
   };
 }
 
-async function serializePdfData(
+/**
+ * Serialize a v7-shape PDF payload. Retained (and exported) for the A5b
+ * auto-`.landroid` v7 backup hook, which needs the v7 wire format even
+ * though normal export is v8.
+ */
+export async function serializePdfData(
   pdfData: PdfWorkspaceData | undefined
 ): Promise<
   | undefined
@@ -495,6 +650,134 @@ async function serializePdfData(
       }))
     ),
   };
+}
+
+async function serializeDocumentData(
+  documentData: DocumentWorkspaceData | undefined
+): Promise<
+  | undefined
+  | {
+      documents: SerializedDocumentRecord[];
+      attachments: DocumentAttachment[];
+    }
+> {
+  if (!documentData) return undefined;
+  return {
+    documents: await Promise.all(
+      documentData.documents.map(async (doc) => ({
+        ...doc,
+        blob: await serializeBlob(doc.blob),
+      }))
+    ),
+    attachments: [...documentData.attachments],
+  };
+}
+
+function isDocumentRecordRow(value: unknown): value is SerializedDocumentRecord {
+  return (
+    isRecord(value)
+    && typeof (value as { docId?: unknown }).docId === 'string'
+    && typeof (value as { workspaceId?: unknown }).workspaceId === 'string'
+  );
+}
+
+function isDocumentAttachmentRow(value: unknown): value is DocumentAttachment {
+  return (
+    isRecord(value)
+    && typeof (value as { attachmentId?: unknown }).attachmentId === 'string'
+    && typeof (value as { docId?: unknown }).docId === 'string'
+    && typeof (value as { entityId?: unknown }).entityId === 'string'
+    && isDocumentEntityKind((value as { entityKind?: unknown }).entityKind)
+  );
+}
+
+function deserializeDocumentData(value: unknown): DocumentWorkspaceData {
+  if (!isRecord(value)) return { documents: [], attachments: [] };
+
+  const rawDocs = Array.isArray((value as { documents?: unknown }).documents)
+    ? ((value as { documents: unknown[] }).documents)
+    : [];
+  const rawAttachments = Array.isArray((value as { attachments?: unknown }).attachments)
+    ? ((value as { attachments: unknown[] }).attachments)
+    : [];
+
+  const documents: DocumentRecord[] = rawDocs.filter(isDocumentRecordRow).flatMap(
+    (raw) => {
+      const fileName = typeof raw.fileName === 'string' ? raw.fileName : '';
+      const blob = deserializeSerializedPdfBlob(
+        raw.blob,
+        `Imported document ${fileName || raw.docId}`
+      );
+      if (blob.size === 0) return [];
+      const now = new Date().toISOString();
+      return [
+        {
+          docId: raw.docId,
+          workspaceId: raw.workspaceId,
+          fileName,
+          mimeType: PDF_MIME_TYPE,
+          byteLength: blob.size,
+          contentHash: typeof raw.contentHash === 'string' ? raw.contentHash : '',
+          blob,
+          kind: normalizeDocumentKind(raw.kind),
+          displayTitle:
+            typeof raw.displayTitle === 'string' ? raw.displayTitle : undefined,
+          documentArea: isDocumentArea(raw.documentArea)
+            ? raw.documentArea
+            : undefined,
+          instrumentType:
+            typeof raw.instrumentType === 'string' ? raw.instrumentType : undefined,
+          county: typeof raw.county === 'string' ? raw.county : undefined,
+          instrumentNumber:
+            typeof raw.instrumentNumber === 'string'
+              ? raw.instrumentNumber
+              : undefined,
+          volume: typeof raw.volume === 'string' ? raw.volume : undefined,
+          page: typeof raw.page === 'string' ? raw.page : undefined,
+          effectiveDate:
+            typeof raw.effectiveDate === 'string' ? raw.effectiveDate : undefined,
+          recordingDate:
+            typeof raw.recordingDate === 'string' ? raw.recordingDate : undefined,
+          grantor: typeof raw.grantor === 'string' ? raw.grantor : undefined,
+          grantee: typeof raw.grantee === 'string' ? raw.grantee : undefined,
+          notes: typeof raw.notes === 'string' ? raw.notes : undefined,
+          sourceReference:
+            typeof raw.sourceReference === 'string'
+              ? raw.sourceReference
+              : undefined,
+          ocrStatus: isDocumentOcrStatus(raw.ocrStatus)
+            ? raw.ocrStatus
+            : undefined,
+          externalRefs: normalizeExternalRefs(raw.externalRefs),
+          createdAt: typeof raw.createdAt === 'string' ? raw.createdAt : now,
+          updatedAt: typeof raw.updatedAt === 'string' ? raw.updatedAt : now,
+        },
+      ];
+    }
+  );
+
+  const docIdSet = new Set(documents.map((d) => d.docId));
+  const workspaceByDocId = new Map(documents.map((d) => [d.docId, d.workspaceId]));
+  const attachments: DocumentAttachment[] = rawAttachments
+    .filter(isDocumentAttachmentRow)
+    .filter((row) => docIdSet.has(row.docId))
+    .map((row) => ({
+      attachmentId: row.attachmentId,
+      workspaceId:
+        typeof row.workspaceId === 'string'
+          ? row.workspaceId
+          : (workspaceByDocId.get(row.docId) ?? ''),
+      docId: row.docId,
+      entityKind: row.entityKind,
+      entityId: row.entityId,
+      position: typeof row.position === 'number' ? row.position : 0,
+      createdAt:
+        typeof row.createdAt === 'string'
+          ? row.createdAt
+          : new Date().toISOString(),
+    }));
+
+  return { documents, attachments };
 }
 
 async function serializeMapData(
@@ -549,12 +832,20 @@ async function serializeResearchData(
   };
 }
 
+/**
+ * Current `.landroid` schema version. Bumped to 8 in Phase 5
+ * (multi-doc-per-entity); see ADR 0004. v8 emits `documentData` and
+ * omits the legacy `pdfData` field. Imports of v7 (or earlier) files
+ * are migrated inline by {@link importLandroidFile}.
+ */
+export const LANDROID_FILE_VERSION = 8;
+
 export async function exportLandroidFile(data: LandroidFileData): Promise<Blob> {
   const payload = {
-    version: 7,
+    version: LANDROID_FILE_VERSION,
     exportedAt: new Date().toISOString(),
     ...data,
-    pdfData: await serializePdfData(data.pdfData),
+    documentData: await serializeDocumentData(data.documentData),
     ownerData: await serializeOwnerData(data.ownerData),
     mapData: await serializeMapData(data.mapData),
     researchData: await serializeResearchData(data.researchData),
@@ -576,20 +867,133 @@ export async function downloadLandroidFile(data: LandroidFileData) {
 export async function exportPdfWorkspaceData(
   nodes: OwnershipNode[]
 ): Promise<PdfWorkspaceData> {
-  const nodeIds = [
-    ...new Set(
-      nodes
-        .filter((node) => node.hasDoc)
-        .map((node) => node.id)
-    ),
-  ];
-  const pdfs = (
-    await Promise.all(nodeIds.map((nodeId) => db.pdfs.get(nodeId)))
-  ).filter(
-    (pdf): pdf is PdfAttachment => Boolean(pdf && pdf.blob.size > 0)
-  );
+  // Phase 5: read from the v8 `documents` + `document_attachments`
+  // tables. The v8 `.landroid` shape (added in A5) will serialize
+  // documents directly; for now we keep emitting v7-compatible
+  // `pdfs: PdfAttachment[]` so existing .landroid round-trips still work.
+  // Each node contributes its first attachment (single-doc UX is still
+  // the only path in A4; Phase B's multi-doc surface plus A5's v8
+  // export are where multi-attachment-per-node lands properly).
+  const nodeIds = nodes.map((node) => node.id);
+  if (nodeIds.length === 0) return { pdfs: [] };
 
+  const attachments = await db.document_attachments
+    .where('entityKind')
+    .equals('node')
+    .and((row) => nodeIds.includes(row.entityId))
+    .toArray();
+  if (attachments.length === 0) return { pdfs: [] };
+
+  // Pick the lowest-position attachment per node for the v7-shape export.
+  const firstByNode = new Map<string, typeof attachments[number]>();
+  for (const a of attachments) {
+    const existing = firstByNode.get(a.entityId);
+    if (!existing || a.position < existing.position) {
+      firstByNode.set(a.entityId, a);
+    }
+  }
+
+  const docIds = [...new Set([...firstByNode.values()].map((a) => a.docId))];
+  const docs = await db.documents.bulkGet(docIds);
+  const docById = new Map<string, NonNullable<typeof docs[number]>>();
+  for (const doc of docs) {
+    if (doc && doc.blob.size > 0) docById.set(doc.docId, doc);
+  }
+
+  const pdfs: PdfAttachment[] = [];
+  for (const [nodeId, attachment] of firstByNode) {
+    const doc = docById.get(attachment.docId);
+    if (!doc) continue;
+    pdfs.push({
+      nodeId,
+      fileName: doc.fileName,
+      mimeType: doc.mimeType,
+      blob: doc.blob,
+      createdAt: attachment.createdAt,
+    });
+  }
   return { pdfs };
+}
+
+/**
+ * Read every document + attachment touching the given nodes, with their
+ * blobs, ready for v8 `.landroid` export. Workspace-scoped — only
+ * documents that share the workspace ID with at least one of the
+ * touched nodes are emitted.
+ */
+export async function exportDocumentWorkspaceData(
+  workspaceId: string,
+  nodes: OwnershipNode[]
+): Promise<DocumentWorkspaceData> {
+  const nodeIds = nodes.map((node) => node.id);
+  if (nodeIds.length === 0) return { documents: [], attachments: [] };
+
+  const attachments = await db.document_attachments
+    .where('entityKind')
+    .equals('node')
+    .and((row) => nodeIds.includes(row.entityId))
+    .toArray();
+  if (attachments.length === 0) return { documents: [], attachments: [] };
+
+  const docIds = [...new Set(attachments.map((a) => a.docId))];
+  const docs = await db.documents.bulkGet(docIds);
+  const documents: DocumentRecord[] = [];
+  const docIdSeen = new Set<string>();
+  for (const doc of docs) {
+    if (doc && doc.workspaceId === workspaceId && doc.blob.size > 0) {
+      documents.push(doc);
+      docIdSeen.add(doc.docId);
+    }
+  }
+  return {
+    documents,
+    attachments: attachments.filter((a) => docIdSeen.has(a.docId)),
+  };
+}
+
+/**
+ * Replace every document + attachment for the given workspace with the
+ * supplied set. Used by `.landroid` import after `importLandroidFile`
+ * resolves to v8 shape (either directly or via inline v7 migration).
+ *
+ * Workspace scoping protects other workspaces' data when a user imports
+ * a file into a fresh workspace alongside existing local data.
+ */
+export async function replaceDocumentWorkspaceData(
+  data: DocumentWorkspaceData,
+  workspaceId: string
+): Promise<void> {
+  // Filter incoming data to the target workspace + non-empty blobs.
+  const documents = data.documents
+    .filter((d) => d.workspaceId === workspaceId && d.blob.size > 0);
+  const docIdSet = new Set(documents.map((d) => d.docId));
+  const attachments = data.attachments
+    .filter((a) => docIdSet.has(a.docId))
+    .map((a) => ({ ...a, workspaceId }));
+
+  await db.transaction('rw', db.documents, db.document_attachments, async () => {
+    // Drop every document scoped to this workspace.
+    const existingDocs = await db.documents
+      .where('workspaceId')
+      .equals(workspaceId)
+      .toArray();
+    const existingDocIds = existingDocs.map((d) => d.docId);
+    if (existingDocIds.length > 0) {
+      await db.documents.bulkDelete(existingDocIds);
+      // Cascade-delete attachments pointing at those docs.
+      const existingAttachmentIds = await db.document_attachments
+        .where('docId')
+        .anyOf(existingDocIds)
+        .primaryKeys();
+      if (existingAttachmentIds.length > 0) {
+        await db.document_attachments.bulkDelete(existingAttachmentIds);
+      }
+    }
+    if (documents.length > 0) {
+      await db.documents.bulkAdd(documents);
+      await db.document_attachments.bulkAdd(attachments);
+    }
+  });
 }
 
 export async function replacePdfWorkspaceData(
@@ -612,6 +1016,7 @@ export async function replacePdfWorkspaceData(
 // ── Import .landroid file ──────────────────────────────
 
 export async function importLandroidFile(file: File): Promise<LandroidFileData> {
+  assertFileSize(file, FILE_SIZE_LIMITS.LANDROID, '.landroid file');
   const text = await file.text();
   let parsed: unknown;
 
@@ -636,7 +1041,11 @@ export async function importLandroidFile(file: File): Promise<LandroidFileData> 
   const ownerData =
     isRecord(parsed.ownerData)
       ? {
-          owners: Array.isArray(parsed.ownerData.owners) ? parsed.ownerData.owners : [],
+          owners: Array.isArray(parsed.ownerData.owners)
+            ? parsed.ownerData.owners
+                .map((raw) => normalizeOwnerRecord(raw, workspaceId))
+                .filter((owner): owner is Owner => owner !== null)
+            : [],
           leases: Array.isArray(parsed.ownerData.leases)
             ? parsed.ownerData.leases
                 .filter(
@@ -651,7 +1060,11 @@ export async function importLandroidFile(file: File): Promise<LandroidFileData> 
                 )
                 .map((lease) => normalizeLease(lease, { workspaceId }))
             : [],
-          contacts: Array.isArray(parsed.ownerData.contacts) ? parsed.ownerData.contacts : [],
+          contacts: Array.isArray(parsed.ownerData.contacts)
+            ? parsed.ownerData.contacts
+                .map((raw) => normalizeContactRecord(raw, workspaceId))
+                .filter((contact): contact is ContactLog => contact !== null)
+            : [],
           docs: Array.isArray(parsed.ownerData.docs)
             ? parsed.ownerData.docs
                 .filter(
@@ -832,6 +1245,14 @@ export async function importLandroidFile(file: File): Promise<LandroidFileData> 
     ...sanitizedResearchLinks,
   };
 
+  // Phase 5 / A5: dispatch on `version` so v7 files and v8 files both
+  // arrive at the canonical v8 in-memory shape (documents +
+  // document_attachments).
+  const fileVersion =
+    typeof parsed.version === 'number' && Number.isFinite(parsed.version)
+      ? parsed.version
+      : 0;
+
   const pdfData =
     isRecord(parsed.pdfData)
       ? {
@@ -844,11 +1265,11 @@ export async function importLandroidFile(file: File): Promise<LandroidFileData> 
                 .map((pdf) => ({
                   nodeId: pdf.nodeId,
                   fileName: typeof pdf.fileName === 'string' ? pdf.fileName : '',
-                  mimeType:
-                    typeof pdf.mimeType === 'string'
-                      ? pdf.mimeType
-                      : 'application/pdf',
-                  blob: deserializeSerializedBlob(pdf.blob, 'application/pdf'),
+                  mimeType: PDF_MIME_TYPE,
+                  blob: deserializeSerializedPdfBlob(
+                    pdf.blob,
+                    `Legacy PDF ${typeof pdf.fileName === 'string' ? pdf.fileName : pdf.nodeId}`
+                  ),
                   createdAt:
                     typeof pdf.createdAt === 'string'
                       ? pdf.createdAt
@@ -858,24 +1279,46 @@ export async function importLandroidFile(file: File): Promise<LandroidFileData> 
             : [],
         }
       : { pdfs: [] };
-  const pdfFileNameByNodeId = new Map(
-    pdfData.pdfs.map((pdf) => [pdf.nodeId, pdf.fileName] as const)
-  );
-  const pdfNodeIds = new Set(pdfFileNameByNodeId.keys());
-  const nodes = core.nodes.map((node) => {
-    if (node.hasDoc && !pdfNodeIds.has(node.id)) {
-      return { ...node, hasDoc: false, docFileName: '' };
-    }
 
-    if (node.hasDoc && !node.docFileName) {
-      return {
-        ...node,
-        docFileName: pdfFileNameByNodeId.get(node.id) ?? '',
-      };
-    }
-
-    return node;
-  });
+  let documentData: DocumentWorkspaceData;
+  if (fileVersion >= 8) {
+    documentData = deserializeDocumentData(parsed.documentData);
+    // Re-scope every doc to the file's workspaceId so callers that
+    // import into a fresh workspace don't accidentally inherit a stale
+    // workspaceId from the file.
+    documentData = {
+      documents: documentData.documents.map((doc) => ({
+        ...doc,
+        workspaceId,
+      })),
+      attachments: documentData.attachments,
+    };
+  } else if (pdfData.pdfs.length > 0) {
+    // v7 (or earlier) inline migration: synthesize document/attachment
+    // rows from the v7 PDF payload so the rest of the pipeline only
+    // ever sees v8 shape.
+    const nodeIdToWorkspaceId = new Map<string, string>(
+      core.nodes.map((node) => [node.id, workspaceId])
+    );
+    const migrationDeps: DocumentMigrationDeps = {
+      generateId: () => crypto.randomUUID(),
+      hashBlob: sha256HexOfBlob,
+      now: () => new Date().toISOString(),
+    };
+    const migrated = await migratePdfsToDocuments(
+      pdfData.pdfs,
+      nodeIdToWorkspaceId,
+      workspaceId,
+      migrationDeps
+    );
+    documentData = {
+      documents: migrated.documents,
+      attachments: migrated.attachments,
+    };
+  } else {
+    documentData = { documents: [], attachments: [] };
+  }
+  const nodes = core.nodes;
 
   const curativeData =
     isRecord(parsed.curativeData)
@@ -903,7 +1346,7 @@ export async function importLandroidFile(file: File): Promise<LandroidFileData> 
     ...core,
     nodes,
     canvas: normalizeCanvasSaveData(parsed.canvas),
-    pdfData,
+    documentData,
     ownerData,
     mapData,
     researchData,

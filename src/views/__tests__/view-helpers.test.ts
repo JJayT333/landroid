@@ -11,7 +11,10 @@ import {
   getTransferOrderEntryDisplayStatus,
   buildLeaseholdGraphTractDetail,
 } from '../LeaseholdView';
-import { buildDeskMapOwnerSearchMatches } from '../DeskMapView';
+import {
+  buildDeskMapOwnerSearchMatches,
+  computeDeskMapFitViewport,
+} from '../DeskMapView';
 import { filterTitleIssues, findDeskMapIdForNode } from '../CurativeView';
 
 describe('view helpers', () => {
@@ -155,6 +158,7 @@ describe('view helpers', () => {
           effectiveDate: '2024-03-01',
           sourceDocNo: 'ASG-1',
           notes: '',
+          depthRange: 'all_depths',
         },
       ],
       leaseholdOrris: [
@@ -168,6 +172,7 @@ describe('view helpers', () => {
           effectiveDate: '2024-02-01',
           sourceDocNo: 'ORRI-1',
           notes: '',
+          depthRange: 'all_depths',
         },
       ],
     });
@@ -348,5 +353,20 @@ describe('view helpers', () => {
         },
       ])
     ).toBe('dm-2');
+  });
+
+  it('computes a centered Desk Map fit viewport for oversized trees', () => {
+    const viewport = computeDeskMapFitViewport({
+      containerWidth: 1200,
+      containerHeight: 800,
+      contentWidth: 2400,
+      contentHeight: 1200,
+    });
+
+    expect(viewport).toEqual({
+      x: 48,
+      y: 124,
+      zoom: 0.46,
+    });
   });
 });

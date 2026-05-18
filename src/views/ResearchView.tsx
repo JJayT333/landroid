@@ -4,6 +4,7 @@ import DrillingPermitMasterDecoderPanel from '../components/research/DrillingPer
 import HorizontalDrillingDecoderPanel from '../components/research/HorizontalDrillingDecoderPanel';
 import PendingDrillingDecoderPanel from '../components/research/PendingDrillingDecoderPanel';
 import RrcDelimitedPreviewTable from '../components/research/RrcDelimitedPreviewTable';
+import { useConfirmation } from '../components/shared/ConfirmationProvider';
 import FormField from '../components/shared/FormField';
 import { RRC_DATASET_CATALOG } from '../data/rrc-datasets';
 import { buildRrcDelimitedTextPreview } from '../research/rrc-delimited-text';
@@ -34,6 +35,18 @@ import { useMapStore } from '../store/map-store';
 import { useOwnerStore } from '../store/owner-store';
 import { useResearchStore } from '../store/research-store';
 import { useWorkspaceStore } from '../store/workspace-store';
+import {
+  RESEARCH_IMPORT_ACCEPT,
+  RESEARCH_IMPORT_UPLOAD_EXTENSIONS,
+  assertAllowedFileExtension,
+  assertFileSize,
+  limitForExtension,
+} from '../utils/file-validation';
+import {
+  PDF_MIME_TYPE,
+  isPdfFileName,
+  normalizePdfBlob,
+} from '../utils/pdf-validation';
 import {
   RESEARCH_CONTEXT_OPTIONS,
   RESEARCH_FORMULA_CATEGORY_OPTIONS,
@@ -337,6 +350,10 @@ export default function ResearchView() {
   const addQuestion = useResearchStore((state) => state.addQuestion);
   const updateQuestion = useResearchStore((state) => state.updateQuestion);
   const removeQuestion = useResearchStore((state) => state.removeQuestion);
+  const {
+    alert: showAlert,
+    confirm: requestConfirmation,
+  } = useConfirmation();
 
   const deskMaps = useWorkspaceStore((state) => state.deskMaps);
   const nodes = useWorkspaceStore((state) => state.nodes);
@@ -1255,7 +1272,11 @@ export default function ResearchView() {
           </div>
         </div>
 
-        <div className="flex-1 overflow-auto">
+        <div
+          role="navigation"
+          aria-label="Research sections"
+          className="flex-1 overflow-auto"
+        >
           {RESEARCH_SECTIONS.map((item) => {
             const count =
               item.id === 'home'
@@ -1274,6 +1295,7 @@ export default function ResearchView() {
                 key={item.id}
                 type="button"
                 onClick={() => setSection(item.id)}
+                aria-current={section === item.id ? 'page' : undefined}
                 className={`w-full border-b border-ledger-line px-4 py-3 text-left transition-colors ${
                   section === item.id ? 'bg-leather/10' : 'hover:bg-ledger'
                 }`}
@@ -1598,7 +1620,13 @@ export default function ResearchView() {
               onDelete={
                 selectedSource
                   ? async () => {
-                      if (!confirm('Delete this research source?')) return;
+                      const confirmed = await requestConfirmation({
+                        title: 'Delete Research Source?',
+                        message: 'Delete this research source?',
+                        confirmLabel: 'Delete Source',
+                        tone: 'danger',
+                      });
+                      if (!confirmed) return;
                       await removeSource(selectedSource.id);
                     }
                   : undefined
@@ -1828,7 +1856,13 @@ export default function ResearchView() {
               onDelete={
                 selectedFormula
                   ? async () => {
-                      if (!confirm('Delete this research formula?')) return;
+                      const confirmed = await requestConfirmation({
+                        title: 'Delete Research Formula?',
+                        message: 'Delete this research formula?',
+                        confirmLabel: 'Delete Formula',
+                        tone: 'danger',
+                      });
+                      if (!confirmed) return;
                       await removeFormula(selectedFormula.id);
                     }
                   : undefined
@@ -1991,7 +2025,13 @@ export default function ResearchView() {
               onDelete={
                 selectedProjectRecord
                   ? async () => {
-                      if (!confirm('Delete this project record?')) return;
+                      const confirmed = await requestConfirmation({
+                        title: 'Delete Project Record?',
+                        message: 'Delete this project record?',
+                        confirmLabel: 'Delete Project Record',
+                        tone: 'danger',
+                      });
+                      if (!confirmed) return;
                       await removeProjectRecord(selectedProjectRecord.id);
                     }
                   : undefined
@@ -2329,7 +2369,13 @@ export default function ResearchView() {
               onDelete={
                 selectedQuestion
                   ? async () => {
-                      if (!confirm('Delete this saved question?')) return;
+                      const confirmed = await requestConfirmation({
+                        title: 'Delete Saved Question?',
+                        message: 'Delete this saved question?',
+                        confirmLabel: 'Delete Question',
+                        tone: 'danger',
+                      });
+                      if (!confirmed) return;
                       await removeQuestion(selectedQuestion.id);
                     }
                   : undefined
@@ -2492,21 +2538,44 @@ export default function ResearchView() {
               <input
                 ref={inputRef}
                 type="file"
+                accept={RESEARCH_IMPORT_ACCEPT}
                 className="hidden"
                 multiple
                 onChange={async (event) => {
                   if (!workspaceId) return;
                   const files = Array.from(event.target.files ?? []);
-                  for (const file of files) {
-                    const researchImport = createBlankResearchImport(workspaceId, file, {
-                      fileName: file.name,
-                      mimeType: file.type || 'application/octet-stream',
-                      datasetId: selectedDataset?.id ?? null,
+                  try {
+                    for (const file of files) {
+                      assertAllowedFileExtension(
+                        file.name,
+                        RESEARCH_IMPORT_UPLOAD_EXTENSIONS,
+                        'Research import'
+                      );
+                      const limit = limitForExtension(file.name);
+                      assertFileSize(file, limit.bytes, limit.label);
+                      const isPdf = isPdfFileName(file.name) || file.type.toLowerCase().includes('pdf');
+                      const blob = isPdf ? await normalizePdfBlob(file, file.name) : file;
+                      const researchImport = createBlankResearchImport(workspaceId, blob, {
+                        fileName: file.name,
+                        mimeType: isPdf
+                          ? PDF_MIME_TYPE
+                          : file.type || 'application/octet-stream',
+                        datasetId: selectedDataset?.id ?? null,
+                      });
+                      await addImport(researchImport);
+                      setSelectedImportId(researchImport.id);
+                    }
+                  } catch (error) {
+                    await showAlert({
+                      title: 'Import Blocked',
+                      message:
+                        error instanceof Error
+                          ? error.message
+                          : 'One or more research files could not be imported.',
                     });
-                    await addImport(researchImport);
-                    setSelectedImportId(researchImport.id);
+                  } finally {
+                    event.target.value = '';
                   }
-                  event.target.value = '';
                 }}
               />
 
@@ -2590,7 +2659,13 @@ export default function ResearchView() {
                             <button
                               type="button"
                               onClick={async () => {
-                                if (!confirm('Delete this imported research file?')) return;
+                                const confirmed = await requestConfirmation({
+                                  title: 'Delete Imported Research File?',
+                                  message: 'Delete this imported research file?',
+                                  confirmLabel: 'Delete Import',
+                                  tone: 'danger',
+                                });
+                                if (!confirmed) return;
                                 await removeImport(selectedImport.id);
                               }}
                               className="px-3 py-1.5 rounded-lg text-xs font-semibold text-seal hover:bg-seal/10 transition-colors"

@@ -24,4 +24,6 @@ Exercises the hardest real cases at once: multi-tract unit grouping, fixed + flo
 chain-of-title parsing, mixed mineral/leasehold sheets, partial coverage, and irregular xlsx
 headers (two-row headers, merged cells, per-tract column groups).
 
-If the wizard can ingest this correctly, it handles any realistic landman runsheet.
+If the wizard can ingest this correctly, confidence is high for difficult
+landman runsheets. It is still a regression fixture, not proof that every
+spreadsheet format is covered.

@@ -143,6 +143,7 @@ describe('leasehold-summary', () => {
           effectiveDate: '2024-03-01',
           sourceDocNo: 'ASG-1',
           notes: '',
+          depthRange: 'all_depths',
         },
         {
           id: 'assignment-tract',
@@ -154,6 +155,7 @@ describe('leasehold-summary', () => {
           effectiveDate: '2024-03-15',
           sourceDocNo: 'ASG-2',
           notes: '',
+          depthRange: 'all_depths',
         },
       ],
       leaseholdOrris: [
@@ -167,6 +169,7 @@ describe('leasehold-summary', () => {
           effectiveDate: '2024-01-01',
           sourceDocNo: 'ORRI-1',
           notes: '',
+          depthRange: 'all_depths',
         },
         {
           id: 'orri-tract',
@@ -178,6 +181,7 @@ describe('leasehold-summary', () => {
           effectiveDate: '2024-01-02',
           sourceDocNo: 'ORRI-2',
           notes: '',
+          depthRange: 'all_depths',
         },
         {
           id: 'orri-unit-wi',
@@ -189,6 +193,7 @@ describe('leasehold-summary', () => {
           effectiveDate: '2024-01-03',
           sourceDocNo: 'ORRI-3',
           notes: '',
+          depthRange: 'all_depths',
         },
         {
           id: 'orri-tract-nri',
@@ -200,6 +205,7 @@ describe('leasehold-summary', () => {
           effectiveDate: '2024-01-04',
           sourceDocNo: 'ORRI-4',
           notes: '',
+          depthRange: 'all_depths',
         },
       ],
     });
@@ -449,6 +455,7 @@ describe('leasehold-summary', () => {
             effectiveDate: '2024-01-01',
             sourceDocNo: 'ORRI-WI',
             notes: '',
+            depthRange: 'all_depths',
           },
         ],
       });
@@ -633,10 +640,8 @@ describe('leasehold-summary', () => {
   });
 
   it('treats a blank lease royalty as 0% — NRI equals full leased WI', () => {
-    // Behavior pin: parseInterestString('') returns 0, so a lease with a missing royalty
-    // contributes 0 to the royalty burden and the lessee retains the full leased WI.
-    // This prevents silent NaN but also means data-entry omissions are invisible —
-    // the "missing royalty" warning surface is a separate piece of work (see audit finding #9).
+    // Behavior pin: blank optional interest inputs still parse as 0 without raising a
+    // malformed-input warning. Non-blank malformed values are covered below.
     const summary = buildLeaseholdUnitSummary({
       deskMaps: [
         {
@@ -685,7 +690,99 @@ describe('leasehold-summary', () => {
     expect(summary.tracts[0]?.preWorkingInterestDecimal).toBe('1');
     expect(summary.preWorkingInterestDecimal).toBe('1');
     expect(summary.retainedWorkingInterestDecimal).toBe('1');
+    expect(summary.inputWarningCount).toBe(0);
+    expect(summary.tracts[0]?.inputWarnings).toEqual([]);
     expect(Number.isFinite(Number(summary.tracts[0]?.preWorkingInterestDecimal))).toBe(true);
+  });
+
+  it('surfaces malformed lease royalty, ORRI burden, and WI assignment inputs as warnings', () => {
+    const summary = buildLeaseholdUnitSummary({
+      deskMaps: [
+        {
+          id: 'dm-1',
+          name: 'Tract 1',
+          code: 'T1',
+          tractId: 'T1',
+          grossAcres: '100',
+          pooledAcres: '100',
+          description: '',
+          nodeIds: ['n1', 'l1'],
+        },
+      ],
+      nodes: [
+        {
+          ...createBlankNode('n1', null),
+          grantee: 'A Owner',
+          linkedOwnerId: 'owner-1',
+          fraction: '1',
+          initialFraction: '1',
+        },
+        {
+          ...createBlankNode('l1', 'n1'),
+          type: 'related' as const,
+          relatedKind: 'lease' as const,
+        },
+      ],
+      owners: [createBlankOwner('ws-1', { id: 'owner-1', name: 'A Owner' })],
+      leases: [
+        createBlankLease('ws-1', 'owner-1', {
+          id: 'lease-1',
+          leaseName: 'Bad Royalty Lease',
+          lessee: 'Operator A',
+          royaltyRate: '2',
+          leasedInterest: '1',
+        }),
+      ],
+      leaseholdAssignments: [
+        {
+          id: 'assignment-1',
+          assignor: 'Operator A',
+          assignee: 'Assignee A',
+          scope: 'unit',
+          deskMapId: null,
+          workingInterestFraction: '5/4',
+          effectiveDate: '2024-03-01',
+          sourceDocNo: 'ASG-1',
+          notes: '',
+          depthRange: 'all_depths',
+        },
+      ],
+      leaseholdOrris: [
+        {
+          id: 'orri-1',
+          payee: 'Override A',
+          scope: 'unit',
+          deskMapId: null,
+          burdenFraction: '1/0',
+          burdenBasis: 'gross_8_8',
+          effectiveDate: '2024-02-01',
+          sourceDocNo: 'ORRI-1',
+          notes: '',
+          depthRange: 'all_depths',
+        },
+      ],
+    });
+
+    expect(summary.inputWarningCount).toBe(3);
+    expect(summary.inputWarnings.map((warning) => warning.id)).toEqual([
+      'lease:lease-1:royaltyRate',
+      'orri:orri-1:burdenFraction',
+      'assignment:assignment-1:workingInterestFraction',
+    ]);
+    expect(summary.inputWarnings.map((warning) => warning.value)).toEqual(['2', '1/0', '5/4']);
+    expect(summary.inputWarnings.every((warning) =>
+      warning.message.includes('treated as 0 in leasehold math')
+    )).toBe(true);
+    expect(summary.tracts[0]?.inputWarnings.map((warning) => warning.id)).toEqual(
+      summary.inputWarnings.map((warning) => warning.id)
+    );
+    expect(summary.totalRoyaltyDecimal).toBe('0');
+    expect(summary.totalOrriDecimal).toBe('0');
+    expect(summary.totalAssignedWorkingInterestDecimal).toBe('0');
+    expect(summary.orris[0]?.unitDecimal).toBe('0');
+    expect(summary.assignments[0]?.unitDecimal).toBe('0');
+    expect(summary.preWorkingInterestDecimal).toBe('1');
+    expect(summary.retainedWorkingInterestDecimal).toBe('1');
   });
 
   it('clamps over-burdened NRI base and pre-WI at zero when ORRIs exceed the leased WI', () => {
@@ -743,6 +840,7 @@ describe('leasehold-summary', () => {
           effectiveDate: '2024-01-01',
           sourceDocNo: 'ORRI-G',
           notes: '',
+          depthRange: 'all_depths',
         },
         {
           id: 'orri-wi',
@@ -754,6 +852,7 @@ describe('leasehold-summary', () => {
           effectiveDate: '2024-01-02',
           sourceDocNo: 'ORRI-W',
           notes: '',
+          depthRange: 'all_depths',
         },
         {
           id: 'orri-nri',
@@ -765,6 +864,7 @@ describe('leasehold-summary', () => {
           effectiveDate: '2024-01-03',
           sourceDocNo: 'ORRI-N',
           notes: '',
+          depthRange: 'all_depths',
         },
       ],
     });
@@ -845,6 +945,7 @@ describe('leasehold-summary', () => {
           effectiveDate: '2024-01-01',
           sourceDocNo: 'ORRI-G',
           notes: '',
+          depthRange: 'all_depths',
         },
         {
           id: 'orri-wi',
@@ -856,6 +957,7 @@ describe('leasehold-summary', () => {
           effectiveDate: '2024-01-02',
           sourceDocNo: 'ORRI-W',
           notes: '',
+          depthRange: 'all_depths',
         },
         {
           id: 'orri-nri',
@@ -867,6 +969,7 @@ describe('leasehold-summary', () => {
           effectiveDate: '2024-01-03',
           sourceDocNo: 'ORRI-N',
           notes: '',
+          depthRange: 'all_depths',
         },
       ],
     });
@@ -936,6 +1039,7 @@ describe('leasehold-summary', () => {
           effectiveDate: '2024-01-01',
           sourceDocNo: 'ORRI-NA',
           notes: '',
+          depthRange: 'all_depths',
         },
         {
           id: 'orri-nri-b',
@@ -947,6 +1051,7 @@ describe('leasehold-summary', () => {
           effectiveDate: '2024-01-02',
           sourceDocNo: 'ORRI-NB',
           notes: '',
+          depthRange: 'all_depths',
         },
       ],
     });
@@ -1027,6 +1132,7 @@ describe('leasehold-summary', () => {
           effectiveDate: '2024-01-01',
           sourceDocNo: 'ORRI-NA',
           notes: '',
+          depthRange: 'all_depths',
         },
         {
           id: 'orri-nri-b',
@@ -1038,6 +1144,7 @@ describe('leasehold-summary', () => {
           effectiveDate: '2024-01-02',
           sourceDocNo: 'ORRI-NB',
           notes: '',
+          depthRange: 'all_depths',
         },
       ],
     });
@@ -1379,6 +1486,7 @@ describe('leasehold-summary', () => {
           effectiveDate: '2024-01-05',
           sourceDocNo: 'ORRI-NRI',
           notes: '',
+          depthRange: 'all_depths',
         },
       ],
     });
@@ -1545,6 +1653,7 @@ describe('leasehold-summary', () => {
           effectiveDate: '2024-03-01',
           sourceDocNo: 'ASG-1',
           notes: '',
+          depthRange: 'all_depths',
         },
         {
           id: 'assignment-tract',
@@ -1556,6 +1665,7 @@ describe('leasehold-summary', () => {
           effectiveDate: '2024-03-15',
           sourceDocNo: 'ASG-2',
           notes: '',
+          depthRange: 'all_depths',
         },
       ],
       leaseholdOrris: [],
@@ -1755,5 +1865,134 @@ describe('leasehold-summary', () => {
     expect(tractTwoOwner?.activeLeaseCount).toBe(0);
     expect(summary.tracts[0]?.leasedOwnership).toBe('0.25');
     expect(summary.tracts[1]?.leasedOwnership).toBe('0');
+  });
+
+  it('keeps unit-wide ORRIs and assignments inside their tagged unit', () => {
+    const summary = buildLeaseholdUnitSummary({
+      deskMaps: [
+        {
+          id: 'dm-a',
+          name: 'A Tract',
+          code: 'A1',
+          tractId: 'A1',
+          grossAcres: '100',
+          pooledAcres: '100',
+          description: '',
+          nodeIds: ['owner-a', 'lease-a-node'],
+          unitName: 'Raven Forest Unit A',
+          unitCode: 'A',
+        },
+        {
+          id: 'dm-b',
+          name: 'B Tract',
+          code: 'B1',
+          tractId: 'B1',
+          grossAcres: '100',
+          pooledAcres: '100',
+          description: '',
+          nodeIds: ['owner-b', 'lease-b-node'],
+          unitName: 'Raven Forest Unit B',
+          unitCode: 'B',
+        },
+      ],
+      nodes: [
+        {
+          ...createBlankNode('owner-a', null),
+          grantee: 'A Owner',
+          linkedOwnerId: 'owner-a-record',
+          fraction: '1',
+          initialFraction: '1',
+        },
+        {
+          ...createBlankNode('lease-a-node', 'owner-a'),
+          type: 'related' as const,
+          relatedKind: 'lease' as const,
+          linkedLeaseId: 'lease-a',
+        },
+        {
+          ...createBlankNode('owner-b', null),
+          grantee: 'B Owner',
+          linkedOwnerId: 'owner-b-record',
+          fraction: '1',
+          initialFraction: '1',
+        },
+        {
+          ...createBlankNode('lease-b-node', 'owner-b'),
+          type: 'related' as const,
+          relatedKind: 'lease' as const,
+          linkedLeaseId: 'lease-b',
+        },
+      ],
+      owners: [
+        createBlankOwner('ws-1', { id: 'owner-a-record', name: 'A Owner' }),
+        createBlankOwner('ws-1', { id: 'owner-b-record', name: 'B Owner' }),
+      ],
+      leases: [
+        createBlankLease('ws-1', 'owner-a-record', {
+          id: 'lease-a',
+          lessee: 'Operator A',
+          royaltyRate: '1/8',
+          leasedInterest: '1',
+        }),
+        createBlankLease('ws-1', 'owner-b-record', {
+          id: 'lease-b',
+          lessee: 'Operator B',
+          royaltyRate: '1/8',
+          leasedInterest: '1',
+        }),
+      ],
+      leaseholdAssignments: [
+        {
+          id: 'assignment-a',
+          assignor: 'Operator A',
+          assignee: 'A WI Partner',
+          scope: 'unit',
+          unitCode: 'A',
+          deskMapId: null,
+          workingInterestFraction: '1/2',
+          effectiveDate: '2024-01-01',
+          sourceDocNo: 'ASG-A',
+          notes: '',
+          depthRange: 'all_depths',
+        },
+      ],
+      leaseholdOrris: [
+        {
+          id: 'orri-a',
+          payee: 'A Override',
+          scope: 'unit',
+          unitCode: 'A',
+          deskMapId: null,
+          burdenFraction: '1/32',
+          burdenBasis: 'gross_8_8',
+          effectiveDate: '2024-01-01',
+          sourceDocNo: 'ORRI-A',
+          notes: '',
+          depthRange: 'all_depths',
+        },
+      ],
+    });
+
+    const tractA = summary.tracts.find((tract) => tract.deskMapId === 'dm-a')!;
+    const tractB = summary.tracts.find((tract) => tract.deskMapId === 'dm-b')!;
+
+    expect(tractA.trackedAssignmentCount).toBe(1);
+    expect(tractA.trackedOrriCount).toBe(1);
+    expect(tractB.trackedAssignmentCount).toBe(0);
+    expect(tractB.trackedOrriCount).toBe(0);
+    expect(summary.assignments[0]).toEqual(
+      expect.objectContaining({
+        id: 'assignment-a',
+        unitCode: 'A',
+        tractName: 'Raven Forest Unit A',
+      })
+    );
+    expect(summary.orris[0]).toEqual(
+      expect.objectContaining({
+        id: 'orri-a',
+        unitCode: 'A',
+        tractName: 'Raven Forest Unit A',
+      })
+    );
   });
 });

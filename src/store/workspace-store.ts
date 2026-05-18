@@ -8,9 +8,40 @@ import { create } from 'zustand';
 import { buildLeaseNode, isLeaseNode } from '../components/deskmap/deskmap-lease-node';
 import { useCurativeStore } from './curative-store';
 import { useMapStore } from './map-store';
-import { deletePdf } from '../storage/pdf-store';
-import type { OwnershipNode, DeskMap } from '../types/node';
+import {
+  deleteDocsForAttachments,
+  detachDocFromEntity,
+  listAttachmentsForNodes,
+  reorderAttachments,
+  renameDoc,
+  saveDoc,
+} from '../storage/document-store';
+
+/**
+ * Remove attachment links from deleted nodes and delete only the documents
+ * that have no surviving links. Fired after a `removeNode` /
+ * `clearDeskMapNodes` set so the v9 document rows don't leak, while shared
+ * documents remain attached to surviving entities.
+ *
+ * The storage cleanup is atomic across all affected attachment IDs. The
+ * in-memory node delete has already happened when this runs, so callers must
+ * surface failures through `lastError`.
+ */
+async function cascadeDeleteDocsForRemovedNodes(
+  removedNodes: ReadonlyArray<{
+    attachments: ReadonlyArray<{ attachmentId: string }>;
+  }>
+): Promise<void> {
+  const attachmentIds = new Set<string>();
+  for (const node of removedNodes) {
+    for (const a of node.attachments) attachmentIds.add(a.attachmentId);
+  }
+  if (attachmentIds.size === 0) return;
+  await deleteDocsForAttachments([...attachmentIds]);
+}
+import type { OwnershipNode, DeskMap, NodeAttachmentSummary } from '../types/node';
 import { normalizeDeskMap, normalizeOwnershipNode } from '../types/node';
+import type { DocumentKind } from '../types/document';
 import {
   createBlankLeaseholdAssignment,
   createBlankLeaseholdTransferOrderEntry,
@@ -27,10 +58,11 @@ import {
   type LeaseholdTransferOrderEntry,
   type LeaseholdUnit,
 } from '../types/leasehold';
-import type { Lease } from '../types/owner';
+import { isTexasMathLease, type Lease } from '../types/owner';
 import {
   executeConveyance,
   executeCreateNpri,
+  executeCreateRootNode,
   executeRebalance,
   executePredecessorInsert,
   executeAttachConveyance,
@@ -38,6 +70,7 @@ import {
 } from '../engine/math-engine';
 import type { Audit } from '../types/result';
 import { createWorkspaceId } from '../utils/workspace-id';
+import { resolveActiveUnitCode } from '../utils/desk-map-units';
 
 const DEFAULT_INSTRUMENT_TYPES = [
   'Deed',
@@ -68,6 +101,7 @@ interface WorkspaceState {
   leaseholdOrris: LeaseholdOrri[];
   leaseholdTransferOrderEntries: LeaseholdTransferOrderEntry[];
   activeDeskMapId: string | null;
+  activeUnitCode: string | null;
   instrumentTypes: string[];
 
   // Lifecycle
@@ -95,24 +129,63 @@ interface WorkspaceState {
   removeLeaseholdTransferOrderEntry: (sourceRowId: string) => void;
   setActiveNode: (id: string | null) => void;
   setActiveDeskMap: (id: string) => void;
+  setActiveUnitCode: (unitCode: string | null) => void;
   addInstrumentType: (type: string) => void;
 
   // Desk map management
-  createDeskMap: (name: string, code: string, initialNodeIds?: string[]) => string;
+  createDeskMap: (
+    name: string,
+    code: string,
+    initialNodeIds?: string[],
+    fields?: Partial<
+      Pick<
+        DeskMap,
+        'tractId' | 'grossAcres' | 'pooledAcres' | 'description' | 'unitName' | 'unitCode'
+      >
+    >
+  ) => string;
   renameDeskMap: (id: string, name: string) => void;
   updateDeskMapDetails: (
     id: string,
-    fields: Partial<Pick<DeskMap, 'grossAcres' | 'pooledAcres' | 'description'>>
+    fields: Partial<
+      Pick<
+        DeskMap,
+        'grossAcres' | 'pooledAcres' | 'description' | 'unitName' | 'unitCode'
+      >
+    >
   ) => void;
+  clearDeskMapNodes: (id: string) => void;
   deleteDeskMap: (id: string) => void;
   getActiveDeskMapNodes: () => OwnershipNode[];
 
   // Math operations (delegate to engine, replace nodes on success)
   convey: (parentId: string, newNodeId: string, share: string, form: Partial<OwnershipNode>) => boolean;
   createNpri: (parentId: string, newNodeId: string, share: string, form: Partial<OwnershipNode>) => boolean;
+  createRootNode: (newNodeId: string, initialFraction: string, form: Partial<OwnershipNode>, deskMapId?: string) => boolean;
   rebalance: (nodeId: string, newInitialFraction: string, formFields?: Partial<OwnershipNode>) => boolean;
   insertPredecessor: (activeNodeId: string, newPredecessorId: string, newInitialFraction: string, form: Partial<OwnershipNode>) => boolean;
   attachConveyance: (activeNodeId: string, attachParentId: string, calcShare: string, form: Partial<OwnershipNode>) => boolean;
+  /**
+   * Atomic batch attach (audit M1).
+   *
+   * Either every item attaches or the store is not mutated at all. Returns
+   * which orphans would attach (`attached`) and which would fail (`failed`)
+   * with per-orphan reasons. On failure the store is NOT mutated — caller
+   * must read `failed` and retry after fixing the input.
+   */
+  batchAttachConveyance: (
+    items: Array<{
+      activeNodeId: string;
+      attachParentId: string;
+      calcShare: string;
+      form: Partial<OwnershipNode>;
+    }>
+  ) => {
+    ok: boolean;
+    attached: string[];
+    failed: Array<{ nodeId: string; reason: string }>;
+  };
+  attachLease: (mineralNodeId: string, lease: Lease, leaseNodeId?: string) => string | null;
 
   // CRUD
   addNode: (node: OwnershipNode) => void;
@@ -122,6 +195,41 @@ interface WorkspaceState {
   clearLinkedLease: (leaseId: string) => void;
   syncLeaseNodesFromRecord: (lease: Lease) => void;
   addNodeToActiveDeskMap: (nodeId: string) => void;
+
+  // Document attachments (Phase 5 / ADR 0004)
+  /**
+   * Attach a file to `nodeId` as a new document. Persists through the
+   * document-store and appends a summary to the node's `attachments[]`
+   * cache. Returns the newly-created summary so callers can show the
+   * fresh chip without re-reading.
+   */
+  attachDocToNode: (
+    nodeId: string,
+    file: File | Blob,
+    options?: { fileName?: string; kind?: DocumentKind }
+  ) => Promise<NodeAttachmentSummary | null>;
+  /**
+   * Remove one attachment link from a node. The underlying document stays in
+   * the registry and on any other entities that reference it.
+   */
+  detachDocFromNode: (nodeId: string, attachmentId: string) => Promise<void>;
+  /** Rename a document. Updates every node's `attachments[]` cache. */
+  renameDocOnNode: (docId: string, newFileName: string) => Promise<void>;
+  /**
+   * Reorder a node's attachments. Persists through the document-store
+   * and reflects the new order in the node's `attachments[]` cache.
+   */
+  reorderNodeAttachments: (
+    nodeId: string,
+    orderedAttachmentIds: ReadonlyArray<string>
+  ) => Promise<void>;
+  /**
+   * Re-read attachment metadata from Dexie and refresh every node's
+   * `attachments[]` cache. Call after `loadWorkspace` (initial boot,
+   * `.landroid` import) so chips render with the current data.
+   * No-op when there are no nodes in state.
+   */
+  hydrateNodeAttachments: () => Promise<void>;
   setHydrated: () => void;
   setStartupWarning: (message: string | null) => void;
   loadWorkspace: (data: {
@@ -134,6 +242,7 @@ interface WorkspaceState {
     leaseholdOrris?: LeaseholdOrri[];
     leaseholdTransferOrderEntries?: LeaseholdTransferOrderEntry[];
     activeDeskMapId: string | null;
+    activeUnitCode?: string | null;
     instrumentTypes?: string[];
   }) => void;
 }
@@ -157,6 +266,50 @@ function resolveActiveDeskMapId(
   return deskMaps[0]?.id ?? null;
 }
 
+function collectDescendantIds(
+  nodes: OwnershipNode[],
+  rootIds: Set<string>
+): Set<string> {
+  const childrenByParentId = new Map<string, string[]>();
+  for (const node of nodes) {
+    if (!node.parentId) continue;
+    const children = childrenByParentId.get(node.parentId) ?? [];
+    children.push(node.id);
+    childrenByParentId.set(node.parentId, children);
+  }
+
+  const collected = new Set(rootIds);
+  const stack = [...rootIds];
+  while (stack.length > 0) {
+    const currentId = stack.pop()!;
+    for (const childId of childrenByParentId.get(currentId) ?? []) {
+      if (collected.has(childId)) continue;
+      collected.add(childId);
+      stack.push(childId);
+    }
+  }
+  return collected;
+}
+
+function collectAncestorIds(
+  nodes: OwnershipNode[],
+  startIds: Set<string>
+): Set<string> {
+  const nodeById = new Map(nodes.map((node) => [node.id, node]));
+  const ancestors = new Set<string>();
+
+  for (const id of startIds) {
+    let parentId = nodeById.get(id)?.parentId ?? null;
+    while (parentId) {
+      if (ancestors.has(parentId)) break;
+      ancestors.add(parentId);
+      parentId = nodeById.get(parentId)?.parentId ?? null;
+    }
+  }
+
+  return ancestors;
+}
+
 export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
   workspaceId: createWorkspaceId(),
   projectName: 'Untitled Workspace',
@@ -167,6 +320,7 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
   leaseholdOrris: [],
   leaseholdTransferOrderEntries: [],
   activeDeskMapId: null,
+  activeUnitCode: null,
   instrumentTypes: [...DEFAULT_INSTRUMENT_TYPES],
   _hydrated: false,
   activeNodeId: null,
@@ -183,10 +337,15 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
       }),
     })),
   addLeaseholdAssignment: (assignment = {}) => {
+    const state = get();
+    const validUnitCodes = new Set(
+      state.deskMaps.flatMap((deskMap) => (deskMap.unitCode ? [deskMap.unitCode] : []))
+    );
     const next = normalizeLeaseholdAssignment({
       ...createBlankLeaseholdAssignment(),
+      unitCode: assignment.scope === 'tract' ? null : state.activeUnitCode,
       ...assignment,
-    });
+    }, { validUnitCodes });
     set((state) => ({
       leaseholdAssignments: [...state.leaseholdAssignments, next],
     }));
@@ -195,6 +354,9 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
   updateLeaseholdAssignment: (id, fields) =>
     set((state) => {
       const validDeskMapIds = new Set(state.deskMaps.map((deskMap) => deskMap.id));
+      const validUnitCodes = new Set(
+        state.deskMaps.flatMap((deskMap) => (deskMap.unitCode ? [deskMap.unitCode] : []))
+      );
       return {
         leaseholdAssignments: state.leaseholdAssignments.map((assignment) =>
           assignment.id === id
@@ -202,8 +364,14 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
                 {
                   ...assignment,
                   ...fields,
+                  unitCode:
+                    fields.scope === 'tract'
+                      ? null
+                      : fields.scope === 'unit' && fields.unitCode === undefined
+                        ? state.activeUnitCode
+                        : fields.unitCode ?? assignment.unitCode,
                 },
-                { validDeskMapIds }
+                { validDeskMapIds, validUnitCodes }
               )
             : assignment
         ),
@@ -219,7 +387,14 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
       ),
     })),
   addLeaseholdOrri: (orri = {}) => {
-    const next = normalizeLeaseholdOrri(orri);
+    const state = get();
+    const validUnitCodes = new Set(
+      state.deskMaps.flatMap((deskMap) => (deskMap.unitCode ? [deskMap.unitCode] : []))
+    );
+    const next = normalizeLeaseholdOrri({
+      unitCode: orri.scope === 'tract' ? null : state.activeUnitCode,
+      ...orri,
+    }, { validUnitCodes });
     set((state) => ({
       leaseholdOrris: [...state.leaseholdOrris, next],
     }));
@@ -228,6 +403,9 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
   updateLeaseholdOrri: (id, fields) =>
     set((state) => {
       const validDeskMapIds = new Set(state.deskMaps.map((deskMap) => deskMap.id));
+      const validUnitCodes = new Set(
+        state.deskMaps.flatMap((deskMap) => (deskMap.unitCode ? [deskMap.unitCode] : []))
+      );
       return {
         leaseholdOrris: state.leaseholdOrris.map((orri) =>
           orri.id === id
@@ -235,8 +413,14 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
                 {
                   ...orri,
                   ...fields,
+                  unitCode:
+                    fields.scope === 'tract'
+                      ? null
+                      : fields.scope === 'unit' && fields.unitCode === undefined
+                        ? state.activeUnitCode
+                        : fields.unitCode ?? orri.unitCode,
                 },
-                { validDeskMapIds }
+                { validDeskMapIds, validUnitCodes }
               )
             : orri
         ),
@@ -301,9 +485,35 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
     })),
   setActiveNode: (id) => set({ activeNodeId: id }),
   setActiveDeskMap: (id) =>
-    set((state) => ({
-      activeDeskMapId: resolveActiveDeskMapId(state.deskMaps, id),
-    })),
+    set((state) => {
+      const activeDeskMapId = resolveActiveDeskMapId(state.deskMaps, id);
+      const activeDeskMap = activeDeskMapId
+        ? state.deskMaps.find((deskMap) => deskMap.id === activeDeskMapId) ?? null
+        : null;
+      return {
+        activeDeskMapId,
+        activeUnitCode: activeDeskMap?.unitCode
+          ? activeDeskMap.unitCode
+          : resolveActiveUnitCode(state.deskMaps, state.activeUnitCode, activeDeskMapId),
+      };
+    }),
+  setActiveUnitCode: (unitCode) =>
+    set((state) => {
+      const activeUnitCode = resolveActiveUnitCode(
+        state.deskMaps,
+        unitCode,
+        state.activeDeskMapId
+      );
+      const activeDeskMapId = activeUnitCode
+        ? state.deskMaps.find((deskMap) => deskMap.unitCode === activeUnitCode)?.id
+          ?? state.activeDeskMapId
+        : state.activeDeskMapId;
+
+      return {
+        activeUnitCode,
+        activeDeskMapId: resolveActiveDeskMapId(state.deskMaps, activeDeskMapId),
+      };
+    }),
   addInstrumentType: (type) =>
     set((state) => ({
       instrumentTypes: state.instrumentTypes.includes(type)
@@ -311,26 +521,29 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
         : [...state.instrumentTypes, type],
     })),
 
-  createDeskMap: (name, code, initialNodeIds) => {
+  createDeskMap: (name, code, initialNodeIds, fields = {}) => {
     const id = `dm-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    const normalized = normalizeDeskMap(
+      {
+        id,
+        name,
+        code,
+        tractId: fields.tractId ?? null,
+        grossAcres: fields.grossAcres ?? '',
+        pooledAcres: fields.pooledAcres ?? '',
+        description: fields.description ?? '',
+        nodeIds: initialNodeIds ?? [],
+        unitName: fields.unitName,
+        unitCode: fields.unitCode,
+      },
+      name
+    );
     set((state) => ({
-      deskMaps: [
-        ...state.deskMaps,
-        normalizeDeskMap(
-          {
-            id,
-            name,
-            code,
-            tractId: null,
-            grossAcres: '',
-            pooledAcres: '',
-            description: '',
-            nodeIds: initialNodeIds ?? [],
-          },
-          name
-        ),
-      ],
+      deskMaps: [...state.deskMaps, normalized],
       activeDeskMapId: id,
+      activeUnitCode: normalized.unitCode
+        ? normalized.unitCode
+        : resolveActiveUnitCode([...state.deskMaps, normalized], state.activeUnitCode, id),
     }));
     return id;
   },
@@ -341,8 +554,8 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
     })),
 
   updateDeskMapDetails: (id, fields) =>
-    set((state) => ({
-      deskMaps: state.deskMaps.map((deskMap) =>
+    set((state) => {
+      const deskMaps = state.deskMaps.map((deskMap) =>
         deskMap.id === id
           ? normalizeDeskMap(
               {
@@ -352,14 +565,101 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
               deskMap.name
             )
           : deskMap
+      );
+      return {
+        deskMaps,
+        activeUnitCode: resolveActiveUnitCode(
+          deskMaps,
+          state.activeUnitCode,
+          state.activeDeskMapId
+        ),
+      };
+    }),
+
+  clearDeskMapNodes: (id) => {
+    const state = get();
+    const targetDeskMap = state.deskMaps.find((deskMap) => deskMap.id === id);
+    if (!targetDeskMap) {
+      set({ lastError: `Desk map ${id} not found` });
+      return;
+    }
+
+    const activeIds = new Set(targetDeskMap.nodeIds);
+    if (activeIds.size === 0) {
+      set({ lastError: null });
+      return;
+    }
+
+    const idsReferencedElsewhere = new Set(
+      state.deskMaps
+        .filter((deskMap) => deskMap.id !== id)
+        .flatMap((deskMap) => deskMap.nodeIds)
+    );
+    const deleteCandidates = collectDescendantIds(state.nodes, activeIds);
+    const protectedAncestors = collectAncestorIds(state.nodes, idsReferencedElsewhere);
+
+    for (const protectedId of idsReferencedElsewhere) {
+      deleteCandidates.delete(protectedId);
+    }
+    for (const protectedId of protectedAncestors) {
+      deleteCandidates.delete(protectedId);
+    }
+
+    const deletedIds = [...deleteCandidates];
+    const deletedIdSet = new Set(deletedIds);
+    const removedNodes = state.nodes.filter((node) => deletedIdSet.has(node.id));
+
+    set({
+      nodes: state.nodes.filter((node) => !deletedIdSet.has(node.id)),
+      deskMaps: state.deskMaps.map((deskMap) =>
+        deskMap.id === id
+          ? { ...deskMap, nodeIds: [] }
+          : {
+              ...deskMap,
+              nodeIds: deskMap.nodeIds.filter((nodeId) => !deletedIdSet.has(nodeId)),
+            }
       ),
-    })),
+      leaseholdAssignments: state.leaseholdAssignments.filter(
+        (assignment) => assignment.deskMapId !== id
+      ),
+      leaseholdOrris: state.leaseholdOrris.filter((orri) => orri.deskMapId !== id),
+      leaseholdTransferOrderEntries: state.leaseholdTransferOrderEntries.filter(
+        (entry) => !entry.sourceRowId.startsWith(`royalty-${id}-`)
+      ),
+      activeNodeId:
+        state.activeNodeId && activeIds.has(state.activeNodeId)
+          ? null
+          : state.activeNodeId,
+      lastAudit: null,
+      lastError: null,
+    });
+
+    void cascadeDeleteDocsForRemovedNodes(removedNodes).catch((err) => {
+      const message = err instanceof Error ? err.message : String(err);
+      console.warn('[workspace-store] document cascade delete failed:', err);
+      set({
+        lastError: `Document cleanup failed after clearing tract: ${message}. Save a backup and retry cleanup before relying on document registry state.`,
+      });
+    });
+    for (const nodeId of deletedIds) {
+      void useMapStore.getState().unlinkNode(nodeId);
+      useCurativeStore.getState().unlinkNode(nodeId);
+    }
+  },
 
   deleteDeskMap: (id) =>
     set((state) => {
       void useMapStore.getState().unlinkDeskMap(id);
       useCurativeStore.getState().unlinkDeskMap(id);
       const remainingDeskMaps = state.deskMaps.filter((dm) => dm.id !== id);
+      const activeDeskMapId = state.activeDeskMapId === id
+        ? (remainingDeskMaps[0]?.id ?? null)
+        : state.activeDeskMapId;
+      const activeUnitCode = resolveActiveUnitCode(
+        remainingDeskMaps,
+        state.activeUnitCode,
+        activeDeskMapId
+      );
       return {
         deskMaps: remainingDeskMaps,
         leaseholdAssignments: state.leaseholdAssignments.filter(
@@ -369,9 +669,11 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
         leaseholdTransferOrderEntries: state.leaseholdTransferOrderEntries.filter(
           (entry) => !entry.sourceRowId.startsWith(`royalty-${id}-`)
         ),
-        activeDeskMapId: state.activeDeskMapId === id
-          ? (remainingDeskMaps[0]?.id ?? null)
-          : state.activeDeskMapId,
+        activeDeskMapId: activeUnitCode
+          ? remainingDeskMaps.find((deskMap) => deskMap.unitCode === activeUnitCode)?.id
+            ?? activeDeskMapId
+          : activeDeskMapId,
+        activeUnitCode,
       };
     }),
 
@@ -390,7 +692,13 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
     const state = get();
     const result = executeConveyance({ allNodes: state.nodes, parentId, newNodeId, share, form });
     if (result.ok) {
-      const targetDeskMapId = resolveActiveDeskMapId(state.deskMaps, state.activeDeskMapId);
+      // Child always lives in the same tract as its parent. Falls back to the
+      // active desk map only when the parent has somehow been orphaned from
+      // every tract (shouldn't happen via the AI tools, but possible in
+      // legacy workspaces).
+      const parentDeskMap = state.deskMaps.find((dm) => dm.nodeIds.includes(parentId));
+      const targetDeskMapId = parentDeskMap?.id
+        ?? resolveActiveDeskMapId(state.deskMaps, state.activeDeskMapId);
       const dmUpdate = targetDeskMapId
         ? {
             deskMaps: state.deskMaps.map((dm) =>
@@ -423,7 +731,54 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
       form,
     });
     if (result.ok) {
-      const targetDeskMapId = resolveActiveDeskMapId(state.deskMaps, state.activeDeskMapId);
+      const parentDeskMap = state.deskMaps.find((dm) => dm.nodeIds.includes(parentId));
+      const targetDeskMapId = parentDeskMap?.id
+        ?? resolveActiveDeskMapId(state.deskMaps, state.activeDeskMapId);
+      const dmUpdate = targetDeskMapId
+        ? {
+            deskMaps: state.deskMaps.map((dm) =>
+              dm.id === targetDeskMapId
+                ? { ...dm, nodeIds: [...dm.nodeIds, newNodeId] }
+                : dm
+            ),
+            activeDeskMapId: targetDeskMapId,
+          }
+        : {};
+      set({
+        nodes: result.data.map((node) => normalizeOwnershipNode(node)),
+        lastAudit: result.audit,
+        lastError: null,
+        ...dmUpdate,
+      });
+      return true;
+    }
+    set({ lastError: result.error.message });
+    return false;
+  },
+
+  createRootNode: (newNodeId, initialFraction, form, deskMapId) => {
+    const state = get();
+    // Audit M2: when caller passes an explicit deskMapId it must exist.
+    // Silently falling back to the active map lets a mistyped ID attach a
+    // root to the wrong tract without any signal to the user. Reject loudly
+    // and let the caller retry with a valid ID (or omit it to fall back).
+    if (deskMapId !== undefined && !state.deskMaps.some((dm) => dm.id === deskMapId)) {
+      set({ lastError: `Desk map not found: ${deskMapId}` });
+      return false;
+    }
+    const result = executeCreateRootNode({
+      allNodes: state.nodes,
+      newNodeId,
+      initialFraction,
+      form,
+    });
+    if (result.ok) {
+      const explicitDeskMapExists =
+        deskMapId !== undefined
+        && state.deskMaps.some((dm) => dm.id === deskMapId);
+      const targetDeskMapId = explicitDeskMapExists
+        ? deskMapId!
+        : resolveActiveDeskMapId(state.deskMaps, state.activeDeskMapId);
       const dmUpdate = targetDeskMapId
         ? {
             deskMaps: state.deskMaps.map((dm) =>
@@ -474,7 +829,10 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
       form,
     });
     if (result.ok) {
-      const targetDeskMapId = resolveActiveDeskMapId(state.deskMaps, state.activeDeskMapId);
+      // Predecessor joins the same tract as the node it now parents.
+      const childDeskMap = state.deskMaps.find((dm) => dm.nodeIds.includes(activeNodeId));
+      const targetDeskMapId = childDeskMap?.id
+        ?? resolveActiveDeskMapId(state.deskMaps, state.activeDeskMapId);
       const dmUpdate = targetDeskMapId
         ? {
             deskMaps: state.deskMaps.map((dm) =>
@@ -512,6 +870,109 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
     return false;
   },
 
+  batchAttachConveyance: (items) => {
+    // Audit M1: either every item attaches or the store is not mutated.
+    // We simulate the batch on an in-memory candidate graph; only after all
+    // grafts succeed do we commit the result with a single set().
+    const initial = get().nodes;
+    let candidate: OwnershipNode[] = initial;
+    const attached: string[] = [];
+    const failed: Array<{ nodeId: string; reason: string }> = [];
+    let lastAudit: Audit | null = null;
+
+    for (const { activeNodeId, attachParentId, calcShare, form } of items) {
+      const result = executeAttachConveyance({
+        allNodes: candidate,
+        activeNodeId,
+        attachParentId,
+        calcShare,
+        form,
+      });
+      if (result.ok) {
+        candidate = result.data;
+        lastAudit = result.audit;
+        attached.push(activeNodeId);
+      } else {
+        failed.push({ nodeId: activeNodeId, reason: result.error.message });
+      }
+    }
+
+    if (failed.length > 0) {
+      set({
+        lastError: `Batch attach aborted — ${failed.length} of ${items.length} invalid. No change committed.`,
+      });
+      return { ok: false, attached: [], failed };
+    }
+
+    set({
+      nodes: candidate.map((node) => normalizeOwnershipNode(node)),
+      lastAudit: lastAudit,
+      lastError: null,
+    });
+    return { ok: true, attached, failed: [] };
+  },
+
+  attachLease: (mineralNodeId, lease, leaseNodeId) => {
+    const state = get();
+    const parent = state.nodes.find((n) => n.id === mineralNodeId);
+    if (!parent) {
+      set({ lastError: `Mineral node ${mineralNodeId} not found` });
+      return null;
+    }
+    if (parent.type === 'related') {
+      set({ lastError: 'Leases must attach to a title-interest node, not a lease or document node' });
+      return null;
+    }
+    if (parent.interestClass !== 'mineral') {
+      set({ lastError: 'Leases can only attach to mineral nodes, never NPRI' });
+      return null;
+    }
+    if (!isTexasMathLease(lease)) {
+      set({
+        lastError:
+          'Only Texas fee/state leases can attach to Desk Map math. Keep federal/private/tribal leases in Research or Federal Leasing as reference records.',
+      });
+      return null;
+    }
+    if (parent.linkedOwnerId && lease.ownerId !== parent.linkedOwnerId) {
+      set({
+        lastError:
+          'Lease owner does not match the mineral node linked owner. Link the correct owner or create a separate lease record before attaching.',
+      });
+      return null;
+    }
+
+    const newId =
+      leaseNodeId
+      ?? `leasenode-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    if (state.nodes.some((n) => n.id === newId)) {
+      set({ lastError: `Node id ${newId} already exists` });
+      return null;
+    }
+
+    const leaseNode = normalizeOwnershipNode(
+      buildLeaseNode({ id: newId, parentNode: parent, lease })
+    );
+    // Lease node lives in the same tract as the mineral owner it burdens,
+    // never blindly the active desk map (which may be a different tract).
+    const parentDeskMap = state.deskMaps.find((dm) => dm.nodeIds.includes(mineralNodeId));
+    const targetDeskMapId = parentDeskMap?.id
+      ?? resolveActiveDeskMapId(state.deskMaps, state.activeDeskMapId);
+    set({
+      nodes: [...state.nodes, leaseNode],
+      deskMaps: targetDeskMapId
+        ? state.deskMaps.map((dm) =>
+            dm.id === targetDeskMapId
+              ? { ...dm, nodeIds: [...dm.nodeIds, newId] }
+              : dm
+          )
+        : state.deskMaps,
+      activeDeskMapId: targetDeskMapId ?? state.activeDeskMapId,
+      lastError: null,
+    });
+    return newId;
+  },
+
   addNode: (node) => set((state) => ({ nodes: [...state.nodes, node] })),
 
   updateNode: (id, fields) =>
@@ -528,9 +989,8 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
     }
 
     const remainingIds = new Set(result.data.map((node) => node.id));
-    const removedIds = state.nodes
-      .filter((node) => !remainingIds.has(node.id))
-      .map((node) => node.id);
+    const removedNodes = state.nodes.filter((node) => !remainingIds.has(node.id));
+    const removedIds = removedNodes.map((node) => node.id);
     set({
       nodes: result.data.map((node) => normalizeOwnershipNode(node)),
       deskMaps: state.deskMaps.map((dm) => ({
@@ -544,8 +1004,14 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
       lastAudit: result.audit,
       lastError: null,
     });
+    void cascadeDeleteDocsForRemovedNodes(removedNodes).catch((err) => {
+      const message = err instanceof Error ? err.message : String(err);
+      console.warn('[workspace-store] document cascade delete failed:', err);
+      set({
+        lastError: `Document cleanup failed after deleting branch: ${message}. Save a backup and retry cleanup before relying on document registry state.`,
+      });
+    });
     for (const removedId of removedIds) {
-      void deletePdf(removedId);
       void useMapStore.getState().unlinkNode(removedId);
       useCurativeStore.getState().unlinkNode(removedId);
     }
@@ -624,6 +1090,127 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
       };
     }),
 
+  attachDocToNode: async (nodeId, file, options) => {
+    const state = get();
+    const node = state.nodes.find((n) => n.id === nodeId);
+    if (!node) return null;
+    const fileName =
+      options?.fileName?.trim()
+      || (file instanceof File ? file.name : 'document.pdf');
+    const { document, attachment } = await saveDoc({
+      workspaceId: state.workspaceId,
+      file,
+      fileName,
+      kind: options?.kind,
+      entityKind: 'node',
+      entityId: nodeId,
+    });
+    const summary: NodeAttachmentSummary = {
+      docId: document.docId,
+      attachmentId: attachment.attachmentId,
+      fileName: document.fileName,
+      kind: document.kind,
+    };
+    set((current) => ({
+      nodes: current.nodes.map((n) =>
+        n.id === nodeId ? { ...n, attachments: [...n.attachments, summary] } : n
+      ),
+    }));
+    return summary;
+  },
+
+  detachDocFromNode: async (nodeId, attachmentId) => {
+    const state = get();
+    const node = state.nodes.find((n) => n.id === nodeId);
+    if (!node) return;
+    const target = node.attachments.find((a) => a.attachmentId === attachmentId);
+    if (!target) return;
+    await detachDocFromEntity(target.attachmentId);
+    set((current) => ({
+      nodes: current.nodes.map((n) =>
+        n.id === nodeId
+          ? {
+              ...n,
+              attachments: n.attachments.filter(
+                (a) => a.attachmentId !== attachmentId
+              ),
+            }
+          : n
+      ),
+    }));
+  },
+
+  renameDocOnNode: async (docId, newFileName) => {
+    const trimmed = newFileName.trim();
+    if (!trimmed) return;
+    await renameDoc(docId, trimmed);
+    set((current) => ({
+      nodes: current.nodes.map((n) =>
+        n.attachments.some((a) => a.docId === docId)
+          ? {
+              ...n,
+              attachments: n.attachments.map((a) =>
+                a.docId === docId ? { ...a, fileName: trimmed } : a
+              ),
+            }
+          : n
+      ),
+    }));
+  },
+
+  reorderNodeAttachments: async (nodeId, orderedAttachmentIds) => {
+    const state = get();
+    const node = state.nodes.find((n) => n.id === nodeId);
+    if (!node) return;
+    await reorderAttachments('node', nodeId, orderedAttachmentIds);
+    const byId = new Map(node.attachments.map((a) => [a.attachmentId, a] as const));
+    const seen = new Set<string>();
+    const reordered: NodeAttachmentSummary[] = [];
+    for (const id of orderedAttachmentIds) {
+      const found = byId.get(id);
+      if (found && !seen.has(id)) {
+        reordered.push(found);
+        seen.add(id);
+      }
+    }
+    for (const a of node.attachments) {
+      if (!seen.has(a.attachmentId)) reordered.push(a);
+    }
+    set((current) => ({
+      nodes: current.nodes.map((n) =>
+        n.id === nodeId ? { ...n, attachments: reordered } : n
+      ),
+    }));
+  },
+
+  hydrateNodeAttachments: async () => {
+    const state = get();
+    if (state.nodes.length === 0) return;
+    const nodeIds = state.nodes.map((n) => n.id);
+    const byNodeId = await listAttachmentsForNodes(state.workspaceId, nodeIds);
+    if (byNodeId.size === 0) {
+      // No documents touched anything in this workspace — leave the
+      // existing in-memory attachments[] alone so a transient Dexie
+      // read miss doesn't blank the badges for an already-loaded view.
+      return;
+    }
+    set((current) => ({
+      nodes: current.nodes.map((node) => {
+        const fresh = byNodeId.get(node.id);
+        if (!fresh) return node;
+        return {
+          ...node,
+          attachments: fresh.map((entry) => ({
+            docId: entry.docId,
+            attachmentId: entry.attachmentId,
+            fileName: entry.fileName,
+            kind: entry.kind,
+          })),
+        };
+      }),
+    }));
+  },
+
   setHydrated: () => set({ _hydrated: true }),
   setStartupWarning: (startupWarning) => set({ startupWarning }),
 
@@ -641,6 +1228,20 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
         )
       );
       const validDeskMapIds = new Set(normalizedDeskMaps.map((deskMap) => deskMap.id));
+      const validUnitCodes = new Set(
+        normalizedDeskMaps.flatMap((deskMap) =>
+          deskMap.unitCode ? [deskMap.unitCode] : []
+        )
+      );
+      const activeDeskMapId = resolveActiveDeskMapId(
+        normalizedDeskMaps,
+        data.activeDeskMapId
+      );
+      const activeUnitCode = resolveActiveUnitCode(
+        normalizedDeskMaps,
+        data.activeUnitCode,
+        activeDeskMapId
+      );
 
       return {
         workspaceId: data.workspaceId,
@@ -650,15 +1251,20 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
         leaseholdUnit: normalizeLeaseholdUnit(data.leaseholdUnit),
         leaseholdAssignments: normalizeLeaseholdAssignments(data.leaseholdAssignments, {
           validDeskMapIds,
+          validUnitCodes,
         }),
-        leaseholdOrris: normalizeLeaseholdOrris(data.leaseholdOrris, { validDeskMapIds }),
+        leaseholdOrris: normalizeLeaseholdOrris(data.leaseholdOrris, {
+          validDeskMapIds,
+          validUnitCodes,
+        }),
         leaseholdTransferOrderEntries: normalizeLeaseholdTransferOrderEntries(
           data.leaseholdTransferOrderEntries
         ),
-        activeDeskMapId: resolveActiveDeskMapId(
-          normalizedDeskMaps,
-          data.activeDeskMapId
-        ),
+        activeDeskMapId: activeUnitCode
+          ? normalizedDeskMaps.find((deskMap) => deskMap.unitCode === activeUnitCode)?.id
+            ?? activeDeskMapId
+          : activeDeskMapId,
+        activeUnitCode,
         instrumentTypes: data.instrumentTypes?.length
           ? data.instrumentTypes
           : [...DEFAULT_INSTRUMENT_TYPES],

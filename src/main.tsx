@@ -2,6 +2,10 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
 import RootErrorBoundary from './components/shared/RootErrorBoundary';
+import { ConfirmationProvider } from './components/shared/ConfirmationProvider';
+import { AuthProvider } from './auth/AuthProvider';
+import LoginGate from './auth/LoginGate';
+import { isHostedMode } from './utils/deploy-env';
 import './theme/index.css';
 import { useMapStore } from './store/map-store';
 import { useOwnerStore } from './store/owner-store';
@@ -11,6 +15,8 @@ import { useWorkspaceStore } from './store/workspace-store';
 import { useCanvasStore } from './store/canvas-store';
 import { saveWorkspaceToDb, loadWorkspaceFromDb } from './storage/workspace-persistence';
 import { saveCanvasToDb, loadCanvasFromDb } from './storage/canvas-persistence';
+import { awaitWorkspaceKeyReady } from './storage/active-workspace-key';
+import { runPostV8BackupIfNeeded } from './storage/post-v8-backup';
 import {
   buildCanvasAutosavePayload,
   buildWorkspaceAutosavePayload,
@@ -22,6 +28,21 @@ import {
 
 // ── Auto-load saved workspace and canvas on startup ─────
 async function bootstrapApp() {
+  // Audit M-1: in hosted mode, the IndexedDB row key is namespaced by the
+  // Cognito ID-token `sub`. AuthProvider populates it; bootstrap waits so
+  // the first read uses the per-user key, not the legacy 'default' row.
+  // In local mode awaitWorkspaceKeyReady resolves at module load.
+  await awaitWorkspaceKeyReady();
+
+  // Phase 5 / A5b: one-shot v7 `.landroid` backup the first time the user
+  // boots into a v8 schema. The Dexie v7→v8 migration is non-destructive
+  // (the v7 `pdfs` table is preserved), so reading it post-`db.open()` is
+  // safe. Tracked via a localStorage flag so a refresh doesn't redownload.
+  // Errors are warnings, never blocking.
+  await runPostV8BackupIfNeeded().catch((err) => {
+    console.warn('[landroid] post-v8 backup hook failed:', err);
+  });
+
   const [workspaceResult, canvasResult] = await Promise.all([
     loadWorkspaceFromDb(),
     loadCanvasFromDb(),
@@ -36,6 +57,10 @@ async function bootstrapApp() {
       useResearchStore.getState().setWorkspace(workspaceResult.data.workspaceId),
       useCurativeStore.getState().setWorkspace(workspaceResult.data.workspaceId),
     ]);
+    // Phase 5: pull `node.attachments[]` from Dexie's `documents` +
+    // `document_attachments` tables after the workspace state lands.
+    // Safe to fail; the rest of the workspace still renders.
+    await useWorkspaceStore.getState().hydrateNodeAttachments().catch(() => {});
   } else {
     useWorkspaceStore.getState().setHydrated();
     const workspaceId = useWorkspaceStore.getState().workspaceId;
@@ -109,7 +134,19 @@ useCanvasStore.subscribe((state) => {
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <RootErrorBoundary>
-      <App />
+      {isHostedMode() ? (
+        <AuthProvider>
+          <LoginGate>
+            <ConfirmationProvider>
+              <App />
+            </ConfirmationProvider>
+          </LoginGate>
+        </AuthProvider>
+      ) : (
+        <ConfirmationProvider>
+          <App />
+        </ConfirmationProvider>
+      )}
     </RootErrorBoundary>
   </StrictMode>
 );

@@ -6,6 +6,8 @@ import {
   LEASE_STATUS_OPTIONS,
   createBlankLease,
   isInactiveLeaseStatus,
+  isTexasMathLease,
+  isTexasMathLeaseJurisdiction,
   normalizeLease,
   normalizeLeaseJurisdiction,
   normalizeLeaseStatus,
@@ -66,23 +68,41 @@ describe('lease jurisdiction discriminator', () => {
       expect(normalizeLeaseJurisdiction('  tx_state  ')).toBe('tx_state');
     });
 
-    it('falls back to tx_fee for unknown strings', () => {
-      expect(normalizeLeaseJurisdiction('fee')).toBe('tx_fee');
-      expect(normalizeLeaseJurisdiction('TX_FEE')).toBe('tx_fee');
-      expect(normalizeLeaseJurisdiction('blm')).toBe('tx_fee');
+    it('throws for unknown strings instead of silently entering Texas math', () => {
+      expect(() => normalizeLeaseJurisdiction('fee')).toThrow(/invalid lease jurisdiction/i);
+      expect(() => normalizeLeaseJurisdiction('TX_FEE')).toThrow(/invalid lease jurisdiction/i);
+      expect(() => normalizeLeaseJurisdiction('blm')).toThrow(/invalid lease jurisdiction/i);
     });
 
-    it('falls back to tx_fee for nullish, empty, and non-string input', () => {
+    it('falls back to tx_fee for nullish and empty input', () => {
       expect(normalizeLeaseJurisdiction(undefined)).toBe('tx_fee');
       expect(normalizeLeaseJurisdiction(null)).toBe('tx_fee');
       expect(normalizeLeaseJurisdiction('')).toBe('tx_fee');
-      expect(normalizeLeaseJurisdiction(42)).toBe('tx_fee');
-      expect(normalizeLeaseJurisdiction({})).toBe('tx_fee');
-      expect(normalizeLeaseJurisdiction([])).toBe('tx_fee');
+    });
+
+    it('throws for non-string explicit values', () => {
+      expect(() => normalizeLeaseJurisdiction(42)).toThrow(/invalid lease jurisdiction/i);
+      expect(() => normalizeLeaseJurisdiction({})).toThrow(/invalid lease jurisdiction/i);
+      expect(() => normalizeLeaseJurisdiction([])).toThrow(/invalid lease jurisdiction/i);
     });
 
     it('exposes tx_fee as the documented default constant', () => {
       expect(DEFAULT_LEASE_JURISDICTION).toBe('tx_fee');
+    });
+
+    it('identifies only Texas fee/state leases as active math jurisdictions', () => {
+      expect(isTexasMathLeaseJurisdiction('tx_fee')).toBe(true);
+      expect(isTexasMathLeaseJurisdiction('tx_state')).toBe(true);
+      expect(isTexasMathLeaseJurisdiction('federal')).toBe(false);
+      expect(isTexasMathLeaseJurisdiction('private')).toBe(false);
+      expect(isTexasMathLeaseJurisdiction('tribal')).toBe(false);
+
+      expect(
+        isTexasMathLease(createBlankLease('ws-1', 'owner-1', { jurisdiction: 'tx_state' }))
+      ).toBe(true);
+      expect(
+        isTexasMathLease(createBlankLease('ws-1', 'owner-1', { jurisdiction: 'federal' }))
+      ).toBe(false);
     });
   });
 
@@ -100,14 +120,11 @@ describe('lease jurisdiction discriminator', () => {
       expect(lease.jurisdiction).toBe('tx_state');
     });
 
-    it('coerces a junk jurisdiction override back to tx_fee', () => {
-      // The override path is the most likely place for a stale import shape
-      // (for instance, a future migration that hands us {jurisdiction: 'fee'}).
-      const lease = createBlankLease('ws-1', 'owner-1', {
+    it('throws on a junk jurisdiction override', () => {
+      expect(() => createBlankLease('ws-1', 'owner-1', {
         // @ts-expect-error — exercise the runtime guard against bad data
         jurisdiction: 'fee',
-      });
-      expect(lease.jurisdiction).toBe('tx_fee');
+      })).toThrow(/invalid lease jurisdiction/i);
     });
 
     it('preserves trimmed legacy status text when supplied by existing data', () => {
@@ -151,15 +168,14 @@ describe('lease jurisdiction discriminator', () => {
       expect(normalized.jurisdiction).toBe('private');
     });
 
-    it('coerces an invalid jurisdiction string back to tx_fee', () => {
-      const normalized = normalizeLease({
+    it('throws on an invalid jurisdiction string', () => {
+      expect(() => normalizeLease({
         id: 'lease-3',
         workspaceId: 'ws-1',
         ownerId: 'owner-1',
         // @ts-expect-error — exercise the runtime guard against bad data
         jurisdiction: 'BLM',
-      });
-      expect(normalized.jurisdiction).toBe('tx_fee');
+      })).toThrow(/invalid lease jurisdiction/i);
     });
 
     it('canonicalizes known status text during normalization', () => {
@@ -194,12 +210,11 @@ describe('lease jurisdiction discriminator', () => {
       expect(unit.jurisdiction).toBe('federal');
     });
 
-    it('coerces a junk jurisdiction override back to tx_fee', () => {
-      const unit = createBlankLeaseholdUnit({
+    it('throws on a junk jurisdiction override', () => {
+      expect(() => createBlankLeaseholdUnit({
         // @ts-expect-error — exercise the runtime guard against bad data
         jurisdiction: 'state',
-      });
-      expect(unit.jurisdiction).toBe('tx_fee');
+      })).toThrow(/invalid lease jurisdiction/i);
     });
   });
 
@@ -225,15 +240,14 @@ describe('lease jurisdiction discriminator', () => {
       expect(normalized.jurisdiction).toBe('tx_state');
     });
 
-    it('coerces an invalid jurisdiction value back to tx_fee', () => {
-      const normalized = normalizeLeaseholdUnit({
+    it('throws on an invalid jurisdiction value', () => {
+      expect(() => normalizeLeaseholdUnit({
         name: 'Raven Bend Unit',
         description: '',
         operator: '',
         effectiveDate: '',
         jurisdiction: 'glo',
-      });
-      expect(normalized.jurisdiction).toBe('tx_fee');
+      })).toThrow(/invalid lease jurisdiction/i);
     });
 
     it('returns a tx_fee blank unit for non-object input', () => {

@@ -1,14 +1,14 @@
 import { memo } from 'react';
 import { useWorkspaceStore } from '../../store/workspace-store';
 import type { OwnershipNode } from '../../types/node';
-import DeskMapDocumentBadge from './DeskMapDocumentBadge';
+import DeskMapDocumentChips from './DeskMapDocumentChips';
 
 interface DeskMapLeaseCardProps {
   node: OwnershipNode;
   onEdit: (nodeId: string) => void;
   onAttachDoc: (nodeId: string) => void;
   onDelete: (nodeId: string) => void;
-  onViewPdf: (nodeId: string) => void;
+  onViewDoc: (docId: string) => void;
 }
 
 function DeskMapLeaseCard({
@@ -16,7 +16,7 @@ function DeskMapLeaseCard({
   onEdit,
   onAttachDoc,
   onDelete,
-  onViewPdf,
+  onViewDoc,
 }: DeskMapLeaseCardProps) {
   const isActive = useWorkspaceStore((state) => state.activeNodeId === node.id);
   const termChips = node.remarks
@@ -76,7 +76,7 @@ function DeskMapLeaseCard({
               ))}
             </div>
           )}
-          <DeskMapDocumentBadge node={node} tone="emerald" onViewPdf={onViewPdf} />
+          <DeskMapDocumentChips node={node} tone="emerald" onViewDoc={onViewDoc} />
         </div>
 
         <div className="hidden group-hover:flex px-2 py-1.5 border-t border-emerald-200 bg-emerald-100/70 rounded-b-lg gap-1 justify-center">
@@ -124,7 +124,7 @@ function deskMapLeaseCardPropsAreEqual(
     previous.onEdit === next.onEdit &&
     previous.onAttachDoc === next.onAttachDoc &&
     previous.onDelete === next.onDelete &&
-    previous.onViewPdf === next.onViewPdf
+    previous.onViewDoc === next.onViewDoc
   );
 }
 

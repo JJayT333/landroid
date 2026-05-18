@@ -3,6 +3,10 @@
   "private": true,
   "version": "2.0.0",
   "type": "module",
+  "engines": {
+    "node": ">=22 <26",
+    "npm": ">=10"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
@@ -12,7 +16,8 @@
     "test:e2e:headed": "playwright test --headed",
     "test:watch": "vitest",
     "test:engine": "vitest run src/engine",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "deploy:check": "bash scripts/predeploy-check.sh"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.71",
@@ -23,10 +28,10 @@
     "decimal.js": "^10.4.3",
     "dexie": "^4.0.11",
     "elkjs": "^0.11.1",
+    "oidc-client-ts": "^3.5.0",
     "papaparse": "^5.4.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "xlsx": "^0.18.5",
     "zod": "^4.3.6",
     "zustand": "^5.0.3"
   },

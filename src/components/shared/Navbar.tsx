@@ -11,12 +11,18 @@ import { useWorkspaceStore } from '../../store/workspace-store';
 import { useCanvasStore } from '../../store/canvas-store';
 import {
   downloadLandroidFile,
-  exportPdfWorkspaceData,
+  exportDocumentWorkspaceData,
   importLandroidFile,
-  replacePdfWorkspaceData,
+  replaceDocumentWorkspaceData,
 } from '../../storage/workspace-persistence';
 import { importCSV } from '../../storage/csv-io';
+import { assertFileSize, FILE_SIZE_LIMITS } from '../../utils/file-validation';
 import { seedCombinatorialData } from '../../storage/seed-test-data';
+import { seedCrackbabyCarnivalData } from '../../storage/seed-crackbaby-carnival';
+import { isHostedMode } from '../../utils/deploy-env';
+import HostedUserMenu from '../../auth/HostedUserMenu';
+import { useConfirmation } from './ConfirmationProvider';
+import { shouldShowDemoDataMenu } from './navbar-policy';
 
 const landroidLogoUrl = new URL('../../assets/branding/landroid-logo.png', import.meta.url).href;
 const ravenForestBackdropUrl = new URL('../../assets/branding/raven-forest-backdrop.png', import.meta.url).href;
@@ -26,6 +32,7 @@ const views: { id: ViewMode; label: string }[] = [
   { id: 'leasehold', label: 'Leasehold' },
   { id: 'flowchart', label: 'Flowchart' },
   { id: 'master', label: 'Runsheet' },
+  { id: 'documents', label: 'Documents' },
   { id: 'owners', label: 'Owners' },
   { id: 'curative', label: 'Curative' },
   { id: 'maps', label: 'Maps' },
@@ -33,7 +40,13 @@ const views: { id: ViewMode; label: string }[] = [
   { id: 'research', label: 'Research' },
 ];
 
+const LOAD_DEMO_CONFIRMATION_TEXT = 'LOAD DEMO';
+const LOAD_WORKSPACE_CONFIRMATION_TEXT = 'LOAD WORKSPACE';
+
 export default function Navbar() {
+  const hostedMode = isHostedMode();
+  const showDemoDataMenu = shouldShowDemoDataMenu(hostedMode);
+  const { alert: showAlert, confirm: requestConfirmation } = useConfirmation();
   const view = useUIStore((s) => s.view);
   const setView = useUIStore((s) => s.setView);
   const projectName = useWorkspaceStore((s) => s.projectName);
@@ -99,6 +112,18 @@ export default function Navbar() {
 
   const handleCombinatorial = async () => {
     setDemoMenuOpen(false);
+    const confirmed = await requestConfirmation({
+      title: 'Load Combinatorial Demo?',
+      message:
+        'This replaces the current workspace with the Raven Forest demo fixture. Save first if you need to keep the current workspace.',
+      confirmLabel: 'Load Demo Data',
+      tone: 'danger',
+      requiredConfirmationText: LOAD_DEMO_CONFIRMATION_TEXT,
+      typedConfirmationHelp:
+        'The demo loader overwrites the active local workspace in this browser session.',
+    });
+    if (!confirmed) return;
+
     setSeedLoading(true);
     try {
       const { nodeCount, pdfCount } = await seedCombinatorialData();
@@ -107,6 +132,32 @@ export default function Navbar() {
       );
     } catch (err) {
       console.error('[combinatorial] Failed:', err);
+    }
+    setSeedLoading(false);
+  };
+
+  const handleCrackbaby = async () => {
+    setDemoMenuOpen(false);
+    const confirmed = await requestConfirmation({
+      title: 'Load Crackbaby Carnival Demo?',
+      message:
+        'This replaces the current workspace with the Crackbaby Carnival demo fixture. Save first if you need to keep the current workspace.',
+      confirmLabel: 'Load Demo Data',
+      tone: 'danger',
+      requiredConfirmationText: LOAD_DEMO_CONFIRMATION_TEXT,
+      typedConfirmationHelp:
+        'The demo loader overwrites the active local workspace in this browser session.',
+    });
+    if (!confirmed) return;
+
+    setSeedLoading(true);
+    try {
+      const { nodeCount, pdfCount } = await seedCrackbabyCarnivalData();
+      console.log(
+        `[crackbaby] Loaded ${nodeCount} nodes, attached ${pdfCount} PDFs`
+      );
+    } catch (err) {
+      console.error('[crackbaby] Failed:', err);
     }
     setSeedLoading(false);
   };
@@ -125,9 +176,13 @@ export default function Navbar() {
       leaseholdOrris,
       leaseholdTransferOrderEntries,
       activeDeskMapId: state.activeDeskMapId,
+      activeUnitCode: state.activeUnitCode,
       instrumentTypes: state.instrumentTypes,
       ownerData: await useOwnerStore.getState().exportWorkspaceData(),
-      pdfData: await exportPdfWorkspaceData(state.nodes),
+      documentData: await exportDocumentWorkspaceData(
+        state.workspaceId,
+        state.nodes
+      ),
       mapData: await useMapStore.getState().exportWorkspaceData(),
       researchData: await useResearchStore.getState().exportWorkspaceData(),
       curativeData: await useCurativeStore.getState().exportWorkspaceData(),
@@ -153,11 +208,25 @@ export default function Navbar() {
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+    const input = e.currentTarget;
+    const file = input.files?.[0];
     if (!file) return;
 
     try {
       if (file.name.endsWith('.landroid')) {
+        assertFileSize(file, FILE_SIZE_LIMITS.LANDROID, '.landroid file');
+        const confirmed = await requestConfirmation({
+          title: `Load ${file.name}?`,
+          message:
+            'This replaces the current workspace with the selected .landroid file. Save first if you need to keep the current workspace.',
+          confirmLabel: 'Replace Workspace',
+          tone: 'danger',
+          requiredConfirmationText: LOAD_WORKSPACE_CONFIRMATION_TEXT,
+          typedConfirmationHelp:
+            'The selected .landroid file will replace the active workspace in this browser session.',
+        });
+        if (!confirmed) return;
+
         const data = await importLandroidFile(file);
         loadWorkspace(data);
         useCanvasStore.getState().loadCanvas(data.canvas ?? { nodes: [], edges: [] });
@@ -166,7 +235,10 @@ export default function Navbar() {
             data.workspaceId,
             data.ownerData ?? { owners: [], leases: [], contacts: [], docs: [] }
           ),
-          replacePdfWorkspaceData(data.pdfData ?? { pdfs: [] }, data.nodes),
+          replaceDocumentWorkspaceData(
+            data.documentData ?? { documents: [], attachments: [] },
+            data.workspaceId
+          ),
           useMapStore.getState().replaceWorkspaceData(
             data.workspaceId,
             data.mapData ?? { mapAssets: [], mapRegions: [], mapReferences: [] }
@@ -186,7 +258,25 @@ export default function Navbar() {
             data.curativeData ?? { titleIssues: [] }
           ),
         ]);
+        // Phase 5: refresh node.attachments[] after PDF table write.
+        await useWorkspaceStore
+          .getState()
+          .hydrateNodeAttachments()
+          .catch(() => {});
       } else if (file.name.endsWith('.csv')) {
+        assertFileSize(file, FILE_SIZE_LIMITS.SPREADSHEET, 'CSV file');
+        const confirmed = await requestConfirmation({
+          title: `Load ${file.name}?`,
+          message:
+            'This imports the CSV into a fresh LANDroid workspace. Save first if you need to keep the current workspace.',
+          confirmLabel: 'Replace Workspace',
+          tone: 'danger',
+          requiredConfirmationText: LOAD_WORKSPACE_CONFIRMATION_TEXT,
+          typedConfirmationHelp:
+            'The selected CSV will replace the active workspace in this browser session.',
+        });
+        if (!confirmed) return;
+
         const text = await file.text();
         const result = importCSV(text);
         loadWorkspace(result);
@@ -198,17 +288,26 @@ export default function Navbar() {
           useCurativeStore.getState().setWorkspace(result.workspaceId),
         ]);
       } else {
-        alert('Unsupported file type. Use .landroid or .csv files.');
+        await showAlert({
+          title: 'Unsupported File Type',
+          message: 'Unsupported file type. Use .landroid or .csv files.',
+        });
       }
     } catch (err) {
-      alert(`Import failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      await showAlert({
+        title: 'Import Failed',
+        message: `Import failed: ${err instanceof Error ? err.message : 'Unknown error'}`,
+      });
+    } finally {
+      input.value = '';
     }
-
-    e.target.value = '';
   };
 
   return (
-    <nav className="no-print flex items-center justify-between px-4 py-2 bg-ink text-parchment border-b border-leather">
+    <nav
+      aria-label="Primary"
+      className="no-print flex items-center justify-between px-4 py-2 bg-ink text-parchment border-b border-leather"
+    >
       <div className="flex min-w-0 items-center gap-3">
         <div className="flex h-11 w-[4.25rem] shrink-0 items-center justify-center overflow-hidden rounded-xl border border-parchment/15 bg-parchment/5 px-1.5 shadow-lg">
           <img
@@ -251,8 +350,8 @@ export default function Navbar() {
         </div>
       </div>
 
-      <div className="flex items-center gap-4">
-        <div className="flex gap-1">
+      <div className="flex min-w-0 items-center gap-4">
+        <div className="flex min-w-0 gap-1 overflow-x-auto">
           <div className="flex items-center pr-2">
             <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-parchment/15 bg-parchment/10 p-1 shadow-md">
               <img
@@ -265,9 +364,11 @@ export default function Navbar() {
           {views.map((v) => (
             <button
               key={v.id}
+              type="button"
               onClick={() => setView(v.id)}
+              aria-current={view === v.id ? 'page' : undefined}
               className={`
-                px-4 py-1.5 rounded-lg text-sm font-medium transition-colors
+                shrink-0 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors
                 ${view === v.id
                   ? 'bg-leather text-parchment'
                   : 'text-parchment/70 hover:text-parchment hover:bg-ink-light/30'}
@@ -317,37 +418,50 @@ export default function Navbar() {
             )}
           </div>
 
-          <div ref={demoMenuRef} className="relative">
-            <button
-              type="button"
-              onClick={() => {
-                setDemoMenuOpen((open) => !open);
-                setFileMenuOpen(false);
-              }}
-              disabled={seedLoading}
-              aria-haspopup="menu"
-              aria-expanded={demoMenuOpen}
-              className="px-3 py-1.5 rounded-lg text-xs font-medium text-gold/80 hover:text-gold hover:bg-gold/10 transition-colors disabled:opacity-50"
-            >
-              {seedLoading ? 'Loading…' : 'Demo Data ▾'}
-            </button>
-            {demoMenuOpen && (
-              <div
-                role="menu"
-                className="absolute right-0 z-20 mt-1 w-56 overflow-hidden rounded-lg border border-leather bg-ink shadow-xl"
+          {hostedMode && <HostedUserMenu />}
+
+          {showDemoDataMenu && (
+            <div ref={demoMenuRef} className="relative">
+              <button
+                type="button"
+                onClick={() => {
+                  setDemoMenuOpen((open) => !open);
+                  setFileMenuOpen(false);
+                }}
+                disabled={seedLoading}
+                aria-haspopup="menu"
+                aria-expanded={demoMenuOpen}
+                className="px-3 py-1.5 rounded-lg text-xs font-medium text-gold/80 hover:text-gold hover:bg-gold/10 transition-colors disabled:opacity-50"
               >
-                <button
-                  type="button"
-                  role="menuitem"
-                  onClick={handleCombinatorial}
-                  disabled={seedLoading}
-                  className="block w-full px-3 py-2 text-left text-xs text-parchment/80 hover:bg-ink-light/40 hover:text-parchment disabled:opacity-50"
+                {seedLoading ? 'Loading…' : 'Demo Data ▾'}
+              </button>
+              {demoMenuOpen && (
+                <div
+                  role="menu"
+                  className="absolute right-0 z-20 mt-1 w-56 overflow-hidden rounded-lg border border-leather bg-ink shadow-xl"
                 >
-                  Combinatorial — Raven Forest
-                </button>
-              </div>
-            )}
-          </div>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={handleCombinatorial}
+                    disabled={seedLoading}
+                    className="block w-full px-3 py-2 text-left text-xs text-parchment/80 hover:bg-ink-light/40 hover:text-parchment disabled:opacity-50"
+                  >
+                    Combinatorial — Raven Forest
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={handleCrackbaby}
+                    disabled={seedLoading}
+                    className="block w-full px-3 py-2 text-left text-xs text-parchment/80 hover:bg-ink-light/40 hover:text-parchment disabled:opacity-50"
+                  >
+                    Crackbaby Carnival — Demo
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 

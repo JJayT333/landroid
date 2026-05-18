@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import FormField from '../shared/FormField';
+import { useConfirmation } from '../shared/ConfirmationProvider';
 import {
   LEASE_STATUS_OPTIONS,
   createBlankLease,
@@ -40,6 +41,7 @@ export default function OwnerLeasesTab({
   getDeskMapTargetsForLease,
   onOpenDeskMapLeaseTarget,
 }: OwnerLeasesTabProps) {
+  const { confirm: requestConfirmation } = useConfirmation();
   const [draft, setDraft] = useState<Lease | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -286,9 +288,13 @@ export default function OwnerLeasesTab({
                 <button
                   type="button"
                   onClick={async () => {
-                    if (!confirm('Delete this lease? Linked map/doc references will be cleared.')) {
-                      return;
-                    }
+                    const confirmed = await requestConfirmation({
+                      title: 'Delete Lease?',
+                      message: 'Delete this lease? Linked map/doc references will be cleared.',
+                      confirmLabel: 'Delete Lease',
+                      tone: 'danger',
+                    });
+                    if (!confirmed) return;
                     await onRemove(lease.id);
                   }}
                   className="px-3 py-1.5 rounded-lg text-xs font-semibold text-seal hover:bg-seal/10 transition-colors"

@@ -10,7 +10,7 @@ import OwnershipNodeEditorModals from '../components/shared/OwnershipNodeEditorM
 import { useWorkspaceStore } from '../store/workspace-store';
 import { formatAsFraction } from '../engine/fraction-display';
 import { d } from '../engine/decimal';
-import { downloadRunsheetWorkbook } from '../storage/runsheet-export';
+import { downloadRunsheetCsv } from '../storage/runsheet-export';
 import type { OwnershipNode } from '../types/node';
 import type { NodeEditorRoute } from '../utils/node-editor-route';
 import { resolveNodeEditorRoute } from '../utils/node-editor-route';
@@ -52,7 +52,7 @@ export default function RunsheetView() {
   const [tractFilter, setTractFilter] = useState<TractFilter>('all');
   const [editorRoute, setEditorRoute] = useState<NodeEditorRoute | null>(null);
   const [npriParentId, setNpriParentId] = useState<string | null>(null);
-  const [pdfViewNodeId, setPdfViewNodeId] = useState<string | null>(null);
+  const [pdfViewDocId, setPdfViewDocId] = useState<string | null>(null);
 
   const tractOptions = useMemo(
     () =>
@@ -103,7 +103,7 @@ export default function RunsheetView() {
     sortField === field ? (sortDir === 'asc' ? ' \u25b2' : ' \u25bc') : '';
 
   const handleExport = () => {
-    void downloadRunsheetWorkbook(sorted, {
+    downloadRunsheetCsv(sorted, {
       projectName,
       tractLabel: activeTractLabel,
     });
@@ -242,8 +242,8 @@ export default function RunsheetView() {
         onSetRoute={setEditorRoute}
         npriParentId={npriParentId}
         onSetNpriParentId={setNpriParentId}
-        pdfViewNodeId={pdfViewNodeId}
-        onSetPdfViewNodeId={setPdfViewNodeId}
+        pdfViewDocId={pdfViewDocId}
+        onSetPdfViewDocId={setPdfViewDocId}
       />
     </div>
   );

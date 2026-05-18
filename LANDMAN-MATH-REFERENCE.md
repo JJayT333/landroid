@@ -6,6 +6,28 @@ This document is a reviewer-facing math reference for the current Texas baseline
 
 LANDroid currently calculates Texas mineral-title ownership and Texas leasehold decimal review for Texas fee and Texas state leases only. It calculates chain-of-title fractions, lease coverage, acreage-weighted royalty, ORRI burdens, basic working-interest assignment splits, and transfer-order review totals. Desk Map lease cards now scope a linked lease to the branch where that lease card sits; owner lease records without a Desk Map lease card remain owner-level. Research may track federal/private sources, lease inventory, mapped tracts, and acquisition notes as reference-only project records, but those records do not participate in math. LANDroid does not yet calculate any federal or BLM lease math, any tribal lease math, or the many lease-administration items that sit outside the present Texas baseline. The current regulatory regime modeled in code is Texas fee plus Texas state only; federal math is deferred to Phase 2, and tribal is permanently out of scope.
 
+## Quick math cheat sheet
+
+- Conveyance: moves a finite, positive share from a parent to a same-class child
+  and reduces the parent's remaining same-class fraction.
+- NPRI creation: creates a separate royalty burden from a mineral branch without
+  reducing mineral coverage totals.
+- Attach/graft: moves and rescales an existing branch under a new same-class
+  parent; this must preserve graph validity.
+- Lease coverage: active Texas math leases allocate owner by owner and clip
+  overlapping later leases instead of deciding legal priority.
+- TPF: tract participation factor equals tract pooled acres divided by total
+  pooled acres.
+- Owner unit royalty decimal: tract participation factor multiplied by the
+  owner's tract royalty.
+- ORRI bases: gross `8/8` and working-interest bases burden leased ownership;
+  net-revenue-interest basis burdens the remaining NRI after earlier burdens.
+- Warning-only states: over-100 mineral coverage, NPRI over-claims, lease
+  overlap clipping, over-assigned WI, and some payout holds may remain visible
+  for landman review instead of being hard-blocked.
+- Hard-blocking states: negative fractions, non-finite values, cycles, missing
+  parents, invalid same-class allocation, and impossible conveyance capacity.
+
 ## 2. Data model in landman terms
 
 - Owner. This is the person or entity record the landman knows in the owner database. It can represent a mineral owner, an NPRI owner, or even a surface-only contact if the user wants the record for research purposes. The fields a landman will care about are the owner name, entity type, county, prospect, mailing address, email, phone, notes, and timestamps. Source: `src/types/owner.ts:1-14`.

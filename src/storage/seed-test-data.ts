@@ -16,7 +16,7 @@ import { useResearchStore } from '../store/research-store';
 import { buildLeaseNode, isLeaseNode } from '../components/deskmap/deskmap-lease-node';
 import type { OwnerWorkspaceData } from './owner-persistence';
 import { createBundledDeskMapPdfFile } from './bundled-deskmap-pdfs';
-import { savePdf } from './pdf-store';
+import type { DocumentKind } from '../types/document';
 import type { DeskMap, OwnershipNode } from '../types/node';
 import { createBlankNode } from '../types/node';
 import { createBlankLease, createBlankOwner } from '../types/owner';
@@ -55,21 +55,16 @@ function makeNode(
 // Maps nodeId → filename in TORS_Documents/
 // We'll attach a handful of PDFs to specific nodes.
 
-interface PdfMapping {
+export interface PdfMapping {
   nodeId: string;
   fileName: string;
+  kind?: DocumentKind;
 }
 
-function markNodePdfMetadata(
-  nodes: OwnershipNode[],
-  nodeId: string,
-  fileName: string
-): void {
-  const node = nodes.find((candidate) => candidate.id === nodeId);
-  if (!node) return;
-  node.hasDoc = true;
-  node.docFileName = fileName;
-}
+// Phase 5: PDFs no longer require a pre-flight node flag. The
+// workspace-store `attachDocToNode` action fills in `node.attachments[]`
+// on success; failed attaches leave it empty, which is what the badge
+// path expects.
 
 function countyFromLandDesc(landDesc: string): string {
   const match = landDesc.match(/([A-Za-z .'-]+?)\s+County\b/i);
@@ -127,7 +122,7 @@ function hasPositiveFraction(node: OwnershipNode): boolean {
   return node.type !== 'related' && Number(node.fraction) > 0;
 }
 
-function buildSeedOwnerWorkspaceData(
+export function buildSeedOwnerWorkspaceData(
   workspaceId: string,
   nodes: OwnershipNode[],
   projectName: string,
@@ -377,7 +372,7 @@ function buildGeneratedRemark(
   return `${node.grantor} conveyed ${node.initialFraction} of the whole tract to ${node.grantee} in ${county} County. ${punchline}`;
 }
 
-function finalizeGeneratedNodes(
+export function finalizeGeneratedNodes(
   nodes: OwnershipNode[],
   { humorousDeaths }: { humorousDeaths: boolean }
 ): OwnershipNode[] {
@@ -763,25 +758,29 @@ function buildTestNodes(): { nodes: OwnershipNode[]; pdfMappings: PdfMapping[] }
 
 // ── Store a bundled PDF sample in IDB ───────────────────
 
-async function attachPdf(nodeId: string, fileName: string): Promise<boolean> {
+export async function attachPdf(
+  nodeId: string,
+  fileName: string,
+  kind: DocumentKind = 'other'
+): Promise<boolean> {
   try {
     const file = await createBundledDeskMapPdfFile(
       `${nodeId}:${fileName}`,
       fileName
     );
-    const attachment = await savePdf(nodeId, file);
-    useWorkspaceStore.getState().updateNode(nodeId, {
-      hasDoc: true,
-      docFileName: attachment.fileName,
-    });
-    return true;
+    // Phase 5: route through the workspace-store action so the v8
+    // document tables and `node.attachments[]` cache stay in sync.
+    const summary = await useWorkspaceStore
+      .getState()
+      .attachDocToNode(nodeId, file, { fileName, kind });
+    return summary !== null;
   } catch (err) {
     console.warn(`[seed] Failed to attach ${fileName}:`, err);
     return false;
   }
 }
 
-async function resetWorkspaceSideStores(
+export async function resetWorkspaceSideStores(
   workspaceId: string,
   ownerData: OwnerWorkspaceData
 ) {
@@ -812,11 +811,6 @@ export async function seedTestData(): Promise<{ nodeCount: number; pdfCount: num
     finalizedNodes,
     'Elmore Title Examination'
   );
-
-  // Mark nodes that will have PDFs
-  for (const mapping of pdfMappings) {
-    markNodePdfMetadata(nodes, mapping.nodeId, mapping.fileName);
-  }
 
   // Create desk map
   const dmId = `dm-seed-${Date.now()}`;
@@ -852,7 +846,7 @@ export async function seedTestData(): Promise<{ nodeCount: number; pdfCount: num
   let pdfCount = 0;
   const failedPdfNodeIds: string[] = [];
   for (const mapping of pdfMappings) {
-    const ok = await attachPdf(mapping.nodeId, mapping.fileName);
+    const ok = await attachPdf(mapping.nodeId, mapping.fileName, mapping.kind);
     if (ok) {
       pdfCount++;
     } else {
@@ -860,14 +854,10 @@ export async function seedTestData(): Promise<{ nodeCount: number; pdfCount: num
     }
   }
 
-  if (failedPdfNodeIds.length > 0) {
-    for (const failedNodeId of failedPdfNodeIds) {
-      useWorkspaceStore.getState().updateNode(failedNodeId, {
-        hasDoc: false,
-        docFileName: '',
-      });
-    }
-  }
+  // Phase 5: no failed-PDF cleanup needed — `attachDocToNode` only
+  // populates `node.attachments[]` on success, so a failure leaves the
+  // node already in the empty-attachments state the UI expects.
+  void failedPdfNodeIds;
 
   return { nodeCount: nodes.length, pdfCount };
 }
@@ -876,7 +866,7 @@ export async function seedTestData(): Promise<{ nodeCount: number; pdfCount: num
 // Demo instrument palette + PDF pool (shared by the combinatorial seed)
 // ═══════════════════════════════════════════════════════════
 
-const DEMO_INSTRUMENT_TYPES = [
+export const DEMO_INSTRUMENT_TYPES = [
   'Patent', 'Warranty Deed', 'Mineral Deed', 'Royalty Deed',
   'Special Warranty Deed', 'Oil & Gas Lease', 'Probate', 'Affidavit of Heirship',
   'Surface Use Agreement',
@@ -884,7 +874,7 @@ const DEMO_INSTRUMENT_TYPES = [
   'Will', 'Order',
 ];
 
-const DEMO_PDFS = [
+export const DEMO_PDFS = [
   '09-4292.pdf', '09-6968.pdf', '10-5146.pdf', '10-5147.pdf', '10-6043.pdf',
   '10-6044.pdf', '11-2474.pdf', '11-3054.pdf', '11-4768.pdf', '11-769.pdf',
   '20-519-CP4.pdf', '2013000463.pdf', '2013003629.pdf', '2014001940.pdf',
@@ -942,12 +932,21 @@ class StressBuilder {
   nextId(): string { return `stress-${++this.seq}`; }
   nextDocNo(): string { return `ST-${++this.docSeq}`; }
 
-  assignPdf(nodeId: string): void {
+  assignPdf(nodeId: string, kind: DocumentKind = 'other'): void {
     if (this.pdfIdx >= DEMO_PDFS.length) return;
     const node = this.nodes.find((n) => n.id === nodeId);
     if (node) {
-      markNodePdfMetadata(this.nodes, nodeId, DEMO_PDFS[this.pdfIdx]);
-      this.pdfMappings.push({ nodeId, fileName: DEMO_PDFS[this.pdfIdx++] });
+      this.pdfMappings.push({
+        nodeId,
+        fileName: DEMO_PDFS[this.pdfIdx++],
+        kind,
+      });
+    }
+  }
+
+  addNamedPdf(nodeId: string, fileName: string, kind: DocumentKind): void {
+    if (this.nodes.some((node) => node.id === nodeId)) {
+      this.pdfMappings.push({ nodeId, fileName, kind });
     }
   }
 
@@ -1019,6 +1018,35 @@ function getTractNodes(nodes: OwnershipNode[], landDesc: string): OwnershipNode[
   return nodes.filter((node) => node.landDesc === landDesc);
 }
 
+function addNaturalMultiDocSeedMappings(builder: StressBuilder): void {
+  const targetCodes = new Set(['C2', 'C5', 'C10']);
+  const attachedNodeIds = new Set(builder.pdfMappings.map((mapping) => mapping.nodeId));
+
+  for (const tract of COMBINATORIAL_TRACTS) {
+    if (!targetCodes.has(tract.code)) continue;
+    const target = builder.nodes.find(
+      (node) =>
+        node.landDesc === tract.landDesc
+        && node.type === 'conveyance'
+        && node.interestClass === 'mineral'
+        && node.parentId !== null
+        && /deed/i.test(node.instrument)
+        && !attachedNodeIds.has(node.id)
+    );
+    if (!target) continue;
+
+    const baseName = `${tract.code}-${target.docNo}`;
+    builder.addNamedPdf(target.id, `${baseName}-deed.pdf`, 'deed');
+    builder.addNamedPdf(target.id, `${baseName}-obituary.pdf`, 'obit');
+    builder.addNamedPdf(
+      target.id,
+      `${baseName}-affidavit-of-heirship.pdf`,
+      'affidavit'
+    );
+    attachedNodeIds.add(target.id);
+  }
+}
+
 // ═══════════════════════════════════════════════════════════
 // Combinatorial fixture — 10 tracts, Raven Forest prospect
 // a Texas landman regularly encounters (simple power-of-2 fractions).
@@ -1054,7 +1082,7 @@ interface CombinatorialTractPlan {
     | 'kitchen_sink';
   /** Raven Forest pooled-unit grouping. */
   unitName: string;
-  unitCode: 'A' | 'B';
+  unitCode: string;
   /** Target node count — varies per tract so the dataset has realistic variety. */
   targetNodes: number;
   /** Lessee name for leases generated on this tract. */
@@ -2083,6 +2111,7 @@ export function buildCombinatorialWorkspaceData(): {
   leaseholdOrris: LeaseholdOrri[];
   leaseholdTransferOrderEntries: LeaseholdTransferOrderEntry[];
   activeDeskMapId: string | null;
+  activeUnitCode: string | null;
   instrumentTypes: string[];
   pdfMappings: PdfMapping[];
   ownerData: OwnerWorkspaceData;
@@ -2097,6 +2126,7 @@ export function buildCombinatorialWorkspaceData(): {
   for (const tract of COMBINATORIAL_TRACTS) {
     buildCombinatorialTract(builder, leaseOverrides, tract);
   }
+  addNaturalMultiDocSeedMappings(builder);
 
   const finalizedNodes = finalizeGeneratedNodes(builder.nodes, { humorousDeaths: false });
   const { nodes, ownerData } = buildSeedOwnerWorkspaceData(
@@ -2127,56 +2157,79 @@ export function buildCombinatorialWorkspaceData(): {
       id: 'combinatorial-orri-1',
       payee: 'Prairie Vista Override, LP',
       scope: 'unit',
+      unitCode: 'A',
       deskMapId: null,
       burdenFraction: '1/32',
       burdenBasis: 'gross_8_8',
       effectiveDate: '2024-02-01',
       sourceDocNo: 'CB-ORRI-1',
-      notes: 'Unit-wide gross 8/8 ORRI covering every tract.',
+      notes: 'Unit A gross 8/8 ORRI covering every Unit A tract.',
+      depthRange: 'all_depths',
     },
     {
       id: 'combinatorial-orri-2',
       payee: 'Salt Fork Royalty Partners',
       scope: 'unit',
+      unitCode: 'A',
       deskMapId: null,
       burdenFraction: '1/64',
       burdenBasis: 'net_revenue_interest',
       effectiveDate: '2024-02-15',
       sourceDocNo: 'CB-ORRI-2',
-      notes: 'Unit-wide NRI-basis ORRI for stacking-order review.',
+      notes: 'Unit A NRI-basis ORRI for stacking-order review.',
+      depthRange: 'all_depths',
     },
     {
       id: 'combinatorial-orri-3',
       payee: 'Llano Working Interest Override LLC',
       scope: 'unit',
+      unitCode: 'A',
       deskMapId: null,
       burdenFraction: '1/80',
       burdenBasis: 'working_interest',
       effectiveDate: '2024-03-01',
       sourceDocNo: 'CB-ORRI-3',
-      notes: 'Unit-wide WI-basis ORRI (note: see audit finding #2 on the WI-basis convention).',
+      notes: 'Unit A WI-basis ORRI.',
+      depthRange: 'all_depths',
+    },
+    {
+      id: 'combinatorial-orri-3b',
+      payee: 'Pine Island Override, LP',
+      scope: 'unit',
+      unitCode: 'B',
+      deskMapId: null,
+      burdenFraction: '1/40',
+      burdenBasis: 'gross_8_8',
+      effectiveDate: '2024-03-15',
+      sourceDocNo: 'CB-ORRI-3B',
+      notes: 'Unit B gross 8/8 ORRI covering every Unit B tract.',
+      depthRange: 'all_depths',
     },
     {
       id: 'combinatorial-orri-4',
       payee: 'Pecos Override Co.',
       scope: 'tract',
+      unitCode: null,
       deskMapId: deskMapIdByCode.get('C6') ?? null,
       burdenFraction: '1/16',
       burdenBasis: 'gross_8_8',
       effectiveDate: '2024-04-10',
       sourceDocNo: 'CB-ORRI-4',
       notes: 'Tract-scope gross 8/8 ORRI on Tract 6 (royalty-deed flavor).',
+      depthRange: 'all_depths',
     },
     {
       id: 'combinatorial-orri-5',
       payee: 'Brazos Bend Overrides, LP',
       scope: 'tract',
+      unitCode: null,
       deskMapId: deskMapIdByCode.get('C10') ?? null,
       burdenFraction: '1/128',
       burdenBasis: 'net_revenue_interest',
       effectiveDate: '2024-05-20',
       sourceDocNo: 'CB-ORRI-5',
       notes: 'Tract-scope NRI-basis ORRI on Tract 10 (kitchen sink).',
+      depthRange: 'all_depths',
     },
   ];
 
@@ -2187,33 +2240,39 @@ export function buildCombinatorialWorkspaceData(): {
       assignor: UNIT_A_LESSEE,
       assignee: 'Caprock Resources, LLC',
       scope: 'unit',
+      unitCode: 'A',
       deskMapId: null,
       workingInterestFraction: '1/2',
       effectiveDate: '2024-03-01',
       sourceDocNo: 'CB-ASG-1',
-      notes: 'Unit-wide 50% working-interest assignment to Caprock Resources.',
+      notes: 'Unit A 50% working-interest assignment to Caprock Resources.',
+      depthRange: 'all_depths',
     },
     {
       id: 'combinatorial-assignment-2',
       assignor: UNIT_B_LESSEE,
       assignee: 'Rio Draw Operating Co.',
       scope: 'tract',
+      unitCode: null,
       deskMapId: deskMapIdByCode.get('C6') ?? null,
       workingInterestFraction: '1/4',
       effectiveDate: '2024-04-01',
       sourceDocNo: 'CB-ASG-2',
       notes: 'Tract-scope 25% WI assignment on Tract 6.',
+      depthRange: 'all_depths',
     },
     {
       id: 'combinatorial-assignment-3',
       assignor: UNIT_B_LESSEE,
       assignee: 'Staked Plains Minerals',
       scope: 'tract',
+      unitCode: null,
       deskMapId: deskMapIdByCode.get('C10') ?? null,
       workingInterestFraction: '1/8',
       effectiveDate: '2024-05-01',
       sourceDocNo: 'CB-ASG-3',
       notes: 'Tract-scope 12.5% WI assignment on Tract 10 (kitchen sink).',
+      depthRange: 'all_depths',
     },
   ];
 
@@ -2236,6 +2295,7 @@ export function buildCombinatorialWorkspaceData(): {
     leaseholdOrris,
     leaseholdTransferOrderEntries: [],
     activeDeskMapId: deskMaps[0]?.id ?? null,
+    activeUnitCode: 'A',
     instrumentTypes: [...DEMO_INSTRUMENT_TYPES],
     pdfMappings: builder.pdfMappings,
     ownerData,
@@ -2258,6 +2318,7 @@ export async function seedCombinatorialData(): Promise<{
     leaseholdOrris: workspace.leaseholdOrris,
     leaseholdTransferOrderEntries: workspace.leaseholdTransferOrderEntries,
     activeDeskMapId: workspace.activeDeskMapId,
+    activeUnitCode: workspace.activeUnitCode,
     instrumentTypes: workspace.instrumentTypes,
   });
   await resetWorkspaceSideStores(workspace.workspaceId, workspace.ownerData);
@@ -2276,7 +2337,7 @@ export async function seedCombinatorialData(): Promise<{
   let pdfCount = 0;
   const failedPdfNodeIds: string[] = [];
   for (const mapping of workspace.pdfMappings) {
-    const ok = await attachPdf(mapping.nodeId, mapping.fileName);
+    const ok = await attachPdf(mapping.nodeId, mapping.fileName, mapping.kind);
     if (ok) {
       pdfCount++;
     } else {
@@ -2284,14 +2345,9 @@ export async function seedCombinatorialData(): Promise<{
     }
   }
 
-  if (failedPdfNodeIds.length > 0) {
-    for (const failedNodeId of failedPdfNodeIds) {
-      useWorkspaceStore.getState().updateNode(failedNodeId, {
-        hasDoc: false,
-        docFileName: '',
-      });
-    }
-  }
+  // Phase 5: no failed-PDF cleanup needed; see the equivalent comment in
+  // the Elmore seed above.
+  void failedPdfNodeIds;
 
   console.log(
     `[combinatorial] Built ${workspace.nodes.length} nodes, attached ${pdfCount} PDFs, ${workspace.deskMaps.length} desk maps`

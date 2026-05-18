@@ -1,8 +1,8 @@
 /**
  * Desk Map tab bar — switch between tracts, create/rename/delete desk maps.
  *
- * When desk maps carry `unitCode` / `unitName` (Phase 4a), the tab bar groups
- * them under bold section headers. Tracts without a `unitCode` render under an
+ * When desk maps carry `unitCode` / `unitName`, the tab bar groups them under
+ * bold section headers. Tracts without a `unitCode` render under an
  * "Unassigned" header for backward compatibility with pre-overhaul workspaces.
  *
  * Double-click a tab to rename. Click × to delete.
@@ -11,6 +11,7 @@
 import { useMemo, useState } from 'react';
 import { useWorkspaceStore } from '../../store/workspace-store';
 import type { DeskMap, DeskMapUnitCode } from '../../types/node';
+import { useConfirmation } from '../shared/ConfirmationProvider';
 
 /** Tracts that belong to error-scenario flavors show a small dot indicator. */
 function hasWarning(dm: DeskMap): boolean {
@@ -31,10 +32,12 @@ interface UnitGroup {
 export default function DeskMapTabs() {
   const deskMaps = useWorkspaceStore((s) => s.deskMaps);
   const activeDeskMapId = useWorkspaceStore((s) => s.activeDeskMapId);
+  const activeUnitCode = useWorkspaceStore((s) => s.activeUnitCode);
   const createDeskMap = useWorkspaceStore((s) => s.createDeskMap);
   const setActiveDeskMap = useWorkspaceStore((s) => s.setActiveDeskMap);
   const renameDeskMap = useWorkspaceStore((s) => s.renameDeskMap);
   const deleteDeskMap = useWorkspaceStore((s) => s.deleteDeskMap);
+  const { confirm: requestConfirmation } = useConfirmation();
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
@@ -62,8 +65,19 @@ export default function DeskMapTabs() {
   const hasMultipleGroups = groups.length > 1 || (groups.length === 1 && groups[0].unitCode !== null);
 
   const handleCreate = () => {
-    const num = deskMaps.length + 1;
-    createDeskMap(`Tract ${num}`, `T${num}`);
+    const activeDeskMap = activeDeskMapId
+      ? deskMaps.find((deskMap) => deskMap.id === activeDeskMapId) ?? null
+      : null;
+    const activeUnit = activeUnitCode
+      ? groups.find((group) => group.unitCode === activeUnitCode) ?? null
+      : activeDeskMap?.unitCode
+        ? groups.find((group) => group.unitCode === activeDeskMap.unitCode) ?? null
+        : null;
+    const num = activeUnit ? activeUnit.deskMaps.length + 1 : deskMaps.length + 1;
+    createDeskMap(`Tract ${num}`, `T${deskMaps.length + 1}`, [], {
+      unitName: activeUnit?.unitName,
+      unitCode: activeUnit?.unitCode ?? undefined,
+    });
   };
 
   const handleStartRename = (id: string, name: string) => {
@@ -78,9 +92,15 @@ export default function DeskMapTabs() {
     setEditingId(null);
   };
 
-  const handleDelete = (id: string, e: React.MouseEvent) => {
+  const handleDelete = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (confirm('Delete this desk map? Nodes will remain in the workspace.')) {
+    const confirmed = await requestConfirmation({
+      title: 'Delete Desk Map?',
+      message: 'Delete this desk map? Nodes will remain in the workspace.',
+      confirmLabel: 'Delete Desk Map',
+      tone: 'danger',
+    });
+    if (confirmed) {
       deleteDeskMap(id);
     }
   };
@@ -88,9 +108,17 @@ export default function DeskMapTabs() {
   if (deskMaps.length === 0) return null;
 
   return (
-    <div className="flex items-center gap-3 px-4 py-3 bg-parchment border-b border-ledger-line overflow-x-auto">
+    <div
+      role="tablist"
+      aria-label="Desk maps"
+      className="flex items-center gap-3 px-4 py-3 bg-parchment border-b border-ledger-line overflow-x-auto"
+    >
       {groups.map((group) => (
-        <div key={group.unitCode ?? '_unassigned'} className="flex items-center gap-2">
+        <div
+          key={group.unitCode ?? '_unassigned'}
+          role="presentation"
+          className="flex items-center gap-2"
+        >
           {/* Section header — only shown when unit grouping is present */}
           {hasMultipleGroups && (
             <span className="text-[11px] font-bold uppercase tracking-wider text-ink/50 whitespace-nowrap mr-1">
@@ -101,7 +129,16 @@ export default function DeskMapTabs() {
           {group.deskMaps.map((dm) => (
             <div
               key={dm.id}
+              role="tab"
+              aria-selected={activeDeskMapId === dm.id}
+              tabIndex={activeDeskMapId === dm.id ? 0 : -1}
               onClick={() => setActiveDeskMap(dm.id)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  setActiveDeskMap(dm.id);
+                }
+              }}
               className={`group flex items-center gap-2 px-6 py-2.5 rounded-2xl text-sm font-semibold whitespace-nowrap cursor-pointer transition-colors ${
                 activeDeskMapId === dm.id
                   ? 'bg-leather text-parchment'
@@ -119,6 +156,7 @@ export default function DeskMapTabs() {
                     if (e.key === 'Escape') setEditingId(null);
                   }}
                   onClick={(e) => e.stopPropagation()}
+                  aria-label={`Rename ${dm.name}`}
                   className="w-36 px-2 py-1 rounded-lg text-sm bg-parchment text-ink border border-ledger-line outline-none"
                 />
               ) : (
@@ -137,7 +175,9 @@ export default function DeskMapTabs() {
               )}
               {activeDeskMapId === dm.id && editingId !== dm.id && (
                 <button
+                  type="button"
                   onClick={(e) => handleDelete(dm.id, e)}
+                  aria-label={`Delete ${dm.name}`}
                   className="opacity-0 group-hover:opacity-100 text-parchment/60 hover:text-parchment text-xs transition-opacity"
                 >
                   ×
@@ -153,6 +193,7 @@ export default function DeskMapTabs() {
         </div>
       ))}
       <button
+        type="button"
         onClick={handleCreate}
         className="px-5 py-2.5 rounded-2xl text-sm font-semibold whitespace-nowrap text-leather hover:bg-leather/10 border border-dashed border-leather/40 transition-colors"
         title="Add new desk map"

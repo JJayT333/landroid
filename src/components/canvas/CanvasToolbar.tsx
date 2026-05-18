@@ -12,6 +12,7 @@ import {
 } from '../../engine/flowchart-metrics';
 import { useCanvasStore } from '../../store/canvas-store';
 import type { FlowTool } from '../../types/flowchart';
+import { useConfirmation } from '../shared/ConfirmationProvider';
 
 interface CanvasToolbarProps {
   onImportTree: () => void;
@@ -53,8 +54,10 @@ function StepperButton({
         {label}
       </span>
       <button
+        type="button"
         onClick={() => onChange(Math.max(min, value - 1))}
         disabled={value <= min}
+        aria-label={`Decrease ${label.toLowerCase()}`}
         className="w-5 h-5 rounded text-xs font-bold text-ink-light hover:bg-parchment-dark disabled:opacity-30 transition-colors flex items-center justify-center"
       >
         -
@@ -63,8 +66,10 @@ function StepperButton({
         {value}
       </span>
       <button
+        type="button"
         onClick={() => onChange(Math.min(max, value + 1))}
         disabled={value >= max}
+        aria-label={`Increase ${label.toLowerCase()}`}
         className="w-5 h-5 rounded text-xs font-bold text-ink-light hover:bg-parchment-dark disabled:opacity-30 transition-colors flex items-center justify-center"
       >
         +
@@ -98,8 +103,10 @@ function FactorStepperButton({
         {label}
       </span>
       <button
+        type="button"
         onClick={() => onChange(decreaseValue)}
         disabled={value <= min}
+        aria-label={`Decrease ${label.toLowerCase()} spacing`}
         className="w-5 h-5 rounded text-xs font-bold text-ink-light hover:bg-parchment-dark disabled:opacity-30 transition-colors flex items-center justify-center"
         title={`Decrease ${label.toLowerCase()} spacing`}
       >
@@ -109,8 +116,10 @@ function FactorStepperButton({
         {value.toFixed(decimals)}x
       </span>
       <button
+        type="button"
         onClick={() => onChange(increaseValue)}
         disabled={value >= max}
+        aria-label={`Increase ${label.toLowerCase()} spacing`}
         className="w-5 h-5 rounded text-xs font-bold text-ink-light hover:bg-parchment-dark disabled:opacity-30 transition-colors flex items-center justify-center"
         title={`Increase ${label.toLowerCase()} spacing`}
       >
@@ -150,23 +159,39 @@ export default function CanvasToolbar({
   const redo = useCanvasStore((s) => s.redo);
   const canUndo = useCanvasStore((s) => s._past.length > 0);
   const canRedo = useCanvasStore((s) => s._future.length > 0);
+  const { confirm: requestConfirmation } = useConfirmation();
+
+  const handleClearCanvas = async () => {
+    const confirmed = await requestConfirmation({
+      title: 'Clear Flowchart Canvas?',
+      message:
+        'This removes all nodes and edges from the flowchart canvas. Desk Map title data stays in the workspace.',
+      confirmLabel: 'Clear Canvas',
+      tone: 'danger',
+    });
+    if (confirmed) clearCanvas();
+  };
 
   return (
     <div className="no-print absolute top-3 left-3 z-10 flex items-center gap-1 rounded-xl bg-parchment/95 backdrop-blur border border-ledger-line shadow-lg px-2 py-1.5">
       {/* Undo / Redo */}
       <button
+        type="button"
         onClick={undo}
         disabled={!canUndo}
         className="px-2 py-1.5 rounded-lg text-sm transition-colors text-ink-light hover:bg-parchment-dark disabled:opacity-30"
         title="Undo (Ctrl+Z)"
+        aria-label="Undo"
       >
         ↩
       </button>
       <button
+        type="button"
         onClick={redo}
         disabled={!canRedo}
         className="px-2 py-1.5 rounded-lg text-sm transition-colors text-ink-light hover:bg-parchment-dark disabled:opacity-30"
         title="Redo (Ctrl+Shift+Z)"
+        aria-label="Redo"
       >
         ↪
       </button>
@@ -177,7 +202,10 @@ export default function CanvasToolbar({
       {tools.map((tool) => (
         <button
           key={tool.id}
+          type="button"
           onClick={() => setActiveTool(tool.id)}
+          aria-label={tool.label}
+          aria-pressed={activeTool === tool.id}
           className={`
             px-2.5 py-1.5 rounded-lg text-sm transition-colors
             ${activeTool === tool.id
@@ -194,6 +222,7 @@ export default function CanvasToolbar({
 
       {/* Import / layout */}
       <button
+        type="button"
         onClick={onImportTree}
         className="px-3 py-1.5 rounded-lg text-xs font-semibold text-leather hover:bg-leather/10 transition-colors"
         title="Import active desk map to canvas"
@@ -205,7 +234,10 @@ export default function CanvasToolbar({
 
       {/* Snap toggle */}
       <button
+        type="button"
         onClick={() => setSnapToGrid(!snapToGrid)}
+        aria-label="Snap to grid"
+        aria-pressed={snapToGrid}
         className={`px-2 py-1.5 rounded-lg text-xs font-medium transition-colors ${
           snapToGrid
             ? 'bg-leather/20 text-leather font-semibold'
@@ -250,9 +282,11 @@ export default function CanvasToolbar({
       />
 
       <button
+        type="button"
         onClick={() =>
           setOrientation(orientation === 'landscape' ? 'portrait' : 'landscape')
         }
+        aria-label={`Switch to ${orientation === 'landscape' ? 'portrait' : 'landscape'}`}
         className="px-2 py-1.5 rounded-lg text-xs font-medium text-ink-light hover:bg-parchment-dark transition-colors"
         title={`Switch to ${orientation === 'landscape' ? 'portrait' : 'landscape'}`}
       >
@@ -279,6 +313,7 @@ export default function CanvasToolbar({
         onChange={onVerticalSpacingChange}
       />
       <button
+        type="button"
         onClick={onFitToGrid}
         className="px-3 py-1.5 rounded-lg text-xs font-semibold text-leather hover:bg-leather/10 transition-colors"
         title="Scale tree to fit within page grid"
@@ -286,7 +321,9 @@ export default function CanvasToolbar({
         Fit to Grid
       </button>
       <button
+        type="button"
         onClick={onResize}
+        aria-pressed={resizeMode}
         className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
           resizeMode
             ? 'bg-leather text-parchment'
@@ -297,6 +334,7 @@ export default function CanvasToolbar({
         Resize All
       </button>
       <button
+        type="button"
         onClick={selectAll}
         className="px-3 py-1.5 rounded-lg text-xs font-medium text-ink-light hover:bg-parchment-dark transition-colors"
         title="Select all nodes (Ctrl+A)"
@@ -308,6 +346,7 @@ export default function CanvasToolbar({
 
       {/* Print */}
       <button
+        type="button"
         onClick={onPrint}
         className="px-3 py-1.5 rounded-lg text-xs font-semibold text-leather hover:bg-leather/10 transition-colors"
         title="Print flowchart pages"
@@ -318,7 +357,8 @@ export default function CanvasToolbar({
       <div className="w-px h-6 bg-ledger-line mx-1" />
 
       <button
-        onClick={clearCanvas}
+        type="button"
+        onClick={() => void handleClearCanvas()}
         className="px-3 py-1.5 rounded-lg text-xs font-medium text-seal hover:bg-seal/10 transition-colors"
         title="Clear all canvas nodes"
       >

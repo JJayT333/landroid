@@ -9,10 +9,32 @@ import { createAnthropic } from '@ai-sdk/anthropic';
 import { createOpenAI } from '@ai-sdk/openai';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import type { AISettings } from './settings-store';
+import { isHostedMode } from '../utils/deploy-env';
+import { getIdToken, triggerUnauthorized } from '../auth/session';
 
 export class AISettingsError extends Error {}
 
+export const HOSTED_MODEL_ID = 'gpt-4o-mini';
+
 export function resolveModel(settings: AISettings): LanguageModel {
+  if (isHostedMode()) {
+    const proxy = createOpenAICompatible({
+      name: 'landroid-proxy',
+      baseURL: '/api/ai',
+      fetch: async (url, init) => {
+        const token = await getIdToken();
+        const headers = new Headers(init?.headers);
+        if (token) headers.set('Authorization', `Bearer ${token}`);
+        const res = await fetch(url as string, { ...init, headers });
+        // Token expired / invalid. Clear the session so LoginGate re-prompts
+        // instead of leaving the user staring at a broken AI stream.
+        if (res.status === 401) triggerUnauthorized();
+        return res;
+      },
+    });
+    return proxy(HOSTED_MODEL_ID);
+  }
+
   if (settings.provider === 'ollama') {
     const ollama = createOpenAICompatible({
       name: 'ollama',

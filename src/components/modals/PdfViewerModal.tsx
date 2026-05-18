@@ -1,21 +1,28 @@
 /**
- * PDF viewer modal — displays an attached PDF in an iframe.
+ * PDF viewer modal — displays a stored document in an iframe.
  *
- * Loads the PDF blob from IndexedDB, creates an object URL,
- * and renders it inline. Cleans up the URL on unmount.
+ * Phase 5 / B2: keyed by `docId`. The caller (chips, modal "View PDF"
+ * buttons, multi-chip rows) resolves which document to show before
+ * opening the modal. `nodeId`-based callers are gone after B2.
  */
 import { useEffect, useState } from 'react';
 import Modal from '../shared/Modal';
-import { getPdf } from '../../storage/pdf-store';
+import { getDocBlob, getDocMeta } from '../../storage/document-store';
+import { normalizePdfBlob } from '../../utils/pdf-validation';
 
 interface PdfViewerModalProps {
-  nodeId: string;
+  docId: string;
+  /**
+   * Optional filename shown in the title while the blob loads. The
+   * modal falls back to `getDocMeta(docId)` so the hint is purely a
+   * visual smoothing aid and can be omitted.
+   */
   fileNameHint?: string | null;
   onClose: () => void;
 }
 
 export default function PdfViewerModal({
-  nodeId,
+  docId,
   fileNameHint,
   onClose,
 }: PdfViewerModalProps) {
@@ -33,24 +40,34 @@ export default function PdfViewerModal({
 
     (async () => {
       try {
-        const attachment = await getPdf(nodeId);
-
-        if (!attachment || attachment.blob.size === 0) {
+        if (!docId) {
+          throw new Error(
+            'No PDF attachment was found for this title card. Reattach the recorded instrument before relying on View PDF.'
+          );
+        }
+        const [blob, meta] = await Promise.all([
+          getDocBlob(docId),
+          getDocMeta(docId),
+        ]);
+        if (!blob || blob.size === 0) {
           throw new Error(
             'No PDF attachment was found for this title card. Reattach the recorded instrument before relying on View PDF.'
           );
         }
 
         if (cancelled) return;
-        url = URL.createObjectURL(attachment.blob);
+        const resolvedFileName = meta?.fileName ?? fileNameHint ?? 'PDF';
+        const safeBlob = await normalizePdfBlob(blob, resolvedFileName);
+        if (cancelled) return;
+        url = URL.createObjectURL(safeBlob);
         setObjectUrl(url);
-        setFileName(attachment.fileName);
+        setFileName(resolvedFileName);
       } catch (loadError) {
         if (cancelled) return;
         setError(
           loadError instanceof Error
             ? loadError.message
-            : 'No PDF found for this node.'
+            : 'No PDF found for this document.'
         );
       }
     })();
@@ -59,7 +76,7 @@ export default function PdfViewerModal({
       cancelled = true;
       if (url) URL.revokeObjectURL(url);
     };
-  }, [fileNameHint, nodeId]);
+  }, [docId, fileNameHint]);
 
   return (
     <Modal open onClose={onClose} title={fileName || fileNameHint || 'View PDF'} wide>
@@ -68,6 +85,7 @@ export default function PdfViewerModal({
       ) : objectUrl ? (
         <iframe
           src={objectUrl}
+          sandbox="allow-downloads"
           className="w-full rounded-lg border border-ledger-line"
           style={{ height: '70vh' }}
           title={fileName}

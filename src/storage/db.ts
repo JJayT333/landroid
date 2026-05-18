@@ -2,10 +2,26 @@
  * Dexie database — IndexedDB storage for LANDroid v2.
  *
  * Tables:
- *   pdfs       — PDF file attachments keyed by nodeId
- *   workspaces — auto-saved workspace state
+ *   pdfs                 — v7 single-PDF-per-node attachments. Kept
+ *                          read-only for one rollback version; new writes
+ *                          go through `documents` + `document_attachments`.
+ *   documents            — v8 workspace-scoped document blobs (Phase 5).
+ *   document_attachments — v8 polymorphic join (node | owner | lease |
+ *                          curative | research). Only `'node'` rows are
+ *                          written by this pass.
+ *   workspaces           — auto-saved workspace state
  */
-import Dexie, { type EntityTable } from 'dexie';
+import Dexie, { type EntityTable, type Transaction } from 'dexie';
+import type {
+  DocumentAttachment,
+  DocumentRecord,
+} from '../types/document';
+import {
+  buildNodeWorkspaceIndex,
+  migratePdfsToDocuments,
+  type DocumentMigrationDeps,
+} from './document-migration';
+import { sha256HexOfBlob } from './blob-hash';
 import type { ContactLog, Lease, Owner, OwnerDoc } from '../types/owner';
 import type { MapAsset, MapExternalReference, MapRegion } from '../types/map';
 import type {
@@ -40,6 +56,8 @@ export interface CanvasRecord {
 
 const db = new Dexie('landroid-v2') as Dexie & {
   pdfs: EntityTable<PdfAttachment, 'nodeId'>;
+  documents: EntityTable<DocumentRecord, 'docId'>;
+  document_attachments: EntityTable<DocumentAttachment, 'attachmentId'>;
   workspaces: EntityTable<WorkspaceRecord, 'id'>;
   canvases: EntityTable<CanvasRecord, 'id'>;
   owners: EntityTable<Owner, 'id'>;
@@ -164,5 +182,182 @@ db.version(7).stores({
   titleIssues:
     'id, workspaceId, status, priority, issueType, affectedDeskMapId, affectedNodeId, affectedOwnerId, affectedLeaseId, [workspaceId+status], [workspaceId+priority]',
 });
+
+/**
+ * v8 (Phase 5 — multi-doc-per-entity persistence; see ADR 0004).
+ *
+ * Adds:
+ *   - `documents` — workspace-scoped document blobs.
+ *   - `document_attachments` — polymorphic join from a document to any
+ *     entity that wants to reference it.
+ *
+ * Keeps:
+ *   - `pdfs` is left in place (read-only for new code) so the v8 → v7
+ *     rollback path remains intact for one release. The next Dexie bump
+ *     can drop the table once the migration is field-proven.
+ *
+ * Migration:
+ *   Each existing `pdfs` row becomes a (`documents`, `document_attachments`)
+ *   pair. Pure logic lives in `./document-migration.ts` so the same
+ *   transformation can be unit-tested without a Dexie/IndexedDB harness.
+ *
+ * Auto-`.landroid` v7 backup before the upgrade is wired separately in
+ * Phase A4 (where it integrates with `workspace-persistence.ts`).
+ */
+db.version(8)
+  .stores({
+    pdfs: 'nodeId',
+    workspaces: 'id',
+    canvases: 'id',
+    owners: 'id, workspaceId, name',
+    leases: 'id, workspaceId, ownerId, [workspaceId+ownerId]',
+    contactLogs: 'id, workspaceId, ownerId, [workspaceId+ownerId]',
+    ownerDocs:
+      'id, workspaceId, ownerId, leaseId, [workspaceId+ownerId], [workspaceId+leaseId]',
+    mapAssets:
+      'id, workspaceId, isFeatured, deskMapId, nodeId, linkedOwnerId, leaseId, researchSourceId, researchProjectRecordId, [workspaceId+isFeatured], [workspaceId+deskMapId], [workspaceId+nodeId], [workspaceId+linkedOwnerId], [workspaceId+leaseId], [workspaceId+researchSourceId], [workspaceId+researchProjectRecordId]',
+    mapRegions:
+      'id, workspaceId, assetId, deskMapId, nodeId, linkedOwnerId, leaseId, researchSourceId, researchProjectRecordId, [workspaceId+assetId], [workspaceId+deskMapId], [workspaceId+nodeId], [workspaceId+linkedOwnerId], [workspaceId+leaseId], [workspaceId+researchSourceId], [workspaceId+researchProjectRecordId]',
+    mapExternalReferences:
+      'id, workspaceId, assetId, regionId, source, [workspaceId+assetId], [workspaceId+regionId]',
+    researchImports:
+      'id, workspaceId, datasetId, detectedFormat, [workspaceId+datasetId], [workspaceId+detectedFormat]',
+    researchSources:
+      'id, workspaceId, sourceType, context, [workspaceId+sourceType], [workspaceId+context]',
+    researchFormulas:
+      'id, workspaceId, category, status, [workspaceId+category], [workspaceId+status]',
+    researchProjectRecords:
+      'id, workspaceId, recordType, jurisdiction, status, [workspaceId+recordType], [workspaceId+jurisdiction], [workspaceId+status]',
+    researchQuestions:
+      'id, workspaceId, status, [workspaceId+status]',
+    titleIssues:
+      'id, workspaceId, status, priority, issueType, affectedDeskMapId, affectedNodeId, affectedOwnerId, affectedLeaseId, [workspaceId+status], [workspaceId+priority]',
+    documents:
+      'docId, workspaceId, contentHash, [workspaceId+kind], [workspaceId+createdAt]',
+    document_attachments:
+      'attachmentId, docId, [entityKind+entityId], [docId+entityKind+entityId]',
+  })
+  .upgrade(async (tx) => {
+    await runV7ToV8PdfMigration(tx);
+  });
+
+/**
+ * v9 (main-readiness cleanup) scopes attachment rows directly by workspace.
+ *
+ * v8 could derive workspace through `documents.docId`, but the join rows did
+ * not carry their own scope. Storing `workspaceId` on every attachment makes
+ * entity-link queries explicit and prevents same-entity-id links from another
+ * workspace from ever entering the result set.
+ */
+db.version(9)
+  .stores({
+    pdfs: 'nodeId',
+    workspaces: 'id',
+    canvases: 'id',
+    owners: 'id, workspaceId, name',
+    leases: 'id, workspaceId, ownerId, [workspaceId+ownerId]',
+    contactLogs: 'id, workspaceId, ownerId, [workspaceId+ownerId]',
+    ownerDocs:
+      'id, workspaceId, ownerId, leaseId, [workspaceId+ownerId], [workspaceId+leaseId]',
+    mapAssets:
+      'id, workspaceId, isFeatured, deskMapId, nodeId, linkedOwnerId, leaseId, researchSourceId, researchProjectRecordId, [workspaceId+isFeatured], [workspaceId+deskMapId], [workspaceId+nodeId], [workspaceId+linkedOwnerId], [workspaceId+leaseId], [workspaceId+researchSourceId], [workspaceId+researchProjectRecordId]',
+    mapRegions:
+      'id, workspaceId, assetId, deskMapId, nodeId, linkedOwnerId, leaseId, researchSourceId, researchProjectRecordId, [workspaceId+assetId], [workspaceId+deskMapId], [workspaceId+nodeId], [workspaceId+linkedOwnerId], [workspaceId+leaseId], [workspaceId+researchSourceId], [workspaceId+researchProjectRecordId]',
+    mapExternalReferences:
+      'id, workspaceId, assetId, regionId, source, [workspaceId+assetId], [workspaceId+regionId]',
+    researchImports:
+      'id, workspaceId, datasetId, detectedFormat, [workspaceId+datasetId], [workspaceId+detectedFormat]',
+    researchSources:
+      'id, workspaceId, sourceType, context, [workspaceId+sourceType], [workspaceId+context]',
+    researchFormulas:
+      'id, workspaceId, category, status, [workspaceId+category], [workspaceId+status]',
+    researchProjectRecords:
+      'id, workspaceId, recordType, jurisdiction, status, [workspaceId+recordType], [workspaceId+jurisdiction], [workspaceId+status]',
+    researchQuestions:
+      'id, workspaceId, status, [workspaceId+status]',
+    titleIssues:
+      'id, workspaceId, status, priority, issueType, affectedDeskMapId, affectedNodeId, affectedOwnerId, affectedLeaseId, [workspaceId+status], [workspaceId+priority]',
+    documents:
+      'docId, workspaceId, contentHash, [workspaceId+kind], [workspaceId+createdAt]',
+    document_attachments:
+      'attachmentId, workspaceId, docId, [workspaceId+entityKind+entityId], [entityKind+entityId], [docId+entityKind+entityId]',
+  })
+  .upgrade(async (tx) => {
+    const docs = await tx.table<DocumentRecord, 'docId'>('documents').toArray();
+    const workspaceByDocId = new Map(docs.map((doc) => [doc.docId, doc.workspaceId]));
+    const attachments = await tx
+      .table<DocumentAttachment, 'attachmentId'>('document_attachments')
+      .toArray();
+    await Promise.all(
+      attachments.map((attachment) => {
+        const workspaceId = workspaceByDocId.get(attachment.docId);
+        if (!workspaceId) return undefined;
+        return tx.table('document_attachments').update(attachment.attachmentId, {
+          workspaceId,
+        });
+      })
+    );
+  });
+
+/**
+ * Real-implementation deps for the migration. The pure helper accepts
+ * everything as injection so tests can run with deterministic stubs.
+ */
+function realMigrationDeps(): DocumentMigrationDeps {
+  return {
+    generateId: () => crypto.randomUUID(),
+    hashBlob: sha256HexOfBlob,
+    now: () => new Date().toISOString(),
+  };
+}
+
+/**
+ * Dexie upgrade body for v7 → v8. Split out so the migration steps are
+ * legible in isolation and so a future explicit-rerun path (e.g. recovery
+ * tooling) can reuse it.
+ */
+async function runV7ToV8PdfMigration(tx: Transaction): Promise<void> {
+  const pdfs = await tx.table<PdfAttachment, 'nodeId'>('pdfs').toArray();
+  if (pdfs.length === 0) {
+    return;
+  }
+  const workspaceRows = await tx
+    .table<WorkspaceRecord, 'id'>('workspaces')
+    .toArray();
+  const nodeIndex = buildNodeWorkspaceIndex(
+    workspaceRows.map((row) => ({ id: row.id, data: row.data }))
+  );
+  const fallbackWorkspaceId =
+    workspaceRows[0]?.id
+    // If there are pdfs but no workspaces (corrupt state), the migration
+    // would otherwise lose the blobs. Use a sentinel ID so the rows still
+    // land in the new schema and the user can recover them manually.
+    ?? '__orphaned_pre_v8__';
+  const result = await migratePdfsToDocuments(
+    pdfs,
+    nodeIndex,
+    fallbackWorkspaceId,
+    realMigrationDeps()
+  );
+  if (result.documents.length > 0) {
+    await tx.table<DocumentRecord, 'docId'>('documents').bulkAdd(result.documents);
+    await tx
+      .table<DocumentAttachment, 'attachmentId'>('document_attachments')
+      .bulkAdd(result.attachments);
+  }
+  if (result.orphans.length > 0) {
+    // Don't throw — orphans are a recoverable warning, not a migration
+    // failure. The blobs are still in `documents` keyed to the fallback
+    // workspace; the v8 UI can show them under a "Pre-migration leftovers"
+    // section if needed.
+    console.warn(
+      `[landroid v7→v8] ${result.orphans.length} PDF row(s) had no matching `
+      + `workspace and were attached to the fallback workspace `
+      + `(${fallbackWorkspaceId}). Affected node IDs: `
+      + `${result.orphans.slice(0, 10).join(', ')}`
+      + (result.orphans.length > 10 ? ' …' : '')
+    );
+  }
+}
 
 export default db;

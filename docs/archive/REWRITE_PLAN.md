@@ -1,5 +1,10 @@
 # LANDroid v2 — Ground-Up Rewrite Plan
 
+> ARCHIVED / HISTORICAL.
+> The rewrite described here has already been absorbed into the active app.
+> Use `ARCHITECTURE.md`, `PROJECT_CONTEXT.md`, and `ROADMAP.md` for current
+> implementation guidance.
+
 ## Architecture Decision Record
 
 ### Why Rewrite

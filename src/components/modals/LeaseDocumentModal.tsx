@@ -146,6 +146,7 @@ export default function LeaseDocumentModal({
         {pdfUrl && (
           <iframe
             src={pdfUrl}
+            sandbox="allow-downloads"
             className="w-full rounded-lg border border-ledger-line"
             style={{ height: '60vh' }}
             title={`${resolved.mlrsSerial} attachment`}

@@ -179,6 +179,7 @@ describe('owner-store', () => {
           jurisdiction: 'tx_fee',
           createdAt: '',
           updatedAt: '',
+          depthRange: 'all_depths',
         },
       ],
       contacts: [
@@ -252,6 +253,7 @@ describe('owner-store', () => {
           jurisdiction: 'tx_fee',
           createdAt: '',
           updatedAt: '',
+          depthRange: 'all_depths',
         },
       ],
       contacts: [],
@@ -290,6 +292,7 @@ describe('owner-store', () => {
           jurisdiction: 'tx_fee',
           createdAt: '',
           updatedAt: '',
+          depthRange: 'all_depths',
         },
       ],
       contacts: [],

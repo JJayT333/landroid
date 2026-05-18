@@ -18,6 +18,13 @@ import {
 import DeskMapCard from '../components/deskmap/DeskMapCard';
 import DeskMapLeaseCard from '../components/deskmap/DeskMapLeaseCard';
 import DeskMapNpriCard from '../components/deskmap/DeskMapNpriCard';
+import { FormulaTooltip } from '../components/leasehold/FormulaTooltip';
+import {
+  coverageFoundInChainFormula,
+  coverageLeasedFormula,
+  coverageLinkedOwnersFormula,
+  leaseOverlapClippedFormula,
+} from '../components/deskmap/deskmap-formulas';
 import { planDeskMapLeaseDeletion } from '../components/deskmap/deskmap-lease-delete';
 import { isLeaseNode } from '../components/deskmap/deskmap-lease-node';
 import {
@@ -38,6 +45,7 @@ import {
 import ConveyModal from '../components/modals/ConveyModal';
 import PredecessorModal from '../components/modals/PredecessorModal';
 import AttachDocModal from '../components/modals/AttachDocModal';
+import { useConfirmation } from '../components/shared/ConfirmationProvider';
 import OwnershipNodeEditorModals from '../components/shared/OwnershipNodeEditorModals';
 import {
   createBlankNode,
@@ -62,7 +70,7 @@ interface TreeBranchProps {
   onPrecede: (id: string) => void;
   onAttachDoc: (id: string) => void;
   onDelete: (id: string) => void;
-  onViewPdf: (id: string) => void;
+  onViewDoc: (id: string) => void;
 }
 
 function TreeBranchComponent({
@@ -77,7 +85,7 @@ function TreeBranchComponent({
   onPrecede,
   onAttachDoc,
   onDelete,
-  onViewPdf,
+  onViewDoc,
 }: TreeBranchProps) {
   const leaseNode = isLeaseNode(tree.node);
   const npriNode = isNpriNode(tree.node);
@@ -90,7 +98,7 @@ function TreeBranchComponent({
           onEdit={onEdit}
           onAttachDoc={onAttachDoc}
           onDelete={onDelete}
-          onViewPdf={onViewPdf}
+          onViewDoc={onViewDoc}
         />
       ) : npriNode ? (
         <DeskMapNpriCard
@@ -102,7 +110,7 @@ function TreeBranchComponent({
           onPrecede={onPrecede}
           onAttachDoc={onAttachDoc}
           onDelete={onDelete}
-          onViewPdf={onViewPdf}
+          onViewDoc={onViewDoc}
         />
       ) : (
         <DeskMapCard
@@ -119,7 +127,7 @@ function TreeBranchComponent({
           onPrecede={onPrecede}
           onAttachDoc={onAttachDoc}
           onDelete={onDelete}
-          onViewPdf={onViewPdf}
+          onViewDoc={onViewDoc}
         />
       )}
 
@@ -139,7 +147,7 @@ function TreeBranchComponent({
               onPrecede={onPrecede}
               onAttachDoc={onAttachDoc}
               onDelete={onDelete}
-              onViewPdf={onViewPdf}
+              onViewDoc={onViewDoc}
             />
           ))}
         </div>
@@ -165,21 +173,66 @@ function treeBranchPropsAreEqual(
     previous.onPrecede === next.onPrecede &&
     previous.onAttachDoc === next.onAttachDoc &&
     previous.onDelete === next.onDelete &&
-    previous.onViewPdf === next.onViewPdf
+    previous.onViewDoc === next.onViewDoc
   );
 }
 
 const TreeBranch = memo(TreeBranchComponent, treeBranchPropsAreEqual);
+
+export function computeDeskMapFitViewport({
+  containerWidth,
+  containerHeight,
+  contentWidth,
+  contentHeight,
+  padding = 96,
+}: {
+  containerWidth: number;
+  containerHeight: number;
+  contentWidth: number;
+  contentHeight: number;
+  padding?: number;
+}): { x: number; y: number; zoom: number } | null {
+  if (
+    containerWidth <= 0
+    || containerHeight <= 0
+    || contentWidth <= 0
+    || contentHeight <= 0
+  ) {
+    return null;
+  }
+  const fitZoom = Math.min(
+    1.15,
+    Math.max(
+      0.25,
+      Math.min(
+        (containerWidth - padding) / contentWidth,
+        (containerHeight - padding) / contentHeight
+      )
+    )
+  );
+  return {
+    x: Math.max(24, (containerWidth - contentWidth * fitZoom) / 2),
+    y: Math.max(24, (containerHeight - contentHeight * fitZoom) / 2),
+    zoom: fitZoom,
+  };
+}
 
 // ── Pan/zoom container ──────────────────────────────────
 // Uses Pointer Events with setPointerCapture for reliable drag tracking.
 // setPointerCapture routes ALL subsequent pointer events to the capturing
 // element, even if the pointer leaves the window. No window-level listeners needed.
 
-function PanZoomContainer({ children }: { children: React.ReactNode }) {
+function PanZoomContainer({
+  children,
+  resetKey,
+}: {
+  children: React.ReactNode;
+  resetKey: string;
+}) {
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(0.8);
   const containerRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
   const dragging = useRef(false);
   const startPos = useRef({ x: 0, y: 0 });
   const lastPos = useRef({ x: 0, y: 0 });
@@ -225,6 +278,34 @@ function PanZoomContainer({ children }: { children: React.ReactNode }) {
     dragging.current = false;
     pendingPointerId.current = null;
   }, []);
+
+  const fitToContent = useCallback(() => {
+    const container = containerRef.current;
+    const content = contentRef.current;
+    if (!container || !content) return;
+
+    const containerRect = container.getBoundingClientRect();
+    const contentWidth = content.scrollWidth;
+    const contentHeight = content.scrollHeight;
+    if (containerRect.width <= 0 || containerRect.height <= 0 || contentWidth <= 0 || contentHeight <= 0) {
+      return;
+    }
+
+    const viewport = computeDeskMapFitViewport({
+      containerWidth: containerRect.width,
+      containerHeight: containerRect.height,
+      contentWidth,
+      contentHeight,
+    });
+    if (!viewport) return;
+    setZoom(viewport.zoom);
+    setPan({ x: viewport.x, y: viewport.y });
+  }, []);
+
+  useEffect(() => {
+    const id = window.requestAnimationFrame(fitToContent);
+    return () => window.cancelAnimationFrame(id);
+  }, [fitToContent, resetKey]);
 
   // Wheel zoom toward cursor position — needs native listener for { passive: false }
   useEffect(() => {
@@ -274,7 +355,15 @@ function PanZoomContainer({ children }: { children: React.ReactNode }) {
       onClickCapture={handleClickCapture}
       onDragStart={(e) => e.preventDefault()}
     >
+      <button
+        type="button"
+        onClick={fitToContent}
+        className="absolute right-3 top-3 z-20 rounded-lg border border-ledger-line bg-parchment/95 px-3 py-1.5 text-xs font-semibold text-ink shadow-sm hover:bg-parchment-dark/80"
+      >
+        Fit
+      </button>
       <div
+        ref={contentRef}
         style={{
           transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
           transformOrigin: '0 0',
@@ -437,22 +526,26 @@ function CoverageCard({
   fraction,
   detail,
   toneClassName,
+  formula,
 }: {
   label: string;
   fraction: string;
   detail: string;
   toneClassName: string;
+  formula?: import('../components/leasehold/FormulaTooltip').FormulaContent;
 }) {
+  const value = formatAsFraction(d(fraction));
+  const pct = formatCoveragePercent(fraction);
   return (
     <div className={`rounded-md border px-2 py-1.5 ${toneClassName}`}>
       <div className="text-[9px] font-semibold uppercase tracking-wider leading-tight">
         {label}
       </div>
       <div className="mt-1 text-xs font-semibold font-mono">
-        {formatAsFraction(d(fraction))}
+        {formula ? <FormulaTooltip content={formula}>{value}</FormulaTooltip> : value}
       </div>
       <div className="text-[9px] mt-0.5 opacity-80">
-        {formatCoveragePercent(fraction)}
+        {formula ? <FormulaTooltip content={formula}>{pct}</FormulaTooltip> : pct}
       </div>
       <div className="text-[9px] mt-1 opacity-80 leading-tight">
         {detail}
@@ -468,6 +561,7 @@ export default function DeskMapView() {
   const setPendingNodeEditorRoute = useUIStore((state) => state.setPendingNodeEditorRoute);
   const leases = useOwnerStore((state) => state.leases);
   const removeLeaseRecord = useOwnerStore((state) => state.removeLease);
+  const { confirm: requestConfirmation, alert: showAlert } = useConfirmation();
   const nodes = useWorkspaceStore((s) => s.nodes);
   const deskMaps = useWorkspaceStore((s) => s.deskMaps);
   const activeNodeId = useWorkspaceStore((s) => s.activeNodeId);
@@ -476,6 +570,7 @@ export default function DeskMapView() {
   const removeNode = useWorkspaceStore((s) => s.removeNode);
   const addNode = useWorkspaceStore((s) => s.addNode);
   const createDeskMap = useWorkspaceStore((s) => s.createDeskMap);
+  const clearDeskMapNodes = useWorkspaceStore((s) => s.clearDeskMapNodes);
   const addNodeToActiveDeskMap = useWorkspaceStore((s) => s.addNodeToActiveDeskMap);
   const activeDeskMapId = useWorkspaceStore((s) => s.activeDeskMapId);
 
@@ -484,7 +579,7 @@ export default function DeskMapView() {
   const [precedeNodeId, setPrecedeNodeId] = useState<string | null>(null);
   const [attachDocParentId, setAttachDocParentId] = useState<string | null>(null);
   const [npriParentId, setNpriParentId] = useState<string | null>(null);
-  const [pdfViewNodeId, setPdfViewNodeId] = useState<string | null>(null);
+  const [pdfViewDocId, setPdfViewDocId] = useState<string | null>(null);
   const [ownerSearchQuery, setOwnerSearchQuery] = useState('');
   const [ownerSearchMatchIndex, setOwnerSearchMatchIndex] = useState(0);
   // Phase 7 polish: collapsible toolbar so the canvas stays unobstructed once
@@ -655,9 +750,19 @@ export default function DeskMapView() {
     setAttachDocParentId(id);
   }, []);
 
-  const handleDelete = useCallback((id: string) => {
+  const handleDelete = useCallback(async (id: string) => {
     const node = nodeById.get(id) ?? null;
     const leaseDeletionPlan = planDeskMapLeaseDeletion(nodes, id);
+    const title = leaseDeletionPlan.leaseId
+      ? 'Delete Lessee Card?'
+      : node?.type === 'related'
+      ? 'Delete Related Node?'
+      : 'Delete Node?';
+    const confirmLabel = leaseDeletionPlan.leaseId
+      ? 'Delete Lessee Card'
+      : node?.type === 'related'
+      ? 'Delete Related Node'
+      : 'Delete Node';
     const message = leaseDeletionPlan.leaseId
       ? leaseDeletionPlan.removeOwnerLeaseRecord
         ? 'Delete this lessee card and remove the linked lease from the owner record?'
@@ -666,37 +771,47 @@ export default function DeskMapView() {
       ? 'Delete this related node? Any attached related records beneath it will also be removed.'
       : 'Delete this node? Its branch will be removed, and any conveyed amount will be restored to the grantor.';
 
-    if (confirm(message)) {
-      void (async () => {
-        try {
-          if (leaseDeletionPlan.leaseId && leaseDeletionPlan.removeOwnerLeaseRecord) {
-            await removeLeaseRecord(leaseDeletionPlan.leaseId);
-          }
-          // Snapshot pre-delete state so we can detect a silent failure
-          // (the store sets `lastError` instead of throwing for math/graph
-          // rejections). If the node is still present afterwards, surface
-          // the actual error to the user instead of leaving them puzzled.
-          const beforeIds = new Set(
-            useWorkspaceStore.getState().nodes.map((n) => n.id)
-          );
-          removeNode(id);
-          const after = useWorkspaceStore.getState();
-          const stillPresent = after.nodes.some((n) => n.id === id);
-          if (stillPresent && beforeIds.has(id)) {
-            const reason = after.lastError ?? 'Delete was rejected by the ownership-graph validator.';
-            console.error('[DeskMap delete] failed:', reason);
-            alert(`Could not delete this node.\n\n${reason}`);
-          }
-        } catch (deleteError) {
-          console.error(deleteError);
-          alert('Delete failed. The card was left in place so owner data stays consistent.');
-        }
-      })();
-    }
-  }, [nodeById, nodes, removeLeaseRecord, removeNode]);
+    const confirmed = await requestConfirmation({
+      title,
+      message,
+      confirmLabel,
+      tone: 'danger',
+    });
+    if (!confirmed) return;
 
-  const handleViewPdf = useCallback((id: string) => {
-    setPdfViewNodeId(id);
+    try {
+      if (leaseDeletionPlan.leaseId && leaseDeletionPlan.removeOwnerLeaseRecord) {
+        await removeLeaseRecord(leaseDeletionPlan.leaseId);
+      }
+      // Snapshot pre-delete state so we can detect a silent failure
+      // (the store sets `lastError` instead of throwing for math/graph
+      // rejections). If the node is still present afterwards, surface
+      // the actual error to the user instead of leaving them puzzled.
+      const beforeIds = new Set(
+        useWorkspaceStore.getState().nodes.map((n) => n.id)
+      );
+      removeNode(id);
+      const after = useWorkspaceStore.getState();
+      const stillPresent = after.nodes.some((n) => n.id === id);
+      if (stillPresent && beforeIds.has(id)) {
+        const reason = after.lastError ?? 'Delete was rejected by the ownership-graph validator.';
+        console.error('[DeskMap delete] failed:', reason);
+        await showAlert({
+          title: 'Could Not Delete Node',
+          message: `Could not delete this node.\n\n${reason}`,
+        });
+      }
+    } catch (deleteError) {
+      console.error(deleteError);
+      await showAlert({
+        title: 'Delete Failed',
+        message: 'Delete failed. The card was left in place so owner data stays consistent.',
+      });
+    }
+  }, [nodeById, nodes, removeLeaseRecord, removeNode, requestConfirmation, showAlert]);
+
+  const handleViewDoc = useCallback((id: string) => {
+    setPdfViewDocId(id);
   }, []);
 
   const handleAddRoot = useCallback(() => {
@@ -717,6 +832,27 @@ export default function DeskMapView() {
     setActiveNode(id);
     setEditorRoute({ kind: 'node', nodeId: id });
   }, [addNode, addNodeToActiveDeskMap, createDeskMap, deskMaps.length, setActiveNode]);
+
+  const handleClearDeskMap = useCallback(async () => {
+    if (!activeDeskMap) return;
+    if (visibleCardCount === 0) {
+      await showAlert({
+        title: 'Desk Map Already Clear',
+        message: `${activeDeskMap.name} is already clear.`,
+      });
+      return;
+    }
+
+    const confirmed = await requestConfirmation({
+      title: `Clear ${activeDeskMap.name}?`,
+      message: `This removes the ${visibleCardCount} visible card${visibleCardCount === 1 ? '' : 's'} from this Desk Map. Other tracts and owner records stay in the workspace.`,
+      confirmLabel: 'Clear Desk Map',
+      tone: 'danger',
+    });
+    if (!confirmed) return;
+
+    clearDeskMapNodes(activeDeskMap.id);
+  }, [activeDeskMap, clearDeskMapNodes, requestConfirmation, showAlert, visibleCardCount]);
 
   const cycleOwnerSearchMatch = useCallback((direction: 1 | -1) => {
     setOwnerSearchMatchIndex((currentIndex) => {
@@ -761,6 +897,17 @@ export default function DeskMapView() {
                 className="px-3 py-1.5 rounded-lg text-xs font-semibold text-leather hover:bg-leather/10 transition-colors"
               >
                 + Add Root
+              </button>
+            )}
+            {!toolbarCollapsed && (
+              <button
+                type="button"
+                onClick={handleClearDeskMap}
+                disabled={!activeDeskMap || visibleCardCount === 0}
+                className="rounded-lg border border-seal/30 px-3 py-1.5 text-xs font-semibold text-seal transition-colors hover:bg-seal/10 disabled:cursor-not-allowed disabled:opacity-40"
+                title="Clear all cards from the active Desk Map"
+              >
+                Clear Map
               </button>
             )}
             <span className="text-[10px] text-ink-light font-mono">
@@ -909,6 +1056,7 @@ export default function DeskMapView() {
                   balancedLabel: 'Balanced at 100%',
                 })}
                 toneClassName={coverageTone(coverageSummary.missingOwnership)}
+                formula={coverageFoundInChainFormula(coverageSummary)}
               />
               <CoverageCard
                 label="Linked Owners"
@@ -919,6 +1067,7 @@ export default function DeskMapView() {
                   balancedLabel: 'All current owners linked',
                 })}
                 toneClassName={coverageTone(coverageSummary.unlinkedOwnership)}
+                formula={coverageLinkedOwnersFormula(coverageSummary)}
               />
               <CoverageCard
                 label="Leased"
@@ -929,8 +1078,58 @@ export default function DeskMapView() {
                   balancedLabel: 'Fully leased',
                 })}
                 toneClassName={coverageTone(coverageSummary.unleasedOwnership)}
+                formula={coverageLeasedFormula(coverageSummary)}
               />
             </div>
+            {d(coverageSummary.currentOwnership).greaterThan(1) && (
+              <div className="rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-2 text-[10px] leading-4 text-amber-950">
+                <div className="font-semibold uppercase tracking-wider">
+                  Over 100% mineral coverage
+                </div>
+                <div className="mt-1">
+                  Current cards contributing to the tract total:{' '}
+                  {coverageSummary.currentOwnershipContributors
+                    .slice(0, 6)
+                    .map((contributor) =>
+                      `${contributor.grantee} (${formatAsFraction(d(contributor.fraction))})`
+                    )
+                    .join(', ')}
+                  {coverageSummary.currentOwnershipContributors.length > 6
+                    ? `, +${coverageSummary.currentOwnershipContributors.length - 6} more`
+                    : ''}
+                  . This is warning-only while title is being reconciled.
+                </div>
+              </div>
+            )}
+            {coverageSummary.leaseOverlaps.length > 0 && (
+              <div
+                className="rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-2 text-[10px] leading-4 text-amber-950"
+                title="Audit M5: overlapping active leases on the same owner. Later leases are clipped by earlier ones until reconciled."
+              >
+                <div className="font-semibold uppercase tracking-wider">
+                  Lease overlap ({coverageSummary.leaseOverlaps.length})
+                </div>
+                <div className="mt-1">
+                  {coverageSummary.leaseOverlaps
+                    .slice(0, 3)
+                    .map(({ ownerGrantee, overlap }, i, arr) => (
+                      <span key={overlap.leaseId}>
+                        {ownerGrantee}: {overlap.leaseName || overlap.lessee} clipped{' '}
+                        <FormulaTooltip
+                          content={leaseOverlapClippedFormula(ownerGrantee, overlap)}
+                        >
+                          {overlap.clippedFraction}
+                        </FormulaTooltip>
+                        {i < arr.length - 1 ? '; ' : ''}
+                      </span>
+                    ))}
+                  {coverageSummary.leaseOverlaps.length > 3
+                    ? `, +${coverageSummary.leaseOverlaps.length - 3} more`
+                    : ''}
+                  . Review the leasehold deck to reconcile.
+                </div>
+              </div>
+            )}
             <div className="flex flex-wrap gap-x-2 gap-y-1 text-[9px] text-ink-light font-mono">
               <span>{coverageSummary.currentOwnerCount} present owners</span>
               <span>{coverageSummary.linkedOwnerCount} linked</span>
@@ -959,7 +1158,9 @@ export default function DeskMapView() {
             </div>
           </div>
         ) : (
-          <PanZoomContainer>
+          <PanZoomContainer
+            resetKey={`${activeDeskMapId ?? 'none'}:${visibleNodes.map((node) => node.id).join('|')}`}
+          >
             <div className="flex gap-16">
               {trees.map((tree) => (
                 <TreeBranch
@@ -979,7 +1180,7 @@ export default function DeskMapView() {
                   onPrecede={handlePrecede}
                   onAttachDoc={handleAttachDoc}
                   onDelete={handleDelete}
-                  onViewPdf={handleViewPdf}
+                  onViewDoc={handleViewDoc}
                 />
               ))}
             </div>
@@ -991,8 +1192,8 @@ export default function DeskMapView() {
           onSetRoute={setEditorRoute}
           npriParentId={npriParentId}
           onSetNpriParentId={setNpriParentId}
-          pdfViewNodeId={pdfViewNodeId}
-          onSetPdfViewNodeId={setPdfViewNodeId}
+          pdfViewDocId={pdfViewDocId}
+          onSetPdfViewDocId={setPdfViewDocId}
         />
 
         {/* Convey modal */}

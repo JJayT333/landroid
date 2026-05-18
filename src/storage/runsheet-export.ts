@@ -1,9 +1,6 @@
 import type { OwnershipNode } from '../types/node';
-import type { ColInfo } from 'xlsx';
 
-const SHEET_NAME = 'Leasehold';
-const XLSX_MIME_TYPE =
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+const CSV_MIME_TYPE = 'text/csv;charset=utf-8';
 
 const RUNSHEET_HEADERS = [
   'Documents Hyperlinked to TORS_Documents Folder',
@@ -21,25 +18,11 @@ const RUNSHEET_HEADERS = [
   'Remarks',
 ] as const;
 
-const RUNSHEET_COLUMN_WIDTHS: ColInfo[] = [
-  { wch: 15.33 },
-  { wch: 14 },
-  { wch: 8.5 },
-  { wch: 42.66 },
-  { wch: 6.83 },
-  { wch: 7 },
-  { wch: 12.33 },
-  { wch: 12 },
-  { wch: 11.5 },
-  { wch: 47 },
-  { wch: 47 },
-  { wch: 52.83 },
-  { wch: 55.33 },
-] as const;
-
 function buildImagePath(node: OwnershipNode) {
   const docNo = node.docNo.trim();
-  return node.hasDoc && docNo ? `TORS_Documents\\${docNo}.pdf` : '';
+  // Phase 5: a node "has a document" when its v8 attachments[] is
+  // non-empty. The legacy `hasDoc` flag was dropped in A4c.
+  return node.attachments.length > 0 && docNo ? `TORS_Documents\\${docNo}.pdf` : '';
 }
 
 function sanitizeFileNamePart(value: string) {
@@ -49,9 +32,16 @@ function sanitizeFileNamePart(value: string) {
     .replace(/\s+/g, ' ');
 }
 
-export async function buildRunsheetWorkbook(nodes: OwnershipNode[]) {
-  const XLSX = await import('xlsx');
-  const sheetRows = [
+function escapeCsvCell(value: unknown): string {
+  const text = String(value ?? '');
+  if (/[",\r\n]/.test(text)) {
+    return `"${text.replace(/"/g, '""')}"`;
+  }
+  return text;
+}
+
+export function buildRunsheetRows(nodes: OwnershipNode[]) {
+  return [
     [...RUNSHEET_HEADERS],
     ...nodes.map((node, index) => [
       index + 1,
@@ -69,44 +59,12 @@ export async function buildRunsheetWorkbook(nodes: OwnershipNode[]) {
       node.remarks || '',
     ]),
   ];
+}
 
-  const worksheet = XLSX.utils.aoa_to_sheet(sheetRows);
-  worksheet['!cols'] = [...RUNSHEET_COLUMN_WIDTHS];
-  worksheet['!autofilter'] = {
-    ref: `A1:M${Math.max(sheetRows.length, 1)}`,
-  };
-
-  for (let rowNumber = 2; rowNumber <= nodes.length + 1; rowNumber += 1) {
-    const orderByDate = rowNumber - 1;
-    const node = nodes[orderByDate - 1];
-
-    const imagePath = node ? buildImagePath(node) : '';
-
-    worksheet[`A${rowNumber}`] = imagePath
-      ? {
-          t: 'n',
-          f: `HYPERLINK(D${rowNumber},C${rowNumber})`,
-          v: orderByDate,
-        }
-      : {
-          t: 'n',
-          v: orderByDate,
-        };
-    worksheet[`D${rowNumber}`] = imagePath
-      ? {
-          t: 's',
-          f: `CONCATENATE("TORS_Documents\\",G${rowNumber},".pdf")`,
-          v: imagePath,
-        }
-      : {
-          t: 's',
-          v: '',
-        };
-  }
-
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, SHEET_NAME);
-  return workbook;
+export function buildRunsheetCsv(nodes: OwnershipNode[]) {
+  return buildRunsheetRows(nodes)
+    .map((row) => row.map(escapeCsvCell).join(','))
+    .join('\r\n');
 }
 
 export function buildRunsheetDownloadName(
@@ -119,20 +77,14 @@ export function buildRunsheetDownloadName(
     'runsheet',
   ].filter(Boolean);
 
-  return `${parts.join('-')}.xlsx`;
+  return `${parts.join('-')}.csv`;
 }
 
-export async function exportRunsheetWorkbook(nodes: OwnershipNode[]) {
-  const workbook = await buildRunsheetWorkbook(nodes);
-  const XLSX = await import('xlsx');
-  const buffer = XLSX.write(workbook, {
-    bookType: 'xlsx',
-    type: 'array',
-  });
-  return new Blob([buffer], { type: XLSX_MIME_TYPE });
+export function exportRunsheetCsv(nodes: OwnershipNode[]) {
+  return new Blob([`\uFEFF${buildRunsheetCsv(nodes)}`], { type: CSV_MIME_TYPE });
 }
 
-export async function downloadRunsheetWorkbook(
+export function downloadRunsheetCsv(
   nodes: OwnershipNode[],
   {
     projectName,
@@ -142,7 +94,7 @@ export async function downloadRunsheetWorkbook(
     tractLabel?: string | null;
   }
 ) {
-  const blob = await exportRunsheetWorkbook(nodes);
+  const blob = exportRunsheetCsv(nodes);
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;

@@ -66,6 +66,9 @@ export default function OwnerDetailPanel({
   onUpdateDoc,
   onRemoveDoc,
 }: OwnerDetailPanelProps) {
+  const tabBaseId = `owner-${owner.id}`;
+  const activePanelId = `${tabBaseId}-${tab}-panel`;
+
   return (
     <div className="h-full flex flex-col rounded-xl border border-ledger-line bg-parchment shadow-sm overflow-hidden">
       <div className="px-5 py-4 border-b border-ledger-line bg-ledger">
@@ -77,11 +80,20 @@ export default function OwnerDetailPanel({
         </div>
       </div>
 
-      <div className="px-4 py-3 border-b border-ledger-line bg-parchment-dark/50 flex gap-2">
+      <div
+        role="tablist"
+        aria-label={`${owner.name || 'Owner'} sections`}
+        className="px-4 py-3 border-b border-ledger-line bg-parchment-dark/50 flex gap-2"
+      >
         {tabs.map((item) => (
           <button
             key={item.id}
             type="button"
+            role="tab"
+            id={`${tabBaseId}-${item.id}-tab`}
+            aria-selected={tab === item.id}
+            aria-controls={`${tabBaseId}-${item.id}-panel`}
+            tabIndex={tab === item.id ? 0 : -1}
             onClick={() => onChangeTab(item.id)}
             className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
               tab === item.id
@@ -94,7 +106,12 @@ export default function OwnerDetailPanel({
         ))}
       </div>
 
-      <div className="flex-1 overflow-auto p-5">
+      <div
+        id={activePanelId}
+        role="tabpanel"
+        aria-labelledby={`${tabBaseId}-${tab}-tab`}
+        className="flex-1 overflow-auto p-5"
+      >
         {tab === 'info' && (
           <OwnerInfoTab owner={owner} onSave={onSaveOwner} onDelete={onDeleteOwner} />
         )}

@@ -19,7 +19,7 @@ import {
 
 const WIZARD_SYSTEM_PROMPT = `You are the LANDroid spreadsheet-import wizard.
 
-Your job: classify each sheet in the uploaded workbook and propose a column mapping. You DO NOT apply changes — your output is a preview the landman will review and approve.
+Your job: classify the uploaded CSV spreadsheet and propose a column mapping. You DO NOT apply changes — your output is a preview the landman will review and approve.
 
 # Ground rules
 
@@ -60,7 +60,7 @@ export async function analyzeWorkbook(
     model,
     system: WIZARD_SYSTEM_PROMPT,
     schema: workspaceImportProposalSchema,
-    prompt: `Classify every sheet in this workbook and propose column mappings.
+  prompt: `Classify this CSV spreadsheet and propose column mappings.
 
 ${rendered}`,
   });

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import FormField from '../shared/FormField';
+import { useConfirmation } from '../shared/ConfirmationProvider';
 import type { ContactLog } from '../../types/owner';
 import { createBlankContact } from '../../types/owner';
 
@@ -20,6 +21,7 @@ export default function OwnerContactsTab({
   onUpdate,
   onRemove,
 }: OwnerContactsTabProps) {
+  const { confirm: requestConfirmation } = useConfirmation();
   const [draft, setDraft] = useState<ContactLog | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -152,9 +154,13 @@ export default function OwnerContactsTab({
                   <button
                     type="button"
                     onClick={async () => {
-                      if (!confirm('Delete this contact log?')) {
-                        return;
-                      }
+                      const confirmed = await requestConfirmation({
+                        title: 'Delete Contact Log?',
+                        message: 'Delete this contact log?',
+                        confirmLabel: 'Delete Contact Log',
+                        tone: 'danger',
+                      });
+                      if (!confirmed) return;
                       await onRemove(contact.id);
                     }}
                     className="px-3 py-1.5 rounded-lg text-xs font-semibold text-seal hover:bg-seal/10 transition-colors"

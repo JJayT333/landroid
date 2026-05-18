@@ -5,6 +5,8 @@ import { useCurativeStore } from '../../store/curative-store';
 import { createBlankNode, type DeskMap } from '../../types/node';
 import { createBlankOwner, createBlankLease } from '../../types/owner';
 import { landroidTools } from '../tools';
+import { approveAIProposal, useAIApprovalStore } from '../approval-store';
+import { useAIUndoStore } from '../undo-store';
 
 function deskMap(overrides: Partial<DeskMap>): DeskMap {
   return {
@@ -29,9 +31,19 @@ async function runTool<Tool extends { execute?: (...args: never[]) => unknown }>
   return await exec(args, {} as never);
 }
 
+async function approveQueuedResult(result: any): Promise<any> {
+  expect(result).toMatchObject({
+    ok: true,
+    approvalRequired: true,
+    proposalId: expect.any(String),
+  });
+  return await approveAIProposal(result.proposalId);
+}
+
 describe('AI tools — read-only project queries', () => {
   beforeEach(() => {
     useWorkspaceStore.setState({
+      workspaceId: 'ws-1',
       projectName: 'Test Project',
       deskMaps: [],
       nodes: [],
@@ -42,6 +54,8 @@ describe('AI tools — read-only project queries', () => {
     });
     useOwnerStore.setState({ owners: [], leases: [] });
     useCurativeStore.setState({ titleIssues: [] });
+    useAIApprovalStore.getState().clear();
+    useAIUndoStore.getState().clear();
   });
 
   it('getProjectSummary returns counts from current state', async () => {
@@ -148,4 +162,190 @@ describe('AI tools — read-only project queries', () => {
     const result = await runTool(landroidTools.explainNode, { nodeId: 'nope' });
     expect(result).toMatchObject({ error: expect.stringContaining('nope') });
   });
+
+  it('queues mutating tools until approval and snapshots the approved batch', async () => {
+    useWorkspaceStore.setState({
+      deskMaps: [deskMap({ id: 'dm-1', nodeIds: [] })],
+      activeDeskMapId: 'dm-1',
+      nodes: [],
+    });
+
+    const queued = await runTool(landroidTools.createRootNode, {
+      kind: 'mineral',
+      initialFraction: '1',
+      form: { grantee: 'Approved Owner', instrument: 'Patent' },
+    });
+
+    expect(queued).toMatchObject({
+      ok: true,
+      approvalRequired: true,
+      proposalId: expect.any(String),
+      toolName: 'createRootNode',
+    });
+    expect(useWorkspaceStore.getState().nodes).toEqual([]);
+    expect(useAIApprovalStore.getState().proposals).toHaveLength(1);
+
+    const applied = await approveQueuedResult(queued);
+
+    expect(applied).toMatchObject({ ok: true, nodeId: expect.any(String) });
+    expect(useWorkspaceStore.getState().nodes).toHaveLength(1);
+    expect(useAIApprovalStore.getState().proposals).toHaveLength(0);
+    expect(useAIUndoStore.getState().snapshot).toMatchObject({
+      label: expect.stringContaining('Approved AI:'),
+    });
+  });
+
+  it('rejects malformed lease economics before AI-created leases enter active math', async () => {
+    const owner = { ...createBlankOwner('ws-1'), id: 'owner-1', name: 'Owner One' };
+    useOwnerStore.setState({ owners: [owner], leases: [] });
+
+    const badRoyalty = await runTool(landroidTools.createLease, {
+      ownerId: owner.id,
+      royaltyRate: 'one eighth',
+    });
+    await expect(approveQueuedResult(badRoyalty)).resolves.toMatchObject({
+      ok: false,
+      error: expect.stringContaining('Royalty rate'),
+    });
+
+    const badLeasedInterest = await runTool(landroidTools.createLease, {
+      ownerId: owner.id,
+      leasedInterest: 'all of it',
+    });
+    await expect(approveQueuedResult(badLeasedInterest)).resolves.toMatchObject({
+      ok: false,
+      error: expect.stringContaining('Leased interest'),
+    });
+    expect(useOwnerStore.getState().leases).toEqual([]);
+  });
+
+  // Audit L-4: explicit empty strings must be rejected so a model can't save
+  // a 0-royalty lease by passing royaltyRate=''. Missing keys remain valid
+  // (the user can fill them in later); the error only fires for explicit ''.
+  it('rejects explicit empty-string royaltyRate / leasedInterest from the AI', async () => {
+    const owner = { ...createBlankOwner('ws-1'), id: 'owner-1', name: 'Owner One' };
+    useOwnerStore.setState({ owners: [owner], leases: [] });
+
+    const emptyRoyalty = await runTool(landroidTools.createLease, {
+      ownerId: owner.id,
+      royaltyRate: '',
+    });
+    await expect(approveQueuedResult(emptyRoyalty)).resolves.toMatchObject({
+      ok: false,
+      error: expect.stringContaining('royaltyRate cannot be an empty string'),
+    });
+
+    const emptyLeasedInterest = await runTool(landroidTools.createLease, {
+      ownerId: owner.id,
+      leasedInterest: '',
+    });
+    await expect(approveQueuedResult(emptyLeasedInterest)).resolves.toMatchObject({
+      ok: false,
+      error: expect.stringContaining('leasedInterest cannot be an empty string'),
+    });
+    expect(useOwnerStore.getState().leases).toEqual([]);
+  });
+
+  it('keeps non-Texas leases out of active AI lease creation and attachment', async () => {
+    const owner = { ...createBlankOwner('ws-1'), id: 'owner-1', name: 'Owner One' };
+    const mineralNode = {
+      ...createBlankNode('node-1'),
+      interestClass: 'mineral' as const,
+      linkedOwnerId: owner.id,
+    };
+    const federalLease = createBlankLease('ws-1', owner.id, {
+      id: 'lease-federal',
+      jurisdiction: 'federal',
+    });
+    useOwnerStore.setState({ owners: [owner], leases: [federalLease] });
+    useWorkspaceStore.setState({
+      nodes: [mineralNode],
+      deskMaps: [deskMap({ id: 'dm-1', nodeIds: [mineralNode.id] })],
+      activeDeskMapId: 'dm-1',
+    });
+
+    const createdFederal = await runTool(landroidTools.createLease, {
+      ownerId: owner.id,
+      jurisdiction: 'federal',
+    });
+    await expect(approveQueuedResult(createdFederal)).resolves.toMatchObject({
+      ok: false,
+      error: expect.stringContaining('Only Texas fee/state leases'),
+    });
+
+    const attachedFederal = await runTool(landroidTools.attachLease, {
+      mineralNodeId: mineralNode.id,
+      leaseId: federalLease.id,
+    });
+    await expect(approveQueuedResult(attachedFederal)).resolves.toMatchObject({
+      ok: false,
+      error: expect.stringContaining('Only Texas fee/state leases'),
+    });
+    expect(useWorkspaceStore.getState().nodes).toHaveLength(1);
+  });
+
+  it('rejects attaching a lease to a mineral node linked to a different owner', async () => {
+    const ownerOne = { ...createBlankOwner('ws-1'), id: 'owner-1', name: 'Owner One' };
+    const ownerTwo = { ...createBlankOwner('ws-1'), id: 'owner-2', name: 'Owner Two' };
+    const mineralNode = {
+      ...createBlankNode('node-1'),
+      interestClass: 'mineral' as const,
+      linkedOwnerId: ownerOne.id,
+    };
+    const ownerTwoLease = createBlankLease('ws-1', ownerTwo.id, {
+      id: 'lease-owner-two',
+      jurisdiction: 'tx_fee',
+    });
+    useOwnerStore.setState({ owners: [ownerOne, ownerTwo], leases: [ownerTwoLease] });
+    useWorkspaceStore.setState({
+      nodes: [mineralNode],
+      deskMaps: [deskMap({ id: 'dm-1', nodeIds: [mineralNode.id] })],
+      activeDeskMapId: 'dm-1',
+    });
+
+    const result = await runTool(landroidTools.attachLease, {
+      mineralNodeId: mineralNode.id,
+      leaseId: ownerTwoLease.id,
+    });
+
+    await expect(approveQueuedResult(result)).resolves.toMatchObject({
+      ok: false,
+      error: expect.stringContaining('does not match'),
+    });
+    expect(useWorkspaceStore.getState().nodes).toHaveLength(1);
+  });
+
+  // Audit M-3: deleteNode used to gate cascading deletes on a model-supplied
+  // boolean, which the model could just set on its own. Now the AI tool
+  // refuses cascades unconditionally; the user must perform them from the UI.
+  it('refuses to cascade-delete a node with descendants regardless of the AI', async () => {
+    const root = { ...createBlankNode('root-1'), interestClass: 'mineral' as const };
+    const child = {
+      ...createBlankNode('child-1'),
+      parentId: 'root-1',
+      interestClass: 'mineral' as const,
+    };
+    useWorkspaceStore.setState({
+      nodes: [root, child],
+      deskMaps: [deskMap({ id: 'dm-1', nodeIds: ['root-1', 'child-1'] })],
+      activeDeskMapId: 'dm-1',
+    });
+
+    const queued = await runTool(landroidTools.deleteNode, { nodeId: 'root-1' });
+    const refused = await approveQueuedResult(queued);
+    expect(refused).toMatchObject({
+      ok: false,
+      error: expect.stringContaining('Refusing cascading delete'),
+      descendantCount: 1,
+    });
+    // Workspace untouched.
+    expect(useWorkspaceStore.getState().nodes).toHaveLength(2);
+
+    const preview = await runTool(landroidTools.previewDeleteNode, { nodeId: 'root-1' });
+    expect(preview).toMatchObject({
+      descendantCount: 1,
+      cascadeRequiresUiApproval: true,
+    });
+  });
+
 });

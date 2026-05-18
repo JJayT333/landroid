@@ -56,6 +56,7 @@ describe('autosave-change-detection', () => {
           effectiveDate: '2024-03-01',
           sourceDocNo: 'ASG-1',
           notes: '',
+          depthRange: 'all_depths' as const,
         },
       ],
       leaseholdOrris: [
@@ -69,6 +70,7 @@ describe('autosave-change-detection', () => {
           effectiveDate: '2024-02-01',
           sourceDocNo: 'ORRI-1',
           notes: '',
+          depthRange: 'all_depths' as const,
         },
       ],
       leaseholdTransferOrderEntries: [
@@ -81,6 +83,7 @@ describe('autosave-change-detection', () => {
         },
       ],
       activeDeskMapId: 'dm-1',
+      activeUnitCode: null,
       instrumentTypes: ['Deed'],
     };
 

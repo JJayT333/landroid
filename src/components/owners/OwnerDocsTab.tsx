@@ -1,8 +1,21 @@
 import { useRef, useState } from 'react';
 import AssetPreviewModal from '../modals/AssetPreviewModal';
 import OwnerDocEditModal from '../modals/OwnerDocEditModal';
+import { useConfirmation } from '../shared/ConfirmationProvider';
 import type { Lease, OwnerDoc } from '../../types/owner';
 import { createBlankOwnerDoc } from '../../types/owner';
+import {
+  OWNER_DOCUMENT_ACCEPT,
+  OWNER_DOCUMENT_UPLOAD_EXTENSIONS,
+  assertAllowedFileExtension,
+  assertFileSize,
+  limitForExtension,
+} from '../../utils/file-validation';
+import {
+  PDF_MIME_TYPE,
+  isPdfFileName,
+  normalizePdfBlob,
+} from '../../utils/pdf-validation';
 
 function downloadBlob(blob: Blob, fileName: string) {
   const url = URL.createObjectURL(blob);
@@ -32,6 +45,10 @@ export default function OwnerDocsTab({
   onUpdate,
   onRemove,
 }: OwnerDocsTabProps) {
+  const {
+    alert: showAlert,
+    confirm: requestConfirmation,
+  } = useConfirmation();
   const inputRef = useRef<HTMLInputElement>(null);
   const [previewDoc, setPreviewDoc] = useState<OwnerDoc | null>(null);
   const [editingDoc, setEditingDoc] = useState<OwnerDoc | null>(null);
@@ -41,19 +58,42 @@ export default function OwnerDocsTab({
       <input
         ref={inputRef}
         type="file"
+        accept={OWNER_DOCUMENT_ACCEPT}
         className="hidden"
         multiple
         onChange={async (event) => {
           const files = Array.from(event.target.files ?? []);
-          for (const file of files) {
-            await onAdd(
-              createBlankOwnerDoc(workspaceId, ownerId, file, {
-                fileName: file.name,
-                mimeType: file.type || 'application/octet-stream',
-              })
-            );
+          try {
+            for (const file of files) {
+              assertAllowedFileExtension(
+                file.name,
+                OWNER_DOCUMENT_UPLOAD_EXTENSIONS,
+                'Owner document'
+              );
+              const limit = limitForExtension(file.name);
+              assertFileSize(file, limit.bytes, limit.label);
+              const isPdf = isPdfFileName(file.name) || file.type.toLowerCase().includes('pdf');
+              const blob = isPdf ? await normalizePdfBlob(file, file.name) : file;
+              await onAdd(
+                createBlankOwnerDoc(workspaceId, ownerId, blob, {
+                  fileName: file.name,
+                  mimeType: isPdf
+                    ? PDF_MIME_TYPE
+                    : file.type || 'application/octet-stream',
+                })
+              );
+            }
+          } catch (error) {
+            await showAlert({
+              title: 'Upload Blocked',
+              message:
+                error instanceof Error
+                  ? error.message
+                  : 'One or more owner documents could not be uploaded.',
+            });
+          } finally {
+            event.target.value = '';
           }
-          event.target.value = '';
         }}
       />
 
@@ -117,9 +157,13 @@ export default function OwnerDocsTab({
                   <button
                     type="button"
                     onClick={async () => {
-                      if (!confirm('Delete this document?')) {
-                        return;
-                      }
+                      const confirmed = await requestConfirmation({
+                        title: 'Delete Owner Document?',
+                        message: 'Delete this document?',
+                        confirmLabel: 'Delete Document',
+                        tone: 'danger',
+                      });
+                      if (!confirmed) return;
                       await onRemove(doc.id);
                     }}
                     className="px-3 py-1.5 rounded-lg text-xs font-semibold text-seal hover:bg-seal/10 transition-colors"
