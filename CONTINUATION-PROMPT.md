@@ -23,6 +23,10 @@ Current follow-up branch: `codex/show-demo-data-hosted`. It makes Demo Data
 visible in hosted mode so signed-in POC users can load the Crackbaby Carnival
 fixture online.
 
+Deployment docs follow-up is on `codex/deployment-docs-main`: it removes stale
+Node 20 / `audit-verification-pre-aws` instructions and adds
+`DEPLOYMENT_STATE.md` as the current AWS resource map.
+
 Do not commit directly to `main`.
 
 ## Current Workstream

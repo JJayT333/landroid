@@ -156,7 +156,8 @@ Function → **Configuration → Function URL → Create function URL**:
 
 1. AWS console → **AWS Amplify** → **Create new app** → **Host web app**.
 2. Source: **GitHub**. Authorize and pick `JJayT333/landroid`.
-3. Branch: **`audit-verification-pre-aws`** for the test deploy. You can switch to `main` later once this branch is merged.
+3. Branch: **`main`**. Amplify is configured so merging to `main` rebuilds
+   and redeploys the hosted frontend automatically.
 
 ### 3b. Build settings
 

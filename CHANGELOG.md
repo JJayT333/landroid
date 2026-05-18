@@ -13,6 +13,10 @@ stay short.
   requests when the in-memory auth bridge is empty.
 - Made the Demo Data menu visible in hosted mode for the signed-in POC so the
   Crackbaby Carnival and Raven Forest fixtures can be loaded online.
+- Added `DEPLOYMENT_STATE.md` and refreshed deployment docs so the current AWS
+  setup is explicit: Amplify deploys frontend changes from `main`, while Lambda
+  AI proxy changes still require a bundle/upload until deployment automation is
+  added.
 
 ## 2026-05-17
 

@@ -34,7 +34,7 @@ SDK.
 
 1. Lambda console → **Create function** → Author from scratch
    - Name: `landroid-ai-proxy`
-   - Runtime: **Node.js 20.x**
+   - Runtime: **Node.js 22.x**
    - Architecture: arm64
 2. Upload `lambda.zip` (Code → Upload from → .zip file)
 3. Runtime settings → Handler: `handler.handler`
