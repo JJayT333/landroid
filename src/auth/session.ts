@@ -17,7 +17,29 @@ export function setIdToken(token: string | null): void {
 }
 
 export async function getIdToken(): Promise<string | null> {
-  return currentIdToken;
+  if (currentIdToken) return currentIdToken;
+  return readStoredOidcIdToken();
+}
+
+function readStoredOidcIdToken(): string | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    for (let i = 0; i < window.localStorage.length; i += 1) {
+      const key = window.localStorage.key(i);
+      if (!key?.startsWith('oidc.user:')) continue;
+      const raw = window.localStorage.getItem(key);
+      if (!raw) continue;
+      const parsed = JSON.parse(raw) as { id_token?: unknown; expired?: unknown };
+      if (parsed.expired === true) continue;
+      if (typeof parsed.id_token === 'string' && parsed.id_token.trim()) {
+        currentIdToken = parsed.id_token;
+        return currentIdToken;
+      }
+    }
+  } catch {
+    return null;
+  }
+  return null;
 }
 
 /**
