@@ -6,16 +6,32 @@ Keep long history in `CHANGELOG.md`.
 
 ## Current Branch
 
-Current branch: `claude/epic-hoover-48f4d0`.
+Current checked-out branch: `main`.
 
-Latest known commit before this audit work: `6d70597 docs: handoff prompt for
-the Audit Sheet export work`.
+Current `main` head: `298df0d Merge pull request #72 from
+JJayT333/claude/epic-hoover-48f4d0`.
+
+PR #72, `Main-readiness cleanup before AWS deployment`, was marked ready and
+merged into `main` on 2026-05-18. The old feature branch was deleted on GitHub.
+
+PR #73, `Fix hosted AI Cognito token recovery`, was merged into `main` on
+2026-05-18 after hosted manual AI testing showed Lambda receiving
+`missing_bearer` requests from the AI panel. `main` head after that merge is
+`b74bda1 fix: recover hosted ai id token (#73)`.
+
+Current follow-up branch: `codex/show-demo-data-hosted`. It makes Demo Data
+visible in hosted mode so signed-in POC users can load the Crackbaby Carnival
+fixture online.
 
 Do not commit directly to `main`.
 
 ## Current Workstream
 
-Main-readiness / housecleaning audit for the current LANDroid branch.
+Main-readiness / housecleaning audit is merged. AWS hosted deployment was
+updated to use `main` as the Amplify production branch, Lambda `nodejs22.x`,
+fresh AI proxy zip, `/api/ai` rewrite to the existing Function URL, and
+`landroid.abstractmapping.com` mapped to `main`. The current active workstream
+is hosted smoke testing and any follow-up fixes from the live site.
 
 The audit covered:
 
@@ -87,6 +103,43 @@ The first security blocker cleanup has also landed in the working tree:
   - A `Fit` control recenters large trees after manual pan/zoom.
 
 ## Latest Validation
+
+Completed on merged `main` at `298df0d` on 2026-05-18:
+
+- `git pull --ff-only origin main` passed; local `main` was already current.
+- `npm ci` passed with 0 vulnerabilities. Local shell was Node `v26.0.0`, so
+  npm warned that the repo engine target is `>=22 <26`.
+- `npm run lint` passed.
+- `npm test` passed: 71 files, 598 tests. Known intentional error-path logs
+  appeared for document cascade failure and post-v8 backup coverage.
+- `npm run build` passed. Known Vite warnings remain:
+  - `src/storage/db.ts` is both dynamically and statically imported.
+  - some generated chunks exceed 500 kB after minification.
+  - Node `v26.0.0` emitted a local `module.register()` deprecation warning.
+- `npm run deploy:check` passed. It warned that `amplify-rewrites.json` still
+  contains the expected `REPLACE_WITH_FUNCTION_URL_HOST` template placeholder.
+- `npm run test:e2e -- tests/e2e/landroid-workflows.spec.ts` passed: 11
+  Playwright workflows.
+- Working tree after validation was clean except intentionally untracked
+  `LANDroid-Features.pptx`; this handoff file was then updated on `main` but
+  not committed because repo policy says not to commit directly to `main`.
+
+Additional hosted-AI fix validation on PR #73:
+
+- `npm test -- src/auth/__tests__/session.test.ts src/ai/__tests__/read-only-tools.test.ts`
+  passed: 2 files, 15 tests.
+- `npm run lint` passed.
+- GitHub Actions for PR #73 passed for Root app and AI proxy.
+- `bash scripts/smoke-test-hosted.sh` passed against
+  `https://landroid.abstractmapping.com` before PR #73; it verifies routing and
+  unauthenticated rejection, but the manual authenticated AI response still
+  needs retesting after Amplify finishes deploying `b74bda1`.
+
+Hosted Demo Data follow-up validation:
+
+- `npm test -- src/components/shared/__tests__/navbar-policy.test.ts src/auth/__tests__/session.test.ts`
+  passed: 2 files, 11 tests.
+- `npm run lint` passed.
 
 Completed on `claude/epic-hoover-48f4d0`:
 

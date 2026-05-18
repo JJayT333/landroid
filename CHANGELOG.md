@@ -3,6 +3,17 @@
 This file records meaningful project changes so `CONTINUATION-PROMPT.md` can
 stay short.
 
+## 2026-05-18
+
+- Merged PR #72 into `main`, moved Amplify production to `main`, updated the
+  existing Lambda AI proxy to Node.js 22, uploaded the fresh proxy bundle, and
+  mapped `landroid.abstractmapping.com` to the `main` Amplify branch.
+- Fixed hosted AI token recovery in PR #73 so the AI client can recover the
+  Cognito ID token from OIDC storage and no longer sends anonymous proxy
+  requests when the in-memory auth bridge is empty.
+- Made the Demo Data menu visible in hosted mode for the signed-in POC so the
+  Crackbaby Carnival and Raven Forest fixtures can be loaded online.
+
 ## 2026-05-17
 
 - Ran the main-readiness housecleaning audit on
