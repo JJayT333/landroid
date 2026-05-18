@@ -11,7 +11,7 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "test": "vitest run",
+    "test": "vitest run --config vitest.config.ts",
     "package": "npm run bundle",
     "bundle": "rm -rf dist lambda.zip && npm run build && cp package.json dist/ && cp -r node_modules dist/ && cd dist && zip -qr ../lambda.zip . && cd .. && ls -lh lambda.zip"
   },
