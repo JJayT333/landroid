@@ -14,6 +14,7 @@ Use this map to decide which Markdown file to read or update.
 | `SECURITY.md` | Security model, AI key policy, and import risk notes. | Provider, hosting, upload, or secret-handling posture changes. |
 | `DEPLOYMENT_PLAN.md` | Hosted deployment, cloud security, and online AI rollout plan. | Hosted architecture, rollout phases, or provider strategy changes. |
 | `DEPLOYMENT_GUIDE.md` | Step-by-step AWS POC deployment instructions. | Console steps, AWS resource names, hosted env vars, or smoke-test instructions change. |
+| `DEPLOYMENT_STATE.md` | Current hosted AWS resource map and deploy behavior. | Amplify branch/domain, Lambda URL/runtime, Cognito IDs, DynamoDB table, or deploy automation changes. |
 | `DEPLOY_TEST_CHECKLIST.md` | Operational preflight and go/no-go checklist for the test deploy. | Test-deploy sequencing, AWS readiness gates, or stop conditions change. |
 | `USER_MANUAL.md` | User-facing app workflow guide. | User-visible behavior changes. |
 | `LANDMAN-MATH-REFERENCE.md` | Landman-facing math formulas and conventions. | Calculation semantics or warning/blocking behavior changes. |

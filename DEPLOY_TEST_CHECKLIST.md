@@ -30,8 +30,9 @@ Expected:
 
 ## 2. Git Checkpoint
 
-Deploy from a non-`main` branch. Before touching AWS, checkpoint the exact
-source and docs changes that support the deploy:
+Develop on a non-`main` branch, then merge through a PR. Amplify deploys the
+frontend from `main`, so do not push half-finished work there. Before touching
+AWS, checkpoint the exact source and docs changes that support the deploy:
 
 ```bash
 git status
@@ -92,7 +93,7 @@ Do not set `ALLOW_IN_MEMORY_USAGE_STORE` in AWS.
 
 ## 5. Amplify Frontend
 
-Connect/deploy branch `audit-verification-pre-aws`.
+Connect/deploy branch `main`.
 
 Build environment variables:
 
