@@ -23,8 +23,11 @@ export function resolveModel(settings: AISettings): LanguageModel {
       baseURL: '/api/ai',
       fetch: async (url, init) => {
         const token = await getIdToken();
+        if (!token) {
+          throw new AISettingsError('Hosted AI session is missing a Cognito ID token. Sign out, sign back in, and try again.');
+        }
         const headers = new Headers(init?.headers);
-        if (token) headers.set('Authorization', `Bearer ${token}`);
+        headers.set('Authorization', `Bearer ${token}`);
         const res = await fetch(url as string, { ...init, headers });
         // Token expired / invalid. Clear the session so LoginGate re-prompts
         // instead of leaving the user staring at a broken AI stream.

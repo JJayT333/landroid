@@ -9,7 +9,22 @@ import {
 afterEach(() => {
   setIdToken(null);
   setUnauthorizedHandler(null);
+  vi.unstubAllGlobals();
 });
+
+function stubWindowLocalStorage() {
+  const items = new Map<string, string>();
+  vi.stubGlobal('window', {
+    localStorage: {
+      get length() {
+        return items.size;
+      },
+      key: (index: number) => Array.from(items.keys())[index] ?? null,
+      getItem: (key: string) => items.get(key) ?? null,
+      setItem: (key: string, value: string) => items.set(key, value),
+    },
+  });
+}
 
 describe('auth/session', () => {
   describe('id token holder', () => {
@@ -23,6 +38,22 @@ describe('auth/session', () => {
     it('clears the token when set to null (sign-out)', async () => {
       setIdToken('jwt');
       setIdToken(null);
+      await expect(getIdToken()).resolves.toBeNull();
+    });
+    it('falls back to oidc-client localStorage when the in-memory bridge is empty', async () => {
+      stubWindowLocalStorage();
+      window.localStorage.setItem(
+        'oidc.user:https://cognito-idp.us-east-1.amazonaws.com/us-east-1_pool:client',
+        JSON.stringify({ id_token: 'stored.id.token', expired: false })
+      );
+      await expect(getIdToken()).resolves.toBe('stored.id.token');
+    });
+    it('ignores expired oidc-client localStorage users', async () => {
+      stubWindowLocalStorage();
+      window.localStorage.setItem(
+        'oidc.user:https://cognito-idp.us-east-1.amazonaws.com/us-east-1_pool:client',
+        JSON.stringify({ id_token: 'expired.id.token', expired: true })
+      );
       await expect(getIdToken()).resolves.toBeNull();
     });
   });
