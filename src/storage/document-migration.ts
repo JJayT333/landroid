@@ -90,6 +90,7 @@ export async function migratePdfsToDocuments(
 
     attachments.push({
       attachmentId: deps.generateId(),
+      workspaceId: resolvedWorkspaceId,
       docId,
       entityKind: 'node',
       entityId: pdf.nodeId,

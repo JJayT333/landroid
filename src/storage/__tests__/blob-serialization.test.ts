@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   MAX_DESERIALIZED_BLOB_BYTES,
   deserializeBlob,
+  deserializePdfBlob,
   serializeBlob,
 } from '../blob-serialization';
 
@@ -33,5 +34,22 @@ describe('blob-serialization (audit M3 per-blob cap)', () => {
     expect(() =>
       deserializeBlob({ mimeType: 'application/octet-stream', base64 })
     ).not.toThrow();
+  });
+
+  it('normalizes serialized PDF blobs to application/pdf after magic-byte validation', () => {
+    const base64 = Buffer.from('%PDF-1.7\n% test fixture').toString('base64');
+    const restored = deserializePdfBlob({
+      mimeType: 'text/html',
+      base64,
+    });
+    expect(restored.type).toBe('application/pdf');
+    expect(restored.size).toBeGreaterThan(0);
+  });
+
+  it('rejects serialized PDF blobs without a PDF header even when MIME claims PDF', () => {
+    const base64 = Buffer.from('<script>alert(1)</script>').toString('base64');
+    expect(() =>
+      deserializePdfBlob({ mimeType: 'application/pdf', base64 }, 'Imported PDF')
+    ).toThrow(/valid PDF file/i);
   });
 });

@@ -177,6 +177,8 @@ test('combinatorial demo loads with desk-map cards and PDF chips', async ({
   await expect(
     page.locator('button[data-attachment-id][title^="View attached PDF:"]').first()
   ).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Fit' })).toBeVisible();
+  await page.getByRole('button', { name: 'Fit' }).click();
   // Present-owner status now shows as a sky card tint + retained-interest gold
   // dot instead of a "Present Owner" pill — assert at least one retained-interest
   // marker rendered on a combinatorial desk-map card.
@@ -368,7 +370,7 @@ test('landroid export/import preserves v8 document chips and same-owner records'
   await expect(page.getByText(/C2-ST-\d+-deed\.pdf/)).toBeVisible();
   await expect(page.getByText(/C2-ST-\d+-obituary\.pdf/)).toBeVisible();
   await expect(page.getByText(/C2-ST-\d+-affidavit-of-heirship\.pdf/)).toBeVisible();
-  await page.getByRole('button', { name: 'Owners' }).click();
+  await page.getByRole('button', { name: 'Owners', exact: true }).click();
   const ownersShell = page.locator('main').first();
   await fillInput(ownersShell, 'Search', 'Charlotte Whitaker');
   await page.getByRole('button', { name: /Charlotte Whitaker/ }).click();
@@ -391,6 +393,9 @@ test('deleting a branch-scoped lessee card removes only that owner lease', async
   await expect(page.getByText('Lessor: Olivia Whitaker')).toBeVisible();
 
   await page.getByRole('button', { name: 'Collapse toolbar' }).click();
+  await page.addStyleTag({
+    content: '[class~="group-hover:flex"] { display: flex !important; }',
+  });
   const leaseCard = page
     .locator('div.group')
     .filter({ hasText: 'Lessor: Charlotte Whitaker' })

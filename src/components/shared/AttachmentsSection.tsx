@@ -7,7 +7,8 @@
  *   - "View PDF" button (calls `onViewDoc(docId)`)
  *   - up / down reorder buttons (last/first row disable the corresponding
  *     direction)
- *   - remove button (cascades to `deleteDoc`)
+ *   - remove button (detaches this node's link; the document stays in the
+ *     registry and on any other entities that reference it)
  * Plus an "Attach PDF" file picker at the bottom.
  *
  * Routed through the workspace-store actions

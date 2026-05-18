@@ -23,6 +23,8 @@ import {
 } from '../workspace-persistence';
 import { parsePersistedCanvasData } from '../canvas-persistence';
 
+const TEST_PDF_BODY = '%PDF-1.7\n% LANDroid test PDF\n';
+
 function buildCanvas(): CanvasSaveData {
   return {
     nodes: [
@@ -275,9 +277,9 @@ function buildWorkspace(canvas: CanvasSaveData | null): LandroidFileData {
           workspaceId: 'ws-1',
           fileName: '20260001.pdf',
           mimeType: 'application/pdf',
-          byteLength: 13,
+          byteLength: TEST_PDF_BODY.length,
           contentHash: 'fixture-hash',
-          blob: new Blob(['node-pdf-body'], { type: 'application/pdf' }),
+          blob: new Blob([TEST_PDF_BODY], { type: 'application/pdf' }),
           kind: 'deed',
           displayTitle: 'Recorded Mineral Deed',
           documentArea: 'runsheet_mineral_title',
@@ -300,6 +302,7 @@ function buildWorkspace(canvas: CanvasSaveData | null): LandroidFileData {
       attachments: [
         {
           attachmentId: 'att-fixture-1',
+          workspaceId: 'ws-1',
           docId: 'doc-fixture-1',
           entityKind: 'node',
           entityId: 'node-1',
@@ -370,11 +373,10 @@ describe('workspace-persistence', () => {
       sourceReference: 'TORS packet A',
       ocrStatus: 'not_needed',
     });
-    expect(await imported.documentData?.documents[0]?.blob.text()).toBe(
-      'node-pdf-body'
-    );
+    expect(await imported.documentData?.documents[0]?.blob.text()).toBe(TEST_PDF_BODY);
     expect(imported.documentData?.attachments[0]).toMatchObject({
       attachmentId: 'att-fixture-1',
+      workspaceId: 'ws-1',
       docId: 'doc-fixture-1',
       entityKind: 'node',
       entityId: 'node-1',
@@ -515,7 +517,7 @@ describe('workspace-persistence', () => {
       nodeId: 'node-v7',
       fileName: 'oldfile.pdf',
       mimeType: 'application/pdf',
-      blob: { base64: btoa('v7-blob-body'), mimeType: 'application/pdf' },
+      blob: { base64: btoa(TEST_PDF_BODY), mimeType: 'application/pdf' },
       createdAt: '2025-12-01T00:00:00.000Z',
     };
     const payload = {
@@ -541,16 +543,62 @@ describe('workspace-persistence', () => {
       mimeType: 'application/pdf',
       kind: 'other',
     });
-    expect(await imported.documentData?.documents[0]?.blob.text()).toBe(
-      'v7-blob-body'
-    );
+    expect(await imported.documentData?.documents[0]?.blob.text()).toBe(TEST_PDF_BODY);
     expect(imported.documentData?.attachments).toHaveLength(1);
     expect(imported.documentData?.attachments[0]).toMatchObject({
       entityKind: 'node',
       entityId: 'node-v7',
+      workspaceId: 'ws-v7',
       position: 0,
       docId: imported.documentData?.documents[0]?.docId,
     });
+  });
+
+  it('rejects v8 document blobs that claim PDF MIME without PDF bytes', async () => {
+    const payload = {
+      version: 8,
+      workspaceId: 'ws-bad-doc',
+      projectName: 'Bad Document',
+      nodes: [createBlankNode('node-bad-doc')],
+      deskMaps: [],
+      activeDeskMapId: null,
+      instrumentTypes: [],
+      documentData: {
+        documents: [
+          {
+            docId: 'doc-bad',
+            workspaceId: 'ws-bad-doc',
+            fileName: 'evil.pdf',
+            mimeType: 'application/pdf',
+            byteLength: 31,
+            contentHash: 'bad',
+            blob: {
+              base64: btoa('<script>alert("owned")</script>'),
+              mimeType: 'application/pdf',
+            },
+            kind: 'deed',
+            createdAt: '2026-05-17T00:00:00.000Z',
+            updatedAt: '2026-05-17T00:00:00.000Z',
+          },
+        ],
+        attachments: [
+          {
+            attachmentId: 'att-bad',
+            workspaceId: 'ws-bad-doc',
+            docId: 'doc-bad',
+            entityKind: 'node',
+            entityId: 'node-bad-doc',
+            position: 0,
+            createdAt: '2026-05-17T00:00:00.000Z',
+          },
+        ],
+      },
+    };
+    const file = new File([JSON.stringify(payload)], 'bad.landroid', {
+      type: 'application/json',
+    });
+
+    await expect(importLandroidFile(file)).rejects.toThrow(/valid PDF file/i);
   });
 
   it('writes version 8 in the export payload', async () => {
@@ -861,8 +909,8 @@ describe('workspace-persistence', () => {
       nodes: [
         {
           ...createBlankNode('a', 'b'),
-          fraction: '-0.250000000',
-          initialFraction: '-0.250000000',
+          fraction: '0.250000000',
+          initialFraction: '0.250000000',
         },
         {
           ...createBlankNode('b', 'a'),
@@ -880,6 +928,64 @@ describe('workspace-persistence', () => {
 
     await expect(importLandroidFile(file)).rejects.toThrow(
       'Invalid .landroid file: invalid ownership graph'
+    );
+  });
+
+  it('rejects malformed persisted node fractions before graph validation', async () => {
+    const invalidPayload = {
+      version: 5,
+      workspaceId: 'ws-invalid-fraction',
+      projectName: 'Invalid Fraction',
+      nodes: [
+        {
+          ...createBlankNode('node-bad'),
+          fraction: 'not-a-number',
+          initialFraction: '1',
+        },
+      ],
+      deskMaps: [],
+      activeDeskMapId: null,
+      instrumentTypes: [],
+    };
+    const file = new File(
+      [JSON.stringify(invalidPayload)],
+      'invalid-fraction.landroid',
+      { type: 'application/json' }
+    );
+
+    await expect(importLandroidFile(file)).rejects.toThrow(/invalid fraction/i);
+  });
+
+  it('rejects explicit invalid imported lease jurisdictions', async () => {
+    const invalidPayload = {
+      version: 5,
+      workspaceId: 'ws-invalid-lease',
+      projectName: 'Invalid Lease Jurisdiction',
+      nodes: [createBlankNode('node-1')],
+      deskMaps: [],
+      activeDeskMapId: null,
+      instrumentTypes: [],
+      ownerData: {
+        owners: [],
+        leases: [
+          {
+            id: 'lease-1',
+            ownerId: 'owner-1',
+            jurisdiction: 'blm',
+          },
+        ],
+        contacts: [],
+        docs: [],
+      },
+    };
+    const file = new File(
+      [JSON.stringify(invalidPayload)],
+      'invalid-lease-jurisdiction.landroid',
+      { type: 'application/json' }
+    );
+
+    await expect(importLandroidFile(file)).rejects.toThrow(
+      /invalid lease jurisdiction/i
     );
   });
 

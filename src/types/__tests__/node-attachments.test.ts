@@ -100,4 +100,22 @@ describe('OwnershipNode.attachments[] (Phase 5)', () => {
     const node = normalizeOwnershipNode({ id: 'n', attachments: entries });
     expect(node.attachments.map((a) => a.docId)).toEqual(['d1', 'd2', 'd3']);
   });
+
+  it('throws on malformed persisted fraction text instead of coercing to 0', () => {
+    expect(() =>
+      normalizeOwnershipNode({
+        id: 'node-bad-fraction',
+        fraction: 'not-a-number',
+      })
+    ).toThrow(/invalid fraction/i);
+  });
+
+  it('throws on negative persisted initialFraction values', () => {
+    expect(() =>
+      normalizeOwnershipNode({
+        id: 'node-negative',
+        initialFraction: '-0.25',
+      })
+    ).toThrow(/invalid initialFraction/i);
+  });
 });

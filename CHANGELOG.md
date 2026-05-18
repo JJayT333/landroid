@@ -3,6 +3,47 @@
 This file records meaningful project changes so `CONTINUATION-PROMPT.md` can
 stay short.
 
+## 2026-05-17
+
+- Ran the main-readiness housecleaning audit on
+  `claude/epic-hoover-48f4d0`, covering UX, landman workflow usefulness,
+  engine correctness, architecture/persistence, hosted security, dependency
+  audit state, AI behavior, and browser runtime smoke.
+- Added `docs/archive/audits/MAIN_READINESS_AUDIT_2026-05-17.md` with
+  prioritized blockers and cleanup sequence before treating the branch as a
+  main candidate.
+- Tightened one Playwright export/import workflow locator so the `Owners`
+  navigation click remains exact after formula badges expose "Linked Owners" as
+  role-button elements.
+- Updated `CONTINUATION-PROMPT.md` to point at the actual current branch,
+  latest validation, audit report, and next cleanup priorities.
+- Began the main-readiness security cleanup by validating and normalizing stored
+  PDF document blobs, rejecting hostile `.landroid` document payloads that do
+  not contain PDF bytes, sandboxing PDF iframe previews, and applying shared
+  upload allowlists/size limits to owner documents and Research imports.
+- Removed the vulnerable production `xlsx` dependency by narrowing AI
+  spreadsheet parsing to CSV, converting Runsheet export to CSV, and updating
+  the related tests and docs.
+- Updated the backend AWS SDK lockfile to clear the `fast-xml-builder`
+  production audit issue, moved Lambda/local guidance to Node.js 22, and added
+  GitHub Actions CI for root and AI-proxy install, audit, tests, and build.
+- Scoped document attachment rows by `workspaceId`, added a Dexie v9 migration
+  for existing attachment links, and made branch/tract document cascade cleanup
+  use one storage transaction with visible `lastError` reporting on failure.
+- Split document detach from global document delete: node-level remove actions
+  now detach only the selected attachment link, and node/tract deletion only
+  deletes document blobs that have no surviving attachment links.
+- Tightened persisted data validation so malformed/negative `.landroid` node
+  fraction fields and explicit unknown lease jurisdictions fail fast instead of
+  being normalized into zero or Texas-fee math.
+- Added an app-level AI approval queue: mutating AI tools now create pending
+  proposals, user approval applies each batch, and every approved batch gets one
+  undo snapshot.
+- Labeled spreadsheet prompt rows as untrusted CSV data and added hostile-cell
+  coverage so prompt-injection-like cells are treated as values.
+- Added Desk Map auto-fit and a `Fit` canvas control so large trees recenter
+  after load/import/tract switch or manual panning.
+
 ## 2026-05-16
 
 - Added `IDEAS.md` as a lightweight brainstorming inbox and archived stale

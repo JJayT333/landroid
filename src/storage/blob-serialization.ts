@@ -1,3 +1,8 @@
+import {
+  PDF_MIME_TYPE,
+  normalizePdfBytes,
+} from '../utils/pdf-validation';
+
 export interface SerializedBlob {
   mimeType: string;
   base64: string;
@@ -70,14 +75,31 @@ export async function serializeBlob(blob: Blob): Promise<SerializedBlob> {
   };
 }
 
-export function deserializeBlob(serialized: SerializedBlob): Blob {
+function deserializeBytes(serialized: SerializedBlob): Uint8Array {
   const estimated = estimateDecodedByteLength(serialized.base64);
   if (estimated > MAX_DESERIALIZED_BLOB_BYTES) {
     throw new Error(
       `Serialized blob too large to deserialize (~${(estimated / (1024 * 1024)).toFixed(1)} MB; limit is ${(MAX_DESERIALIZED_BLOB_BYTES / (1024 * 1024)).toFixed(0)} MB).`
     );
   }
-  return new Blob([fromBase64(serialized.base64)], {
+  return fromBase64(serialized.base64);
+}
+
+export function deserializeBlob(serialized: SerializedBlob): Blob {
+  const bytes = deserializeBytes(serialized);
+  const safeCopy = new Uint8Array(bytes);
+  return new Blob([safeCopy.buffer as ArrayBuffer], {
     type: serialized.mimeType || 'application/octet-stream',
   });
+}
+
+export function deserializePdfBlob(
+  serialized: SerializedBlob,
+  label = 'PDF'
+): Blob {
+  return normalizePdfBytes(deserializeBytes(serialized), label);
+}
+
+export function emptyPdfBlob(): Blob {
+  return new Blob([], { type: PDF_MIME_TYPE });
 }

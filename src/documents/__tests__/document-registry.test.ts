@@ -27,6 +27,7 @@ function doc(overrides: Partial<RegistryDocument> = {}): RegistryDocument {
 function attachment(overrides: Partial<DocumentAttachment> = {}): DocumentAttachment {
   return {
     attachmentId: 'att-1',
+    workspaceId: 'ws-1',
     docId: 'doc-1',
     entityKind: 'node',
     entityId: 'node-1',

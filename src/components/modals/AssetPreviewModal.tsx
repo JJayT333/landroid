@@ -4,6 +4,7 @@ import {
   PENDING_DRILLING_FILE_SPECS,
   detectPendingDrillingFileKind,
 } from '../../research/rrc-pending-drilling';
+import { isPdfFileName, normalizePdfBlob } from '../../utils/pdf-validation';
 import RrcDelimitedPreviewTable from '../research/RrcDelimitedPreviewTable';
 import Modal from '../shared/Modal';
 
@@ -31,15 +32,26 @@ export default function AssetPreviewModal({
 }: AssetPreviewModalProps) {
   const [textPreview, setTextPreview] = useState<string | null>(null);
   const [delimitedPreview, setDelimitedPreview] = useState<ReturnType<typeof buildRrcDelimitedTextPreview> | null>(null);
-  const objectUrl = useMemo(() => URL.createObjectURL(blob), [blob]);
   const lowerMime = mimeType.toLowerCase();
-  const isPdf = lowerMime.includes('pdf');
-  const isImage = lowerMime.startsWith('image/');
+  const lowerFileName = fileName.toLowerCase();
+  const isPdf = lowerMime.includes('pdf') || isPdfFileName(fileName);
+  const isImage =
+    lowerMime === 'image/png' ||
+    lowerMime === 'image/jpeg' ||
+    lowerFileName.endsWith('.png') ||
+    lowerFileName.endsWith('.jpg') ||
+    lowerFileName.endsWith('.jpeg');
   const isTextLike =
     lowerMime.includes('json') ||
     lowerMime.startsWith('text/') ||
-    fileName.toLowerCase().endsWith('.geojson') ||
-    fileName.toLowerCase().endsWith('.json');
+    lowerFileName.endsWith('.geojson') ||
+    lowerFileName.endsWith('.json');
+  const objectUrl = useMemo(
+    () => (isPdf ? null : URL.createObjectURL(blob)),
+    [blob, isPdf]
+  );
+  const [pdfObjectUrl, setPdfObjectUrl] = useState<string | null>(null);
+  const [pdfError, setPdfError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isTextLike) {
@@ -78,6 +90,40 @@ export default function AssetPreviewModal({
   }, [blob, fileName, isTextLike]);
 
   useEffect(() => {
+    if (!isPdf) {
+      setPdfObjectUrl(null);
+      setPdfError(null);
+      return;
+    }
+
+    let cancelled = false;
+    let url: string | null = null;
+    setPdfObjectUrl(null);
+    setPdfError(null);
+
+    normalizePdfBlob(blob, fileName)
+      .then((safeBlob) => {
+        if (cancelled) return;
+        url = URL.createObjectURL(safeBlob);
+        setPdfObjectUrl(url);
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        setPdfError(
+          error instanceof Error
+            ? error.message
+            : 'This file is not a valid PDF.'
+        );
+      });
+
+    return () => {
+      cancelled = true;
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [blob, fileName, isPdf]);
+
+  useEffect(() => {
+    if (!objectUrl) return undefined;
     return () => {
       URL.revokeObjectURL(objectUrl);
     };
@@ -97,15 +143,26 @@ export default function AssetPreviewModal({
         </div>
 
         {isPdf && (
-          <iframe
-            src={objectUrl}
-            className="w-full rounded-lg border border-ledger-line"
-            style={{ height: '70vh' }}
-            title={fileName}
-          />
+          pdfError ? (
+            <div className="rounded-lg border border-seal/30 bg-seal/5 p-4 text-sm text-seal">
+              {pdfError}
+            </div>
+          ) : pdfObjectUrl ? (
+            <iframe
+              src={pdfObjectUrl}
+              sandbox="allow-downloads"
+              className="w-full rounded-lg border border-ledger-line"
+              style={{ height: '70vh' }}
+              title={fileName}
+            />
+          ) : (
+            <div className="rounded-lg border border-ledger-line bg-ledger p-4 text-sm text-ink-light">
+              Loading PDF preview...
+            </div>
+          )
         )}
 
-        {isImage && (
+        {isImage && objectUrl && (
           <div className="rounded-lg border border-ledger-line bg-ledger p-3">
             <img
               src={objectUrl}

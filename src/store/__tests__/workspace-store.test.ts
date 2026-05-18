@@ -9,7 +9,7 @@ const mocks = vi.hoisted(() => ({
   // Default to a resolved promise so the cascade-delete helper's `.catch`
   // doesn't trip on `undefined`. Individual tests can override with
   // `mockRejectedValueOnce` if they need to exercise the error path.
-  deleteDoc: vi.fn(async () => undefined),
+  deleteDocsForAttachments: vi.fn(async () => undefined),
   unlinkCurativeNode: vi.fn(),
 }));
 
@@ -23,11 +23,12 @@ vi.mock('../map-store', () => ({
 }));
 
 vi.mock('../../storage/document-store', () => ({
-  // Phase 5: workspace-store cascade-deletes docs via document-store.
+  // Phase 5: workspace-store cleans removed node attachment rows via document-store.
   // Other document-store functions land on `attachDocToNode` etc. and
   // are exercised in `workspace-store-doc-actions.test.ts`.
-  deleteDoc: mocks.deleteDoc,
+  deleteDocsForAttachments: mocks.deleteDocsForAttachments,
   saveDoc: vi.fn(),
+  detachDocFromEntity: vi.fn(),
   renameDoc: vi.fn(),
   reorderAttachments: vi.fn(),
   listAttachmentsForNodes: vi.fn(),
@@ -446,10 +447,11 @@ describe('workspace-store', () => {
     expect(state.leaseholdTransferOrderEntries).toEqual([
       expect.objectContaining({ sourceRowId: 'assignment-other' }),
     ]);
-    // Phase 5: cascade-delete now targets `documents` by docId, not the
-    // legacy `pdfs` table by nodeId.
-    expect(mocks.deleteDoc).toHaveBeenCalledWith('doc-root-1');
-    expect(mocks.deleteDoc).toHaveBeenCalledWith('doc-child-1');
+    // Cascade cleanup now removes attachment rows and only deletes orphaned docs.
+    expect(mocks.deleteDocsForAttachments).toHaveBeenCalledWith([
+      'att-root-1',
+      'att-child-1',
+    ]);
     expect(mocks.unlinkNode).toHaveBeenCalledWith('root-1');
     expect(mocks.unlinkNode).toHaveBeenCalledWith('child-1');
     expect(mocks.unlinkCurativeNode).toHaveBeenCalledWith('root-1');
@@ -500,8 +502,33 @@ describe('workspace-store', () => {
     expect(state.deskMaps.find((deskMap) => deskMap.id === 'dm-2')?.nodeIds).toEqual([
       'shared-root',
     ]);
-    expect(mocks.deleteDoc).not.toHaveBeenCalled();
+    expect(mocks.deleteDocsForAttachments).not.toHaveBeenCalled();
     expect(mocks.unlinkNode).not.toHaveBeenCalled();
+  });
+
+  it('surfaces document cascade cleanup failures after deleting a branch', async () => {
+    const root = {
+      ...createBlankNode('root-1', null),
+      initialFraction: '1',
+      fraction: '1',
+      attachments: [
+        {
+          docId: 'doc-root-1',
+          attachmentId: 'att-root-1',
+          fileName: 'root.pdf',
+          kind: 'deed' as const,
+        },
+      ],
+    };
+    useWorkspaceStore.setState({ nodes: [root] });
+    mocks.deleteDocsForAttachments.mockRejectedValueOnce(new Error('dexie failed'));
+
+    useWorkspaceStore.getState().removeNode('root-1');
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(useWorkspaceStore.getState().nodes).toEqual([]);
+    expect(useWorkspaceStore.getState().lastError).toMatch(/Document cleanup failed/i);
+    expect(useWorkspaceStore.getState().lastError).toMatch(/dexie failed/i);
   });
 
   it('rejects createRootNode when explicit deskMapId does not exist (audit M2)', () => {

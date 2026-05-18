@@ -68,7 +68,7 @@ Upload `backend/ai-proxy/lambda.zip` to `landroid-ai-proxy`.
 
 Required Lambda settings:
 
-- Runtime: Node.js 20.x
+- Runtime: Node.js 22.x
 - Architecture: arm64
 - Handler: `handler.handler`
 - Memory: 512 MB
@@ -140,7 +140,7 @@ Manual pass criteria:
 - A simple AI prompt streams a response.
 - DynamoDB `landroid-ai-usage` has a row for your Cognito `sub` and today's
   `day`.
-- Uploading a small CSV/workbook still parses.
+- Uploading a small CSV still parses for AI-guided row review.
 
 ## 8. Stop Conditions
 

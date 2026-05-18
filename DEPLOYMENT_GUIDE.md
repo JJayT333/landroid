@@ -99,7 +99,7 @@ the uploaded zip.
 1. AWS console → **Lambda** (us-east-1) → **Create function**.
 2. **Author from scratch.**
 3. Name: `landroid-ai-proxy`.
-4. Runtime: **Node.js 20.x**. Architecture: **arm64** (cheapest).
+4. Runtime: **Node.js 22.x**. Architecture: **arm64** (cheapest).
 5. Execution role: "Create a new role with basic Lambda permissions".
 6. Create.
 

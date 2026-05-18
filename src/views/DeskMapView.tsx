@@ -179,15 +179,60 @@ function treeBranchPropsAreEqual(
 
 const TreeBranch = memo(TreeBranchComponent, treeBranchPropsAreEqual);
 
+export function computeDeskMapFitViewport({
+  containerWidth,
+  containerHeight,
+  contentWidth,
+  contentHeight,
+  padding = 96,
+}: {
+  containerWidth: number;
+  containerHeight: number;
+  contentWidth: number;
+  contentHeight: number;
+  padding?: number;
+}): { x: number; y: number; zoom: number } | null {
+  if (
+    containerWidth <= 0
+    || containerHeight <= 0
+    || contentWidth <= 0
+    || contentHeight <= 0
+  ) {
+    return null;
+  }
+  const fitZoom = Math.min(
+    1.15,
+    Math.max(
+      0.25,
+      Math.min(
+        (containerWidth - padding) / contentWidth,
+        (containerHeight - padding) / contentHeight
+      )
+    )
+  );
+  return {
+    x: Math.max(24, (containerWidth - contentWidth * fitZoom) / 2),
+    y: Math.max(24, (containerHeight - contentHeight * fitZoom) / 2),
+    zoom: fitZoom,
+  };
+}
+
 // ── Pan/zoom container ──────────────────────────────────
 // Uses Pointer Events with setPointerCapture for reliable drag tracking.
 // setPointerCapture routes ALL subsequent pointer events to the capturing
 // element, even if the pointer leaves the window. No window-level listeners needed.
 
-function PanZoomContainer({ children }: { children: React.ReactNode }) {
+function PanZoomContainer({
+  children,
+  resetKey,
+}: {
+  children: React.ReactNode;
+  resetKey: string;
+}) {
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(0.8);
   const containerRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
   const dragging = useRef(false);
   const startPos = useRef({ x: 0, y: 0 });
   const lastPos = useRef({ x: 0, y: 0 });
@@ -233,6 +278,34 @@ function PanZoomContainer({ children }: { children: React.ReactNode }) {
     dragging.current = false;
     pendingPointerId.current = null;
   }, []);
+
+  const fitToContent = useCallback(() => {
+    const container = containerRef.current;
+    const content = contentRef.current;
+    if (!container || !content) return;
+
+    const containerRect = container.getBoundingClientRect();
+    const contentWidth = content.scrollWidth;
+    const contentHeight = content.scrollHeight;
+    if (containerRect.width <= 0 || containerRect.height <= 0 || contentWidth <= 0 || contentHeight <= 0) {
+      return;
+    }
+
+    const viewport = computeDeskMapFitViewport({
+      containerWidth: containerRect.width,
+      containerHeight: containerRect.height,
+      contentWidth,
+      contentHeight,
+    });
+    if (!viewport) return;
+    setZoom(viewport.zoom);
+    setPan({ x: viewport.x, y: viewport.y });
+  }, []);
+
+  useEffect(() => {
+    const id = window.requestAnimationFrame(fitToContent);
+    return () => window.cancelAnimationFrame(id);
+  }, [fitToContent, resetKey]);
 
   // Wheel zoom toward cursor position — needs native listener for { passive: false }
   useEffect(() => {
@@ -282,7 +355,15 @@ function PanZoomContainer({ children }: { children: React.ReactNode }) {
       onClickCapture={handleClickCapture}
       onDragStart={(e) => e.preventDefault()}
     >
+      <button
+        type="button"
+        onClick={fitToContent}
+        className="absolute right-3 top-3 z-20 rounded-lg border border-ledger-line bg-parchment/95 px-3 py-1.5 text-xs font-semibold text-ink shadow-sm hover:bg-parchment-dark/80"
+      >
+        Fit
+      </button>
       <div
+        ref={contentRef}
         style={{
           transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
           transformOrigin: '0 0',
@@ -1077,7 +1158,9 @@ export default function DeskMapView() {
             </div>
           </div>
         ) : (
-          <PanZoomContainer>
+          <PanZoomContainer
+            resetKey={`${activeDeskMapId ?? 'none'}:${visibleNodes.map((node) => node.id).join('|')}`}
+          >
             <div className="flex gap-16">
               {trees.map((tree) => (
                 <TreeBranch

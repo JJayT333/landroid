@@ -11,10 +11,11 @@ session handoff lives in `CONTINUATION-PROMPT.md`.
   manifest preview.
 - Keep ArcGIS work design-only for now; `docs/gis-data-catalog.md` remains the
   source inventory for a later canonical layer map.
-- Test spreadsheet row staging against additional recurring workbook formats.
+- Test CSV row staging against additional recurring spreadsheet formats.
 - Refine column aliases and row-review UX from real import feedback beyond the
   Elmore DOTO sample.
-- Add file-size/worker containment or replacement for vulnerable `xlsx` read paths.
+- Evaluate a safe binary Excel parser before re-enabling `.xlsx` / `.xls`
+  parsing in AI-guided imports.
 - Make batch graft/attach operations atomic.
 - Harden `.landroid` and CSV import validation.
 
@@ -35,8 +36,8 @@ session handoff lives in `CONTINUATION-PROMPT.md`.
   saved-project index instead of the current single autosave slot.
 - Promote unit metadata to first-class records if future units need separate
   operator/effective-date settings beyond current Desk Map unit tags.
-- Improve AI mutation approval/proposal UX without losing the user's desired
-  single-user local workflow speed.
+- Continue polishing AI mutation approval/proposal UX without losing the user's
+  desired single-user local workflow speed.
 - Add a persistent import ledger for staged spreadsheet rows.
 
 ## Later

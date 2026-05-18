@@ -39,9 +39,10 @@ Treat these as sensitive:
 - Hosted browser persistence is keyed by the Cognito `sub` claim. Signed-out
   hosted state must not read or write the local `default` workspace/canvas rows;
   the persistence key helpers now stay locked until a real `sub` is available.
-- Hosted AI currently receives only `readOnlyLandroidTools`; `HOSTED_BLOCKED_TOOL_NAMES`
-  also excludes persisted-focus tools such as `setActiveDeskMap` until an
-  approval boundary exists.
+- AI mutating tools are app-gated through the approval queue. Tool calls create
+  pending proposals; only the user approval button applies a proposal, and each
+  approved batch captures one undo snapshot. Hosted AI still receives only
+  `readOnlyLandroidTools` until the hosted approval path is reviewed.
 - Phase 5 added document persistence and UI, but no AI document-mutating tools.
   If tools such as `saveDoc`, `deleteDoc`, `renameDoc`, `attachDocToEntity`, or
   `detachDocFromEntity` land later, add them to `HOSTED_BLOCKED_TOOL_NAMES`
@@ -62,12 +63,29 @@ Treat all imported files as untrusted:
 
 Known risk:
 
-- The production `xlsx` dependency has unresolved high-severity advisories.
-  Keep workbook parsing local, add size/timeout containment, and replace or
-  isolate the read path when practical.
+- Binary Excel parsing is disabled in the AI import path because the previous
+  production `xlsx` dependency had unresolved high-severity advisories. AI
+  spreadsheet review currently accepts CSV only; `.xlsx` / `.xls` files may be
+  stored only as unparsed uploaded documents until a safer parser is selected.
+- CSV cells rendered into AI prompts are labeled as untrusted user data. Cells
+  that contain instructions must be treated as spreadsheet text, not commands.
+- Document-registry PDFs are treated as PDF-only content. New node-document
+  uploads are magic-byte checked, `.landroid` document rows and legacy PDF rows
+  are rejected unless the decoded bytes begin with a PDF header, stored PDF
+  MIME is normalized to `application/pdf`, and PDF iframe previews are
+  sandboxed without same-origin privileges. Document attachments are
+  workspace-scoped on the link row as well as on the blob row. UI document
+  removal detaches only the current link, while branch/tract document cleanup
+  deletes only documents that have no surviving attachment links. Owner and
+  Research uploads use explicit extension allowlists plus the shared size
+  limits before saving.
 - Imported or legacy lease royalty, ORRI burden, and WI assignment fractions are
   strict-parsed before leasehold math. Malformed non-blank values must stay
   warning-visible and treated as 0 until corrected, not silently clamped.
+- Persisted `.landroid` node fraction fields and explicit lease jurisdiction
+  values are strict. Missing legacy jurisdiction still defaults to `tx_fee`, but
+  an explicit unknown jurisdiction now blocks import/normalization instead of
+  silently entering Texas math.
 
 ## Document Database / OCR Planning
 

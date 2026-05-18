@@ -12,9 +12,9 @@ check status here before treating the original audit wording as current.
 
 | Finding / Workstream | Status | Current Notes |
 | --- | --- | --- |
-| C1 AI live mutation approval boundary | Partial | Rollback, cancel/status, and timeout safety improved. Live local mutations remain intentionally available for the current single-user workflow. Full proposal/approval queue remains open. |
-| H1 workbook prompt injection into mutating chat | Partial | First deterministic `Review rows` staging flow exists. The old guided chat path still needs stronger isolation/proposal gating. |
-| H2 vulnerable `xlsx` read path | Open | Still needs file-size containment, worker isolation, or parser replacement. |
+| C1 AI live mutation approval boundary | Done | Mutating AI tools now create pending proposals. The AI panel applies a proposal only after user approval, and each approved batch gets one undo snapshot. |
+| H1 workbook prompt injection into mutating chat | Done | Parsed AI spreadsheet review is CSV-only, CSV cells are labeled as untrusted data in prompts, and mutating chat tools are proposal-gated before any store write. |
+| H2 vulnerable `xlsx` read path | Done | Production `xlsx` dependency removed. AI spreadsheet review accepts CSV only; binary Excel uploads are stored only as unparsed documents until a safer parser is selected. |
 | H3 persisted cloud AI keys | Done | Cloud keys are session-only; persisted settings keep only safe fields. |
 | H4 Texas-only active math gates | Done | Active math and attach paths filter/reject non-Texas math leases. |
 | H5 strict AI lease validation and owner matching | Done | AI lease creation strict-validates economics and Texas jurisdictions; attach rejects linked-owner mismatch. |
@@ -23,7 +23,7 @@ check status here before treating the original audit wording as current.
 | M1 atomic batch graft | Open | Batch graft can still partially mutate. |
 | M2 explicit desk-map targeting | Open | Invalid explicit `deskMapId` fallback still needs hard rejection. |
 | M3 `.landroid` import hardening | Open | Side-store normalization and size limits remain. |
-| M4 CSV import strictness | Open | Invalid fraction and duplicate-ID behavior still needs hardening. |
+| M4 CSV / persisted fraction strictness | Done | CSV import rejects duplicate node IDs and invalid/negative fractions; `.landroid` node normalization now rejects malformed or negative persisted decimal fields instead of coercing them to 0. |
 | M5 Desk Map lease overlap warning | Open | Lease overlap warnings still need Desk Map surfacing. |
 | M6 docs and handoff cleanup | Partial | Professional docs rails added; ongoing status updates must keep them current. |
 | M7 skipped e2e workflows | Open | 5 Playwright workflows remain skipped. |
@@ -93,7 +93,9 @@ Tests:
 
 Fixes:
 
-- H2: vulnerable `xlsx` dependency on user-controlled files.
+- H2: vulnerable `xlsx` dependency on user-controlled files. **Done for the
+  local AI import path by removing the dependency and keeping parsed
+  spreadsheet upload CSV-only.**
 
 Smallest safe implementation:
 

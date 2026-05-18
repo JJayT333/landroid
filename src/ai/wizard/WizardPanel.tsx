@@ -58,7 +58,7 @@ const ROLE_LABELS: Record<SheetRole, { label: string; tone: string }> = {
 export default function WizardPanel({
   onStartGuided,
 }: {
-  onStartGuided?: (workbookText: string) => void;
+  onStartGuided?: (spreadsheetText: string) => void;
 }) {
   const [status, setStatus] = useState<Status>('idle');
   const [error, setError] = useState<string | null>(null);
@@ -74,8 +74,8 @@ export default function WizardPanel({
     try {
       assertFileSize(file, FILE_SIZE_LIMITS.SPREADSHEET, 'Spreadsheet');
       const buffer = await file.arrayBuffer();
-      // Audit L-2 / H2-full: parse off-thread so a malicious workbook can't
-      // pollute the main thread. The worker is terminated on completion.
+      // Parse off-thread so larger CSVs do not block the main thread. The
+      // worker is terminated on completion.
       const result = await parseWorkbookInWorker(file.name, buffer);
       setParsed(result);
       setStatus('parsed');
@@ -121,7 +121,7 @@ export default function WizardPanel({
 
       {(status === 'parsing' || status === 'analyzing') && (
         <div className="rounded-lg border border-leather/30 bg-parchment p-3 text-xs text-ink-light">
-          {status === 'parsing' ? 'Parsing workbook…' : 'AI is analyzing sheets…'}
+          {status === 'parsing' ? 'Parsing CSV…' : 'AI is analyzing rows…'}
         </div>
       )}
 
@@ -594,7 +594,7 @@ function StagedImportReview({
           <div>
             <div className="font-semibold text-ink">Detected tracts</div>
             <div className="text-[10px] text-ink-light">
-              Each workbook tab can map to its own Desk Map before you create roots.
+              The CSV can map to a Desk Map before you create roots.
             </div>
           </div>
           <button
@@ -946,13 +946,13 @@ function UploadZone({ onFile }: { onFile: (f: File) => void }) {
   return (
     <label className="block cursor-pointer rounded-lg border-2 border-dashed border-leather/40 bg-parchment/40 p-6 text-center text-xs text-ink-light hover:border-gold hover:bg-parchment">
       <div className="mb-1 font-semibold text-ink">Upload a spreadsheet</div>
-      <div>.xlsx or .csv — landman runsheet, NRI status, document list</div>
+      <div>.csv — landman runsheet, NRI status, document list</div>
       <div className="mt-2 text-[10px] uppercase tracking-wide">
         click to choose a file
       </div>
       <input
         type="file"
-        accept=".xlsx,.xls,.csv"
+        accept=".csv"
         className="hidden"
         onChange={(e) => {
           const file = e.target.files?.[0];

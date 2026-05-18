@@ -23,7 +23,7 @@ summarizes how the app is put together and where changes should live.
 - `src/components/shared/Navbar.tsx`: file actions, demo loading, navigation,
   and project-name editing.
 - `src/views/DocumentsView.tsx`: Phase 7A document registry surface over the
-  local v8 document tables.
+  local document tables.
 
 ## State Ownership
 
@@ -39,7 +39,13 @@ summarizes how the app is put together and where changes should live.
 - `canvas-store`: flowchart nodes, edges, viewport, and print/layout settings.
 - `ai/settings-store`: AI provider/model settings; cloud keys are session-only.
 - `ai/undo-store`: latest AI rollback snapshot.
-- Document blobs and entity links are persisted through `src/storage/document-store.ts`.
+- Document blobs and workspace-scoped entity links are persisted through
+  `src/storage/document-store.ts`. `documents` stores the blob/metadata and
+  `document_attachments` stores scoped links to nodes, owners, leases,
+  curative records, or research records.
+  UI remove actions detach link rows without deleting the underlying document.
+  Node/tract deletes remove the affected attachment links and only delete a
+  document blob when no surviving entity links remain.
   Registry filtering, duplicate surfacing, linked-entity summaries, and packet
   manifest previews live in pure helpers under `src/documents`.
 
@@ -89,6 +95,7 @@ The AI layer lives under `src/ai`.
 - Prompt text and provider calls: `src/ai/system-prompt.ts`, `src/ai/client.ts`,
   `src/ai/runChat.ts`.
 - Tool definitions: `src/ai/tools.ts`.
+- Approval queue: `src/ai/approval-store.ts`.
 - Undo snapshots: `src/ai/undo-store.ts`.
 - Settings: `src/ai/settings-store.ts`.
 - Workbook staging: `src/ai/wizard`.
@@ -97,8 +104,9 @@ Current policy:
 
 - Ollama is the preferred default.
 - OpenAI/Anthropic keys are session-only in browser memory.
-- AI can perform live local mutations in the current single-user workflow, but
-  it must snapshot rollback state before mutating.
+- AI mutating tools create pending approval proposals. The AI panel is the
+  human approval gate; approving a proposal applies that batch and captures one
+  rollback snapshot.
 - Spreadsheet import should prefer deterministic row staging and user review
   over blind bulk mutation.
 

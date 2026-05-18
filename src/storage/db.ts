@@ -242,6 +242,64 @@ db.version(8)
   });
 
 /**
+ * v9 (main-readiness cleanup) scopes attachment rows directly by workspace.
+ *
+ * v8 could derive workspace through `documents.docId`, but the join rows did
+ * not carry their own scope. Storing `workspaceId` on every attachment makes
+ * entity-link queries explicit and prevents same-entity-id links from another
+ * workspace from ever entering the result set.
+ */
+db.version(9)
+  .stores({
+    pdfs: 'nodeId',
+    workspaces: 'id',
+    canvases: 'id',
+    owners: 'id, workspaceId, name',
+    leases: 'id, workspaceId, ownerId, [workspaceId+ownerId]',
+    contactLogs: 'id, workspaceId, ownerId, [workspaceId+ownerId]',
+    ownerDocs:
+      'id, workspaceId, ownerId, leaseId, [workspaceId+ownerId], [workspaceId+leaseId]',
+    mapAssets:
+      'id, workspaceId, isFeatured, deskMapId, nodeId, linkedOwnerId, leaseId, researchSourceId, researchProjectRecordId, [workspaceId+isFeatured], [workspaceId+deskMapId], [workspaceId+nodeId], [workspaceId+linkedOwnerId], [workspaceId+leaseId], [workspaceId+researchSourceId], [workspaceId+researchProjectRecordId]',
+    mapRegions:
+      'id, workspaceId, assetId, deskMapId, nodeId, linkedOwnerId, leaseId, researchSourceId, researchProjectRecordId, [workspaceId+assetId], [workspaceId+deskMapId], [workspaceId+nodeId], [workspaceId+linkedOwnerId], [workspaceId+leaseId], [workspaceId+researchSourceId], [workspaceId+researchProjectRecordId]',
+    mapExternalReferences:
+      'id, workspaceId, assetId, regionId, source, [workspaceId+assetId], [workspaceId+regionId]',
+    researchImports:
+      'id, workspaceId, datasetId, detectedFormat, [workspaceId+datasetId], [workspaceId+detectedFormat]',
+    researchSources:
+      'id, workspaceId, sourceType, context, [workspaceId+sourceType], [workspaceId+context]',
+    researchFormulas:
+      'id, workspaceId, category, status, [workspaceId+category], [workspaceId+status]',
+    researchProjectRecords:
+      'id, workspaceId, recordType, jurisdiction, status, [workspaceId+recordType], [workspaceId+jurisdiction], [workspaceId+status]',
+    researchQuestions:
+      'id, workspaceId, status, [workspaceId+status]',
+    titleIssues:
+      'id, workspaceId, status, priority, issueType, affectedDeskMapId, affectedNodeId, affectedOwnerId, affectedLeaseId, [workspaceId+status], [workspaceId+priority]',
+    documents:
+      'docId, workspaceId, contentHash, [workspaceId+kind], [workspaceId+createdAt]',
+    document_attachments:
+      'attachmentId, workspaceId, docId, [workspaceId+entityKind+entityId], [entityKind+entityId], [docId+entityKind+entityId]',
+  })
+  .upgrade(async (tx) => {
+    const docs = await tx.table<DocumentRecord, 'docId'>('documents').toArray();
+    const workspaceByDocId = new Map(docs.map((doc) => [doc.docId, doc.workspaceId]));
+    const attachments = await tx
+      .table<DocumentAttachment, 'attachmentId'>('document_attachments')
+      .toArray();
+    await Promise.all(
+      attachments.map((attachment) => {
+        const workspaceId = workspaceByDocId.get(attachment.docId);
+        if (!workspaceId) return undefined;
+        return tx.table('document_attachments').update(attachment.attachmentId, {
+          workspaceId,
+        });
+      })
+    );
+  });
+
+/**
  * Real-implementation deps for the migration. The pure helper accepts
  * everything as injection so tests can run with deterministic stubs.
  */

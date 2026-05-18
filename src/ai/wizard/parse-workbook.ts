@@ -1,14 +1,13 @@
 /**
- * Deterministic xlsx/csv parsing for the AI wizard.
+ * Deterministic CSV parsing for the AI wizard.
  *
  * Two entry points:
  *
  *  - `parseWorkbook` — synchronous; runs in the calling thread. Used by
  *    tests and by tools that don't need worker isolation.
  *
- *  - `parseWorkbookInWorker` — async; spawns a dedicated Web Worker so a
- *    malicious workbook can't pollute the main thread (audit L-2 / H2-full
- *    response to the unfixed `xlsx` advisories). Wraps the worker with a
+ *  - `parseWorkbookInWorker` — async; spawns a dedicated Web Worker so larger
+ *    CSV files do not block the main thread. Wraps the worker with a
  *    30-second timeout; the worker is terminated on timeout, error, or
  *    successful completion.
  *

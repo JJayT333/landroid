@@ -2,7 +2,14 @@
  * Workspace persistence — auto-save to IndexedDB, export/import .landroid files.
  */
 import db, { type PdfAttachment } from './db';
-import { deserializeBlob, serializeBlob, type SerializedBlob } from './blob-serialization';
+import {
+  deserializeBlob,
+  deserializePdfBlob,
+  emptyPdfBlob,
+  serializeBlob,
+  type SerializedBlob,
+} from './blob-serialization';
+import { PDF_MIME_TYPE } from '../utils/pdf-validation';
 import {
   isDocumentEntityKind,
   isDocumentArea,
@@ -237,6 +244,27 @@ function deserializeSerializedBlob(
   }
 
   return new Blob([], { type: fallbackMimeType });
+}
+
+function deserializeSerializedPdfBlob(
+  serialized: unknown,
+  label: string
+): Blob {
+  if (
+    isRecord(serialized) &&
+    typeof serialized.base64 === 'string' &&
+    typeof serialized.mimeType === 'string'
+  ) {
+    return deserializePdfBlob(
+      {
+        base64: serialized.base64,
+        mimeType: serialized.mimeType,
+      },
+      label
+    );
+  }
+
+  return emptyPdfBlob();
 }
 
 function isPageSizeId(value: unknown): value is PageSizeId {
@@ -675,9 +703,10 @@ function deserializeDocumentData(value: unknown): DocumentWorkspaceData {
 
   const documents: DocumentRecord[] = rawDocs.filter(isDocumentRecordRow).flatMap(
     (raw) => {
-      const blob = deserializeSerializedBlob(
+      const fileName = typeof raw.fileName === 'string' ? raw.fileName : '';
+      const blob = deserializeSerializedPdfBlob(
         raw.blob,
-        typeof raw.mimeType === 'string' ? raw.mimeType : 'application/pdf'
+        `Imported document ${fileName || raw.docId}`
       );
       if (blob.size === 0) return [];
       const now = new Date().toISOString();
@@ -685,9 +714,9 @@ function deserializeDocumentData(value: unknown): DocumentWorkspaceData {
         {
           docId: raw.docId,
           workspaceId: raw.workspaceId,
-          fileName: typeof raw.fileName === 'string' ? raw.fileName : '',
-          mimeType: typeof raw.mimeType === 'string' ? raw.mimeType : 'application/pdf',
-          byteLength: typeof raw.byteLength === 'number' ? raw.byteLength : blob.size,
+          fileName,
+          mimeType: PDF_MIME_TYPE,
+          byteLength: blob.size,
           contentHash: typeof raw.contentHash === 'string' ? raw.contentHash : '',
           blob,
           kind: normalizeDocumentKind(raw.kind),
@@ -728,11 +757,16 @@ function deserializeDocumentData(value: unknown): DocumentWorkspaceData {
   );
 
   const docIdSet = new Set(documents.map((d) => d.docId));
+  const workspaceByDocId = new Map(documents.map((d) => [d.docId, d.workspaceId]));
   const attachments: DocumentAttachment[] = rawAttachments
     .filter(isDocumentAttachmentRow)
     .filter((row) => docIdSet.has(row.docId))
     .map((row) => ({
       attachmentId: row.attachmentId,
+      workspaceId:
+        typeof row.workspaceId === 'string'
+          ? row.workspaceId
+          : (workspaceByDocId.get(row.docId) ?? ''),
       docId: row.docId,
       entityKind: row.entityKind,
       entityId: row.entityId,
@@ -933,7 +967,9 @@ export async function replaceDocumentWorkspaceData(
   const documents = data.documents
     .filter((d) => d.workspaceId === workspaceId && d.blob.size > 0);
   const docIdSet = new Set(documents.map((d) => d.docId));
-  const attachments = data.attachments.filter((a) => docIdSet.has(a.docId));
+  const attachments = data.attachments
+    .filter((a) => docIdSet.has(a.docId))
+    .map((a) => ({ ...a, workspaceId }));
 
   await db.transaction('rw', db.documents, db.document_attachments, async () => {
     // Drop every document scoped to this workspace.
@@ -1229,11 +1265,11 @@ export async function importLandroidFile(file: File): Promise<LandroidFileData> 
                 .map((pdf) => ({
                   nodeId: pdf.nodeId,
                   fileName: typeof pdf.fileName === 'string' ? pdf.fileName : '',
-                  mimeType:
-                    typeof pdf.mimeType === 'string'
-                      ? pdf.mimeType
-                      : 'application/pdf',
-                  blob: deserializeSerializedBlob(pdf.blob, 'application/pdf'),
+                  mimeType: PDF_MIME_TYPE,
+                  blob: deserializeSerializedPdfBlob(
+                    pdf.blob,
+                    `Legacy PDF ${typeof pdf.fileName === 'string' ? pdf.fileName : pdf.nodeId}`
+                  ),
                   createdAt:
                     typeof pdf.createdAt === 'string'
                       ? pdf.createdAt

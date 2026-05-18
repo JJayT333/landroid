@@ -8,6 +8,7 @@
 import { useEffect, useState } from 'react';
 import Modal from '../shared/Modal';
 import { getDocBlob, getDocMeta } from '../../storage/document-store';
+import { normalizePdfBlob } from '../../utils/pdf-validation';
 
 interface PdfViewerModalProps {
   docId: string;
@@ -55,9 +56,12 @@ export default function PdfViewerModal({
         }
 
         if (cancelled) return;
-        url = URL.createObjectURL(blob);
+        const resolvedFileName = meta?.fileName ?? fileNameHint ?? 'PDF';
+        const safeBlob = await normalizePdfBlob(blob, resolvedFileName);
+        if (cancelled) return;
+        url = URL.createObjectURL(safeBlob);
         setObjectUrl(url);
-        setFileName(meta?.fileName ?? fileNameHint ?? '');
+        setFileName(resolvedFileName);
       } catch (loadError) {
         if (cancelled) return;
         setError(
@@ -81,6 +85,7 @@ export default function PdfViewerModal({
       ) : objectUrl ? (
         <iframe
           src={objectUrl}
+          sandbox="allow-downloads"
           className="w-full rounded-lg border border-ledger-line"
           style={{ height: '70vh' }}
           title={fileName}

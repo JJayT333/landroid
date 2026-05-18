@@ -14,7 +14,12 @@
  */
 
 import db from './db';
+import Dexie from 'dexie';
 import { sha256HexOfBlob } from './blob-hash';
+import {
+  PDF_MIME_TYPE,
+  normalizePdfBlob,
+} from '../utils/pdf-validation';
 import {
   DEFAULT_DOCUMENT_KIND,
   normalizeDocumentArea,
@@ -160,12 +165,11 @@ function normalizeMetadataPatch(
 export async function saveDoc(
   input: SaveDocumentInput
 ): Promise<SaveDocumentResult> {
-  const blob = input.file instanceof File ? input.file : input.file;
   const fileName =
     input.fileName
     || (input.file instanceof File ? input.file.name : 'document');
-  const mimeType =
-    (input.file instanceof Blob && input.file.type) || 'application/pdf';
+  const blob = await normalizePdfBlob(input.file, fileName);
+  const mimeType = PDF_MIME_TYPE;
   const contentHash = await sha256HexOfBlob(blob);
   const docId = newId();
   const attachmentId = newId();
@@ -198,6 +202,7 @@ export async function saveDoc(
         .count();
       const attachment: DocumentAttachment = {
         attachmentId,
+        workspaceId: input.workspaceId,
         docId,
         entityKind: input.entityKind,
         entityId: input.entityId,
@@ -232,6 +237,7 @@ export async function attachDocToEntity(
       .count();
     const attachment: DocumentAttachment = {
       attachmentId: newId(),
+      workspaceId: doc.workspaceId,
       docId,
       entityKind,
       entityId,
@@ -345,6 +351,72 @@ export async function deleteDoc(docId: string): Promise<void> {
   });
 }
 
+/**
+ * Delete multiple documents in one transaction. Used for branch/tract cascades
+ * so storage either removes every affected document link/blob or none of them.
+ */
+export async function deleteDocs(docIds: ReadonlyArray<string>): Promise<void> {
+  const uniqueDocIds = [...new Set(docIds)].filter(Boolean);
+  if (uniqueDocIds.length === 0) return;
+  await db.transaction('rw', db.documents, db.document_attachments, async () => {
+    const attachmentIds = await db.document_attachments
+      .where('docId')
+      .anyOf(uniqueDocIds)
+      .primaryKeys();
+    if (attachmentIds.length > 0) {
+      await db.document_attachments.bulkDelete(attachmentIds);
+    }
+    await db.documents.bulkDelete(uniqueDocIds);
+  });
+}
+
+/**
+ * Remove a set of attachment links and delete only the documents that become
+ * attachmentless because of that same removal. Used when ownership nodes are
+ * deleted: docs shared with surviving nodes stay in the registry.
+ */
+export async function deleteDocsForAttachments(
+  attachmentIds: ReadonlyArray<string>
+): Promise<void> {
+  const uniqueAttachmentIds = [...new Set(attachmentIds)].filter(Boolean);
+  if (uniqueAttachmentIds.length === 0) return;
+
+  await db.transaction('rw', db.documents, db.document_attachments, async () => {
+    const removedAttachmentSet = new Set(uniqueAttachmentIds);
+    const removedAttachments = (await db.document_attachments.bulkGet(
+      uniqueAttachmentIds
+    )).filter((attachment): attachment is DocumentAttachment => Boolean(attachment));
+    if (removedAttachments.length === 0) return;
+
+    const docIds = [...new Set(removedAttachments.map((attachment) => attachment.docId))];
+    const allAttachmentsForDocs = await db.document_attachments
+      .where('docId')
+      .anyOf(docIds)
+      .toArray();
+    const attachmentsByDoc = new Map<string, DocumentAttachment[]>();
+    for (const attachment of allAttachmentsForDocs) {
+      const existing = attachmentsByDoc.get(attachment.docId) ?? [];
+      existing.push(attachment);
+      attachmentsByDoc.set(attachment.docId, existing);
+    }
+
+    const docIdsToDelete = docIds.filter((docId) => {
+      const attachments = attachmentsByDoc.get(docId) ?? [];
+      return (
+        attachments.length > 0
+        && attachments.every((attachment) =>
+          removedAttachmentSet.has(attachment.attachmentId)
+        )
+      );
+    });
+
+    await db.document_attachments.bulkDelete(uniqueAttachmentIds);
+    if (docIdsToDelete.length > 0) {
+      await db.documents.bulkDelete(docIdsToDelete);
+    }
+  });
+}
+
 export async function getDocBlob(docId: string): Promise<Blob | undefined> {
   const doc = await db.documents.get(docId);
   return doc?.blob;
@@ -364,6 +436,7 @@ export async function getDocMeta(
  * `position`, paired with its document metadata (blob omitted).
  */
 export async function listDocsForEntity(
+  workspaceId: string,
   entityKind: DocumentEntityKind,
   entityId: string
 ): Promise<
@@ -373,8 +446,8 @@ export async function listDocsForEntity(
   }>
 > {
   const attachments = await db.document_attachments
-    .where('[entityKind+entityId]')
-    .equals([entityKind, entityId])
+    .where('[workspaceId+entityKind+entityId]')
+    .equals([workspaceId, entityKind, entityId])
     .toArray();
   attachments.sort((a, b) => a.position - b.position);
   if (attachments.length === 0) return [];
@@ -394,6 +467,7 @@ export async function listDocsForEntity(
 
 /** Convenience: every doc attached to a single ownership node. */
 export async function listDocsForNode(
+  workspaceId: string,
   nodeId: string
 ): Promise<
   Array<{
@@ -401,7 +475,7 @@ export async function listDocsForNode(
     document: Omit<DocumentRecord, 'blob'>;
   }>
 > {
-  return listDocsForEntity('node', nodeId);
+  return listDocsForEntity(workspaceId, 'node', nodeId);
 }
 
 /**
@@ -431,8 +505,8 @@ export async function listAttachmentsForNodes(
 
   // Dexie equalsAnyOf lets us bulk-fetch attachments without N round-trips.
   const attachments = await db.document_attachments
-    .where('entityKind')
-    .equals('node')
+    .where('[workspaceId+entityKind+entityId]')
+    .between([workspaceId, 'node', Dexie.minKey], [workspaceId, 'node', Dexie.maxKey])
     .and((a) => nodeIds.includes(a.entityId))
     .toArray();
   if (attachments.length === 0) return result;

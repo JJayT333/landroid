@@ -230,6 +230,7 @@ function FeaturedMapStage({
       <div className="space-y-3">
         <iframe
           src={objectUrl}
+          sandbox="allow-downloads"
           className="w-full rounded-xl border border-ledger-line bg-ledger"
           style={{ height: 'calc(100vh - 17rem)' }}
           title={asset.fileName}

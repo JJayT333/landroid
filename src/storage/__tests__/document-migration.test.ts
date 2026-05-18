@@ -144,6 +144,7 @@ describe('migratePdfsToDocuments', () => {
     );
     expect(result.attachments[0].entityKind).toBe('node');
     expect(result.attachments[0].entityId).toBe('node-1');
+    expect(result.attachments[0].workspaceId).toBe('ws-1');
     expect(result.attachments[0].position).toBe(0);
   });
 

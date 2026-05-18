@@ -94,18 +94,32 @@ function toNormalizedLeaseStatusText(value: unknown): string {
 }
 
 export function normalizeLeaseJurisdiction(value: unknown): LeaseJurisdiction {
+  if (value === undefined || value === null) {
+    return DEFAULT_LEASE_JURISDICTION;
+  }
   if (typeof value === 'string') {
-    const candidate = value.trim() as LeaseJurisdiction;
+    const trimmed = value.trim();
+    if (trimmed.length === 0) {
+      return DEFAULT_LEASE_JURISDICTION;
+    }
+    const candidate = trimmed as LeaseJurisdiction;
     if ((LEASE_JURISDICTION_OPTIONS as readonly string[]).includes(candidate)) {
       return candidate;
     }
   }
-  return DEFAULT_LEASE_JURISDICTION;
+  throw new Error(`Invalid lease jurisdiction: ${String(value)}`);
 }
 
 export function isTexasMathLeaseJurisdiction(value: unknown): boolean {
-  return TEXAS_MATH_LEASE_JURISDICTIONS.includes(
-    normalizeLeaseJurisdiction(value)
+  if (value === undefined || value === null) {
+    return true;
+  }
+  if (typeof value === 'string' && value.trim().length === 0) {
+    return true;
+  }
+  return (
+    typeof value === 'string'
+    && TEXAS_MATH_LEASE_JURISDICTIONS.includes(value.trim() as LeaseJurisdiction)
   );
 }
 
@@ -266,8 +280,8 @@ export function createBlankLease(
   };
   lease.workspaceId = workspaceId;
   lease.ownerId = ownerId;
-  // Coerce jurisdiction even when overrides supplies a junk value, so a stray
-  // import that hands us {jurisdiction: 'fee'} or undefined still lands on tx_fee.
+  // Missing legacy data defaults to tx_fee; explicit junk now throws so imports
+  // cannot silently become Texas math records.
   lease.jurisdiction = normalizeLeaseJurisdiction(lease.jurisdiction);
   lease.depthRange = normalizeDepthRange(lease.depthRange);
   lease.status = normalizeLeaseStatus(lease.status);

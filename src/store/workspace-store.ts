@@ -9,7 +9,8 @@ import { buildLeaseNode, isLeaseNode } from '../components/deskmap/deskmap-lease
 import { useCurativeStore } from './curative-store';
 import { useMapStore } from './map-store';
 import {
-  deleteDoc,
+  deleteDocsForAttachments,
+  detachDocFromEntity,
   listAttachmentsForNodes,
   reorderAttachments,
   renameDoc,
@@ -17,26 +18,26 @@ import {
 } from '../storage/document-store';
 
 /**
- * Cascade-delete every document attached to the removed nodes. Fired
- * after a `removeNode` / `clearDeskMapNodes` set so the v8 `documents`
- * and `document_attachments` rows don't leak when their owner node
- * disappears.
+ * Remove attachment links from deleted nodes and delete only the documents
+ * that have no surviving links. Fired after a `removeNode` /
+ * `clearDeskMapNodes` set so the v9 document rows don't leak, while shared
+ * documents remain attached to surviving entities.
  *
- * Fire-and-forget: errors are logged but don't roll back the in-memory
- * state change (matches the pre-v8 `void deletePdf(nodeId)` pattern).
+ * The storage cleanup is atomic across all affected attachment IDs. The
+ * in-memory node delete has already happened when this runs, so callers must
+ * surface failures through `lastError`.
  */
-function cascadeDeleteDocsForRemovedNodes(
-  removedNodes: ReadonlyArray<{ attachments: ReadonlyArray<{ docId: string }> }>
-): void {
-  const docIds = new Set<string>();
+async function cascadeDeleteDocsForRemovedNodes(
+  removedNodes: ReadonlyArray<{
+    attachments: ReadonlyArray<{ attachmentId: string }>;
+  }>
+): Promise<void> {
+  const attachmentIds = new Set<string>();
   for (const node of removedNodes) {
-    for (const a of node.attachments) docIds.add(a.docId);
+    for (const a of node.attachments) attachmentIds.add(a.attachmentId);
   }
-  for (const docId of docIds) {
-    void deleteDoc(docId).catch((err) => {
-      console.warn(`[workspace-store] cascade deleteDoc(${docId}) failed:`, err);
-    });
-  }
+  if (attachmentIds.size === 0) return;
+  await deleteDocsForAttachments([...attachmentIds]);
 }
 import type { OwnershipNode, DeskMap, NodeAttachmentSummary } from '../types/node';
 import { normalizeDeskMap, normalizeOwnershipNode } from '../types/node';
@@ -208,10 +209,8 @@ interface WorkspaceState {
     options?: { fileName?: string; kind?: DocumentKind }
   ) => Promise<NodeAttachmentSummary | null>;
   /**
-   * Remove one attachment from a node. The underlying document blob is
-   * deleted as well — A4 still mirrors the v7 "one doc per node" UX, so
-   * cascade-delete keeps blob lifetime simple. Phase B (multi-doc UI)
-   * will switch to detach-only semantics.
+   * Remove one attachment link from a node. The underlying document stays in
+   * the registry and on any other entities that reference it.
    */
   detachDocFromNode: (nodeId: string, attachmentId: string) => Promise<void>;
   /** Rename a document. Updates every node's `attachments[]` cache. */
@@ -635,7 +634,13 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
       lastError: null,
     });
 
-    cascadeDeleteDocsForRemovedNodes(removedNodes);
+    void cascadeDeleteDocsForRemovedNodes(removedNodes).catch((err) => {
+      const message = err instanceof Error ? err.message : String(err);
+      console.warn('[workspace-store] document cascade delete failed:', err);
+      set({
+        lastError: `Document cleanup failed after clearing tract: ${message}. Save a backup and retry cleanup before relying on document registry state.`,
+      });
+    });
     for (const nodeId of deletedIds) {
       void useMapStore.getState().unlinkNode(nodeId);
       useCurativeStore.getState().unlinkNode(nodeId);
@@ -999,7 +1004,13 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
       lastAudit: result.audit,
       lastError: null,
     });
-    cascadeDeleteDocsForRemovedNodes(removedNodes);
+    void cascadeDeleteDocsForRemovedNodes(removedNodes).catch((err) => {
+      const message = err instanceof Error ? err.message : String(err);
+      console.warn('[workspace-store] document cascade delete failed:', err);
+      set({
+        lastError: `Document cleanup failed after deleting branch: ${message}. Save a backup and retry cleanup before relying on document registry state.`,
+      });
+    });
     for (const removedId of removedIds) {
       void useMapStore.getState().unlinkNode(removedId);
       useCurativeStore.getState().unlinkNode(removedId);
@@ -1114,10 +1125,7 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
     if (!node) return;
     const target = node.attachments.find((a) => a.attachmentId === attachmentId);
     if (!target) return;
-    // Single-doc UX preserved for A4: cascade-delete the underlying blob.
-    // Phase B's multi-doc work will switch this to detach-only semantics
-    // (the blob lives on if it's attached anywhere else).
-    await deleteDoc(target.docId);
+    await detachDocFromEntity(target.attachmentId);
     set((current) => ({
       nodes: current.nodes.map((n) =>
         n.id === nodeId

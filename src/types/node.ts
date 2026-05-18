@@ -13,6 +13,7 @@ import {
   normalizeExternalRefs,
   type ExternalRef,
 } from './external-ref';
+import { Decimal } from '../engine/decimal';
 
 export type ConveyanceMode = 'fraction' | 'fixed' | 'all';
 export type SplitBasis = 'initial' | 'remaining' | 'whole';
@@ -172,17 +173,39 @@ function normalizeText(value: unknown): string {
   return '';
 }
 
-function normalizeDecimalInput(value: unknown, fallback: string): string {
+function normalizeDecimalInput(
+  value: unknown,
+  fallback: string,
+  fieldName: string
+): string {
+  if (value === undefined || value === null) {
+    return fallback;
+  }
+
   if (typeof value === 'number') {
-    return Number.isFinite(value) ? value.toString() : fallback;
+    if (!Number.isFinite(value) || value < 0) {
+      throw new Error(`Invalid ${fieldName}: ${String(value)}`);
+    }
+    return value.toString();
   }
 
   if (typeof value === 'string') {
     const trimmed = value.trim();
-    return trimmed.length > 0 ? trimmed : fallback;
+    if (trimmed.length === 0) {
+      return fallback;
+    }
+    try {
+      const parsed = new Decimal(trimmed);
+      if (!parsed.isFinite() || parsed.isNegative()) {
+        throw new Error();
+      }
+      return trimmed;
+    } catch {
+      throw new Error(`Invalid ${fieldName}: ${trimmed}`);
+    }
   }
 
-  return fallback;
+  throw new Error(`Invalid ${fieldName}: ${String(value)}`);
 }
 
 function normalizeNodeType(value: unknown): NodeType {
@@ -411,14 +434,26 @@ export function normalizeOwnershipNode(
     grantee: normalizeText(node.grantee),
     landDesc: normalizeText(node.landDesc),
     remarks: normalizeText(node.remarks),
-    fraction: normalizeDecimalInput(node.fraction, '0'),
-    initialFraction: normalizeDecimalInput(node.initialFraction, '0'),
+    fraction: normalizeDecimalInput(node.fraction, '0', `fraction for node ${node.id}`),
+    initialFraction: normalizeDecimalInput(
+      node.initialFraction,
+      '0',
+      `initialFraction for node ${node.id}`
+    ),
     parentId: typeof node.parentId === 'string' ? node.parentId : null,
     conveyanceMode: normalizeConveyanceMode(node.conveyanceMode),
     splitBasis,
-    numerator: normalizeDecimalInput(node.numerator, '0'),
-    denominator: normalizeDecimalInput(node.denominator, '1'),
-    manualAmount: normalizeDecimalInput(node.manualAmount, '0'),
+    numerator: normalizeDecimalInput(node.numerator, '0', `numerator for node ${node.id}`),
+    denominator: normalizeDecimalInput(
+      node.denominator,
+      '1',
+      `denominator for node ${node.id}`
+    ),
+    manualAmount: normalizeDecimalInput(
+      node.manualAmount,
+      '0',
+      `manualAmount for node ${node.id}`
+    ),
     isDeceased: node.isDeceased === true,
     obituary: normalizeText(node.obituary),
     graveyardLink: normalizeText(node.graveyardLink),

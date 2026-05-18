@@ -17,6 +17,10 @@ import { z } from 'zod';
 import { useWorkspaceStore } from '../store/workspace-store';
 import { useOwnerStore } from '../store/owner-store';
 import { useCurativeStore } from '../store/curative-store';
+import {
+  queueAIApprovalProposal,
+  registerAIMutationExecutor,
+} from './approval-store';
 import type { OwnershipNode } from '../types/node';
 import { validateOwnershipGraph } from '../engine/math-engine';
 import {
@@ -274,6 +278,42 @@ function summariseValidation() {
       message: i.message,
     })),
   };
+}
+
+function summariseMutationProposal(toolName: string, input: unknown): string {
+  const data = (input && typeof input === 'object' ? input : {}) as Record<string, unknown>;
+  const text = (value: unknown): string => {
+    if (typeof value === 'string') return value.trim();
+    if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+    return '';
+  };
+
+  switch (toolName) {
+    case 'createRootNode':
+      return `Create ${text(data.kind) || 'mineral'} root for ${text((data.form as Record<string, unknown> | undefined)?.grantee) || text(data.linkedOwnerId) || 'new owner'} (${text(data.initialFraction)})`;
+    case 'convey':
+      return `Convey ${text(data.share)} from ${text(data.parentNodeId)}`;
+    case 'createNpri':
+      return `Create ${text(data.royaltyKind) || 'fixed'} NPRI ${text(data.share)} on ${text(data.parentNodeId)}`;
+    case 'precede':
+      return `Insert predecessor above ${text(data.nodeId)} (${text(data.newInitialFraction)})`;
+    case 'graftToParent':
+      return `Graft ${Array.isArray(data.orphanNodeIds) ? data.orphanNodeIds.length : 0} node(s) to ${text(data.parentNodeId)}`;
+    case 'deleteNode':
+      return `Delete leaf node ${text(data.nodeId)}`;
+    case 'createOwner':
+      return `Create owner ${text(data.name)}`;
+    case 'createLease':
+      return `Create lease for owner ${text(data.ownerId)}`;
+    case 'createDeskMap':
+      return `Create desk map ${text(data.name)} (${text(data.code)})`;
+    case 'setActiveDeskMap':
+      return `Switch active desk map to ${text(data.deskMapId)}`;
+    case 'attachLease':
+      return `Attach lease ${text(data.leaseId)} to ${text(data.mineralNodeId)}`;
+    default:
+      return `Run ${toolName}`;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -912,6 +952,22 @@ export const HOSTED_BLOCKED_TOOL_NAMES: ReadonlySet<string> = new Set([
   ...UNDO_MUTATING_TOOL_NAMES,
   'setActiveDeskMap',
 ]);
+
+for (const name of HOSTED_BLOCKED_TOOL_NAMES) {
+  const toolDef = (landroidTools as Record<string, { execute?: unknown }>)[name];
+  const originalExecute = toolDef?.execute;
+  if (typeof originalExecute !== 'function') continue;
+
+  registerAIMutationExecutor(name, async (input: unknown) =>
+    (originalExecute as (input: unknown, options: unknown) => Promise<unknown>)(
+      input,
+      {}
+    )
+  );
+
+  toolDef.execute = async (input: unknown) =>
+    queueAIApprovalProposal(name, input, summariseMutationProposal(name, input));
+}
 
 /**
  * Read-only subset of `landroidTools`. Used by hosted mode until the

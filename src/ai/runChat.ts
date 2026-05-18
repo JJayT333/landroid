@@ -44,15 +44,16 @@ export async function runChatTurn(
   const settings = useAISettingsStore.getState();
   const model = resolveModel(settings);
 
-  // Pre-turn snapshot. We always capture — it's cheap — and discard later if
-  // the turn didn't call any mutating tool. Capturing before the stream
-  // guarantees the snapshot predates every mutation in this turn.
+  // Mutating tools now queue approval proposals. The approved apply path takes
+  // its own snapshot, so merely proposing a change must not consume the undo
+  // slot. This fallback snapshot remains for any future live mutator that is
+  // intentionally left outside the approval wrapper.
   const lastUserMessage = [...input.messages].reverse().find((m) => m.role === 'user');
   const label =
     typeof lastUserMessage?.content === 'string'
       ? lastUserMessage.content.slice(0, 60)
       : 'AI mutation';
-  const pendingSnapshot = await captureSnapshot(label);
+  let pendingSnapshot: Awaited<ReturnType<typeof captureSnapshot>> | null = null;
 
   // Hosted deploy: ship the read-only tool subset until the proposal/approval
   // boundary (AUDIT CB-4) lands. Local dev keeps the full tool set so the
@@ -96,10 +97,6 @@ export async function runChatTurn(
           toolName: part.toolName,
           input: part.input,
         });
-        if (UNDO_MUTATING_TOOL_NAMES.has(part.toolName)) {
-          mutated = true;
-          commitMutationSnapshot();
-        }
         input.onToolStart?.({ toolName: part.toolName, input: part.input });
         break;
       }
@@ -110,8 +107,13 @@ export async function runChatTurn(
           input: pending?.input ?? null,
           output: part.output ?? null,
         };
-        if (UNDO_MUTATING_TOOL_NAMES.has(call.toolName)) {
+        const output = call.output as { approvalRequired?: unknown } | null;
+        if (
+          UNDO_MUTATING_TOOL_NAMES.has(call.toolName)
+          && output?.approvalRequired !== true
+        ) {
           mutated = true;
+          pendingSnapshot ??= await captureSnapshot(label);
           commitMutationSnapshot();
         }
         toolCalls.push(call);

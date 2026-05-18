@@ -44,9 +44,10 @@ The current repo is not yet a secure hosted app:
   `anthropic-dangerous-direct-browser-access`.
 - OpenAI/Anthropic keys are session-only now, but they are still entered in the
   browser and used from the browser.
-- Uploads (`.landroid`, `.csv`, `.xlsx`, PDFs, images, GeoJSON) are treated as
+- Uploads (`.landroid`, `.csv`, PDFs, images, GeoJSON, and unparsed document/spreadsheet attachments) are treated as
   untrusted, but the hosted upload path does not exist yet.
-- The production `xlsx` dependency still needs containment / replacement.
+- Binary Excel parsing has been removed from the local AI import path; CSV is
+  the current parsed spreadsheet format until a safer parser is selected.
 
 Implication: **hosting the current frontend is easy; hosting it safely with all
 features and cloud AI requires a backend boundary first.**
@@ -396,8 +397,8 @@ Add immutable or append-only audit events for:
 
 ### 6.5 File-import hardening
 
-- contain or replace `xlsx`
-- move workbook import to isolated execution path
+- keep binary Excel parsing disabled until a safer parser is selected
+- keep parsed spreadsheet import on the CSV worker path
 - add size/time limits
 - add better structured upload errors
 
@@ -526,7 +527,7 @@ Do not expose the hosted app broadly until all of the following are true:
 - [ ] Hosted auth is required for non-demo access.
 - [ ] Project load/save works against server storage.
 - [ ] Upload limits are enforced server-side.
-- [ ] `xlsx` path is contained or replaced.
+- [x] `xlsx` path is contained or replaced.
 - [ ] WAF rules are attached and tested.
 - [ ] CSP and security headers are active.
 - [ ] AI mutation approval is app-enforced, not prompt-enforced.

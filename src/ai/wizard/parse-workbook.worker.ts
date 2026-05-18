@@ -1,11 +1,8 @@
 /**
- * Web Worker for xlsx/csv parsing.
+ * Web Worker for CSV parsing.
  *
- * Audit L-2 / H2-full: the `xlsx` package has open prototype-pollution and
- * ReDoS advisories with no upstream fix. Running the parser in a Worker
- * isolates a malicious workbook from the main thread — even if a payload
- * triggers the bug, only the worker's heap is corrupted and the caller
- * terminates the worker on timeout / error.
+ * Binary Excel parsing is intentionally disabled until a safer parser is
+ * chosen. The worker keeps larger CSV files from blocking the main thread.
  */
 /// <reference lib="webworker" />
 

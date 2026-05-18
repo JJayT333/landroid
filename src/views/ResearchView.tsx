@@ -36,6 +36,18 @@ import { useOwnerStore } from '../store/owner-store';
 import { useResearchStore } from '../store/research-store';
 import { useWorkspaceStore } from '../store/workspace-store';
 import {
+  RESEARCH_IMPORT_ACCEPT,
+  RESEARCH_IMPORT_UPLOAD_EXTENSIONS,
+  assertAllowedFileExtension,
+  assertFileSize,
+  limitForExtension,
+} from '../utils/file-validation';
+import {
+  PDF_MIME_TYPE,
+  isPdfFileName,
+  normalizePdfBlob,
+} from '../utils/pdf-validation';
+import {
   RESEARCH_CONTEXT_OPTIONS,
   RESEARCH_FORMULA_CATEGORY_OPTIONS,
   RESEARCH_PROJECT_RECORD_TYPE_OPTIONS,
@@ -338,7 +350,10 @@ export default function ResearchView() {
   const addQuestion = useResearchStore((state) => state.addQuestion);
   const updateQuestion = useResearchStore((state) => state.updateQuestion);
   const removeQuestion = useResearchStore((state) => state.removeQuestion);
-  const { confirm: requestConfirmation } = useConfirmation();
+  const {
+    alert: showAlert,
+    confirm: requestConfirmation,
+  } = useConfirmation();
 
   const deskMaps = useWorkspaceStore((state) => state.deskMaps);
   const nodes = useWorkspaceStore((state) => state.nodes);
@@ -2523,21 +2538,44 @@ export default function ResearchView() {
               <input
                 ref={inputRef}
                 type="file"
+                accept={RESEARCH_IMPORT_ACCEPT}
                 className="hidden"
                 multiple
                 onChange={async (event) => {
                   if (!workspaceId) return;
                   const files = Array.from(event.target.files ?? []);
-                  for (const file of files) {
-                    const researchImport = createBlankResearchImport(workspaceId, file, {
-                      fileName: file.name,
-                      mimeType: file.type || 'application/octet-stream',
-                      datasetId: selectedDataset?.id ?? null,
+                  try {
+                    for (const file of files) {
+                      assertAllowedFileExtension(
+                        file.name,
+                        RESEARCH_IMPORT_UPLOAD_EXTENSIONS,
+                        'Research import'
+                      );
+                      const limit = limitForExtension(file.name);
+                      assertFileSize(file, limit.bytes, limit.label);
+                      const isPdf = isPdfFileName(file.name) || file.type.toLowerCase().includes('pdf');
+                      const blob = isPdf ? await normalizePdfBlob(file, file.name) : file;
+                      const researchImport = createBlankResearchImport(workspaceId, blob, {
+                        fileName: file.name,
+                        mimeType: isPdf
+                          ? PDF_MIME_TYPE
+                          : file.type || 'application/octet-stream',
+                        datasetId: selectedDataset?.id ?? null,
+                      });
+                      await addImport(researchImport);
+                      setSelectedImportId(researchImport.id);
+                    }
+                  } catch (error) {
+                    await showAlert({
+                      title: 'Import Blocked',
+                      message:
+                        error instanceof Error
+                          ? error.message
+                          : 'One or more research files could not be imported.',
                     });
-                    await addImport(researchImport);
-                    setSelectedImportId(researchImport.id);
+                  } finally {
+                    event.target.value = '';
                   }
-                  event.target.value = '';
                 }}
               />
 

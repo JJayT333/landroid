@@ -5,6 +5,10 @@
   "description": "Lambda that verifies a Cognito ID token and proxies OpenAI chat completions.",
   "type": "module",
   "main": "dist/handler.js",
+  "engines": {
+    "node": ">=22 <23",
+    "npm": ">=10"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "test": "vitest run",
@@ -12,12 +16,12 @@
     "bundle": "rm -rf dist lambda.zip && npm run build && cp package.json dist/ && cp -r node_modules dist/ && cd dist && zip -qr ../lambda.zip . && cd .. && ls -lh lambda.zip"
   },
   "dependencies": {
-    "@aws-sdk/client-dynamodb": "^3.1037.0",
+    "@aws-sdk/client-dynamodb": "^3.1048.0",
     "aws-jwt-verify": "^5.0.0"
   },
   "devDependencies": {
     "@types/aws-lambda": "^8.10.145",
-    "@types/node": "^20.14.0",
+    "@types/node": "^22.19.19",
     "typescript": "^5.4.5",
     "vitest": "^4.1.5"
   }

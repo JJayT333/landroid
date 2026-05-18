@@ -8,7 +8,8 @@ import type {
 
 const docMocks = vi.hoisted(() => ({
   saveDoc: vi.fn(),
-  deleteDoc: vi.fn(),
+  deleteDocsForAttachments: vi.fn(),
+  detachDocFromEntity: vi.fn(),
   renameDoc: vi.fn(),
   reorderAttachments: vi.fn(),
   listAttachmentsForNodes: vi.fn(),
@@ -23,7 +24,8 @@ const otherMocks = vi.hoisted(() => ({
 
 vi.mock('../../storage/document-store', () => ({
   saveDoc: docMocks.saveDoc,
-  deleteDoc: docMocks.deleteDoc,
+  deleteDocsForAttachments: docMocks.deleteDocsForAttachments,
+  detachDocFromEntity: docMocks.detachDocFromEntity,
   renameDoc: docMocks.renameDoc,
   reorderAttachments: docMocks.reorderAttachments,
   listAttachmentsForNodes: docMocks.listAttachmentsForNodes,
@@ -76,6 +78,7 @@ function fakeAttachment(
 ): DocumentAttachment {
   return {
     attachmentId: 'att-1',
+    workspaceId: 'ws-test',
     docId: 'doc-1',
     entityKind: 'node',
     entityId: 'node-1',
@@ -181,7 +184,7 @@ describe('workspace-store document actions (Phase 5)', () => {
   });
 
   describe('detachDocFromNode', () => {
-    it('cascades to deleteDoc and removes the attachment from the cache', async () => {
+    it('detaches the attachment row and removes it from the cache', async () => {
       seed([
         {
           id: 'node-1',
@@ -201,11 +204,11 @@ describe('workspace-store document actions (Phase 5)', () => {
           ],
         },
       ]);
-      docMocks.deleteDoc.mockResolvedValue(undefined);
+      docMocks.detachDocFromEntity.mockResolvedValue(undefined);
 
       await useWorkspaceStore.getState().detachDocFromNode('node-1', 'att-drop');
 
-      expect(docMocks.deleteDoc).toHaveBeenCalledWith('doc-drop');
+      expect(docMocks.detachDocFromEntity).toHaveBeenCalledWith('att-drop');
       expect(useWorkspaceStore.getState().nodes[0].attachments).toEqual([
         {
           docId: 'doc-keep',
@@ -219,7 +222,7 @@ describe('workspace-store document actions (Phase 5)', () => {
     it('is a no-op if the attachment is not on the node', async () => {
       seed([{ id: 'node-1' }]);
       await useWorkspaceStore.getState().detachDocFromNode('node-1', 'missing');
-      expect(docMocks.deleteDoc).not.toHaveBeenCalled();
+      expect(docMocks.detachDocFromEntity).not.toHaveBeenCalled();
     });
   });
 

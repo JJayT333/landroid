@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   FILE_SIZE_LIMITS,
+  OWNER_DOCUMENT_UPLOAD_EXTENSIONS,
+  assertAllowedFileExtension,
   assertFileSize,
   formatBytes,
   limitForExtension,
@@ -75,6 +77,35 @@ describe('file-validation', () => {
       const fallback = limitForExtension('mystery.xyz');
       expect(fallback.bytes).toBe(FILE_SIZE_LIMITS.PDF);
       expect(fallback.label).toBe('file');
+    });
+  });
+
+  describe('assertAllowedFileExtension', () => {
+    it('accepts extensions from the supplied allowlist case-insensitively', () => {
+      expect(() =>
+        assertAllowedFileExtension(
+          'Recorded-Deed.PDF',
+          OWNER_DOCUMENT_UPLOAD_EXTENSIONS,
+          'Owner document'
+        )
+      ).not.toThrow();
+    });
+
+    it('rejects unsupported active-content extensions', () => {
+      expect(() =>
+        assertAllowedFileExtension(
+          'pretend-pdf.html',
+          OWNER_DOCUMENT_UPLOAD_EXTENSIONS,
+          'Owner document'
+        )
+      ).toThrow(/not supported/i);
+      expect(() =>
+        assertAllowedFileExtension(
+          'tract.svg',
+          OWNER_DOCUMENT_UPLOAD_EXTENSIONS,
+          'Owner document'
+        )
+      ).toThrow(/not supported/i);
     });
   });
 });

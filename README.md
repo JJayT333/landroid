@@ -34,6 +34,9 @@ xattr -dr com.apple.quarantine .
 
 ### Terminal
 
+Use Node.js 22 LTS for local development and CI. Node.js 20 is no longer a
+supported runtime target for this project.
+
 ```bash
 cd /path/to/landroid
 npm install
@@ -83,7 +86,7 @@ See `docs/README.md` for the full documentation map.
 - `Desk Map`: title-chain editing and ownership review.
 - `Leasehold`: unit-focused acreage, lease, ORRI, WI, NPRI payout, and transfer-order review.
 - `Flowchart`: presentation and print layout.
-- `Runsheet`: chronology review and workbook export.
+- `Runsheet`: chronology review and CSV export.
 - `Documents`: flat document registry with saved views, metadata editing,
   duplicate surfacing, linked-node display, and packet manifest preview.
 - `Owners`: unit-filtered owner, lease, contact, and document records.
@@ -91,7 +94,7 @@ See `docs/README.md` for the full documentation map.
 - `Maps`: project map assets, regions, and references.
 - `Federal Leasing`: reference-only federal/BLM lease tracking.
 - `Research`: source records, formulas, project records, saved questions, and RRC imports.
-- `Ask LANDroid AI`: local-first assistant workflows and workbook row review, with Ollama as the default provider.
+- `Ask LANDroid AI`: local-first assistant workflows and CSV row review, with Ollama as the default provider and approval-gated AI edits.
 
 Leasehold math strictly validates legacy/imported lease royalty, ORRI burden, and
 WI assignment fractions; malformed non-blank values are treated as 0 and surfaced
@@ -116,7 +119,8 @@ Older stress and 8-tract leasehold demos have been retired.
   edit document metadata, group documents by saved view/area, surface duplicate
   hashes, and preview title-opinion packet manifests. Dropbox/local folders or
   later object storage remain optional raw-file vaults rather than the only
-  database.
+  database. Removing a document from a card detaches that link; shared document
+  blobs remain until no entity links reference them.
 - `.landroid` imports validate the top-level workspace graph before loading.
 - CSV imports create a fresh workspace and intentionally start with empty owner,
   curative, map, and research side records.

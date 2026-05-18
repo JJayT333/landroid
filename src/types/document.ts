@@ -105,6 +105,8 @@ export interface DocumentRecord {
 export interface DocumentAttachment {
   /** Stable UUID. Primary key. */
   attachmentId: string;
+  /** Workspace scoping. Mirrors `DocumentRecord.workspaceId` for link queries. */
+  workspaceId: string;
   docId: string;
   entityKind: DocumentEntityKind;
   entityId: string;

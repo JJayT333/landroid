@@ -10,7 +10,7 @@ import OwnershipNodeEditorModals from '../components/shared/OwnershipNodeEditorM
 import { useWorkspaceStore } from '../store/workspace-store';
 import { formatAsFraction } from '../engine/fraction-display';
 import { d } from '../engine/decimal';
-import { downloadRunsheetWorkbook } from '../storage/runsheet-export';
+import { downloadRunsheetCsv } from '../storage/runsheet-export';
 import type { OwnershipNode } from '../types/node';
 import type { NodeEditorRoute } from '../utils/node-editor-route';
 import { resolveNodeEditorRoute } from '../utils/node-editor-route';
@@ -103,7 +103,7 @@ export default function RunsheetView() {
     sortField === field ? (sortDir === 'asc' ? ' \u25b2' : ' \u25bc') : '';
 
   const handleExport = () => {
-    void downloadRunsheetWorkbook(sorted, {
+    downloadRunsheetCsv(sorted, {
       projectName,
       tractLabel: activeTractLabel,
     });

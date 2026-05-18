@@ -141,8 +141,8 @@ export function createBlankLeaseholdUnit(
     jurisdiction: DEFAULT_LEASE_JURISDICTION,
     ...overrides,
   };
-  // Coerce so an override of `{jurisdiction: 'fee'}` or undefined still
-  // lands on tx_fee instead of a structurally-invalid value.
+  // Missing legacy data defaults to tx_fee; explicit junk now throws so
+  // non-Texas records cannot silently become Texas math inputs.
   unit.jurisdiction = normalizeLeaseJurisdiction(unit.jurisdiction);
   return unit;
 }

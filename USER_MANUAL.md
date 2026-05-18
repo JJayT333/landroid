@@ -85,7 +85,10 @@ Gross acres and tract descriptions now live on the tract record itself, but you 
 - The mineral-owner card stays part of the main title tree and does not turn into a separate lessor card.
 - The attached green lessee node is the lease-side view. It is terminal in Desk Map, holds the lease terms and metadata, and stays linked back to the same owner record so Desk Map and `Owners` use the same lease data.
 - Any Desk Map card with attached PDFs shows document chips on the card face, including title cards, lessee cards, NPRI cards, and related-document chips. Up to four chips are visible at once; if a card has more, a `+N more` chip expands the rest.
-- Click any document chip to open that exact PDF. The node edit modal also has an `Attached Documents` section where you can add, open, rename, remove, and reorder the PDFs on that card.
+- Click any document chip to open that exact PDF. The node edit modal also has an `Attached Documents` section where you can add, open, rename, remove, and reorder the PDFs on that card. Removing a PDF from a card detaches that card's link; the document remains in the registry or on any other card that references it.
+- The Desk Map canvas auto-fits the active tract after load/import/tract switch.
+  Use `Fit` in the canvas corner if a large title tree has been panned or
+  zoomed out of view.
 - NPRI nodes render as their own amber royalty cards. They can convey within the NPRI branch, but they stay separate from the mineral-owner coverage totals.
 
 ### Coverage totals
@@ -234,12 +237,12 @@ At the top of the runsheet:
 - If you update a lease from `Owners`, linked lease rows in `Runsheet` and the linked Desk Map lease node refresh from that shared lease record.
 
 ### Export Runsheet
-`Export Runsheet` creates an `.xlsx` workbook from the current runsheet view.
+`Export Runsheet` creates a `.csv` file from the current runsheet view.
 
 Useful notes:
 - The export respects the current tract filter and current sort order.
-- The workbook includes the `TORS_Documents\{docNo}.pdf` path formula structure.
-- If you want those links to resolve outside LANDroid, keep the `TORS_Documents` folder alongside the workbook.
+- The CSV includes the `TORS_Documents\{docNo}.pdf` path text for rows that have both a document number and an attached PDF.
+- If you want those paths to resolve outside LANDroid, keep the `TORS_Documents` folder alongside the CSV.
 
 ## 5) Documents view
 
@@ -482,17 +485,23 @@ The Curative view also keeps the next broader company-readiness areas visible so
 - Cloud AI may send project context to third-party providers; use it only when that is acceptable for the current project.
 
 ### Live edits and rollback
-- AI can make live Desk Map and owner/lease edits in the current local workflow.
-- Before an AI mutation is applied, LANDroid captures rollback state for the latest AI change.
-- Use the AI back/rollback control if an AI edit takes the project in the wrong direction.
+- AI can propose Desk Map and owner/lease edits in the current local workflow.
+- Proposed AI edits appear in the AI panel as an approval queue. Click `Approve`
+  to apply one proposal, or reject it to leave the workspace unchanged.
+- Each approved AI proposal captures rollback state for that approved batch.
+- Use the AI back/rollback control if an approved AI edit takes the project in
+  the wrong direction.
 - The rollback is a safety net, not a replacement for reviewing title/math changes.
 
-### Workbook row review
-- In the AI workbook panel, `Review rows` stages recognizable spreadsheet title rows from the full parsed workbook, including multiple tract tabs.
+### Spreadsheet row review
+- In the AI spreadsheet panel, `Review rows` stages recognizable CSV title rows. Binary Excel parsing is disabled until a safer parser is selected.
+- Spreadsheet cell text is treated as untrusted data. If a cell says something
+  like "ignore instructions," LANDroid treats that as a cell value, not a
+  command.
 - Common columns such as Instrument, Doc #, file date, instrument date, Grantor, Grantee, land description, remarks, and fraction map into editable node drafts.
 - LANDroid detects tract-style sheet names, such as `Tract 2 - 106.19 ac.`, and can create the matching Desk Map tracts before you start creating root nodes.
 - DOTO-style ownership rows inherit the source instrument, dates, document number, and land description from the controlling document row, then use the listed owner as the node grantee and keep exhibit/fraction notes in remarks.
-- The Instrument field uses the same dropdown as the normal node editor, so a new instrument type from the workbook can be added to the workspace list.
+- The Instrument field uses the same dropdown as the normal node editor, so a new instrument type from the CSV can be added to the workspace list.
 - LANDroid suggests a parent when a row grantor matches an existing grantee on the selected tract.
 - Each staged row can be edited, created as a root on the selected tract, attached to a same-tract parent, or skipped.
 - Row creation uses the same Desk Map math actions as the normal editor, so bad fractions, invalid NPRI/mineral attachments, and over-capacity conveyances fail visibly instead of silently importing.
@@ -610,7 +619,7 @@ Recent ownership work improved how fractions are stored and displayed.
 9. Capture supporting sources, formulas, shared project records, saved questions, and any useful RRC data imports in `Research`.
 10. Use `Ask LANDroid AI` to reduce typing or stage spreadsheet rows, while reviewing each suggested title/math change.
 11. Review chronology and field quality in `Runsheet`.
-12. Export the runsheet if you need workbook output.
+12. Export the runsheet if you need CSV output.
 13. Import the active tract into `Flowchart`.
 14. Adjust paper size, spacing, and fit settings.
 15. Print or save final backups.
@@ -648,8 +657,8 @@ xattr -dr com.apple.quarantine .
 - Use `Resize All` if you need a larger or smaller global scale.
 
 ### "My runsheet export does not open the PDFs"
-- Make sure the exported workbook can still reference a `TORS_Documents` folder beside it.
-- Confirm the affected records have both a document number and an attached PDF. Rows without both are exported without fake hyperlinks.
+- Make sure the exported CSV still sits beside the `TORS_Documents` folder.
+- Confirm the affected records have both a document number and an attached PDF. Rows without both are exported with a blank document path.
 
 ### "I want to test without touching real work"
 - In local mode, use `Demo Data ▾ → Combinatorial — Raven Forest` to load sample tract data. Hosted mode hides demo loading to protect signed-in workspaces.
