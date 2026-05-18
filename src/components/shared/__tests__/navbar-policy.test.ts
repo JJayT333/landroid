@@ -2,11 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { shouldShowDemoDataMenu } from '../navbar-policy';
 
 describe('navbar hosted policy', () => {
-  it('hides demo data in hosted mode to avoid overwriting a signed-in workspace', () => {
-    expect(shouldShowDemoDataMenu(true)).toBe(false);
+  it('shows demo data in hosted mode for signed-in POC fixture workflows', () => {
+    expect(shouldShowDemoDataMenu()).toBe(true);
   });
 
   it('keeps demo data available for local fixture workflows', () => {
-    expect(shouldShowDemoDataMenu(false)).toBe(true);
+    expect(shouldShowDemoDataMenu()).toBe(true);
   });
 });

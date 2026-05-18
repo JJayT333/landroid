@@ -45,7 +45,7 @@ const LOAD_WORKSPACE_CONFIRMATION_TEXT = 'LOAD WORKSPACE';
 
 export default function Navbar() {
   const hostedMode = isHostedMode();
-  const showDemoDataMenu = shouldShowDemoDataMenu(hostedMode);
+  const showDemoDataMenu = shouldShowDemoDataMenu();
   const { alert: showAlert, confirm: requestConfirmation } = useConfirmation();
   const view = useUIStore((s) => s.view);
   const setView = useUIStore((s) => s.setView);

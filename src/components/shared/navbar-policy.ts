@@ -1,3 +1,3 @@
-export function shouldShowDemoDataMenu(hostedMode: boolean): boolean {
-  return !hostedMode;
+export function shouldShowDemoDataMenu(): boolean {
+  return true;
 }
