@@ -6,318 +6,168 @@ Keep long history in `CHANGELOG.md`.
 
 ## Current Branch
 
-Current checked-out branch: `main`.
+Current checked-out branch:
+`codex/deskmap-doc-attachments-formula-cleanup`.
 
-Current `main` head: `298df0d Merge pull request #72 from
-JJayT333/claude/epic-hoover-48f4d0`.
-
-PR #72, `Main-readiness cleanup before AWS deployment`, was marked ready and
-merged into `main` on 2026-05-18. The old feature branch was deleted on GitHub.
-
-PR #73, `Fix hosted AI Cognito token recovery`, was merged into `main` on
-2026-05-18 after hosted manual AI testing showed Lambda receiving
-`missing_bearer` requests from the AI panel. `main` head after that merge is
-`b74bda1 fix: recover hosted ai id token (#73)`.
-
-Current follow-up branch: `codex/show-demo-data-hosted`. It makes Demo Data
-visible in hosted mode so signed-in POC users can load the Crackbaby Carnival
-fixture online.
-
-Deployment docs follow-up is on `codex/deployment-docs-main`: it removes stale
-Node 20 / `audit-verification-pre-aws` instructions and adds
-`DEPLOYMENT_STATE.md` as the current AWS resource map.
+Current `main` head when this branch was created:
+`8eea5b1 docs: record current hosted deployment state (#75)`.
 
 Do not commit directly to `main`.
 
 ## Current Workstream
 
-Main-readiness / housecleaning audit is merged. AWS hosted deployment was
-updated to use `main` as the Amplify production branch, Lambda `nodejs22.x`,
-fresh AI proxy zip, `/api/ai` rewrite to the existing Function URL, and
-`landroid.abstractmapping.com` mapped to `main`. The current active workstream
-is hosted smoke testing and any follow-up fixes from the live site.
+Product cleanup after PRs #72-#75.
 
-The audit covered:
+Completed in this branch:
 
-- UX and landman workflow usefulness
-- Texas title/leasehold engine and invariants
-- architecture, Zustand/Dexie persistence, document registry, and import/export
-- hosted security, file upload/preview risk, dependency audit state, and AI proxy
-- AI chat, workbook import, row review, mutation tools, and prompt-injection risk
-- browser runtime checks across Desk Map, Documents, Leasehold, Federal Leasing,
-  Research, and the AI panel
-
-The consolidated point-in-time report is:
-
-- `docs/archive/audits/MAIN_READINESS_AUDIT_2026-05-17.md`
-
-One small test-only fix was made during validation:
-
-- `tests/e2e/landroid-workflows.spec.ts` now clicks the exact `Owners` nav
-  button in the export/import workflow so formula badges named "Linked Owners"
-  do not create an ambiguous Playwright locator.
-
-The first security blocker cleanup has also landed in the working tree:
-
-- Document-registry PDF uploads and `.landroid` document imports are now
-  magic-byte checked and normalized to `application/pdf`.
-- Legacy v7 PDF payload migration rejects non-PDF bytes instead of carrying
-  them into v8 document rows.
-- PDF previews in document, asset, lease-document, and map modals are sandboxed
-  without same-origin privileges.
-- Owner document and Research file upload entry points now use explicit
-  extension allowlists plus shared size limits before saving.
-- A Playwright hover-action test was stabilized by making hidden Desk Map
-  action rows visible inside that test only.
-- Main-readiness dependency/runtime cleanup is now in the working tree:
-  - Removed the production `xlsx` dependency.
-  - AI spreadsheet row review is CSV-only until a safer binary Excel parser is
-    selected.
-  - Runsheet export now emits CSV instead of `.xlsx`.
-  - Backend `@aws-sdk/client-dynamodb` lockfile updated to `3.1048.0`, clearing
-    the `fast-xml-builder` production audit issue.
-  - Node.js 22 is the documented local/CI/Lambda runtime target.
-  - `.github/workflows/ci.yml` now runs root and AI-proxy install, production
-    audit, tests, and build on Node.js 22.
-- Document attachment scoping/cascade cleanup is now in the working tree:
-  - `DocumentAttachment` rows now carry `workspaceId`.
-  - Dexie v9 backfills attachment `workspaceId` from the linked document row.
-  - `.landroid` document import normalizes attachment rows to the importing
-    workspace.
-  - Branch/tract document cleanup now deletes affected docs in one storage
-    transaction and reports a visible `lastError` if cleanup fails after the
-    in-memory node delete.
-  - Node-level remove actions now detach only the selected attachment link, and
-    branch/tract cleanup deletes a document blob only when no surviving links
-    still reference it.
-- Strict jurisdiction/fraction validation is now in the working tree:
-  - Explicit unknown lease jurisdictions now throw instead of normalizing into
-    `tx_fee`.
-  - Missing/blank legacy lease jurisdiction still defaults to `tx_fee`.
-  - Persisted `.landroid` node fraction fields now reject malformed,
-    non-finite, or negative values instead of coercing to zero.
-- AI approval and prompt-injection cleanup is now in the working tree:
-  - Mutating AI tools create pending proposals instead of writing live state.
-  - The AI panel approval queue applies one proposal only after user approval.
-  - Each approved AI proposal captures one undo snapshot.
-  - CSV prompt rows are labeled as untrusted user data, and hostile spreadsheet
-    instructions are tested as cell values.
-- Desk Map fit/center cleanup is now in the working tree:
-  - The canvas auto-fits the active tract after load/import/tract switch.
-  - A `Fit` control recenters large trees after manual pan/zoom.
+- Hosted smoke test passed again for
+  `https://landroid.abstractmapping.com`: root HTML, security headers,
+  unauthenticated `/api/ai/*` rejection, SPA fallback, Cognito metadata, and
+  JWKS.
+- Manual hosted browser check using Chrome confirmed the user remains signed in
+  as `joshua@abstractmapping...`, the hosted Demo Data menu is visible, and
+  Crackbaby Carnival loads with tract tabs and Desk Map cards.
+- Manual hosted AI check opened the AI panel, submitted `hello`, and confirmed
+  the request still stalls with no assistant response. The panel accepted the
+  prompt and showed the user message/loading state. The header still showed the
+  stale persisted local `OLLAMA · GPT-OSS:20B` label before this branch's
+  frontend fix.
+- Computer Use AWS Console check navigated Lambda/CloudWatch for
+  `landroid-ai-proxy`. The newest same-day log streams at
+  `2026-05-18T22:21:52Z`, `2026-05-18T21:49:18Z`, and
+  `2026-05-18T21:05:21Z` all show fast `evt: "reject"` /
+  `reason: "missing_bearer"` / `status: 401` events. No authenticated
+  `evt: "request"` log for the hosted `hello` chat was found in those visible
+  streams.
+- Frontend hosted-AI polish now treats hosted mode as configured, hides local
+  provider settings in hosted mode, displays `hosted · gpt-4o-mini`, and uses
+  a direct `/api/ai/chat/completions` streaming fetch with the Cognito ID token
+  instead of the generic OpenAI-compatible provider shim. This should make the
+  hosted `hello` path reach Lambda as an authenticated request after deploy.
+- `Attach Related Document` now supports optional PDF upload during related
+  record creation. It pre-validates PDF size and magic bytes, then writes the
+  file through the existing `attachDocToNode` document registry path.
+- Formula popovers now render fixed to the viewport to avoid clipping inside
+  constrained panels or overflow-hidden map surfaces.
+- Desk Map now has a right-side `Formula Tray`: hover popovers remain
+  temporary, and clicking a formula value pins a comparison card into the tray.
+- The Unit Map Reference panel idea from `ROADMAP.md` is now implemented as a
+  collapsible Desk Map reference rail sourced from `Maps`.
+- Added a signed-in `Pitch Deck` tab that previews the LANDroid feature deck as
+  a bundled PDF and provides the original `LANDroid-Features.pptx` for download.
+  The PDF was generated with LibreOffice from the local deck file.
+- Desk Map `Fit` now measures the actual rendered visible tree/chain and
+  accounts for its offset inside the pan container before centering.
+- Leasehold `Overview` now has an `Override Review` strip for NPRI branches,
+  ORRI overrides, WI assignments, retained WI, and included/tracked record
+  counts, plus tract cards now show WI split counts beside NPRI/ORRI counts.
+- Desk Map now has a collapsible `Unit Map Reference` rail. It previews a
+  `Maps` asset linked to any tract in the active unit, then falls back to the
+  featured map asset. This is reference-only and does not attempt coordinate
+  underlay. The rail labels whether the map is `Unit-linked`,
+  `Featured fallback`, or the first available asset.
 
 ## Latest Validation
 
-Completed on merged `main` at `298df0d` on 2026-05-18:
+Automated:
 
-- `git pull --ff-only origin main` passed; local `main` was already current.
-- `npm ci` passed with 0 vulnerabilities. Local shell was Node `v26.0.0`, so
-  npm warned that the repo engine target is `>=22 <26`.
-- `npm run lint` passed.
-- `npm test` passed: 71 files, 598 tests. Known intentional error-path logs
-  appeared for document cascade failure and post-v8 backup coverage.
-- `npm run build` passed. Known Vite warnings remain:
-  - `src/storage/db.ts` is both dynamically and statically imported.
-  - some generated chunks exceed 500 kB after minification.
-  - Node `v26.0.0` emitted a local `module.register()` deprecation warning.
-- `npm run deploy:check` passed. It warned that `amplify-rewrites.json` still
-  contains the expected `REPLACE_WITH_FUNCTION_URL_HOST` template placeholder.
-- `npm run test:e2e -- tests/e2e/landroid-workflows.spec.ts` passed: 11
-  Playwright workflows.
-- Working tree after validation was clean except intentionally untracked
-  `LANDroid-Features.pptx`; this handoff file was then updated on `main` but
-  not committed because repo policy says not to commit directly to `main`.
-
-Additional hosted-AI fix validation on PR #73:
-
-- `npm test -- src/auth/__tests__/session.test.ts src/ai/__tests__/read-only-tools.test.ts`
-  passed: 2 files, 15 tests.
-- `npm run lint` passed.
-- GitHub Actions for PR #73 passed for Root app and AI proxy.
 - `bash scripts/smoke-test-hosted.sh` passed against
-  `https://landroid.abstractmapping.com` before PR #73; it verifies routing and
-  unauthenticated rejection, but the manual authenticated AI response still
-  needs retesting after Amplify finishes deploying `b74bda1`.
-
-Hosted Demo Data follow-up validation:
-
-- `npm test -- src/components/shared/__tests__/navbar-policy.test.ts src/auth/__tests__/session.test.ts`
-  passed: 2 files, 11 tests.
+  `https://landroid.abstractmapping.com`.
 - `npm run lint` passed.
-
-Completed on `claude/epic-hoover-48f4d0`:
-
-- `npm run lint` passed.
-- `npm test` passed: 70 files, 587 tests. Known post-v8 backup error-path log
-  still appears.
-- `npm run build` passed. Known Vite warnings remain:
+- `npm test -- src/components/leasehold/__tests__/leasehold-summary.test.ts src/views/__tests__/view-helpers.test.ts`
+  passed: 2 files, 26 tests.
+- `npm test -- src/store/__tests__/map-store.test.ts src/views/__tests__/view-helpers.test.ts`
+  passed: 2 files, 12 tests.
+- `npm test -- src/views/__tests__/view-helpers.test.ts src/ai/__tests__/runChat-hosted.test.ts src/auth/__tests__/session.test.ts src/ai/__tests__/settings-store.test.ts src/ai/__tests__/read-only-tools.test.ts src/store/__tests__/workspace-store-doc-actions.test.ts`
+  passed: 6 files, 46 tests.
+- `npm run build` passed. Known warnings remain:
+  - Node emitted the local `module.register()` deprecation warning.
   - `src/storage/db.ts` is both dynamically and statically imported.
-  - some generated chunks exceed 500 kB after minification.
-- `npm run deploy:check` passed. It warned that `amplify-rewrites.json` still
-  contains the expected `REPLACE_WITH_FUNCTION_URL_HOST` template placeholder.
-- `cd backend/ai-proxy && npm test` passed: 3 files, 38 tests.
-- `cd backend/ai-proxy && npm run build` passed.
-- `npm run test:e2e` passed: 11 Playwright workflows. It initially exposed one
-  hover-only Desk Map delete-button flake; the test now makes those hidden
-  action rows visible inside the test before clicking.
-- Manual in-app browser smoke passed for loading Raven Forest, opening
-  Documents, Leasehold, Federal Leasing, Research, and the AI panel.
-- Manual in-app browser smoke after document hardening loaded Raven Forest and
-  the Documents route. The Browser safety policy blocked direct PDF-preview
-  clicking, so PDF-preview rendering is covered by Playwright E2E rather than
-  the manual browser click.
+  - chunks over 500 kB after minification.
+- `git diff --check` passed after the latest Leasehold Overview/doc updates.
 
-Audit-only checks:
+Browser/manual:
 
-- Root `npm audit --omit=dev` passed: 0 vulnerabilities.
-- Backend `cd backend/ai-proxy && npm audit --omit=dev` passed: 0
-  vulnerabilities.
+- Computer Use Chrome check confirmed hosted Demo Data and Crackbaby Carnival.
+- Computer Use Chrome check confirmed hosted AI still stalls after submitting
+  `hello`.
+- Computer Use Chrome/AWS Console check confirmed the Lambda Function URL is
+  reachable and enforcing bearer auth, but the hosted manual chat request did
+  not show up as an authenticated CloudWatch request in the same-day streams.
+- Local Playwright smoke against `http://127.0.0.1:5174/` confirmed clicking a
+  formula pins one card into the `Formula Tray` with no lingering tooltip and
+  no console/page errors.
+- Local Playwright smoke confirmed the `Attach Related Document` modal opens
+  from a Desk Map `ATTACH` action and exposes `+ Attach PDF`.
+- The deck file converted successfully to
+  `src/assets/pitch/LANDroid-Features.pdf` with `soffice --headless
+  --convert-to pdf --outdir src/assets/pitch LANDroid-Features.pptx`.
+- Local Playwright smoke confirmed the `Pitch Deck` tab loads, exposes the PDF
+  preview iframe and PowerPoint download link, and has no console/page errors.
+- Local Playwright smoke against `http://127.0.0.1:5174/` loaded the
+  Combinatorial demo, opened Leasehold `Overview`, and confirmed the rendered
+  page shows `Override Review`, NPRI branch, ORRI override, WI assignment,
+  retained WI, and tract `WI splits` text with no console/page errors.
+- Local Playwright smoke uploaded an image asset through `Maps`, returned to
+  Desk Map, and confirmed the `UNIT MAP REFERENCE` rail rendered, showed the
+  reference-only copy, and collapsed to `Map Ref`. The direct upload-to-route
+  smoke logged transient `net::ERR_FILE_NOT_FOUND` image resource errors while
+  leaving the Maps route; the rail still rendered and toggled correctly.
 
-Additional validation after dependency/runtime cleanup:
+Development server:
 
-- `npm test -- src/ai/wizard/__tests__/parse-workbook.test.ts src/storage/__tests__/runsheet-export.test.ts`
-  passed: 2 files, 10 tests.
-- `npm run lint` passed.
-- `npm test` passed: 70 files, 588 tests. Known post-v8 backup error-path log
-  still appears.
-- `npm run build` passed. Known Vite warnings remain:
-  - `src/storage/db.ts` is both dynamically and statically imported.
-  - some generated chunks exceed 500 kB after minification.
-- `npm run deploy:check` passed. It warned that `amplify-rewrites.json` still
-  contains the expected `REPLACE_WITH_FUNCTION_URL_HOST` template placeholder.
-- `cd backend/ai-proxy && npm test` passed: 3 files, 38 tests.
-- `cd backend/ai-proxy && npm run build` passed.
-- `cd backend/ai-proxy && npm run package` passed and refreshed the ignored
-  local `lambda.zip` artifact.
-- `npm test -- src/store/__tests__/workspace-store.test.ts src/store/__tests__/workspace-store-doc-actions.test.ts src/storage/__tests__/document-migration.test.ts src/storage/__tests__/workspace-persistence.test.ts src/documents/__tests__/document-registry.test.ts`
-  passed: 5 files, 60 tests. The intentional cascade-failure test logs the
-  simulated Dexie failure.
-- `npm run lint` passed after the document scoping changes.
-- `npm test` passed after the document scoping changes: 70 files, 589 tests.
-  Known intentional error-path logs appear for document cascade failure and
-  post-v8 backup failure coverage.
-- `npm run build` passed after the document scoping changes. Known Vite
-  warnings remain:
-  - `src/storage/db.ts` is both dynamically and statically imported.
-  - some generated chunks exceed 500 kB after minification.
-- `npm test -- src/types/__tests__/lease-jurisdiction.test.ts src/types/__tests__/node-attachments.test.ts src/storage/__tests__/workspace-persistence.test.ts src/storage/__tests__/csv-io.test.ts`
-  passed after strict jurisdiction/fraction validation: 4 files, 62 tests.
-- `npm run lint` passed after strict jurisdiction/fraction validation.
-- `npm test -- src/components/deskmap/__tests__/deskmap-coverage.test.ts src/types/__tests__/lease-jurisdiction.test.ts`
-  passed after preserving missing legacy lease jurisdictions as Texas math:
-  2 files, 49 tests.
-- `npm test` passed after strict jurisdiction/fraction validation: 70 files,
-  594 tests. Known intentional error-path logs appear for document cascade
-  failure and post-v8 backup failure coverage.
-- `npm run build` passed after strict jurisdiction/fraction validation. Known
-  Vite warnings remain:
-  - `src/storage/db.ts` is both dynamically and statically imported.
-  - some generated chunks exceed 500 kB after minification.
-- `git diff --check` passed after strict jurisdiction/fraction validation.
-- `npm test -- src/storage/__tests__/document-store.test.ts src/store/__tests__/workspace-store-doc-actions.test.ts src/store/__tests__/workspace-store.test.ts`
-  passed after document detach/shared-blob cleanup: 3 files, 27 tests. The
-  intentional cascade-failure test logs the simulated Dexie failure.
-- `npm run lint` passed after document detach/shared-blob cleanup.
-- `npm test` passed after document detach/shared-blob cleanup: 71 files, 595
-  tests. Known intentional error-path logs appear for document cascade failure
-  and post-v8 backup failure coverage.
-- `npm run build` passed after document detach/shared-blob cleanup. Known Vite
-  warnings remain:
-  - `src/storage/db.ts` is both dynamically and statically imported.
-  - some generated chunks exceed 500 kB after minification.
-- `git diff --check` passed after document detach/shared-blob cleanup.
-- `npm test -- src/ai/__tests__/tools.test.ts src/ai/__tests__/read-only-tools.test.ts src/ai/__tests__/undo-store.test.ts src/ai/wizard/__tests__/parse-workbook.test.ts src/views/__tests__/view-helpers.test.ts`
-  passed after AI approval/prompt-injection and Desk Map fit cleanup: 5 files,
-  33 tests.
-- `npm run lint` passed after AI approval/prompt-injection and Desk Map fit
-  cleanup.
-- `npm test` passed after AI approval/prompt-injection and Desk Map fit
-  cleanup: 71 files, 598 tests. Known intentional error-path logs appear for
-  document cascade failure and post-v8 backup failure coverage.
-- `npm run build` passed after AI approval/prompt-injection and Desk Map fit
-  cleanup. Known Vite warnings remain:
-  - `src/storage/db.ts` is both dynamically and statically imported.
-  - some generated chunks exceed 500 kB after minification.
-- `npm run deploy:check` passed after AI approval/prompt-injection and Desk Map
-  fit cleanup. It warned that `amplify-rewrites.json` still contains the
-  expected `REPLACE_WITH_FUNCTION_URL_HOST` template placeholder.
-- `npm run test:e2e -- tests/e2e/landroid-workflows.spec.ts` passed after
-  adding Desk Map `Fit` control browser coverage: 11 Playwright workflows.
-- Root `npm audit --omit=dev` passed after final GitHub/AWS prep: 0
-  vulnerabilities. The first sandboxed attempt failed DNS, then passed with
-  registry access.
-- Backend `cd backend/ai-proxy && npm audit --omit=dev` passed after final
-  GitHub/AWS prep: 0 vulnerabilities. The first sandboxed attempt failed DNS,
-  then passed with registry access.
-- `cd backend/ai-proxy && npm test` passed after final GitHub/AWS prep: 3
-  files, 38 tests.
-- `cd backend/ai-proxy && npm run build` passed after final GitHub/AWS prep.
-- `cd backend/ai-proxy && npm run package` passed after final GitHub/AWS prep
-  and refreshed the ignored local `lambda.zip` artifact.
-- `git diff --check` passed after AI approval/prompt-injection and Desk Map fit
-  cleanup.
-
-Run `git diff --check`, `npm run lint`, and targeted tests after the next
-cleanup changes. Run the full pipeline again before any main merge.
+- `npm run dev -- --host 127.0.0.1 --port 5174` was started for local browser
+  checks and stopped afterward.
 
 ## Open Risks And Assumptions
 
-Remaining main-readiness blockers from the audit:
-
-- No legacy `.landroid` compatibility is required; import/export/data formats
-  can stay fluid while the cleanest model is chosen.
-- PDFs and documents are first-class uploads and must stay secure.
-- Spreadsheet upload still matters for AI-guided unit/deskmap creation, but
-  parsed AI spreadsheet review is currently CSV-only. Binary Excel uploads can
-  be stored as unparsed documents until a safer parser is selected.
-- AWS Lambda Node.js 22 (`nodejs22.x`) is the current Lambda guidance. AWS docs
-  list Node.js 22 on Amazon Linux 2023 with deprecation on 2027-04-30, create
-  block on 2027-06-01, and update block on 2027-07-01.
-- Local AI mutating tools are approval-gated. The current queue is intentionally
-  simple: one proposal per tool call, approve/reject in the AI panel, and one
-  undo snapshot per approved proposal. Further UX polish can group larger
-  reviewed batches later.
-- CSV guided import labels spreadsheet text as untrusted data and has hostile
-  cell coverage, but broader prompt-injection suites are still useful before
-  expanding document/OCR AI workflows.
-- Document attachment link rows are now workspace-scoped, UI remove detaches
-  only the selected link, and cascade cleanup deletes only orphaned document
-  blobs in one storage transaction.
-- Large Desk Map trees now auto-fit and have a browser-covered `Fit` control.
-  Add mobile-specific visual checks before merge if layout risk feels high.
-
-Product opportunities:
-
-- Make M&B/legal-description extraction a reviewed, source-cited workflow.
-- Add a "What needs attention?" dashboard for unlinked docs, missing legal
-  descriptions, source gaps, curative issues, expiring leases, unleased owners,
-  and import rows awaiting review.
-- Add federal/private packet checklists while preserving the reference-only math
-  boundary.
+- Hosted AI still needs hosted browser confirmation after this branch deploys.
+  Lambda is reachable and rejecting unauthenticated smoke probes correctly; the
+  branch now changes the hosted frontend request path so `hello` should produce
+  an authenticated CloudWatch `evt: "request"` instead of only `missing_bearer`
+  smoke probes. If backend code changes are needed later, manual Lambda bundle
+  upload remains required.
+- `aws` CLI is not installed in this repo shell, so CloudWatch logs were not
+  inspected from the terminal.
+- `LANDroid-Features.pptx` remains intentionally untracked local noise in the
+  repo root. The bundled copy under `src/assets/pitch/` is intentional.
+- The tracked generated `dist/assets/xlsx-CkFp8p6R.js` deletion from the latest
+  `npm run build` was restored with `git restore`; re-check before committing
+  if another build is run.
+- True coordinate map underlay remains out of scope; the current Desk Map map
+  rail is a reference preview only.
+- The bundled `Pitch Deck` assets are appropriate for signed-in POC navigation
+  but are not strong private-file hosting. Static frontend assets can still be
+  fetched if someone has the built asset URL; true private deck hosting would
+  need authenticated backend storage.
 
 ## Likely Next Steps
 
-- Clean up GitHub state, checkpoint this branch, and prepare the reviewed code
-  path for `main`.
-- Run the full release validation set once the GitHub cleanup is complete.
-- Prepare AWS hosted deployment using the Node.js 22 Lambda/runtime guidance.
-- Add broader AI prompt-injection fixtures before OCR/document-query workflows.
-- Update `PATCH_PLAN.md`, `ROADMAP.md`, `SECURITY.md`, `TESTING.md`,
-  `README.md`, `USER_MANUAL.md`, and `CHANGELOG.md` as cleanup fixes land.
+- Re-test hosted AI after this branch is deployed: send `hello` and confirm
+  CloudWatch shows an
+  authenticated `evt: "request"` rather than only `missing_bearer` smoke probes.
+- Re-run hosted AI manually after deploying this branch if frontend polish is
+  merged.
+- Continue product cleanup order: re-test hosted AI after deploy, then choose
+  the next small correctness/audit visibility cleanup.
+- Run `git diff --check` again after these doc updates and before committing.
+- Run full relevant validation before opening/merging a PR.
 
 ## Paste-Ready Next Chat Prompt
 
 Resume in `/Users/abstractmapping/projects/landroid` on branch
-`claude/epic-hoover-48f4d0`. Read `AGENTS.md`, `PROJECT_CONTEXT.md`,
-`docs/README.md`, and `CONTINUATION-PROMPT.md` first. Continue the
-main-readiness housecleaning from
-`docs/archive/audits/MAIN_READINESS_AUDIT_2026-05-17.md`. The document
-blob validation/sandboxing pass has landed in the working tree. Continue with
-GitHub cleanup/checkpointing, release validation for `main`, and AWS hosted
-deployment prep. Production dependency audits are currently clean, parsed AI
-spreadsheet import is CSV-only, Runsheet export is CSV, Lambda/local runtime
-guidance is Node.js 22, GitHub Actions CI has been added, document attachment
-links are workspace-scoped with detach-only UI removal and orphan-only cascade
-deletion, AI mutations are approval-gated with one undo snapshot per approved
-proposal, Desk Map has auto-fit plus browser-covered `Fit`, and strict
-jurisdiction/fraction validation is in place.
+`codex/deskmap-doc-attachments-formula-cleanup`. Read `AGENTS.md`,
+`PROJECT_CONTEXT.md`, `docs/README.md`, `DEPLOYMENT_STATE.md`, and
+`CONTINUATION-PROMPT.md` first. Continue the product cleanup after PRs #72-#75.
+Hosted smoke and hosted Demo Data/Crackbaby Carnival are confirmed; hosted AI
+still stalled after `hello` before this branch was deployed. This branch now
+fixes hosted AI label/settings visibility and replaces the hosted provider shim
+with a direct authenticated `/api/ai/chat/completions` streaming fetch.
+CloudWatch previously showed only same-day `missing_bearer` 401 smoke-style
+Lambda events, not an authenticated hosted chat request. Desk Map
+related-document attach now supports PDF upload, formula popovers avoid
+clipping, formula click pins to a side tray, Desk Map Fit measures the visible
+tree, Leasehold Overview has clearer override visibility, and Desk Map has a
+collapsible Unit Map Reference rail sourced from Maps. Next, re-test hosted AI
+after deploying this frontend branch, then choose the next small
+correctness/audit visibility cleanup.

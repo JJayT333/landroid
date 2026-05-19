@@ -9,6 +9,8 @@ import Modal from '../shared/Modal';
 import FormField from '../shared/FormField';
 import InstrumentSelect from '../shared/InstrumentSelect';
 import { useWorkspaceStore } from '../../store/workspace-store';
+import { assertFileSize, FILE_SIZE_LIMITS } from '../../utils/file-validation';
+import { normalizePdfBlob } from '../../utils/pdf-validation';
 import { createBlankNode } from '../../types/node';
 
 interface AttachDocModalProps {
@@ -19,6 +21,8 @@ interface AttachDocModalProps {
 export default function AttachDocModal({ parentNodeId, onClose }: AttachDocModalProps) {
   const addNode = useWorkspaceStore((s) => s.addNode);
   const addNodeToActiveDeskMap = useWorkspaceStore((s) => s.addNodeToActiveDeskMap);
+  const attachDocToNode = useWorkspaceStore((s) => s.attachDocToNode);
+  const removeNode = useWorkspaceStore((s) => s.removeNode);
 
   const [form, setForm] = useState({
     instrument: '',
@@ -29,11 +33,16 @@ export default function AttachDocModal({ parentNodeId, onClose }: AttachDocModal
     docNo: '',
     remarks: '',
   });
+  const [file, setFile] = useState<File | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
 
   const set = (field: string, value: string) =>
     setForm((f) => ({ ...f, [field]: value }));
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    setError(null);
+    setPending(true);
     const id = `node-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
     const node = {
       ...createBlankNode(id, parentNodeId),
@@ -49,9 +58,34 @@ export default function AttachDocModal({ parentNodeId, onClose }: AttachDocModal
       fraction: '0',
       initialFraction: '0',
     };
-    addNode(node);
-    addNodeToActiveDeskMap(id);
-    onClose();
+    let nodeAdded = false;
+    try {
+      if (file) {
+        assertFileSize(file, FILE_SIZE_LIMITS.PDF, 'PDF');
+        await normalizePdfBlob(file, file.name);
+      }
+      addNode(node);
+      addNodeToActiveDeskMap(id);
+      nodeAdded = true;
+      if (file) {
+        await attachDocToNode(id, file, {
+          kind: 'related',
+          fileName: file.name,
+        });
+      }
+      onClose();
+    } catch (saveError) {
+      if (nodeAdded) {
+        removeNode(id);
+      }
+      setError(
+        saveError instanceof Error
+          ? saveError.message
+          : 'Document attachment failed. Please try again.'
+      );
+    } finally {
+      setPending(false);
+    }
   };
 
   return (
@@ -60,6 +94,12 @@ export default function AttachDocModal({ parentNodeId, onClose }: AttachDocModal
         <div className="bg-gold/10 border border-gold/30 rounded-lg p-2 text-xs text-ink">
           This document will be attached as a related record — it does not convey any interest.
         </div>
+
+        {error && (
+          <div className="rounded-md border border-seal/30 bg-seal/10 px-2 py-1 text-xs text-seal">
+            {error}
+          </div>
+        )}
 
         <fieldset className="space-y-2">
           <legend className="text-xs font-semibold text-ink-light uppercase tracking-wider mb-2">
@@ -88,6 +128,54 @@ export default function AttachDocModal({ parentNodeId, onClose }: AttachDocModal
           />
         </div>
 
+        <fieldset className="space-y-2">
+          <legend className="text-xs font-semibold text-ink-light uppercase tracking-wider mb-2">
+            PDF Attachment
+          </legend>
+          <label className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-ledger-line bg-parchment px-2 py-1 text-xs font-semibold text-leather hover:bg-leather/5">
+            <input
+              type="file"
+              accept=".pdf"
+              className="hidden"
+              disabled={pending}
+              onChange={(event) => {
+                setError(null);
+                const selected = event.target.files?.[0] ?? null;
+                if (!selected) {
+                  setFile(null);
+                  return;
+                }
+                try {
+                  assertFileSize(selected, FILE_SIZE_LIMITS.PDF, 'PDF');
+                  setFile(selected);
+                } catch (uploadError) {
+                  setFile(null);
+                  setError(
+                    uploadError instanceof Error
+                      ? uploadError.message
+                      : 'PDF attachment failed. Please try again.'
+                  );
+                } finally {
+                  event.target.value = '';
+                }
+              }}
+            />
+            {file ? 'Change PDF' : '+ Attach PDF'}
+          </label>
+          {file && (
+            <div className="flex items-center justify-between gap-2 rounded-md border border-ledger-line bg-ledger px-2 py-1 text-xs text-ink">
+              <span className="min-w-0 truncate font-mono">{file.name}</span>
+              <button
+                type="button"
+                onClick={() => setFile(null)}
+                className="shrink-0 rounded px-2 py-0.5 text-[10px] font-semibold text-seal hover:bg-seal/10"
+              >
+                Remove
+              </button>
+            </div>
+          )}
+        </fieldset>
+
         <div className="flex justify-end gap-2 pt-2 border-t border-ledger-line">
           <button
             onClick={onClose}
@@ -97,9 +185,10 @@ export default function AttachDocModal({ parentNodeId, onClose }: AttachDocModal
           </button>
           <button
             onClick={handleSave}
+            disabled={pending}
             className="px-4 py-2 rounded-lg text-sm font-semibold bg-leather text-parchment hover:bg-leather-light transition-colors"
           >
-            Attach
+            {pending ? 'Attaching...' : 'Attach'}
           </button>
         </div>
       </div>

@@ -6,12 +6,13 @@
  * (AIPanel does) or ignore them (tests).
  */
 import { streamText, stepCountIs, type ModelMessage } from 'ai';
-import { resolveModel } from './client';
+import { HOSTED_MODEL_ID, resolveModel } from './client';
 import { LANDROID_SYSTEM_PROMPT } from './system-prompt';
-import { landroidTools, readOnlyLandroidTools, UNDO_MUTATING_TOOL_NAMES } from './tools';
+import { landroidTools, UNDO_MUTATING_TOOL_NAMES } from './tools';
 import { useAISettingsStore } from './settings-store';
 import { captureSnapshot, useAIUndoStore } from './undo-store';
 import { isHostedMode } from '../utils/deploy-env';
+import { getIdToken, triggerUnauthorized } from '../auth/session';
 
 export interface ChatTurnInput {
   messages: ModelMessage[];
@@ -42,6 +43,10 @@ export async function runChatTurn(
   input: ChatTurnInput
 ): Promise<ChatTurnResult> {
   const settings = useAISettingsStore.getState();
+  if (isHostedMode()) {
+    return runHostedProxyChatTurn(input);
+  }
+
   const model = resolveModel(settings);
 
   // Mutating tools now queue approval proposals. The approved apply path takes
@@ -55,19 +60,15 @@ export async function runChatTurn(
       : 'AI mutation';
   let pendingSnapshot: Awaited<ReturnType<typeof captureSnapshot>> | null = null;
 
-  // Hosted deploy: ship the read-only tool subset until the proposal/approval
-  // boundary (AUDIT CB-4) lands. Local dev keeps the full tool set so the
-  // user-as-operator can continue authoring.
-  const activeTools = isHostedMode() ? readOnlyLandroidTools : landroidTools;
-
   const result = streamText({
     model,
     system: LANDROID_SYSTEM_PROMPT,
     messages: input.messages,
-    tools: activeTools,
+    tools: landroidTools,
     stopWhen: stepCountIs(8),
     abortSignal: input.signal,
-    timeout: settings.provider === 'ollama' ? 10 * 60_000 : 2 * 60_000,
+    timeout:
+      settings.provider !== 'ollama' ? 2 * 60_000 : 10 * 60_000,
   });
 
   // Consume the full stream. `fullStream` yields text deltas, tool-call events,
@@ -144,4 +145,150 @@ export async function runChatTurn(
         }
       : undefined,
   };
+}
+
+async function runHostedProxyChatTurn(
+  input: ChatTurnInput
+): Promise<ChatTurnResult> {
+  const token = await getIdToken();
+  if (!token) {
+    throw new Error('Hosted AI session is missing a Cognito ID token. Sign out, sign back in, and try again.');
+  }
+
+  const { signal, clear } = withTimeout(input.signal, 2 * 60_000);
+  try {
+    const response = await fetch('/api/ai/chat/completions', {
+      method: 'POST',
+      headers: {
+        'authorization': `Bearer ${token}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: HOSTED_MODEL_ID,
+        stream: true,
+        messages: [
+          { role: 'system', content: LANDROID_SYSTEM_PROMPT },
+          ...input.messages.map(toOpenAIMessage),
+        ],
+      }),
+      signal,
+    });
+
+    if (response.status === 401) {
+      triggerUnauthorized();
+    }
+    if (!response.ok) {
+      throw new Error(await readHostedError(response));
+    }
+
+    const reader = response.body?.getReader();
+    if (!reader) return { text: '', toolCalls: [] };
+
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let finalText = '';
+
+    const consumeEvent = (event: string) => {
+      for (const rawLine of event.split('\n')) {
+        const line = rawLine.trim();
+        if (!line.startsWith('data:')) continue;
+        const data = line.slice('data:'.length).trim();
+        if (!data || data === '[DONE]') continue;
+        try {
+          const parsed = JSON.parse(data) as {
+            choices?: Array<{ delta?: { content?: unknown } }>;
+            error?: { message?: unknown };
+          };
+          if (typeof parsed.error?.message === 'string') {
+            throw new Error(parsed.error.message);
+          }
+          const delta = parsed.choices?.[0]?.delta?.content;
+          if (typeof delta === 'string' && delta.length > 0) {
+            finalText += delta;
+            input.onDelta?.(delta);
+          }
+        } catch (err) {
+          if (err instanceof Error) throw err;
+          throw new Error('Hosted AI returned an unreadable stream event.');
+        }
+      }
+    };
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+
+      let separator = findSseSeparator(buffer);
+      while (separator) {
+        const event = buffer.slice(0, separator.index);
+        buffer = buffer.slice(separator.index + separator.length);
+        consumeEvent(event);
+        separator = findSseSeparator(buffer);
+      }
+    }
+
+    buffer += decoder.decode();
+    if (buffer.trim()) consumeEvent(buffer);
+
+    return { text: finalText, toolCalls: [] };
+  } finally {
+    clear();
+  }
+}
+
+function withTimeout(parent: AbortSignal | undefined, timeoutMs: number): { signal: AbortSignal; clear: () => void } {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  const abort = () => {
+    clearTimeout(timeout);
+    controller.abort();
+  };
+  if (parent) {
+    if (parent.aborted) abort();
+    else parent.addEventListener('abort', abort, { once: true });
+  }
+  return { signal: controller.signal, clear: () => clearTimeout(timeout) };
+}
+
+function findSseSeparator(buffer: string): { index: number; length: number } | null {
+  const match = /\r?\n\r?\n/.exec(buffer);
+  return match ? { index: match.index, length: match[0].length } : null;
+}
+
+function toOpenAIMessage(message: ModelMessage): { role: 'user' | 'assistant' | 'system'; content: string } {
+  const role =
+    message.role === 'assistant' || message.role === 'system' ? message.role : 'user';
+  return {
+    role,
+    content: messageContentToText(message.content),
+  };
+}
+
+function messageContentToText(content: ModelMessage['content']): string {
+  if (typeof content === 'string') return content;
+  if (Array.isArray(content)) {
+    return content
+      .map((part) => {
+        if (part && typeof part === 'object' && 'text' in part && typeof part.text === 'string') {
+          return part.text;
+        }
+        return '';
+      })
+      .filter(Boolean)
+      .join('\n');
+  }
+  return '';
+}
+
+async function readHostedError(response: Response): Promise<string> {
+  const fallback = `Hosted AI request failed with HTTP ${response.status}.`;
+  try {
+    const text = await response.text();
+    if (!text.trim()) return fallback;
+    const parsed = JSON.parse(text) as { error?: { message?: unknown } };
+    return typeof parsed.error?.message === 'string' ? parsed.error.message : text.slice(0, 500);
+  } catch {
+    return fallback;
+  }
 }

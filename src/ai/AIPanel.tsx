@@ -17,6 +17,8 @@ import {
 } from './approval-store';
 import AISettingsPanel from './AISettingsPanel';
 import WizardPanel from './wizard/WizardPanel';
+import { HOSTED_MODEL_ID } from './client';
+import { isHostedMode } from '../utils/deploy-env';
 
 interface ChatEntry {
   role: 'user' | 'assistant';
@@ -29,7 +31,8 @@ type Mode = 'chat' | 'wizard';
 
 export default function AIPanel({ onClose }: { onClose: () => void }) {
   const settings = useAISettingsStore();
-  const configured = isConfigured(settings);
+  const hostedMode = isHostedMode();
+  const configured = hostedMode || isConfigured(settings);
 
   const [mode, setMode] = useState<Mode>('chat');
   const [entries, setEntries] = useState<ChatEntry[]>([]);
@@ -221,7 +224,9 @@ export default function AIPanel({ onClose }: { onClose: () => void }) {
         <div className="flex items-center gap-2">
           <span className="text-sm font-display font-bold">LANDroid AI</span>
           <span className="rounded border border-parchment/30 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide text-parchment/80">
-            {settings.provider} · {settings.model}
+            {hostedMode
+              ? `hosted · ${HOSTED_MODEL_ID}`
+              : `${settings.provider} · ${settings.model}`}
           </span>
         </div>
         <div className="flex items-center gap-1">
@@ -236,14 +241,16 @@ export default function AIPanel({ onClose }: { onClose: () => void }) {
               ↩ Undo
             </button>
           )}
-          <button
-            type="button"
-            onClick={() => setShowSettings((s) => !s)}
-            className="rounded px-2 py-0.5 text-xs text-parchment/70 hover:bg-ink-light/40 hover:text-parchment"
-            aria-label="Toggle AI settings"
-          >
-            ⚙
-          </button>
+          {!hostedMode && (
+            <button
+              type="button"
+              onClick={() => setShowSettings((s) => !s)}
+              className="rounded px-2 py-0.5 text-xs text-parchment/70 hover:bg-ink-light/40 hover:text-parchment"
+              aria-label="Toggle AI settings"
+            >
+              ⚙
+            </button>
+          )}
           <button
             type="button"
             onClick={onClose}
@@ -265,7 +272,9 @@ export default function AIPanel({ onClose }: { onClose: () => void }) {
       </nav>
 
       <div className="flex-1 space-y-3 overflow-y-auto bg-parchment-light p-3 text-sm text-ink">
-        {showSettings && <AISettingsPanel onClose={() => setShowSettings(false)} />}
+        {showSettings && !hostedMode && (
+          <AISettingsPanel onClose={() => setShowSettings(false)} />
+        )}
 
         {mode === 'wizard' && !showSettings && (
           <WizardPanel onStartGuided={startGuidedImport} />
