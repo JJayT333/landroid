@@ -69,6 +69,9 @@ describe('runChatTurn hosted proxy path', () => {
       messages?: Array<{ role: string; content: string }>;
     };
     expect(body.stream).toBe(true);
+    expect(body.messages?.[0]?.content).toContain(
+      'Hosted read-only context counts as project context'
+    );
     expect(body.messages?.[1]?.content).toContain('Read-only LANDroid app context');
     expect(body.messages?.at(-1)).toEqual({ role: 'user', content: 'hello' });
   });
@@ -143,7 +146,7 @@ describe('runChatTurn hosted proxy path', () => {
       messages?: Array<{ role: string; content: string }>;
     };
     const context = body.messages?.find((message) =>
-      message.content.includes('Read-only LANDroid app context')
+      message.content.startsWith('# Read-only LANDroid app context')
     )?.content;
     expect(context).toContain('Active view: Desk Map');
     expect(context).toContain('Project: Crackbaby Carnival - Demo');
