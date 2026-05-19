@@ -2,7 +2,7 @@
 
 Point-in-time hosted deployment map for the current POC.
 
-Last updated: 2026-05-18.
+Last updated: 2026-05-19.
 
 ## Frontend
 
@@ -82,6 +82,13 @@ Then upload `backend/ai-proxy/lambda.zip` to `landroid-ai-proxy`.
 
 ## Verification
 
+Latest frontend deployment verified:
+
+- Date: 2026-05-19
+- Commit: `88a8967` (`Add native Sales Deck view (#80)`)
+- Hosted bundle check confirmed `https://landroid.abstractmapping.com` serves
+  the native `Sales Deck` code.
+
 Automated hosted smoke:
 
 ```bash
@@ -97,4 +104,3 @@ Manual hosted smoke:
 5. Confirm CloudWatch logs show an authenticated `evt: "request"` and
    DynamoDB records a usage row.
 6. Use `Demo Data` to load `Crackbaby Carnival — Demo`.
-

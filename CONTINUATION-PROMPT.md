@@ -8,46 +8,56 @@ Use this file to resume the active workstream in a new chat. Read it with
 ## Current Branch
 
 Current checked-out branch:
-`codex/sales-deck-native`.
+`main`.
 
-Do not commit directly to `main`.
+The latest completed deploy is on `main` at:
+`88a8967` (`Add native Sales Deck view (#80)`).
+
+Do not commit directly to `main` unless the user explicitly asks for a direct
+main push/deploy.
 
 ## Current Workstream
 
-Native in-app Sales Deck MVP.
+Sales Deck MVP is complete and deployed.
 
-Completed in this branch:
+Completed:
 
-- Replaced the user-facing `Pitch Deck` navigation label with `Sales Deck`
-  while keeping the internal `pitch` view id for a small reversible change.
-- Reworked `src/views/PitchDeckView.tsx` so the first screen is a native
-  LANDroid slide experience with a slide rail, previous/next controls, and a
-  legacy reference section for the bundled PDF/PPTX feature deck.
-- Added `src/sales-deck/sales-deck-content.ts` to define ten polished slides
-  and extract status bullets from `CHANGELOG.md`, `ROADMAP.md`,
+- PR #80 replaced the user-facing `Pitch Deck` navigation label with
+  `Sales Deck` while keeping the internal `pitch` view id for a small
+  reversible change.
+- `src/views/PitchDeckView.tsx` now opens as a native LANDroid slide
+  experience with a slide rail, previous/next controls, scroll reset on slide
+  change, and a legacy reference section for the bundled PDF/PPTX feature deck.
+- `src/sales-deck/sales-deck-content.ts` defines ten polished slides and
+  extracts status bullets from `CHANGELOG.md`, `ROADMAP.md`,
   `CONTINUATION-PROMPT.md`, and `DEPLOYMENT_STATE.md` through Vite `?raw`
   imports at build time.
-- Added targeted unit coverage for the Markdown extraction and generated deck
-  structure.
-- Updated `README.md`, `USER_MANUAL.md`, `ARCHITECTURE.md`, `ROADMAP.md`, and
-  `CHANGELOG.md` for the native Sales Deck surface and helper data flow.
+- The Sales Deck branch was marked ready, merged to `main`, and the remote
+  feature branch was deleted.
+- Amplify served the updated custom-domain bundle after the merge.
 
 ## Latest Validation
 
-- `npm test -- src/sales-deck/__tests__/sales-deck-content.test.ts`
-  passed: 1 file, 2 tests.
-- `npm run lint` passed.
-- `npm test` passed: 74 files, 609 tests. Existing intentional stderr coverage
-  appeared for simulated Dexie/document-cascade failures.
-- `npm run build` passed. Existing Vite warnings remained for dynamic imports
-  that are also statically imported, chunk size, and Node `module.register()`
-  deprecation.
-- `git diff --check` passed.
-- Browser smoke at `http://localhost:5173/` passed through the in-app Browser:
-  app loaded as `LANDroid v2`, `Sales Deck` opened, `Next` advanced from the
-  overview slide to workflow pain, legacy reference/download controls were
-  present, the deck pane reset to scroll top on slide change, and browser
+- PR #80 GitHub Actions CI passed for both `Root app` and `AI proxy`.
+- Main-branch CI for commit `88a8967` passed.
+- Before merge, local validation passed:
+  - `npm test -- src/sales-deck/__tests__/sales-deck-content.test.ts`
+  - `npm run lint`
+  - `npm test` (74 files, 609 tests; existing intentional stderr coverage for
+    simulated Dexie/document-cascade failures)
+  - `npm run build` (existing Vite dynamic/static import warnings, chunk-size
+    warning, and Node `module.register()` deprecation remained)
+  - `git diff --check`
+- Local browser smoke passed at `http://localhost:5173/`: `Sales Deck` opened,
+  `Next` advanced from overview to workflow pain, legacy reference/download
+  controls were present, slide change reset the deck pane to top, and browser
   error/warn logs were empty.
+- Hosted infrastructure smoke passed with
+  `bash scripts/smoke-test-hosted.sh`: root HTML, security headers,
+  unauthenticated AI rejection, SPA fallback, Cognito metadata, and JWKS.
+- Hosted bundle check confirmed
+  `https://landroid.abstractmapping.com/assets/index-imE3mt9i.js` contains the
+  native Sales Deck code.
 
 ## Open Risks And Assumptions
 
@@ -58,25 +68,28 @@ Completed in this branch:
   touched unless explicitly requested.
 - `dist/assets/xlsx-CkFp8p6R.js` remains intentionally absent and should not be
   restored.
-- The first version is intentionally static-plus-small-helper. Deeper live doc
-  editing, user-authored slide management, or backend deck publishing is not
-  included.
+- Manual signed-in hosted browser verification was not completed in this pass;
+  the hosted bundle and infrastructure were verified without entering a Cognito
+  session.
 
 ## Likely Next Steps
 
-- Finish lint, full tests, build, diff-check, and local browser smoke.
-- Commit the Sales Deck branch and open a PR.
-- After merge to `main`, Amplify should rebuild the frontend automatically.
-- If the deck becomes a recurring sales artifact, consider adding a small
-  single-source status metadata file instead of expanding Markdown parsing.
+- Manually sign in at `https://landroid.abstractmapping.com` and confirm the
+  `Sales Deck` tab renders in the authenticated hosted app.
+- Load hosted Demo Data and re-test hosted AI against a populated Desk Map,
+  specifically asking whether it can see the current map/context.
+- Review the Phase 7A `Documents` registry MVP and capture only small,
+  concrete fixes before opening a broader document-packet workstream.
+- Test CSV row staging against one or two recurring spreadsheet formats and
+  add only proven aliases or row-review fixes.
 
 ## Paste-Ready Next Chat Prompt
 
-Resume in `/Users/abstractmapping/projects/landroid` on branch
-`codex/sales-deck-native`. Read `AGENTS.md`, `PROJECT_CONTEXT.md`,
-`docs/README.md`, `DEPLOYMENT_STATE.md`, and `CONTINUATION-PROMPT.md` first.
-Continue the native Sales Deck MVP. The branch replaces the user-facing
-`Pitch Deck` tab with a native `Sales Deck` slide view, keeps the bundled
-PDF/PPTX as a legacy reference section, and adds a small build-time Markdown
-helper for recent status slides. Finish validation, browser smoke, commit, push,
-and open a PR.
+Resume in `/Users/abstractmapping/projects/landroid` on `main`. Read
+`AGENTS.md`, `PROJECT_CONTEXT.md`, `docs/README.md`,
+`DEPLOYMENT_STATE.md`, and `CONTINUATION-PROMPT.md` first. Sales Deck PR #80
+has been merged and the hosted custom-domain bundle now contains the native
+Sales Deck code. Start with the next contained item: either manual signed-in
+hosted verification, hosted AI populated Desk Map retest, Phase 7A Documents
+registry review, or one real CSV row-staging test. Keep the work scoped and
+avoid opening new product fronts.
