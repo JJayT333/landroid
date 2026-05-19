@@ -113,7 +113,9 @@ as input warnings in the leasehold focus that they affect.
 Use `Demo Data -> Crackbaby Carnival` or the Raven Forest sample to load the
 current sample workspaces. The hosted POC site keeps Demo Data visible for
 signed-in fixture review. Demo loading replaces the active browser workspace,
-so it requires the typed phrase `LOAD DEMO` before it runs.
+so it requires the typed phrase `LOAD DEMO` before it runs. Demo loading resets
+owner, document, curative, map, research, and transient AI approval/undo state
+before seeding the selected fixture.
 Older stress and 8-tract leasehold demos have been retired.
 
 ## Persistence Notes
@@ -129,7 +131,7 @@ Older stress and 8-tract leasehold demos have been retired.
   blobs remain until no entity links reference them.
 - `.landroid` imports validate the top-level workspace graph before loading.
 - CSV imports create a fresh workspace and intentionally start with empty owner,
-  curative, map, and research side records.
+  document, curative, map, research, and transient AI side state.
 - `.landroid` and CSV loads require the typed phrase `LOAD WORKSPACE` because
   they replace the active browser workspace.
 

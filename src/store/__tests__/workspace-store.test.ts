@@ -11,6 +11,11 @@ const mocks = vi.hoisted(() => ({
   // `mockRejectedValueOnce` if they need to exercise the error path.
   deleteDocsForAttachments: vi.fn(async () => undefined),
   unlinkCurativeNode: vi.fn(),
+  removeOwner: vi.fn(async () => undefined),
+  removeLease: vi.fn(async () => undefined),
+  ownerState: {
+    leases: [] as Array<{ id: string; ownerId: string }>,
+  },
 }));
 
 vi.mock('../map-store', () => ({
@@ -45,11 +50,22 @@ vi.mock('../curative-store', () => ({
   },
 }));
 
+vi.mock('../owner-store', () => ({
+  useOwnerStore: {
+    getState: () => ({
+      leases: mocks.ownerState.leases,
+      removeOwner: mocks.removeOwner,
+      removeLease: mocks.removeLease,
+    }),
+  },
+}));
+
 import { useWorkspaceStore } from '../workspace-store';
 
 describe('workspace-store', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.ownerState.leases = [];
     useWorkspaceStore.setState({
       workspaceId: 'ws-test',
       projectName: 'Workspace Store Test',
@@ -504,6 +520,74 @@ describe('workspace-store', () => {
     ]);
     expect(mocks.deleteDocsForAttachments).not.toHaveBeenCalled();
     expect(mocks.unlinkNode).not.toHaveBeenCalled();
+  });
+
+  it('removes owner and lease records only linked to cleared desk map nodes', async () => {
+    const clearedRoot = {
+      ...createBlankNode('root-1', null),
+      grantee: 'Cleared Owner',
+      initialFraction: '1',
+      fraction: '1',
+      linkedOwnerId: 'owner-cleared',
+    };
+    const clearedLease = {
+      ...createBlankNode('lease-node-1', 'root-1'),
+      grantee: 'Cleared Lessee',
+      initialFraction: '1',
+      fraction: '1',
+      linkedLeaseId: 'lease-cleared',
+    };
+    const survivingRoot = {
+      ...createBlankNode('root-2', null),
+      grantee: 'Surviving Owner',
+      initialFraction: '1',
+      fraction: '1',
+      linkedOwnerId: 'owner-shared',
+    };
+    const sharedLease = {
+      ...createBlankNode('lease-node-2', 'root-2'),
+      grantee: 'Surviving Lessee',
+      initialFraction: '1',
+      fraction: '1',
+      linkedLeaseId: 'lease-shared',
+    };
+    mocks.ownerState.leases = [
+      { id: 'lease-cleared', ownerId: 'owner-cleared' },
+      { id: 'lease-shared', ownerId: 'owner-shared' },
+    ];
+
+    useWorkspaceStore.setState({
+      nodes: [clearedRoot, clearedLease, survivingRoot, sharedLease],
+      deskMaps: [
+        {
+          id: 'dm-1',
+          name: 'Tract 1',
+          code: 'T1',
+          tractId: null,
+          grossAcres: '',
+          pooledAcres: '',
+          description: '',
+          nodeIds: ['root-1'],
+        },
+        {
+          id: 'dm-2',
+          name: 'Tract 2',
+          code: 'T2',
+          tractId: null,
+          grossAcres: '',
+          pooledAcres: '',
+          description: '',
+          nodeIds: ['root-2', 'lease-node-2'],
+        },
+      ],
+    });
+
+    useWorkspaceStore.getState().clearDeskMapNodes('dm-1');
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(mocks.removeOwner).toHaveBeenCalledWith('owner-cleared');
+    expect(mocks.removeOwner).not.toHaveBeenCalledWith('owner-shared');
+    expect(mocks.removeLease).not.toHaveBeenCalledWith('lease-shared');
   });
 
   it('surfaces document cascade cleanup failures after deleting a branch', async () => {

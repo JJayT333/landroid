@@ -64,6 +64,17 @@ Normal app edits follow this path:
 Avoid writing business rules directly into UI components when a store action,
 engine helper, or typed utility already owns the behavior.
 
+Workspace-replacing flows use `src/storage/workspace-side-store-reset.ts` to
+replace every side store in one pass. Demo loads and CSV imports pass empty
+side-store data, while `.landroid` imports pass the file payload and default
+missing sections to empty. That reset also clears transient AI approval and undo
+state so stale proposals cannot apply against a replaced workspace.
+
+Tract-level Desk Map clearing remains scoped to the active Desk Map. It removes
+deleted node artifacts from document, map, and curative stores, then removes
+owner/lease records only when those records are not still linked by surviving
+nodes in another tract.
+
 ## Math Boundary
 
 Core title-tree mutation math belongs in `src/engine/math-engine.ts`.

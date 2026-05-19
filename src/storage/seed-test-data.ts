@@ -9,9 +9,6 @@
  * and stores those PDFs in IndexedDB alongside the workspace data.
  */
 import { useWorkspaceStore } from '../store/workspace-store';
-import { useMapStore } from '../store/map-store';
-import { useOwnerStore } from '../store/owner-store';
-import { useCurativeStore } from '../store/curative-store';
 import { useResearchStore } from '../store/research-store';
 import { buildLeaseNode, isLeaseNode } from '../components/deskmap/deskmap-lease-node';
 import type { OwnerWorkspaceData } from './owner-persistence';
@@ -32,6 +29,7 @@ import {
   clearFederalLeaseDocuments,
   registerFederalLeaseDocuments,
 } from './federal-lease-seed';
+import { replaceWorkspaceSideStores } from './workspace-side-store-reset';
 
 // ── Node factory ────────────────────────────────────────
 
@@ -784,20 +782,7 @@ export async function resetWorkspaceSideStores(
   workspaceId: string,
   ownerData: OwnerWorkspaceData
 ) {
-  await Promise.all([
-    useOwnerStore.getState().replaceWorkspaceData(workspaceId, ownerData),
-    useMapStore.getState().setWorkspace(workspaceId),
-    useCurativeStore.getState().replaceWorkspaceData(workspaceId, {
-      titleIssues: [],
-    }),
-    useResearchStore.getState().replaceWorkspaceData(workspaceId, {
-      imports: [],
-      sources: [],
-      formulas: [],
-      projectRecords: [],
-      questions: [],
-    }),
-  ]);
+  await replaceWorkspaceSideStores(workspaceId, { ownerData });
 }
 
 // ── Main entry point ────────────────────────────────────

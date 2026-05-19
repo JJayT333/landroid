@@ -13,8 +13,8 @@ import {
   downloadLandroidFile,
   exportDocumentWorkspaceData,
   importLandroidFile,
-  replaceDocumentWorkspaceData,
 } from '../../storage/workspace-persistence';
+import { replaceWorkspaceSideStores } from '../../storage/workspace-side-store-reset';
 import { importCSV } from '../../storage/csv-io';
 import { assertFileSize, FILE_SIZE_LIMITS } from '../../utils/file-validation';
 import { seedCombinatorialData } from '../../storage/seed-test-data';
@@ -231,34 +231,13 @@ export default function Navbar() {
         const data = await importLandroidFile(file);
         loadWorkspace(data);
         useCanvasStore.getState().loadCanvas(data.canvas ?? { nodes: [], edges: [] });
-        await Promise.all([
-          useOwnerStore.getState().replaceWorkspaceData(
-            data.workspaceId,
-            data.ownerData ?? { owners: [], leases: [], contacts: [], docs: [] }
-          ),
-          replaceDocumentWorkspaceData(
-            data.documentData ?? { documents: [], attachments: [] },
-            data.workspaceId
-          ),
-          useMapStore.getState().replaceWorkspaceData(
-            data.workspaceId,
-            data.mapData ?? { mapAssets: [], mapRegions: [], mapReferences: [] }
-          ),
-          useResearchStore.getState().replaceWorkspaceData(
-            data.workspaceId,
-            data.researchData ?? {
-              imports: [],
-              sources: [],
-              formulas: [],
-              projectRecords: [],
-              questions: [],
-            }
-          ),
-          useCurativeStore.getState().replaceWorkspaceData(
-            data.workspaceId,
-            data.curativeData ?? { titleIssues: [] }
-          ),
-        ]);
+        await replaceWorkspaceSideStores(data.workspaceId, {
+          ownerData: data.ownerData,
+          documentData: data.documentData,
+          mapData: data.mapData,
+          researchData: data.researchData,
+          curativeData: data.curativeData,
+        });
         // Phase 5: refresh node.attachments[] after PDF table write.
         await useWorkspaceStore
           .getState()
@@ -282,12 +261,7 @@ export default function Navbar() {
         const result = importCSV(text);
         loadWorkspace(result);
         useCanvasStore.getState().loadCanvas({ nodes: [], edges: [] });
-        await Promise.all([
-          useOwnerStore.getState().setWorkspace(result.workspaceId),
-          useMapStore.getState().setWorkspace(result.workspaceId),
-          useResearchStore.getState().setWorkspace(result.workspaceId),
-          useCurativeStore.getState().setWorkspace(result.workspaceId),
-        ]);
+        await replaceWorkspaceSideStores(result.workspaceId);
       } else {
         await showAlert({
           title: 'Unsupported File Type',

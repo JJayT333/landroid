@@ -90,6 +90,59 @@ const DEFAULT_INSTRUMENT_TYPES = [
   'Release',
 ];
 
+async function cleanupOwnerRecordsForRemovedNodes(
+  removedNodes: OwnershipNode[],
+  survivingNodes: OwnershipNode[]
+): Promise<void> {
+  const removedOwnerIds = new Set(
+    removedNodes
+      .map((node) => node.linkedOwnerId)
+      .filter((id): id is string => Boolean(id))
+  );
+  const removedLeaseIds = new Set(
+    removedNodes
+      .map((node) => node.linkedLeaseId)
+      .filter((id): id is string => Boolean(id))
+  );
+  if (removedOwnerIds.size === 0 && removedLeaseIds.size === 0) return;
+
+  const survivingOwnerIds = new Set(
+    survivingNodes
+      .map((node) => node.linkedOwnerId)
+      .filter((id): id is string => Boolean(id))
+  );
+  const survivingLeaseIds = new Set(
+    survivingNodes
+      .map((node) => node.linkedLeaseId)
+      .filter((id): id is string => Boolean(id))
+  );
+
+  const { useOwnerStore } = await import('./owner-store');
+  const leases = useOwnerStore.getState().leases;
+  for (const lease of leases) {
+    if (survivingLeaseIds.has(lease.id)) {
+      survivingOwnerIds.add(lease.ownerId);
+    }
+  }
+
+  const ownerIdsToRemove = [...removedOwnerIds].filter(
+    (ownerId) => !survivingOwnerIds.has(ownerId)
+  );
+  const ownerIdsToRemoveSet = new Set(ownerIdsToRemove);
+  const leaseIdsToRemove = [...removedLeaseIds].filter((leaseId) => {
+    if (survivingLeaseIds.has(leaseId)) return false;
+    const lease = leases.find((candidate) => candidate.id === leaseId);
+    return !lease || !ownerIdsToRemoveSet.has(lease.ownerId);
+  });
+
+  for (const leaseId of leaseIdsToRemove) {
+    await useOwnerStore.getState().removeLease(leaseId);
+  }
+  for (const ownerId of ownerIdsToRemove) {
+    await useOwnerStore.getState().removeOwner(ownerId);
+  }
+}
+
 interface WorkspaceState {
   // Data
   workspaceId: string;
@@ -608,9 +661,10 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
     const deletedIds = [...deleteCandidates];
     const deletedIdSet = new Set(deletedIds);
     const removedNodes = state.nodes.filter((node) => deletedIdSet.has(node.id));
+    const survivingNodes = state.nodes.filter((node) => !deletedIdSet.has(node.id));
 
     set({
-      nodes: state.nodes.filter((node) => !deletedIdSet.has(node.id)),
+      nodes: survivingNodes,
       deskMaps: state.deskMaps.map((deskMap) =>
         deskMap.id === id
           ? { ...deskMap, nodeIds: [] }
@@ -645,6 +699,13 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
       void useMapStore.getState().unlinkNode(nodeId);
       useCurativeStore.getState().unlinkNode(nodeId);
     }
+    void cleanupOwnerRecordsForRemovedNodes(removedNodes, survivingNodes).catch((err) => {
+      const message = err instanceof Error ? err.message : String(err);
+      console.warn('[workspace-store] owner cleanup failed after clearing tract:', err);
+      set({
+        lastError: `Owner/lease cleanup failed after clearing tract: ${message}. Review Owners and Leasehold for stale linked records before relying on side-panel data.`,
+      });
+    });
   },
 
   deleteDeskMap: (id) =>
@@ -990,9 +1051,10 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
 
     const remainingIds = new Set(result.data.map((node) => node.id));
     const removedNodes = state.nodes.filter((node) => !remainingIds.has(node.id));
+    const survivingNodes = result.data.map((node) => normalizeOwnershipNode(node));
     const removedIds = removedNodes.map((node) => node.id);
     set({
-      nodes: result.data.map((node) => normalizeOwnershipNode(node)),
+      nodes: survivingNodes,
       deskMaps: state.deskMaps.map((dm) => ({
         ...dm,
         nodeIds: dm.nodeIds.filter((nodeId) => remainingIds.has(nodeId)),
@@ -1015,6 +1077,13 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
       void useMapStore.getState().unlinkNode(removedId);
       useCurativeStore.getState().unlinkNode(removedId);
     }
+    void cleanupOwnerRecordsForRemovedNodes(removedNodes, survivingNodes).catch((err) => {
+      const message = err instanceof Error ? err.message : String(err);
+      console.warn('[workspace-store] owner cleanup failed after deleting branch:', err);
+      set({
+        lastError: `Owner/lease cleanup failed after deleting branch: ${message}. Review Owners and Leasehold for stale linked records before relying on side-panel data.`,
+      });
+    });
   },
 
   clearLinkedOwner: (ownerId) =>
