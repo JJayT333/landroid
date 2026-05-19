@@ -506,6 +506,10 @@ need to display inline.
 - Cloud AI may send project context to third-party providers; use it only when that is acceptable for the current project.
 - On the hosted POC site, chat runs through the signed-in Cognito session and
   the LANDroid Lambda AI proxy; no provider key is entered in the browser.
+- Hosted chat sends a compact read-only app context packet with each request,
+  including the active view, project, unit/tract, visible Desk Map cards, and
+  deterministic mineral coverage totals. This lets the hosted assistant answer
+  questions about what is visible without receiving edit tools.
 
 ### Live edits and rollback
 - AI can propose Desk Map and owner/lease edits in the current local workflow.

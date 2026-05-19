@@ -66,6 +66,16 @@ Completed in this branch:
   featured map asset. This is reference-only and does not attempt coordinate
   underlay. The rail labels whether the map is `Unit-linked`,
   `Featured fallback`, or the first available asset.
+- Hosted AI now includes a compact read-only app context packet in each
+  authenticated `/api/ai/chat/completions` request. The packet includes the
+  active view, project, unit/tract, visible Desk Map card summaries, linked
+  lease summaries, and deterministic mineral coverage totals so the hosted
+  assistant can answer questions like "Can you see the Desk Map?" without
+  receiving edit tools.
+- The stale tracked generated asset `dist/assets/xlsx-CkFp8p6R.js` is now
+  intentionally removed instead of restored. It was the only tracked file under
+  `dist/`, came from the old vulnerable Excel parser build path, and is no
+  longer emitted now that spreadsheet review is CSV-only.
 
 ## Latest Validation
 
@@ -79,12 +89,15 @@ Automated:
 - `npm test -- src/store/__tests__/map-store.test.ts src/views/__tests__/view-helpers.test.ts`
   passed: 2 files, 12 tests.
 - `npm test -- src/views/__tests__/view-helpers.test.ts src/ai/__tests__/runChat-hosted.test.ts src/auth/__tests__/session.test.ts src/ai/__tests__/settings-store.test.ts src/ai/__tests__/read-only-tools.test.ts src/store/__tests__/workspace-store-doc-actions.test.ts`
-  passed: 6 files, 46 tests.
+  passed after adding hosted Desk Map context coverage: 6 files, 47 tests.
+- `npm test -- src/ai/__tests__/runChat-hosted.test.ts` passed after adding
+  hosted Desk Map context coverage: 1 file, 4 tests.
 - `npm run build` passed. Known warnings remain:
   - Node emitted the local `module.register()` deprecation warning.
   - `src/storage/db.ts` is both dynamically and statically imported.
   - chunks over 500 kB after minification.
-- `git diff --check` passed after the latest Leasehold Overview/doc updates.
+- `git diff --check` and `git diff --cached --check` passed after the hosted
+  AI context and stale `dist` asset cleanup.
 
 Browser/manual:
 
@@ -123,17 +136,18 @@ Development server:
 
 - Hosted AI still needs hosted browser confirmation after this branch deploys.
   Lambda is reachable and rejecting unauthenticated smoke probes correctly; the
-  branch now changes the hosted frontend request path so `hello` should produce
-  an authenticated CloudWatch `evt: "request"` instead of only `missing_bearer`
-  smoke probes. If backend code changes are needed later, manual Lambda bundle
-  upload remains required.
+  branch now changes the hosted frontend request path and sends read-only app
+  context with the signed-in request, so Desk Map questions should produce an
+  authenticated CloudWatch `evt: "request"` with useful context instead of only
+  `missing_bearer` smoke probes. If backend code changes are needed later,
+  manual Lambda bundle upload remains required.
 - `aws` CLI is not installed in this repo shell, so CloudWatch logs were not
   inspected from the terminal.
 - `LANDroid-Features.pptx` remains intentionally untracked local noise in the
   repo root. The bundled copy under `src/assets/pitch/` is intentional.
-- The tracked generated `dist/assets/xlsx-CkFp8p6R.js` deletion from the latest
-  `npm run build` was restored with `git restore`; re-check before committing
-  if another build is run.
+- `dist/assets/xlsx-CkFp8p6R.js` is intentionally deleted in this branch. Do
+  not restore it unless the source parser path is intentionally changed back to
+  emit an Excel-parser chunk.
 - True coordinate map underlay remains out of scope; the current Desk Map map
   rail is a reference preview only.
 - The bundled `Pitch Deck` assets are appropriate for signed-in POC navigation
@@ -143,15 +157,19 @@ Development server:
 
 ## Likely Next Steps
 
-- Re-test hosted AI after this branch is deployed: send `hello` and confirm
-  CloudWatch shows an
-  authenticated `evt: "request"` rather than only `missing_bearer` smoke probes.
+- Re-test hosted AI after this branch is deployed: ask `Can you see the Desk
+  Map?` and confirm the answer references the active project/tract context, then
+  confirm CloudWatch shows an authenticated `evt: "request"` rather than only
+  `missing_bearer` smoke probes.
 - Re-run hosted AI manually after deploying this branch if frontend polish is
   merged.
 - Continue product cleanup order: re-test hosted AI after deploy, then choose
   the next small correctness/audit visibility cleanup.
-- Run `git diff --check` again after these doc updates and before committing.
-- Run full relevant validation before opening/merging a PR.
+- The hosted AI context changes and intentional
+  `dist/assets/xlsx-CkFp8p6R.js` deletion are committed and pushed on this
+  branch. Root `LANDroid-Features.pptx` remains untracked local noise.
+- Run full relevant validation before opening/merging a PR if new code changes
+  are added.
 
 ## Paste-Ready Next Chat Prompt
 
@@ -160,14 +178,16 @@ Resume in `/Users/abstractmapping/projects/landroid` on branch
 `PROJECT_CONTEXT.md`, `docs/README.md`, `DEPLOYMENT_STATE.md`, and
 `CONTINUATION-PROMPT.md` first. Continue the product cleanup after PRs #72-#75.
 Hosted smoke and hosted Demo Data/Crackbaby Carnival are confirmed; hosted AI
-still stalled after `hello` before this branch was deployed. This branch now
-fixes hosted AI label/settings visibility and replaces the hosted provider shim
-with a direct authenticated `/api/ai/chat/completions` streaming fetch.
+initially stalled after `hello`, then later responded but could not see the
+Desk Map. This branch now fixes hosted AI label/settings visibility, replaces
+the hosted provider shim with a direct authenticated
+`/api/ai/chat/completions` streaming fetch, and adds a read-only app context
+packet for the current view/project/unit/tract/Desk Map coverage.
 CloudWatch previously showed only same-day `missing_bearer` 401 smoke-style
 Lambda events, not an authenticated hosted chat request. Desk Map
 related-document attach now supports PDF upload, formula popovers avoid
 clipping, formula click pins to a side tray, Desk Map Fit measures the visible
 tree, Leasehold Overview has clearer override visibility, and Desk Map has a
 collapsible Unit Map Reference rail sourced from Maps. Next, re-test hosted AI
-after deploying this frontend branch, then choose the next small
-correctness/audit visibility cleanup.
+after deploying this frontend branch by asking whether it can see the Desk Map,
+then choose the next small correctness/audit visibility cleanup.

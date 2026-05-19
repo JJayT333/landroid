@@ -8,6 +8,7 @@
 import { streamText, stepCountIs, type ModelMessage } from 'ai';
 import { HOSTED_MODEL_ID, resolveModel } from './client';
 import { LANDROID_SYSTEM_PROMPT } from './system-prompt';
+import { buildAIAppContext } from './app-context';
 import { landroidTools, UNDO_MUTATING_TOOL_NAMES } from './tools';
 import { useAISettingsStore } from './settings-store';
 import { captureSnapshot, useAIUndoStore } from './undo-store';
@@ -168,6 +169,7 @@ async function runHostedProxyChatTurn(
         stream: true,
         messages: [
           { role: 'system', content: LANDROID_SYSTEM_PROMPT },
+          { role: 'system', content: buildAIAppContext() },
           ...input.messages.map(toOpenAIMessage),
         ],
       }),
