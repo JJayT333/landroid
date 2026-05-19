@@ -89,14 +89,15 @@ Automated:
 - `npm test -- src/store/__tests__/map-store.test.ts src/views/__tests__/view-helpers.test.ts`
   passed: 2 files, 12 tests.
 - `npm test -- src/views/__tests__/view-helpers.test.ts src/ai/__tests__/runChat-hosted.test.ts src/auth/__tests__/session.test.ts src/ai/__tests__/settings-store.test.ts src/ai/__tests__/read-only-tools.test.ts src/store/__tests__/workspace-store-doc-actions.test.ts`
-  passed: 6 files, 46 tests.
+  passed after adding hosted Desk Map context coverage: 6 files, 47 tests.
 - `npm test -- src/ai/__tests__/runChat-hosted.test.ts` passed after adding
   hosted Desk Map context coverage: 1 file, 4 tests.
 - `npm run build` passed. Known warnings remain:
   - Node emitted the local `module.register()` deprecation warning.
   - `src/storage/db.ts` is both dynamically and statically imported.
   - chunks over 500 kB after minification.
-- `git diff --check` passed after the latest Leasehold Overview/doc updates.
+- `git diff --check` and `git diff --cached --check` passed after the hosted
+  AI context and stale `dist` asset cleanup.
 
 Browser/manual:
 
@@ -164,9 +165,9 @@ Development server:
   merged.
 - Continue product cleanup order: re-test hosted AI after deploy, then choose
   the next small correctness/audit visibility cleanup.
-- Stage the intentional source/docs/test changes plus the
-  `dist/assets/xlsx-CkFp8p6R.js` deletion, but leave root
-  `LANDroid-Features.pptx` untracked.
+- The hosted AI context changes and intentional
+  `dist/assets/xlsx-CkFp8p6R.js` deletion are committed and pushed on this
+  branch. Root `LANDroid-Features.pptx` remains untracked local noise.
 - Run full relevant validation before opening/merging a PR if new code changes
   are added.
 
