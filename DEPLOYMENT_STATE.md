@@ -82,7 +82,7 @@ Then upload `backend/ai-proxy/lambda.zip` to `landroid-ai-proxy`.
 
 ## Verification
 
-Latest frontend deployment verified:
+Latest Sales Deck frontend deployment verified:
 
 - Date: 2026-05-19
 - Commit: `88a8967` (`Add native Sales Deck view (#80)`)

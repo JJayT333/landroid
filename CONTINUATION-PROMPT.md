@@ -10,7 +10,7 @@ Use this file to resume the active workstream in a new chat. Read it with
 Current checked-out branch:
 `main`.
 
-The latest completed deploy is on `main` at:
+Sales Deck landed on `main` in PR #80 at:
 `88a8967` (`Add native Sales Deck view (#80)`).
 
 Do not commit directly to `main` unless the user explicitly asks for a direct
