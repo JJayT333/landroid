@@ -33,7 +33,7 @@ The top bar has view buttons for the active work surfaces:
 - `Owners`
 - `Curative`
 - `Maps`
-- `Pitch Deck`
+- `Sales Deck`
 - `Federal Leasing`
 - `Research`
 
@@ -409,12 +409,23 @@ The Curative view also keeps the next broader company-readiness areas visible so
 - ArcGIS Pro is not embedded in the app.
 - The practical short-term path is to bring ArcGIS outputs into LANDroid as exported PDF, image, or GeoJSON artifacts, then link those artifacts back to the sources and project records that explain them.
 
-## 9) Pitch Deck
+## 9) Sales Deck
 
-`Pitch Deck` previews the current LANDroid feature deck as a PDF inside the app
-and provides the original PowerPoint for download. Browser preview support is
-PDF-first; native Office formats should be paired with a PDF preview when they
-need to display inline.
+`Sales Deck` opens as a native in-app slide deck for current product/status
+conversations. Use the slide rail or `Previous` / `Next` controls to move
+through the LANDroid overview, workflow pain, current product surface, Desk Map,
+Leasehold, Documents, AI direction, hosted POC state, recent progress, and next
+milestones.
+
+The `Recent Progress`, hosted status, and next-milestones content is generated
+from repository Markdown snapshots at build time, so the deck can evolve with
+`CHANGELOG.md`, `DEPLOYMENT_STATE.md`, `ROADMAP.md`, and
+`CONTINUATION-PROMPT.md`.
+
+The original bundled feature deck remains available in the `Legacy Reference
+Deck` section as an inline PDF preview and PowerPoint download. Browser preview
+support is PDF-first; native Office formats should be paired with a PDF preview
+when they need to display inline.
 
 ## 10) Federal Leasing view
 

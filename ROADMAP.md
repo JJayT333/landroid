@@ -9,6 +9,8 @@ session handoff lives in `CONTINUATION-PROMPT.md`.
   `codex/document-registry-build-2026-05-16`: flat document index, saved
   views, metadata editing, duplicate surfacing, linked-node display, and packet
   manifest preview.
+- Keep the native `Sales Deck` current as a lightweight status surface by
+  refreshing the build-time Markdown helper from current docs every few days.
 - Keep ArcGIS work design-only for now; `docs/gis-data-catalog.md` remains the
   source inventory for a later canonical layer map.
 - Test CSV row staging against additional recurring spreadsheet formats.

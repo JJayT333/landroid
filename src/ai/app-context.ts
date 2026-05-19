@@ -31,7 +31,7 @@ const VIEW_LABELS: Record<ViewMode, string> = {
   maps: 'Maps',
   federalLeasing: 'Federal Leasing',
   research: 'Research',
-  pitch: 'Pitch Deck',
+  pitch: 'Sales Deck',
 };
 
 export function buildAIAppContext(): string {
