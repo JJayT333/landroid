@@ -65,7 +65,7 @@ Gross acres and tract descriptions now live on the tract record itself, but you 
 ### Working with title cards
 - `+ Add Root` starts a new title chain in the active tract.
 - Use `+ Add Root` more than once when a tract starts from separate families or competing starting points.
-- `Clear Map` empties the active Desk Map after confirmation. Use it when a tract import went sideways and you want to rebuild that tract without deleting other tracts or owner records.
+- `Clear Map` empties the active Desk Map after confirmation. Use it when a tract import went sideways and you want to rebuild that tract without deleting other tracts. LANDroid also removes documents, map links, curative links, and owner/lease records that were only tied to the cleared nodes.
 - Temporary totals over `100%` are acceptable while you work farther back in title and reconcile the chain later.
 - Use the `Find Mineral Owner` box in the top-left toolbar to jump straight to a mineral-owner card by name, even if that owner lives on another tract tab. Matching results now appear as a clickable list beneath the search box.
 - Use `Fit` to recenter the visible tract tree when a branch grows wider or
@@ -118,7 +118,7 @@ If `Found in Chain` is temporarily over `100%`, LANDroid keeps that state visibl
 ### Important delete behavior
 Deleting a conveyance branch removes that branch and restores the deleted conveyed amount back to the original grantor or parent. This is safer than simply dropping the branch and losing the fraction.
 Deleting the only Desk Map lessee card tied to an owner lease also removes that lease from the owner record. If another Desk Map card still uses the same lease record, deleting one lessee card leaves the owner lease in place and only removes that card.
-Clearing a Desk Map removes the visible title cards and node-linked artifacts from that tract, but it keeps the project, other tracts, owner records, maps, research, and curative records that are not tied to those cleared nodes. If a node is shared with another Desk Map, LANDroid removes it from the cleared map without deleting the shared node record.
+Clearing a Desk Map removes the visible title cards and node-linked artifacts from that tract, but it keeps the project, other tracts, owner records, maps, research, and curative records that are not tied to those cleared nodes. Owner and lease records that are only linked to the cleared nodes are removed from `Owners`; records still used by another tract stay in place. If a node is shared with another Desk Map, LANDroid removes it from the cleared map without deleting the shared node record.
 Destructive actions now open a LANDroid confirmation modal instead of a browser pop-up, so you can cancel with the button, `Esc`, or by closing the modal before the action runs.
 Workspace-replacing actions use the same modal but keep the final button disabled until you type the displayed phrase.
 
@@ -204,7 +204,7 @@ It now has three internal modes:
 - Owner-card grantee names stay unique across the fixture so it is easy to scan
 - Seeded title and lease PDFs show their filenames on the Desk Map cards. Representative conveying nodes in C2, C5, and C10 also include a natural Texas deed + obituary + affidavit of heirship pattern so the multi-document chip behavior is visible in the demo.
 - The demo starts focused on Unit A. Unit-wide ORRIs and WI assignments carry a unit code so Unit A and Unit B leasehold math stay separated.
-- The demo loader resets Curative, Maps, and Research side workspaces so stale side records from previous work are not carried over
+- The demo loader resets Owners, Documents, Curative, Maps, Research, and transient AI approval/undo state so stale side records from previous work are not carried over
 - The tract descriptions are prefilled so you can see how the tab is meant to be used before entering your own data
 
 ## 4) Runsheet view
@@ -605,7 +605,7 @@ These are the main workspace snapshot files. They now include:
 - flowchart spacing settings
 
 ### `.csv` import
-CSV import loads workspace data, resets the flowchart canvas, and starts a fresh empty owner/curative/maps/research side workspace so you can re-import and relink cleanly. `.landroid` export/import carries node document attachments and registry metadata, including multiple PDFs on the same title card. Older v7 `.landroid` files are migrated into the current multi-document attachment shape during import.
+CSV import loads workspace data, resets the flowchart canvas, and starts a fresh empty owner/document/curative/maps/research side workspace so you can re-import and relink cleanly. It also clears pending AI approvals and the last AI undo snapshot. `.landroid` export/import carries node document attachments and registry metadata, including multiple PDFs on the same title card. Older v7 `.landroid` files are migrated into the current multi-document attachment shape during import.
 When PDF payloads are present, LANDroid preserves the stored filenames so Desk Map can show exactly what is attached instead of only saying that a PDF exists.
 
 ### Local browser storage

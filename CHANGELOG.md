@@ -5,6 +5,13 @@ stay short.
 
 ## 2026-05-19
 
+- Centralized workspace side-store replacement so demo loads, `.landroid`
+  imports, and CSV imports consistently reset missing owner, document,
+  curative, map, research, and transient AI approval/undo state instead of
+  carrying stale side-section data forward.
+- Tightened Desk Map cleanup so `Clear Map` and branch deletes remove owner and
+  lease records only when those records were linked exclusively to deleted
+  nodes, while preserving records still used by other tracts.
 - Added a hosted AI read-only app context packet so signed-in hosted chat
   requests include the active view, project, unit/tract, visible Desk Map
   cards, linked lease summaries, and deterministic mineral coverage totals.
