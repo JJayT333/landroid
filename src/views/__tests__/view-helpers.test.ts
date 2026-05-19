@@ -369,4 +369,19 @@ describe('view helpers', () => {
       zoom: 0.46,
     });
   });
+
+  it('accounts for measured tree offsets when fitting Desk Map content', () => {
+    const viewport = computeDeskMapFitViewport({
+      containerWidth: 1000,
+      containerHeight: 700,
+      contentWidth: 500,
+      contentHeight: 300,
+      contentX: 48,
+      contentY: 48,
+    });
+
+    expect(viewport?.x).toBeCloseTo(157.3);
+    expect(viewport?.y).toBeCloseTo(122.3);
+    expect(viewport?.zoom).toBe(1.15);
+  });
 });

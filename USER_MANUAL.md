@@ -33,12 +33,13 @@ The top bar has view buttons for the active work surfaces:
 - `Owners`
 - `Curative`
 - `Maps`
+- `Pitch Deck`
 - `Federal Leasing`
 - `Research`
 
 The top bar also has:
 - `File ▾` with `Save workspace` (exports a `.landroid` snapshot) and `Load workspace` (imports a `.landroid` or `.csv` file)
-- Local mode only: `Demo Data ▾` with the `Combinatorial — Raven Forest` sample fixture for exercising Desk Map, Leasehold, and Federal Leasing surfaces without real project data. Hosted mode hides this menu so signed-in project data cannot be overwritten by a fixture.
+- `Demo Data ▾` with the Crackbaby Carnival and Raven Forest sample fixtures for exercising Desk Map, Leasehold, and Federal Leasing surfaces without real project data. The hosted POC site keeps this menu visible for signed-in fixture review.
 - Loading demo data requires typing `LOAD DEMO`; loading a `.landroid` or `.csv` file requires typing `LOAD WORKSPACE`, because each action replaces the active browser workspace.
 
 The current project name appears in the top bar and is editable inline — click the name, type a new one, and press `Enter` to commit or `Esc` to cancel. Local autosave still uses browser storage, but `Save` now captures workspace data, flowchart canvas state, owner records, owner documents, curative title issues, map assets, and Research sources, formulas, project records, saved questions, and imports in the exported `.landroid` file.
@@ -67,9 +68,14 @@ Gross acres and tract descriptions now live on the tract record itself, but you 
 - `Clear Map` empties the active Desk Map after confirmation. Use it when a tract import went sideways and you want to rebuild that tract without deleting other tracts or owner records.
 - Temporary totals over `100%` are acceptable while you work farther back in title and reconcile the chain later.
 - Use the `Find Mineral Owner` box in the top-left toolbar to jump straight to a mineral-owner card by name, even if that owner lives on another tract tab. Matching results now appear as a clickable list beneath the search box.
+- Use `Fit` to recenter the visible tract tree when a branch grows wider or
+  deeper than the current viewport.
+- If a map asset has been uploaded in `Maps`, Desk Map shows a collapsible
+  `Unit Map Reference` rail on the right. It prefers a map linked to any tract
+  in the active unit, then falls back to the featured map.
 - Click a card to edit it.
 - Hover a card to reveal actions such as `PRECEDE`, `CONVEY`, `ATTACH`, and `DELETE`.
-- Related documents stay attached to a title card and do not change ownership math.
+- Related documents stay attached to a title card and do not change ownership math. The `ATTACH` action opens `Attach Related Document`, where you can enter the record metadata and optionally attach a PDF immediately.
 - Cards that still retain interest are visually emphasized so they are easier to spot.
 - The node edit modal includes an `Owner Record` section so you can create or open a linked owner record without crowding the card footer.
 - If the title card is not linked to an owner yet, `Owner Record` can link an existing owner record. Use this when the same legal owner appears in another tract and you want one owner/lease file without merging the tract title branches.
@@ -89,6 +95,13 @@ Gross acres and tract descriptions now live on the tract record itself, but you 
 - The Desk Map canvas auto-fits the active tract after load/import/tract switch.
   Use `Fit` in the canvas corner if a large title tree has been panned or
   zoomed out of view.
+- The `Unit Map Reference` rail is reference-only. Upload, feature, link, and
+  annotate map assets from `Maps`; use the Desk Map rail only as a side-by-side
+  visual aid while tracing title. The rail labels whether the asset is
+  `Unit-linked`, a `Featured fallback`, or the first available map asset.
+- Hover a dotted formula value to see the temporary calculation popover. Click
+  a formula value to pin that formula into the right-side `Formula Tray` for
+  side-by-side comparison; use `Remove` or `Clear` to dismiss pinned formulas.
 - NPRI nodes render as their own amber royalty cards. They can convey within the NPRI branch, but they stay separate from the mineral-owner coverage totals.
 
 ### Coverage totals
@@ -132,6 +145,7 @@ It now has three internal modes:
 - Lets you add another unit from the selector; LANDroid creates a starter tract under that new unit so the group exists immediately
 - Lets you set unit name, operator / lessee, effective date, and a short unit description
 - Lets you set `gross acres`, `pooled acres`, and a short tract description for each Desk Map
+- Shows an `Override Review` strip in `Overview` so NPRI branches, ORRI overrides, WI assignments, and retained WI are visible before opening the map or deck
 - Derives tract participation from pooled acres
 - Derives each present owner's net mineral acres from gross tract acres and also shows the pooled-acre participation equivalent
 - Pulls active lease data from `Owners` so the tract summary and owner rows stay tied to the same lease record; leases with linked Desk Map lease cards are scoped to that owner branch, while owner leases without a Desk Map lease card remain owner-level
@@ -181,7 +195,7 @@ It now has three internal modes:
 - `Deck` mode is the intended visual home for WI, assignments, transfer-order review, and later deeper payout workflows
 
 ### Demo workspace
-- In local mode, `Demo Data ▾ → Combinatorial — Raven Forest` loads the sample fixture. Hosted mode hides the demo loader.
+- `Demo Data ▾` loads the sample fixtures after the typed confirmation phrase.
 - 10 tracts in two pooled units — Raven Forest Unit A (C1–C5, Walker County) and Unit B (C6–C10, Walker/Montgomery line), reflecting the Sam Houston National Forest prospect
 - Unit A tracts are leased to Texas Energy Acquisitions LP at 1/8 royalty; Unit B tracts to Lone Star Minerals LLC at 3/16 royalty
 - Leasehold and Owners open with a unit selector so you can switch between Raven Forest Unit A and Unit B instead of reviewing the whole combinatorial sample as one combined unit
@@ -395,7 +409,14 @@ The Curative view also keeps the next broader company-readiness areas visible so
 - ArcGIS Pro is not embedded in the app.
 - The practical short-term path is to bring ArcGIS outputs into LANDroid as exported PDF, image, or GeoJSON artifacts, then link those artifacts back to the sources and project records that explain them.
 
-## 9) Federal Leasing view
+## 9) Pitch Deck
+
+`Pitch Deck` previews the current LANDroid feature deck as a PDF inside the app
+and provides the original PowerPoint for download. Browser preview support is
+PDF-first; native Office formats should be paired with a PDF preview when they
+need to display inline.
+
+## 10) Federal Leasing view
 
 `Federal Leasing` is the first-class workspace for federal/BLM lease inventory, expiration tracking, potential leasing targets, source packets, and map evidence. It uses the same saved project-record backbone as `Research`, so a federal lease created here still appears in Research project records and exports in the same `.landroid` file.
 
@@ -419,7 +440,7 @@ The Curative view also keeps the next broader company-readiness areas visible so
 - No federal royalty math, ONRR reporting, payout math, BLM calculation behavior, CA/TPF math, or tribal lease workflow is active here.
 - Research remains the source library and cross-record hub; Federal Leasing is the working board for the federal lease inventory itself.
 
-## 10) Research view
+## 11) Research view
 
 `Research` is now the source-of-truth workspace for project sources, formulas, shared project records, saved questions, and advanced data imports. It opens to a home view with cross-library search, a review queue, and quick actions before you dive into any one record type.
 
@@ -474,7 +495,7 @@ The Curative view also keeps the next broader company-readiness areas visible so
 - The horizontal-permit decoder currently focuses on the published 360-character row layout for that family. It does not yet cross-link those rows to other RRC families inside LANDroid.
 - DBF and EBCDIC-heavy imports are no longer near-term roadmap work. They remain staged safely for later if that work becomes worth the time.
 
-## 11) Ask LANDroid AI
+## 12) Ask LANDroid AI
 
 `Ask LANDroid AI` is active for single-user local workflows.
 
@@ -483,6 +504,8 @@ The Curative view also keeps the next broader company-readiness areas visible so
 - OpenAI and Anthropic are optional cloud providers.
 - Cloud provider keys are session-only and should be treated as sensitive.
 - Cloud AI may send project context to third-party providers; use it only when that is acceptable for the current project.
+- On the hosted POC site, chat runs through the signed-in Cognito session and
+  the LANDroid Lambda AI proxy; no provider key is entered in the browser.
 
 ### Live edits and rollback
 - AI can propose Desk Map and owner/lease edits in the current local workflow.

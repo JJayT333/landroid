@@ -83,7 +83,8 @@ See `docs/README.md` for the full documentation map.
 
 ## Current App Surfaces
 
-- `Desk Map`: title-chain editing and ownership review.
+- `Desk Map`: title-chain editing, ownership review, and a collapsible unit-map
+  reference rail sourced from `Maps`.
 - `Leasehold`: unit-focused acreage, lease, ORRI, WI, NPRI payout, and transfer-order review.
 - `Flowchart`: presentation and print layout.
 - `Runsheet`: chronology review and CSV export.
@@ -91,10 +92,16 @@ See `docs/README.md` for the full documentation map.
   duplicate surfacing, linked-node display, and packet manifest preview.
 - `Owners`: unit-filtered owner, lease, contact, and document records.
 - `Curative`: title issue and curative tracking.
-- `Maps`: project map assets, regions, and references.
+- `Maps`: project map assets, regions, references, and the featured/unit-linked
+  map shown in Desk Map.
+- `Pitch Deck`: signed-in PDF preview and PowerPoint download for the current
+  LANDroid feature deck.
 - `Federal Leasing`: reference-only federal/BLM lease tracking.
 - `Research`: source records, formulas, project records, saved questions, and RRC imports.
-- `Ask LANDroid AI`: local-first assistant workflows and CSV row review, with Ollama as the default provider and approval-gated AI edits.
+- `Ask LANDroid AI`: local-first assistant workflows and CSV row review, with
+  Ollama as the local default provider, hosted proxy mode for the POC site, and
+  approval-gated AI edits. Hosted chat posts directly to the Lambda-backed
+  `/api/ai/chat/completions` proxy with the signed-in Cognito session.
 
 Leasehold math strictly validates legacy/imported lease royalty, ORRI burden, and
 WI assignment fractions; malformed non-blank values are treated as 0 and surfaced
@@ -102,12 +109,10 @@ as input warnings in the leasehold focus that they affect.
 
 ## Demo Data
 
-In local mode, use `Demo Data -> Combinatorial - Raven Forest` to load the
-current sample workspace. It starts on Raven Forest Unit A and separates Unit A
-and Unit B so Leasehold and Owners can be reviewed by unit. Hosted mode hides
-the demo loader so a signed-in workspace cannot be overwritten by a fixture.
-Local demo loading still replaces the active workspace, so it requires the
-typed phrase `LOAD DEMO` before it runs.
+Use `Demo Data -> Crackbaby Carnival` or the Raven Forest sample to load the
+current sample workspaces. The hosted POC site keeps Demo Data visible for
+signed-in fixture review. Demo loading replaces the active browser workspace,
+so it requires the typed phrase `LOAD DEMO` before it runs.
 Older stress and 8-tract leasehold demos have been retired.
 
 ## Persistence Notes

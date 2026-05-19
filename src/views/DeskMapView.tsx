@@ -7,6 +7,7 @@
  */
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useUIStore } from '../store/ui-store';
+import { useMapStore } from '../store/map-store';
 import { useOwnerStore } from '../store/owner-store';
 import { useWorkspaceStore } from '../store/workspace-store';
 import { d } from '../engine/decimal';
@@ -18,7 +19,12 @@ import {
 import DeskMapCard from '../components/deskmap/DeskMapCard';
 import DeskMapLeaseCard from '../components/deskmap/DeskMapLeaseCard';
 import DeskMapNpriCard from '../components/deskmap/DeskMapNpriCard';
-import { FormulaTooltip } from '../components/leasehold/FormulaTooltip';
+import {
+  FormulaContentBody,
+  FormulaPinProvider,
+  FormulaTooltip,
+  type FormulaContent,
+} from '../components/leasehold/FormulaTooltip';
 import {
   coverageFoundInChainFormula,
   coverageLeasedFormula,
@@ -55,6 +61,13 @@ import {
 } from '../types/node';
 import type { NodeEditorRoute } from '../utils/node-editor-route';
 import { resolveNodeEditorRoute } from '../utils/node-editor-route';
+import {
+  filterDeskMapsByUnitCode,
+  findUnitOption,
+  makeUnitOptionLabel,
+  resolveActiveUnitCode,
+} from '../utils/desk-map-units';
+import type { MapAsset, MapRegion } from '../types/map';
 
 // ── Tree branch renderer ────────────────────────────────
 
@@ -184,12 +197,16 @@ export function computeDeskMapFitViewport({
   containerHeight,
   contentWidth,
   contentHeight,
+  contentX = 0,
+  contentY = 0,
   padding = 96,
 }: {
   containerWidth: number;
   containerHeight: number;
   contentWidth: number;
   contentHeight: number;
+  contentX?: number;
+  contentY?: number;
   padding?: number;
 }): { x: number; y: number; zoom: number } | null {
   if (
@@ -211,9 +228,33 @@ export function computeDeskMapFitViewport({
     )
   );
   return {
-    x: Math.max(24, (containerWidth - contentWidth * fitZoom) / 2),
-    y: Math.max(24, (containerHeight - contentHeight * fitZoom) / 2),
+    x: Math.max(24, (containerWidth - contentWidth * fitZoom) / 2 - contentX * fitZoom),
+    y: Math.max(24, (containerHeight - contentHeight * fitZoom) / 2 - contentY * fitZoom),
     zoom: fitZoom,
+  };
+}
+
+function measureDeskMapFitContent(content: HTMLElement): {
+  contentWidth: number;
+  contentHeight: number;
+  contentX: number;
+  contentY: number;
+} {
+  const visibleTree = content.querySelector<HTMLElement>('[data-desk-map-fit-content]');
+  if (!visibleTree) {
+    return {
+      contentWidth: content.scrollWidth,
+      contentHeight: content.scrollHeight,
+      contentX: 0,
+      contentY: 0,
+    };
+  }
+
+  return {
+    contentWidth: visibleTree.offsetWidth,
+    contentHeight: visibleTree.offsetHeight,
+    contentX: visibleTree.offsetLeft,
+    contentY: visibleTree.offsetTop,
   };
 }
 
@@ -285,8 +326,12 @@ function PanZoomContainer({
     if (!container || !content) return;
 
     const containerRect = container.getBoundingClientRect();
-    const contentWidth = content.scrollWidth;
-    const contentHeight = content.scrollHeight;
+    const {
+      contentWidth,
+      contentHeight,
+      contentX,
+      contentY,
+    } = measureDeskMapFitContent(content);
     if (containerRect.width <= 0 || containerRect.height <= 0 || contentWidth <= 0 || contentHeight <= 0) {
       return;
     }
@@ -296,6 +341,8 @@ function PanZoomContainer({
       containerHeight: containerRect.height,
       contentWidth,
       contentHeight,
+      contentX,
+      contentY,
     });
     if (!viewport) return;
     setZoom(viewport.zoom);
@@ -554,6 +601,199 @@ function CoverageCard({
   );
 }
 
+interface PinnedFormula {
+  id: string;
+  content: FormulaContent;
+}
+
+function formulaPinId(content: FormulaContent): string {
+  return JSON.stringify({
+    title: content.title,
+    result: content.result,
+    steps: content.steps.map((step) => [
+      step.label,
+      step.expression,
+      step.value,
+    ]),
+  });
+}
+
+function FormulaTray({
+  formulas,
+  onRemove,
+  onClear,
+}: {
+  formulas: PinnedFormula[];
+  onRemove: (id: string) => void;
+  onClear: () => void;
+}) {
+  if (formulas.length === 0) return null;
+
+  return (
+    <aside className="absolute bottom-3 right-3 top-14 z-30 flex w-[22rem] max-w-[calc(100%-1.5rem)] flex-col rounded-lg border border-ledger-line bg-parchment/96 shadow-xl backdrop-blur">
+      <div className="flex items-center justify-between gap-2 border-b border-ledger-line px-3 py-2">
+        <div>
+          <div className="text-xs font-semibold uppercase tracking-wider text-ink">
+            Formula Tray
+          </div>
+          <div className="text-[10px] text-ink-light">
+            {formulas.length} pinned for comparison
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={onClear}
+          className="rounded-md border border-ledger-line px-2 py-1 text-[10px] font-semibold text-ink-light hover:bg-parchment-dark/70"
+        >
+          Clear
+        </button>
+      </div>
+      <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-2">
+        {formulas.map((formula) => (
+          <section
+            key={formula.id}
+            className="rounded-lg border border-leather/50 bg-ink p-3 text-xs text-parchment shadow-sm"
+          >
+            <div className="mb-2 flex justify-end">
+              <button
+                type="button"
+                onClick={() => onRemove(formula.id)}
+                className="rounded px-2 py-0.5 text-[10px] font-semibold text-parchment/70 hover:bg-parchment/10 hover:text-parchment"
+              >
+                Remove
+              </button>
+            </div>
+            <FormulaContentBody content={formula.content} pinned pinHint="Pinned in tray." />
+          </section>
+        ))}
+      </div>
+    </aside>
+  );
+}
+
+function isImageMapAsset(asset: MapAsset): boolean {
+  return asset.mimeType.toLowerCase().startsWith('image/');
+}
+
+function isPdfMapAsset(asset: MapAsset): boolean {
+  return asset.mimeType.toLowerCase().includes('pdf');
+}
+
+function UnitMapReferencePanel({
+  asset,
+  regions,
+  unitLabel,
+  linkedTractCount,
+  selectionLabel,
+  collapsed,
+  onToggle,
+}: {
+  asset: MapAsset;
+  regions: MapRegion[];
+  unitLabel: string;
+  linkedTractCount: number;
+  selectionLabel: string;
+  collapsed: boolean;
+  onToggle: () => void;
+}) {
+  const objectUrl = useMemo(() => URL.createObjectURL(asset.blob), [asset.blob]);
+
+  useEffect(() => {
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [objectUrl]);
+
+  if (collapsed) {
+    return (
+      <button
+        type="button"
+        onClick={onToggle}
+        className="absolute right-3 top-3 z-20 rounded-xl border border-ledger-line bg-parchment/95 px-3 py-2 text-xs font-semibold text-ink shadow-md backdrop-blur transition-colors hover:bg-parchment"
+        title="Open Unit Map Reference"
+      >
+        Map Ref
+      </button>
+    );
+  }
+
+  return (
+    <aside className="absolute right-3 top-3 z-20 flex max-h-[min(34rem,calc(100%-1.5rem))] w-[21rem] max-w-[calc(100%-1.5rem)] flex-col overflow-hidden rounded-xl border border-ledger-line bg-parchment/96 shadow-xl backdrop-blur">
+      <div className="flex items-start justify-between gap-3 border-b border-ledger-line bg-ledger px-3 py-2">
+        <div className="min-w-0">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-light">
+            Unit Map Reference
+          </div>
+          <div className="mt-0.5 truncate text-sm font-semibold text-ink">
+            {asset.title || asset.fileName}
+          </div>
+          <div className="mt-0.5 text-[10px] text-ink-light">
+            {unitLabel} • {linkedTractCount} tract{linkedTractCount === 1 ? '' : 's'}
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={onToggle}
+          className="rounded-md border border-ledger-line px-2 py-1 text-[10px] font-semibold text-ink-light transition-colors hover:bg-parchment"
+          title="Collapse Unit Map Reference"
+        >
+          Hide
+        </button>
+      </div>
+
+      <div className="min-h-0 flex-1 overflow-auto p-3">
+        {isImageMapAsset(asset) ? (
+          <img
+            src={objectUrl}
+            alt={asset.title || asset.fileName}
+            className="max-h-80 w-full rounded-lg border border-ledger-line bg-white object-contain"
+          />
+        ) : isPdfMapAsset(asset) ? (
+          <iframe
+            src={objectUrl}
+            sandbox="allow-downloads"
+            className="h-80 w-full rounded-lg border border-ledger-line bg-white"
+            title={asset.fileName}
+          />
+        ) : (
+          <div className="rounded-lg border border-dashed border-ledger-line bg-parchment-dark/40 px-3 py-4 text-sm text-ink-light">
+            This map asset is saved as {asset.kind}. Use Maps for the full preview.
+          </div>
+        )}
+
+        <div className="mt-3 space-y-2 text-xs text-ink-light">
+          <div className="flex flex-wrap gap-1.5">
+            <span className="rounded-full border border-ledger-line bg-parchment px-2 py-0.5">
+              {asset.kind}
+            </span>
+            {asset.isFeatured && (
+              <span className="rounded-full border border-leather/30 bg-leather/10 px-2 py-0.5 text-leather">
+                Featured
+              </span>
+            )}
+            <span className="rounded-full border border-ledger-line bg-parchment px-2 py-0.5">
+              {selectionLabel}
+            </span>
+            {regions.length > 0 && (
+              <span className="rounded-full border border-ledger-line bg-parchment px-2 py-0.5">
+                {regions.length} region{regions.length === 1 ? '' : 's'}
+              </span>
+            )}
+          </div>
+          <div className="break-all">{asset.fileName}</div>
+          {(asset.presentationSummary || asset.notes) && (
+            <div className="rounded-lg border border-ledger-line bg-parchment-dark/35 p-2 leading-5 text-ink">
+              {asset.presentationSummary || asset.notes}
+            </div>
+          )}
+          <div>
+            Reference-only panel. Title cards stay on the Desk Map canvas; open Maps
+            to edit assets, regions, and source links.
+          </div>
+        </div>
+      </div>
+    </aside>
+  );
+}
+
 // ── Main view ───────────────────────────────────────────
 
 export default function DeskMapView() {
@@ -564,6 +804,9 @@ export default function DeskMapView() {
   const { confirm: requestConfirmation, alert: showAlert } = useConfirmation();
   const nodes = useWorkspaceStore((s) => s.nodes);
   const deskMaps = useWorkspaceStore((s) => s.deskMaps);
+  const activeUnitCode = useWorkspaceStore((s) => s.activeUnitCode);
+  const mapAssets = useMapStore((s) => s.mapAssets);
+  const mapRegions = useMapStore((s) => s.mapRegions);
   const activeNodeId = useWorkspaceStore((s) => s.activeNodeId);
   const setActiveNode = useWorkspaceStore((s) => s.setActiveNode);
   const setActiveDeskMap = useWorkspaceStore((s) => s.setActiveDeskMap);
@@ -585,6 +828,8 @@ export default function DeskMapView() {
   // Phase 7 polish: collapsible toolbar so the canvas stays unobstructed once
   // the landman knows the controls.
   const [toolbarCollapsed, setToolbarCollapsed] = useState(false);
+  const [pinnedFormulas, setPinnedFormulas] = useState<PinnedFormula[]>([]);
+  const [mapReferenceCollapsed, setMapReferenceCollapsed] = useState(false);
 
   const hydrated = useWorkspaceStore((s) => s._hydrated);
 
@@ -628,6 +873,64 @@ export default function DeskMapView() {
     () => deskMaps.find((deskMap) => deskMap.id === activeDeskMapId) ?? null,
     [activeDeskMapId, deskMaps]
   );
+  const effectiveUnitCode = useMemo(
+    () => resolveActiveUnitCode(deskMaps, activeUnitCode, activeDeskMapId),
+    [activeDeskMapId, activeUnitCode, deskMaps]
+  );
+  const activeUnitOption = useMemo(
+    () => findUnitOption(deskMaps, effectiveUnitCode),
+    [deskMaps, effectiveUnitCode]
+  );
+  const activeUnitDeskMaps = useMemo(
+    () => filterDeskMapsByUnitCode(deskMaps, effectiveUnitCode),
+    [deskMaps, effectiveUnitCode]
+  );
+  const activeUnitDeskMapIds = useMemo(
+    () => new Set(activeUnitDeskMaps.map((deskMap) => deskMap.id)),
+    [activeUnitDeskMaps]
+  );
+  const unitMapReferenceSelection = useMemo(() => {
+    if (mapAssets.length === 0) {
+      return null;
+    }
+
+    const unitLinkedAsset = mapAssets.find(
+      (asset) => asset.deskMapId !== null && activeUnitDeskMapIds.has(asset.deskMapId)
+    );
+    if (unitLinkedAsset) {
+      return {
+        asset: unitLinkedAsset,
+        label: 'Unit-linked',
+      };
+    }
+
+    const featuredAsset = mapAssets.find((asset) => asset.isFeatured);
+    if (featuredAsset) {
+      return {
+        asset: featuredAsset,
+        label: 'Featured fallback',
+      };
+    }
+
+    const firstAsset = mapAssets[0];
+    return firstAsset
+      ? {
+          asset: firstAsset,
+          label: 'First map asset',
+        }
+      : null;
+  }, [activeUnitDeskMapIds, mapAssets]);
+  const unitMapReferenceAsset = unitMapReferenceSelection?.asset ?? null;
+  const unitMapReferenceRegions = useMemo(
+    () =>
+      unitMapReferenceAsset
+        ? mapRegions.filter((region) => region.assetId === unitMapReferenceAsset.id)
+        : [],
+    [mapRegions, unitMapReferenceAsset]
+  );
+  const unitMapReferenceLabel = activeUnitOption
+    ? makeUnitOptionLabel(activeUnitOption)
+    : activeDeskMap?.unitName || activeDeskMap?.name || 'Active Desk Map';
   const visibleNodes = useMemo(() => {
     if (!activeDeskMap || activeDeskMap.nodeIds.length === 0) {
       return [];
@@ -814,6 +1117,18 @@ export default function DeskMapView() {
     setPdfViewDocId(id);
   }, []);
 
+  const handlePinFormula = useCallback((content: FormulaContent) => {
+    const id = formulaPinId(content);
+    setPinnedFormulas((current) => {
+      const existing = current.filter((formula) => formula.id !== id);
+      return [{ id, content }, ...existing].slice(0, 8);
+    });
+  }, []);
+
+  const handleRemovePinnedFormula = useCallback((id: string) => {
+    setPinnedFormulas((current) => current.filter((formula) => formula.id !== id));
+  }, []);
+
   const handleAddRoot = useCallback(() => {
     const id = `node-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
     const root = {
@@ -866,6 +1181,7 @@ export default function DeskMapView() {
   }, [ownerSearchMatches.length]);
 
   return (
+    <FormulaPinProvider onPin={handlePinFormula}>
     <div className="w-full h-full relative flex flex-col">
       {/* Desk map tabs */}
       <DeskMapTabs />
@@ -1161,7 +1477,7 @@ export default function DeskMapView() {
           <PanZoomContainer
             resetKey={`${activeDeskMapId ?? 'none'}:${visibleNodes.map((node) => node.id).join('|')}`}
           >
-            <div className="flex gap-16">
+            <div className="flex gap-16" data-desk-map-fit-content>
               {trees.map((tree) => (
                 <TreeBranch
                   key={tree.node.id}
@@ -1185,6 +1501,24 @@ export default function DeskMapView() {
               ))}
             </div>
           </PanZoomContainer>
+        )}
+
+        <FormulaTray
+          formulas={pinnedFormulas}
+          onRemove={handleRemovePinnedFormula}
+          onClear={() => setPinnedFormulas([])}
+        />
+
+        {unitMapReferenceSelection && (
+          <UnitMapReferencePanel
+            asset={unitMapReferenceSelection.asset}
+            regions={unitMapReferenceRegions}
+            unitLabel={unitMapReferenceLabel}
+            linkedTractCount={activeUnitDeskMaps.length}
+            selectionLabel={unitMapReferenceSelection.label}
+            collapsed={mapReferenceCollapsed}
+            onToggle={() => setMapReferenceCollapsed((current) => !current)}
+          />
         )}
 
         <OwnershipNodeEditorModals
@@ -1221,5 +1555,6 @@ export default function DeskMapView() {
         )}
       </div>
     </div>
+    </FormulaPinProvider>
   );
 }

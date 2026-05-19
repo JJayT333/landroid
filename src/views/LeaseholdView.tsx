@@ -36,6 +36,7 @@ import {
   type LeaseholdOwnerSummary,
   type LeaseholdTractSummary,
   type LeaseholdTransferOrderReview,
+  type LeaseholdUnitSummary,
 } from '../components/leasehold/leasehold-summary';
 import type { LeaseCoverageOverlap } from '../components/deskmap/deskmap-coverage';
 import UnitFocusSelector from '../components/shared/UnitFocusSelector';
@@ -373,6 +374,88 @@ function LeaseholdInputWarningPanel({
   );
 }
 
+function LeaseholdOverrideOverview({
+  summary,
+}: {
+  summary: LeaseholdUnitSummary;
+}) {
+  const hasOverrides =
+    summary.trackedNpriCount > 0
+    || summary.trackedOrriCount > 0
+    || summary.trackedAssignmentCount > 0;
+
+  if (!hasOverrides) {
+    return null;
+  }
+
+  const rows = [
+    {
+      label: 'NPRI branches',
+      value: formatPercent(summary.totalNpriDecimal),
+      count: `${summary.includedNpriCount}/${summary.trackedNpriCount} in payout math`,
+      detail: 'Mineral-side royalty burdens from Desk Map title branches.',
+      tone: 'border-sky-200 bg-sky-50 text-sky-950',
+    },
+    {
+      label: 'ORRI overrides',
+      value: formatPercent(summary.totalOrriDecimal),
+      count: `${summary.includedOrriCount}/${summary.trackedOrriCount} in payout math`,
+      detail: 'Leasehold-side burdens carved before retained working interest.',
+      tone: 'border-seal/30 bg-seal/10 text-seal',
+    },
+    {
+      label: 'WI assignments',
+      value: formatPercent(summary.totalAssignedWorkingInterestDecimal),
+      count: `${summary.includedAssignmentCount}/${summary.trackedAssignmentCount} in payout math`,
+      detail: 'Working-interest splits after royalty, NPRI, and ORRI burdens.',
+      tone: 'border-leather/30 bg-leather/10 text-leather',
+    },
+    {
+      label: 'Retained WI',
+      value: formatPercent(summary.retainedWorkingInterestDecimal),
+      count:
+        summary.overAssignedTractCount > 0
+          ? `${summary.overAssignedTractCount} over-assigned tract${summary.overAssignedTractCount === 1 ? '' : 's'}`
+          : 'No over-assigned tracts',
+      detail: 'Remaining leasehold working interest after visible assignments.',
+      tone:
+        summary.overAssignedTractCount > 0
+          ? 'border-seal/30 bg-seal/10 text-seal'
+          : 'border-emerald-200 bg-emerald-50 text-emerald-900',
+    },
+  ];
+
+  return (
+    <div className="mt-4 rounded-2xl border border-ledger-line bg-parchment px-4 py-3 shadow-sm">
+      <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-light">
+            Override Review
+          </div>
+          <div className="mt-1 text-sm font-semibold text-ink">
+            Leasehold overrides affecting this overview
+          </div>
+        </div>
+        <div className="text-xs text-ink-light">
+          Counts show included/tracked records for the active unit focus.
+        </div>
+      </div>
+      <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        {rows.map((row) => (
+          <div key={row.label} className={`rounded-xl border px-3 py-3 ${row.tone}`}>
+            <div className="text-[10px] font-semibold uppercase tracking-[0.14em] opacity-80">
+              {row.label}
+            </div>
+            <div className="mt-1 font-mono text-lg font-semibold">{row.value}</div>
+            <div className="mt-1 text-xs font-semibold">{row.count}</div>
+            <div className="mt-1 text-[11px] leading-5 opacity-85">{row.detail}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 type LeaseholdMode = 'overview' | 'map' | 'deck';
 
 function LeaseholdTractCard({
@@ -492,6 +575,9 @@ function LeaseholdTractCard({
           </span>
           <span className="rounded-full bg-seal/10 px-3 py-1.5 font-medium text-seal">
             ORRIs {tract.trackedOrriCount}
+          </span>
+          <span className="rounded-full bg-leather/10 px-3 py-1.5 font-medium text-leather">
+            WI splits {tract.trackedAssignmentCount}
           </span>
         </div>
       </div>
@@ -4074,6 +4160,7 @@ export default function LeaseholdView() {
                   }
                 />
               </div>
+              <LeaseholdOverrideOverview summary={summary} />
               {npriSummary.total > 0 && (
                 <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
                   <div className="font-semibold">NPRI payout layer active</div>

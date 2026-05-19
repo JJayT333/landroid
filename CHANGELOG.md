@@ -17,6 +17,39 @@ stay short.
   setup is explicit: Amplify deploys frontend changes from `main`, while Lambda
   AI proxy changes still require a bundle/upload until deployment automation is
   added.
+- Manual hosted browser verification confirmed the signed-in POC still loads
+  Crackbaby Carnival from the hosted Demo Data menu after PR #74. Hosted AI
+  still accepted a `hello` request but stalled without an assistant response, so
+  the current branch tightens hosted AI display/timeout behavior while leaving
+  Lambda/CloudWatch follow-up open.
+- Reworked the hosted AI frontend path to post directly to
+  `/api/ai/chat/completions` with the Cognito ID token and parse the OpenAI SSE
+  stream in-browser, bypassing the generic provider shim that hid stalled
+  hosted requests. Added hosted-path tests for bearer headers, streamed deltas,
+  missing tokens, and 401 session recovery.
+- Fixed `Attach Related Document` so the Desk Map `ATTACH` action can create a
+  related record and upload a PDF into the existing document registry in one
+  flow.
+- Moved formula popovers to fixed viewport positioning to avoid clipping and
+  added a Desk Map `Formula Tray`: hover remains temporary, while clicking a
+  formula pins it into a right-side comparison rail.
+- Added the Desk Map unit-map reference panel idea to `ROADMAP.md`, anchored on
+  uploading the main unit map through `Maps` before any true coordinate underlay
+  work.
+- Added a signed-in `Pitch Deck` tab with an inline PDF preview of
+  `LANDroid-Features.pptx` and a PowerPoint download link. The original deck is
+  bundled with a generated PDF companion because browser-native Office preview
+  is not reliable without an external viewer or backend conversion service.
+- Reworked Desk Map `Fit` so it measures the rendered visible tree/chain rather
+  than the padded pan container, keeping the actual card layout centered when
+  fitting a tract.
+- Added a Leasehold `Overview` override review strip so NPRI branches, ORRI
+  overrides, WI assignments, retained WI, and included/tracked record counts are
+  visible before switching into Map or Deck mode.
+- Added a Desk Map `Unit Map Reference` rail that previews the unit-linked or
+  featured `Maps` asset as a collapsible side reference without attempting
+  coordinate underlay. The rail labels whether the displayed map is unit-linked
+  or a fallback asset.
 
 ## 2026-05-17
 

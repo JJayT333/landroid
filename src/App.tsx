@@ -14,6 +14,7 @@ const DocumentsView = lazy(() => import('./views/DocumentsView'));
 const OwnerDatabaseView = lazy(() => import('./views/OwnerDatabaseView'));
 const CurativeView = lazy(() => import('./views/CurativeView'));
 const MapsView = lazy(() => import('./views/MapsView'));
+const PitchDeckView = lazy(() => import('./views/PitchDeckView'));
 const FederalLeasingView = lazy(() => import('./views/FederalLeasingView'));
 const ResearchView = lazy(() => import('./views/ResearchView'));
 const AIToggleButton = lazy(() => import('./ai/AIToggleButton'));
@@ -141,6 +142,18 @@ export default function App() {
             }
           >
             <MapsView />
+          </Suspense>
+        )}
+        {view === 'pitch' && (
+          <Suspense
+            fallback={
+              <PlaceholderView
+                name="Loading Pitch Deck"
+                description="Preparing the LANDroid feature deck."
+              />
+            }
+          >
+            <PitchDeckView />
           </Suspense>
         )}
         {view === 'federalLeasing' && (
