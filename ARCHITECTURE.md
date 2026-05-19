@@ -24,6 +24,9 @@ summarizes how the app is put together and where changes should live.
   and project-name editing.
 - `src/views/DocumentsView.tsx`: Phase 7A document registry surface over the
   local document tables.
+- `src/views/PitchDeckView.tsx`: signed-in Sales Deck surface. The route keeps
+  the historical `pitch` view id, but the user-facing tab now opens native
+  LANDroid status/sales slides before the legacy PDF/PPTX reference deck.
 
 ## State Ownership
 
@@ -74,6 +77,13 @@ Tract-level Desk Map clearing remains scoped to the active Desk Map. It removes
 deleted node artifacts from document, map, and curative stores, then removes
 owner/lease records only when those records are not still linked by surviving
 nodes in another tract.
+
+The Sales Deck content helper in `src/sales-deck/sales-deck-content.ts` imports
+repo Markdown snapshots with Vite `?raw` imports at build time. Static slide
+copy lives beside the helper, while status-oriented bullets are extracted from
+`CHANGELOG.md`, `DEPLOYMENT_STATE.md`, `ROADMAP.md`, and
+`CONTINUATION-PROMPT.md`. This keeps the deck in-app and easy to refresh
+without adding a backend or new dependency.
 
 ## Math Boundary
 

@@ -94,8 +94,9 @@ See `docs/README.md` for the full documentation map.
 - `Curative`: title issue and curative tracking.
 - `Maps`: project map assets, regions, references, and the featured/unit-linked
   map shown in Desk Map.
-- `Pitch Deck`: signed-in PDF preview and PowerPoint download for the current
-  LANDroid feature deck.
+- `Sales Deck`: signed-in native status/sales slides for the current LANDroid
+  story, recent progress, hosted POC state, and next milestones, with the
+  bundled PDF/PPTX feature deck retained as a legacy reference.
 - `Federal Leasing`: reference-only federal/BLM lease tracking.
 - `Research`: source records, formulas, project records, saved questions, and RRC imports.
 - `Ask LANDroid AI`: local-first assistant workflows and CSV row review, with

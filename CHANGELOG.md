@@ -5,6 +5,10 @@ stay short.
 
 ## 2026-05-19
 
+- Replaced the signed-in PDF-only `Pitch Deck` tab with a native `Sales Deck`
+  view: ten in-app status/sales slides, slide navigation, build-time Markdown
+  status bullets from repo docs, and the existing bundled PDF/PPTX retained as a
+  legacy reference section.
 - Centralized workspace side-store replacement so demo loads, `.landroid`
   imports, and CSV imports consistently reset missing owner, document,
   curative, map, research, and transient AI approval/undo state instead of

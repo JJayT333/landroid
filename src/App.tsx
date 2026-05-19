@@ -148,7 +148,7 @@ export default function App() {
           <Suspense
             fallback={
               <PlaceholderView
-                name="Loading Pitch Deck"
+                name="Loading Sales Deck"
                 description="Preparing the LANDroid feature deck."
               />
             }
