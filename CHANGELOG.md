@@ -3,6 +3,18 @@
 This file records meaningful project changes so `CONTINUATION-PROMPT.md` can
 stay short.
 
+## 2026-05-19
+
+- Added a hosted AI read-only app context packet so signed-in hosted chat
+  requests include the active view, project, unit/tract, visible Desk Map
+  cards, linked lease summaries, and deterministic mineral coverage totals.
+  This lets hosted chat answer questions about the current Desk Map without
+  exposing local edit tools.
+- Retired the stale tracked Vite asset `dist/assets/xlsx-CkFp8p6R.js`. That
+  chunk was leftover generated output from the old `xlsx` parser path; the
+  active CSV-only spreadsheet worker now builds without it, and `dist/` is not
+  a source-of-truth directory.
+
 ## 2026-05-18
 
 - Merged PR #72 into `main`, moved Amplify production to `main`, updated the

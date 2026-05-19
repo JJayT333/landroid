@@ -101,7 +101,8 @@ See `docs/README.md` for the full documentation map.
 - `Ask LANDroid AI`: local-first assistant workflows and CSV row review, with
   Ollama as the local default provider, hosted proxy mode for the POC site, and
   approval-gated AI edits. Hosted chat posts directly to the Lambda-backed
-  `/api/ai/chat/completions` proxy with the signed-in Cognito session.
+  `/api/ai/chat/completions` proxy with the signed-in Cognito session and a
+  compact read-only packet of the current app/Desk Map context.
 
 Leasehold math strictly validates legacy/imported lease royalty, ORRI burden, and
 WI assignment fractions; malformed non-blank values are treated as 0 and surfaced
