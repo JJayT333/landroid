@@ -3,6 +3,35 @@
 This file records meaningful project changes so `CONTINUATION-PROMPT.md` can
 stay short.
 
+## 2026-05-20
+
+- Started audit remediation Phase 0: AI undo snapshot capture now fails closed
+  if document workspace export fails, so approvals do not create empty document
+  undo snapshots.
+- Hardened `.landroid` import by rejecting files from future schema versions
+  and applying side-store replacement before core workspace swap with rollback
+  to the previous active side stores on replacement failure.
+- Fixed focused Leasehold transfer-order rows so unit-scoped ORRI and WI
+  records only appear for the focused tract's unit and only when included in
+  math.
+- Changed CSV row staging so ambiguous NPRI rows keep unknown fixed/floating or
+  fixed-basis answers, show a `needs answer` state, and cannot create title
+  nodes until the user answers.
+- Added the next AI safety-foundation chunk: approved proposal results now land
+  in an in-memory action/result journal, future local AI turns receive a concise
+  journal context with exact created IDs and validation state, approval cards
+  show structured tool-input details, and workspace replacement clears the
+  transient journal.
+- Added typed AI approval previews: proposed local AI edits now show
+  before/after effects and graph-validation preview results before approval,
+  and blocked previews cannot be approved or take rollback snapshots.
+- Tightened the hosted AI proxy request policy so client-supplied OpenAI
+  `tools` / `tool_choice` fields are rejected before usage charging or upstream
+  forwarding. This keeps hosted chat read-only until a hosted approval/undo path
+  is deliberately designed.
+- Hardened map asset uploads with an explicit passive-file allowlist and PDF
+  magic-byte validation before map PDFs are saved or previewed.
+
 ## 2026-05-19
 
 - Replaced the signed-in PDF-only `Pitch Deck` tab with a native `Sales Deck`

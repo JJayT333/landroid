@@ -34,8 +34,18 @@ export const RESEARCH_IMPORT_UPLOAD_EXTENSIONS = [
   '.zip',
 ] as const;
 
+export const MAP_ASSET_UPLOAD_EXTENSIONS = [
+  '.pdf',
+  '.png',
+  '.jpg',
+  '.jpeg',
+  '.geojson',
+  '.json',
+] as const;
+
 export const OWNER_DOCUMENT_ACCEPT = OWNER_DOCUMENT_UPLOAD_EXTENSIONS.join(',');
 export const RESEARCH_IMPORT_ACCEPT = RESEARCH_IMPORT_UPLOAD_EXTENSIONS.join(',');
+export const MAP_ASSET_ACCEPT = MAP_ASSET_UPLOAD_EXTENSIONS.join(',');
 
 export function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;

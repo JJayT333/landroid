@@ -39,6 +39,9 @@ summarizes how the app is put together and where changes should live.
   imported RRC/source files.
 - `curative-store`: title issues and curative tracking.
 - `map-store`: map assets, regions, external references, and map links.
+  Upload validation/preparation for map assets lives in
+  `src/maps/map-asset-upload.ts`; it reuses shared file-size/extension helpers
+  and PDF magic-byte validation before records enter `map-store`.
 - `canvas-store`: flowchart nodes, edges, viewport, and print/layout settings.
 - `ai/settings-store`: AI provider/model settings; cloud keys are session-only.
 - `ai/undo-store`: latest AI rollback snapshot.
@@ -117,6 +120,9 @@ The AI layer lives under `src/ai`.
   `src/ai/runChat.ts`.
 - Tool definitions: `src/ai/tools.ts`.
 - Approval queue: `src/ai/approval-store.ts`.
+- Typed approval previews: `src/ai/approval-preview.ts`.
+- Action/result journal and model-context formatter:
+  `src/ai/action-journal.ts`, `src/ai/chat-context.ts`.
 - Undo snapshots: `src/ai/undo-store.ts`.
 - Settings: `src/ai/settings-store.ts`.
 - Workbook staging: `src/ai/wizard`.
@@ -127,7 +133,14 @@ Current policy:
 - OpenAI/Anthropic keys are session-only in browser memory.
 - AI mutating tools create pending approval proposals. The AI panel is the
   human approval gate; approving a proposal applies that batch and captures one
-  rollback snapshot.
+  rollback snapshot. Proposal cards include typed before/after previews and
+  graph-validation previews built from the current store state; proposals with
+  blocked previews cannot be approved. Approved proposal results are recorded
+  in an in-memory action/result journal and prepended to later local AI turns as
+  concise context so follow-up tool calls can reuse exact created IDs and
+  validation results.
+- Workspace replacement clears AI proposals, the action/result journal, and the
+  undo snapshot so stale AI state cannot target a replaced workspace.
 - Spreadsheet import should prefer deterministic row staging and user review
   over blind bulk mutation.
 

@@ -34,6 +34,7 @@ import {
   buildStagedImportRows,
   parseImportFraction,
   stagedRowToNodeForm,
+  stagedImportRowNeedsQuestion,
   suggestParentForRow,
   validateStagedImportRow,
   type StagedImportBuildResult,
@@ -357,8 +358,13 @@ function StagedImportReview({
     ? parentSelections[currentRow.id] ?? suggestion?.nodeId ?? ''
     : '';
   const currentWarnings = currentRow ? validateStagedImportRow(currentRow) : [];
+  const currentRowEditable = currentRow ? isEditableRowStatus(currentRow.status) : false;
+  const currentRowCanApply = currentRow
+    ? currentRow.status === 'pending' && !stagedImportRowNeedsQuestion(currentRow)
+    : false;
   const pendingCount = rows.filter((row) => row.status === 'pending').length;
-  const completedCount = rows.filter((row) => row.status !== 'pending').length;
+  const needsQuestionCount = rows.filter((row) => row.status === 'needs_question').length;
+  const completedCount = rows.filter((row) => !isEditableRowStatus(row.status)).length;
   const parentOptions = useMemo(
     () => {
       const selectedDeskMap = deskMaps.find((deskMap) => deskMap.id === selectedDeskMapId);
@@ -385,12 +391,15 @@ function StagedImportReview({
   };
 
   const updateCurrentRow = (fields: Partial<StagedImportRow>) => {
-    if (!currentRow || currentRow.status !== 'pending') return;
+    if (!currentRow || !isEditableRowStatus(currentRow.status)) return;
     updateRows((existingRows) =>
       existingRows.map((row) => {
         if (row.id !== currentRow.id) return row;
         const next = { ...row, ...fields };
-        return { ...next, warnings: validateStagedImportRow(next) };
+        const status = stagedImportRowNeedsQuestion(next)
+          ? 'needs_question'
+          : 'pending';
+        return { ...next, status, warnings: validateStagedImportRow(next) };
       })
     );
   };
@@ -398,13 +407,15 @@ function StagedImportReview({
   const advanceAfter = (rowId: string, nextRows: StagedImportRow[]) => {
     const current = nextRows.findIndex((row) => row.id === rowId);
     const laterPending = nextRows.findIndex(
-      (row, index) => index > current && row.status === 'pending'
+      (row, index) => index > current && isEditableRowStatus(row.status)
     );
     if (laterPending >= 0) {
       setCurrentIndex(laterPending);
       return;
     }
-    const firstPending = nextRows.findIndex((row) => row.status === 'pending');
+    const firstPending = nextRows.findIndex((row) =>
+      isEditableRowStatus(row.status)
+    );
     if (firstPending >= 0) {
       setCurrentIndex(firstPending);
       return;
@@ -470,6 +481,12 @@ function StagedImportReview({
     }
     if (!currentRow.grantee.trim()) {
       setActionError('Grantee is required before creating a node.');
+      return;
+    }
+    if (stagedImportRowNeedsQuestion(currentRow)) {
+      setActionError(
+        'Answer the NPRI fixed/floating and burden-basis question before creating title nodes.'
+      );
       return;
     }
 
@@ -552,7 +569,7 @@ function StagedImportReview({
         <div>
           <h3 className="text-sm font-display font-bold text-ink">Row Review</h3>
           <p className="text-[10px] text-ink-light">
-            {rows.length} staged · {pendingCount} pending · {completedCount} handled
+            {rows.length} staged · {pendingCount} pending · {needsQuestionCount} need answer · {completedCount} handled
           </p>
         </div>
         <button
@@ -633,6 +650,8 @@ function StagedImportReview({
                 ? 'border-ink bg-ink text-parchment'
                 : row.status === 'pending'
                   ? 'border-leather/30 bg-parchment text-ink'
+                  : row.status === 'needs_question'
+                    ? 'border-amber-300 bg-amber-50 text-amber-900'
                   : 'border-emerald-300 bg-emerald-50 text-emerald-900'
             }`}
           >
@@ -648,7 +667,7 @@ function StagedImportReview({
               {currentRow.sheetName} row {currentRow.rowNumber}
             </div>
             <div className="text-[10px] text-ink-light">
-              {currentRow.status === 'pending'
+              {currentRowEditable
                 ? 'Review, edit, then create or attach.'
                 : `Handled as ${rowStatusLabel(currentRow.status)}${currentRow.createdNodeId ? ` (${currentRow.createdNodeId})` : ''}.`}
             </div>
@@ -659,17 +678,17 @@ function StagedImportReview({
         </div>
 
         <div className="grid gap-2 md:grid-cols-2">
-          <StageTextField label="Grantor" value={currentRow.grantor} disabled={currentRow.status !== 'pending'} onChange={(value) => updateCurrentRow({ grantor: value })} />
-          <StageTextField label="Grantee" value={currentRow.grantee} disabled={currentRow.status !== 'pending'} onChange={(value) => updateCurrentRow({ grantee: value })} />
-          <InstrumentSelect value={currentRow.instrument} disabled={currentRow.status !== 'pending'} onChange={(value) => updateCurrentRow({ instrument: value })} />
-          <StageTextField label="Fraction" value={currentRow.fractionInput} disabled={currentRow.status !== 'pending'} onChange={(value) => updateCurrentRow({ fractionInput: value })} />
-          <StageTextField label="Doc #" value={currentRow.docNo} disabled={currentRow.status !== 'pending'} onChange={(value) => updateCurrentRow({ docNo: value })} />
+          <StageTextField label="Grantor" value={currentRow.grantor} disabled={!currentRowEditable} onChange={(value) => updateCurrentRow({ grantor: value })} />
+          <StageTextField label="Grantee" value={currentRow.grantee} disabled={!currentRowEditable} onChange={(value) => updateCurrentRow({ grantee: value })} />
+          <InstrumentSelect value={currentRow.instrument} disabled={!currentRowEditable} onChange={(value) => updateCurrentRow({ instrument: value })} />
+          <StageTextField label="Fraction" value={currentRow.fractionInput} disabled={!currentRowEditable} onChange={(value) => updateCurrentRow({ fractionInput: value })} />
+          <StageTextField label="Doc #" value={currentRow.docNo} disabled={!currentRowEditable} onChange={(value) => updateCurrentRow({ docNo: value })} />
           <div className="grid grid-cols-2 gap-2">
-            <StageTextField label="Volume" value={currentRow.vol} disabled={currentRow.status !== 'pending'} onChange={(value) => updateCurrentRow({ vol: value })} />
-            <StageTextField label="Page" value={currentRow.page} disabled={currentRow.status !== 'pending'} onChange={(value) => updateCurrentRow({ page: value })} />
+            <StageTextField label="Volume" value={currentRow.vol} disabled={!currentRowEditable} onChange={(value) => updateCurrentRow({ vol: value })} />
+            <StageTextField label="Page" value={currentRow.page} disabled={!currentRowEditable} onChange={(value) => updateCurrentRow({ page: value })} />
           </div>
-          <StageTextField label="Instrument Date" value={currentRow.date} disabled={currentRow.status !== 'pending'} onChange={(value) => updateCurrentRow({ date: value })} />
-          <StageTextField label="File Date" value={currentRow.fileDate} disabled={currentRow.status !== 'pending'} onChange={(value) => updateCurrentRow({ fileDate: value })} />
+          <StageTextField label="Instrument Date" value={currentRow.date} disabled={!currentRowEditable} onChange={(value) => updateCurrentRow({ date: value })} />
+          <StageTextField label="File Date" value={currentRow.fileDate} disabled={!currentRowEditable} onChange={(value) => updateCurrentRow({ fileDate: value })} />
         </div>
 
         <div className="mt-2 grid gap-2 md:grid-cols-2">
@@ -677,16 +696,15 @@ function StagedImportReview({
             Interest Class
             <select
               value={currentRow.interestClass}
-              disabled={currentRow.status !== 'pending'}
+              disabled={!currentRowEditable}
               onChange={(event) => {
                 const interestClass = event.target.value as InterestClass;
                 updateCurrentRow({
                   interestClass,
-                  royaltyKind: interestClass === 'npri' ? currentRow.royaltyKind ?? 'fixed' : null,
-                  fixedRoyaltyBasis:
-                    interestClass === 'npri'
-                      ? currentRow.fixedRoyaltyBasis ?? 'burdened_branch'
-                      : null,
+                  royaltyKind: interestClass === 'npri' ? currentRow.royaltyKind : null,
+                  fixedRoyaltyBasis: interestClass === 'npri'
+                    ? currentRow.fixedRoyaltyBasis
+                    : null,
                 });
               }}
               className="mt-1 w-full rounded border border-leather/30 bg-white px-2 py-1 text-xs normal-case tracking-normal text-ink disabled:bg-leather/10"
@@ -700,20 +718,23 @@ function StagedImportReview({
               <label className="block text-[10px] font-semibold uppercase tracking-wide text-ink-light">
                 Royalty Kind
                 <select
-                  value={currentRow.royaltyKind ?? 'fixed'}
-                  disabled={currentRow.status !== 'pending'}
+                  value={currentRow.royaltyKind ?? ''}
+                  disabled={!currentRowEditable}
                   onChange={(event) => {
-                    const royaltyKind = event.target.value as Exclude<RoyaltyKind, null>;
+                    const royaltyKind = event.target.value
+                      ? event.target.value as Exclude<RoyaltyKind, null>
+                      : null;
                     updateCurrentRow({
                       royaltyKind,
                       fixedRoyaltyBasis:
                         royaltyKind === 'fixed'
-                          ? currentRow.fixedRoyaltyBasis ?? 'burdened_branch'
+                          ? currentRow.fixedRoyaltyBasis
                           : null,
                     });
                   }}
                   className="mt-1 w-full rounded border border-leather/30 bg-white px-2 py-1 text-xs normal-case tracking-normal text-ink disabled:bg-leather/10"
                 >
+                  <option value="">Choose...</option>
                   <option value="fixed">Fixed</option>
                   <option value="floating">Floating</option>
                 </select>
@@ -721,15 +742,18 @@ function StagedImportReview({
               <label className="block text-[10px] font-semibold uppercase tracking-wide text-ink-light">
                 Fixed Basis
                 <select
-                  value={currentRow.fixedRoyaltyBasis ?? 'burdened_branch'}
-                  disabled={currentRow.status !== 'pending' || currentRow.royaltyKind === 'floating'}
+                  value={currentRow.fixedRoyaltyBasis ?? ''}
+                  disabled={!currentRowEditable || currentRow.royaltyKind !== 'fixed'}
                   onChange={(event) =>
                     updateCurrentRow({
-                      fixedRoyaltyBasis: event.target.value as FixedRoyaltyBasis,
+                      fixedRoyaltyBasis: event.target.value
+                        ? event.target.value as FixedRoyaltyBasis
+                        : null,
                     })
                   }
                   className="mt-1 w-full rounded border border-leather/30 bg-white px-2 py-1 text-xs normal-case tracking-normal text-ink disabled:bg-leather/10"
                 >
+                  <option value="">Choose...</option>
                   <option value="burdened_branch">Burdened branch</option>
                   <option value="whole_tract">Whole tract</option>
                 </select>
@@ -739,8 +763,8 @@ function StagedImportReview({
         </div>
 
         <div className="mt-2 grid gap-2 md:grid-cols-2">
-          <StageTextArea label="Land Description" value={currentRow.landDesc} disabled={currentRow.status !== 'pending'} onChange={(value) => updateCurrentRow({ landDesc: value })} />
-          <StageTextArea label="Remarks" value={currentRow.remarks} disabled={currentRow.status !== 'pending'} onChange={(value) => updateCurrentRow({ remarks: value })} />
+          <StageTextArea label="Land Description" value={currentRow.landDesc} disabled={!currentRowEditable} onChange={(value) => updateCurrentRow({ landDesc: value })} />
+          <StageTextArea label="Remarks" value={currentRow.remarks} disabled={!currentRowEditable} onChange={(value) => updateCurrentRow({ remarks: value })} />
         </div>
 
         {currentWarnings.length > 0 && (
@@ -751,14 +775,14 @@ function StagedImportReview({
           </div>
         )}
 
-        {suggestion && currentRow.status === 'pending' && (
+        {suggestion && currentRowEditable && (
           <div className="mt-3 rounded border border-emerald-300 bg-emerald-50 p-2 text-[10px] text-emerald-900">
             Suggested parent: <span className="font-semibold">{suggestion.label}</span>{' '}
             ({suggestion.confidence}, {suggestion.reason})
           </div>
         )}
 
-        {currentRow.status === 'pending' && (
+        {currentRowEditable && (
           <div className="mt-3 grid gap-2 md:grid-cols-[1fr_1fr]">
             <label className="block text-[10px] font-semibold uppercase tracking-wide text-ink-light">
               Tract / Desk Map
@@ -802,7 +826,7 @@ function StagedImportReview({
         <div className="mt-3 flex flex-wrap gap-2">
           <button
             type="button"
-            disabled={currentRow.status !== 'pending'}
+            disabled={!currentRowCanApply}
             onClick={() => createFromCurrentRow('attach')}
             className="rounded bg-ink px-3 py-1.5 text-xs font-semibold text-parchment hover:bg-ink-light disabled:opacity-40"
           >
@@ -810,7 +834,7 @@ function StagedImportReview({
           </button>
           <button
             type="button"
-            disabled={currentRow.status !== 'pending'}
+            disabled={!currentRowCanApply}
             onClick={() => createFromCurrentRow('root')}
             className="rounded border border-leather/40 px-3 py-1.5 text-xs font-semibold text-ink hover:bg-leather/10 disabled:opacity-40"
           >
@@ -818,7 +842,7 @@ function StagedImportReview({
           </button>
           <button
             type="button"
-            disabled={currentRow.status !== 'pending'}
+            disabled={!currentRowEditable}
             onClick={skipCurrentRow}
             className="rounded border border-leather/40 px-3 py-1.5 text-xs text-ink-light hover:bg-leather/10 disabled:opacity-40"
           >
@@ -894,10 +918,15 @@ function StageTextArea({
 }
 
 function rowStatusLabel(status: StagedImportRowStatus): string {
+  if (status === 'needs_question') return 'needs answer';
   if (status === 'created_root') return 'root';
   if (status === 'attached') return 'attached';
   if (status === 'skipped') return 'skipped';
   return 'pending';
+}
+
+function isEditableRowStatus(status: StagedImportRowStatus): boolean {
+  return status === 'pending' || status === 'needs_question';
 }
 
 function buildInitialSheetDeskMapIds(

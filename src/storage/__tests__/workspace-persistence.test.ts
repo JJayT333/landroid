@@ -18,6 +18,7 @@ import { createBlankTitleIssue } from '../../types/title-issue';
 import {
   exportLandroidFile,
   importLandroidFile,
+  LANDROID_FILE_VERSION,
   parsePersistedWorkspaceData,
   type LandroidFileData,
 } from '../workspace-persistence';
@@ -609,6 +610,25 @@ describe('workspace-persistence', () => {
     // The legacy v7 `pdfData` slot is gone in v8.
     expect(parsed.pdfData).toBeUndefined();
     expect(parsed.documentData).toBeDefined();
+  });
+
+  it('rejects .landroid files from a newer schema version', async () => {
+    const payload = {
+      version: LANDROID_FILE_VERSION + 1,
+      workspaceId: 'ws-future',
+      projectName: 'Future Workspace',
+      nodes: [],
+      deskMaps: [],
+      activeDeskMapId: null,
+      instrumentTypes: [],
+    };
+    const file = new File([JSON.stringify(payload)], 'future.landroid', {
+      type: 'application/json',
+    });
+
+    await expect(importLandroidFile(file)).rejects.toThrow(
+      `Unsupported .landroid file version ${LANDROID_FILE_VERSION + 1}`
+    );
   });
 
   it('normalizes legacy imported leases that predate royalty and leased-interest fields', async () => {

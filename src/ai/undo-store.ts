@@ -83,7 +83,7 @@ export async function captureSnapshot(label: string): Promise<UndoSnapshot | nul
   const documentData = await exportDocumentWorkspaceData(
     ws.workspaceId,
     ws.nodes
-  ).catch((): DocumentWorkspaceData => ({ documents: [], attachments: [] }));
+  );
 
   return {
     capturedAt: Date.now(),

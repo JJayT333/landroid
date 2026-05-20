@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useWorkspaceStore } from '../../store/workspace-store';
 import { useOwnerStore } from '../../store/owner-store';
 import { useCurativeStore } from '../../store/curative-store';
@@ -7,6 +7,20 @@ import { createBlankOwner, createBlankLease } from '../../types/owner';
 import { landroidTools } from '../tools';
 import { approveAIProposal, useAIApprovalStore } from '../approval-store';
 import { useAIUndoStore } from '../undo-store';
+import { useAIActionJournalStore } from '../action-journal';
+
+const persistenceMocks = vi.hoisted(() => ({
+  exportDocumentWorkspaceData: vi.fn(async () => ({
+    documents: [],
+    attachments: [],
+  })),
+  replaceDocumentWorkspaceData: vi.fn(async () => undefined),
+}));
+
+vi.mock('../../storage/workspace-persistence', () => ({
+  exportDocumentWorkspaceData: persistenceMocks.exportDocumentWorkspaceData,
+  replaceDocumentWorkspaceData: persistenceMocks.replaceDocumentWorkspaceData,
+}));
 
 function deskMap(overrides: Partial<DeskMap>): DeskMap {
   return {
@@ -40,8 +54,33 @@ async function approveQueuedResult(result: any): Promise<any> {
   return await approveAIProposal(result.proposalId);
 }
 
+async function expectQueuedApprovalBlocked(
+  result: any,
+  message: RegExp | string
+): Promise<void> {
+  expect(result).toMatchObject({
+    ok: true,
+    approvalRequired: true,
+    proposalId: expect.any(String),
+  });
+  const proposal = useAIApprovalStore
+    .getState()
+    .proposals.find((item) => item.id === result.proposalId);
+  expect(proposal?.preview).toMatchObject({
+    canApprove: false,
+    validation: expect.objectContaining({ status: 'blocked' }),
+  });
+  await expect(approveAIProposal(result.proposalId)).rejects.toThrow(message);
+  useAIApprovalStore.getState().remove(result.proposalId);
+}
+
 describe('AI tools — read-only project queries', () => {
   beforeEach(() => {
+    persistenceMocks.exportDocumentWorkspaceData.mockResolvedValue({
+      documents: [],
+      attachments: [],
+    });
+    persistenceMocks.replaceDocumentWorkspaceData.mockResolvedValue(undefined);
     useWorkspaceStore.setState({
       workspaceId: 'ws-1',
       projectName: 'Test Project',
@@ -56,6 +95,7 @@ describe('AI tools — read-only project queries', () => {
     useCurativeStore.setState({ titleIssues: [] });
     useAIApprovalStore.getState().clear();
     useAIUndoStore.getState().clear();
+    useAIActionJournalStore.getState().clear();
   });
 
   it('getProjectSummary returns counts from current state', async () => {
@@ -183,7 +223,26 @@ describe('AI tools — read-only project queries', () => {
       toolName: 'createRootNode',
     });
     expect(useWorkspaceStore.getState().nodes).toEqual([]);
-    expect(useAIApprovalStore.getState().proposals).toHaveLength(1);
+    expect(useAIApprovalStore.getState().proposals).toEqual([
+      expect.objectContaining({
+        details: expect.arrayContaining([
+          { label: 'Interest', value: 'mineral' },
+          { label: 'Fraction', value: '1' },
+          { label: 'Grantee', value: 'Approved Owner' },
+        ]),
+        preview: expect.objectContaining({
+          canApprove: true,
+          validation: expect.objectContaining({ status: 'valid' }),
+          changes: expect.arrayContaining([
+            expect.objectContaining({
+              label: 'Node count',
+              before: '0',
+              after: '1',
+            }),
+          ]),
+        }),
+      }),
+    ]);
 
     const applied = await approveQueuedResult(queued);
 
@@ -193,6 +252,14 @@ describe('AI tools — read-only project queries', () => {
     expect(useAIUndoStore.getState().snapshot).toMatchObject({
       label: expect.stringContaining('Approved AI:'),
     });
+    expect(useAIActionJournalStore.getState().entries).toEqual([
+      expect.objectContaining({
+        proposalId: queued.proposalId,
+        toolName: 'createRootNode',
+        status: 'applied',
+        resultSummary: expect.stringContaining(applied.nodeId),
+      }),
+    ]);
   });
 
   it('rejects malformed lease economics before AI-created leases enter active math', async () => {
@@ -203,19 +270,13 @@ describe('AI tools — read-only project queries', () => {
       ownerId: owner.id,
       royaltyRate: 'one eighth',
     });
-    await expect(approveQueuedResult(badRoyalty)).resolves.toMatchObject({
-      ok: false,
-      error: expect.stringContaining('Royalty rate'),
-    });
+    await expectQueuedApprovalBlocked(badRoyalty, /Royalty rate/);
 
     const badLeasedInterest = await runTool(landroidTools.createLease, {
       ownerId: owner.id,
       leasedInterest: 'all of it',
     });
-    await expect(approveQueuedResult(badLeasedInterest)).resolves.toMatchObject({
-      ok: false,
-      error: expect.stringContaining('Leased interest'),
-    });
+    await expectQueuedApprovalBlocked(badLeasedInterest, /Leased interest/);
     expect(useOwnerStore.getState().leases).toEqual([]);
   });
 
@@ -230,19 +291,19 @@ describe('AI tools — read-only project queries', () => {
       ownerId: owner.id,
       royaltyRate: '',
     });
-    await expect(approveQueuedResult(emptyRoyalty)).resolves.toMatchObject({
-      ok: false,
-      error: expect.stringContaining('royaltyRate cannot be an empty string'),
-    });
+    await expectQueuedApprovalBlocked(
+      emptyRoyalty,
+      /royaltyRate cannot be an empty string/
+    );
 
     const emptyLeasedInterest = await runTool(landroidTools.createLease, {
       ownerId: owner.id,
       leasedInterest: '',
     });
-    await expect(approveQueuedResult(emptyLeasedInterest)).resolves.toMatchObject({
-      ok: false,
-      error: expect.stringContaining('leasedInterest cannot be an empty string'),
-    });
+    await expectQueuedApprovalBlocked(
+      emptyLeasedInterest,
+      /leasedInterest cannot be an empty string/
+    );
     expect(useOwnerStore.getState().leases).toEqual([]);
   });
 
@@ -268,19 +329,19 @@ describe('AI tools — read-only project queries', () => {
       ownerId: owner.id,
       jurisdiction: 'federal',
     });
-    await expect(approveQueuedResult(createdFederal)).resolves.toMatchObject({
-      ok: false,
-      error: expect.stringContaining('Only Texas fee/state leases'),
-    });
+    await expectQueuedApprovalBlocked(
+      createdFederal,
+      /Only Texas fee\/state leases/
+    );
 
     const attachedFederal = await runTool(landroidTools.attachLease, {
       mineralNodeId: mineralNode.id,
       leaseId: federalLease.id,
     });
-    await expect(approveQueuedResult(attachedFederal)).resolves.toMatchObject({
-      ok: false,
-      error: expect.stringContaining('Only Texas fee/state leases'),
-    });
+    await expectQueuedApprovalBlocked(
+      attachedFederal,
+      /Only Texas fee\/state leases/
+    );
     expect(useWorkspaceStore.getState().nodes).toHaveLength(1);
   });
 
@@ -308,10 +369,7 @@ describe('AI tools — read-only project queries', () => {
       leaseId: ownerTwoLease.id,
     });
 
-    await expect(approveQueuedResult(result)).resolves.toMatchObject({
-      ok: false,
-      error: expect.stringContaining('does not match'),
-    });
+    await expectQueuedApprovalBlocked(result, /does not match/);
     expect(useWorkspaceStore.getState().nodes).toHaveLength(1);
   });
 
@@ -332,12 +390,7 @@ describe('AI tools — read-only project queries', () => {
     });
 
     const queued = await runTool(landroidTools.deleteNode, { nodeId: 'root-1' });
-    const refused = await approveQueuedResult(queued);
-    expect(refused).toMatchObject({
-      ok: false,
-      error: expect.stringContaining('Refusing cascading delete'),
-      descendantCount: 1,
-    });
+    await expectQueuedApprovalBlocked(queued, /cannot be approved/);
     // Workspace untouched.
     expect(useWorkspaceStore.getState().nodes).toHaveLength(2);
 

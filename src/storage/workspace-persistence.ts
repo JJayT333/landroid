@@ -1030,6 +1030,16 @@ export async function importLandroidFile(file: File): Promise<LandroidFileData> 
     throw new Error('Invalid .landroid file: root payload must be an object');
   }
 
+  if (
+    typeof parsed.version === 'number'
+    && Number.isFinite(parsed.version)
+    && parsed.version > LANDROID_FILE_VERSION
+  ) {
+    throw new Error(
+      `Unsupported .landroid file version ${parsed.version}. This LANDroid build supports up to version ${LANDROID_FILE_VERSION}.`
+    );
+  }
+
   if (!parsed.nodes || !Array.isArray(parsed.nodes)) {
     throw new Error('Invalid .landroid file: missing nodes array');
   }

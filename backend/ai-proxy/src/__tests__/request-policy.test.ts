@@ -11,6 +11,7 @@ import {
   MAX_REQUEST_BODY_BYTES,
   parseJsonBody,
   routeMatches,
+  validateBodyPolicy,
 } from '../request-policy.js';
 
 describe('routeMatches', () => {
@@ -140,8 +141,6 @@ describe('applyBodyPolicy', () => {
         messages: [],
         stream: true,
         stream_options: { include_usage: true },
-        tools: [],
-        tool_choice: 'auto',
         store: true,
         metadata: { caseId: 'should-not-pass-through' },
         max_completion_tokens: 99_999,
@@ -154,8 +153,6 @@ describe('applyBodyPolicy', () => {
       messages: [],
       stream: true,
       stream_options: { include_usage: true },
-      tools: [],
-      tool_choice: 'auto',
       model: HARDCODED_MODEL,
       max_tokens: MAX_OUTPUT_TOKENS,
       user: 'sub',
@@ -168,6 +165,8 @@ describe('applyBodyPolicy', () => {
 
   it('keeps the allowlist intentionally narrow', () => {
     expect(ALLOWED_OPENAI_CHAT_BODY_FIELDS.has('messages')).toBe(true);
+    expect(ALLOWED_OPENAI_CHAT_BODY_FIELDS.has('tools')).toBe(false);
+    expect(ALLOWED_OPENAI_CHAT_BODY_FIELDS.has('tool_choice')).toBe(false);
     expect(ALLOWED_OPENAI_CHAT_BODY_FIELDS.has('metadata')).toBe(false);
     expect(ALLOWED_OPENAI_CHAT_BODY_FIELDS.has('store')).toBe(false);
   });
@@ -177,5 +176,30 @@ describe('applyBodyPolicy', () => {
     const out = applyBodyPolicy(input, 'sub');
     expect(input.model).toBe('foo');
     expect(out).not.toBe(input);
+  });
+});
+
+describe('validateBodyPolicy', () => {
+  it('rejects client-supplied hosted tool schemas before upstream forwarding', () => {
+    expect(validateBodyPolicy({ messages: [], tools: [] })).toMatchObject({
+      ok: false,
+      status: 400,
+      reason: 'client_tools_not_allowed',
+    });
+    expect(validateBodyPolicy({ messages: [], tool_choice: 'auto' })).toMatchObject({
+      ok: false,
+      status: 400,
+      reason: 'client_tools_not_allowed',
+    });
+  });
+
+  it('accepts the current hosted read-only chat body shape', () => {
+    expect(
+      validateBodyPolicy({
+        messages: [{ role: 'user', content: 'hello' }],
+        stream: true,
+        model: 'client-choice-will-be-overwritten',
+      })
+    ).toEqual({ ok: true });
   });
 });

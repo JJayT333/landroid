@@ -6,7 +6,6 @@
  * everything deterministic still lives in the Zustand stores the tools read.
  */
 import { useRef, useState } from 'react';
-import type { ModelMessage } from 'ai';
 import { runChatTurn, type ChatTurnResult } from './runChat';
 import { useAISettingsStore, isConfigured } from './settings-store';
 import { useAIUndoStore, restoreSnapshot } from './undo-store';
@@ -15,6 +14,16 @@ import {
   useAIApprovalStore,
   type AIApprovalProposal,
 } from './approval-store';
+import type {
+  AIApprovalPreview,
+  AIApprovalPreviewValidationStatus,
+} from './approval-preview';
+import {
+  markLatestAppliedJournalEntryUndone,
+  useAIActionJournalStore,
+  type AIActionJournalEntry,
+} from './action-journal';
+import { buildModelMessagesWithActionJournal } from './chat-context';
 import AISettingsPanel from './AISettingsPanel';
 import WizardPanel from './wizard/WizardPanel';
 import { HOSTED_MODEL_ID } from './client';
@@ -44,6 +53,7 @@ export default function AIPanel({ onClose }: { onClose: () => void }) {
   const clearSnapshot = useAIUndoStore((s) => s.clear);
   const approvalProposals = useAIApprovalStore((s) => s.proposals);
   const removeApprovalProposal = useAIApprovalStore((s) => s.remove);
+  const actionJournalEntries = useAIActionJournalStore((s) => s.entries);
   const [undoing, setUndoing] = useState(false);
   const [approvingId, setApprovingId] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -53,6 +63,7 @@ export default function AIPanel({ onClose }: { onClose: () => void }) {
     setUndoing(true);
     try {
       await restoreSnapshot(undoSnapshot);
+      markLatestAppliedJournalEntryUndone(undoSnapshot.label);
       clearSnapshot();
       setEntries((prev) => [
         ...prev,
@@ -124,10 +135,10 @@ export default function AIPanel({ onClose }: { onClose: () => void }) {
     const abortController = new AbortController();
     abortRef.current = abortController;
 
-    const modelMessages: ModelMessage[] = baseEntries.map((e) => ({
-      role: e.role,
-      content: e.text,
-    }));
+    const modelMessages = buildModelMessagesWithActionJournal(
+      baseEntries,
+      actionJournalEntries
+    );
 
     // Live-stream buffers (refs-via-closure pattern — React state would
     // re-batch and swallow mid-flight updates).
@@ -290,6 +301,9 @@ export default function AIPanel({ onClose }: { onClose: () => void }) {
                 onReject={(id) => removeApprovalProposal(id)}
               />
             )}
+            {actionJournalEntries.length > 0 && (
+              <AIActionJournalSummary entries={actionJournalEntries} />
+            )}
             {entries.length === 0 && (
               <div className="rounded-lg border border-leather/30 bg-parchment p-3 text-xs text-ink-light">
                 Ask about the current project, a tract, a lessor, or a mineral-math
@@ -430,11 +444,38 @@ function AIApprovalQueue({
           <div className="mt-1 font-mono text-[10px] text-ink-light">
             {proposal.toolName}
           </div>
+          <AIApprovalPreviewCard preview={proposal.preview} />
+          {proposal.details.length > 0 && (
+            <dl className="mt-2 grid gap-1 text-[10px]">
+              {proposal.details.map((detail) => (
+                <div
+                  key={`${proposal.id}-${detail.label}`}
+                  className={`flex items-start justify-between gap-2 rounded border px-2 py-1 ${
+                    detail.tone === 'danger'
+                      ? 'border-seal/30 bg-seal/5 text-seal'
+                      : detail.tone === 'warning'
+                        ? 'border-amber-300 bg-amber-50 text-amber-900'
+                        : 'border-leather/20 bg-parchment-light text-ink'
+                  }`}
+                >
+                  <dt className="font-semibold uppercase tracking-wide text-ink-light">
+                    {detail.label}
+                  </dt>
+                  <dd className="break-all text-right font-mono">{detail.value}</dd>
+                </div>
+              ))}
+            </dl>
+          )}
           <div className="mt-2 flex gap-2">
             <button
               type="button"
               onClick={() => onApprove(proposal)}
-              disabled={approvingId !== null}
+              disabled={approvingId !== null || !proposal.preview.canApprove}
+              title={
+                proposal.preview.canApprove
+                  ? 'Apply this approved AI change'
+                  : proposal.preview.validation.message
+              }
               className="rounded bg-ink px-2 py-1 text-[10px] font-semibold text-parchment hover:bg-ink-light disabled:opacity-40"
             >
               {approvingId === proposal.id ? 'Applying...' : 'Approve'}
@@ -454,6 +495,122 @@ function AIApprovalQueue({
   );
 }
 
+function AIApprovalPreviewCard({ preview }: { preview: AIApprovalPreview }) {
+  const validationTone = approvalValidationTone(preview.validation.status);
+  return (
+    <div className="mt-2 rounded border border-leather/25 bg-white/50 p-2 text-[10px] text-ink">
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <div className="font-semibold uppercase tracking-wide text-ink-light">
+            Typed preview
+          </div>
+          <div className="font-semibold">{preview.title}</div>
+          <div className="font-mono text-ink-light">{preview.target}</div>
+        </div>
+        <div className={`rounded border px-1.5 py-0.5 font-semibold uppercase tracking-wide ${validationTone}`}>
+          {preview.validation.status.replace('_', ' ')}
+        </div>
+      </div>
+      {preview.changes.length > 0 && (
+        <dl className="mt-2 grid gap-1">
+          {preview.changes.map((item) => (
+            <div
+              key={`${item.label}-${item.before}-${item.after}`}
+              className={`grid grid-cols-[1fr_auto_auto] items-center gap-1 rounded border px-2 py-1 ${
+                item.tone === 'danger'
+                  ? 'border-seal/30 bg-seal/5 text-seal'
+                  : item.tone === 'warning'
+                    ? 'border-amber-300 bg-amber-50 text-amber-900'
+                    : 'border-leather/20 bg-parchment-light text-ink'
+              }`}
+            >
+              <dt className="font-semibold uppercase tracking-wide text-ink-light">
+                {item.label}
+              </dt>
+              <dd className="break-all text-right font-mono text-ink-light">
+                {item.before}
+              </dd>
+              <dd className="break-all text-right font-mono font-semibold">
+                {item.after}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      )}
+      <div className={`mt-2 rounded border px-2 py-1 ${validationTone}`}>
+        <div className="font-semibold uppercase tracking-wide">Validation preview</div>
+        <div>{preview.validation.message}</div>
+        {preview.validation.issues.length > 0 && (
+          <ul className="mt-1 space-y-0.5 font-mono">
+            {preview.validation.issues.map((issue, index) => (
+              <li key={`${issue.code}-${issue.nodeId ?? 'workspace'}-${index}`}>
+                <span className="font-semibold">{issue.code}</span>
+                {issue.nodeId && <span> · {issue.nodeId}</span>}
+                <span> · {issue.message}</span>
+              </li>
+            ))}
+            {preview.validation.issueCount > preview.validation.issues.length && (
+              <li className="italic">
+                and {preview.validation.issueCount - preview.validation.issues.length} more
+              </li>
+            )}
+          </ul>
+        )}
+      </div>
+      {preview.warnings.length > 0 && (
+        <ul className="mt-2 space-y-0.5 rounded border border-amber-300 bg-amber-50 px-2 py-1 text-amber-900">
+          {preview.warnings.map((warning) => (
+            <li key={warning}>{warning}</li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function approvalValidationTone(status: AIApprovalPreviewValidationStatus): string {
+  switch (status) {
+    case 'valid':
+      return 'border-emerald-300 bg-emerald-50 text-emerald-900';
+    case 'issues':
+      return 'border-amber-300 bg-amber-50 text-amber-900';
+    case 'blocked':
+      return 'border-seal/30 bg-seal/5 text-seal';
+    case 'not_applicable':
+      return 'border-leather/20 bg-parchment-light text-ink-light';
+  }
+}
+
+function AIActionJournalSummary({ entries }: { entries: AIActionJournalEntry[] }) {
+  const recent = entries.slice(-5).reverse();
+  return (
+    <details className="rounded-lg border border-leather/30 bg-parchment p-2 text-xs">
+      <summary className="cursor-pointer font-semibold text-ink">
+        Approved AI actions this session ({entries.length})
+      </summary>
+      <ul className="mt-2 space-y-1 text-[10px]">
+        {recent.map((entry) => {
+          const tone =
+            entry.status === 'failed'
+              ? 'text-rose-800'
+              : entry.status === 'undone'
+                ? 'text-ink-light'
+                : 'text-emerald-800';
+          return (
+            <li key={entry.id} className={`rounded border border-leather/20 bg-white/60 px-2 py-1 ${tone}`}>
+              <div className="font-semibold uppercase tracking-wide">
+                {entry.status} · {entry.toolName}
+              </div>
+              <div>{entry.summary}</div>
+              <div className="font-mono">{entry.resultSummary}</div>
+            </li>
+          );
+        })}
+      </ul>
+    </details>
+  );
+}
+
 type ToolCall = NonNullable<ChatEntry['toolCalls']>[number];
 
 function toolCallSummary(call: ToolCall): { text: string; ok: boolean | null } {
@@ -467,9 +624,18 @@ function toolCallSummary(call: ToolCall): { text: string; ok: boolean | null } {
     return '';
   };
   if (out?.approvalRequired === true) {
+    const preview = out.preview as Record<string, unknown> | undefined;
+    const canApprove = preview && typeof preview === 'object'
+      ? preview.canApprove
+      : undefined;
+    const validationMessage = preview && typeof preview === 'object'
+      ? peek(preview.validationMessage)
+      : '';
     return {
-      text: `${call.toolName} → pending approval (${peek(out.summary) || peek(out.proposalId)})`,
-      ok: null,
+      text: canApprove === false
+        ? `${call.toolName} → blocked preview (${validationMessage || peek(out.summary) || peek(out.proposalId)})`
+        : `${call.toolName} → pending approval (${peek(out.summary) || peek(out.proposalId)})`,
+      ok: canApprove === false ? false : null,
     };
   }
 

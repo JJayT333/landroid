@@ -243,6 +243,56 @@ describe('row staging', () => {
     });
   });
 
+  it('marks ambiguous NPRI rows as needing a question instead of defaulting to fixed', () => {
+    const [row] = buildStagedImportRows(
+      workbook([
+        ['Grantor', 'Grantee', 'Instrument', 'Kind', 'Interest'],
+        ['Alpha Land', 'Royalty Co', 'NPRI Reservation', 'NPRI', '1/16'],
+      ])
+    ).rows;
+
+    expect(row).toMatchObject({
+      status: 'needs_question',
+      interestClass: 'npri',
+      royaltyKind: null,
+      fixedRoyaltyBasis: null,
+    });
+    expect(row.warnings).toContain(
+      'NPRI row needs a fixed or floating royalty answer before creating title nodes.'
+    );
+    expect(stagedRowToNodeForm(row, '0.062500000')).toMatchObject({
+      interestClass: 'npri',
+      royaltyKind: null,
+      fixedRoyaltyBasis: null,
+    });
+  });
+
+  it('marks fixed NPRI rows with unknown burden basis as needing a question', () => {
+    const [row] = buildStagedImportRows(
+      workbook([
+        [
+          'Grantor',
+          'Grantee',
+          'Instrument',
+          'Kind',
+          'Royalty Kind',
+          'Interest',
+        ],
+        ['Alpha Land', 'Royalty Co', 'Royalty Deed', 'NPRI', 'Fixed NPRI', '1/16'],
+      ])
+    ).rows;
+
+    expect(row).toMatchObject({
+      status: 'needs_question',
+      interestClass: 'npri',
+      royaltyKind: 'fixed',
+      fixedRoyaltyBasis: null,
+    });
+    expect(row.warnings).toContain(
+      'Fixed NPRI row needs a burden basis answer: burdened branch or whole tract.'
+    );
+  });
+
   it('infers tract code and acreage from workbook tab names', () => {
     expect(inferTractInfoFromSheetName('Tract 2 - 106.19 ac.')).toEqual({
       code: 'T2',

@@ -399,6 +399,132 @@ describe('leasehold-summary', () => {
     ]);
   });
 
+  it('excludes ORRI and WI rows scoped to a different unit when a tract is focused', () => {
+    const summary = buildLeaseholdUnitSummary({
+      deskMaps: [
+        {
+          id: 'dm-a',
+          name: 'Unit A Tract',
+          code: 'A1',
+          tractId: 'A1',
+          unitCode: 'UNIT-A',
+          unitName: 'Unit A',
+          grossAcres: '100',
+          pooledAcres: '100',
+          description: '',
+          nodeIds: ['a-owner', 'a-lease'],
+        },
+        {
+          id: 'dm-b',
+          name: 'Unit B Tract',
+          code: 'B1',
+          tractId: 'B1',
+          unitCode: 'UNIT-B',
+          unitName: 'Unit B',
+          grossAcres: '100',
+          pooledAcres: '100',
+          description: '',
+          nodeIds: ['b-owner', 'b-lease'],
+        },
+      ],
+      nodes: [
+        {
+          ...createBlankNode('a-owner', null),
+          grantee: 'A Owner',
+          linkedOwnerId: 'owner-a',
+          fraction: '1',
+          initialFraction: '1',
+        },
+        {
+          ...createBlankNode('a-lease', 'a-owner'),
+          type: 'related' as const,
+          relatedKind: 'lease' as const,
+        },
+        {
+          ...createBlankNode('b-owner', null),
+          grantee: 'B Owner',
+          linkedOwnerId: 'owner-b',
+          fraction: '1',
+          initialFraction: '1',
+        },
+        {
+          ...createBlankNode('b-lease', 'b-owner'),
+          type: 'related' as const,
+          relatedKind: 'lease' as const,
+        },
+      ],
+      owners: [
+        createBlankOwner('ws-1', { id: 'owner-a', name: 'A Owner' }),
+        createBlankOwner('ws-1', { id: 'owner-b', name: 'B Owner' }),
+      ],
+      leases: [
+        createBlankLease('ws-1', 'owner-a', {
+          id: 'lease-a',
+          leaseName: 'A Lease',
+          lessee: 'Operator A',
+          royaltyRate: '1/8',
+          leasedInterest: '1',
+        }),
+        createBlankLease('ws-1', 'owner-b', {
+          id: 'lease-b',
+          leaseName: 'B Lease',
+          lessee: 'Operator B',
+          royaltyRate: '1/8',
+          leasedInterest: '1',
+        }),
+      ],
+      leaseholdAssignments: [
+        {
+          id: 'assignment-b',
+          assignor: 'Operator B',
+          assignee: 'Wrong Unit WI',
+          scope: 'unit',
+          unitCode: 'UNIT-B',
+          deskMapId: null,
+          workingInterestFraction: '1/2',
+          effectiveDate: '2024-03-01',
+          sourceDocNo: 'ASG-B',
+          notes: '',
+          depthRange: 'all_depths',
+        },
+      ],
+      leaseholdOrris: [
+        {
+          id: 'orri-b',
+          payee: 'Wrong Unit ORRI',
+          scope: 'unit',
+          unitCode: 'UNIT-B',
+          deskMapId: null,
+          burdenFraction: '1/16',
+          burdenBasis: 'gross_8_8',
+          effectiveDate: '2024-01-01',
+          sourceDocNo: 'ORRI-B',
+          notes: '',
+          depthRange: 'all_depths',
+        },
+      ],
+    });
+
+    const rows = buildLeaseholdDecimalRows({
+      unit: {
+        name: 'Multi-unit review',
+        description: '',
+        operator: 'Operator A',
+        effectiveDate: '2024-01-01',
+        jurisdiction: 'tx_fee',
+      },
+      unitSummary: summary,
+      focusedDeskMapId: 'dm-a',
+    });
+
+    expect(rows).toEqual(
+      expect.not.arrayContaining([
+        expect.objectContaining({ payee: 'Wrong Unit ORRI' }),
+        expect.objectContaining({ payee: 'Wrong Unit WI' }),
+      ])
+    );
+  });
+
   it('applies working-interest ORRI basis to the full leased WI, independent of royalty rate', () => {
     // Standard convention: a "1/80 of WI" ORRI is 1/80 of the 8/8 leasehold estate.
     // Result must be the same 0.0125 burden whether the lease royalty is 1/8 or 3/16.

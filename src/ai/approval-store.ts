@@ -1,11 +1,23 @@
 import { create } from 'zustand';
 import { captureSnapshot, useAIUndoStore } from './undo-store';
+import {
+  buildAIApprovalDetails,
+  recordAIActionResult,
+  type AIApprovalDetail,
+} from './action-journal';
+import {
+  assertAIApprovalPreviewCanApply,
+  buildAIApprovalPreview,
+  type AIApprovalPreview,
+} from './approval-preview';
 
 export interface AIApprovalProposal {
   id: string;
   toolName: string;
   input: unknown;
   summary: string;
+  details: AIApprovalDetail[];
+  preview: AIApprovalPreview;
   createdAt: number;
 }
 
@@ -53,11 +65,20 @@ export function queueAIApprovalProposal(
   proposalId: string;
   toolName: string;
   summary: string;
+  preview: {
+    canApprove: boolean;
+    validationStatus: AIApprovalPreview['validation']['status'];
+    validationMessage: string;
+    issueCount: number;
+  };
 } {
+  const preview = buildAIApprovalPreview(toolName, input);
   const proposal = useAIApprovalStore.getState().enqueue({
     toolName,
     input,
     summary,
+    details: buildAIApprovalDetails(toolName, input),
+    preview,
   });
   return {
     ok: true,
@@ -65,6 +86,12 @@ export function queueAIApprovalProposal(
     proposalId: proposal.id,
     toolName,
     summary,
+    preview: {
+      canApprove: preview.canApprove,
+      validationStatus: preview.validation.status,
+      validationMessage: preview.validation.message,
+      issueCount: preview.validation.issueCount,
+    },
   };
 }
 
@@ -81,9 +108,19 @@ export async function approveAIProposal(id: string): Promise<unknown> {
     throw new Error(`No approval executor registered for ${proposal.toolName}.`);
   }
 
-  const snapshot = await captureSnapshot(`Approved AI: ${proposal.summary}`);
+  const undoLabel = `Approved AI: ${proposal.summary}`;
+  assertAIApprovalPreviewCanApply(proposal.id, proposal.toolName, proposal.input);
+  const snapshot = await captureSnapshot(undoLabel);
   const result = await executor(proposal.input);
   useAIApprovalStore.getState().remove(id);
+  recordAIActionResult({
+    proposalId: proposal.id,
+    toolName: proposal.toolName,
+    summary: proposal.summary,
+    input: proposal.input,
+    result,
+    undoLabel,
+  });
 
   if (
     snapshot

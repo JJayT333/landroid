@@ -2,7 +2,7 @@
 
 Point-in-time hosted deployment map for the current POC.
 
-Last updated: 2026-05-19.
+Last updated: 2026-05-20.
 
 ## Frontend
 
@@ -50,6 +50,9 @@ Lambda deploy behavior:
 
 - Frontend changes auto-deploy from `main`.
 - Lambda changes under `backend/ai-proxy` do not auto-deploy yet.
+- Branch `codex/audit-pass-a-2026-05-20` contains an undeployed Lambda source
+  hardening change: the proxy rejects client-supplied `tools` / `tool_choice`
+  request fields before charging usage or forwarding to OpenAI.
 - To update Lambda manually:
 
 ```bash

@@ -14,7 +14,10 @@ import {
   exportDocumentWorkspaceData,
   importLandroidFile,
 } from '../../storage/workspace-persistence';
-import { replaceWorkspaceSideStores } from '../../storage/workspace-side-store-reset';
+import {
+  replaceWorkspaceSideStores,
+  replaceWorkspaceSideStoresWithRollback,
+} from '../../storage/workspace-side-store-reset';
 import { importCSV } from '../../storage/csv-io';
 import { assertFileSize, FILE_SIZE_LIMITS } from '../../utils/file-validation';
 import { seedCombinatorialData } from '../../storage/seed-test-data';
@@ -229,15 +232,21 @@ export default function Navbar() {
         if (!confirmed) return;
 
         const data = await importLandroidFile(file);
+        const currentWorkspace = useWorkspaceStore.getState();
+        await replaceWorkspaceSideStoresWithRollback({
+          targetWorkspaceId: data.workspaceId,
+          targetData: {
+            ownerData: data.ownerData,
+            documentData: data.documentData,
+            mapData: data.mapData,
+            researchData: data.researchData,
+            curativeData: data.curativeData,
+          },
+          rollbackWorkspaceId: currentWorkspace.workspaceId,
+          rollbackNodes: currentWorkspace.nodes,
+        });
         loadWorkspace(data);
         useCanvasStore.getState().loadCanvas(data.canvas ?? { nodes: [], edges: [] });
-        await replaceWorkspaceSideStores(data.workspaceId, {
-          ownerData: data.ownerData,
-          documentData: data.documentData,
-          mapData: data.mapData,
-          researchData: data.researchData,
-          curativeData: data.curativeData,
-        });
         // Phase 5: refresh node.attachments[] after PDF table write.
         await useWorkspaceStore
           .getState()

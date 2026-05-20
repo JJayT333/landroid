@@ -34,15 +34,23 @@ Treat these as sensitive:
   Use cloud AI only when that is acceptable for the current project.
 - Hosted/cloud mode uses a backend proxy with server-held keys. Keep Cognito
   JWT verification, server-side model policy, durable token-ceiling tracking,
-  request body caps, body-field allowlisting, and structured request logging
-  covered by proxy tests before broadening access.
+  request body caps, body-field allowlisting, client-supplied tool-schema
+  rejection, and structured request logging covered by proxy tests before
+  broadening access.
 - Hosted browser persistence is keyed by the Cognito `sub` claim. Signed-out
   hosted state must not read or write the local `default` workspace/canvas rows;
   the persistence key helpers now stay locked until a real `sub` is available.
 - AI mutating tools are app-gated through the approval queue. Tool calls create
   pending proposals; only the user approval button applies a proposal, and each
-  approved batch captures one undo snapshot. Hosted AI still receives only
-  `readOnlyLandroidTools` until the hosted approval path is reviewed.
+  approved batch captures one undo snapshot. Proposal cards include typed
+  before/after previews and graph-validation previews; blocked previews cannot
+  be approved. Undo snapshot capture fails closed if document workspace export
+  fails, so LANDroid must not approve an AI edit with an empty fallback document
+  snapshot. Approved proposal results are recorded in an in-memory action/result
+  journal and summarized into future local model turns; treat that journal as AI
+  context, not a durable audit log. Hosted AI still receives only
+  `readOnlyLandroidTools` until the hosted approval path is reviewed, and the
+  hosted proxy rejects client-supplied `tools` / `tool_choice` bodies.
 - Phase 5 added document persistence and UI, but no AI document-mutating tools.
   If tools such as `saveDoc`, `deleteDoc`, `renameDoc`, `attachDocToEntity`, or
   `detachDocFromEntity` land later, add them to `HOSTED_BLOCKED_TOOL_NAMES`
@@ -79,6 +87,8 @@ Known risk:
   deletes only documents that have no surviving attachment links. Owner and
   Research uploads use explicit extension allowlists plus the shared size
   limits before saving.
+- Map asset uploads also use an explicit passive-file allowlist and validate
+  PDF magic bytes before saving or previewing PDF maps.
 - Imported or legacy lease royalty, ORRI burden, and WI assignment fractions are
   strict-parsed before leasehold math. Malformed non-blank values must stay
   warning-visible and treated as 0 until corrected, not silently clamped.
@@ -86,6 +96,10 @@ Known risk:
   values are strict. Missing legacy jurisdiction still defaults to `tx_fee`, but
   an explicit unknown jurisdiction now blocks import/normalization instead of
   silently entering Texas math.
+- `.landroid` imports from future schema versions are rejected instead of being
+  partially normalized by an older app build. Side-store replacement for
+  `.landroid` loads snapshots the previous active side stores and rolls them
+  back if replacement fails before the core workspace is swapped.
 
 ## Document Database / OCR Planning
 

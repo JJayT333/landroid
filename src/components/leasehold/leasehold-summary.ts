@@ -667,6 +667,26 @@ function unitScopedName(
   return firstDeskMap?.unitName ?? (unitCode ? `Unit ${unitCode}` : 'Unit-wide');
 }
 
+function summaryRecordAppliesToFocusedTract(
+  record: {
+    scope: 'unit' | 'tract';
+    unitCode?: string | null;
+    deskMapId: string | null;
+    includedInMath: boolean;
+  },
+  focusedTract: Pick<LeaseholdTractSummary, 'deskMapId' | 'unitCode'>
+): boolean {
+  if (!record.includedInMath) {
+    return false;
+  }
+  if (record.scope === 'tract') {
+    return record.deskMapId === focusedTract.deskMapId;
+  }
+  const focusedUnitCode = focusedTract.unitCode ?? null;
+  const recordUnitCode = record.unitCode ?? null;
+  return focusedUnitCode ? recordUnitCode === focusedUnitCode : recordUnitCode === null;
+}
+
 export function buildLeaseholdUnitSummary({
   deskMaps,
   nodes,
@@ -1336,7 +1356,7 @@ export function buildLeaseholdDecimalRows({
         weightedRoyaltyRate: d(focusedTract.weightedRoyaltyRate),
         fixedNpriBurdenRate: d(focusedTract.fixedNpriBurdenRate),
         orris: unitSummary.orris.filter(
-          (orri) => orri.scope === 'unit' || orri.deskMapId === focusedTract.deskMapId
+          (orri) => summaryRecordAppliesToFocusedTract(orri, focusedTract)
         ),
       }).orriBurdenRateById
     : null;
@@ -1389,7 +1409,7 @@ export function buildLeaseholdDecimalRows({
       });
 
     unitSummary.orris
-      .filter((orri) => orri.scope === 'unit' || orri.deskMapId === focusedTract.deskMapId)
+      .filter((orri) => summaryRecordAppliesToFocusedTract(orri, focusedTract))
       .forEach((orri) => {
         const decimal = d(focusedTract.unitParticipation)
           .times(focusedOrriBurdenRateById?.get(orri.id) ?? d(0))
@@ -1427,10 +1447,7 @@ export function buildLeaseholdDecimalRows({
     }
 
     unitSummary.assignments
-      .filter(
-        (assignment) =>
-          assignment.scope === 'unit' || assignment.deskMapId === focusedTract.deskMapId
-      )
+      .filter((assignment) => summaryRecordAppliesToFocusedTract(assignment, focusedTract))
       .forEach((assignment) => {
         const decimal =
           assignment.scope === 'unit'

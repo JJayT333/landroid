@@ -175,6 +175,29 @@ describe('handler integration', () => {
     expect(bodyText(stream)).toContain('Request body is too large');
   });
 
+  it('rejects client-supplied tool schemas before charging usage or calling upstream OpenAI', async () => {
+    verifyToken.mockResolvedValue({ sub: 'cognito-sub-123' });
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const handler = await loadHandler();
+    const stream = makeStream();
+
+    await handler(
+      chatEvent({
+        messages: [{ role: 'user', content: 'hello' }],
+        tools: [{ type: 'function', function: { name: 'external_tool' } }],
+        tool_choice: 'auto',
+      }),
+      stream,
+      {}
+    );
+
+    expect(trackUsageMock).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(stream.metadata?.statusCode).toBe(400);
+    expect(bodyText(stream)).toContain('does not accept client-supplied tool');
+  });
+
   it('pins the verified sub onto the OpenAI body and streams the upstream response', async () => {
     verifyToken.mockResolvedValue({ sub: 'cognito-sub-123' });
     const upstreamBody = new ReadableStream<Uint8Array>({

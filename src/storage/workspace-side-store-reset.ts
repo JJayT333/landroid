@@ -1,14 +1,17 @@
 import { useAIApprovalStore } from '../ai/approval-store';
+import { useAIActionJournalStore } from '../ai/action-journal';
 import { useAIUndoStore } from '../ai/undo-store';
 import { useCurativeStore } from '../store/curative-store';
 import { useMapStore } from '../store/map-store';
 import { useOwnerStore } from '../store/owner-store';
 import { useResearchStore } from '../store/research-store';
+import type { OwnershipNode } from '../types/node';
 import type { CurativeWorkspaceData } from './curative-persistence';
 import type { MapWorkspaceData } from './map-persistence';
 import type { OwnerWorkspaceData } from './owner-persistence';
 import type { ResearchWorkspaceData } from './research-persistence';
 import {
+  exportDocumentWorkspaceData,
   replaceDocumentWorkspaceData,
   type DocumentWorkspaceData,
 } from './workspace-persistence';
@@ -51,6 +54,13 @@ export interface WorkspaceSideStoreData {
   curativeData?: CurativeWorkspaceData;
 }
 
+interface ReplaceWorkspaceSideStoresWithRollbackOptions {
+  targetWorkspaceId: string;
+  targetData?: WorkspaceSideStoreData;
+  rollbackWorkspaceId: string;
+  rollbackNodes: OwnershipNode[];
+}
+
 export async function replaceWorkspaceSideStores(
   workspaceId: string,
   data: WorkspaceSideStoreData = {}
@@ -75,5 +85,46 @@ export async function replaceWorkspaceSideStores(
   ]);
 
   useAIApprovalStore.getState().clear();
+  useAIActionJournalStore.getState().clear();
   useAIUndoStore.getState().clear();
+}
+
+async function exportActiveWorkspaceSideStores(
+  workspaceId: string,
+  nodes: OwnershipNode[]
+): Promise<Required<WorkspaceSideStoreData>> {
+  const [ownerData, documentData, mapData, researchData, curativeData] =
+    await Promise.all([
+      useOwnerStore.getState().exportWorkspaceData(),
+      exportDocumentWorkspaceData(workspaceId, nodes),
+      useMapStore.getState().exportWorkspaceData(),
+      useResearchStore.getState().exportWorkspaceData(),
+      useCurativeStore.getState().exportWorkspaceData(),
+    ]);
+  return {
+    ownerData,
+    documentData,
+    mapData,
+    researchData,
+    curativeData,
+  };
+}
+
+export async function replaceWorkspaceSideStoresWithRollback({
+  targetWorkspaceId,
+  targetData = {},
+  rollbackWorkspaceId,
+  rollbackNodes,
+}: ReplaceWorkspaceSideStoresWithRollbackOptions): Promise<void> {
+  const rollbackData = await exportActiveWorkspaceSideStores(
+    rollbackWorkspaceId,
+    rollbackNodes
+  );
+
+  try {
+    await replaceWorkspaceSideStores(targetWorkspaceId, targetData);
+  } catch (error) {
+    await replaceWorkspaceSideStores(rollbackWorkspaceId, rollbackData);
+    throw error;
+  }
 }
