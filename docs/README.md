@@ -20,6 +20,7 @@ Use this map to decide which Markdown file to read or update.
 | `LANDMAN-MATH-REFERENCE.md` | Landman-facing math formulas and conventions. | Calculation semantics or warning/blocking behavior changes. |
 | `ROADMAP.md` | Short priority map. | Strategic priorities change. |
 | `IDEAS.md` | Low-friction idea inbox and brainstorming parking lot. | A new idea is worth remembering but is not yet approved roadmap scope. |
+| `docs/rebuild-plan.md` | Incremental rebuild source of truth: project record graph, document vault, source attestations, import/action layers, inventory gates, and phase order. | Rebuild scope, phase gates, or long-lived migration strategy changes. |
 | `CHANGELOG.md` | Completed meaningful work. | A meaningful feature, fix, or docs rail lands. |
 | `CONTINUATION-PROMPT.md` | Current short handoff. | Before switching chats or after meaningful work. |
 | `PATCH_PLAN.md` | Audit remediation status and sequence. | Remediation status changes. |

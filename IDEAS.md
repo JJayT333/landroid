@@ -19,6 +19,18 @@ Rules:
 
 ## Promising
 
+- Incremental rebuild target: project record graph first, action/event audit
+  layer second, current UI/workflows preserved until inventory and parity tests
+  exist. The working source of truth is `docs/rebuild-plan.md`.
+- Source-attestation start workflows: title opinion, division order, probate
+  inventory, prior chain, working assumption, patent, and Spanish grant as
+  explicit starting-source options for a tract or project.
+- Title-opinion-as-root import: upload an opinion PDF, extract or manually enter
+  listed owners/fractions/effective date/exceptions, create a visible opinion
+  root, and convert exceptions into cited curative issues.
+- Runsheet package import/export: recurring Excel workbook plus
+  `TitleDocuments` folder, relative hyperlinks, manifests, staged row review,
+  and optional `LANDroid Target` / `LANDroid Action` helper columns.
 - Registry packet export that distinguishes link-bookkeeping manifests from
   deduped recipient packets.
 - Entity document linking beyond Desk Map nodes: owners, leases, curative
@@ -26,6 +38,26 @@ Rules:
 - Review-first OCR/text indexing with citations, kept separate from title math
   mutation paths.
 - Import ledger for spreadsheet and document-source staging.
+
+## Math Engine Revisit
+
+Parked for a dedicated design pass before implementation:
+
+- Net mineral acres and decimal interest as first-class outputs.
+- Pooled-unit allocation engine.
+- Substance severance.
+- Depth severance.
+- Term, defeasible, and life-estate interests.
+- Probate cascade assistant.
+- Estate-vector decomposition: executive right, bonus, delay rental, royalty,
+  and working interest.
+- Recording date and priority conflicts.
+- Hysaw/Luckel/Bath ambiguity flags.
+- Spanish/Mexican grant rule pack.
+- Vacancy, gap, strip-and-gore, accretion, and contested-state markers.
+- Deeds as first-class reversible source entities.
+- Working-interest flow-through.
+- JOA structures.
 
 ## Questions To Revisit
 

@@ -18,6 +18,18 @@ main push/deploy.
 AI/security/structure/performance audit remediation has started. Phase 0 plus
 the first Phase 1 AI safety chunks are implemented on this branch.
 
+Rebuild planning is now documented but implementation has not started. The
+current planning source of truth is `docs/rebuild-plan.md`. It consolidates the
+incremental rebuild direction: inventory current page/workflow behavior first,
+then add a project record graph, document vault, source attestations, import
+sessions, action plans/action records, project-wide party identity, well/unit
+reference records, and only later gated math expansion. It also adds the
+title-opinion-as-root workflow and the Springhill-style Excel plus document
+folder package workflow as first-class requirements. The plan explicitly
+reconciles the outside rebuild proposal with the repo-grounded analysis and
+locks dual decimal plus fraction display as a rebuild contract anywhere
+fractional interests are shown.
+
 Primary report:
 
 - `docs/archive/audits/AI_SECURITY_STRUCTURAL_AUDIT_2026-05-20.md`
@@ -121,6 +133,10 @@ Commands run on this branch:
 
 ## Likely Next Steps
 
+- If continuing rebuild planning, start with the Phase 0 inventory in
+  `docs/rebuild-plan.md`: document each page's current workflows, backing
+  stores/helpers, existing tests, missing tests, migration risks, and manual
+  smoke checks before changing behavior.
 - Continue the Phase 1 AI foundation in small steps:
   - make result summaries more domain-specific where tool outputs are richer,
   - decide whether any action-journal records should become durable audit

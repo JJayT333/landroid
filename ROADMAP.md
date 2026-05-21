@@ -5,6 +5,10 @@ session handoff lives in `CONTINUATION-PROMPT.md`.
 
 ## Now
 
+- Treat `docs/rebuild-plan.md` as the planning source of truth for any rebuild
+  work: current behavior inventory first, then project record graph, document
+  vault, source attestations, import/action layers, and only then workflow
+  cutovers. Preserve dual decimal plus fraction display as a rebuild contract.
 - Validate and review the Phase 7A document registry MVP from
   `codex/document-registry-build-2026-05-16`: flat document index, saved
   views, metadata editing, duplicate surfacing, linked-node display, and packet
@@ -41,11 +45,17 @@ session handoff lives in `CONTINUATION-PROMPT.md`.
 - Continue polishing AI mutation approval/proposal UX without losing the user's
   desired single-user local workflow speed.
 - Add a persistent import ledger for staged spreadsheet rows.
+- Add title-opinion-as-root and other `SourceAttestation` starting-source
+  workflows after the document vault and import-session foundations are ready.
 
 ## Later
 
 - Federal/private Phase 2 math only after the reference workspace and source
   packet workflow are stable enough for that gate.
+- Revisit the Texas math-engine expansion plan in detail before implementation:
+  NMA/DI, pooled-unit allocation, depth/substance/time, probate, estate vector,
+  priority conflicts, Hysaw flags, Spanish/Mexican grants, contested states,
+  deed reversibility, WI flow-through, and JOA structures.
 - Hosted/security posture, including CSP and a backend AI proxy if cloud use
   becomes a deployment requirement.
 - Deeper RRC decoder coverage only for high-value file families proven by real
