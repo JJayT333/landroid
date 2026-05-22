@@ -88,4 +88,15 @@ describe('AI undo snapshots', () => {
     );
     expect(snapshot?.documents).toBe(documentData);
   });
+
+  it('fails closed when document workspace export fails', async () => {
+    const { captureSnapshot } = await import('../undo-store');
+    persistenceMocks.exportDocumentWorkspaceData.mockRejectedValue(
+      new Error('document export failed')
+    );
+
+    await expect(captureSnapshot('before AI')).rejects.toThrow(
+      'document export failed'
+    );
+  });
 });

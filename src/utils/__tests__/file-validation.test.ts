@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   FILE_SIZE_LIMITS,
+  MAP_ASSET_UPLOAD_EXTENSIONS,
   OWNER_DOCUMENT_UPLOAD_EXTENSIONS,
   assertAllowedFileExtension,
   assertFileSize,
@@ -104,6 +105,30 @@ describe('file-validation', () => {
           'tract.svg',
           OWNER_DOCUMENT_UPLOAD_EXTENSIONS,
           'Owner document'
+        )
+      ).toThrow(/not supported/i);
+    });
+
+    it('keeps map asset uploads on an explicit passive allowlist', () => {
+      expect(() =>
+        assertAllowedFileExtension(
+          'unit-map.geojson',
+          MAP_ASSET_UPLOAD_EXTENSIONS,
+          'Map asset'
+        )
+      ).not.toThrow();
+      expect(() =>
+        assertAllowedFileExtension(
+          'interactive-map.svg',
+          MAP_ASSET_UPLOAD_EXTENSIONS,
+          'Map asset'
+        )
+      ).toThrow(/not supported/i);
+      expect(() =>
+        assertAllowedFileExtension(
+          'map-preview.html',
+          MAP_ASSET_UPLOAD_EXTENSIONS,
+          'Map asset'
         )
       ).toThrow(/not supported/i);
     });

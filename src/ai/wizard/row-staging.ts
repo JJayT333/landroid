@@ -9,7 +9,12 @@ import type {
 import { parseStrictInterestString } from '../../utils/interest-string';
 import type { ParsedSheet, ParsedWorkbook } from './parse-workbook';
 
-export type StagedImportRowStatus = 'pending' | 'created_root' | 'attached' | 'skipped';
+export type StagedImportRowStatus =
+  | 'pending'
+  | 'needs_question'
+  | 'created_root'
+  | 'attached'
+  | 'skipped';
 
 export type StagedImportField =
   | 'grantor'
@@ -359,14 +364,15 @@ function inferRoyaltyKind(raw: string, interestClass: InterestClass): RoyaltyKin
   const text = raw.toLowerCase();
   if (/\bfloating\b/.test(text)) return 'floating';
   if (/\bfixed\b/.test(text)) return 'fixed';
-  return 'fixed';
+  return null;
 }
 
 function inferFixedRoyaltyBasis(raw: string, royaltyKind: RoyaltyKind): FixedRoyaltyBasis {
   if (royaltyKind !== 'fixed') return null;
   const text = raw.toLowerCase();
   if (/whole\s*tract/.test(text)) return 'whole_tract';
-  return 'burdened_branch';
+  if (/burdened\s*branch/.test(text)) return 'burdened_branch';
+  return null;
 }
 
 function rowHasUsefulTitleData(row: StagedImportRow): boolean {
@@ -514,7 +520,29 @@ export function validateStagedImportRow(row: StagedImportRow): string[] {
   ) {
     warnings.push('Instrument looks royalty-related; confirm Mineral vs NPRI before attaching.');
   }
+  if (row.interestClass === 'npri' && row.royaltyKind === null) {
+    warnings.push(
+      'NPRI row needs a fixed or floating royalty answer before creating title nodes.'
+    );
+  }
+  if (
+    row.interestClass === 'npri'
+    && row.royaltyKind === 'fixed'
+    && row.fixedRoyaltyBasis === null
+  ) {
+    warnings.push(
+      'Fixed NPRI row needs a burden basis answer: burdened branch or whole tract.'
+    );
+  }
   return warnings;
+}
+
+export function stagedImportRowNeedsQuestion(row: StagedImportRow): boolean {
+  return row.interestClass === 'npri'
+    && (
+      row.royaltyKind === null
+      || (row.royaltyKind === 'fixed' && row.fixedRoyaltyBasis === null)
+    );
 }
 
 export function buildStagedImportRows(parsed: ParsedWorkbook): StagedImportBuildResult {
@@ -608,6 +636,9 @@ export function buildStagedImportRows(parsed: ParsedWorkbook): StagedImportBuild
       if (!rowHasUsefulTitleData(stagedRow)) {
         continue;
       }
+      stagedRow.status = stagedImportRowNeedsQuestion(stagedRow)
+        ? 'needs_question'
+        : 'pending';
       stagedRow.warnings = validateStagedImportRow(stagedRow);
       rows.push(stagedRow);
     }
@@ -746,10 +777,10 @@ export function stagedRowToNodeForm(
     splitBasis: 'whole',
     manualAmount: normalizedFraction,
     interestClass: row.interestClass,
-    royaltyKind: row.interestClass === 'npri' ? row.royaltyKind ?? 'fixed' : null,
+    royaltyKind: row.interestClass === 'npri' ? row.royaltyKind : null,
     fixedRoyaltyBasis:
-      row.interestClass === 'npri' && (row.royaltyKind ?? 'fixed') === 'fixed'
-        ? row.fixedRoyaltyBasis ?? 'burdened_branch'
+      row.interestClass === 'npri' && row.royaltyKind === 'fixed'
+        ? row.fixedRoyaltyBasis
         : null,
   };
 }

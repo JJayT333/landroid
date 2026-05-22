@@ -10,6 +10,11 @@ summarizes how the app is put together and where changes should live.
 - State: Zustand stores in `src/store`.
 - Persistence: IndexedDB/Dexie helpers in `src/storage`, plus browser storage
   for selected local settings.
+- Target storage planning: keep Dexie as the current runtime path, add
+  workspace sharding before broad rebuild work unless the Phase 0.75 backend
+  decision changes that path, and treat SQLite/OPFS, Tauri/native filesystem,
+  backend object storage, or cloud object storage as explicit decision gates,
+  not current defaults.
 - Math: Decimal.js through `src/engine`.
 - Graph/canvas: React Flow and ELK for flowchart layout.
 - AI: Vercel AI SDK adapters in `src/ai`; Ollama is the default provider.
@@ -39,6 +44,9 @@ summarizes how the app is put together and where changes should live.
   imported RRC/source files.
 - `curative-store`: title issues and curative tracking.
 - `map-store`: map assets, regions, external references, and map links.
+  Upload validation/preparation for map assets lives in
+  `src/maps/map-asset-upload.ts`; it reuses shared file-size/extension helpers
+  and PDF magic-byte validation before records enter `map-store`.
 - `canvas-store`: flowchart nodes, edges, viewport, and print/layout settings.
 - `ai/settings-store`: AI provider/model settings; cloud keys are session-only.
 - `ai/undo-store`: latest AI rollback snapshot.
@@ -51,6 +59,45 @@ summarizes how the app is put together and where changes should live.
   document blob when no surviving entity links remain.
   Registry filtering, duplicate surfacing, linked-entity summaries, and packet
   manifest previews live in pure helpers under `src/documents`.
+
+## Target Rebuild Boundaries
+
+The current app remains the behavioral reference until Phase 0 inventory,
+golden masters, and parity checks prove otherwise.
+
+Target rebuild boundaries:
+
+- Project record schema: normalized records for parties, aliases, tracts,
+  documents, instruments, leases, units, wells, source attestations, curative
+  issues, import sessions, action plans, action records, packets, and audit
+  events. The ownership tree is graph-shaped, but the implementation target is
+  records and projections, not a graph database.
+- Evidence Vault: immutable originals, content hashes, document versions,
+  vault objects, extraction runs, citation anchors, derivative OCR/text
+  artifacts, and deterministic packet manifests. Search indexes and packet
+  exports are rebuildable derivatives.
+- Action layer: typed `ActionPlan` previews and durable `ActionRecord`s over
+  records. Meaningful approved changes should also be able to produce
+  append-only audit events with hash continuity.
+- Math input view: `math-engine.ts` should continue to consume a stable
+  `MathInputView` projection rather than raw rebuild records. This insulates
+  Texas math semantics from storage/schema churn.
+- Citation verifier: AI answers and document-derived claims need a structural
+  verifier that rejects unsupported claims before display. Pre-OCR answers may
+  cite structured records and source attestations, but not nonexistent document
+  text spans.
+- Runtime adapters: blob storage, OCR job dispatch, AI inference, and hosted
+  persistence should have adapter boundaries before any backend/cloud or Tauri
+  pivot becomes the source of truth.
+- Backend spine: after Phase 0, LANDroid has a decision gate for whether to add
+  backend infrastructure before Phase 1 schema implementation. If approved, the
+  backend owns durable project records, object storage, background jobs, search,
+  AI/RAG policy, audit logs, backup/sync, and future permissions while keeping
+  local project semantics and `.landroid` export mandatory.
+
+Target projections include Desk Map, Runsheet, Leasehold, Documents, Owners,
+Curative, packet export, AI context, `OpinionDraft`, `ObligationCalendar`, and
+`AbstractorPackage`.
 
 ## Data Flow
 
@@ -97,10 +144,32 @@ Domain-specific derived review math belongs in focused helpers such as:
 UI components should display and collect inputs; they should not duplicate the
 calculation rules.
 
+During rebuild work, do not make the math engine consume new domain records
+directly. Add a stable `MathInputView` projection first, then compare its
+outputs against existing golden masters before any cutover.
+
 ## Persistence Boundary
 
 Persistence helpers live under `src/storage`. Import paths must treat external
 files as untrusted input.
+
+Current persistence is browser-local. Planned storage changes must follow the
+staged trajectory in `docs/rebuild-plan.md`:
+
+1. Shard current workspace persistence inside Dexie.
+2. Keep `.landroid` snapshots/packages loadable with migration/backup rules.
+3. Evaluate SQLite/OPFS only after query/search needs justify it.
+4. Consider Tauri/native filesystem only when local OCR process control,
+   Finder-visible project packages, native SQLite, or corpus size forces it.
+
+Document originals, checksums, and source metadata are canonical. OCR text,
+embeddings, FTS rows, page images, and packet exports are derived artifacts that
+must be rebuildable from the canonical vault state.
+
+If Phase 0.75 approves a backend spine, this staged trajectory must be revised
+before Phase 1. The backend should make storage, jobs, search, and AI policy
+more durable; it should not make the app unable to produce a complete local
+project package.
 
 Generated folders are not source of truth:
 
@@ -117,6 +186,9 @@ The AI layer lives under `src/ai`.
   `src/ai/runChat.ts`.
 - Tool definitions: `src/ai/tools.ts`.
 - Approval queue: `src/ai/approval-store.ts`.
+- Typed approval previews: `src/ai/approval-preview.ts`.
+- Action/result journal and model-context formatter:
+  `src/ai/action-journal.ts`, `src/ai/chat-context.ts`.
 - Undo snapshots: `src/ai/undo-store.ts`.
 - Settings: `src/ai/settings-store.ts`.
 - Workbook staging: `src/ai/wizard`.
@@ -127,9 +199,29 @@ Current policy:
 - OpenAI/Anthropic keys are session-only in browser memory.
 - AI mutating tools create pending approval proposals. The AI panel is the
   human approval gate; approving a proposal applies that batch and captures one
-  rollback snapshot.
+  rollback snapshot. Proposal cards include typed before/after previews and
+  graph-validation previews built from the current store state; proposals with
+  blocked previews cannot be approved. Approved proposal results are recorded
+  in an in-memory action/result journal and prepended to later local AI turns as
+  concise context so follow-up tool calls can reuse exact created IDs and
+  validation results.
+- Workspace replacement clears AI proposals, the action/result journal, and the
+  undo snapshot so stale AI state cannot target a replaced workspace.
 - Spreadsheet import should prefer deterministic row staging and user review
   over blind bulk mutation.
+
+Target AI evidence policy:
+
+- AI document-text claims are disabled until OCR/text extraction creates
+  citation anchors.
+- Every displayed answer should pass a `CitationVerifier` boundary. Material
+  claims must trace to a source citation, record ID, deterministic math result,
+  approved action record, or explicit curative issue.
+- Retrieval should be hybrid: exact/keyword search, vector recall, record
+  traversal tools, deterministic math tools, and rank fusion before answer
+  generation.
+- Suggested next actions must be typed `ActionPlan` proposals or navigation
+  hints, not ungrounded prose commands.
 
 Future policy work is tracked in `PATCH_PLAN.md`.
 

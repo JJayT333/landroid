@@ -30,6 +30,7 @@ import {
   extractBearer,
   parseJsonBody,
   routeMatches,
+  validateBodyPolicy,
 } from './request-policy.js';
 
 declare const awslambda: {
@@ -159,6 +160,16 @@ export const handler = awslambda.streamifyResponse(
       if (!parsed.ok) {
         logEvent({ evt: 'reject', reason: 'bad_json', user: payload.sub, status: 400 });
         return jsonError(responseStream, 400, 'Body must be JSON.');
+      }
+      const bodyPolicy = validateBodyPolicy(parsed.body);
+      if (!bodyPolicy.ok) {
+        logEvent({
+          evt: 'reject',
+          reason: bodyPolicy.reason,
+          user: payload.sub,
+          status: bodyPolicy.status,
+        });
+        return jsonError(responseStream, bodyPolicy.status, bodyPolicy.message);
       }
       const body = applyBodyPolicy(parsed.body, payload.sub);
       const estimatedTokens = estimateInputTokens(JSON.stringify(body));

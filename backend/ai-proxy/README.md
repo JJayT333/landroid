@@ -3,6 +3,11 @@
 Minimal OpenAI proxy for the hosted LANDroid instance. Cognito-authenticated,
 single endpoint: `POST /chat/completions`. Hardcoded `gpt-4o-mini`.
 
+The hosted UI currently sends read-only app context only. Until a hosted
+approval/undo path is deliberately designed, the proxy rejects client-supplied
+OpenAI `tools` and `tool_choice` fields before usage charging or upstream
+forwarding.
+
 The Lambda Function URL uses auth type `NONE`; the handler verifies Cognito ID
 tokens itself. CORS is still configured for the hosted origin, but CORS is not
 a replay defense if an ID token is stolen.

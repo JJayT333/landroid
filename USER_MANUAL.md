@@ -394,6 +394,8 @@ The Curative view also keeps the next broader company-readiness areas visible so
 
 ### How to use it
 - Upload one or more files into `Maps`.
+- Map uploads accept PDF, PNG, JPG/JPEG, GeoJSON, and JSON files. PDFs are
+  checked for real PDF bytes before LANDroid saves or previews them.
 - Mark the main prospect map as the featured map. `Maps` opens to that map first.
 - Use `Present` mode for a cleaner map/story view.
 - Use `Edit` mode to update metadata, place image-based regions, and save outside reference links.
@@ -524,9 +526,17 @@ when they need to display inline.
 
 ### Live edits and rollback
 - AI can propose Desk Map and owner/lease edits in the current local workflow.
-- Proposed AI edits appear in the AI panel as an approval queue. Click `Approve`
-  to apply one proposal, or reject it to leave the workspace unchanged.
+- Proposed AI edits appear in the AI panel as an approval queue with structured
+  details such as target node, fraction, owner, lease, or document number when
+  the tool input provides them. Each card also shows a typed preview of the
+  before/after effect and a validation preview where graph math can be
+  simulated. Click `Approve` to apply one proposal, or reject it to leave the
+  workspace unchanged. If the preview is blocked, LANDroid disables approval so
+  the proposal cannot take a rollback snapshot or mutate the workspace.
 - Each approved AI proposal captures rollback state for that approved batch.
+- Approved proposal results stay in an in-memory session journal, visible in
+  the AI panel, so follow-up AI turns can reuse exact created IDs and validation
+  results instead of guessing.
 - Use the AI back/rollback control if an approved AI edit takes the project in
   the wrong direction.
 - The rollback is a safety net, not a replacement for reviewing title/math changes.
@@ -542,6 +552,9 @@ when they need to display inline.
 - The Instrument field uses the same dropdown as the normal node editor, so a new instrument type from the CSV can be added to the workspace list.
 - LANDroid suggests a parent when a row grantor matches an existing grantee on the selected tract.
 - Each staged row can be edited, created as a root on the selected tract, attached to a same-tract parent, or skipped.
+- Ambiguous NPRI rows show `needs answer` instead of guessing fixed/floating or
+  burdened-branch terms. Choose fixed or floating, and for fixed NPRIs choose
+  burdened branch or whole tract, before creating or attaching the row.
 - Row creation uses the same Desk Map math actions as the normal editor, so bad fractions, invalid NPRI/mineral attachments, and over-capacity conveyances fail visibly instead of silently importing.
 
 ### Practical AI habit
@@ -616,8 +629,11 @@ These are the main workspace snapshot files. They now include:
 - flowchart spacing settings
 
 ### `.csv` import
-CSV import loads workspace data, resets the flowchart canvas, and starts a fresh empty owner/document/curative/maps/research side workspace so you can re-import and relink cleanly. It also clears pending AI approvals and the last AI undo snapshot. `.landroid` export/import carries node document attachments and registry metadata, including multiple PDFs on the same title card. Older v7 `.landroid` files are migrated into the current multi-document attachment shape during import.
+CSV import loads workspace data, resets the flowchart canvas, and starts a fresh empty owner/document/curative/maps/research side workspace so you can re-import and relink cleanly. It also clears pending AI approvals, the AI action/result journal, and the last AI undo snapshot. `.landroid` export/import carries node document attachments and registry metadata, including multiple PDFs on the same title card. Older v7 `.landroid` files are migrated into the current multi-document attachment shape during import.
 When PDF payloads are present, LANDroid preserves the stored filenames so Desk Map can show exactly what is attached instead of only saying that a PDF exists.
+Newer `.landroid` schema versions are rejected by older app builds. When a
+`.landroid` import replaces side stores, LANDroid rolls back to the previous
+active side-store data if replacement fails before the core workspace swap.
 
 ### Local browser storage
 The app also uses browser storage for local autosave. This is convenient, but it is not a substitute for named backups.

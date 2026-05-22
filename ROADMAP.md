@@ -5,6 +5,33 @@ session handoff lives in `CONTINUATION-PROMPT.md`.
 
 ## Now
 
+- Treat `docs/rebuild-plan.md` as the planning source of truth for any rebuild
+  work: current behavior inventory first, then workspace storage sharding,
+  project record schema, evidence-grade document vault, source attestations,
+  import/action layers, and only then workflow cutovers. Preserve dual decimal
+  plus fraction display, print fidelity, in-flight migration safety, and
+  citation verification as rebuild contracts.
+- Before Phase 1 rebuild implementation, define the Phase 0 exit artifacts:
+  frozen reference workspaces, atomic behavior catalog rows, measured
+  performance baselines, CI-running golden masters, and the `.landroid`
+  migration/backup rule for in-flight projects.
+- Run the next deep review as a Phase 0 ultra-review, not another broad rebuild
+  audit. It should define the inventory lanes, behavior catalog format, fixture
+  plan, baselines, validation commands, and Phase 0 exit gate.
+- Execute Phase 0 lane by lane under one lead source-of-truth thread. Secondary
+  agents may do read-only lane reviews, but the lead thread consolidates
+  findings into the master inventory and docs.
+- After Phase 0, run a Phase 0.75 backend architecture decision before storage
+  or schema implementation. If approved, add a backend spine for durable
+  records, object storage, background jobs, search, server-controlled AI/RAG,
+  audit logs, backup/sync, and future permissions while keeping `.landroid`
+  package export mandatory.
+- Plan Phase 0.5 workspace sharding in Dexie before broad record-schema work so
+  Raven Forest scale does not depend on one large autosaved JSON workspace row;
+  revise this step if the Phase 0.75 backend decision changes the storage path.
+- Promote the Evidence Vault contract: immutable originals, SHA-256 hashes,
+  document versions, extraction runs, citation anchors, hash-continuity audit
+  events, and deterministic packet manifests.
 - Validate and review the Phase 7A document registry MVP from
   `codex/document-registry-build-2026-05-16`: flat document index, saved
   views, metadata editing, duplicate surfacing, linked-node display, and packet
@@ -24,13 +51,23 @@ session handoff lives in `CONTINUATION-PROMPT.md`.
 ## Next
 
 - Harden document packet export after the registry is reviewed: ZIP/PDF
-  packaging, CSV load file, and stricter packet-readiness checks.
+  packaging, CSV load file, checksum manifest, source-citation sidecar,
+  unresolved-issues export, and optional Concordance/Opticon-style eDiscovery
+  sidecar.
 - Expand entity document links beyond Desk Map nodes: owners, leases, curative
   issues, and research records.
+- Unify document-like side stores before expanding the vault: owner documents,
+  PDF map assets, research file imports, and registry documents should converge
+  on shared document/entity-link semantics where practical.
 - Add import-manifest previews for large document sources such as ArcGIS
   attachment tables, Dropbox/local folders, and selected source packets.
 - Design OCR/text indexing after the document registry exists; AI document
-  query should return citations and stay read-only by default.
+  query should return citations and stay read-only by default. Until OCR/text
+  anchors exist, AI may cite structured records and source attestations but not
+  unsupported document text spans.
+- Design the hybrid retrieval contract for future AI Q&A: exact/keyword search,
+  vector recall, graph/schema traversal tools, deterministic math tools, rank
+  fusion, and a `CitationVerifier` gate before answers display.
 - Execute Phase 0/1 of `DEPLOYMENT_PLAN.md`: hosted frontend, backend boundary,
   auth, cloud save path, and server-side AI proxy before any broad internet
   exposure.
@@ -41,11 +78,24 @@ session handoff lives in `CONTINUATION-PROMPT.md`.
 - Continue polishing AI mutation approval/proposal UX without losing the user's
   desired single-user local workflow speed.
 - Add a persistent import ledger for staged spreadsheet rows.
+- Add title-opinion-as-root and other `SourceAttestation` starting-source
+  workflows after the document vault and import-session foundations are ready.
+- Design `OpinionDraft`, `ObligationCalendar`, and `AbstractorPackage`
+  projections after the record schema and evidence vault are explicit.
 
 ## Later
 
+- Evaluate SQLite WASM in OPFS, cloud object storage, and Tauri 2 desktop shell
+  only at documented decision gates; do not make them Phase 1 defaults.
+- If Phase 0.75 approves a backend spine, build it as infrastructure for
+  storage, jobs, search, AI policy, audit, backup, and sync, not as a wholesale
+  SaaS rewrite that removes local project semantics.
 - Federal/private Phase 2 math only after the reference workspace and source
   packet workflow are stable enough for that gate.
+- Revisit the Texas math-engine expansion plan in detail before implementation:
+  NMA/DI, pooled-unit allocation, depth/substance/time, probate, estate vector,
+  priority conflicts, Hysaw flags, Spanish/Mexican grants, contested states,
+  deed reversibility, WI flow-through, and JOA structures.
 - Hosted/security posture, including CSP and a backend AI proxy if cloud use
   becomes a deployment requirement.
 - Deeper RRC decoder coverage only for high-value file families proven by real

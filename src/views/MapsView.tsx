@@ -4,8 +4,9 @@ import MapAssetModal from '../components/modals/MapAssetModal';
 import MapReferenceModal from '../components/modals/MapReferenceModal';
 import MapRegionModal from '../components/modals/MapRegionModal';
 import { useConfirmation } from '../components/shared/ConfirmationProvider';
+import { prepareMapAssetUploadFile } from '../maps/map-asset-upload';
 import { parseGeoJsonSummary, type GeoJsonSummary } from '../maps/geojson-summary';
-import { assertFileSize, limitForExtension } from '../utils/file-validation';
+import { MAP_ASSET_ACCEPT } from '../utils/file-validation';
 import { useMapStore } from '../store/map-store';
 import { useOwnerStore } from '../store/owner-store';
 import { useResearchStore } from '../store/research-store';
@@ -482,18 +483,17 @@ export default function MapsView() {
         ref={inputRef}
         type="file"
         className="hidden"
-        accept=".pdf,.png,.jpg,.jpeg,.geojson,.json"
+        accept={MAP_ASSET_ACCEPT}
         multiple
         onChange={async (event) => {
           if (!workspaceId) return;
           const files = Array.from(event.target.files ?? []);
           try {
             for (const file of files) {
-              const limit = limitForExtension(file.name);
-              assertFileSize(file, limit.bytes, limit.label);
-              const asset = createBlankMapAsset(workspaceId, file, {
-                fileName: file.name,
-                mimeType: file.type || 'application/octet-stream',
+              const prepared = await prepareMapAssetUploadFile(file);
+              const asset = createBlankMapAsset(workspaceId, prepared.blob, {
+                fileName: prepared.fileName,
+                mimeType: prepared.mimeType,
               });
               await addAsset(asset);
               setSelectedAssetId(asset.id);

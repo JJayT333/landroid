@@ -27,13 +27,16 @@ export const ALLOWED_OPENAI_CHAT_BODY_FIELDS = new Set([
   'seed',
   'reasoning_effort',
   'verbosity',
-  'tools',
-  'tool_choice',
   'stream',
   'stream_options',
   'max_tokens',
   'model',
   'user',
+]);
+
+export const REJECTED_OPENAI_CHAT_BODY_FIELDS = new Set([
+  'tools',
+  'tool_choice',
 ]);
 
 export function routeMatches(method: string, path: string): boolean {
@@ -93,6 +96,25 @@ export function applyBodyPolicy(
   out.max_tokens = Math.min(requested, MAX_OUTPUT_TOKENS);
   out.user = sub;
   return out;
+}
+
+export function validateBodyPolicy(
+  body: Record<string, unknown>
+):
+  | { ok: true }
+  | { ok: false; status: number; reason: string; message: string } {
+  for (const key of REJECTED_OPENAI_CHAT_BODY_FIELDS) {
+    if (Object.prototype.hasOwnProperty.call(body, key)) {
+      return {
+        ok: false,
+        status: 400,
+        reason: 'client_tools_not_allowed',
+        message:
+          'Hosted LANDroid AI does not accept client-supplied tool definitions.',
+      };
+    }
+  }
+  return { ok: true };
 }
 
 export function parseJsonBody(rawBody: string): { ok: true; body: Record<string, unknown> } | { ok: false } {
