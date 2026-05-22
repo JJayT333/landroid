@@ -20,7 +20,7 @@ Use this map to decide which Markdown file to read or update.
 | `LANDMAN-MATH-REFERENCE.md` | Landman-facing math formulas and conventions. | Calculation semantics or warning/blocking behavior changes. |
 | `ROADMAP.md` | Short priority map. | Strategic priorities change. |
 | `IDEAS.md` | Low-friction idea inbox and brainstorming parking lot. | A new idea is worth remembering but is not yet approved roadmap scope. |
-| `docs/rebuild-plan.md` | Incremental rebuild source of truth: project record graph, document vault, source attestations, import/action layers, inventory gates, and phase order. | Rebuild scope, phase gates, or long-lived migration strategy changes. |
+| `docs/rebuild-plan.md` | Incremental rebuild source of truth: project record schema, evidence vault, source attestations, import/action layers, inventory gates, storage trajectory, and phase order. | Rebuild scope, phase gates, or long-lived migration strategy changes. |
 | `CHANGELOG.md` | Completed meaningful work. | A meaningful feature, fix, or docs rail lands. |
 | `CONTINUATION-PROMPT.md` | Current short handoff. | Before switching chats or after meaningful work. |
 | `PATCH_PLAN.md` | Audit remediation status and sequence. | Remediation status changes. |
@@ -36,6 +36,10 @@ Current ADRs:
 - `docs/adr/0002-texas-only-active-math.md`
 - `docs/adr/0003-ai-local-first-provider-policy.md`
 - `docs/adr/0004-multi-doc-per-entity-persistence.md`
+- `docs/adr/0005-storage-format-trajectory.md`
+- `docs/adr/0006-ai-citation-verification-contract.md`
+- `docs/adr/0007-action-layer-and-audit-schema.md`
+- `docs/adr/0008-backend-spine-decision-gate.md`
 
 ## Architecture Notes
 

@@ -12,6 +12,12 @@ file records the security assumptions future changes should preserve or revisit.
 - Hosted deployment is a POC surface: Cognito gates the app, AI calls go
   through the Lambda proxy, and workspace autosave remains browser IndexedDB
   scoped by Cognito `sub` rather than a shared backend project database.
+- Rebuild planning keeps LANDroid local-first for now. Workspace sharding,
+  evidence-vault packaging, and citation verification come before any backend,
+  Tauri, cloud object-storage, or cloud OCR source-of-truth change.
+- After Phase 0, LANDroid has a Phase 0.75 backend architecture decision gate.
+  If a backend spine is approved, it must have an explicit threat model before
+  implementation and must preserve complete local project-package export.
 
 ## Sensitive Data
 
@@ -107,12 +113,39 @@ Known risk:
   Dropbox, local folders, or later object storage are raw-file vault options,
   not substitutes for structured metadata, entity links, hashes, OCR status,
   and citations.
+- The rebuild target treats document originals as evidence. Original bytes
+  should be immutable after import, content-hashed, MIME/magic validated, and
+  tracked separately from OCR PDFs, page images, text, hOCR, embeddings, and
+  packet copies.
+- `DocumentVersion`, `VaultObject`, `ExtractionRun`, and `SourceCitation`
+  records are security-relevant because they prove which original file,
+  derivative, OCR engine/version, page, and span supported a claim.
+- Meaningful vault, packet, import, AI-approval, and destructive actions should
+  be able to write append-only audit events with hash continuity. Attorney
+  packets should include deterministic manifests and SHA-256 checksums; signed
+  or Merkle-rooted manifests are a later hardening option.
 - OCR text is sensitive because it can expose full title instruments, owner
   names, lease economics, and legal descriptions. Do not send documents or OCR
   text to cloud OCR or cloud AI without an explicit provider/security decision.
+- OCR text, extracted JSON, hOCR, embeddings, and vector/keyword indexes are
+  sensitive derived data. Treat them as project data even if they can be
+  rebuilt from originals.
+- Cloud OCR must be per-document opt-in, with provider, retention, logging,
+  training-use, region/data-residency, and deletion expectations documented
+  before upload.
+- Cloud object storage, if added later, must use private buckets/containers,
+  server-side authorization, short-lived signed URLs where needed, encryption at
+  rest, and manifest/hash verification. Do not make browser-public object paths
+  part of the trust model.
 - AI document query should be read-only by default and return cited source
   references. Automatic title updates from OCR or AI remain out of scope until
   separately designed.
+- AI answers must pass a structural citation-verification gate before display.
+  If a claim cannot trace to a source citation, record ID, deterministic math
+  result, approved action record, or explicit curative issue, LANDroid should
+  report insufficient evidence instead of showing a plausible answer.
+- Pre-OCR AI may cite structured records and source attestations, but must not
+  cite document text spans that LANDroid has not extracted and anchored.
 
 ## Browser Security
 
@@ -136,3 +169,6 @@ Do not assume local-first safety carries over to hosted deployments.
 - Keep cloud keys out of persistent browser storage.
 - Keep federal/private records reference-only until the Phase 2 math gate opens.
 - Add validation and size limits to import paths before broadening file support.
+- Do not add backend storage, OCR jobs, cloud object storage, server-side RAG,
+  or multi-user permissions without updating the security model, threat model,
+  deployment docs, and validation plan in the same phase.

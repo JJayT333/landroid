@@ -19,9 +19,22 @@ Rules:
 
 ## Promising
 
-- Incremental rebuild target: project record graph first, action/event audit
-  layer second, current UI/workflows preserved until inventory and parity tests
-  exist. The working source of truth is `docs/rebuild-plan.md`.
+- Incremental rebuild target: current behavior inventory, Phase 0.5 workspace
+  sharding, project record schema, evidence-grade vault, action/event audit
+  layer, then workflow cutovers. Current UI/workflows stay preserved until
+  inventory, parity tests, and migration gates exist. The working source of
+  truth is `docs/rebuild-plan.md`.
+- Phase 0 ultra-review: a dedicated review that designs the current-behavior
+  inventory, lane structure, fixture plan, performance baselines, and exit gate
+  before implementation starts.
+- Phase 0.75 backend architecture decision: after Phase 0 evidence, decide
+  whether to add a backend spine for durable records, object storage, jobs,
+  search, AI/RAG policy, audit, backup/sync, and future permissions before
+  Phase 1 schema work.
+- Evidence Vault package shape: immutable originals, SHA-256 checksums,
+  document versions, extraction runs, derivative OCR/text sidecars, and
+  deterministic packet manifests modeled after legal DMS/eDiscovery custody
+  patterns.
 - Source-attestation start workflows: title opinion, division order, probate
   inventory, prior chain, working assumption, patent, and Spanish grant as
   explicit starting-source options for a tract or project.
@@ -31,12 +44,29 @@ Rules:
 - Runsheet package import/export: recurring Excel workbook plus
   `TitleDocuments` folder, relative hyperlinks, manifests, staged row review,
   and optional `LANDroid Target` / `LANDroid Action` helper columns.
+- eDiscovery-compatible attorney packet sidecar: generated
+  Concordance/Opticon-style load files, checksums, source citations, text
+  folder, family relationships, and unresolved issues from the same packet
+  manifest as the human workbook.
 - Registry packet export that distinguishes link-bookkeeping manifests from
   deduped recipient packets.
 - Entity document linking beyond Desk Map nodes: owners, leases, curative
   issues, research records, and GIS/map assets.
 - Review-first OCR/text indexing with citations, kept separate from title math
   mutation paths.
+- Local OCR/PDF toolchain for the Mac: `ocrmypdf`, `ocrmypdf-apple`,
+  `tesseract`, `ghostscript`, `qpdf`, `poppler`, `mupdf`, `exiftool`,
+  `sqlite-utils`, and `duckdb`.
+- Hybrid AI search: exact/keyword search, vector recall, record traversal,
+  deterministic math tools, rank fusion, and a `CitationVerifier` that rejects
+  unsupported claims before display.
+- Opinion-shaped deliverables: `OpinionDraft`, `ObligationCalendar`,
+  `LeaseObligation`, and `AbstractorPackage` projections once the record schema
+  and vault contracts are explicit.
+- Tokenized DMS-style search such as `area:leasehold`, party names, instrument
+  numbers, volume/page, quoted phrases, and saved filters over the unified
+  document registry.
+- Saved named packet selections.
 - Import ledger for spreadsheet and document-source staging.
 
 ## Math Engine Revisit
@@ -69,9 +99,11 @@ Parked for a dedicated design pass before implementation:
 
 ## Parked
 
-- Tokenized DMS-style search such as `area:leasehold` and quoted phrases.
-- Saved named packet selections.
 - 3D Desk Map exploration after 2D document/GIS traceability is stable.
+- Cross-project party canonical identity after per-project `externalPartyId`
+  hooks and review-gated deduplication are field-tested.
+- Tauri 2 desktop shell if browser storage, local OCR process spawning, native
+  filesystem packaging, or Raven Forest corpus size forces the pivot.
 
 ## Not Now
 

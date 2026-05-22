@@ -18,17 +18,43 @@ main push/deploy.
 AI/security/structure/performance audit remediation has started. Phase 0 plus
 the first Phase 1 AI safety chunks are implemented on this branch.
 
-Rebuild planning is now documented but implementation has not started. The
-current planning source of truth is `docs/rebuild-plan.md`. It consolidates the
-incremental rebuild direction: inventory current page/workflow behavior first,
-then add a project record graph, document vault, source attestations, import
-sessions, action plans/action records, project-wide party identity, well/unit
-reference records, and only later gated math expansion. It also adds the
-title-opinion-as-root workflow and the Springhill-style Excel plus document
-folder package workflow as first-class requirements. The plan explicitly
-reconciles the outside rebuild proposal with the repo-grounded analysis and
-locks dual decimal plus fraction display as a rebuild contract anywhere
-fractional interests are shown.
+Rebuild planning is now documented and amended, but implementation has not
+started. The current planning source of truth is `docs/rebuild-plan.md`. It
+consolidates the incremental rebuild direction: inventory current page/workflow
+behavior first, then Phase 0.5 workspace sharding, project record schema,
+evidence-grade document vault, source attestations, import sessions, action
+plans/action records, citation-verified AI, project-wide party identity,
+well/unit/obligation reference records, and only later gated math expansion.
+It also adds the title-opinion-as-root workflow, the Springhill-style Excel plus
+document folder package workflow, attorney/eDiscovery packet sidecars,
+`MathInputView`, `CitationVerifier`, `OpinionDraft`, `ObligationCalendar`, and
+`AbstractorPackage` as rebuild planning requirements. The plan explicitly
+reconciles the outside rebuild proposal, the repo-grounded analysis, and the
+side-by-side review PDF, while locking dual decimal plus fraction display,
+print fidelity, in-flight migration safety, multi-tab conflict handling, and
+source citation proof as rebuild contracts.
+Proposed ADRs were added for storage trajectory, AI citation verification, and
+the action/audit schema. A proposed backend-spine ADR was added after the user
+decided the next deep review should focus on Phase 0 and that backend
+future-proofing should be decided immediately after Phase 0.
+
+Current agreed rebuild sequence:
+
+1. Run a Phase 0 ultra-review focused only on current-behavior capture,
+   inventory lanes, fixture plan, golden masters, performance baselines, and
+   Phase 0 exit criteria.
+2. Execute Phase 0 lane by lane under one lead source-of-truth thread. Secondary
+   agents may perform read-only lane reviews, but they should not create
+   competing master plans.
+3. Revisit the rebuild direction after Phase 0 because current-state findings
+   may change the best sequence.
+4. Run Phase 0.75 backend architecture decision before Phase 0.5 storage work
+   or Phase 1 schema implementation. If approved, add a backend spine for
+   durable records, object storage, OCR/index/export jobs, search, AI/RAG
+   policy, audit logs, backup/sync, and future permissions while keeping
+   `.landroid` package export mandatory.
+5. Continue to Phase 0.5 storage sharding or backend-spine foundation depending
+   on the Phase 0.75 decision.
 
 Primary report:
 
@@ -105,9 +131,28 @@ Commands run on this branch:
   chunk-size warning, and Node `module.register()` deprecation warning.
 - `npm run test:e2e` - passed, 11 Playwright tests.
 - `git diff --check` - passed.
+- `git diff --check -- *.md docs/**/*.md` - passed after the rebuild-plan
+  amendment docs-only pass.
 
 ## Top Findings To Carry Forward
 
+- P0 before rebuild: Phase 0 must now produce frozen reference workspaces,
+  atomic behavior catalog rows, measured performance baselines, and CI-running
+  golden masters before Phase 1 implementation starts.
+- P0.5 before rebuild schema work: workspace persistence needs sharding inside
+  Dexie before broad record-schema work, so Raven Forest scale does not depend
+  on one large autosaved workspace payload, unless Phase 0.75 approves a
+  backend path that changes the storage foundation.
+- P0.75: Backend should be decided after Phase 0, not guessed before it. The
+  backend can improve durability, OCR/jobs, search, AI/RAG, audit, backup/sync,
+  and future permissions, but it also adds APIs, migrations, auth, deployment,
+  cost, monitoring, and security responsibilities.
+- P1: The Document Vault plan now means evidence-grade durability: immutable
+  originals, hashes, document versions, extraction runs, citation anchors,
+  deterministic manifests, and audit-event continuity.
+- P1: AI document-text answers are not allowed before OCR/text extraction
+  creates citation anchors and `CitationVerifier` can reject unsupported
+  claims.
 - P1: The desired runsheet assistant is not built end to end. Current pieces
   parse/stage rows or create desk maps, but not the full guided import,
   question, attachment, owner, lease, and graph workflow.
@@ -119,7 +164,10 @@ Commands run on this branch:
 
 - This branch now contains Phase 0 source/docs remediation plus the original
   audit report artifact, AI approval-preview/action-journal foundation work, and
-  map upload hardening, plus an undeployed hosted proxy policy hardening change.
+  map upload hardening, plus an undeployed hosted proxy policy hardening change,
+  plus a docs-only rebuild-plan amendment pass.
+- `docs/landroid-rebuild-plan-reviews.pdf` is currently untracked local input
+  from the user; do not delete or commit it unless the user explicitly asks.
 - The action journal is in-memory session context, not a durable audit log.
 - Approval previews are deterministic, typed summaries for the current proposal;
   they do not persist as formal audit records.
@@ -127,16 +175,27 @@ Commands run on this branch:
   and upload to affect the hosted proxy.
 - The full runsheet import-session / walkthrough wizard is still open and should
   not be started without explicit direction.
+- SQLite/OPFS, Tauri 2, cloud object storage, and cloud OCR are documented
+  decision gates only; they are not approved implementation defaults.
+- Backend implementation is not approved until Phase 0 evidence is captured and
+  Phase 0.75 produces a written go/no-go plus updated security/deployment/test
+  docs.
 - MCP servers are relevant later for external systems such as county records,
   OCR, GIS, storage vaults, or backend-only connectors, but should not bypass
   LANDroid approval/undo/audit boundaries.
 
 ## Likely Next Steps
 
-- If continuing rebuild planning, start with the Phase 0 inventory in
+- If continuing rebuild planning, run the Phase 0 ultra-review next. Do not run
+  another broad rebuild audit first.
+- If starting rebuild work after the Phase 0 ultra-review, start with the Phase
+  0 inventory in
   `docs/rebuild-plan.md`: document each page's current workflows, backing
-  stores/helpers, existing tests, missing tests, migration risks, and manual
-  smoke checks before changing behavior.
+  stores/helpers, existing tests, missing tests, migration risks, manual smoke
+  checks, reference workspace fixtures, and performance baselines before
+  changing behavior.
+- After Phase 0, run Phase 0.75 backend architecture decision and then revisit
+  the rebuild plan before Phase 0.5 or Phase 1 implementation.
 - Continue the Phase 1 AI foundation in small steps:
   - make result summaries more domain-specific where tool outputs are richer,
   - decide whether any action-journal records should become durable audit
@@ -163,10 +222,22 @@ model context from approved results, journal visibility in the AI panel, and
 journal clearing on workspace replacement. Hosted proxy source now rejects
 client-supplied `tools` / `tool_choice` fields before usage charging; Lambda
 changes still need manual bundle/upload to deploy. Map uploads now enforce a
-passive allowlist and validate PDF bytes before save/preview. Latest validation passed:
+passive allowlist and validate PDF bytes before save/preview.
+Rebuild planning has been amended in `docs/rebuild-plan.md`, `ROADMAP.md`,
+`IDEAS.md`, `ARCHITECTURE.md`, `TESTING.md`, `SECURITY.md`, `docs/README.md`,
+and proposed ADRs 0005-0008 after reading the side-by-side review PDF and the
+user's Phase 0/backend sequencing decision. The amended plan keeps the
+incremental approach but renames the target to project record schema, adds the
+Phase 0 ultra-review process, sectioned Phase 0 execution, Phase 0.75 backend
+architecture decision, Phase 0.5 workspace sharding, stronger Phase 0 exit
+gates, the Evidence Vault contract, `MathInputView`, `CitationVerifier`,
+OCR/citation-anchor sequencing, attorney/eDiscovery packet sidecars,
+print/migration/multi-tab contracts, and explicit SQLite/Tauri/cloud/backend
+decision gates. Latest validation passed:
 `npm run lint`, targeted Phase 0/action-journal/approval-preview tests,
 backend proxy tests/build, targeted map upload tests, `npm test`,
-`npm run build`, and `npm run test:e2e`.
+`npm run build`, `npm run test:e2e`, and
+`git diff --check -- *.md docs/**/*.md`.
 Do not start the full runsheet walkthrough wizard unless explicitly directed.
-Recommended next small step is document attachment ordering scoped by workspace
-or a structured runsheet import-session model.
+Recommended next step is the Phase 0 ultra-review, then sectioned Phase 0
+inventory/golden-master work, then Phase 0.75 backend go/no-go.
