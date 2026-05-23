@@ -106,4 +106,4 @@ Manual hosted smoke:
 4. Open `Ask LANDroid AI` and send `hello`.
 5. Confirm CloudWatch logs show an authenticated `evt: "request"` and
    DynamoDB records a usage row.
-6. Use `Demo Data` to load `Crackbaby Carnival — Demo`.
+6. Use `Demo Data` to load `Vulcan Mesa — Demo`.

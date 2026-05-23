@@ -570,14 +570,16 @@ Areas where Phase 0 confirmed there is **no current test or golden master**:
 
 Three reference workspaces are required as Phase 0 fixtures. Two are derivable from existing seed code; one is new.
 
-### W1 — Demo Fixture Pending Rename (existing seed)
-- Source: current internal seed file `src/storage/seed-crackbaby-carnival.ts`
-  until the demo workspace is renamed.
-- Shape: small Texas project, single unit, mixed mineral + NPRI, leases, federal references seeded by `buildRavenForestFederalLeases`.
+### W1 — Vulcan Mesa Demo Fixture (existing seed)
+- Source: `src/storage/seed-vulcan-mesa.ts`.
+- Shape: small Texas project, two non-pooled units, mixed mineral + NPRI,
+  leases, planted warnings, and federal references seeded by
+  `buildRavenForestFederalLeases`.
 - Use: smoke/regression of all lanes; .landroid round trip; print fidelity; AI approval previews.
-- Note: this demo name must be renamed before external sharing. Keep the
-  replacement professional but Texas-flavored; user will choose the final name.
-- Export target after rename: `fixtures/phase-0/demo.landroid` (committed; check size before committing).
+- Note: this fixture was renamed from the prior internal-only demo name before
+  external sharing. The current name intentionally mixes Texas/Wild West flavor
+  with Roman mythology.
+- Export target: `fixtures/phase-0/demo.landroid` (committed; check size before committing).
 - Checksum target: `fixtures/phase-0/demo.sha256`.
 - Expected outputs: `fixtures/phase-0/demo.runsheet.csv`, `demo.packet-manifest.json`, `demo.leasehold-decimals.json`, `demo.flowchart-print.pdf` (or PNG screenshots if PDF unstable).
 

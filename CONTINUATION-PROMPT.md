@@ -15,10 +15,11 @@ main push/deploy.
 
 ## Current Workstream
 
-Phase 0 rebuild planning reconciliation is active on this branch. This is a
-docs-only workstream: adopt Claude's `docs/phase-0-inventory.md` as the draft
-master Phase 0 inventory, verify the highest-risk rows, and update the
-source-of-truth docs without starting app-code implementation.
+Phase 0 rebuild planning reconciliation is active on this branch. The first
+checkpoint adopted Claude's `docs/phase-0-inventory.md` as the draft master
+Phase 0 inventory and updated source-of-truth docs. A follow-up cleanup renamed
+the second demo fixture to Vulcan Mesa and archived the ultrareview prompt; no
+rebuild implementation has started.
 
 Rebuild planning is now documented and amended, but implementation has not
 started. The current planning source of truth is `docs/rebuild-plan.md`. It
@@ -102,11 +103,21 @@ The full runsheet walkthrough wizard has not been started.
 ## Latest Validation
 
 Commands run on this branch before this reconciliation remain from the prior
-audit/rebuild-planning handoff. Current docs-only reconciliation validation:
+audit/rebuild-planning handoff. Current reconciliation and demo-rename
+validation:
 
 - `git diff --check -- *.md docs/**/*.md` - passed.
 - `rg -n "[ \t]+$" docs/phase-0-inventory.md docs/phase-0-ultrareview-prompt.md`
   - passed after removing one trailing space from the inventory draft.
+- `git diff --check -- *.md docs/**/*.md src/**/*.ts src/**/*.tsx` - passed.
+- `npm test -- src/ai/__tests__/runChat-hosted.test.ts` - passed, 1 file / 4
+  tests.
+- `npm run lint` - passed after fixing one single-quote syntax issue in the
+  renamed Vulcan Mesa seed.
+- `npm test` - passed, 78 files / 627 tests. Existing intentional stderr
+  coverage for simulated Dexie failures appeared.
+- `npm run build` - passed with existing Vite dynamic/static import warnings,
+  chunk-size warning, and Node `module.register()` deprecation warning.
 - Targeted inventory-risk tests passed:
   - `npm test -- src/components/deskmap/__tests__/deskmap-coverage.test.ts src/storage/__tests__/workspace-persistence.test.ts src/storage/__tests__/document-migration.test.ts`
     - passed, 3 files / 54 tests.
@@ -116,12 +127,6 @@ audit/rebuild-planning handoff. Current docs-only reconciliation validation:
     - passed, 3 files / 5 tests.
   - `npm test -- src/store/__tests__/workspace-store-doc-actions.test.ts src/engine/__tests__/fraction-display.test.ts src/storage/__tests__/runsheet-export.test.ts`
     - passed, 3 files / 40 tests.
-- `npm run lint` - passed.
-- `npm test` - passed, 78 files / 627 tests. Existing intentional stderr
-  coverage for simulated Dexie failures appeared.
-- `npm run build` - passed with existing Vite dynamic/static import warnings,
-  chunk-size warning, and Node `module.register()` deprecation warning.
-
 Prior validation from the audit/rebuild-planning checkpoint:
 
 - `npm run lint` - passed.
@@ -198,12 +203,13 @@ Prior validation from the audit/rebuild-planning checkpoint:
 
 ## Open Risks And Assumptions
 
-- This branch contains docs-only Phase 0 reconciliation. Do not start app code,
-  fixture generation, demo rename implementation, sharding, backend, or the
-  runsheet walkthrough wizard unless the user explicitly redirects.
+- This branch contains Phase 0 reconciliation plus the Vulcan Mesa demo rename.
+  Do not start fixture generation, sharding, backend, or the runsheet
+  walkthrough wizard unless the user explicitly redirects.
 - `docs/phase-0-inventory.md` and `docs/phase-0-ultrareview-prompt.md` came in
-  as untracked Claude/session artifacts. The inventory is now being adopted as
-  the draft master Phase 0 inventory; the prompt remains supporting context.
+  as Claude/session artifacts. The inventory is now committed as the draft
+  master Phase 0 inventory; the prompt was archived under
+  `docs/archive/prompts/`.
 - Current source search verified most top-risk inventory claims. Correction:
   the v7 document migration records orphaned node IDs and uses a fallback
   workspace path; a literal `__orphaned_pre_v8__` workspace was not found in
@@ -233,8 +239,8 @@ Prior validation from the audit/rebuild-planning checkpoint:
 - Next Phase 0 work after docs reconciliation: generate/freeze reference
   workspaces, capture expected outputs, capture performance baselines, and mark
   remaining inventory rows as verified or `needs verification`.
-- Before any external sharing, rename the Crackbaby Carnival demo fixture to a
-  professional Texas-funny name chosen by the user.
+- Vulcan Mesa demo rename is complete. Keep fixture exports under neutral
+  `fixtures/phase-0/demo.*` names when Phase 0 fixture generation starts.
 - Do not start the full runsheet walkthrough wizard unless the user explicitly
   redirects to that scope.
 
@@ -251,6 +257,6 @@ local-first, hosted-web/PWA first, with `.landroid` export permanent; Phase 0.5
 must shard Dexie storage, add multi-tab protection, persistent-storage request,
 lazy PDF loading, canvas viewport persistence, autosave timing, and iPad
 Pro-class Raven Forest scale; Phase 1 records must be backend-ready. Do not
-start app code, fixtures, demo rename implementation, backend, sharding, or the
-runsheet walkthrough wizard unless explicitly directed. Current docs validation
-passed with `git diff --check -- *.md docs/**/*.md`.
+start fixtures, backend, sharding, or the runsheet walkthrough wizard unless
+explicitly directed. Current docs validation passed with
+`git diff --check -- *.md docs/**/*.md`.

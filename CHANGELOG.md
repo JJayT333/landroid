@@ -17,6 +17,9 @@ stay short.
   protection, autosave timing, canvas viewport persistence, PWA/iPad persistent
   storage, lazy PDF loading, and Raven Forest-scale validation on iPad-class
   hardware or a documented equivalent.
+- Renamed the internal-only second demo fixture to Vulcan Mesa, updated current
+  docs and tests to the new name, and archived the Phase 0 ultrareview prompt
+  under `docs/archive/prompts/`.
 
 ## 2026-05-20
 
@@ -79,13 +82,13 @@ stay short.
   Cognito ID token from OIDC storage and no longer sends anonymous proxy
   requests when the in-memory auth bridge is empty.
 - Made the Demo Data menu visible in hosted mode for the signed-in POC so the
-  Crackbaby Carnival and Raven Forest fixtures can be loaded online.
+  Vulcan Mesa and Raven Forest fixtures can be loaded online.
 - Added `DEPLOYMENT_STATE.md` and refreshed deployment docs so the current AWS
   setup is explicit: Amplify deploys frontend changes from `main`, while Lambda
   AI proxy changes still require a bundle/upload until deployment automation is
   added.
 - Manual hosted browser verification confirmed the signed-in POC still loads
-  Crackbaby Carnival from the hosted Demo Data menu after PR #74. Hosted AI
+  Vulcan Mesa from the hosted Demo Data menu after PR #74. Hosted AI
   still accepted a `hello` request but stalled without an assistant response, so
   the current branch tightens hosted AI display/timeout behavior while leaving
   Lambda/CloudWatch follow-up open.

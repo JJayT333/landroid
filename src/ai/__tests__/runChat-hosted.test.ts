@@ -86,20 +86,20 @@ describe('runChatTurn hosted proxy path', () => {
     session.setIdToken('id.jwt.token');
     useUIStore.setState({ view: 'chart' });
     useWorkspaceStore.setState({
-      projectName: 'Crackbaby Carnival - Demo',
-      activeDeskMapId: 'dm-cc1',
-      activeUnitCode: 'FCU',
+      projectName: 'Vulcan Mesa - Demo',
+      activeDeskMapId: 'dm-vm1',
+      activeUnitCode: 'JFU',
       deskMaps: [
         {
-          id: 'dm-cc1',
-          name: 'Cotton Candy Catastrophe',
-          code: 'CC1',
-          tractId: 'tract-cc1',
+          id: 'dm-vm1',
+          name: 'Apollo Draw',
+          code: 'VM1',
+          tractId: 'tract-vm1',
           grossAcres: '160',
           pooledAcres: '160',
           description: '',
-          unitName: 'Funnel Cake Unit',
-          unitCode: 'FCU',
+          unitName: 'Jupiter Flats Unit',
+          unitCode: 'JFU',
           nodeIds: ['root-1', 'lease-node-1'],
         },
       ],
@@ -107,7 +107,7 @@ describe('runChatTurn hosted proxy path', () => {
         makeNode({
           id: 'root-1',
           grantor: 'Front State of Texas',
-          grantee: 'P.T. Barnswallow',
+          grantee: 'P. T. Broncus',
           instrument: 'Patent',
           docNo: '1473-01-15',
           linkedOwnerId: 'owner-1',
@@ -115,8 +115,8 @@ describe('runChatTurn hosted proxy path', () => {
         makeNode({
           id: 'lease-node-1',
           type: 'related',
-          grantor: 'P.T. Barnswallow',
-          grantee: 'Crackbaby Carnival Petroleum, LLC',
+          grantor: 'P. T. Broncus',
+          grantee: 'Vulcan Mesa Petroleum, LLC',
           instrument: 'Oil & Gas Lease',
           parentId: 'root-1',
           fraction: '0',
@@ -131,8 +131,8 @@ describe('runChatTurn hosted proxy path', () => {
         makeLease({
           id: 'lease-1',
           ownerId: 'owner-1',
-          leaseName: 'Cotton Candy Catastrophe Lease',
-          lessee: 'Crackbaby Carnival Petroleum, LLC',
+          leaseName: 'Apollo Draw Lease',
+          lessee: 'Vulcan Mesa Petroleum, LLC',
         }),
       ],
     });
@@ -149,13 +149,13 @@ describe('runChatTurn hosted proxy path', () => {
       message.content.startsWith('# Read-only LANDroid app context')
     )?.content;
     expect(context).toContain('Active view: Desk Map');
-    expect(context).toContain('Project: Crackbaby Carnival - Demo');
-    expect(context).toContain('Active unit: Funnel Cake Unit (FCU) (1 tract)');
-    expect(context).toContain('Active tract: CC1 - Cotton Candy Catastrophe');
+    expect(context).toContain('Project: Vulcan Mesa - Demo');
+    expect(context).toContain('Active unit: Jupiter Flats Unit (JFU) (1 tract)');
+    expect(context).toContain('Active tract: VM1 - Apollo Draw');
     expect(context).toContain('Visible Desk Map cards: 2');
     expect(context).toContain('Found in chain: 1/1 (100.00%)');
-    expect(context).toContain('Front State of Texas -> P.T. Barnswallow');
-    expect(context).toContain('Cotton Candy Catastrophe Lease to Crackbaby Carnival Petroleum, LLC');
+    expect(context).toContain('Front State of Texas -> P. T. Broncus');
+    expect(context).toContain('Apollo Draw Lease to Vulcan Mesa Petroleum, LLC');
   });
 
   it('throws before fetch when hosted auth has no ID token', async () => {

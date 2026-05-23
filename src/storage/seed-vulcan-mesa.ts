@@ -1,8 +1,8 @@
 /**
- * Crackbaby Carnival — second demo fixture (alongside Raven Forest).
+ * Vulcan Mesa — second demo fixture (alongside Raven Forest).
  *
- * Walker County, TX. One operator (Crackbaby Carnival Petroleum, LLC) covers
- * two non-pooled units (Funnel Cake — A, Tilt-A-Whirl — B) of five tracts
+ * Walker County, TX. One operator (Vulcan Mesa Petroleum, LLC) covers
+ * two non-pooled units (Jupiter Flats — A, Minerva Draw — B) of five tracts
  * each. Designed as a teaching/test fixture: simple power-of-2 fractions, a
  * handful of "bridge" owners shared across multiple tracts in both units, and
  * intentionally-planted errors that should each trip a visible warning so the
@@ -33,22 +33,22 @@ import {
 
 // ── Constants ───────────────────────────────────────────
 
-const OPERATOR = 'Crackbaby Carnival Petroleum, LLC';
-const UNIT_A_NAME = 'Funnel Cake Unit';
-const UNIT_B_NAME = 'Tilt-A-Whirl Unit';
+const OPERATOR = 'Vulcan Mesa Petroleum, LLC';
+const UNIT_A_NAME = 'Jupiter Flats Unit';
+const UNIT_B_NAME = 'Minerva Draw Unit';
 
 // Bridge owners — appear in multiple tracts across both units so the user can
 // see how ownership records, leases, and roll-ups stay linked between
 // prospects. Each is a different entity type so all three code paths are
 // exercised at least once.
 const BRIDGE = {
-  cletus: { name: "Cletus 'Two-Teeth' Boggs", entityType: 'Individual' },
+  cletus: { name: "Buster 'Janus' McGraw", entityType: 'Individual' },
   trust: {
-    name: 'The Funnel Cake Family Mineral Trust',
+    name: 'The Jupiter Flats Family Mineral Trust',
     entityType: 'Trust',
   },
-  llc: { name: 'Greasepaint Holdings, LLC', entityType: 'LLC' },
-  ophelia: { name: "Ophelia 'Lockjaw' Pickens", entityType: 'Individual' },
+  llc: { name: 'Vulcan Spur Holdings, LLC', entityType: 'LLC' },
+  ophelia: { name: "Minerva 'Minnie' Pickens", entityType: 'Individual' },
 } as const;
 
 // ── Tract plan ──────────────────────────────────────────
@@ -74,7 +74,7 @@ type NpriSpec = {
 };
 
 interface TractPlan {
-  code: string; // CC1..CC10
+  code: string; // VM1..VM10
   name: string;
   unitCode: 'A' | 'B';
   unitName: string;
@@ -114,44 +114,44 @@ interface TractPlan {
   };
 }
 
-const CC_TRACTS: TractPlan[] = [
-  // ── Unit A — Funnel Cake ──────────────────────────────
+const VM_TRACTS: TractPlan[] = [
+  // ── Unit A — Jupiter Flats ────────────────────────────
   {
-    code: 'CC1',
-    name: 'CC1 — Cotton Candy Catastrophe',
+    code: 'VM1',
+    name: 'VM1 — Apollo Draw',
     unitCode: 'A',
     unitName: UNIT_A_NAME,
     grossAcres: '160',
     pooledAcres: '160',
-    landDesc: 'A. Acrobat Survey, Abstract 401, Walker County, Texas',
+    landDesc: 'A. Apollo Draw Survey, Abstract 401, Walker County, Texas',
     description:
-      'Two-owner tract with a clean 1/2 + 1/4 + 1/4 split — Cletus and Ophelia both land here.',
-    patentee: 'P. T. Barnswallow',
+      'Two-owner tract with a clean 1/2 + 1/4 + 1/4 split — Buster and Minerva both land here.',
+    patentee: 'P. T. Broncus',
     patentYear: 1872,
     primaryRoyalty: '1/4',
     owners: [
-      { grantee: BRIDGE.cletus.name, num: 1, den: 2, docNo: 'CC1-WD-001', deedDate: '1948-04-12' },
-      { grantee: BRIDGE.ophelia.name, num: 1, den: 4, docNo: 'CC1-WD-002', deedDate: '1952-08-03' },
-      { grantee: 'Mortimer "Sawdust" Hench', num: 1, den: 4, docNo: 'CC1-WD-003', deedDate: '1961-11-29' },
+      { grantee: BRIDGE.cletus.name, num: 1, den: 2, docNo: 'VM1-WD-001', deedDate: '1948-04-12' },
+      { grantee: BRIDGE.ophelia.name, num: 1, den: 4, docNo: 'VM1-WD-002', deedDate: '1952-08-03' },
+      { grantee: 'Mortimer "Sawdust" Hench', num: 1, den: 4, docNo: 'VM1-WD-003', deedDate: '1961-11-29' },
     ],
   },
   {
-    code: 'CC2',
-    name: 'CC2 — Whack-A-Widow',
+    code: 'VM2',
+    name: "VM2 — Widow's Aegis",
     unitCode: 'A',
     unitName: UNIT_A_NAME,
     grossAcres: '240',
     pooledAcres: '240',
-    landDesc: 'B. Bigtop Survey, Abstract 412, Walker County, Texas',
+    landDesc: 'B. Aegis Survey, Abstract 412, Walker County, Texas',
     description:
-      'Trust + Ophelia + Carny tract. Planted: an over-conveyance on the patent root that sums past 100%.',
-    patentee: 'Eulalia Greasepaint',
+      'Trust + Minerva + rodeo-Olympus tract. Planted: an over-conveyance on the patent root that sums past 100%.',
+    patentee: 'Eulalia Mesa',
     patentYear: 1874,
     primaryRoyalty: '1/4',
     owners: [
-      { grantee: BRIDGE.trust.name, num: 1, den: 2, docNo: 'CC2-WD-001', deedDate: '1955-02-17' },
-      { grantee: BRIDGE.ophelia.name, num: 1, den: 4, docNo: 'CC2-WD-002', deedDate: '1958-06-21' },
-      { grantee: 'Estate of Hambone "Lefty" McGurkin', num: 1, den: 4, docNo: 'CC2-WD-003', deedDate: '1962-10-05' },
+      { grantee: BRIDGE.trust.name, num: 1, den: 2, docNo: 'VM2-WD-001', deedDate: '1955-02-17' },
+      { grantee: BRIDGE.ophelia.name, num: 1, den: 4, docNo: 'VM2-WD-002', deedDate: '1958-06-21' },
+      { grantee: 'Estate of Hambone "Lefty" McGurkin', num: 1, den: 4, docNo: 'VM2-WD-003', deedDate: '1962-10-05' },
     ],
     overConveyance: {
       // Two extra deeds out of the patent root, each conveying 3/5 of the
@@ -161,62 +161,62 @@ const CC_TRACTS: TractPlan[] = [
           grantee: 'Pinhead "Doublecount" Crumley',
           num: 3,
           den: 5,
-          docNo: 'CC2-WD-OVR-1',
+          docNo: 'VM2-WD-OVR-1',
           deedDate: '1979-04-01',
         },
         {
           grantee: 'Pinhead "Doublecount" Crumley',
           num: 3,
           den: 5,
-          docNo: 'CC2-WD-OVR-2',
+          docNo: 'VM2-WD-OVR-2',
           deedDate: '1979-04-02',
         },
       ],
     },
   },
   {
-    code: 'CC3',
-    name: 'CC3 — The Vomit Comet',
+    code: 'VM3',
+    name: 'VM3 — Mercury Cutoff',
     unitCode: 'A',
     unitName: UNIT_A_NAME,
     grossAcres: '160',
     pooledAcres: '160',
-    landDesc: 'C. Concession Survey, Abstract 423, Walker County, Texas',
+    landDesc: 'C. Mercury Cutoff Survey, Abstract 423, Walker County, Texas',
     description:
       'LLC + small owners. Planted: fixed NPRIs that stack above the available NRI for the over-burden warning.',
     patentee: 'Roustabout Whitfield',
     patentYear: 1871,
     primaryRoyalty: '1/4',
     owners: [
-      { grantee: BRIDGE.llc.name, num: 1, den: 2, docNo: 'CC3-WD-001', deedDate: '1950-03-08' },
-      { grantee: 'Mavis "Sword-Eater" Toomey', num: 1, den: 4, docNo: 'CC3-WD-002', deedDate: '1954-07-14' },
-      { grantee: 'Beauregard Plumstead', num: 1, den: 8, docNo: 'CC3-WD-003', deedDate: '1968-12-19' },
-      { grantee: 'Beauregard Plumstead', num: 1, den: 8, docNo: 'CC3-WD-004', deedDate: '1970-05-22' },
+      { grantee: BRIDGE.llc.name, num: 1, den: 2, docNo: 'VM3-WD-001', deedDate: '1950-03-08' },
+      { grantee: 'Mavis "Sword-Eater" Toomey', num: 1, den: 4, docNo: 'VM3-WD-002', deedDate: '1954-07-14' },
+      { grantee: 'Beauregard Plumstead', num: 1, den: 8, docNo: 'VM3-WD-003', deedDate: '1968-12-19' },
+      { grantee: 'Beauregard Plumstead', num: 1, den: 8, docNo: 'VM3-WD-004', deedDate: '1970-05-22' },
     ],
     // 1/2 + 1/4 = 3/4 of whole as fixed NPRIs — way more than the 1/4 lease
     // royalty can absorb. Should light up "Over-burdened".
     fixedNpris: [
-      { grantee: 'Toothless Annie Boggs', num: 1, den: 2, docNo: 'CC3-NPRI-001', deedDate: '1965-04-30' },
-      { grantee: 'Sideshow Royalty Holdings, LP', num: 1, den: 4, docNo: 'CC3-NPRI-002', deedDate: '1972-09-09' },
+      { grantee: 'Annie Boggs', num: 1, den: 2, docNo: 'VM3-NPRI-001', deedDate: '1965-04-30' },
+      { grantee: 'Hermes Royalty Holdings, LP', num: 1, den: 4, docNo: 'VM3-NPRI-002', deedDate: '1972-09-09' },
     ],
   },
   {
-    code: 'CC4',
-    name: 'CC4 — Greasepaint Gulch',
+    code: 'VM4',
+    name: 'VM4 — Vulcan Gulch',
     unitCode: 'A',
     unitName: UNIT_A_NAME,
     grossAcres: '200',
     pooledAcres: '200',
-    landDesc: 'D. Deepfryer Survey, Abstract 434, Walker County, Texas',
+    landDesc: 'D. Vulcan Gulch Survey, Abstract 434, Walker County, Texas',
     description:
-      'Cletus + locals. Planted: one lease has a malformed royalty (1/6.5) for the Leasehold Input Error warning.',
+      'Buster + locals. Planted: one lease has a malformed royalty (1/6.5) for the Leasehold Input Error warning.',
     patentee: 'Gertrude "Cannonball" Spivey',
     patentYear: 1869,
     primaryRoyalty: '1/4',
     owners: [
-      { grantee: BRIDGE.cletus.name, num: 1, den: 4, docNo: 'CC4-WD-001', deedDate: '1946-09-30' },
-      { grantee: 'Constance "Bone-Saw" Whittle', num: 3, den: 8, docNo: 'CC4-WD-002', deedDate: '1953-04-18' },
-      { grantee: 'Reginald "Ringmaster" Crumley', num: 3, den: 8, docNo: 'CC4-WD-003', deedDate: '1961-07-25' },
+      { grantee: BRIDGE.cletus.name, num: 1, den: 4, docNo: 'VM4-WD-001', deedDate: '1946-09-30' },
+      { grantee: 'Constance "Bone-Saw" Whittle', num: 3, den: 8, docNo: 'VM4-WD-002', deedDate: '1953-04-18' },
+      { grantee: 'Reginald "Ringmaster" Crumley', num: 3, den: 8, docNo: 'VM4-WD-003', deedDate: '1961-07-25' },
     ],
     leaseOverridesByGrantee: {
       // Planted error #1 — malformed royalty rate. Strict parser should fail
@@ -228,132 +228,132 @@ const CC_TRACTS: TractPlan[] = [
     },
   },
   {
-    code: 'CC5',
-    name: 'CC5 — Last Carny Standing',
+    code: 'VM5',
+    name: 'VM5 — Last Centurion',
     unitCode: 'A',
     unitName: UNIT_A_NAME,
     grossAcres: '320',
     pooledAcres: '320',
-    landDesc: 'E. Elephant Survey, Abstract 445, Walker County, Texas',
+    landDesc: 'E. Centurion Survey, Abstract 445, Walker County, Texas',
     description:
       'Trust + LLC + locals at 3/16 royalty so the leasehold math hits a different decimal track from the other tracts.',
-    patentee: 'Doctor Hieronymus Quack',
+    patentee: 'Doc Hieronymus Delphi',
     patentYear: 1873,
     primaryRoyalty: '3/16',
     owners: [
-      { grantee: BRIDGE.trust.name, num: 1, den: 4, docNo: 'CC5-WD-001', deedDate: '1949-02-14' },
-      { grantee: BRIDGE.llc.name, num: 1, den: 4, docNo: 'CC5-WD-002', deedDate: '1951-05-30' },
-      { grantee: 'Pearl "Knife-Catcher" Velasquez', num: 1, den: 4, docNo: 'CC5-WD-003', deedDate: '1956-08-11' },
-      { grantee: 'Wendell "Stilt-Stumble" Krabowski', num: 1, den: 4, docNo: 'CC5-WD-004', deedDate: '1963-12-04' },
+      { grantee: BRIDGE.trust.name, num: 1, den: 4, docNo: 'VM5-WD-001', deedDate: '1949-02-14' },
+      { grantee: BRIDGE.llc.name, num: 1, den: 4, docNo: 'VM5-WD-002', deedDate: '1951-05-30' },
+      { grantee: 'Pearl "Knife-Catcher" Velasquez', num: 1, den: 4, docNo: 'VM5-WD-003', deedDate: '1956-08-11' },
+      { grantee: 'Wendell "Stilt-Stumble" Krabowski', num: 1, den: 4, docNo: 'VM5-WD-004', deedDate: '1963-12-04' },
     ],
   },
-  // ── Unit B — Tilt-A-Whirl ─────────────────────────────
+  // ── Unit B — Minerva Draw ─────────────────────────────
   {
-    code: 'CC6',
-    name: 'CC6 — Ring Toss of Regret',
+    code: 'VM6',
+    name: 'VM6 — Jupiter Spur',
     unitCode: 'B',
     unitName: UNIT_B_NAME,
     grossAcres: '160',
     pooledAcres: '160',
-    landDesc: 'F. Fortuneteller Survey, Abstract 502, Walker County, Texas',
+    landDesc: 'F. Jupiter Spur Survey, Abstract 502, Walker County, Texas',
     description:
       'Trust + Pickled-egg vendor at 1/2 each. Smallest-and-cleanest tract.',
     patentee: 'Octavia Slipknot',
     patentYear: 1870,
     primaryRoyalty: '1/4',
     owners: [
-      { grantee: BRIDGE.trust.name, num: 1, den: 2, docNo: 'CC6-WD-001', deedDate: '1944-06-22' },
-      { grantee: 'Festus "Pickled-Egg" Drumheller', num: 1, den: 2, docNo: 'CC6-WD-002', deedDate: '1957-10-14' },
+      { grantee: BRIDGE.trust.name, num: 1, den: 2, docNo: 'VM6-WD-001', deedDate: '1944-06-22' },
+      { grantee: 'Festus "Pickled-Egg" Drumheller', num: 1, den: 2, docNo: 'VM6-WD-002', deedDate: '1957-10-14' },
     ],
   },
   {
-    code: 'CC7',
-    name: 'CC7 — Funhouse of Foreclosure',
+    code: 'VM7',
+    name: 'VM7 — Minotaur Fork',
     unitCode: 'B',
     unitName: UNIT_B_NAME,
     grossAcres: '240',
     pooledAcres: '240',
-    landDesc: 'G. Geek Survey, Abstract 514, Walker County, Texas',
+    landDesc: 'G. Minotaur Fork Survey, Abstract 514, Walker County, Texas',
     description:
-      'Cletus + LLC tract at 1/5 royalty (atypical decimal). Planted: a top-lease that overlaps Cletus\'s original lease — should trigger the lease-overlap warning.',
+      'Buster + LLC tract at 1/5 royalty (atypical decimal). Planted: a top-lease that overlaps Buster\'s original lease — should trigger the lease-overlap warning.',
     patentee: 'Cornelius Whiplash',
     patentYear: 1872,
     primaryRoyalty: '1/5',
     owners: [
-      { grantee: BRIDGE.cletus.name, num: 1, den: 2, docNo: 'CC7-WD-001', deedDate: '1947-03-19' },
-      { grantee: BRIDGE.llc.name, num: 1, den: 4, docNo: 'CC7-WD-002', deedDate: '1953-09-08' },
-      { grantee: 'Lurleen "Bearded" Sproat', num: 1, den: 4, docNo: 'CC7-WD-003', deedDate: '1960-02-27' },
+      { grantee: BRIDGE.cletus.name, num: 1, den: 2, docNo: 'VM7-WD-001', deedDate: '1947-03-19' },
+      { grantee: BRIDGE.llc.name, num: 1, den: 4, docNo: 'VM7-WD-002', deedDate: '1953-09-08' },
+      { grantee: 'Lurleen "Ares" Sproat', num: 1, den: 4, docNo: 'VM7-WD-003', deedDate: '1960-02-27' },
     ],
     topLeasesByGrantee: {
-      // Planted error #5 — second lease on Cletus's CC7 interest overlapping
+      // Planted error #5 — second lease on Buster's VM7 interest overlapping
       // the original lease (which fires in 2024). This second lease starts
       // 2025 with a different lessee and runs forward — coverage analysis
       // should report the overlap.
       [BRIDGE.cletus.name]: {
-        lessee: 'Funhouse Top-Lease Partners, LP',
+        lessee: 'Labyrinth Top-Lease Partners, LP',
         royaltyRate: '1/4',
         effectiveDate: '2025-03-01',
         notes:
-          "PLANTED ERROR: top-lease intentionally overlaps the original CC7 lease on Cletus — should appear as a Lease Overlap warning.",
+          "PLANTED ERROR: top-lease intentionally overlaps the original VM7 lease on Buster — should appear as a Lease Overlap warning.",
       },
     },
   },
   {
-    code: 'CC8',
-    name: 'CC8 — The Tunnel of Probate',
+    code: 'VM8',
+    name: 'VM8 — Probate Styx',
     unitCode: 'B',
     unitName: UNIT_B_NAME,
     grossAcres: '200',
     pooledAcres: '200',
-    landDesc: 'H. Houdini Survey, Abstract 525, Walker County, Texas',
+    landDesc: 'H. Styx Crossing Survey, Abstract 525, Walker County, Texas',
     description:
-      'LLC + Ophelia + an estate. Round-number splits exercise the average tract path.',
+      'LLC + Minerva + an estate. Round-number splits exercise the average tract path.',
     patentee: 'Ezekiel "Trapdoor" Murch',
     patentYear: 1875,
     primaryRoyalty: '1/4',
     owners: [
-      { grantee: BRIDGE.llc.name, num: 1, den: 2, docNo: 'CC8-WD-001', deedDate: '1950-07-04' },
-      { grantee: BRIDGE.ophelia.name, num: 1, den: 4, docNo: 'CC8-WD-002', deedDate: '1955-11-11' },
-      { grantee: 'Estate of Wilbur "The Geek" Posthumous', num: 1, den: 4, docNo: 'CC8-WD-003', deedDate: '1968-03-23' },
+      { grantee: BRIDGE.llc.name, num: 1, den: 2, docNo: 'VM8-WD-001', deedDate: '1950-07-04' },
+      { grantee: BRIDGE.ophelia.name, num: 1, den: 4, docNo: 'VM8-WD-002', deedDate: '1955-11-11' },
+      { grantee: 'Estate of Wilbur "The Geek" Posthumous', num: 1, den: 4, docNo: 'VM8-WD-003', deedDate: '1968-03-23' },
     ],
   },
   {
-    code: 'CC9',
-    name: "CC9 — Bearded Lady's Bequest",
+    code: 'VM9',
+    name: "VM9 — Minerva's Bequest",
     unitCode: 'B',
     unitName: UNIT_B_NAME,
     grossAcres: '160',
     pooledAcres: '160',
-    landDesc: 'I. Illusionist Survey, Abstract 537, Walker County, Texas',
+    landDesc: 'I. Minerva Draw Survey, Abstract 537, Walker County, Texas',
     description:
-      'Trust + Ophelia majority + a small local. Two bridges meet here.',
+      'Trust + Minerva majority + a small local. Two bridges meet here.',
     patentee: 'Madame Gloria "Six-Toes" Underwood',
     patentYear: 1871,
     primaryRoyalty: '1/4',
     owners: [
-      { grantee: BRIDGE.ophelia.name, num: 1, den: 2, docNo: 'CC9-WD-001', deedDate: '1948-08-30' },
-      { grantee: BRIDGE.trust.name, num: 1, den: 4, docNo: 'CC9-WD-002', deedDate: '1953-12-08' },
-      { grantee: 'Bartholomew "Sword-Swallower" Pickens', num: 1, den: 4, docNo: 'CC9-WD-003', deedDate: '1959-05-15' },
+      { grantee: BRIDGE.ophelia.name, num: 1, den: 2, docNo: 'VM9-WD-001', deedDate: '1948-08-30' },
+      { grantee: BRIDGE.trust.name, num: 1, den: 4, docNo: 'VM9-WD-002', deedDate: '1953-12-08' },
+      { grantee: 'Bartholomew "Centurion" Pickens', num: 1, den: 4, docNo: 'VM9-WD-003', deedDate: '1959-05-15' },
     ],
   },
   {
-    code: 'CC10',
-    name: 'CC10 — Fried Dough Liquidation',
+    code: 'VM10',
+    name: 'VM10 — Roughneck Olympus',
     unitCode: 'B',
     unitName: UNIT_B_NAME,
     grossAcres: '320',
     pooledAcres: '320',
-    landDesc: 'J. Juggler Survey, Abstract 548, Walker County, Texas',
+    landDesc: 'J. Roughneck Olympus Survey, Abstract 548, Walker County, Texas',
     description:
-      'Cletus + LLC + two locals. Biggest Unit-B tract.',
+      'Buster + LLC + two locals. Biggest Unit-B tract.',
     patentee: 'Hortense "Trapeze" Wickersham',
     patentYear: 1874,
     primaryRoyalty: '1/4',
     owners: [
-      { grantee: BRIDGE.cletus.name, num: 1, den: 4, docNo: 'CC10-WD-001', deedDate: '1946-04-09' },
-      { grantee: BRIDGE.llc.name, num: 1, den: 4, docNo: 'CC10-WD-002', deedDate: '1951-08-26' },
-      { grantee: 'Algernon "Fire-Breather" Lipinski', num: 1, den: 4, docNo: 'CC10-WD-003', deedDate: '1957-01-31' },
-      { grantee: 'Mable "Dunk-Tank" Twiggs', num: 1, den: 4, docNo: 'CC10-WD-004', deedDate: '1964-06-13' },
+      { grantee: BRIDGE.cletus.name, num: 1, den: 4, docNo: 'VM10-WD-001', deedDate: '1946-04-09' },
+      { grantee: BRIDGE.llc.name, num: 1, den: 4, docNo: 'VM10-WD-002', deedDate: '1951-08-26' },
+      { grantee: 'Algernon "Fire-Breather" Lipinski', num: 1, den: 4, docNo: 'VM10-WD-003', deedDate: '1957-01-31' },
+      { grantee: 'Mable "Dunk-Tank" Twiggs', num: 1, den: 4, docNo: 'VM10-WD-004', deedDate: '1964-06-13' },
     ],
   },
 ];
@@ -362,7 +362,7 @@ const CC_TRACTS: TractPlan[] = [
 
 let nodeCounter = 0;
 function nextId(): string {
-  return `cc-${++nodeCounter}`;
+  return `vm-${++nodeCounter}`;
 }
 
 function buildTractNodes(
@@ -595,7 +595,7 @@ function patchBridgeOwnerEntityTypes(ownerData: OwnerWorkspaceData) {
 
 // ── Workspace builder ───────────────────────────────────
 
-export function buildCrackbabyWorkspaceData(): {
+export function buildVulcanMesaWorkspaceData(): {
   workspaceId: string;
   projectName: string;
   nodes: OwnershipNode[];
@@ -628,7 +628,7 @@ export function buildCrackbabyWorkspaceData(): {
 
   const rawNodes: OwnershipNode[] = [];
   const pdfMappings: PdfMapping[] = [];
-  for (const tract of CC_TRACTS) {
+  for (const tract of VM_TRACTS) {
     const built = buildTractNodes(tract, leaseOverrides, pdfPool);
     rawNodes.push(...built.nodes);
     pdfMappings.push(...built.pdfMappings);
@@ -640,14 +640,14 @@ export function buildCrackbabyWorkspaceData(): {
   const { nodes, ownerData } = buildSeedOwnerWorkspaceData(
     workspaceId,
     finalizedNodes,
-    'Crackbaby Carnival — Demo',
+    'Vulcan Mesa — Demo',
     { leaseOverridesByNodeId: leaseOverrides }
   );
   patchBridgeOwnerEntityTypes(ownerData);
 
   const ts = Date.now();
-  const deskMaps: DeskMap[] = CC_TRACTS.map((tract, index) => ({
-    id: `dm-crackbaby-${index + 1}-${ts}`,
+  const deskMaps: DeskMap[] = VM_TRACTS.map((tract, index) => ({
+    id: `dm-vulcan-mesa-${index + 1}-${ts}`,
     name: tract.name,
     code: tract.code,
     tractId: tract.code,
@@ -663,58 +663,58 @@ export function buildCrackbabyWorkspaceData(): {
   // ── ORRIs — one per basis, plus a tract-scope with a planted div-by-zero
   const leaseholdOrris: LeaseholdOrri[] = [
     {
-      id: 'cc-orri-1-unit-a-gross',
-      payee: 'Bearded Lady Override, LP',
+      id: 'vm-orri-1-unit-a-gross',
+      payee: 'Ares Override, LP',
       scope: 'unit',
       unitCode: 'A',
       deskMapId: null,
       burdenFraction: '1/32',
       burdenBasis: 'gross_8_8',
       effectiveDate: '2024-02-01',
-      sourceDocNo: 'CC-ORRI-1',
+      sourceDocNo: 'VM-ORRI-1',
       notes: 'Unit A gross-8/8 ORRI — exercises the gross_8_8 burden basis.',
       depthRange: 'all_depths',
     },
     {
-      id: 'cc-orri-2-unit-b-nri',
-      payee: 'Sideshow Royalty Holdings, LP',
+      id: 'vm-orri-2-unit-b-nri',
+      payee: 'Hermes Royalty Holdings, LP',
       scope: 'unit',
       unitCode: 'B',
       deskMapId: null,
       burdenFraction: '1/64',
       burdenBasis: 'net_revenue_interest',
       effectiveDate: '2024-02-15',
-      sourceDocNo: 'CC-ORRI-2',
+      sourceDocNo: 'VM-ORRI-2',
       notes: 'Unit B NRI-basis ORRI — exercises the net_revenue_interest burden basis.',
       depthRange: 'all_depths',
     },
     {
-      id: 'cc-orri-3-cc10-wi',
-      payee: 'Carny Override Co.',
+      id: 'vm-orri-3-vm10-wi',
+      payee: 'Centurion Override Co.',
       scope: 'tract',
       unitCode: null,
-      deskMapId: deskMapIdByCode.get('CC10') ?? null,
+      deskMapId: deskMapIdByCode.get('VM10') ?? null,
       burdenFraction: '1/80',
       burdenBasis: 'working_interest',
       effectiveDate: '2024-03-01',
-      sourceDocNo: 'CC-ORRI-3',
-      notes: 'Tract-scope WI-basis ORRI on CC10 — exercises the working_interest burden basis.',
+      sourceDocNo: 'VM-ORRI-3',
+      notes: 'Tract-scope WI-basis ORRI on VM10 — exercises the working_interest burden basis.',
       depthRange: 'all_depths',
     },
     {
-      id: 'cc-orri-4-cc5-broken',
-      payee: 'Quack Royalty Trust',
+      id: 'vm-orri-4-vm5-broken',
+      payee: 'Oracle Royalty Trust',
       scope: 'tract',
       unitCode: null,
-      deskMapId: deskMapIdByCode.get('CC5') ?? null,
+      deskMapId: deskMapIdByCode.get('VM5') ?? null,
       // Planted error #6 — malformed burden fraction (divide by zero). Strict
       // parser should fail and surface this as a Leasehold Input Error.
       burdenFraction: '1/0',
       burdenBasis: 'gross_8_8',
       effectiveDate: '2024-04-01',
-      sourceDocNo: 'CC-ORRI-4',
+      sourceDocNo: 'VM-ORRI-4',
       notes:
-        "PLANTED ERROR: burdenFraction '1/0' is malformed — should appear as a Leasehold Input Error on CC5.",
+        "PLANTED ERROR: burdenFraction '1/0' is malformed — should appear as a Leasehold Input Error on VM5.",
       depthRange: 'all_depths',
     },
   ];
@@ -722,22 +722,22 @@ export function buildCrackbabyWorkspaceData(): {
   // ── Assignments — both scopes, plus a planted over-assignment on Unit A
   const leaseholdAssignments: LeaseholdAssignment[] = [
     {
-      id: 'cc-asg-1-unit-a-60',
+      id: 'vm-asg-1-unit-a-60',
       assignor: OPERATOR,
-      assignee: 'Carney Brothers Operating, LLC',
+      assignee: 'Praetor Brothers Operating, LLC',
       scope: 'unit',
       unitCode: 'A',
       deskMapId: null,
       workingInterestFraction: '3/5',
       effectiveDate: '2024-03-01',
-      sourceDocNo: 'CC-ASG-1',
-      notes: 'Unit A 60% WI assignment to Carney Brothers.',
+      sourceDocNo: 'VM-ASG-1',
+      notes: 'Unit A 60% WI assignment to Praetor Brothers.',
       depthRange: 'all_depths',
     },
     {
-      id: 'cc-asg-2-unit-a-50',
+      id: 'vm-asg-2-unit-a-50',
       assignor: OPERATOR,
-      assignee: 'Tilt-A-Whirl Production Co.',
+      assignee: 'Minerva Draw Production Co.',
       scope: 'unit',
       unitCode: 'A',
       deskMapId: null,
@@ -745,30 +745,30 @@ export function buildCrackbabyWorkspaceData(): {
       // assigned. Should fire the Over-assigned warning on every Unit A tract.
       workingInterestFraction: '1/2',
       effectiveDate: '2024-04-01',
-      sourceDocNo: 'CC-ASG-2',
+      sourceDocNo: 'VM-ASG-2',
       notes:
         "PLANTED ERROR: this Unit A 50% WI assignment, combined with the 60% above, totals 110% WI — should appear as Over-assigned on Unit A tracts.",
       depthRange: 'all_depths',
     },
     {
-      id: 'cc-asg-3-cc10-25',
+      id: 'vm-asg-3-vm10-25',
       assignor: OPERATOR,
-      assignee: 'Bearded Lady Production Co.',
+      assignee: 'Ares Production Co.',
       scope: 'tract',
       unitCode: null,
-      deskMapId: deskMapIdByCode.get('CC10') ?? null,
+      deskMapId: deskMapIdByCode.get('VM10') ?? null,
       workingInterestFraction: '1/4',
       effectiveDate: '2024-05-01',
-      sourceDocNo: 'CC-ASG-3',
-      notes: 'Tract-scope 25% WI assignment on CC10 — exercises tract-scope WI flow.',
+      sourceDocNo: 'VM-ASG-3',
+      notes: 'Tract-scope 25% WI assignment on VM10 — exercises tract-scope WI flow.',
       depthRange: 'all_depths',
     },
   ];
 
   const leaseholdUnit: LeaseholdUnit = {
-    name: 'Crackbaby Carnival Unit',
+    name: 'Vulcan Mesa Unit',
     description:
-      'Two non-pooled units (Funnel Cake — A, Tilt-A-Whirl — B) of five tracts each in Walker County, TX. Same operator covers both; several mineral owners hold interests across both units.',
+      'Two non-pooled units (Jupiter Flats — A, Minerva Draw — B) of five tracts each in Walker County, TX. Same operator covers both; several mineral owners hold interests across both units.',
     operator: OPERATOR,
     effectiveDate: '2024-01-01',
     jurisdiction: 'tx_fee',
@@ -776,7 +776,7 @@ export function buildCrackbabyWorkspaceData(): {
 
   return {
     workspaceId,
-    projectName: `Crackbaby Carnival — Demo (${deskMaps.length} Tracts, ${nodes.length} nodes)`,
+    projectName: `Vulcan Mesa — Demo (${deskMaps.length} Tracts, ${nodes.length} nodes)`,
     nodes,
     deskMaps,
     leaseholdUnit,
@@ -793,11 +793,11 @@ export function buildCrackbabyWorkspaceData(): {
 
 // ── Public seed entry point ─────────────────────────────
 
-export async function seedCrackbabyCarnivalData(): Promise<{
+export async function seedVulcanMesaData(): Promise<{
   nodeCount: number;
   pdfCount: number;
 }> {
-  const workspace = buildCrackbabyWorkspaceData();
+  const workspace = buildVulcanMesaWorkspaceData();
 
   useWorkspaceStore.getState().loadWorkspace({
     workspaceId: workspace.workspaceId,
@@ -821,7 +821,7 @@ export async function seedCrackbabyCarnivalData(): Promise<{
   }
 
   console.log(
-    `[crackbaby] Built ${workspace.nodes.length} nodes, attached ${pdfCount} PDFs, ${workspace.deskMaps.length} desk maps`
+    `[vulcan-mesa] Built ${workspace.nodes.length} nodes, attached ${pdfCount} PDFs, ${workspace.deskMaps.length} desk maps`
   );
   console.table(PLANTED_ERRORS);
   return { nodeCount: workspace.nodes.length, pdfCount };
@@ -831,29 +831,29 @@ export async function seedCrackbabyCarnivalData(): Promise<{
 
 export const PLANTED_ERRORS = [
   {
-    where: 'CC2 patent root',
+    where: 'VM2 patent root',
     what: 'Children sum past 100% of the whole tract',
-    expect: 'Over-conveyance warning on Desk Map for CC2',
+    expect: 'Over-conveyance warning on Desk Map for VM2',
   },
   {
-    where: 'CC3 fixed NPRIs',
+    where: 'VM3 fixed NPRIs',
     what: '1/2 + 1/4 fixed NPRIs of the whole tract stacked above 1/4 royalty',
-    expect: 'Over-burdened chip on CC3 Leasehold summary',
+    expect: 'Over-burdened chip on VM3 Leasehold summary',
   },
   {
-    where: "CC4 Cletus's lease",
+    where: "VM4 Buster's lease",
     what: "royaltyRate '1/6.5' (malformed)",
-    expect: 'Leasehold Input Error chip on CC4',
+    expect: 'Leasehold Input Error chip on VM4',
   },
   {
-    where: 'CC5 tract ORRI (cc-orri-4-cc5-broken)',
+    where: 'VM5 tract ORRI (vm-orri-4-vm5-broken)',
     what: "burdenFraction '1/0' (divide by zero)",
-    expect: 'Leasehold Input Error chip on CC5 ORRI list',
+    expect: 'Leasehold Input Error chip on VM5 ORRI list',
   },
   {
-    where: "CC7 Cletus's leases",
+    where: "VM7 Buster's leases",
     what: 'Original 2024 lease + 2025 top-lease, overlapping date ranges',
-    expect: 'Lease Overlap warning on CC7 Desk Map card + Leasehold summary',
+    expect: 'Lease Overlap warning on VM7 Desk Map card + Leasehold summary',
   },
   {
     where: 'Unit A WI assignments',
