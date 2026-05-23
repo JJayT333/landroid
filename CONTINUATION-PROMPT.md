@@ -8,15 +8,17 @@ Use this file to resume the active workstream in a new chat. Read it with
 ## Current Branch
 
 Current checked-out branch:
-`codex/audit-pass-a-2026-05-20`.
+`codex/phase-0-reconcile-2026-05-23`.
 
 Do not commit directly to `main` unless the user explicitly asks for a direct
 main push/deploy.
 
 ## Current Workstream
 
-AI/security/structure/performance audit remediation has started. Phase 0 plus
-the first Phase 1 AI safety chunks are implemented on this branch.
+Phase 0 rebuild planning reconciliation is active on this branch. This is a
+docs-only workstream: adopt Claude's `docs/phase-0-inventory.md` as the draft
+master Phase 0 inventory, verify the highest-risk rows, and update the
+source-of-truth docs without starting app-code implementation.
 
 Rebuild planning is now documented and amended, but implementation has not
 started. The current planning source of truth is `docs/rebuild-plan.md`. It
@@ -40,21 +42,24 @@ future-proofing should be decided immediately after Phase 0.
 
 Current agreed rebuild sequence:
 
-1. Run a Phase 0 ultra-review focused only on current-behavior capture,
-   inventory lanes, fixture plan, golden masters, performance baselines, and
-   Phase 0 exit criteria.
+1. Reconcile `docs/phase-0-inventory.md` as the working Phase 0 master
+   inventory. It contains lane rows, cross-lane contracts, coverage gaps,
+   reference workspace plans, golden-master plans, and performance baseline
+   plans. Treat it as a draft until high-risk rows are verified.
 2. Execute Phase 0 lane by lane under one lead source-of-truth thread. Secondary
    agents may perform read-only lane reviews, but they should not create
    competing master plans.
-3. Revisit the rebuild direction after Phase 0 because current-state findings
-   may change the best sequence.
-4. Run Phase 0.75 backend architecture decision before Phase 0.5 storage work
-   or Phase 1 schema implementation. If approved, add a backend spine for
-   durable records, object storage, OCR/index/export jobs, search, AI/RAG
-   policy, audit logs, backup/sync, and future permissions while keeping
-   `.landroid` package export mandatory.
-5. Continue to Phase 0.5 storage sharding or backend-spine foundation depending
-   on the Phase 0.75 decision.
+3. Close Phase 0 with checked-in inventory, frozen or documented reference
+   workspaces, expected outputs, performance baselines, manual smoke checks,
+   missing coverage, and validation status.
+4. Phase 0.75 backend decision is now: backend architecture approved in
+   principle; backend implementation deferred until OCR/search/sync scale,
+   live sharing, a second user, or browser storage limits force it. Phase 0.5
+   through Phase 6 must be local-first and backend-ready.
+5. Phase 0.5 storage sharding remains the first implementation phase after
+   Phase 0 closes: sharded Dexie rows, multi-tab protection, persistent-storage
+   request for PWA/iPad where supported, lazy PDF loading, canvas viewport
+   persistence, autosave timing, and Raven Forest iPad Pro-class scale.
 
 Primary report:
 
@@ -96,7 +101,28 @@ The full runsheet walkthrough wizard has not been started.
 
 ## Latest Validation
 
-Commands run on this branch:
+Commands run on this branch before this reconciliation remain from the prior
+audit/rebuild-planning handoff. Current docs-only reconciliation validation:
+
+- `git diff --check -- *.md docs/**/*.md` - passed.
+- `rg -n "[ \t]+$" docs/phase-0-inventory.md docs/phase-0-ultrareview-prompt.md`
+  - passed after removing one trailing space from the inventory draft.
+- Targeted inventory-risk tests passed:
+  - `npm test -- src/components/deskmap/__tests__/deskmap-coverage.test.ts src/storage/__tests__/workspace-persistence.test.ts src/storage/__tests__/document-migration.test.ts`
+    - passed, 3 files / 54 tests.
+  - `npm test -- src/ai/__tests__/read-only-tools.test.ts src/ai/__tests__/approval-preview.test.ts src/documents/__tests__/document-registry.test.ts src/storage/__tests__/federal-lease-seed.test.ts src/federal-leasing/__tests__/federal-lease-tracking.test.ts`
+    - passed, 5 files / 22 tests.
+  - `npm test -- src/storage/__tests__/autosave-change-detection.test.ts src/storage/__tests__/workspace-side-store-reset.test.ts src/storage/__tests__/document-store.test.ts`
+    - passed, 3 files / 5 tests.
+  - `npm test -- src/store/__tests__/workspace-store-doc-actions.test.ts src/engine/__tests__/fraction-display.test.ts src/storage/__tests__/runsheet-export.test.ts`
+    - passed, 3 files / 40 tests.
+- `npm run lint` - passed.
+- `npm test` - passed, 78 files / 627 tests. Existing intentional stderr
+  coverage for simulated Dexie failures appeared.
+- `npm run build` - passed with existing Vite dynamic/static import warnings,
+  chunk-size warning, and Node `module.register()` deprecation warning.
+
+Prior validation from the audit/rebuild-planning checkpoint:
 
 - `npm run lint` - passed.
 - Red/green targeted checks:
@@ -136,17 +162,27 @@ Commands run on this branch:
 
 ## Top Findings To Carry Forward
 
-- P0 before rebuild: Phase 0 must now produce frozen reference workspaces,
-  atomic behavior catalog rows, measured performance baselines, and CI-running
-  golden masters before Phase 1 implementation starts.
+- P0 before rebuild: `docs/phase-0-inventory.md` is the draft master behavior
+  inventory. It still needs lead-thread verification for high-risk rows,
+  reference fixture creation, performance baseline capture, and source-doc
+  cross-links before Phase 0 can be called done.
 - P0.5 before rebuild schema work: workspace persistence needs sharding inside
-  Dexie before broad record-schema work, so Raven Forest scale does not depend
-  on one large autosaved workspace payload, unless Phase 0.75 approves a
-  backend path that changes the storage foundation.
-- P0.75: Backend should be decided after Phase 0, not guessed before it. The
-  backend can improve durability, OCR/jobs, search, AI/RAG, audit, backup/sync,
-  and future permissions, but it also adds APIs, migrations, auth, deployment,
-  cost, monitoring, and security responsibilities.
+  Dexie before broad record-schema work so Raven Forest scale does not depend
+  on one large autosaved JSON workspace row. Phase 0.5 must also cover
+  multi-tab protection, persistent-storage requests for PWA/iPad where
+  supported, lazy PDF loading, canvas viewport persistence, autosave timing, and
+  an iPad Pro-class Raven Forest scale gate.
+- P0.75: Backend architecture is approved in principle, but implementation is
+  deferred until OCR/search/sync scale, live sharing, a second user, or browser
+  storage limits force it. Phase 0.5 through Phase 6 must be local-first and
+  backend-ready.
+- Product direction: LANDroid is hosted web first with PWA/iPad support; native
+  iOS and desktop installers are deferred. Complete `.landroid` export remains
+  permanent.
+- Later product lanes to preserve but not start during Phase 0: template-driven
+  communications, field/iPad mode, universal Cmd+K search, inline AI entry
+  points, persistent workspace chat, three-pane Documents, rolling auto-export,
+  and storage health indicators.
 - P1: The Document Vault plan now means evidence-grade durability: immutable
   originals, hashes, document versions, extraction runs, citation anchors,
   deterministic manifests, and audit-event continuity.
@@ -162,10 +198,16 @@ Commands run on this branch:
 
 ## Open Risks And Assumptions
 
-- This branch now contains Phase 0 source/docs remediation plus the original
-  audit report artifact, AI approval-preview/action-journal foundation work, and
-  map upload hardening, plus an undeployed hosted proxy policy hardening change,
-  plus a docs-only rebuild-plan amendment pass.
+- This branch contains docs-only Phase 0 reconciliation. Do not start app code,
+  fixture generation, demo rename implementation, sharding, backend, or the
+  runsheet walkthrough wizard unless the user explicitly redirects.
+- `docs/phase-0-inventory.md` and `docs/phase-0-ultrareview-prompt.md` came in
+  as untracked Claude/session artifacts. The inventory is now being adopted as
+  the draft master Phase 0 inventory; the prompt remains supporting context.
+- Current source search verified most top-risk inventory claims. Correction:
+  the v7 document migration records orphaned node IDs and uses a fallback
+  workspace path; a literal `__orphaned_pre_v8__` workspace was not found in
+  current source during reconciliation.
 - `docs/landroid-rebuild-plan-reviews.pdf` is currently untracked local input
   from the user; do not delete or commit it unless the user explicitly asks.
 - The action journal is in-memory session context, not a durable audit log.
@@ -176,68 +218,39 @@ Commands run on this branch:
 - The full runsheet import-session / walkthrough wizard is still open and should
   not be started without explicit direction.
 - SQLite/OPFS, Tauri 2, cloud object storage, and cloud OCR are documented
-  decision gates only; they are not approved implementation defaults.
-- Backend implementation is not approved until Phase 0 evidence is captured and
-  Phase 0.75 produces a written go/no-go plus updated security/deployment/test
-  docs.
+  decision gates only; they are not Phase 1 defaults.
+- Backend implementation is not authorized to start yet. Backend architecture
+  is approved in principle, but build is deferred until a documented hard
+  trigger and security/deployment/test updates.
 - MCP servers are relevant later for external systems such as county records,
   OCR, GIS, storage vaults, or backend-only connectors, but should not bypass
   LANDroid approval/undo/audit boundaries.
 
 ## Likely Next Steps
 
-- If continuing rebuild planning, run the Phase 0 ultra-review next. Do not run
-  another broad rebuild audit first.
-- If starting rebuild work after the Phase 0 ultra-review, start with the Phase
-  0 inventory in
-  `docs/rebuild-plan.md`: document each page's current workflows, backing
-  stores/helpers, existing tests, missing tests, migration risks, manual smoke
-  checks, reference workspace fixtures, and performance baselines before
-  changing behavior.
-- After Phase 0, run Phase 0.75 backend architecture decision and then revisit
-  the rebuild plan before Phase 0.5 or Phase 1 implementation.
-- Continue the Phase 1 AI foundation in small steps:
-  - make result summaries more domain-specific where tool outputs are richer,
-  - decide whether any action-journal records should become durable audit
-    records later.
-- Then choose the next hardening item:
-  - document attachment ordering scoped by workspace,
-  - structured runsheet import-session model.
+- Review the docs diff for consistency and decide whether to commit
+  `docs/phase-0-inventory.md` as the Phase 0 master draft.
+- Next Phase 0 work after docs reconciliation: generate/freeze reference
+  workspaces, capture expected outputs, capture performance baselines, and mark
+  remaining inventory rows as verified or `needs verification`.
+- Before any external sharing, rename the Crackbaby Carnival demo fixture to a
+  professional Texas-funny name chosen by the user.
 - Do not start the full runsheet walkthrough wizard unless the user explicitly
   redirects to that scope.
 
 ## Paste-Ready Next Chat Prompt
 
 Resume in `/Users/abstractmapping/projects/landroid` on
-`codex/audit-pass-a-2026-05-20`. Read `AGENTS.md`, `PROJECT_CONTEXT.md`,
+`codex/phase-0-reconcile-2026-05-23`. Read `AGENTS.md`, `PROJECT_CONTEXT.md`,
 `docs/README.md`, `DEPLOYMENT_STATE.md`, and `CONTINUATION-PROMPT.md` first.
-Pass A is `docs/archive/audits/AI_SECURITY_STRUCTURAL_AUDIT_2026-05-20.md`.
-Phase 0 is implemented: AI undo fail-closed, future `.landroid` version
-rejection, rollback-safe `.landroid` side-store replacement, focused Leasehold
-ORRI/WI unit filtering, and NPRI `needs_question` row staging. The first Phase 1
-AI foundation chunk is also implemented: structured approval details,
-typed before/after approval previews, graph-validation previews, blocked-preview
-approval refusal, in-memory applied/failed/undone action journal, future local
-model context from approved results, journal visibility in the AI panel, and
-journal clearing on workspace replacement. Hosted proxy source now rejects
-client-supplied `tools` / `tool_choice` fields before usage charging; Lambda
-changes still need manual bundle/upload to deploy. Map uploads now enforce a
-passive allowlist and validate PDF bytes before save/preview.
-Rebuild planning has been amended in `docs/rebuild-plan.md`, `ROADMAP.md`,
-`IDEAS.md`, `ARCHITECTURE.md`, `TESTING.md`, `SECURITY.md`, `docs/README.md`,
-and proposed ADRs 0005-0008 after reading the side-by-side review PDF and the
-user's Phase 0/backend sequencing decision. The amended plan keeps the
-incremental approach but renames the target to project record schema, adds the
-Phase 0 ultra-review process, sectioned Phase 0 execution, Phase 0.75 backend
-architecture decision, Phase 0.5 workspace sharding, stronger Phase 0 exit
-gates, the Evidence Vault contract, `MathInputView`, `CitationVerifier`,
-OCR/citation-anchor sequencing, attorney/eDiscovery packet sidecars,
-print/migration/multi-tab contracts, and explicit SQLite/Tauri/cloud/backend
-decision gates. Latest validation passed:
-`npm run lint`, targeted Phase 0/action-journal/approval-preview tests,
-backend proxy tests/build, targeted map upload tests, `npm test`,
-`npm run build`, `npm run test:e2e`, and
-`git diff --check -- *.md docs/**/*.md`.
-Do not start the full runsheet walkthrough wizard unless explicitly directed.
-Recommended next step is the Phase 0 ultra-review, then sectioned Phase 0
-inventory/golden-master work, then Phase 0.75 backend go/no-go.
+This is a docs-only Phase 0 reconciliation branch. `docs/phase-0-inventory.md`
+is being adopted as the draft master Phase 0 inventory after Claude's lane
+review. Source docs now need to reflect: backend approved in principle but
+deferred until OCR/search/sync or another hard trigger; LANDroid remains
+local-first, hosted-web/PWA first, with `.landroid` export permanent; Phase 0.5
+must shard Dexie storage, add multi-tab protection, persistent-storage request,
+lazy PDF loading, canvas viewport persistence, autosave timing, and iPad
+Pro-class Raven Forest scale; Phase 1 records must be backend-ready. Do not
+start app code, fixtures, demo rename implementation, backend, sharding, or the
+runsheet walkthrough wizard unless explicitly directed. Current docs validation
+passed with `git diff --check -- *.md docs/**/*.md`.

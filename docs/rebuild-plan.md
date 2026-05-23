@@ -635,6 +635,16 @@ Suggested Phase 0 lanes:
 The Phase 0 output should be a checked-in behavior catalog and fixture plan,
 not an implementation branch.
 
+Current Phase 0 master draft:
+
+- `docs/phase-0-inventory.md`
+
+That inventory was produced as a read-only review artifact on `main` and is the
+working catalog for Phase 0. It should be treated as a draft master inventory
+until the lead thread verifies the highest-risk rows against code and marks
+uncertain rows as `needs verification`. Secondary review agents may contribute
+lane findings, but this file remains the single consolidation target.
+
 ### Phase 0: Current Behavior Inventory And Golden Masters
 
 Goal: freeze the current observable behavior before rebuilding foundations.
@@ -642,6 +652,8 @@ Goal: freeze the current observable behavior before rebuilding foundations.
 Required work:
 
 - inventory every page and major workflow with atomic, testable behavior rows
+- reconcile the `docs/phase-0-inventory.md` draft into the checked-in master
+  catalog, preserving stable lane IDs and explicit coverage status
 - define acceptance checks for each page
 - freeze at least one reference workspace per major demo/project shape, export
   it, checksum it, and capture expected outputs as JSON where practical
@@ -653,6 +665,12 @@ Required work:
 - record implicit behavior such as sort orders, default filters, warning
   thresholds, autosave timing, destructive confirmations, and print/page layout
 - record known gaps instead of pretending they are covered
+- verify the highest-risk current-behavior claims before treating them as
+  binding: monolithic workspace storage, multi-tab overwrite risk, canvas
+  viewport persistence, lease-allocation tie-breaks, AI mutating-tool undo
+  coverage, legacy document migration/orphan handling, federal math isolation,
+  unit-focus transfer-order behavior, packet manifest behavior, and performance
+  baseline gaps
 
 Exit gate:
 
@@ -666,19 +684,33 @@ Exit gate:
 
 ### Phase 0.75: Backend Architecture Decision
 
-Goal: decide, with Phase 0 evidence in hand, whether LANDroid should add a
-backend spine before Phase 1 schema implementation.
+Goal: record the backend architecture decision with Phase 0 evidence in hand,
+without starting backend implementation prematurely.
 
-This gate occurs immediately after Phase 0, before Phase 0.5 storage work,
-because a backend decision may change what storage sharding needs to do.
+Decision:
+
+- backend architecture is approved in principle
+- backend implementation is deferred until OCR/search/sync scale forces it,
+  expected no earlier than Phase 2.5 unless a hard trigger appears first
+- Phase 0.5 and Phase 1 must be built local-first and backend-ready so the
+  later backend is a sync/job/search layer, not a rewrite
+
+This gate occurs immediately after Phase 0 and before Phase 0.5 storage work
+because the backend-ready decision changes what storage sharding needs to
+preserve.
 
 Default assumption:
 
 - local-first project semantics and `.landroid` package export remain mandatory
-- the backend, if added, supports durability, jobs, search, AI, sync, and future
-  collaboration; it does not erase the project-package model
+- LANDroid is a hosted web app first, with PWA/iPad support as a product
+  target; native iOS and desktop installers are deferred unless a later decision
+  gate proves they are necessary
+- the backend supports sync, backup, jobs, search, AI/RAG, sharing, and future
+  collaboration; it does not erase the local project package model
+- the app must remain functional without network access for core title, math,
+  document, and project workflows
 
-Backend responsibilities if approved:
+Backend responsibilities when implementation is triggered:
 
 - durable project-record storage
 - object storage for original documents, derivatives, and packet artifacts
@@ -691,7 +723,19 @@ Backend responsibilities if approved:
 - future multi-user permission boundaries
 - future cross-project party identity indexes
 
-Decision questions:
+Backend-ready requirements for Phase 0.5 through Phase 6:
+
+- stable record IDs across stores and exports
+- `workspaceId` scoping on every persisted project record
+- `lastModified` / version metadata where records can sync later
+- content-hash addressing for document blobs and vault objects
+- sharded per-record or per-table local storage instead of one workspace JSON
+  payload
+- local mutation/action records where practical so later sync can send
+  intentional changes instead of opaque snapshots
+- `.landroid` export remains complete regardless of sync status
+
+Implementation trigger questions:
 
 - does Phase 0 show browser-only persistence is already too fragile for the
   expected project size?
@@ -703,7 +747,7 @@ Decision questions:
 - what stays available offline, and what requires network access?
 - how will `.landroid` package export remain complete and attorney-defensible?
 
-Likely backend shape if approved:
+Likely backend shape when triggered:
 
 ```text
 Frontend: React/Vite LANDroid
@@ -728,15 +772,19 @@ Tradeoff:
 
 Exit gate:
 
-- written backend go/no-go decision
+- written backend decision: approved in principle, build deferred until a hard
+  trigger
 - backend responsibilities and non-responsibilities documented
 - local-first/export contract reaffirmed
-- if backend is approved, update ADRs and phase order before Phase 1 starts
+- backend-ready record requirements added to Phase 0.5 and Phase 1 acceptance
+  criteria
+- security, deployment, and testing docs updated before any backend
+  implementation starts
 
 ### Phase 0.5: Workspace Storage Sharding
 
 Goal: remove the scale risk of one large workspace payload before rebuilding
-domain foundations.
+domain foundations and prove Raven Forest scale on iPad-class hardware.
 
 Required work:
 
@@ -751,6 +799,14 @@ Required work:
 - add migration/backup handling for in-flight projects
 - add multi-tab detection or a workspace write lock before concurrent writes can
   silently overwrite each other
+- extract the autosave debounce timing into a named constant before changing
+  persistence topology
+- persist canvas viewport state across reload if Phase 0 confirms the current
+  behavior is memory-only
+- request persistent browser storage for PWA/iPad use when the platform allows
+  it
+- lazy-load document/PDF blobs from IndexedDB; never load a full document set
+  into memory merely to open a workspace
 
 Exit gate:
 
@@ -758,6 +814,10 @@ Exit gate:
 - `.landroid` round trip and side-store reset tests pass
 - autosave performance is measured against the Phase 0 baseline
 - multi-tab conflict behavior is tested or explicitly blocked
+- Raven Forest-scale fixture target is exercised on iPad Pro-class hardware or
+  an explicitly documented equivalent: 1,000-3,000 title nodes and 200-1,000
+  document records/PDFs without full-blob workspace rewrites
+- `.landroid` export remains usable as the backup/escape hatch after sharding
 
 ### Phase 1: Project Record Schema Foundations
 
@@ -778,12 +838,48 @@ Required work:
 - keep current Zustand stores operational
 - add adapter/projection helpers instead of forcing a UI migration
 - add Zod schemas at import/export boundaries
+- design records as backend-ready even though the backend is deferred: stable
+  IDs, `workspaceId`, `lastModified` / version fields where needed, and
+  content-hash references for blob-backed records
+- add a guard so every mutating AI tool that can change project state is covered
+  by the approval/undo policy
+- make Texas/federal/private isolation a `MathInputView` projection
+  precondition instead of relying on scattered per-surface filters
 
 Exit gate:
 
 - no UI behavior changes
 - type-level tests and serialization tests pass
 - `.landroid` migration strategy is documented before format changes
+- `MathInputView` preserves Phase 0 display/math contracts, including dual
+  decimal plus fraction display, lease allocation order, warning-only states,
+  and jurisdiction isolation
+
+### Planned Product Lanes Outside Phase 0
+
+These are accepted rebuild-planning lanes, not Phase 0 blockers and not
+approval to implement them immediately:
+
+- template and communication generation: a workspace template library using
+  `.docx` templates with `{{variable}}` placeholders, a variable manifest
+  sidecar, manual fill fallback, AI-assisted fill through approval previews, and
+  generated output saved back to the Evidence Vault
+- field/iPad mode: read-heavy, light-edit PWA workflows optimized for courthouse
+  and field use, with offline operation and Ollama/local AI as the offline path
+- universal search / command palette: cross-surface search over owners,
+  documents, instruments, leases, curative issues, research records, maps, and
+  project records
+- inline AI entry points: right-click or contextual "Ask AI about this" on
+  cards, rows, chips, documents, and fractional values, using the selected
+  entity as grounded context
+- persistent workspace chat history, stored locally and exportable with the
+  project when intended
+- three-pane Documents workflow: filter tree, dense document list, metadata and
+  preview panel, with professional document-management patterns rather than
+  modal-heavy review
+- rolling auto-export and storage health surfaces: user-selected backup folder
+  where supported, timestamped `.landroid` snapshots, last-saved / last-exported
+  status, and visible IndexedDB/storage warnings
 
 ### Phase 2: Document Vault And Packet Model
 

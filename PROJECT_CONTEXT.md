@@ -10,6 +10,20 @@ The system prioritizes:
 Performance and maintainability are prioritized over rapid feature expansion.
 The active application surface currently lives at the repository root.
 
+## Product posture
+
+LANDroid is planned as a hosted web app first, with PWA/iPad support as a
+product target. The architecture remains local-first: core title, ownership,
+document, project, and math workflows must remain usable without network access
+where practical. Complete `.landroid` package export is a permanent escape hatch
+and must not be removed by future backend/sync work.
+
+Backend architecture is approved in principle but implementation is deferred
+until a hard trigger such as OCR/search scale, multi-device sync, live sharing,
+second-user access, or browser storage limits. Until then, rebuild work should
+make data backend-ready without turning the backend into the immediate source of
+truth.
+
 ## Jurisdictional scope
 LANDroid is **Texas-only for math today**. Texas fee and Texas state leases are the only jurisdictions modeled in calculation logic, leasehold review, and title-math UI today.
 

@@ -11,10 +11,13 @@ summarizes how the app is put together and where changes should live.
 - Persistence: IndexedDB/Dexie helpers in `src/storage`, plus browser storage
   for selected local settings.
 - Target storage planning: keep Dexie as the current runtime path, add
-  workspace sharding before broad rebuild work unless the Phase 0.75 backend
-  decision changes that path, and treat SQLite/OPFS, Tauri/native filesystem,
-  backend object storage, or cloud object storage as explicit decision gates,
-  not current defaults.
+  workspace sharding before broad rebuild work, design records as
+  backend-ready, and treat SQLite/OPFS, Tauri/native filesystem, backend object
+  storage, or cloud object storage as explicit implementation gates, not
+  current defaults.
+- Runtime target: hosted web app first, with PWA/iPad support as a product
+  target. Native iOS and desktop installers are deferred unless a later
+  decision gate proves they are needed.
 - Math: Decimal.js through `src/engine`.
 - Graph/canvas: React Flow and ELK for flowchart layout.
 - AI: Vercel AI SDK adapters in `src/ai`; Ollama is the default provider.
@@ -90,14 +93,22 @@ Target rebuild boundaries:
   persistence should have adapter boundaries before any backend/cloud or Tauri
   pivot becomes the source of truth.
 - Backend spine: after Phase 0, LANDroid has a decision gate for whether to add
-  backend infrastructure before Phase 1 schema implementation. If approved, the
-  backend owns durable project records, object storage, background jobs, search,
-  AI/RAG policy, audit logs, backup/sync, and future permissions while keeping
-  local project semantics and `.landroid` export mandatory.
+  backend infrastructure. The current decision is backend-approved in
+  principle, implementation deferred until OCR/search/sync or another hard
+  trigger forces it. The backend supports sync, backup, object storage,
+  background jobs, search, AI/RAG policy, audit logs, sharing, and future
+  permissions while keeping local project semantics and `.landroid` export
+  mandatory.
 
 Target projections include Desk Map, Runsheet, Leasehold, Documents, Owners,
 Curative, packet export, AI context, `OpinionDraft`, `ObligationCalendar`, and
 `AbstractorPackage`.
+
+Backend-ready rebuild records should carry stable IDs, `workspaceId` scoping,
+`lastModified` / version metadata where needed, and content-hash references for
+blob-backed evidence. This lets a later backend sync engine move intentional
+records and action/audit data instead of reverse-engineering opaque workspace
+snapshots.
 
 ## Data Flow
 
@@ -153,23 +164,27 @@ outputs against existing golden masters before any cutover.
 Persistence helpers live under `src/storage`. Import paths must treat external
 files as untrusted input.
 
-Current persistence is browser-local. Planned storage changes must follow the
-staged trajectory in `docs/rebuild-plan.md`:
+Current persistence is browser-local and local-first remains a product
+invariant. Planned storage changes must follow the staged trajectory in
+`docs/rebuild-plan.md`:
 
 1. Shard current workspace persistence inside Dexie.
 2. Keep `.landroid` snapshots/packages loadable with migration/backup rules.
-3. Evaluate SQLite/OPFS only after query/search needs justify it.
-4. Consider Tauri/native filesystem only when local OCR process control,
+3. Add multi-tab protection, persistent-storage requests for PWA/iPad where
+   supported, lazy document/PDF blob loading, and measured Raven Forest-scale
+   behavior before calling Phase 0.5 complete.
+4. Evaluate SQLite/OPFS only after query/search needs justify it.
+5. Consider Tauri/native filesystem only when local OCR process control,
    Finder-visible project packages, native SQLite, or corpus size forces it.
 
 Document originals, checksums, and source metadata are canonical. OCR text,
 embeddings, FTS rows, page images, and packet exports are derived artifacts that
 must be rebuildable from the canonical vault state.
 
-If Phase 0.75 approves a backend spine, this staged trajectory must be revised
-before Phase 1. The backend should make storage, jobs, search, and AI policy
-more durable; it should not make the app unable to produce a complete local
-project package.
+The approved-but-deferred backend should make sync, backup, jobs, search,
+sharing, and AI policy more durable. It must not make the app unusable offline
+for core workflows, and it must not make LANDroid unable to produce a complete
+local project package.
 
 Generated folders are not source of truth:
 

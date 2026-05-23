@@ -3,6 +3,21 @@
 This file records meaningful project changes so `CONTINUATION-PROMPT.md` can
 stay short.
 
+## 2026-05-23
+
+- Reconciled the Phase 0 planning track around `docs/phase-0-inventory.md` as
+  the draft master behavior inventory, with cross-links from the rebuild plan,
+  testing policy, roadmap, architecture, security notes, docs map, ADRs, and
+  continuation handoff.
+- Recorded the backend decision for rebuild planning: backend architecture is
+  approved in principle, implementation is deferred until OCR/search/sync scale
+  or another hard trigger, and Phase 0.5 through Phase 6 must stay local-first
+  while using backend-ready record shapes.
+- Added Phase 0.5 planning gates for sharded Dexie storage, multi-tab
+  protection, autosave timing, canvas viewport persistence, PWA/iPad persistent
+  storage, lazy PDF loading, and Raven Forest-scale validation on iPad-class
+  hardware or a documented equivalent.
+
 ## 2026-05-20
 
 - Started audit remediation Phase 0: AI undo snapshot capture now fails closed

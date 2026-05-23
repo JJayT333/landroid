@@ -23,7 +23,8 @@ npm run test:e2e
 | Document registry or packet-preview change | `npm run lint`, `npm test -- src/documents/__tests__/document-registry.test.ts src/storage/__tests__/document-store.test.ts src/storage/__tests__/workspace-persistence.test.ts src/storage/__tests__/document-migration.test.ts src/store/__tests__/workspace-store-doc-actions.test.ts`, plus browser smoke for navigation/inspector changes |
 | Rebuild schema/storage/vault planning change | docs diff check, then update `docs/rebuild-plan.md`, `ARCHITECTURE.md`, `ROADMAP.md`, `TESTING.md`, `SECURITY.md`, and `CONTINUATION-PROMPT.md` together |
 | Phase 0 inventory lane | document current behavior, identify existing tests, list missing tests, define golden-master fixture expectations, record manual smoke steps, and run the smallest existing validation command that proves the inspected behavior |
-| Backend architecture decision | docs diff check, threat-model/security review notes, data-flow/API boundary review, local/export contract review, and explicit go/no-go before backend implementation |
+| Phase 0 inventory reconciliation | docs diff check, verify highest-risk inventory rows against code before marking them binding, and update `docs/rebuild-plan.md`, `docs/phase-0-inventory.md`, `ROADMAP.md`, `ARCHITECTURE.md`, `SECURITY.md`, and `CONTINUATION-PROMPT.md` together |
+| Backend architecture decision | docs diff check, threat-model/security review notes, data-flow/API boundary review, local/export contract review, backend-ready local schema review, and explicit implementation trigger before backend coding |
 | Evidence vault, OCR, packet, or AI citation implementation | `npm run lint`, relevant storage/document tests, package round-trip tests, citation-verifier tests, AI tests when answer behavior changes, and targeted browser/e2e smoke for impacted flows |
 | AI tool/provider change | `npm run lint`, AI tests, relevant wizard/tool tests, approval-queue tests, and rollback check |
 | Hosted AI proxy/deploy change | `npm run deploy:check`, `cd backend/ai-proxy && npm test && npx tsc -p tsconfig.json --noEmit`, plus root `npm test` if frontend policy changes; run `bash scripts/smoke-test-hosted.sh` when network/AWS access is available |
@@ -70,6 +71,13 @@ Do not describe a workflow as verified unless it is active in
 - Phase 0 should be executed lane by lane under one master behavior catalog.
   Secondary agent reviews are useful only as read-only lane reviews; the lead
   inventory thread should reconcile findings into the source-of-truth docs.
+- The working master behavior catalog is `docs/phase-0-inventory.md`. Treat it
+  as a draft until high-risk rows are verified and uncertain rows are marked
+  `needs verification`.
+- Before Phase 0.5 starts, the catalog must identify committed or documented
+  reference workspaces for the demo fixture, a Raven Forest-scale fixture, and a
+  migration-stress `.landroid`; each needs a checksum policy and expected
+  output plan.
 
 ## Regression Expectations
 
@@ -99,6 +107,16 @@ For rebuild storage and evidence-vault work, tests should cover:
 - sharded workspace persistence preserves autosave and side-store reset behavior
 - future-version rejection and rollback-safe import still work
 - multi-tab or concurrent-writer behavior is blocked or conflict-visible
+- autosave debounce behavior remains intentional and measured after sharding
+- canvas viewport persistence is either preserved across reload or explicitly
+  documented as intentionally volatile
+- PWA/iPad persistent-storage requests are attempted where supported, with a
+  visible fallback when the browser refuses
+- PDF/document blobs are lazy-loaded; opening a project must not read every
+  document blob into memory
+- Raven Forest-scale fixtures meet the Phase 0.5 target of 1,000-3,000 title
+  nodes and 200-1,000 document records/PDFs on iPad Pro-class hardware or a
+  documented equivalent
 - immutable original hashes remain stable across import/export/package round
   trips
 - deleting a link does not delete shared documents or originals incorrectly
@@ -116,6 +134,9 @@ For AI cited-answer work, tests should cover:
 - open issues point to existing `CurativeIssue` records or typed proposed
   records
 - suggested next actions are typed `ActionPlan` proposals or navigation hints
+- every mutating tool that can change project state is covered by approval and
+  undo policy; registry drift between tool definitions and undo/approval lists
+  must fail a test
 
 For rebuild-scale performance gates, record:
 
