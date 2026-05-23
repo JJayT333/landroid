@@ -584,8 +584,10 @@ Three reference workspaces are required as Phase 0 fixtures. Two are derivable f
 - Expected outputs: `fixtures/phase-0/demo.runsheet.csv`, `demo.packet-manifest.json`, `demo.leasehold-decimals.json`, `demo.flowchart-print.pdf` (or PNG screenshots if PDF unstable).
 
 ### W2 — Raven Forest (production-shape reference)
-- Source: derive from Federal Lease seed + a representative larger Desk Map (build minimal seed in `src/storage/seed-raven-forest.ts` — proposed, not implemented).
-- Shape: multi-tract, multi-unit, 5 federal leases (read-only reference), 50–80 mineral nodes, document registry of 30+ PDFs (stubbed bytes), lease + NPRI + ORRI overlap fixtures.
+- Source: existing `buildCombinatorialWorkspaceData()` in
+  `src/storage/seed-test-data.ts`.
+- Shape: multi-tract, multi-unit, 5 federal leases (read-only reference), 1,476
+  title nodes, 145 PDF mappings, lease + NPRI + ORRI overlap fixtures.
 - Use: scale & performance baselines; lease-allocation tie-break determinism; coverage-warning golden; transfer-order golden.
 - Export target: `fixtures/phase-0/raven-forest.landroid` (likely too large to commit — document size and provide a deterministic seed script instead).
 - Expected outputs: same shape as W1.
@@ -643,6 +645,13 @@ fixtures/phase-0/
 ```
 
 Test pointers (new files to add or existing files to expand):
+
+Implemented W1 fixture guard:
+
+- `src/phase0/__tests__/vulcan-mesa-fixtures.test.ts` validates the committed
+  Vulcan Mesa `.landroid` checksum, exported workspace counts, runsheet CSV,
+  packet manifest, leasehold decimal/transfer-order output, and Desk Map
+  coverage summary against the generated goldens.
 
 | Lane | Test file (existing or new) | New goldens |
 |---|---|---|
@@ -743,20 +752,23 @@ Status against the Phase 0 exit gate from `docs/rebuild-plan.md` (lines 657–66
 | Gate | Status | Missing |
 |---|---|---|
 | Current branch has a documented page/workflow inventory | **Partially met** (this document is the draft master and is now cross-linked from source docs) | Commit decision; lead-thread row review |
-| Frozen reference workspaces and expected outputs checked in (or explicitly documented if too large) | **Not met** | W1 export needs to be generated and committed; W2 needs a deterministic seed; W3 needs to be hand-crafted; checksum manifest pending |
+| Frozen reference workspaces and expected outputs checked in (or explicitly documented if too large) | **Partially met** (W1 Vulcan Mesa export, checksum, and expected outputs exist under `fixtures/phase-0/`) | W2 needs a deterministic seed; W3 needs to be hand-crafted; checksum manifest beyond W1 pending |
 | Performance baselines recorded with command, fixture, machine, drift | **Not met** | All 8 PERF-* rows above are unfilled; capture run on declared machine pending |
 | Full relevant tests pass | **Partially met** (`npm test`, `npm run lint`, and `npm run build` pass on this branch) | Proposed new golden-master tests still need implementation before Phase 0 can close |
 | Missing coverage listed in `docs/rebuild-plan.md` or `TESTING.md` | **Met for draft inventory** | Keep list updated as rows are verified or marked `needs verification` |
 
 ### Concrete Checklist to Close the Gate
 
-- [ ] Commit `docs/phase-0-inventory.md` (this file)
+- [x] Commit `docs/phase-0-inventory.md` (this file)
 - [x] Cross-link from `TESTING.md` and `docs/rebuild-plan.md` Phase 0 section
-- [ ] Generate and commit `fixtures/phase-0/demo.landroid` + `.sha256` after the demo workspace is renamed
-- [ ] Produce `fixtures/phase-0/demo.runsheet.csv` and freeze as golden
-- [ ] Produce `fixtures/phase-0/demo.packet-manifest.json` and freeze as golden
-- [ ] Produce `fixtures/phase-0/demo.leasehold-decimals.json` and freeze as golden
-- [ ] Author `fixtures/phase-0/raven-forest.seed.ts` (deterministic builder)
+- [x] Generate `fixtures/phase-0/demo.landroid` + `.sha256` after the demo workspace is renamed
+- [x] Produce `fixtures/phase-0/demo.runsheet.csv` and freeze as golden
+- [x] Produce `fixtures/phase-0/demo.packet-manifest.json` and freeze as golden
+- [x] Produce `fixtures/phase-0/demo.leasehold-decimals.json` and freeze as golden
+- [x] Produce `fixtures/phase-0/demo.coverage-summary.json` and freeze as golden
+- [x] Add W1 golden-master test coverage for the committed fixture files
+- [ ] Generate or document W2 Raven Forest-scale fixture artifacts from
+  `buildCombinatorialWorkspaceData()`
 - [ ] Author `fixtures/phase-0/migration-v7-orphan.landroid` + expected
 - [ ] Add the 18 new test files listed in §"Golden Master Fixture Plan"
 - [ ] Snapshot AI system prompt rules (AI-036)

@@ -1,0 +1,1639 @@
+{
+  "projectName": "Vulcan Mesa — Demo (10 Tracts, 79 nodes)",
+  "unitRows": [
+    {
+      "id": "royalty-dm-vulcan-mesa-2-1779555600000-vm-9-lease-vm-14",
+      "category": "royalty",
+      "payee": "The Jupiter Flats Family Mineral Trust",
+      "tractName": "VM2 — Widow's Aegis",
+      "tractCode": "VM2",
+      "sourceLabel": "VM2 • VM2 — Widow's Aegis — The Jupiter Flats Family Mineral Trust Lease • Royalty 1/4",
+      "effectiveDate": "2024-01-01",
+      "sourceDocNo": "VM2-OGL-001",
+      "decimal": "0.01388888888888888888888888888888888888889"
+    },
+    {
+      "id": "royalty-dm-vulcan-mesa-8-1779555600000-vm-58-lease-vm-61",
+      "category": "royalty",
+      "payee": "Vulcan Spur Holdings, LLC",
+      "tractName": "VM8 — Probate Styx",
+      "tractCode": "VM8",
+      "sourceLabel": "VM8 • VM8 — Probate Styx — Vulcan Spur Holdings, LLC Lease • Royalty 1/4",
+      "effectiveDate": "2024-01-01",
+      "sourceDocNo": "VM8-OGL-001",
+      "decimal": "0.01157407407407407407407407407407407407408"
+    },
+    {
+      "id": "royalty-dm-vulcan-mesa-7-1779555600000-vm-50-lease-vm-53",
+      "category": "royalty",
+      "payee": "Buster 'Janus' McGraw",
+      "tractName": "VM7 — Minotaur Fork",
+      "tractCode": "VM7",
+      "sourceLabel": "VM7 • VM7 — Minotaur Fork — Buster 'Janus' McGraw Lease • Royalty 1/5",
+      "effectiveDate": "2024-01-01",
+      "sourceDocNo": "VM7-OGL-001",
+      "decimal": "0.01111111111111111111111111111111111111111"
+    },
+    {
+      "id": "royalty-dm-vulcan-mesa-10-1779555600000-vm-74-lease-vm-78",
+      "category": "royalty",
+      "payee": "Algernon \"Fire-Breather\" Lipinski",
+      "tractName": "VM10 — Roughneck Olympus",
+      "tractCode": "VM10",
+      "sourceLabel": "VM10 • VM10 — Roughneck Olympus — Algernon \"Fire-Breather\" Lipinski Lease • Royalty 1/4",
+      "effectiveDate": "2024-03-01",
+      "sourceDocNo": "VM10-OGL-003",
+      "decimal": "0.00925925925925925925925925925925925925926"
+    },
+    {
+      "id": "royalty-dm-vulcan-mesa-1-1779555600000-vm-2-lease-vm-5",
+      "category": "royalty",
+      "payee": "Buster 'Janus' McGraw",
+      "tractName": "VM1 — Apollo Draw",
+      "tractCode": "VM1",
+      "sourceLabel": "VM1 • VM1 — Apollo Draw — Buster 'Janus' McGraw Lease • Royalty 1/4",
+      "effectiveDate": "2024-01-01",
+      "sourceDocNo": "VM1-OGL-001",
+      "decimal": "0.00925925925925925925925925925925925925926"
+    },
+    {
+      "id": "royalty-dm-vulcan-mesa-10-1779555600000-vm-72-lease-vm-76",
+      "category": "royalty",
+      "payee": "Buster 'Janus' McGraw",
+      "tractName": "VM10 — Roughneck Olympus",
+      "tractCode": "VM10",
+      "sourceLabel": "VM10 • VM10 — Roughneck Olympus — Buster 'Janus' McGraw Lease • Royalty 1/4",
+      "effectiveDate": "2024-01-01",
+      "sourceDocNo": "VM10-OGL-001",
+      "decimal": "0.00925925925925925925925925925925925925926"
+    },
+    {
+      "id": "royalty-dm-vulcan-mesa-6-1779555600000-vm-46-lease-vm-48",
+      "category": "royalty",
+      "payee": "Festus \"Pickled-Egg\" Drumheller",
+      "tractName": "VM6 — Jupiter Spur",
+      "tractCode": "VM6",
+      "sourceLabel": "VM6 • VM6 — Jupiter Spur — Festus \"Pickled-Egg\" Drumheller Lease • Royalty 1/4",
+      "effectiveDate": "2024-02-01",
+      "sourceDocNo": "VM6-OGL-002",
+      "decimal": "0.00925925925925925925925925925925925925926"
+    },
+    {
+      "id": "royalty-dm-vulcan-mesa-10-1779555600000-vm-75-lease-vm-79",
+      "category": "royalty",
+      "payee": "Mable \"Dunk-Tank\" Twiggs",
+      "tractName": "VM10 — Roughneck Olympus",
+      "tractCode": "VM10",
+      "sourceLabel": "VM10 • VM10 — Roughneck Olympus — Mable \"Dunk-Tank\" Twiggs Lease • Royalty 1/4",
+      "effectiveDate": "2024-04-01",
+      "sourceDocNo": "VM10-OGL-004",
+      "decimal": "0.00925925925925925925925925925925925925926"
+    },
+    {
+      "id": "royalty-dm-vulcan-mesa-9-1779555600000-vm-65-lease-vm-68",
+      "category": "royalty",
+      "payee": "Minerva 'Minnie' Pickens",
+      "tractName": "VM9 — Minerva's Bequest",
+      "tractCode": "VM9",
+      "sourceLabel": "VM9 • VM9 — Minerva's Bequest — Minerva 'Minnie' Pickens Lease • Royalty 1/4",
+      "effectiveDate": "2024-01-01",
+      "sourceDocNo": "VM9-OGL-001",
+      "decimal": "0.00925925925925925925925925925925925925926"
+    },
+    {
+      "id": "royalty-dm-vulcan-mesa-6-1779555600000-vm-45-lease-vm-47",
+      "category": "royalty",
+      "payee": "The Jupiter Flats Family Mineral Trust",
+      "tractName": "VM6 — Jupiter Spur",
+      "tractCode": "VM6",
+      "sourceLabel": "VM6 • VM6 — Jupiter Spur — The Jupiter Flats Family Mineral Trust Lease • Royalty 1/4",
+      "effectiveDate": "2024-01-01",
+      "sourceDocNo": "VM6-OGL-001",
+      "decimal": "0.00925925925925925925925925925925925925926"
+    },
+    {
+      "id": "royalty-dm-vulcan-mesa-3-1779555600000-vm-18-lease-vm-24",
+      "category": "royalty",
+      "payee": "Vulcan Spur Holdings, LLC",
+      "tractName": "VM3 — Mercury Cutoff",
+      "tractCode": "VM3",
+      "sourceLabel": "VM3 • VM3 — Mercury Cutoff — Vulcan Spur Holdings, LLC Lease • Royalty 1/4",
+      "effectiveDate": "2024-01-01",
+      "sourceDocNo": "VM3-OGL-001",
+      "decimal": "0.00925925925925925925925925925925925925926"
+    },
+    {
+      "id": "royalty-dm-vulcan-mesa-10-1779555600000-vm-73-lease-vm-77",
+      "category": "royalty",
+      "payee": "Vulcan Spur Holdings, LLC",
+      "tractName": "VM10 — Roughneck Olympus",
+      "tractCode": "VM10",
+      "sourceLabel": "VM10 • VM10 — Roughneck Olympus — Vulcan Spur Holdings, LLC Lease • Royalty 1/4",
+      "effectiveDate": "2024-02-01",
+      "sourceDocNo": "VM10-OGL-002",
+      "decimal": "0.00925925925925925925925925925925925925926"
+    },
+    {
+      "id": "royalty-dm-vulcan-mesa-4-1779555600000-vm-30-lease-vm-33",
+      "category": "royalty",
+      "payee": "Constance \"Bone-Saw\" Whittle",
+      "tractName": "VM4 — Vulcan Gulch",
+      "tractCode": "VM4",
+      "sourceLabel": "VM4 • VM4 — Vulcan Gulch — Constance \"Bone-Saw\" Whittle Lease • Royalty 1/4",
+      "effectiveDate": "2024-02-01",
+      "sourceDocNo": "VM4-OGL-002",
+      "decimal": "0.008680555555555555555555555555555555555555"
+    },
+    {
+      "id": "royalty-dm-vulcan-mesa-4-1779555600000-vm-31-lease-vm-34",
+      "category": "royalty",
+      "payee": "Reginald \"Ringmaster\" Crumley",
+      "tractName": "VM4 — Vulcan Gulch",
+      "tractCode": "VM4",
+      "sourceLabel": "VM4 • VM4 — Vulcan Gulch — Reginald \"Ringmaster\" Crumley Lease • Royalty 1/4",
+      "effectiveDate": "2024-03-01",
+      "sourceDocNo": "VM4-OGL-003",
+      "decimal": "0.008680555555555555555555555555555555555555"
+    },
+    {
+      "id": "royalty-dm-vulcan-mesa-2-1779555600000-vm-11-lease-vm-16",
+      "category": "royalty",
+      "payee": "Estate of Hambone \"Lefty\" McGurkin",
+      "tractName": "VM2 — Widow's Aegis",
+      "tractCode": "VM2",
+      "sourceLabel": "VM2 • VM2 — Widow's Aegis — Estate of Hambone \"Lefty\" McGurkin Lease • Royalty 1/4",
+      "effectiveDate": "2024-03-01",
+      "sourceDocNo": "VM2-OGL-003",
+      "decimal": "0.006944444444444444444444444444444444444445"
+    },
+    {
+      "id": "royalty-dm-vulcan-mesa-2-1779555600000-vm-10-lease-vm-15",
+      "category": "royalty",
+      "payee": "Minerva 'Minnie' Pickens",
+      "tractName": "VM2 — Widow's Aegis",
+      "tractCode": "VM2",
+      "sourceLabel": "VM2 • VM2 — Widow's Aegis — Minerva 'Minnie' Pickens Lease • Royalty 1/4",
+      "effectiveDate": "2024-02-01",
+      "sourceDocNo": "VM2-OGL-002",
+      "decimal": "0.006944444444444444444444444444444444444445"
+    },
+    {
+      "id": "royalty-dm-vulcan-mesa-5-1779555600000-vm-38-lease-vm-42",
+      "category": "royalty",
+      "payee": "Pearl \"Knife-Catcher\" Velasquez",
+      "tractName": "VM5 — Last Centurion",
+      "tractCode": "VM5",
+      "sourceLabel": "VM5 • VM5 — Last Centurion — Pearl \"Knife-Catcher\" Velasquez Lease • Royalty 3/16",
+      "effectiveDate": "2024-03-01",
+      "sourceDocNo": "VM5-OGL-003",
+      "decimal": "0.006944444444444444444444444444444444444445"
+    },
+    {
+      "id": "royalty-dm-vulcan-mesa-5-1779555600000-vm-36-lease-vm-40",
+      "category": "royalty",
+      "payee": "The Jupiter Flats Family Mineral Trust",
+      "tractName": "VM5 — Last Centurion",
+      "tractCode": "VM5",
+      "sourceLabel": "VM5 • VM5 — Last Centurion — The Jupiter Flats Family Mineral Trust Lease • Royalty 3/16",
+      "effectiveDate": "2024-01-01",
+      "sourceDocNo": "VM5-OGL-001",
+      "decimal": "0.006944444444444444444444444444444444444445"
+    },
+    {
+      "id": "royalty-dm-vulcan-mesa-5-1779555600000-vm-37-lease-vm-41",
+      "category": "royalty",
+      "payee": "Vulcan Spur Holdings, LLC",
+      "tractName": "VM5 — Last Centurion",
+      "tractCode": "VM5",
+      "sourceLabel": "VM5 • VM5 — Last Centurion — Vulcan Spur Holdings, LLC Lease • Royalty 3/16",
+      "effectiveDate": "2024-02-01",
+      "sourceDocNo": "VM5-OGL-002",
+      "decimal": "0.006944444444444444444444444444444444444445"
+    },
+    {
+      "id": "royalty-dm-vulcan-mesa-5-1779555600000-vm-39-lease-vm-43",
+      "category": "royalty",
+      "payee": "Wendell \"Stilt-Stumble\" Krabowski",
+      "tractName": "VM5 — Last Centurion",
+      "tractCode": "VM5",
+      "sourceLabel": "VM5 • VM5 — Last Centurion — Wendell \"Stilt-Stumble\" Krabowski Lease • Royalty 3/16",
+      "effectiveDate": "2024-04-01",
+      "sourceDocNo": "VM5-OGL-004",
+      "decimal": "0.006944444444444444444444444444444444444445"
+    },
+    {
+      "id": "royalty-dm-vulcan-mesa-8-1779555600000-vm-60-lease-vm-63",
+      "category": "royalty",
+      "payee": "Estate of Wilbur \"The Geek\" Posthumous",
+      "tractName": "VM8 — Probate Styx",
+      "tractCode": "VM8",
+      "sourceLabel": "VM8 • VM8 — Probate Styx — Estate of Wilbur \"The Geek\" Posthumous Lease • Royalty 1/4",
+      "effectiveDate": "2024-03-01",
+      "sourceDocNo": "VM8-OGL-003",
+      "decimal": "0.005787037037037037037037037037037037037038"
+    },
+    {
+      "id": "royalty-dm-vulcan-mesa-8-1779555600000-vm-59-lease-vm-62",
+      "category": "royalty",
+      "payee": "Minerva 'Minnie' Pickens",
+      "tractName": "VM8 — Probate Styx",
+      "tractCode": "VM8",
+      "sourceLabel": "VM8 • VM8 — Probate Styx — Minerva 'Minnie' Pickens Lease • Royalty 1/4",
+      "effectiveDate": "2024-02-01",
+      "sourceDocNo": "VM8-OGL-002",
+      "decimal": "0.005787037037037037037037037037037037037038"
+    },
+    {
+      "id": "royalty-dm-vulcan-mesa-7-1779555600000-vm-52-lease-vm-55",
+      "category": "royalty",
+      "payee": "Lurleen \"Ares\" Sproat",
+      "tractName": "VM7 — Minotaur Fork",
+      "tractCode": "VM7",
+      "sourceLabel": "VM7 • VM7 — Minotaur Fork — Lurleen \"Ares\" Sproat Lease • Royalty 1/5",
+      "effectiveDate": "2024-03-01",
+      "sourceDocNo": "VM7-OGL-003",
+      "decimal": "0.005555555555555555555555555555555555555556"
+    },
+    {
+      "id": "royalty-dm-vulcan-mesa-7-1779555600000-vm-51-lease-vm-54",
+      "category": "royalty",
+      "payee": "Vulcan Spur Holdings, LLC",
+      "tractName": "VM7 — Minotaur Fork",
+      "tractCode": "VM7",
+      "sourceLabel": "VM7 • VM7 — Minotaur Fork — Vulcan Spur Holdings, LLC Lease • Royalty 1/5",
+      "effectiveDate": "2024-02-01",
+      "sourceDocNo": "VM7-OGL-002",
+      "decimal": "0.005555555555555555555555555555555555555556"
+    },
+    {
+      "id": "royalty-dm-vulcan-mesa-9-1779555600000-vm-67-lease-vm-70",
+      "category": "royalty",
+      "payee": "Bartholomew \"Centurion\" Pickens",
+      "tractName": "VM9 — Minerva's Bequest",
+      "tractCode": "VM9",
+      "sourceLabel": "VM9 • VM9 — Minerva's Bequest — Bartholomew \"Centurion\" Pickens Lease • Royalty 1/4",
+      "effectiveDate": "2024-03-01",
+      "sourceDocNo": "VM9-OGL-003",
+      "decimal": "0.00462962962962962962962962962962962962963"
+    },
+    {
+      "id": "royalty-dm-vulcan-mesa-3-1779555600000-vm-19-lease-vm-25",
+      "category": "royalty",
+      "payee": "Mavis \"Sword-Eater\" Toomey",
+      "tractName": "VM3 — Mercury Cutoff",
+      "tractCode": "VM3",
+      "sourceLabel": "VM3 • VM3 — Mercury Cutoff — Mavis \"Sword-Eater\" Toomey Lease • Royalty 1/4",
+      "effectiveDate": "2024-02-01",
+      "sourceDocNo": "VM3-OGL-002",
+      "decimal": "0.00462962962962962962962962962962962962963"
+    },
+    {
+      "id": "royalty-dm-vulcan-mesa-1-1779555600000-vm-3-lease-vm-6",
+      "category": "royalty",
+      "payee": "Minerva 'Minnie' Pickens",
+      "tractName": "VM1 — Apollo Draw",
+      "tractCode": "VM1",
+      "sourceLabel": "VM1 • VM1 — Apollo Draw — Minerva 'Minnie' Pickens Lease • Royalty 1/4",
+      "effectiveDate": "2024-02-01",
+      "sourceDocNo": "VM1-OGL-002",
+      "decimal": "0.00462962962962962962962962962962962962963"
+    },
+    {
+      "id": "royalty-dm-vulcan-mesa-1-1779555600000-vm-4-lease-vm-7",
+      "category": "royalty",
+      "payee": "Mortimer \"Sawdust\" Hench",
+      "tractName": "VM1 — Apollo Draw",
+      "tractCode": "VM1",
+      "sourceLabel": "VM1 • VM1 — Apollo Draw — Mortimer \"Sawdust\" Hench Lease • Royalty 1/4",
+      "effectiveDate": "2024-03-01",
+      "sourceDocNo": "VM1-OGL-003",
+      "decimal": "0.00462962962962962962962962962962962962963"
+    },
+    {
+      "id": "royalty-dm-vulcan-mesa-9-1779555600000-vm-66-lease-vm-69",
+      "category": "royalty",
+      "payee": "The Jupiter Flats Family Mineral Trust",
+      "tractName": "VM9 — Minerva's Bequest",
+      "tractCode": "VM9",
+      "sourceLabel": "VM9 • VM9 — Minerva's Bequest — The Jupiter Flats Family Mineral Trust Lease • Royalty 1/4",
+      "effectiveDate": "2024-02-01",
+      "sourceDocNo": "VM9-OGL-002",
+      "decimal": "0.00462962962962962962962962962962962962963"
+    },
+    {
+      "id": "royalty-dm-vulcan-mesa-4-1779555600000-vm-29-lease-vm-32",
+      "category": "royalty",
+      "payee": "Buster 'Janus' McGraw",
+      "tractName": "VM4 — Vulcan Gulch",
+      "tractCode": "VM4",
+      "sourceLabel": "VM4 • VM4 — Vulcan Gulch — Buster 'Janus' McGraw Lease • Royalty 1/6.5",
+      "effectiveDate": "2024-01-01",
+      "sourceDocNo": "VM4-OGL-001",
+      "decimal": "0.00356125356125356125356125356125356125356"
+    },
+    {
+      "id": "royalty-dm-vulcan-mesa-3-1779555600000-vm-20-lease-vm-26",
+      "category": "royalty",
+      "payee": "Beauregard Plumstead",
+      "tractName": "VM3 — Mercury Cutoff",
+      "tractCode": "VM3",
+      "sourceLabel": "VM3 • VM3 — Mercury Cutoff — Beauregard Plumstead Lease • Royalty 1/4",
+      "effectiveDate": "2024-03-01",
+      "sourceDocNo": "VM3-OGL-003",
+      "decimal": "0.002314814814814814814814814814814814814815"
+    },
+    {
+      "id": "npri-vm-22",
+      "category": "npri",
+      "payee": "Annie Boggs",
+      "tractName": "VM3 — Mercury Cutoff",
+      "tractCode": "VM3",
+      "sourceLabel": "Fixed NPRI • 0.500000000 of whole tract",
+      "effectiveDate": "1965-04-30",
+      "sourceDocNo": "VM3-NPRI-001",
+      "decimal": "0.03240740740740740740740740740740740740741"
+    },
+    {
+      "id": "npri-vm-23",
+      "category": "npri",
+      "payee": "Hermes Royalty Holdings, LP",
+      "tractName": "VM3 — Mercury Cutoff",
+      "tractCode": "VM3",
+      "sourceLabel": "Fixed NPRI • 0.250000000 of whole tract",
+      "effectiveDate": "1972-09-09",
+      "sourceDocNo": "VM3-NPRI-002",
+      "decimal": "0.01620370370370370370370370370370370370371"
+    },
+    {
+      "id": "orri-vm-orri-1-unit-a-gross",
+      "category": "orri",
+      "payee": "Ares Override, LP",
+      "tractName": "Jupiter Flats Unit",
+      "tractCode": "UNIT",
+      "sourceLabel": "Unit ORRI • Gross 8/8",
+      "effectiveDate": "2024-02-01",
+      "sourceDocNo": "VM-ORRI-1",
+      "decimal": "0.01533564814814814814814814814814814814815"
+    },
+    {
+      "id": "orri-vm-orri-2-unit-b-nri",
+      "category": "orri",
+      "payee": "Hermes Royalty Holdings, LP",
+      "tractName": "Minerva Draw Unit",
+      "tractCode": "UNIT",
+      "sourceLabel": "Unit ORRI • NRI basis",
+      "effectiveDate": "2024-02-15",
+      "sourceDocNo": "VM-ORRI-2",
+      "decimal": "0.00591724537037037037037037037037037037037"
+    },
+    {
+      "id": "orri-vm-orri-3-vm10-wi",
+      "category": "orri",
+      "payee": "Centurion Override Co.",
+      "tractName": "VM10 — Roughneck Olympus",
+      "tractCode": "TRACT",
+      "sourceLabel": "VM10 — Roughneck Olympus ORRI • WI basis",
+      "effectiveDate": "2024-03-01",
+      "sourceDocNo": "VM-ORRI-3",
+      "decimal": "0.001851851851851851851851851851851851851851"
+    },
+    {
+      "id": "retained-wi-unit",
+      "category": "retained_wi",
+      "payee": "Vulcan Mesa Petroleum, LLC",
+      "tractName": "Vulcan Mesa Unit",
+      "tractCode": "UNIT",
+      "sourceLabel": "Retained WI",
+      "effectiveDate": "2024-01-01",
+      "sourceDocNo": "",
+      "decimal": "0.3458984375"
+    },
+    {
+      "id": "assignment-vm-asg-1-unit-a-60",
+      "category": "assigned_wi",
+      "payee": "Praetor Brothers Operating, LLC",
+      "tractName": "Jupiter Flats Unit",
+      "tractCode": "UNIT",
+      "sourceLabel": "Vulcan Mesa Petroleum, LLC assignment",
+      "effectiveDate": "2024-03-01",
+      "sourceDocNo": "VM-ASG-1",
+      "decimal": "0.1905715811965811965811965811965811965811"
+    },
+    {
+      "id": "assignment-vm-asg-2-unit-a-50",
+      "category": "assigned_wi",
+      "payee": "Minerva Draw Production Co.",
+      "tractName": "Jupiter Flats Unit",
+      "tractCode": "UNIT",
+      "sourceLabel": "Vulcan Mesa Petroleum, LLC assignment",
+      "effectiveDate": "2024-04-01",
+      "sourceDocNo": "VM-ASG-2",
+      "decimal": "0.158809650997150997150997150997150997151"
+    },
+    {
+      "id": "assignment-vm-asg-3-vm10-25",
+      "category": "assigned_wi",
+      "payee": "Ares Production Co.",
+      "tractName": "VM10 — Roughneck Olympus",
+      "tractCode": "TRACT",
+      "sourceLabel": "Vulcan Mesa Petroleum, LLC assignment",
+      "effectiveDate": "2024-05-01",
+      "sourceDocNo": "VM-ASG-3",
+      "decimal": "0.02688802083333333333333333333333333333333"
+    }
+  ],
+  "focusedRowsByTractCode": {
+    "VM1": [
+      {
+        "id": "royalty-dm-vulcan-mesa-1-1779555600000-vm-2-lease-vm-5",
+        "category": "royalty",
+        "payee": "Buster 'Janus' McGraw",
+        "tractName": "VM1 — Apollo Draw",
+        "tractCode": "VM1",
+        "sourceLabel": "VM1 — Apollo Draw — Buster 'Janus' McGraw Lease • Royalty 1/4",
+        "effectiveDate": "2024-01-01",
+        "sourceDocNo": "VM1-OGL-001",
+        "decimal": "0.00925925925925925925925925925925925925926"
+      },
+      {
+        "id": "royalty-dm-vulcan-mesa-1-1779555600000-vm-3-lease-vm-6",
+        "category": "royalty",
+        "payee": "Minerva 'Minnie' Pickens",
+        "tractName": "VM1 — Apollo Draw",
+        "tractCode": "VM1",
+        "sourceLabel": "VM1 — Apollo Draw — Minerva 'Minnie' Pickens Lease • Royalty 1/4",
+        "effectiveDate": "2024-02-01",
+        "sourceDocNo": "VM1-OGL-002",
+        "decimal": "0.00462962962962962962962962962962962962963"
+      },
+      {
+        "id": "royalty-dm-vulcan-mesa-1-1779555600000-vm-4-lease-vm-7",
+        "category": "royalty",
+        "payee": "Mortimer \"Sawdust\" Hench",
+        "tractName": "VM1 — Apollo Draw",
+        "tractCode": "VM1",
+        "sourceLabel": "VM1 — Apollo Draw — Mortimer \"Sawdust\" Hench Lease • Royalty 1/4",
+        "effectiveDate": "2024-03-01",
+        "sourceDocNo": "VM1-OGL-003",
+        "decimal": "0.00462962962962962962962962962962962962963"
+      },
+      {
+        "id": "orri-dm-vulcan-mesa-1-1779555600000-vm-orri-1-unit-a-gross",
+        "category": "orri",
+        "payee": "Ares Override, LP",
+        "tractName": "VM1 — Apollo Draw",
+        "tractCode": "VM1",
+        "sourceLabel": "Unit ORRI • Gross 8/8",
+        "effectiveDate": "2024-02-01",
+        "sourceDocNo": "VM-ORRI-1",
+        "decimal": "0.002314814814814814814814814814814814814815"
+      },
+      {
+        "id": "retained-wi-dm-vulcan-mesa-1-1779555600000",
+        "category": "retained_wi",
+        "payee": "Vulcan Mesa Petroleum, LLC",
+        "tractName": "VM1 — Apollo Draw",
+        "tractCode": "VM1",
+        "sourceLabel": "VM1 retained WI",
+        "effectiveDate": "2024-01-01",
+        "sourceDocNo": "",
+        "decimal": "0"
+      },
+      {
+        "id": "assignment-dm-vulcan-mesa-1-1779555600000-vm-asg-1-unit-a-60",
+        "category": "assigned_wi",
+        "payee": "Praetor Brothers Operating, LLC",
+        "tractName": "VM1 — Apollo Draw",
+        "tractCode": "VM1",
+        "sourceLabel": "Vulcan Mesa Petroleum, LLC assignment",
+        "effectiveDate": "2024-03-01",
+        "sourceDocNo": "VM-ASG-1",
+        "decimal": "0.03194444444444444444444444444444444444444"
+      },
+      {
+        "id": "assignment-dm-vulcan-mesa-1-1779555600000-vm-asg-2-unit-a-50",
+        "category": "assigned_wi",
+        "payee": "Minerva Draw Production Co.",
+        "tractName": "VM1 — Apollo Draw",
+        "tractCode": "VM1",
+        "sourceLabel": "Vulcan Mesa Petroleum, LLC assignment",
+        "effectiveDate": "2024-04-01",
+        "sourceDocNo": "VM-ASG-2",
+        "decimal": "0.02662037037037037037037037037037037037037"
+      }
+    ],
+    "VM2": [
+      {
+        "id": "royalty-dm-vulcan-mesa-2-1779555600000-vm-9-lease-vm-14",
+        "category": "royalty",
+        "payee": "The Jupiter Flats Family Mineral Trust",
+        "tractName": "VM2 — Widow's Aegis",
+        "tractCode": "VM2",
+        "sourceLabel": "VM2 — Widow's Aegis — The Jupiter Flats Family Mineral Trust Lease • Royalty 1/4",
+        "effectiveDate": "2024-01-01",
+        "sourceDocNo": "VM2-OGL-001",
+        "decimal": "0.01388888888888888888888888888888888888889"
+      },
+      {
+        "id": "royalty-dm-vulcan-mesa-2-1779555600000-vm-11-lease-vm-16",
+        "category": "royalty",
+        "payee": "Estate of Hambone \"Lefty\" McGurkin",
+        "tractName": "VM2 — Widow's Aegis",
+        "tractCode": "VM2",
+        "sourceLabel": "VM2 — Widow's Aegis — Estate of Hambone \"Lefty\" McGurkin Lease • Royalty 1/4",
+        "effectiveDate": "2024-03-01",
+        "sourceDocNo": "VM2-OGL-003",
+        "decimal": "0.006944444444444444444444444444444444444445"
+      },
+      {
+        "id": "royalty-dm-vulcan-mesa-2-1779555600000-vm-10-lease-vm-15",
+        "category": "royalty",
+        "payee": "Minerva 'Minnie' Pickens",
+        "tractName": "VM2 — Widow's Aegis",
+        "tractCode": "VM2",
+        "sourceLabel": "VM2 — Widow's Aegis — Minerva 'Minnie' Pickens Lease • Royalty 1/4",
+        "effectiveDate": "2024-02-01",
+        "sourceDocNo": "VM2-OGL-002",
+        "decimal": "0.006944444444444444444444444444444444444445"
+      },
+      {
+        "id": "orri-dm-vulcan-mesa-2-1779555600000-vm-orri-1-unit-a-gross",
+        "category": "orri",
+        "payee": "Ares Override, LP",
+        "tractName": "VM2 — Widow's Aegis",
+        "tractCode": "VM2",
+        "sourceLabel": "Unit ORRI • Gross 8/8",
+        "effectiveDate": "2024-02-01",
+        "sourceDocNo": "VM-ORRI-1",
+        "decimal": "0.003472222222222222222222222222222222222222"
+      },
+      {
+        "id": "retained-wi-dm-vulcan-mesa-2-1779555600000",
+        "category": "retained_wi",
+        "payee": "Vulcan Mesa Petroleum, LLC",
+        "tractName": "VM2 — Widow's Aegis",
+        "tractCode": "VM2",
+        "sourceLabel": "VM2 retained WI",
+        "effectiveDate": "2024-01-01",
+        "sourceDocNo": "",
+        "decimal": "0"
+      },
+      {
+        "id": "assignment-dm-vulcan-mesa-2-1779555600000-vm-asg-1-unit-a-60",
+        "category": "assigned_wi",
+        "payee": "Praetor Brothers Operating, LLC",
+        "tractName": "VM2 — Widow's Aegis",
+        "tractCode": "VM2",
+        "sourceLabel": "Vulcan Mesa Petroleum, LLC assignment",
+        "effectiveDate": "2024-03-01",
+        "sourceDocNo": "VM-ASG-1",
+        "decimal": "0.04791666666666666666666666666666666666666"
+      },
+      {
+        "id": "assignment-dm-vulcan-mesa-2-1779555600000-vm-asg-2-unit-a-50",
+        "category": "assigned_wi",
+        "payee": "Minerva Draw Production Co.",
+        "tractName": "VM2 — Widow's Aegis",
+        "tractCode": "VM2",
+        "sourceLabel": "Vulcan Mesa Petroleum, LLC assignment",
+        "effectiveDate": "2024-04-01",
+        "sourceDocNo": "VM-ASG-2",
+        "decimal": "0.03993055555555555555555555555555555555555"
+      }
+    ],
+    "VM3": [
+      {
+        "id": "royalty-dm-vulcan-mesa-3-1779555600000-vm-18-lease-vm-24",
+        "category": "royalty",
+        "payee": "Vulcan Spur Holdings, LLC",
+        "tractName": "VM3 — Mercury Cutoff",
+        "tractCode": "VM3",
+        "sourceLabel": "VM3 — Mercury Cutoff — Vulcan Spur Holdings, LLC Lease • Royalty 1/4",
+        "effectiveDate": "2024-01-01",
+        "sourceDocNo": "VM3-OGL-001",
+        "decimal": "0.00925925925925925925925925925925925925926"
+      },
+      {
+        "id": "royalty-dm-vulcan-mesa-3-1779555600000-vm-19-lease-vm-25",
+        "category": "royalty",
+        "payee": "Mavis \"Sword-Eater\" Toomey",
+        "tractName": "VM3 — Mercury Cutoff",
+        "tractCode": "VM3",
+        "sourceLabel": "VM3 — Mercury Cutoff — Mavis \"Sword-Eater\" Toomey Lease • Royalty 1/4",
+        "effectiveDate": "2024-02-01",
+        "sourceDocNo": "VM3-OGL-002",
+        "decimal": "0.00462962962962962962962962962962962962963"
+      },
+      {
+        "id": "royalty-dm-vulcan-mesa-3-1779555600000-vm-20-lease-vm-26",
+        "category": "royalty",
+        "payee": "Beauregard Plumstead",
+        "tractName": "VM3 — Mercury Cutoff",
+        "tractCode": "VM3",
+        "sourceLabel": "VM3 — Mercury Cutoff — Beauregard Plumstead Lease • Royalty 1/4",
+        "effectiveDate": "2024-03-01",
+        "sourceDocNo": "VM3-OGL-003",
+        "decimal": "0.002314814814814814814814814814814814814815"
+      },
+      {
+        "id": "npri-dm-vulcan-mesa-3-1779555600000-vm-22",
+        "category": "npri",
+        "payee": "Annie Boggs",
+        "tractName": "VM3 — Mercury Cutoff",
+        "tractCode": "VM3",
+        "sourceLabel": "Fixed NPRI • 0.500000000 of whole tract",
+        "effectiveDate": "1965-04-30",
+        "sourceDocNo": "VM3-NPRI-001",
+        "decimal": "0.03240740740740740740740740740740740740741"
+      },
+      {
+        "id": "npri-dm-vulcan-mesa-3-1779555600000-vm-23",
+        "category": "npri",
+        "payee": "Hermes Royalty Holdings, LP",
+        "tractName": "VM3 — Mercury Cutoff",
+        "tractCode": "VM3",
+        "sourceLabel": "Fixed NPRI • 0.250000000 of whole tract",
+        "effectiveDate": "1972-09-09",
+        "sourceDocNo": "VM3-NPRI-002",
+        "decimal": "0.01620370370370370370370370370370370370371"
+      },
+      {
+        "id": "orri-dm-vulcan-mesa-3-1779555600000-vm-orri-1-unit-a-gross",
+        "category": "orri",
+        "payee": "Ares Override, LP",
+        "tractName": "VM3 — Mercury Cutoff",
+        "tractCode": "VM3",
+        "sourceLabel": "Unit ORRI • Gross 8/8",
+        "effectiveDate": "2024-02-01",
+        "sourceDocNo": "VM-ORRI-1",
+        "decimal": "0.002025462962962962962962962962962962962963"
+      },
+      {
+        "id": "retained-wi-dm-vulcan-mesa-3-1779555600000",
+        "category": "retained_wi",
+        "payee": "Vulcan Mesa Petroleum, LLC",
+        "tractName": "VM3 — Mercury Cutoff",
+        "tractCode": "VM3",
+        "sourceLabel": "VM3 retained WI",
+        "effectiveDate": "2024-01-01",
+        "sourceDocNo": "",
+        "decimal": "0"
+      }
+    ],
+    "VM4": [
+      {
+        "id": "royalty-dm-vulcan-mesa-4-1779555600000-vm-30-lease-vm-33",
+        "category": "royalty",
+        "payee": "Constance \"Bone-Saw\" Whittle",
+        "tractName": "VM4 — Vulcan Gulch",
+        "tractCode": "VM4",
+        "sourceLabel": "VM4 — Vulcan Gulch — Constance \"Bone-Saw\" Whittle Lease • Royalty 1/4",
+        "effectiveDate": "2024-02-01",
+        "sourceDocNo": "VM4-OGL-002",
+        "decimal": "0.008680555555555555555555555555555555555555"
+      },
+      {
+        "id": "royalty-dm-vulcan-mesa-4-1779555600000-vm-31-lease-vm-34",
+        "category": "royalty",
+        "payee": "Reginald \"Ringmaster\" Crumley",
+        "tractName": "VM4 — Vulcan Gulch",
+        "tractCode": "VM4",
+        "sourceLabel": "VM4 — Vulcan Gulch — Reginald \"Ringmaster\" Crumley Lease • Royalty 1/4",
+        "effectiveDate": "2024-03-01",
+        "sourceDocNo": "VM4-OGL-003",
+        "decimal": "0.008680555555555555555555555555555555555555"
+      },
+      {
+        "id": "royalty-dm-vulcan-mesa-4-1779555600000-vm-29-lease-vm-32",
+        "category": "royalty",
+        "payee": "Buster 'Janus' McGraw",
+        "tractName": "VM4 — Vulcan Gulch",
+        "tractCode": "VM4",
+        "sourceLabel": "VM4 — Vulcan Gulch — Buster 'Janus' McGraw Lease • Royalty 1/6.5",
+        "effectiveDate": "2024-01-01",
+        "sourceDocNo": "VM4-OGL-001",
+        "decimal": "0.00356125356125356125356125356125356125356"
+      },
+      {
+        "id": "orri-dm-vulcan-mesa-4-1779555600000-vm-orri-1-unit-a-gross",
+        "category": "orri",
+        "payee": "Ares Override, LP",
+        "tractName": "VM4 — Vulcan Gulch",
+        "tractCode": "VM4",
+        "sourceLabel": "Unit ORRI • Gross 8/8",
+        "effectiveDate": "2024-02-01",
+        "sourceDocNo": "VM-ORRI-1",
+        "decimal": "0.002893518518518518518518518518518518518518"
+      },
+      {
+        "id": "retained-wi-dm-vulcan-mesa-4-1779555600000",
+        "category": "retained_wi",
+        "payee": "Vulcan Mesa Petroleum, LLC",
+        "tractName": "VM4 — Vulcan Gulch",
+        "tractCode": "VM4",
+        "sourceLabel": "VM4 retained WI",
+        "effectiveDate": "2024-01-01",
+        "sourceDocNo": "",
+        "decimal": "0"
+      },
+      {
+        "id": "assignment-dm-vulcan-mesa-4-1779555600000-vm-asg-1-unit-a-60",
+        "category": "assigned_wi",
+        "payee": "Praetor Brothers Operating, LLC",
+        "tractName": "VM4 — Vulcan Gulch",
+        "tractCode": "VM4",
+        "sourceLabel": "Vulcan Mesa Petroleum, LLC assignment",
+        "effectiveDate": "2024-03-01",
+        "sourceDocNo": "VM-ASG-1",
+        "decimal": "0.04126602564102564102564102564102564102564"
+      },
+      {
+        "id": "assignment-dm-vulcan-mesa-4-1779555600000-vm-asg-2-unit-a-50",
+        "category": "assigned_wi",
+        "payee": "Minerva Draw Production Co.",
+        "tractName": "VM4 — Vulcan Gulch",
+        "tractCode": "VM4",
+        "sourceLabel": "Vulcan Mesa Petroleum, LLC assignment",
+        "effectiveDate": "2024-04-01",
+        "sourceDocNo": "VM-ASG-2",
+        "decimal": "0.0343883547008547008547008547008547008547"
+      }
+    ],
+    "VM5": [
+      {
+        "id": "royalty-dm-vulcan-mesa-5-1779555600000-vm-38-lease-vm-42",
+        "category": "royalty",
+        "payee": "Pearl \"Knife-Catcher\" Velasquez",
+        "tractName": "VM5 — Last Centurion",
+        "tractCode": "VM5",
+        "sourceLabel": "VM5 — Last Centurion — Pearl \"Knife-Catcher\" Velasquez Lease • Royalty 3/16",
+        "effectiveDate": "2024-03-01",
+        "sourceDocNo": "VM5-OGL-003",
+        "decimal": "0.006944444444444444444444444444444444444445"
+      },
+      {
+        "id": "royalty-dm-vulcan-mesa-5-1779555600000-vm-36-lease-vm-40",
+        "category": "royalty",
+        "payee": "The Jupiter Flats Family Mineral Trust",
+        "tractName": "VM5 — Last Centurion",
+        "tractCode": "VM5",
+        "sourceLabel": "VM5 — Last Centurion — The Jupiter Flats Family Mineral Trust Lease • Royalty 3/16",
+        "effectiveDate": "2024-01-01",
+        "sourceDocNo": "VM5-OGL-001",
+        "decimal": "0.006944444444444444444444444444444444444445"
+      },
+      {
+        "id": "royalty-dm-vulcan-mesa-5-1779555600000-vm-37-lease-vm-41",
+        "category": "royalty",
+        "payee": "Vulcan Spur Holdings, LLC",
+        "tractName": "VM5 — Last Centurion",
+        "tractCode": "VM5",
+        "sourceLabel": "VM5 — Last Centurion — Vulcan Spur Holdings, LLC Lease • Royalty 3/16",
+        "effectiveDate": "2024-02-01",
+        "sourceDocNo": "VM5-OGL-002",
+        "decimal": "0.006944444444444444444444444444444444444445"
+      },
+      {
+        "id": "royalty-dm-vulcan-mesa-5-1779555600000-vm-39-lease-vm-43",
+        "category": "royalty",
+        "payee": "Wendell \"Stilt-Stumble\" Krabowski",
+        "tractName": "VM5 — Last Centurion",
+        "tractCode": "VM5",
+        "sourceLabel": "VM5 — Last Centurion — Wendell \"Stilt-Stumble\" Krabowski Lease • Royalty 3/16",
+        "effectiveDate": "2024-04-01",
+        "sourceDocNo": "VM5-OGL-004",
+        "decimal": "0.006944444444444444444444444444444444444445"
+      },
+      {
+        "id": "orri-dm-vulcan-mesa-5-1779555600000-vm-orri-1-unit-a-gross",
+        "category": "orri",
+        "payee": "Ares Override, LP",
+        "tractName": "VM5 — Last Centurion",
+        "tractCode": "VM5",
+        "sourceLabel": "Unit ORRI • Gross 8/8",
+        "effectiveDate": "2024-02-01",
+        "sourceDocNo": "VM-ORRI-1",
+        "decimal": "0.004629629629629629629629629629629629629628"
+      },
+      {
+        "id": "retained-wi-dm-vulcan-mesa-5-1779555600000",
+        "category": "retained_wi",
+        "payee": "Vulcan Mesa Petroleum, LLC",
+        "tractName": "VM5 — Last Centurion",
+        "tractCode": "VM5",
+        "sourceLabel": "VM5 retained WI",
+        "effectiveDate": "2024-01-01",
+        "sourceDocNo": "",
+        "decimal": "0"
+      },
+      {
+        "id": "assignment-dm-vulcan-mesa-5-1779555600000-vm-asg-1-unit-a-60",
+        "category": "assigned_wi",
+        "payee": "Praetor Brothers Operating, LLC",
+        "tractName": "VM5 — Last Centurion",
+        "tractCode": "VM5",
+        "sourceLabel": "Vulcan Mesa Petroleum, LLC assignment",
+        "effectiveDate": "2024-03-01",
+        "sourceDocNo": "VM-ASG-1",
+        "decimal": "0.06944444444444444444444444444444444444442"
+      },
+      {
+        "id": "assignment-dm-vulcan-mesa-5-1779555600000-vm-asg-2-unit-a-50",
+        "category": "assigned_wi",
+        "payee": "Minerva Draw Production Co.",
+        "tractName": "VM5 — Last Centurion",
+        "tractCode": "VM5",
+        "sourceLabel": "Vulcan Mesa Petroleum, LLC assignment",
+        "effectiveDate": "2024-04-01",
+        "sourceDocNo": "VM-ASG-2",
+        "decimal": "0.05787037037037037037037037037037037037035"
+      }
+    ],
+    "VM6": [
+      {
+        "id": "royalty-dm-vulcan-mesa-6-1779555600000-vm-46-lease-vm-48",
+        "category": "royalty",
+        "payee": "Festus \"Pickled-Egg\" Drumheller",
+        "tractName": "VM6 — Jupiter Spur",
+        "tractCode": "VM6",
+        "sourceLabel": "VM6 — Jupiter Spur — Festus \"Pickled-Egg\" Drumheller Lease • Royalty 1/4",
+        "effectiveDate": "2024-02-01",
+        "sourceDocNo": "VM6-OGL-002",
+        "decimal": "0.00925925925925925925925925925925925925926"
+      },
+      {
+        "id": "royalty-dm-vulcan-mesa-6-1779555600000-vm-45-lease-vm-47",
+        "category": "royalty",
+        "payee": "The Jupiter Flats Family Mineral Trust",
+        "tractName": "VM6 — Jupiter Spur",
+        "tractCode": "VM6",
+        "sourceLabel": "VM6 — Jupiter Spur — The Jupiter Flats Family Mineral Trust Lease • Royalty 1/4",
+        "effectiveDate": "2024-01-01",
+        "sourceDocNo": "VM6-OGL-001",
+        "decimal": "0.00925925925925925925925925925925925925926"
+      },
+      {
+        "id": "orri-dm-vulcan-mesa-6-1779555600000-vm-orri-2-unit-b-nri",
+        "category": "orri",
+        "payee": "Hermes Royalty Holdings, LP",
+        "tractName": "VM6 — Jupiter Spur",
+        "tractCode": "VM6",
+        "sourceLabel": "Unit ORRI • NRI basis",
+        "effectiveDate": "2024-02-15",
+        "sourceDocNo": "VM-ORRI-2",
+        "decimal": "0.0008680555555555555555555555555555555555555"
+      },
+      {
+        "id": "retained-wi-dm-vulcan-mesa-6-1779555600000",
+        "category": "retained_wi",
+        "payee": "Vulcan Mesa Petroleum, LLC",
+        "tractName": "VM6 — Jupiter Spur",
+        "tractCode": "VM6",
+        "sourceLabel": "VM6 retained WI",
+        "effectiveDate": "2024-01-01",
+        "sourceDocNo": "",
+        "decimal": "0.0546875"
+      }
+    ],
+    "VM7": [
+      {
+        "id": "royalty-dm-vulcan-mesa-7-1779555600000-vm-50-lease-vm-53",
+        "category": "royalty",
+        "payee": "Buster 'Janus' McGraw",
+        "tractName": "VM7 — Minotaur Fork",
+        "tractCode": "VM7",
+        "sourceLabel": "VM7 — Minotaur Fork — Buster 'Janus' McGraw Lease • Royalty 1/5",
+        "effectiveDate": "2024-01-01",
+        "sourceDocNo": "VM7-OGL-001",
+        "decimal": "0.01111111111111111111111111111111111111111"
+      },
+      {
+        "id": "royalty-dm-vulcan-mesa-7-1779555600000-vm-52-lease-vm-55",
+        "category": "royalty",
+        "payee": "Lurleen \"Ares\" Sproat",
+        "tractName": "VM7 — Minotaur Fork",
+        "tractCode": "VM7",
+        "sourceLabel": "VM7 — Minotaur Fork — Lurleen \"Ares\" Sproat Lease • Royalty 1/5",
+        "effectiveDate": "2024-03-01",
+        "sourceDocNo": "VM7-OGL-003",
+        "decimal": "0.005555555555555555555555555555555555555556"
+      },
+      {
+        "id": "royalty-dm-vulcan-mesa-7-1779555600000-vm-51-lease-vm-54",
+        "category": "royalty",
+        "payee": "Vulcan Spur Holdings, LLC",
+        "tractName": "VM7 — Minotaur Fork",
+        "tractCode": "VM7",
+        "sourceLabel": "VM7 — Minotaur Fork — Vulcan Spur Holdings, LLC Lease • Royalty 1/5",
+        "effectiveDate": "2024-02-01",
+        "sourceDocNo": "VM7-OGL-002",
+        "decimal": "0.005555555555555555555555555555555555555556"
+      },
+      {
+        "id": "orri-dm-vulcan-mesa-7-1779555600000-vm-orri-2-unit-b-nri",
+        "category": "orri",
+        "payee": "Hermes Royalty Holdings, LP",
+        "tractName": "VM7 — Minotaur Fork",
+        "tractCode": "VM7",
+        "sourceLabel": "Unit ORRI • NRI basis",
+        "effectiveDate": "2024-02-15",
+        "sourceDocNo": "VM-ORRI-2",
+        "decimal": "0.001388888888888888888888888888888888888889"
+      },
+      {
+        "id": "retained-wi-dm-vulcan-mesa-7-1779555600000",
+        "category": "retained_wi",
+        "payee": "Vulcan Mesa Petroleum, LLC",
+        "tractName": "VM7 — Minotaur Fork",
+        "tractCode": "VM7",
+        "sourceLabel": "VM7 retained WI",
+        "effectiveDate": "2024-01-01",
+        "sourceDocNo": "",
+        "decimal": "0.08749999999999999999999999999999999999999"
+      }
+    ],
+    "VM8": [
+      {
+        "id": "royalty-dm-vulcan-mesa-8-1779555600000-vm-58-lease-vm-61",
+        "category": "royalty",
+        "payee": "Vulcan Spur Holdings, LLC",
+        "tractName": "VM8 — Probate Styx",
+        "tractCode": "VM8",
+        "sourceLabel": "VM8 — Probate Styx — Vulcan Spur Holdings, LLC Lease • Royalty 1/4",
+        "effectiveDate": "2024-01-01",
+        "sourceDocNo": "VM8-OGL-001",
+        "decimal": "0.01157407407407407407407407407407407407408"
+      },
+      {
+        "id": "royalty-dm-vulcan-mesa-8-1779555600000-vm-60-lease-vm-63",
+        "category": "royalty",
+        "payee": "Estate of Wilbur \"The Geek\" Posthumous",
+        "tractName": "VM8 — Probate Styx",
+        "tractCode": "VM8",
+        "sourceLabel": "VM8 — Probate Styx — Estate of Wilbur \"The Geek\" Posthumous Lease • Royalty 1/4",
+        "effectiveDate": "2024-03-01",
+        "sourceDocNo": "VM8-OGL-003",
+        "decimal": "0.005787037037037037037037037037037037037038"
+      },
+      {
+        "id": "royalty-dm-vulcan-mesa-8-1779555600000-vm-59-lease-vm-62",
+        "category": "royalty",
+        "payee": "Minerva 'Minnie' Pickens",
+        "tractName": "VM8 — Probate Styx",
+        "tractCode": "VM8",
+        "sourceLabel": "VM8 — Probate Styx — Minerva 'Minnie' Pickens Lease • Royalty 1/4",
+        "effectiveDate": "2024-02-01",
+        "sourceDocNo": "VM8-OGL-002",
+        "decimal": "0.005787037037037037037037037037037037037038"
+      },
+      {
+        "id": "orri-dm-vulcan-mesa-8-1779555600000-vm-orri-2-unit-b-nri",
+        "category": "orri",
+        "payee": "Hermes Royalty Holdings, LP",
+        "tractName": "VM8 — Probate Styx",
+        "tractCode": "VM8",
+        "sourceLabel": "Unit ORRI • NRI basis",
+        "effectiveDate": "2024-02-15",
+        "sourceDocNo": "VM-ORRI-2",
+        "decimal": "0.001085069444444444444444444444444444444444"
+      },
+      {
+        "id": "retained-wi-dm-vulcan-mesa-8-1779555600000",
+        "category": "retained_wi",
+        "payee": "Vulcan Mesa Petroleum, LLC",
+        "tractName": "VM8 — Probate Styx",
+        "tractCode": "VM8",
+        "sourceLabel": "VM8 retained WI",
+        "effectiveDate": "2024-01-01",
+        "sourceDocNo": "",
+        "decimal": "0.068359375"
+      }
+    ],
+    "VM9": [
+      {
+        "id": "royalty-dm-vulcan-mesa-9-1779555600000-vm-65-lease-vm-68",
+        "category": "royalty",
+        "payee": "Minerva 'Minnie' Pickens",
+        "tractName": "VM9 — Minerva's Bequest",
+        "tractCode": "VM9",
+        "sourceLabel": "VM9 — Minerva's Bequest — Minerva 'Minnie' Pickens Lease • Royalty 1/4",
+        "effectiveDate": "2024-01-01",
+        "sourceDocNo": "VM9-OGL-001",
+        "decimal": "0.00925925925925925925925925925925925925926"
+      },
+      {
+        "id": "royalty-dm-vulcan-mesa-9-1779555600000-vm-67-lease-vm-70",
+        "category": "royalty",
+        "payee": "Bartholomew \"Centurion\" Pickens",
+        "tractName": "VM9 — Minerva's Bequest",
+        "tractCode": "VM9",
+        "sourceLabel": "VM9 — Minerva's Bequest — Bartholomew \"Centurion\" Pickens Lease • Royalty 1/4",
+        "effectiveDate": "2024-03-01",
+        "sourceDocNo": "VM9-OGL-003",
+        "decimal": "0.00462962962962962962962962962962962962963"
+      },
+      {
+        "id": "royalty-dm-vulcan-mesa-9-1779555600000-vm-66-lease-vm-69",
+        "category": "royalty",
+        "payee": "The Jupiter Flats Family Mineral Trust",
+        "tractName": "VM9 — Minerva's Bequest",
+        "tractCode": "VM9",
+        "sourceLabel": "VM9 — Minerva's Bequest — The Jupiter Flats Family Mineral Trust Lease • Royalty 1/4",
+        "effectiveDate": "2024-02-01",
+        "sourceDocNo": "VM9-OGL-002",
+        "decimal": "0.00462962962962962962962962962962962962963"
+      },
+      {
+        "id": "orri-dm-vulcan-mesa-9-1779555600000-vm-orri-2-unit-b-nri",
+        "category": "orri",
+        "payee": "Hermes Royalty Holdings, LP",
+        "tractName": "VM9 — Minerva's Bequest",
+        "tractCode": "VM9",
+        "sourceLabel": "Unit ORRI • NRI basis",
+        "effectiveDate": "2024-02-15",
+        "sourceDocNo": "VM-ORRI-2",
+        "decimal": "0.0008680555555555555555555555555555555555555"
+      },
+      {
+        "id": "retained-wi-dm-vulcan-mesa-9-1779555600000",
+        "category": "retained_wi",
+        "payee": "Vulcan Mesa Petroleum, LLC",
+        "tractName": "VM9 — Minerva's Bequest",
+        "tractCode": "VM9",
+        "sourceLabel": "VM9 retained WI",
+        "effectiveDate": "2024-01-01",
+        "sourceDocNo": "",
+        "decimal": "0.0546875"
+      }
+    ],
+    "VM10": [
+      {
+        "id": "royalty-dm-vulcan-mesa-10-1779555600000-vm-74-lease-vm-78",
+        "category": "royalty",
+        "payee": "Algernon \"Fire-Breather\" Lipinski",
+        "tractName": "VM10 — Roughneck Olympus",
+        "tractCode": "VM10",
+        "sourceLabel": "VM10 — Roughneck Olympus — Algernon \"Fire-Breather\" Lipinski Lease • Royalty 1/4",
+        "effectiveDate": "2024-03-01",
+        "sourceDocNo": "VM10-OGL-003",
+        "decimal": "0.00925925925925925925925925925925925925926"
+      },
+      {
+        "id": "royalty-dm-vulcan-mesa-10-1779555600000-vm-72-lease-vm-76",
+        "category": "royalty",
+        "payee": "Buster 'Janus' McGraw",
+        "tractName": "VM10 — Roughneck Olympus",
+        "tractCode": "VM10",
+        "sourceLabel": "VM10 — Roughneck Olympus — Buster 'Janus' McGraw Lease • Royalty 1/4",
+        "effectiveDate": "2024-01-01",
+        "sourceDocNo": "VM10-OGL-001",
+        "decimal": "0.00925925925925925925925925925925925925926"
+      },
+      {
+        "id": "royalty-dm-vulcan-mesa-10-1779555600000-vm-75-lease-vm-79",
+        "category": "royalty",
+        "payee": "Mable \"Dunk-Tank\" Twiggs",
+        "tractName": "VM10 — Roughneck Olympus",
+        "tractCode": "VM10",
+        "sourceLabel": "VM10 — Roughneck Olympus — Mable \"Dunk-Tank\" Twiggs Lease • Royalty 1/4",
+        "effectiveDate": "2024-04-01",
+        "sourceDocNo": "VM10-OGL-004",
+        "decimal": "0.00925925925925925925925925925925925925926"
+      },
+      {
+        "id": "royalty-dm-vulcan-mesa-10-1779555600000-vm-73-lease-vm-77",
+        "category": "royalty",
+        "payee": "Vulcan Spur Holdings, LLC",
+        "tractName": "VM10 — Roughneck Olympus",
+        "tractCode": "VM10",
+        "sourceLabel": "VM10 — Roughneck Olympus — Vulcan Spur Holdings, LLC Lease • Royalty 1/4",
+        "effectiveDate": "2024-02-01",
+        "sourceDocNo": "VM10-OGL-002",
+        "decimal": "0.00925925925925925925925925925925925925926"
+      },
+      {
+        "id": "orri-dm-vulcan-mesa-10-1779555600000-vm-orri-3-vm10-wi",
+        "category": "orri",
+        "payee": "Centurion Override Co.",
+        "tractName": "VM10 — Roughneck Olympus",
+        "tractCode": "VM10",
+        "sourceLabel": "VM10 ORRI • WI basis",
+        "effectiveDate": "2024-03-01",
+        "sourceDocNo": "VM-ORRI-3",
+        "decimal": "0.001851851851851851851851851851851851851851"
+      },
+      {
+        "id": "orri-dm-vulcan-mesa-10-1779555600000-vm-orri-2-unit-b-nri",
+        "category": "orri",
+        "payee": "Hermes Royalty Holdings, LP",
+        "tractName": "VM10 — Roughneck Olympus",
+        "tractCode": "VM10",
+        "sourceLabel": "Unit ORRI • NRI basis",
+        "effectiveDate": "2024-02-15",
+        "sourceDocNo": "VM-ORRI-2",
+        "decimal": "0.001707175925925925925925925925925925925925"
+      },
+      {
+        "id": "retained-wi-dm-vulcan-mesa-10-1779555600000",
+        "category": "retained_wi",
+        "payee": "Vulcan Mesa Petroleum, LLC",
+        "tractName": "VM10 — Roughneck Olympus",
+        "tractCode": "VM10",
+        "sourceLabel": "VM10 retained WI",
+        "effectiveDate": "2024-01-01",
+        "sourceDocNo": "",
+        "decimal": "0.08066406249999999999999999999999999999997"
+      },
+      {
+        "id": "assignment-dm-vulcan-mesa-10-1779555600000-vm-asg-3-vm10-25",
+        "category": "assigned_wi",
+        "payee": "Ares Production Co.",
+        "tractName": "VM10 — Roughneck Olympus",
+        "tractCode": "VM10",
+        "sourceLabel": "Vulcan Mesa Petroleum, LLC assignment",
+        "effectiveDate": "2024-05-01",
+        "sourceDocNo": "VM-ASG-3",
+        "decimal": "0.02688802083333333333333333333333333333333"
+      }
+    ]
+  },
+  "transferOrderReview": {
+    "rows": [
+      {
+        "id": "royalty-dm-vulcan-mesa-2-1779555600000-vm-9-lease-vm-14",
+        "category": "royalty",
+        "payee": "The Jupiter Flats Family Mineral Trust",
+        "tractName": "VM2 — Widow's Aegis",
+        "tractCode": "VM2",
+        "sourceLabel": "VM2 • VM2 — Widow's Aegis — The Jupiter Flats Family Mineral Trust Lease • Royalty 1/4",
+        "effectiveDate": "2024-01-01",
+        "sourceDocNo": "VM2-OGL-001",
+        "decimal": "0.01388888888888888888888888888888888888889"
+      },
+      {
+        "id": "royalty-dm-vulcan-mesa-8-1779555600000-vm-58-lease-vm-61",
+        "category": "royalty",
+        "payee": "Vulcan Spur Holdings, LLC",
+        "tractName": "VM8 — Probate Styx",
+        "tractCode": "VM8",
+        "sourceLabel": "VM8 • VM8 — Probate Styx — Vulcan Spur Holdings, LLC Lease • Royalty 1/4",
+        "effectiveDate": "2024-01-01",
+        "sourceDocNo": "VM8-OGL-001",
+        "decimal": "0.01157407407407407407407407407407407407408"
+      },
+      {
+        "id": "royalty-dm-vulcan-mesa-7-1779555600000-vm-50-lease-vm-53",
+        "category": "royalty",
+        "payee": "Buster 'Janus' McGraw",
+        "tractName": "VM7 — Minotaur Fork",
+        "tractCode": "VM7",
+        "sourceLabel": "VM7 • VM7 — Minotaur Fork — Buster 'Janus' McGraw Lease • Royalty 1/5",
+        "effectiveDate": "2024-01-01",
+        "sourceDocNo": "VM7-OGL-001",
+        "decimal": "0.01111111111111111111111111111111111111111"
+      },
+      {
+        "id": "royalty-dm-vulcan-mesa-10-1779555600000-vm-74-lease-vm-78",
+        "category": "royalty",
+        "payee": "Algernon \"Fire-Breather\" Lipinski",
+        "tractName": "VM10 — Roughneck Olympus",
+        "tractCode": "VM10",
+        "sourceLabel": "VM10 • VM10 — Roughneck Olympus — Algernon \"Fire-Breather\" Lipinski Lease • Royalty 1/4",
+        "effectiveDate": "2024-03-01",
+        "sourceDocNo": "VM10-OGL-003",
+        "decimal": "0.00925925925925925925925925925925925925926"
+      },
+      {
+        "id": "royalty-dm-vulcan-mesa-1-1779555600000-vm-2-lease-vm-5",
+        "category": "royalty",
+        "payee": "Buster 'Janus' McGraw",
+        "tractName": "VM1 — Apollo Draw",
+        "tractCode": "VM1",
+        "sourceLabel": "VM1 • VM1 — Apollo Draw — Buster 'Janus' McGraw Lease • Royalty 1/4",
+        "effectiveDate": "2024-01-01",
+        "sourceDocNo": "VM1-OGL-001",
+        "decimal": "0.00925925925925925925925925925925925925926"
+      },
+      {
+        "id": "royalty-dm-vulcan-mesa-10-1779555600000-vm-72-lease-vm-76",
+        "category": "royalty",
+        "payee": "Buster 'Janus' McGraw",
+        "tractName": "VM10 — Roughneck Olympus",
+        "tractCode": "VM10",
+        "sourceLabel": "VM10 • VM10 — Roughneck Olympus — Buster 'Janus' McGraw Lease • Royalty 1/4",
+        "effectiveDate": "2024-01-01",
+        "sourceDocNo": "VM10-OGL-001",
+        "decimal": "0.00925925925925925925925925925925925925926"
+      },
+      {
+        "id": "royalty-dm-vulcan-mesa-6-1779555600000-vm-46-lease-vm-48",
+        "category": "royalty",
+        "payee": "Festus \"Pickled-Egg\" Drumheller",
+        "tractName": "VM6 — Jupiter Spur",
+        "tractCode": "VM6",
+        "sourceLabel": "VM6 • VM6 — Jupiter Spur — Festus \"Pickled-Egg\" Drumheller Lease • Royalty 1/4",
+        "effectiveDate": "2024-02-01",
+        "sourceDocNo": "VM6-OGL-002",
+        "decimal": "0.00925925925925925925925925925925925925926"
+      },
+      {
+        "id": "royalty-dm-vulcan-mesa-10-1779555600000-vm-75-lease-vm-79",
+        "category": "royalty",
+        "payee": "Mable \"Dunk-Tank\" Twiggs",
+        "tractName": "VM10 — Roughneck Olympus",
+        "tractCode": "VM10",
+        "sourceLabel": "VM10 • VM10 — Roughneck Olympus — Mable \"Dunk-Tank\" Twiggs Lease • Royalty 1/4",
+        "effectiveDate": "2024-04-01",
+        "sourceDocNo": "VM10-OGL-004",
+        "decimal": "0.00925925925925925925925925925925925925926"
+      },
+      {
+        "id": "royalty-dm-vulcan-mesa-9-1779555600000-vm-65-lease-vm-68",
+        "category": "royalty",
+        "payee": "Minerva 'Minnie' Pickens",
+        "tractName": "VM9 — Minerva's Bequest",
+        "tractCode": "VM9",
+        "sourceLabel": "VM9 • VM9 — Minerva's Bequest — Minerva 'Minnie' Pickens Lease • Royalty 1/4",
+        "effectiveDate": "2024-01-01",
+        "sourceDocNo": "VM9-OGL-001",
+        "decimal": "0.00925925925925925925925925925925925925926"
+      },
+      {
+        "id": "royalty-dm-vulcan-mesa-6-1779555600000-vm-45-lease-vm-47",
+        "category": "royalty",
+        "payee": "The Jupiter Flats Family Mineral Trust",
+        "tractName": "VM6 — Jupiter Spur",
+        "tractCode": "VM6",
+        "sourceLabel": "VM6 • VM6 — Jupiter Spur — The Jupiter Flats Family Mineral Trust Lease • Royalty 1/4",
+        "effectiveDate": "2024-01-01",
+        "sourceDocNo": "VM6-OGL-001",
+        "decimal": "0.00925925925925925925925925925925925925926"
+      },
+      {
+        "id": "royalty-dm-vulcan-mesa-3-1779555600000-vm-18-lease-vm-24",
+        "category": "royalty",
+        "payee": "Vulcan Spur Holdings, LLC",
+        "tractName": "VM3 — Mercury Cutoff",
+        "tractCode": "VM3",
+        "sourceLabel": "VM3 • VM3 — Mercury Cutoff — Vulcan Spur Holdings, LLC Lease • Royalty 1/4",
+        "effectiveDate": "2024-01-01",
+        "sourceDocNo": "VM3-OGL-001",
+        "decimal": "0.00925925925925925925925925925925925925926"
+      },
+      {
+        "id": "royalty-dm-vulcan-mesa-10-1779555600000-vm-73-lease-vm-77",
+        "category": "royalty",
+        "payee": "Vulcan Spur Holdings, LLC",
+        "tractName": "VM10 — Roughneck Olympus",
+        "tractCode": "VM10",
+        "sourceLabel": "VM10 • VM10 — Roughneck Olympus — Vulcan Spur Holdings, LLC Lease • Royalty 1/4",
+        "effectiveDate": "2024-02-01",
+        "sourceDocNo": "VM10-OGL-002",
+        "decimal": "0.00925925925925925925925925925925925925926"
+      },
+      {
+        "id": "royalty-dm-vulcan-mesa-4-1779555600000-vm-30-lease-vm-33",
+        "category": "royalty",
+        "payee": "Constance \"Bone-Saw\" Whittle",
+        "tractName": "VM4 — Vulcan Gulch",
+        "tractCode": "VM4",
+        "sourceLabel": "VM4 • VM4 — Vulcan Gulch — Constance \"Bone-Saw\" Whittle Lease • Royalty 1/4",
+        "effectiveDate": "2024-02-01",
+        "sourceDocNo": "VM4-OGL-002",
+        "decimal": "0.008680555555555555555555555555555555555555"
+      },
+      {
+        "id": "royalty-dm-vulcan-mesa-4-1779555600000-vm-31-lease-vm-34",
+        "category": "royalty",
+        "payee": "Reginald \"Ringmaster\" Crumley",
+        "tractName": "VM4 — Vulcan Gulch",
+        "tractCode": "VM4",
+        "sourceLabel": "VM4 • VM4 — Vulcan Gulch — Reginald \"Ringmaster\" Crumley Lease • Royalty 1/4",
+        "effectiveDate": "2024-03-01",
+        "sourceDocNo": "VM4-OGL-003",
+        "decimal": "0.008680555555555555555555555555555555555555"
+      },
+      {
+        "id": "royalty-dm-vulcan-mesa-2-1779555600000-vm-11-lease-vm-16",
+        "category": "royalty",
+        "payee": "Estate of Hambone \"Lefty\" McGurkin",
+        "tractName": "VM2 — Widow's Aegis",
+        "tractCode": "VM2",
+        "sourceLabel": "VM2 • VM2 — Widow's Aegis — Estate of Hambone \"Lefty\" McGurkin Lease • Royalty 1/4",
+        "effectiveDate": "2024-03-01",
+        "sourceDocNo": "VM2-OGL-003",
+        "decimal": "0.006944444444444444444444444444444444444445"
+      },
+      {
+        "id": "royalty-dm-vulcan-mesa-2-1779555600000-vm-10-lease-vm-15",
+        "category": "royalty",
+        "payee": "Minerva 'Minnie' Pickens",
+        "tractName": "VM2 — Widow's Aegis",
+        "tractCode": "VM2",
+        "sourceLabel": "VM2 • VM2 — Widow's Aegis — Minerva 'Minnie' Pickens Lease • Royalty 1/4",
+        "effectiveDate": "2024-02-01",
+        "sourceDocNo": "VM2-OGL-002",
+        "decimal": "0.006944444444444444444444444444444444444445"
+      },
+      {
+        "id": "royalty-dm-vulcan-mesa-5-1779555600000-vm-38-lease-vm-42",
+        "category": "royalty",
+        "payee": "Pearl \"Knife-Catcher\" Velasquez",
+        "tractName": "VM5 — Last Centurion",
+        "tractCode": "VM5",
+        "sourceLabel": "VM5 • VM5 — Last Centurion — Pearl \"Knife-Catcher\" Velasquez Lease • Royalty 3/16",
+        "effectiveDate": "2024-03-01",
+        "sourceDocNo": "VM5-OGL-003",
+        "decimal": "0.006944444444444444444444444444444444444445"
+      },
+      {
+        "id": "royalty-dm-vulcan-mesa-5-1779555600000-vm-36-lease-vm-40",
+        "category": "royalty",
+        "payee": "The Jupiter Flats Family Mineral Trust",
+        "tractName": "VM5 — Last Centurion",
+        "tractCode": "VM5",
+        "sourceLabel": "VM5 • VM5 — Last Centurion — The Jupiter Flats Family Mineral Trust Lease • Royalty 3/16",
+        "effectiveDate": "2024-01-01",
+        "sourceDocNo": "VM5-OGL-001",
+        "decimal": "0.006944444444444444444444444444444444444445"
+      },
+      {
+        "id": "royalty-dm-vulcan-mesa-5-1779555600000-vm-37-lease-vm-41",
+        "category": "royalty",
+        "payee": "Vulcan Spur Holdings, LLC",
+        "tractName": "VM5 — Last Centurion",
+        "tractCode": "VM5",
+        "sourceLabel": "VM5 • VM5 — Last Centurion — Vulcan Spur Holdings, LLC Lease • Royalty 3/16",
+        "effectiveDate": "2024-02-01",
+        "sourceDocNo": "VM5-OGL-002",
+        "decimal": "0.006944444444444444444444444444444444444445"
+      },
+      {
+        "id": "royalty-dm-vulcan-mesa-5-1779555600000-vm-39-lease-vm-43",
+        "category": "royalty",
+        "payee": "Wendell \"Stilt-Stumble\" Krabowski",
+        "tractName": "VM5 — Last Centurion",
+        "tractCode": "VM5",
+        "sourceLabel": "VM5 • VM5 — Last Centurion — Wendell \"Stilt-Stumble\" Krabowski Lease • Royalty 3/16",
+        "effectiveDate": "2024-04-01",
+        "sourceDocNo": "VM5-OGL-004",
+        "decimal": "0.006944444444444444444444444444444444444445"
+      },
+      {
+        "id": "royalty-dm-vulcan-mesa-8-1779555600000-vm-60-lease-vm-63",
+        "category": "royalty",
+        "payee": "Estate of Wilbur \"The Geek\" Posthumous",
+        "tractName": "VM8 — Probate Styx",
+        "tractCode": "VM8",
+        "sourceLabel": "VM8 • VM8 — Probate Styx — Estate of Wilbur \"The Geek\" Posthumous Lease • Royalty 1/4",
+        "effectiveDate": "2024-03-01",
+        "sourceDocNo": "VM8-OGL-003",
+        "decimal": "0.005787037037037037037037037037037037037038"
+      },
+      {
+        "id": "royalty-dm-vulcan-mesa-8-1779555600000-vm-59-lease-vm-62",
+        "category": "royalty",
+        "payee": "Minerva 'Minnie' Pickens",
+        "tractName": "VM8 — Probate Styx",
+        "tractCode": "VM8",
+        "sourceLabel": "VM8 • VM8 — Probate Styx — Minerva 'Minnie' Pickens Lease • Royalty 1/4",
+        "effectiveDate": "2024-02-01",
+        "sourceDocNo": "VM8-OGL-002",
+        "decimal": "0.005787037037037037037037037037037037037038"
+      },
+      {
+        "id": "royalty-dm-vulcan-mesa-7-1779555600000-vm-52-lease-vm-55",
+        "category": "royalty",
+        "payee": "Lurleen \"Ares\" Sproat",
+        "tractName": "VM7 — Minotaur Fork",
+        "tractCode": "VM7",
+        "sourceLabel": "VM7 • VM7 — Minotaur Fork — Lurleen \"Ares\" Sproat Lease • Royalty 1/5",
+        "effectiveDate": "2024-03-01",
+        "sourceDocNo": "VM7-OGL-003",
+        "decimal": "0.005555555555555555555555555555555555555556"
+      },
+      {
+        "id": "royalty-dm-vulcan-mesa-7-1779555600000-vm-51-lease-vm-54",
+        "category": "royalty",
+        "payee": "Vulcan Spur Holdings, LLC",
+        "tractName": "VM7 — Minotaur Fork",
+        "tractCode": "VM7",
+        "sourceLabel": "VM7 • VM7 — Minotaur Fork — Vulcan Spur Holdings, LLC Lease • Royalty 1/5",
+        "effectiveDate": "2024-02-01",
+        "sourceDocNo": "VM7-OGL-002",
+        "decimal": "0.005555555555555555555555555555555555555556"
+      },
+      {
+        "id": "royalty-dm-vulcan-mesa-9-1779555600000-vm-67-lease-vm-70",
+        "category": "royalty",
+        "payee": "Bartholomew \"Centurion\" Pickens",
+        "tractName": "VM9 — Minerva's Bequest",
+        "tractCode": "VM9",
+        "sourceLabel": "VM9 • VM9 — Minerva's Bequest — Bartholomew \"Centurion\" Pickens Lease • Royalty 1/4",
+        "effectiveDate": "2024-03-01",
+        "sourceDocNo": "VM9-OGL-003",
+        "decimal": "0.00462962962962962962962962962962962962963"
+      },
+      {
+        "id": "royalty-dm-vulcan-mesa-3-1779555600000-vm-19-lease-vm-25",
+        "category": "royalty",
+        "payee": "Mavis \"Sword-Eater\" Toomey",
+        "tractName": "VM3 — Mercury Cutoff",
+        "tractCode": "VM3",
+        "sourceLabel": "VM3 • VM3 — Mercury Cutoff — Mavis \"Sword-Eater\" Toomey Lease • Royalty 1/4",
+        "effectiveDate": "2024-02-01",
+        "sourceDocNo": "VM3-OGL-002",
+        "decimal": "0.00462962962962962962962962962962962962963"
+      },
+      {
+        "id": "royalty-dm-vulcan-mesa-1-1779555600000-vm-3-lease-vm-6",
+        "category": "royalty",
+        "payee": "Minerva 'Minnie' Pickens",
+        "tractName": "VM1 — Apollo Draw",
+        "tractCode": "VM1",
+        "sourceLabel": "VM1 • VM1 — Apollo Draw — Minerva 'Minnie' Pickens Lease • Royalty 1/4",
+        "effectiveDate": "2024-02-01",
+        "sourceDocNo": "VM1-OGL-002",
+        "decimal": "0.00462962962962962962962962962962962962963"
+      },
+      {
+        "id": "royalty-dm-vulcan-mesa-1-1779555600000-vm-4-lease-vm-7",
+        "category": "royalty",
+        "payee": "Mortimer \"Sawdust\" Hench",
+        "tractName": "VM1 — Apollo Draw",
+        "tractCode": "VM1",
+        "sourceLabel": "VM1 • VM1 — Apollo Draw — Mortimer \"Sawdust\" Hench Lease • Royalty 1/4",
+        "effectiveDate": "2024-03-01",
+        "sourceDocNo": "VM1-OGL-003",
+        "decimal": "0.00462962962962962962962962962962962962963"
+      },
+      {
+        "id": "royalty-dm-vulcan-mesa-9-1779555600000-vm-66-lease-vm-69",
+        "category": "royalty",
+        "payee": "The Jupiter Flats Family Mineral Trust",
+        "tractName": "VM9 — Minerva's Bequest",
+        "tractCode": "VM9",
+        "sourceLabel": "VM9 • VM9 — Minerva's Bequest — The Jupiter Flats Family Mineral Trust Lease • Royalty 1/4",
+        "effectiveDate": "2024-02-01",
+        "sourceDocNo": "VM9-OGL-002",
+        "decimal": "0.00462962962962962962962962962962962962963"
+      },
+      {
+        "id": "royalty-dm-vulcan-mesa-4-1779555600000-vm-29-lease-vm-32",
+        "category": "royalty",
+        "payee": "Buster 'Janus' McGraw",
+        "tractName": "VM4 — Vulcan Gulch",
+        "tractCode": "VM4",
+        "sourceLabel": "VM4 • VM4 — Vulcan Gulch — Buster 'Janus' McGraw Lease • Royalty 1/6.5",
+        "effectiveDate": "2024-01-01",
+        "sourceDocNo": "VM4-OGL-001",
+        "decimal": "0.00356125356125356125356125356125356125356"
+      },
+      {
+        "id": "royalty-dm-vulcan-mesa-3-1779555600000-vm-20-lease-vm-26",
+        "category": "royalty",
+        "payee": "Beauregard Plumstead",
+        "tractName": "VM3 — Mercury Cutoff",
+        "tractCode": "VM3",
+        "sourceLabel": "VM3 • VM3 — Mercury Cutoff — Beauregard Plumstead Lease • Royalty 1/4",
+        "effectiveDate": "2024-03-01",
+        "sourceDocNo": "VM3-OGL-003",
+        "decimal": "0.002314814814814814814814814814814814814815"
+      },
+      {
+        "id": "npri-vm-22",
+        "category": "npri",
+        "payee": "Annie Boggs",
+        "tractName": "VM3 — Mercury Cutoff",
+        "tractCode": "VM3",
+        "sourceLabel": "Fixed NPRI • 0.500000000 of whole tract",
+        "effectiveDate": "1965-04-30",
+        "sourceDocNo": "VM3-NPRI-001",
+        "decimal": "0.03240740740740740740740740740740740740741"
+      },
+      {
+        "id": "npri-vm-23",
+        "category": "npri",
+        "payee": "Hermes Royalty Holdings, LP",
+        "tractName": "VM3 — Mercury Cutoff",
+        "tractCode": "VM3",
+        "sourceLabel": "Fixed NPRI • 0.250000000 of whole tract",
+        "effectiveDate": "1972-09-09",
+        "sourceDocNo": "VM3-NPRI-002",
+        "decimal": "0.01620370370370370370370370370370370370371"
+      },
+      {
+        "id": "orri-vm-orri-1-unit-a-gross",
+        "category": "orri",
+        "payee": "Ares Override, LP",
+        "tractName": "Jupiter Flats Unit",
+        "tractCode": "UNIT",
+        "sourceLabel": "Unit ORRI • Gross 8/8",
+        "effectiveDate": "2024-02-01",
+        "sourceDocNo": "VM-ORRI-1",
+        "decimal": "0.01533564814814814814814814814814814814815"
+      },
+      {
+        "id": "orri-vm-orri-2-unit-b-nri",
+        "category": "orri",
+        "payee": "Hermes Royalty Holdings, LP",
+        "tractName": "Minerva Draw Unit",
+        "tractCode": "UNIT",
+        "sourceLabel": "Unit ORRI • NRI basis",
+        "effectiveDate": "2024-02-15",
+        "sourceDocNo": "VM-ORRI-2",
+        "decimal": "0.00591724537037037037037037037037037037037"
+      },
+      {
+        "id": "orri-vm-orri-3-vm10-wi",
+        "category": "orri",
+        "payee": "Centurion Override Co.",
+        "tractName": "VM10 — Roughneck Olympus",
+        "tractCode": "TRACT",
+        "sourceLabel": "VM10 — Roughneck Olympus ORRI • WI basis",
+        "effectiveDate": "2024-03-01",
+        "sourceDocNo": "VM-ORRI-3",
+        "decimal": "0.001851851851851851851851851851851851851851"
+      },
+      {
+        "id": "retained-wi-unit",
+        "category": "retained_wi",
+        "payee": "Vulcan Mesa Petroleum, LLC",
+        "tractName": "Vulcan Mesa Unit",
+        "tractCode": "UNIT",
+        "sourceLabel": "Retained WI",
+        "effectiveDate": "2024-01-01",
+        "sourceDocNo": "",
+        "decimal": "0.3458984375"
+      },
+      {
+        "id": "assignment-vm-asg-1-unit-a-60",
+        "category": "assigned_wi",
+        "payee": "Praetor Brothers Operating, LLC",
+        "tractName": "Jupiter Flats Unit",
+        "tractCode": "UNIT",
+        "sourceLabel": "Vulcan Mesa Petroleum, LLC assignment",
+        "effectiveDate": "2024-03-01",
+        "sourceDocNo": "VM-ASG-1",
+        "decimal": "0.1905715811965811965811965811965811965811"
+      },
+      {
+        "id": "assignment-vm-asg-2-unit-a-50",
+        "category": "assigned_wi",
+        "payee": "Minerva Draw Production Co.",
+        "tractName": "Jupiter Flats Unit",
+        "tractCode": "UNIT",
+        "sourceLabel": "Vulcan Mesa Petroleum, LLC assignment",
+        "effectiveDate": "2024-04-01",
+        "sourceDocNo": "VM-ASG-2",
+        "decimal": "0.158809650997150997150997150997150997151"
+      },
+      {
+        "id": "assignment-vm-asg-3-vm10-25",
+        "category": "assigned_wi",
+        "payee": "Ares Production Co.",
+        "tractName": "VM10 — Roughneck Olympus",
+        "tractCode": "TRACT",
+        "sourceLabel": "Vulcan Mesa Petroleum, LLC assignment",
+        "effectiveDate": "2024-05-01",
+        "sourceDocNo": "VM-ASG-3",
+        "decimal": "0.02688802083333333333333333333333333333333"
+      }
+    ],
+    "totalDecimal": "1.024528133903133903133903133903133903134",
+    "expectedDecimal": "0.9907407407407407407407407407407407407407",
+    "varianceDecimal": "0.0337873931623931623931623931623931623933",
+    "categorySummaries": [
+      {
+        "category": "royalty",
+        "rowCount": 31,
+        "totalDecimal": "0.2306445868945868945868945868945868945867"
+      },
+      {
+        "category": "npri",
+        "rowCount": 2,
+        "totalDecimal": "0.04861111111111111111111111111111111111112"
+      },
+      {
+        "category": "orri",
+        "rowCount": 3,
+        "totalDecimal": "0.02310474537037037037037037037037037037037"
+      },
+      {
+        "category": "retained_wi",
+        "rowCount": 1,
+        "totalDecimal": "0.3458984375"
+      },
+      {
+        "category": "assigned_wi",
+        "rowCount": 3,
+        "totalDecimal": "0.3762692530270655270655270655270655270654"
+      }
+    ],
+    "reviewableRowCount": 39,
+    "rowsWithCompleteSource": 39,
+    "rowsWithSourceGap": 0,
+    "rowsMissingEffectiveDate": 0,
+    "rowsMissingSourceDocNo": 0
+  }
+}

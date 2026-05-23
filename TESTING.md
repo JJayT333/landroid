@@ -77,7 +77,9 @@ Do not describe a workflow as verified unless it is active in
 - Before Phase 0.5 starts, the catalog must identify committed or documented
   reference workspaces for the demo fixture, a Raven Forest-scale fixture, and a
   migration-stress `.landroid`; each needs a checksum policy and expected
-  output plan.
+  output plan. The W1 Vulcan Mesa fixture and first expected outputs live under
+  `fixtures/phase-0/` and regenerate through
+  `scripts/generate-phase-0-fixtures.ts`.
 
 ## Regression Expectations
 

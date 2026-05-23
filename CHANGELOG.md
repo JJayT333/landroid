@@ -20,6 +20,13 @@ stay short.
 - Renamed the internal-only second demo fixture to Vulcan Mesa, updated current
   docs and tests to the new name, and archived the Phase 0 ultrareview prompt
   under `docs/archive/prompts/`.
+- Added the first Phase 0 frozen fixture set under `fixtures/phase-0/`:
+  deterministic Vulcan Mesa `.landroid`, checksum, runsheet CSV, packet
+  manifest, leasehold decimals, coverage summary, fixture manifest, and a
+  regeneration script.
+- Added a Phase 0 golden-master test that consumes the committed Vulcan Mesa
+  fixture files and verifies checksum, export counts, runsheet CSV, packet
+  manifest, leasehold decimal output, and Desk Map coverage summaries.
 
 ## 2026-05-20
 

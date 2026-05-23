@@ -1,0 +1,14 @@
+{
+  "generatedAt": "2026-05-23T17:00:00.000Z",
+  "generator": "scripts/generate-phase-0-fixtures.ts",
+  "workspaceId": "ws-00000000-0000-4000-8000-000000000001",
+  "projectName": "Vulcan Mesa — Demo (10 Tracts, 79 nodes)",
+  "nodeCount": 79,
+  "deskMapCount": 10,
+  "ownerCount": 21,
+  "leaseCount": 33,
+  "documentCount": 64,
+  "attachmentCount": 64,
+  "landroidSha256": "bc8ef16a1ecb53838a8ef0f61419d645d737cb62e0ae07db869536cd2ea12e93",
+  "note": "Document blobs are deterministic stub PDFs. Metadata and attachment links come from the Vulcan Mesa seed."
+}
