@@ -19,6 +19,9 @@ stay short.
   work can improve durability and controlled access, but only with explicit
   backup/export, local-first, private-storage, AI/citation, sync-conflict, and
   threat-model gates.
+- Extended the Phase 0 fixture generator so it preserves the current fixture
+  README, emits a deterministic W2 Raven Forest stress manifest/checksum, and
+  keeps the W1 Vulcan Mesa `.landroid` checksum stable.
 
 ## 2026-05-23
 

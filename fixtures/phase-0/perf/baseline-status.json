@@ -24,44 +24,44 @@
       "workflow": "Large Desk Map render",
       "status": "blocked_fixture_missing",
       "fixture": "W2 Raven Forest-scale generated fixture",
-      "fixtureChecksum": null,
+      "fixtureChecksum": "fixtures/phase-0/raven-forest-stress-manifest.sha256",
       "result": null,
       "rawProfilePath": null,
       "driftBudget": "+/- 15%",
-      "notes": "Requires generated W2 stress fixture before capture."
+      "notes": "W2 deterministic manifest exists; full browser-loaded stress fixture/export and raw performance profile are not captured yet."
     },
     {
       "id": "PERF-02",
       "workflow": "Document registry load",
       "status": "blocked_fixture_missing",
       "fixture": "W2 Raven Forest-scale generated fixture with stubbed blobs",
-      "fixtureChecksum": null,
+      "fixtureChecksum": "fixtures/phase-0/raven-forest-stress-manifest.sha256",
       "result": null,
       "rawProfilePath": null,
       "driftBudget": "+/- 15%",
-      "notes": "Requires generated W2 stress fixture before capture."
+      "notes": "W2 deterministic manifest exists; full browser-loaded stress fixture/export and raw performance profile are not captured yet."
     },
     {
       "id": "PERF-03",
       "workflow": "Packet preview build",
       "status": "blocked_fixture_missing",
       "fixture": "W2 Raven Forest-scale generated fixture",
-      "fixtureChecksum": null,
+      "fixtureChecksum": "fixtures/phase-0/raven-forest-stress-manifest.sha256",
       "result": null,
       "rawProfilePath": null,
       "driftBudget": "+/- 15%",
-      "notes": "Requires generated W2 stress fixture before capture."
+      "notes": "W2 deterministic manifest exists; full browser-loaded stress fixture/export and raw performance profile are not captured yet."
     },
     {
       "id": "PERF-04",
       "workflow": ".landroid round trip",
       "status": "blocked_fixture_missing",
       "fixture": "W2 Raven Forest-scale generated fixture",
-      "fixtureChecksum": null,
+      "fixtureChecksum": "fixtures/phase-0/raven-forest-stress-manifest.sha256",
       "result": null,
       "rawProfilePath": null,
       "driftBudget": "+/- 20%",
-      "notes": "Requires generated W2 stress fixture before capture."
+      "notes": "W2 deterministic manifest exists; full browser-loaded stress fixture/export and raw performance profile are not captured yet."
     },
     {
       "id": "PERF-05",
@@ -79,11 +79,11 @@
       "workflow": "Flowchart print",
       "status": "blocked_fixture_missing",
       "fixture": "W2 Raven Forest-scale generated fixture",
-      "fixtureChecksum": null,
+      "fixtureChecksum": "fixtures/phase-0/raven-forest-stress-manifest.sha256",
       "result": null,
       "rawProfilePath": null,
       "driftBudget": "+/- 15%",
-      "notes": "Requires generated W2 stress fixture before capture."
+      "notes": "W2 deterministic manifest exists; full browser-loaded stress fixture/export and raw performance profile are not captured yet."
     },
     {
       "id": "PERF-07",
@@ -101,11 +101,11 @@
       "workflow": "Leasehold transfer-order build",
       "status": "blocked_fixture_missing",
       "fixture": "W2 Raven Forest-scale generated fixture",
-      "fixtureChecksum": null,
+      "fixtureChecksum": "fixtures/phase-0/raven-forest-stress-manifest.sha256",
       "result": null,
       "rawProfilePath": null,
       "driftBudget": "+/- 15%",
-      "notes": "Requires generated W2 stress fixture before capture."
+      "notes": "W2 deterministic manifest exists; full browser-loaded stress fixture/export and raw performance profile are not captured yet."
     }
   ]
 }

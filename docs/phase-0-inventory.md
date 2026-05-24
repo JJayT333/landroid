@@ -44,7 +44,7 @@ Validation run during reconciliation:
 - `npm test -- src/store/__tests__/workspace-store-doc-actions.test.ts src/engine/__tests__/fraction-display.test.ts src/storage/__tests__/runsheet-export.test.ts`
   - passed, 3 files / 40 tests.
 - `npm run lint` - passed.
-- `npm test` - passed, 80 files / 639 tests. Existing intentional stderr
+- `npm test` - passed, 80 files / 640 tests. Existing intentional stderr
   coverage for simulated Dexie failures appeared.
 - `npm run build` - passed with existing Vite dynamic/static import warnings,
   chunk-size warning, and Node `module.register()` deprecation warning.
@@ -593,9 +593,10 @@ Three reference workspaces are required as Phase 0 fixtures. Two are derivable f
   rebuild fixture. Keep W2 as a documented stress-test recipe and generate a
   similar deterministic project specifically for the rebuild.
 - Recipe: `fixtures/phase-0/raven-forest-stress-recipe.md`.
-- Future outputs: generated manifest, performance baselines, and targeted
-  golden summaries. Commit a full `.landroid` only if the stubbed artifact stays
-  small enough to review.
+- Current outputs: `fixtures/phase-0/raven-forest-stress-manifest.json` and
+  `.sha256`, generated from the current combinatorial seed.
+- Future outputs: performance baselines and targeted golden summaries. Commit a
+  full `.landroid` only if the stubbed artifact stays small enough to review.
 
 ### W3 — Migration Stress (v7 + orphan)
 - Source: hand-crafted v7 `.landroid` with one orphaned PDF (no matching workspace node).
@@ -773,7 +774,7 @@ Status against the Phase 0 exit gate from `docs/rebuild-plan.md` (lines 657–66
 | Gate | Status | Missing |
 |---|---|---|
 | Current branch has a documented page/workflow inventory | **Partially met** (this document is the draft master and is now cross-linked from source docs) | Commit decision; lead-thread row review |
-| Frozen reference workspaces and expected outputs checked in (or explicitly documented if too large) | **Partially met** (W1 Vulcan Mesa export/goldens and W3 migration-stress fixture/checksum/expected output exist under `fixtures/phase-0/`) | W2 needs a deterministic generated seed or explicit continued deferral |
+| Frozen reference workspaces and expected outputs checked in (or explicitly documented if too large) | **Partially met** (W1 Vulcan Mesa export/goldens, W2 stress manifest/checksum, and W3 migration-stress fixture/checksum/expected output exist under `fixtures/phase-0/`) | W2 full export remains intentionally uncommitted until baseline capture or a reviewably small artifact policy |
 | Performance baselines recorded with command, fixture, machine, drift | **Not met** | Capture walkthrough and status template exist; all 8 PERF-* measurements remain unfilled |
 | Full relevant tests pass | **Partially met** (`npm test`, `npm run lint`, and `npm run build` pass on this branch) | Proposed new golden-master tests still need implementation before Phase 0 can close |
 | Missing coverage listed in `docs/rebuild-plan.md` or `TESTING.md` | **Met for draft inventory** | Keep list updated as rows are verified or marked `needs verification` |
@@ -790,6 +791,8 @@ Status against the Phase 0 exit gate from `docs/rebuild-plan.md` (lines 657–66
 - [x] Add W1 golden-master test coverage for the committed fixture files
 - [x] Document W2 Raven Forest-scale fixture strategy without freezing today's
   exact workspace export
+- [x] Generate W2 Raven Forest stress manifest + checksum without committing a
+  full large `.landroid` export
 - [x] Author `fixtures/phase-0/migration-v7-orphan.landroid` + expected
 - [ ] Add the 18 new test files listed in §"Golden Master Fixture Plan"
 - [x] Snapshot AI system prompt rules (AI-036)

@@ -1,0 +1,54 @@
+{
+  "generatedAt": "2026-05-23T17:00:00.000Z",
+  "generator": "scripts/generate-phase-0-fixtures.ts",
+  "generatorVersion": 1,
+  "source": "buildCombinatorialWorkspaceData()",
+  "seed": {
+    "dateNow": 1779555600000,
+    "mathRandom": "lcg-0xC0FFEE",
+    "workspaceUuid": "00000000-0000-4000-8000-000000000002"
+  },
+  "artifactPolicy": "Full W2 .landroid export is intentionally not committed by default; regenerate from this script when capturing performance baselines.",
+  "workspaceId": "ws-00000000-0000-4000-8000-000000000002",
+  "projectName": "Combinatorial Demo — Raven Forest (10 Tracts, 1476 nodes)",
+  "nodeCount": 1476,
+  "nodeCountsByClass": {
+    "mineral": 642,
+    "npri": 246,
+    "related": 174,
+    "lease": 414
+  },
+  "deskMapCount": 10,
+  "unitCount": 2,
+  "unitCodes": [
+    "A",
+    "B"
+  ],
+  "ownerCount": 658,
+  "leaseCount": 414,
+  "documentCount": 145,
+  "attachmentCount": 145,
+  "pdfMappingCount": 145,
+  "leaseholdAssignmentCount": 3,
+  "leaseholdOrriCount": 6,
+  "federalReferenceLeaseCount": 5,
+  "warningMarkers": {
+    "npriNodes": 246,
+    "orphanParentRefs": 1,
+    "topLeaseOverlapMarkers": 241,
+    "overConveyanceMarkers": 2
+  },
+  "performanceBaselineWorkloads": [
+    "PERF-01",
+    "PERF-02",
+    "PERF-03",
+    "PERF-04",
+    "PERF-06",
+    "PERF-08"
+  ],
+  "notes": [
+    "Uses deterministic stub PDF metadata for committed summaries.",
+    "Contains no real title documents.",
+    "W2 is a stress fixture shape, not a product behavior source of truth."
+  ]
+}

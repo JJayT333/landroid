@@ -12,6 +12,7 @@ import {
   buildDocumentRegistryRows,
   buildPacketManifest,
 } from '../src/documents/document-registry';
+import { buildCombinatorialWorkspaceData } from '../src/storage/seed-test-data';
 import { buildVulcanMesaWorkspaceData } from '../src/storage/seed-vulcan-mesa';
 import { buildRunsheetCsv } from '../src/storage/runsheet-export';
 import { exportLandroidFile } from '../src/storage/workspace-persistence';
@@ -22,17 +23,28 @@ import type { Lease } from '../src/types/owner';
 const FIXTURE_TIMESTAMP = '2026-05-23T17:00:00.000Z';
 const FIXTURE_DATE_MS = Date.parse(FIXTURE_TIMESTAMP);
 const FIXTURE_WORKSPACE_UUID = '00000000-0000-4000-8000-000000000001';
+const STRESS_WORKSPACE_UUID = '00000000-0000-4000-8000-000000000002';
 const OUTPUT_DIR = join('fixtures', 'phase-0');
 
 function installDeterministicRuntime() {
+  const uuids = [FIXTURE_WORKSPACE_UUID, STRESS_WORKSPACE_UUID];
+  let uuidIndex = 0;
+  let randomSeed = 0xC0FFEE;
+
   Date.now = () => FIXTURE_DATE_MS;
+  Math.random = () => {
+    randomSeed = (randomSeed * 1664525 + 1013904223) >>> 0;
+    return randomSeed / 0x100000000;
+  };
 
   const currentCrypto = globalThis.crypto ?? {};
   Object.defineProperty(globalThis, 'crypto', {
     configurable: true,
     value: {
       ...currentCrypto,
-      randomUUID: () => FIXTURE_WORKSPACE_UUID,
+      randomUUID: () =>
+        uuids[uuidIndex++]
+        ?? `00000000-0000-4000-8000-${String(uuidIndex).padStart(12, '0')}`,
     },
   });
 }
@@ -89,7 +101,14 @@ function buildDocumentData(workspaceId: string, nodes: OwnershipNode[], pdfMappi
   nodeId: string;
   fileName: string;
   kind?: DocumentRecord['kind'];
-}>) {
+}>, options: {
+  idPrefix?: string;
+  notesSourceLabel?: string;
+  sourceReferenceLabel?: string;
+} = {}) {
+  const idPrefix = options.idPrefix ?? 'demo';
+  const notesSourceLabel = options.notesSourceLabel ?? 'Vulcan Mesa seed';
+  const sourceReferenceLabel = options.sourceReferenceLabel ?? 'Vulcan Mesa fixture';
   const nodeById = new Map(nodes.map((node) => [node.id, node]));
   const positionByNodeId = new Map<string, number>();
   const documents: DocumentRecord[] = [];
@@ -100,8 +119,8 @@ function buildDocumentData(workspaceId: string, nodes: OwnershipNode[], pdfMappi
     if (!node) return;
 
     const docNumber = String(index + 1).padStart(3, '0');
-    const docId = `demo-doc-${docNumber}`;
-    const attachmentId = `demo-attachment-${docNumber}`;
+    const docId = `${idPrefix}-doc-${docNumber}`;
+    const attachmentId = `${idPrefix}-attachment-${docNumber}`;
     const fileName = mapping.fileName;
     const kind = mapping.kind ?? 'other';
     const bytes = makeStubPdfBytes(`${docId} ${fileName}`);
@@ -129,8 +148,8 @@ function buildDocumentData(workspaceId: string, nodes: OwnershipNode[], pdfMappi
       recordingDate: node.fileDate || undefined,
       grantor: node.grantor || undefined,
       grantee: node.grantee || undefined,
-      notes: 'Phase 0 fixture stub PDF; metadata is derived from the Vulcan Mesa seed.',
-      sourceReference: `Vulcan Mesa fixture ${docNumber}`,
+      notes: `Phase 0 fixture stub PDF; metadata is derived from the ${notesSourceLabel}.`,
+      sourceReference: `${sourceReferenceLabel} ${docNumber}`,
       ocrStatus: 'not_started',
       createdAt,
       updatedAt: createdAt,
@@ -166,6 +185,104 @@ function activeLeasesByOwnerId(leases: Lease[]) {
     result.set(lease.ownerId, current);
   }
   return result;
+}
+
+function countNodesByInterestClass(nodes: OwnershipNode[]) {
+  const result = { mineral: 0, npri: 0, related: 0, lease: 0 };
+  for (const node of nodes) {
+    if (node.type === 'related') {
+      if (node.relatedKind === 'lease') {
+        result.lease += 1;
+      } else {
+        result.related += 1;
+      }
+      continue;
+    }
+    if (node.interestClass === 'npri') {
+      result.npri += 1;
+    } else {
+      result.mineral += 1;
+    }
+  }
+  return result;
+}
+
+async function writeRavenForestStressManifest() {
+  const workspace = buildCombinatorialWorkspaceData();
+  const nodes = cloneNodes(workspace.nodes);
+  const documentData = buildDocumentData(
+    workspace.workspaceId,
+    nodes,
+    workspace.pdfMappings,
+    {
+      idPrefix: 'stress',
+      notesSourceLabel: 'Raven Forest stress fixture',
+      sourceReferenceLabel: 'Raven Forest stress fixture',
+    }
+  );
+  const unitCodes = [
+    ...new Set(workspace.deskMaps.map((deskMap) => deskMap.unitCode).filter(Boolean)),
+  ];
+  const warningMarkers = {
+    npriNodes: nodes.filter((node) => node.interestClass === 'npri').length,
+    orphanParentRefs: nodes.filter(
+      (node) => node.parentId && !nodes.some((candidate) => candidate.id === node.parentId)
+    ).length,
+    topLeaseOverlapMarkers: nodes.filter((node) => /top-lease/i.test(node.remarks)).length,
+    overConveyanceMarkers: nodes.filter((node) => /over-conveyance trigger/i.test(node.remarks))
+      .length,
+  };
+  const manifest = {
+    generatedAt: FIXTURE_TIMESTAMP,
+    generator: 'scripts/generate-phase-0-fixtures.ts',
+    generatorVersion: 1,
+    source: 'buildCombinatorialWorkspaceData()',
+    seed: {
+      dateNow: FIXTURE_DATE_MS,
+      mathRandom: 'lcg-0xC0FFEE',
+      workspaceUuid: STRESS_WORKSPACE_UUID,
+    },
+    artifactPolicy:
+      'Full W2 .landroid export is intentionally not committed by default; regenerate from this script when capturing performance baselines.',
+    workspaceId: workspace.workspaceId,
+    projectName: workspace.projectName,
+    nodeCount: nodes.length,
+    nodeCountsByClass: countNodesByInterestClass(nodes),
+    deskMapCount: workspace.deskMaps.length,
+    unitCount: unitCodes.length,
+    unitCodes,
+    ownerCount: workspace.ownerData.owners.length,
+    leaseCount: workspace.ownerData.leases.length,
+    documentCount: documentData.documents.length,
+    attachmentCount: documentData.attachments.length,
+    pdfMappingCount: workspace.pdfMappings.length,
+    leaseholdAssignmentCount: workspace.leaseholdAssignments.length,
+    leaseholdOrriCount: workspace.leaseholdOrris.length,
+    federalReferenceLeaseCount: 5,
+    warningMarkers,
+    performanceBaselineWorkloads: [
+      'PERF-01',
+      'PERF-02',
+      'PERF-03',
+      'PERF-04',
+      'PERF-06',
+      'PERF-08',
+    ],
+    notes: [
+      'Uses deterministic stub PDF metadata for committed summaries.',
+      'Contains no real title documents.',
+      'W2 is a stress fixture shape, not a product behavior source of truth.',
+    ],
+  };
+  const manifestText = stableJson(manifest);
+  const manifestHash = createHash('sha256').update(manifestText).digest('hex');
+
+  await writeFile(join(OUTPUT_DIR, 'raven-forest-stress-manifest.json'), manifestText, 'utf8');
+  await writeFile(
+    join(OUTPUT_DIR, 'raven-forest-stress-manifest.sha256'),
+    `${manifestHash}  raven-forest-stress-manifest.json\n`,
+    'utf8'
+  );
 }
 
 function stableJson(value: unknown) {
@@ -367,6 +484,11 @@ async function main() {
       '- `demo.fixture-manifest.json`: counts, generator name, and checksum metadata.',
       '- `migration-v7-orphan.landroid`: hand-crafted legacy v7 import fixture with one linked PDF and one orphaned PDF.',
       '- `migration-v7-orphan.expected.json`: expected migration behavior for the orphaned legacy PDF.',
+      "- `raven-forest-stress-recipe.md`: W2 instructions for rebuilding a Raven Forest-sized stress fixture later without committing today's exact seed.",
+      '- `raven-forest-stress-manifest.json`: deterministic W2 stress-fixture manifest generated from the current combinatorial seed.',
+      '- `raven-forest-stress-manifest.sha256`: SHA-256 checksum for `raven-forest-stress-manifest.json`.',
+      '- `ai/system-prompt.snapshot.md`: AI-036 golden snapshot for the ten non-negotiable system-prompt rules.',
+      '- `perf/`: Phase 0 performance baseline capture status and future raw/summarized profiles.',
       '',
       'The fixture uses deterministic stub PDF blobs so the document registry, packet manifest, and `.landroid` side-store shape are testable without committing the large TORS document corpus.',
       '',
@@ -376,11 +498,20 @@ async function main() {
       './node_modules/.bin/tsx scripts/generate-phase-0-fixtures.ts',
       '```',
       '',
+      'Performance capture is documented separately:',
+      '',
+      '```bash',
+      'scripts/capture-phase-0-baselines.md',
+      '```',
+      '',
+      'The current `perf/baseline-status.json` file is a status template, not evidence that PERF-01 through PERF-08 have been captured.',
+      '',
     ].join('\n'),
     'utf8'
   );
 
   await writeMigrationStressFixture();
+  await writeRavenForestStressManifest();
 
   console.log(`Wrote ${OUTPUT_DIR}/demo.landroid (${Buffer.byteLength(landroidText)} bytes)`);
   console.log(`SHA-256 ${landroidHash}`);

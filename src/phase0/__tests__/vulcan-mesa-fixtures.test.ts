@@ -213,4 +213,64 @@ describe('Phase 0 Vulcan Mesa fixture goldens', () => {
       });
     }
   });
+
+  it('freezes the W2 Raven Forest stress manifest shape', () => {
+    const manifestText = readText('raven-forest-stress-manifest.json');
+    const checksum = createHash('sha256').update(manifestText).digest('hex');
+    const manifest = JSON.parse(manifestText) as {
+      workspaceId: string;
+      nodeCount: number;
+      nodeCountsByClass: {
+        mineral: number;
+        npri: number;
+        related: number;
+        lease: number;
+      };
+      deskMapCount: number;
+      unitCount: number;
+      ownerCount: number;
+      leaseCount: number;
+      documentCount: number;
+      attachmentCount: number;
+      federalReferenceLeaseCount: number;
+      warningMarkers: {
+        orphanParentRefs: number;
+        topLeaseOverlapMarkers: number;
+        overConveyanceMarkers: number;
+      };
+      performanceBaselineWorkloads: string[];
+    };
+
+    expect(readText('raven-forest-stress-manifest.sha256')).toBe(
+      `${checksum}  raven-forest-stress-manifest.json\n`
+    );
+    expect(manifest.workspaceId).toBe('ws-00000000-0000-4000-8000-000000000002');
+    expect(manifest.nodeCount).toBe(1476);
+    expect(manifest.nodeCountsByClass).toEqual({
+      mineral: 642,
+      npri: 246,
+      related: 174,
+      lease: 414,
+    });
+    expect(manifest.deskMapCount).toBe(10);
+    expect(manifest.unitCount).toBe(2);
+    expect(manifest.ownerCount).toBe(658);
+    expect(manifest.leaseCount).toBe(414);
+    expect(manifest.documentCount).toBe(145);
+    expect(manifest.attachmentCount).toBe(145);
+    expect(manifest.federalReferenceLeaseCount).toBe(5);
+    expect(manifest.warningMarkers).toMatchObject({
+      orphanParentRefs: 1,
+      topLeaseOverlapMarkers: 241,
+      overConveyanceMarkers: 2,
+    });
+    expect(manifest.performanceBaselineWorkloads).toEqual([
+      'PERF-01',
+      'PERF-02',
+      'PERF-03',
+      'PERF-04',
+      'PERF-06',
+      'PERF-08',
+    ]);
+  });
 });
