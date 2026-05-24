@@ -731,12 +731,22 @@ Current smoke evidence:
 ```
 fixtures/phase-0/manual-smoke/2026-05-24-local-browser-smoke.json
 fixtures/phase-0/manual-smoke/2026-05-24-main-tabs-smoke.json
+fixtures/phase-0/manual-smoke/2026-05-24-lane-detail-export-smoke.json
+fixtures/phase-0/manual-smoke/2026-05-24-runsheet-export-smoke.json
 ```
 
 These are lightweight Vulcan Mesa browser smokes, not completion of the full
 manual runbook. The main-tabs smoke found current Flowchart React DOM-prop
 warnings from `src/components/canvas/OwnershipEdge.tsx`; record that as current
-behavior unless a later implementation phase explicitly fixes it.
+behavior unless a later implementation phase explicitly fixes it. The
+lane-detail smoke adds read-only Documents, Leasehold, Owners, Runsheet,
+Federal Leasing, and Research signals plus a `.landroid` export-download
+checksum; the export checksum is smoke evidence, not a replacement golden.
+The Runsheet export smoke found a current mismatch between the browser-exported
+CSV and `fixtures/phase-0/demo.runsheet.csv`: the UI export appears globally
+chronological across tracts while the committed generated golden begins
+tract-grouped. Do not regenerate or change behavior until the intended
+Runsheet ordering contract is decided.
 
 ---
 

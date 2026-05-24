@@ -1,0 +1,58 @@
+{
+  "schema": 1,
+  "capturedAt": "2026-05-24",
+  "branch": "codex/phase-0-reconcile-2026-05-23",
+  "fixture": "Vulcan Mesa demo via Demo Data menu",
+  "command": "npm run dev -- --host 127.0.0.1",
+  "browser": "Playwright Chromium headless",
+  "viewport": {
+    "width": 1440,
+    "height": 1000
+  },
+  "loadGuard": {
+    "requiredPhrase": "LOAD DEMO",
+    "confirmed": true
+  },
+  "runsheetView": {
+    "rendered": true,
+    "observed": [
+      "TRACT FILTER",
+      "79 entries",
+      "Export Runsheet",
+      "INST. DATE",
+      "GRANTOR",
+      "GRANTEE"
+    ]
+  },
+  "exportResult": {
+    "downloaded": true,
+    "suggestedFilename": "Vulcan Mesa \u2014 Demo (10 Tracts, 79 nodes)-runsheet.csv",
+    "byteLength": 28932,
+    "sha256": "7b81b45c57ca483064d6c5eaefe9b635e266e9c4cd7e7503744c46828212666a",
+    "goldenPath": "fixtures/phase-0/demo.runsheet.csv",
+    "goldenByteLength": 28931,
+    "goldenSha256": "40084b63274a829696923c495559b8051d710568a0052281e216ffe5d359cff7",
+    "matchesGolden": false,
+    "firstLine": "\ufeffDocuments Hyperlinked to TORS_Documents Folder,Instrument,Order by Date,Image Path,Vol,Page,\"Instrument No."
+  },
+  "observedDifference": {
+    "summary": "The browser-exported CSV does not match the committed generated W1 golden.",
+    "details": [
+      "Browser export begins with a UTF-8 BOM marker.",
+      "Browser export rows are globally chronological across all tracts.",
+      "The committed generated golden begins with VM1 rows, which appears tract-grouped before later tracts."
+    ],
+    "phase0Action": "Record as a Phase 0 golden-master mismatch. Do not change app export behavior or regenerate the golden until the intended Runsheet ordering contract is decided."
+  },
+  "console": {
+    "warningCount": 0,
+    "errorCount": 0,
+    "messages": [],
+    "pageErrors": []
+  },
+  "notes": [
+    "Runsheet CSV export smoke from the current app UI.",
+    "The export path worked without console/page errors.",
+    "The checksum mismatch is the evidence; it should drive a Phase 0 decision on whether the golden or browser behavior is the preserved contract."
+  ]
+}

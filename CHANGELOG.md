@@ -29,6 +29,14 @@ stay short.
   Flowchart, Runsheet, Documents, Owners, Curative, Maps, Sales Deck, Federal
   Leasing, and Research. All tabs rendered recognizable content; Flowchart
   emitted current React DOM-prop warnings from `OwnershipEdge`.
+- Captured a lane-detail/export smoke artifact for Documents, Leasehold,
+  Owners, Runsheet, Federal Leasing, and Research. The run confirmed the Vulcan
+  Mesa load guard, recorded key lane signals, and downloaded a `.landroid`
+  export with checksum as smoke evidence.
+- Captured a Runsheet CSV export smoke artifact from the browser UI. The export
+  downloaded cleanly, but its checksum does not match the committed generated
+  W1 runsheet golden because the UI export appears globally chronological while
+  the current golden begins tract-grouped.
 
 ## 2026-05-23
 

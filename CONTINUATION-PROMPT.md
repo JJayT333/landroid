@@ -40,6 +40,12 @@ A lightweight local browser smoke artifact now exists for the Vulcan Mesa demo
 load, but the full manual smoke runbook is still not complete.
 A broader main-tab smoke artifact also exists; it found current Flowchart React
 DOM-prop warnings from `src/components/canvas/OwnershipEdge.tsx`.
+A lane-detail/export smoke artifact now records read-only Documents, Leasehold,
+Owners, Runsheet, Federal Leasing, and Research signals plus a `.landroid`
+export download checksum.
+A Runsheet CSV export smoke artifact now records a mismatch between the browser
+UI export and the committed generated W1 runsheet golden; the UI export appears
+globally chronological while the generated golden begins tract-grouped.
 
 Rebuild planning is now documented and amended, but implementation has not
 started. The current planning source of truth is `docs/rebuild-plan.md`. It
@@ -163,6 +169,15 @@ validation:
   recognizable content; recorded current Flowchart React DOM-prop warnings.
   Evidence:
   `fixtures/phase-0/manual-smoke/2026-05-24-main-tabs-smoke.json`.
+- Lane-detail/export Playwright Chromium smoke - confirmed the Vulcan Mesa load
+  guard, read-only lane signals for Documents, Leasehold, Owners, Runsheet,
+  Federal Leasing, and Research, and a `.landroid` export download with
+  checksum. Evidence:
+  `fixtures/phase-0/manual-smoke/2026-05-24-lane-detail-export-smoke.json`.
+- Runsheet export Playwright Chromium smoke - downloaded the browser CSV export
+  without console/page errors, but the checksum did not match
+  `fixtures/phase-0/demo.runsheet.csv`. Evidence:
+  `fixtures/phase-0/manual-smoke/2026-05-24-runsheet-export-smoke.json`.
 - Targeted inventory-risk tests passed:
   - `npm test -- src/components/deskmap/__tests__/deskmap-coverage.test.ts src/storage/__tests__/workspace-persistence.test.ts src/storage/__tests__/document-migration.test.ts`
     - passed, 3 files / 54 tests.
@@ -259,6 +274,9 @@ Prior validation from the audit/rebuild-planning checkpoint:
   the v7 document migration records orphaned node IDs and uses a fallback
   workspace path; a literal `__orphaned_pre_v8__` workspace was not found in
   current source during reconciliation.
+- The W1 Runsheet UI export and committed generated W1 runsheet golden do not
+  currently match. Treat this as a Phase 0 ordering-contract decision, not an
+  implementation bug to patch during inventory.
 - `docs/landroid-rebuild-plan-reviews.pdf` is currently untracked local input
   from the user; do not delete or commit it unless the user explicitly asks.
 - The action journal is in-memory session context, not a durable audit log.
@@ -297,8 +315,8 @@ Prior validation from the audit/rebuild-planning checkpoint:
   `src/ai/__tests__/system-prompt.test.ts`.
 - Manual smoke-check instructions are documented in
   `docs/phase-0-manual-smoke-checks.md`; no browser smoke evidence has been
-  captured beyond the lightweight Vulcan Mesa demo-load and main-tab smoke
-  artifacts.
+  captured beyond the lightweight Vulcan Mesa demo-load, main-tab, and
+  lane-detail/export smoke artifacts plus the Runsheet export mismatch smoke.
 - Security direction is clarified in `SECURITY.md`; backend work still requires
   a concrete threat model before implementation.
 - Next Phase 0 work: generate the deterministic W2 stress fixture, capture
@@ -320,8 +338,9 @@ It also includes `scripts/capture-phase-0-baselines.md` and
 but PERF-01 through PERF-08 are not measured yet.
 AI-036 has a system-prompt snapshot fixture and test.
 Manual smoke-check instructions live in
-`docs/phase-0-manual-smoke-checks.md`; only a lightweight Vulcan Mesa demo-load
-and main-tab smoke artifact have been captured so far.
+`docs/phase-0-manual-smoke-checks.md`; only lightweight Vulcan Mesa demo-load,
+main-tab, lane-detail/export, and Runsheet export smoke artifacts have been
+captured so far.
 `SECURITY.md` clarifies that hosted/backend work can be safer than today's
 browser-only durability story only if the documented safety gates ship.
 `docs/phase-0-inventory.md` is the draft master Phase 0 inventory after
