@@ -92,6 +92,10 @@ Do not describe a workflow as verified unless it is active in
   rebuild needs separate coverage for global instrument date, global file date,
   single-tract filtered export, grouped-by-tract export, and later manual/custom
   package order.
+- Packet manifest golden masters must name the packet source mode they protect.
+  Do not treat the full-registry `demo.packet-manifest.json` as proof for
+  `Packet: Runsheet`, `Packet: Filter`, or `Packet: Selected`; each source can
+  have a different item set and needs explicit expected output.
 
 ## Regression Expectations
 

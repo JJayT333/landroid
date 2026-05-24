@@ -50,6 +50,12 @@ The user decided Runsheet ordering must be user-controlled: global instrument
 date, global file date, individual tract, whole-project grouped-by-tract, and
 later manual/custom package order. Future Runsheet goldens must be named by
 ordering/filter mode rather than treated as one generic `demo.runsheet.csv`.
+Document preview smoke now confirms Documents registry PDF actions and Desk Map
+document chips open blob-backed iframe previews with `sandbox="allow-downloads"`.
+Packet manifest smoke now records that `Packet: Runsheet` downloads 32 items
+while the committed full-registry packet manifest golden contains 64 items; this
+is a named packet-source golden gap, not an implementation fix to make during
+Phase 0 inventory.
 
 Rebuild planning is now documented and amended, but implementation has not
 started. The current planning source of truth is `docs/rebuild-plan.md`. It
@@ -185,6 +191,14 @@ validation:
 - Runsheet ordering contract documented in `docs/phase-0-inventory.md`,
   `docs/rebuild-plan.md`, and `TESTING.md`: preserve multiple user-controlled
   ordering/filter modes and name future goldens by mode.
+- Document preview Playwright Chromium smoke - registry PDF actions and Desk
+  Map document chips opened blob-backed iframes with `sandbox="allow-downloads"`
+  and no console/page errors. Evidence:
+  `fixtures/phase-0/manual-smoke/2026-05-24-document-preview-smoke.json`.
+- Packet manifest Playwright Chromium smoke - `Packet: Runsheet` manifest
+  downloaded and parsed as JSON, but did not match the full-registry packet
+  golden because the packet source item set differs. Evidence:
+  `fixtures/phase-0/manual-smoke/2026-05-24-packet-manifest-smoke.json`.
 - Targeted inventory-risk tests passed:
   - `npm test -- src/components/deskmap/__tests__/deskmap-coverage.test.ts src/storage/__tests__/workspace-persistence.test.ts src/storage/__tests__/document-migration.test.ts`
     - passed, 3 files / 54 tests.
@@ -286,6 +300,9 @@ Prior validation from the audit/rebuild-planning checkpoint:
   implementation bug to patch during inventory. The product decision is now
   multi-mode Runsheet ordering, so the next implementation step is named
   goldens and UI/export support for those modes, not picking only one order.
+- The W1 packet manifest UI export for `Packet: Runsheet` and the committed
+  full-registry packet manifest golden do not currently match. Treat this as a
+  named packet-source contract gap; add packet-source-specific goldens later.
 - `docs/landroid-rebuild-plan-reviews.pdf` is currently untracked local input
   from the user; do not delete or commit it unless the user explicitly asks.
 - The action journal is in-memory session context, not a durable audit log.
@@ -330,8 +347,9 @@ Prior validation from the audit/rebuild-planning checkpoint:
   a concrete threat model before implementation.
 - Next Phase 0 work: generate the deterministic W2 stress fixture, capture
   performance baselines, split Runsheet goldens into named ordering modes when
-  that contract is implemented, and mark remaining inventory rows as verified
-  or `needs verification`.
+  that contract is implemented, split packet manifest goldens into named source
+  modes when that contract is implemented, and mark remaining inventory rows as
+  verified or `needs verification`.
 - Do not start the full runsheet walkthrough wizard unless the user explicitly
   redirects to that scope.
 
@@ -349,8 +367,8 @@ but PERF-01 through PERF-08 are not measured yet.
 AI-036 has a system-prompt snapshot fixture and test.
 Manual smoke-check instructions live in
 `docs/phase-0-manual-smoke-checks.md`; only lightweight Vulcan Mesa demo-load,
-main-tab, lane-detail/export, and Runsheet export smoke artifacts have been
-captured so far.
+main-tab, lane-detail/export, Runsheet export, document-preview, and
+packet-manifest smoke artifacts have been captured so far.
 `SECURITY.md` clarifies that hosted/backend work can be safer than today's
 browser-only durability story only if the documented safety gates ship.
 `docs/phase-0-inventory.md` is the draft master Phase 0 inventory after

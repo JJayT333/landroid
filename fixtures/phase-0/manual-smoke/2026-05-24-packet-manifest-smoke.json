@@ -1,0 +1,73 @@
+{
+  "schema": 1,
+  "capturedAt": "2026-05-24",
+  "branch": "codex/phase-0-reconcile-2026-05-23",
+  "fixture": "Vulcan Mesa demo via Demo Data menu",
+  "command": "npm run dev -- --host 127.0.0.1",
+  "browser": "Playwright Chromium headless",
+  "viewport": {
+    "width": 1440,
+    "height": 1000
+  },
+  "packetSource": "runsheet",
+  "packetUiSignals": [
+    "Packet: Runsheet",
+    "Manifest JSON",
+    "64 docs",
+    "64 links"
+  ],
+  "download": {
+    "suggestedFilename": "landroid-document-packet-manifest-2026-05-24.json",
+    "byteLength": 49977,
+    "sha256": "2f36b3ecae3ddd1dc5628e73ac5b1c5cacaa7f50eec8ece195e6e4da3246be6b",
+    "parsesAsJson": true,
+    "topLevelType": "array",
+    "itemCount": 32,
+    "firstItemKeys": [
+      "packetOrder",
+      "docId",
+      "fileName",
+      "displayTitle",
+      "documentArea",
+      "kind",
+      "byteLength",
+      "contentHash",
+      "instrumentType",
+      "county",
+      "instrumentNumber",
+      "volume",
+      "page",
+      "effectiveDate",
+      "recordingDate",
+      "grantor",
+      "grantee",
+      "sourceReference",
+      "linkedEntities",
+      "missingMetadata"
+    ]
+  },
+  "golden": {
+    "path": "fixtures/phase-0/demo.packet-manifest.json",
+    "byteLength": 67660,
+    "sha256": "0ef2515f6b02547691e8acc33ed29d337c29f2d08c43eae229eb969839ce0ae4",
+    "topLevelType": "array",
+    "itemCount": 64,
+    "matchesDownloaded": false
+  },
+  "observedDifference": {
+    "summary": "The browser-downloaded Packet: Runsheet manifest parses as JSON but does not match the committed W1 packet manifest golden.",
+    "likelyCause": "Packet: Runsheet exports rows resolved to runsheet_mineral_title, while demo.packet-manifest.json was generated from the full document registry row set.",
+    "phase0Action": "Record as a packet-source contract gap. Do not regenerate or change behavior until Phase 0 defines named packet manifest goldens by source mode."
+  },
+  "console": {
+    "warningCount": 0,
+    "errorCount": 0,
+    "messages": [],
+    "pageErrors": []
+  },
+  "notes": [
+    "Documents packet manifest JSON download smoke from the current app UI.",
+    "This uses Packet: Runsheet, not Packet: Filter or Packet: Selected.",
+    "Checksum is smoke evidence; named packet-source goldens are needed before treating this as a mismatch bug."
+  ]
+}

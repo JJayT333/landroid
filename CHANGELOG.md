@@ -41,6 +41,13 @@ stay short.
   user-controlled global instrument-date, global file-date, single-tract,
   grouped-by-tract, and later manual/custom package order. Future Runsheet
   goldens must name the ordering mode they protect.
+- Captured document preview smoke evidence showing both Documents registry PDF
+  actions and Desk Map document chips open blob-backed iframe previews with
+  `sandbox="allow-downloads"` and no console/page errors.
+- Captured packet manifest smoke evidence for `Packet: Runsheet`. The browser
+  manifest downloaded and parsed cleanly, but it contains 32 runsheet-source
+  items versus 64 full-registry items in the committed packet manifest golden,
+  so future packet goldens must be named by packet source mode.
 
 ## 2026-05-23
 

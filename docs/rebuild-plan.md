@@ -538,6 +538,13 @@ The attorney-facing package and the eDiscovery sidecar should be generated from
 the same `Packet` / `PacketItem` manifest so the human workbook and machine
 load files cannot drift.
 
+Packet manifest goldens must be named by packet source mode. `Packet: Filter`,
+`Packet: Selected`, and `Packet: Runsheet` can legitimately produce different
+item sets from the same workspace, so a full-registry packet manifest golden
+does not prove the runsheet packet contract. Phase 1/2 document-vault tests
+should add source-mode-specific manifest fixtures before export behavior is
+changed.
+
 ## AI Answer Contract
 
 AI should be able to analyze the project, answer questions, and propose

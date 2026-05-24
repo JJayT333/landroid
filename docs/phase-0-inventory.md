@@ -189,6 +189,7 @@ Tables below are compact; full prose findings for each lane live in the lane rep
 | DOC-016 | Packet preview | Doc count, total bytes, missing-metadata count, duplicate count, up to 25 titles | Preview truncates at 25 | unit | yes | yes (25-title cap) | low | unit |
 | DOC-017 | Manifest | Manifest JSON download named `landroid-document-packet-manifest-YYYY-MM-DD.json`; includes metadata, linked entities, dup info | File downloads with stable schema | **none** | **yes — schema golden** | yes (filename format) | medium | snapshot of manifest JSON |
 | DOC-018 | PDF viewer | Click PDF → modal renders blob in iframe (sandbox `allow-downloads`) | Blob loads w/o crash | none | yes | no | low | playwright |
+| DOC-019 | Packet source goldens | Packet manifests must be named by source mode: Filter, Selected, Runsheet | Runsheet packet golden is not confused with full-registry packet golden | smoke evidence + user review | yes — named packet-source goldens | yes (source changes item set) | medium | named manifest snapshots |
 | DOC-019 | Linked entities | Each link card shows label (instrument + doc#), detail (type \| parties \| tracts), navigation button | Click button → tab + tract switches | unit | yes | yes (label fmt) | low | unit |
 | DOC-020 | Attach modal | Related-doc create: makes `type:'related'` node + attachment in one transaction | Atomic on save | unit | yes | no | low | unit on `AttachDocModal` |
 | DOC-021 | Attach modal | PDF validated at selection AND at save via `normalizePdfBlob` (magic bytes %PDF-) | Bad PDF rejected before write | unit (`pdf-validation`) | yes | no | low | `pdf-validation.test.ts` |
@@ -626,7 +627,10 @@ fixtures/phase-0/
   demo.runsheet-global-file-date.csv
   demo.runsheet-vm1-instrument-date.csv
   demo.runsheet-grouped-by-tract.csv
-  demo.packet-manifest.json          # DOC-017 manifest golden
+  demo.packet-manifest.json          # legacy full-registry manifest golden
+  demo.packet-filter-manifest.json
+  demo.packet-runsheet-manifest.json
+  demo.packet-selected-manifest.json
   demo.leasehold-decimals.json       # LH math golden (all categories)
   demo.flowchart-pages.json          # FC tile layout + page count golden
   demo.coverage-summary.json         # DM coverage card golden
@@ -743,6 +747,8 @@ fixtures/phase-0/manual-smoke/2026-05-24-local-browser-smoke.json
 fixtures/phase-0/manual-smoke/2026-05-24-main-tabs-smoke.json
 fixtures/phase-0/manual-smoke/2026-05-24-lane-detail-export-smoke.json
 fixtures/phase-0/manual-smoke/2026-05-24-runsheet-export-smoke.json
+fixtures/phase-0/manual-smoke/2026-05-24-document-preview-smoke.json
+fixtures/phase-0/manual-smoke/2026-05-24-packet-manifest-smoke.json
 ```
 
 These are lightweight Vulcan Mesa browser smokes, not completion of the full
@@ -759,6 +765,13 @@ tract-grouped. User decision recorded after review: the rebuild must support
 multiple user-controlled Runsheet orders instead of treating either output as
 the only valid order. Do not regenerate or change behavior until the named
 ordering-mode golden plan is implemented.
+The document-preview smoke confirms registry PDF actions and Desk Map document
+chips open blob-backed iframe previews with `sandbox="allow-downloads"` and no
+console/page errors. The packet-manifest smoke found a second named-source
+golden gap: `Packet: Runsheet` downloads 32 manifest items while the committed
+full-registry `demo.packet-manifest.json` contains 64 items. Treat packet
+manifests like Runsheet exports: future goldens must name the packet source
+mode they protect.
 
 ---
 
@@ -788,8 +801,9 @@ Phase 0 findings that should reshape the rebuild plan:
 12. **`MathInputView` projection must preserve current display contracts**, including the "Remaining hidden when initial == remaining" rule (FC-016) and the lease-allocation tie-break (DM-016, LH-002, CL-03). These are display+math joints, not pure math.
 13. **CSV column order (RS-001) is a Phase 1 schema-level contract**, not a Phase 0 UI behavior. The runsheet column list is what landman import templates depend on; record it as a typed `RunsheetColumn` enum tied to schema migrations.
 14. **Runsheet ordering is a named-view contract**, not a single CSV fixture. The rebuild must support global instrument-date, global file-date, single-tract, grouped-by-tract, and later manual/custom package order. Goldens should be named by order mode. *(RS-019, RS-020)*
-15. **Federal math isolation belongs in Phase 1 type design**. The jurisdiction filter is currently spread across multiple math entry points; the rebuild should put `Jurisdiction === 'Texas'` as a precondition on the `MathInputView` projection rather than re-checking per surface. *(FED-016, CL-20)*
-16. **Phase 1 should preserve, not improve, the "lease delete cleans up record only if no other links" rule** (DM-029) — it's an invariant of the current `Lease ↔ DocumentLink` relation.
+15. **Packet manifests are named-source contracts**, not one generic JSON fixture. `Packet: Runsheet` and full-registry packet manifests legitimately contain different item sets; Phase 1/2 document-vault work should add source-mode-specific goldens. *(DOC-015, DOC-017, DOC-019)*
+16. **Federal math isolation belongs in Phase 1 type design**. The jurisdiction filter is currently spread across multiple math entry points; the rebuild should put `Jurisdiction === 'Texas'` as a precondition on the `MathInputView` projection rather than re-checking per surface. *(FED-016, CL-20)*
+17. **Phase 1 should preserve, not improve, the "lease delete cleans up record only if no other links" rule** (DM-029) — it's an invariant of the current `Lease ↔ DocumentLink` relation.
 
 ### Plan File Updates Recommended
 
@@ -822,6 +836,8 @@ Status against the Phase 0 exit gate from `docs/rebuild-plan.md` (lines 657–66
 - [ ] Split Runsheet goldens into named order modes after the ordering contract
   is implemented
 - [x] Produce `fixtures/phase-0/demo.packet-manifest.json` and freeze as golden
+- [ ] Split packet manifest goldens into named source modes after the packet
+  source contract is implemented
 - [x] Produce `fixtures/phase-0/demo.leasehold-decimals.json` and freeze as golden
 - [x] Produce `fixtures/phase-0/demo.coverage-summary.json` and freeze as golden
 - [x] Add W1 golden-master test coverage for the committed fixture files
