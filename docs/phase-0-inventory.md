@@ -308,6 +308,8 @@ Tables below are compact; full prose findings for each lane live in the lane rep
 | RS-016 | Import | Parent suggestion: name-similarity score; ≥100 exact, ≥70 substring/fuzzy → high/medium confidence | "Smith Family" grantor matches existing grantee "Smith Family" → high | unit | yes | no | medium | unit |
 | RS-017 | Export | Image path `TORS_Documents\{docNo}.pdf` only if docNo exists AND attachments[] non-empty | No attachments → blank | unit | yes | yes (two-condition gate) | low | unit |
 | RS-018 | Export | Filename sanitized; joined with `-`; ends `-runsheet.csv` | "My / 2024" → "My-2024-runsheet.csv" | unit | yes | no | low | unit |
+| RS-019 | Ordering modes | Runsheet must support user-controlled order: global instrument date, global file date, single-tract filtered order, whole-project grouped-by-tract order, and later manual/custom package order | User can review/export the same project through each named order without changing underlying title data | smoke evidence + user decision | yes — named CSV goldens per order mode | yes (one CSV cannot represent all workflows) | **high — attorney/landman review contract** | new named golden exports |
+| RS-020 | Golden naming | Runsheet goldens must name the order/filter they represent, not just `demo.runsheet.csv` | Golden filenames distinguish global instrument date, global file date, tract-specific, and grouped-by-tract outputs | none | yes | yes (fixture naming prevents false contract) | high | fixture/test update after contract is implemented |
 
 ## Lane: Flowchart (`FC-*`)
 
@@ -495,6 +497,10 @@ Cross-cutting implicit behaviors users (and the rebuild) need to know:
 **Defaults and fallbacks**
 - Runsheet sort default = `date` (instrument date) ascending (not file date).
 - Runsheet tract filter default = "All Tracts".
+- Runsheet export order is not a single permanent contract. Phase 0 decision:
+  LANDroid must support user-controlled order by instrument date, file date,
+  individual tract, whole-project view, grouped-by-tract view, and later
+  manual/custom package order.
 - Documents area resolution: lease → leasehold, deed → runsheet_mineral_title, else inbox.
 - Display title fallback: `displayTitle` > `fileName` > `docId`.
 - Featured map: first asset becomes featured automatically if none set.
@@ -615,7 +621,11 @@ fixtures/phase-0/
   README.md                          # how to regenerate, where checksums live
   demo.landroid                      # W1 reference workspace after rename
   demo.sha256
-  demo.runsheet.csv                  # CSV golden (matches RS-001 column order)
+  demo.runsheet.csv                  # legacy CSV golden; under-specified order
+  demo.runsheet-global-instrument-date.csv
+  demo.runsheet-global-file-date.csv
+  demo.runsheet-vm1-instrument-date.csv
+  demo.runsheet-grouped-by-tract.csv
   demo.packet-manifest.json          # DOC-017 manifest golden
   demo.leasehold-decimals.json       # LH math golden (all categories)
   demo.flowchart-pages.json          # FC tile layout + page count golden
@@ -745,8 +755,10 @@ checksum; the export checksum is smoke evidence, not a replacement golden.
 The Runsheet export smoke found a current mismatch between the browser-exported
 CSV and `fixtures/phase-0/demo.runsheet.csv`: the UI export appears globally
 chronological across tracts while the committed generated golden begins
-tract-grouped. Do not regenerate or change behavior until the intended
-Runsheet ordering contract is decided.
+tract-grouped. User decision recorded after review: the rebuild must support
+multiple user-controlled Runsheet orders instead of treating either output as
+the only valid order. Do not regenerate or change behavior until the named
+ordering-mode golden plan is implemented.
 
 ---
 
@@ -775,8 +787,9 @@ Phase 0 findings that should reshape the rebuild plan:
 11. **`UNDO_MUTATING_TOOL_NAMES` ↔ `tools.ts` drift needs a compile-time guard**, not just a list. Add a TypeScript discriminated-union check or test that every mutating tool registered in `tools.ts` appears in the list. Without it, every new Phase 1 typed-command is a silent undo regression. *(AI-027, CL-12)*
 12. **`MathInputView` projection must preserve current display contracts**, including the "Remaining hidden when initial == remaining" rule (FC-016) and the lease-allocation tie-break (DM-016, LH-002, CL-03). These are display+math joints, not pure math.
 13. **CSV column order (RS-001) is a Phase 1 schema-level contract**, not a Phase 0 UI behavior. The runsheet column list is what landman import templates depend on; record it as a typed `RunsheetColumn` enum tied to schema migrations.
-14. **Federal math isolation belongs in Phase 1 type design**. The jurisdiction filter is currently spread across multiple math entry points; the rebuild should put `Jurisdiction === 'Texas'` as a precondition on the `MathInputView` projection rather than re-checking per surface. *(FED-016, CL-20)*
-15. **Phase 1 should preserve, not improve, the "lease delete cleans up record only if no other links" rule** (DM-029) — it's an invariant of the current `Lease ↔ DocumentLink` relation.
+14. **Runsheet ordering is a named-view contract**, not a single CSV fixture. The rebuild must support global instrument-date, global file-date, single-tract, grouped-by-tract, and later manual/custom package order. Goldens should be named by order mode. *(RS-019, RS-020)*
+15. **Federal math isolation belongs in Phase 1 type design**. The jurisdiction filter is currently spread across multiple math entry points; the rebuild should put `Jurisdiction === 'Texas'` as a precondition on the `MathInputView` projection rather than re-checking per surface. *(FED-016, CL-20)*
+16. **Phase 1 should preserve, not improve, the "lease delete cleans up record only if no other links" rule** (DM-029) — it's an invariant of the current `Lease ↔ DocumentLink` relation.
 
 ### Plan File Updates Recommended
 
@@ -805,7 +818,9 @@ Status against the Phase 0 exit gate from `docs/rebuild-plan.md` (lines 657–66
 - [x] Commit `docs/phase-0-inventory.md` (this file)
 - [x] Cross-link from `TESTING.md` and `docs/rebuild-plan.md` Phase 0 section
 - [x] Generate `fixtures/phase-0/demo.landroid` + `.sha256` after the demo workspace is renamed
-- [x] Produce `fixtures/phase-0/demo.runsheet.csv` and freeze as golden
+- [x] Produce `fixtures/phase-0/demo.runsheet.csv` and freeze as legacy golden
+- [ ] Split Runsheet goldens into named order modes after the ordering contract
+  is implemented
 - [x] Produce `fixtures/phase-0/demo.packet-manifest.json` and freeze as golden
 - [x] Produce `fixtures/phase-0/demo.leasehold-decimals.json` and freeze as golden
 - [x] Produce `fixtures/phase-0/demo.coverage-summary.json` and freeze as golden

@@ -87,6 +87,11 @@ Do not describe a workflow as verified unless it is active in
   `scripts/generate-phase-0-fixtures.ts`. W2 is documented as a rebuild
   stress-test recipe plus deterministic manifest/checksum instead of a
   committed full Raven Forest `.landroid` export.
+- Runsheet golden masters must name the ordering/filter mode they protect. Do
+  not treat one generic `demo.runsheet.csv` as the full Runsheet contract; the
+  rebuild needs separate coverage for global instrument date, global file date,
+  single-tract filtered export, grouped-by-tract export, and later manual/custom
+  package order.
 
 ## Regression Expectations
 

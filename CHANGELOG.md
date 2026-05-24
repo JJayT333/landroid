@@ -37,6 +37,10 @@ stay short.
   downloaded cleanly, but its checksum does not match the committed generated
   W1 runsheet golden because the UI export appears globally chronological while
   the current golden begins tract-grouped.
+- Recorded the Runsheet ordering product decision: LANDroid must support
+  user-controlled global instrument-date, global file-date, single-tract,
+  grouped-by-tract, and later manual/custom package order. Future Runsheet
+  goldens must name the ordering mode they protect.
 
 ## 2026-05-23
 

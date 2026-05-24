@@ -519,6 +519,21 @@ The exporter should generate the same practical attorney-facing pattern:
 - Concordance/Opticon-style eDiscovery sidecar when requested
 - unresolved issue list when relevant
 
+Runsheet ordering is user-controlled. The rebuild must not hardcode one
+permanent export order. At minimum, Runsheet review and export should support:
+
+- global instrument/effective-date order
+- global file/recording-date order
+- individual tract filtering with sortable rows
+- whole-project grouped-by-tract review
+- later manual/custom package order for attorney-facing delivery
+- saved runsheet views when the workflow matures
+
+Golden masters must name the order/filter they represent, for example
+`global-instrument-date`, `global-file-date`, `vm1-instrument-date`, and
+`grouped-by-tract`. A generic `demo.runsheet.csv` is too ambiguous to be the
+long-term rebuild contract.
+
 The attorney-facing package and the eDiscovery sidecar should be generated from
 the same `Packet` / `PacketItem` manifest so the human workbook and machine
 load files cannot drift.
