@@ -79,7 +79,8 @@ Do not describe a workflow as verified unless it is active in
   migration-stress `.landroid`; each needs a checksum policy and expected
   output plan. The W1 Vulcan Mesa fixture and first expected outputs live under
   `fixtures/phase-0/` and regenerate through
-  `scripts/generate-phase-0-fixtures.ts`.
+  `scripts/generate-phase-0-fixtures.ts`. W2 is documented as a rebuild
+  stress-test recipe instead of a committed exact Raven Forest export.
 
 ## Regression Expectations
 

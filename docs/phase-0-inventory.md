@@ -589,8 +589,13 @@ Three reference workspaces are required as Phase 0 fixtures. Two are derivable f
 - Shape: multi-tract, multi-unit, 5 federal leases (read-only reference), 1,476
   title nodes, 145 PDF mappings, lease + NPRI + ORRI overlap fixtures.
 - Use: scale & performance baselines; lease-allocation tie-break determinism; coverage-warning golden; transfer-order golden.
-- Export target: `fixtures/phase-0/raven-forest.landroid` (likely too large to commit — document size and provide a deterministic seed script instead).
-- Expected outputs: same shape as W1.
+- Policy: do not freeze today's exact Raven Forest export as the long-term
+  rebuild fixture. Keep W2 as a documented stress-test recipe and generate a
+  similar deterministic project specifically for the rebuild.
+- Recipe: `fixtures/phase-0/raven-forest-stress-recipe.md`.
+- Future outputs: generated manifest, performance baselines, and targeted
+  golden summaries. Commit a full `.landroid` only if the stubbed artifact stays
+  small enough to review.
 
 ### W3 — Migration Stress (v7 + orphan)
 - Source: hand-crafted v7 `.landroid` with one orphaned PDF (no matching workspace node).
@@ -614,9 +619,7 @@ fixtures/phase-0/
   demo.leasehold-decimals.json       # LH math golden (all categories)
   demo.flowchart-pages.json          # FC tile layout + page count golden
   demo.coverage-summary.json         # DM coverage card golden
-  raven-forest.seed.ts               # deterministic seed (no committed binary if too big)
-  raven-forest.runsheet.csv          # generated on first run, then frozen
-  raven-forest.leasehold-decimals.json
+  raven-forest-stress-recipe.md      # W2 rebuild stress-test recipe
   migration-v7-orphan.landroid       # W3
   migration-v7-orphan.expected.json
   ai/
@@ -769,8 +772,8 @@ Status against the Phase 0 exit gate from `docs/rebuild-plan.md` (lines 657–66
 - [x] Produce `fixtures/phase-0/demo.leasehold-decimals.json` and freeze as golden
 - [x] Produce `fixtures/phase-0/demo.coverage-summary.json` and freeze as golden
 - [x] Add W1 golden-master test coverage for the committed fixture files
-- [ ] Generate or document W2 Raven Forest-scale fixture artifacts from
-  `buildCombinatorialWorkspaceData()`
+- [x] Document W2 Raven Forest-scale fixture strategy without freezing today's
+  exact workspace export
 - [x] Author `fixtures/phase-0/migration-v7-orphan.landroid` + expected
 - [ ] Add the 18 new test files listed in §"Golden Master Fixture Plan"
 - [ ] Snapshot AI system prompt rules (AI-036)

@@ -28,6 +28,8 @@ stay short.
   fixture files and verifies checksum, export counts, runsheet CSV, packet
   manifest, leasehold decimal output, Desk Map coverage summaries, and the W3
   v7 orphaned-PDF migration fixture.
+- Documented W2 Raven Forest as a generated rebuild stress-test recipe instead
+  of committing today's exact large seed as the permanent fixture.
 
 ## 2026-05-20
 
