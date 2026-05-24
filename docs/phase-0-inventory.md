@@ -684,7 +684,10 @@ Implemented W1 fixture guard:
 
 ## Performance Baseline Plan
 
-Phase 0 has **no recorded baselines on the current branch**. To close the exit gate, capture the following with a single fixed machine profile (declared in the fixture README) and a deterministic seed.
+Phase 0 now has a repeatable capture walkthrough, but it still has **no
+recorded PERF-01 through PERF-08 baseline measurements** on the current branch.
+To close the exit gate, capture the following with a single fixed machine
+profile (declared in the fixture README) and a deterministic seed.
 
 Machine profile (record at capture time): CPU model, core count, total RAM, OS version, Node version, Chrome version, dev-server mode (Vite dev vs prod build).
 
@@ -701,14 +704,19 @@ Workflows to baseline:
 | PERF-07 | Spreadsheet import (Parse only) | wizard upload of a 5,000-row CSV | new fixture `fixtures/phase-0/import-stress.csv` | Worker parse time; main-thread block time (should be ~0) | ±20% |
 | PERF-08 | Leasehold transfer-order build | open Leasehold view with W2, unit focus = Raven Forest A | W2 | Time to compute `buildLeaseholdDecimalRows` | ±15% |
 
-Baseline capture command (proposed):
+Baseline capture walkthrough:
 ```
-npm run dev &
-# then open the workspace in Chrome, use the React Profiler tab, and record using
-# Performance Insights → "Save profile". Store the .json under fixtures/phase-0/perf/.
+scripts/capture-phase-0-baselines.md
 ```
 
-A small `scripts/capture-phase-0-baselines.md` walkthrough should accompany the fixtures so the next operator can re-run identically.
+Current status template:
+```
+fixtures/phase-0/perf/baseline-status.json
+```
+
+Rows must remain `not_captured` or `blocked_*` until raw browser profiles,
+commands, machine context, fixture checksums, and measured results exist. Do not
+convert a row to `captured` from observation or judgment alone.
 
 ---
 
@@ -758,7 +766,7 @@ Status against the Phase 0 exit gate from `docs/rebuild-plan.md` (lines 657–66
 |---|---|---|
 | Current branch has a documented page/workflow inventory | **Partially met** (this document is the draft master and is now cross-linked from source docs) | Commit decision; lead-thread row review |
 | Frozen reference workspaces and expected outputs checked in (or explicitly documented if too large) | **Partially met** (W1 Vulcan Mesa export, checksum, and expected outputs exist under `fixtures/phase-0/`) | W2 needs a deterministic seed; W3 needs to be hand-crafted; checksum manifest beyond W1 pending |
-| Performance baselines recorded with command, fixture, machine, drift | **Not met** | All 8 PERF-* rows above are unfilled; capture run on declared machine pending |
+| Performance baselines recorded with command, fixture, machine, drift | **Not met** | Capture walkthrough and status template exist; all 8 PERF-* measurements remain unfilled |
 | Full relevant tests pass | **Partially met** (`npm test`, `npm run lint`, and `npm run build` pass on this branch) | Proposed new golden-master tests still need implementation before Phase 0 can close |
 | Missing coverage listed in `docs/rebuild-plan.md` or `TESTING.md` | **Met for draft inventory** | Keep list updated as rows are verified or marked `needs verification` |
 
@@ -777,7 +785,8 @@ Status against the Phase 0 exit gate from `docs/rebuild-plan.md` (lines 657–66
 - [x] Author `fixtures/phase-0/migration-v7-orphan.landroid` + expected
 - [ ] Add the 18 new test files listed in §"Golden Master Fixture Plan"
 - [ ] Snapshot AI system prompt rules (AI-036)
-- [ ] Capture all 8 PERF-* baselines on a declared machine; commit `scripts/capture-phase-0-baselines.md`
+- [x] Commit `scripts/capture-phase-0-baselines.md` and `fixtures/phase-0/perf/baseline-status.json`
+- [ ] Capture all 8 PERF-* baselines on a declared machine and attach raw profiles/results
 - [x] Run `npm test` and confirm green or document failing rows here
 - [x] Update `docs/rebuild-plan.md` Phase 0.5 / 0.75 / 1 exit-gate language per §"Sequencing Notes"
 

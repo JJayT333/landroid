@@ -148,3 +148,9 @@ For rebuild-scale performance gates, record:
 - command used
 - baseline result
 - acceptable drift or threshold
+
+The Phase 0 capture walkthrough lives at
+`scripts/capture-phase-0-baselines.md`, and the current status template lives at
+`fixtures/phase-0/perf/baseline-status.json`. A PERF row is not complete until
+its raw profile or command output is attached or referenced with checksum,
+machine context, and reviewer/date.

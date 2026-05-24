@@ -15,6 +15,8 @@ Generated reference artifacts for the Phase 0 behavior inventory.
 - `migration-v7-orphan.expected.json`: expected migration behavior for the orphaned legacy PDF.
 - `raven-forest-stress-recipe.md`: W2 instructions for rebuilding a
   Raven Forest-sized stress fixture later without committing today's exact seed.
+- `perf/`: Phase 0 performance baseline capture status and future raw/summarized
+  profiles.
 
 The fixture uses deterministic stub PDF blobs so the document registry, packet manifest, and `.landroid` side-store shape are testable without committing the large TORS document corpus.
 
@@ -23,3 +25,12 @@ Regenerate with:
 ```bash
 ./node_modules/.bin/tsx scripts/generate-phase-0-fixtures.ts
 ```
+
+Performance capture is documented separately:
+
+```bash
+scripts/capture-phase-0-baselines.md
+```
+
+The current `perf/baseline-status.json` file is a status template, not evidence
+that PERF-01 through PERF-08 have been captured.

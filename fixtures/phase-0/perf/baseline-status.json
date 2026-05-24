@@ -1,0 +1,111 @@
+{
+  "schema": 1,
+  "purpose": "Phase 0 performance baseline status for docs/phase-0-inventory.md PERF-01 through PERF-08.",
+  "branch": "codex/phase-0-reconcile-2026-05-23",
+  "lastUpdated": "2026-05-24",
+  "gitCommitAtLastUpdate": null,
+  "machineProfile": {
+    "status": "partial",
+    "os": "macOS 26.3.1 (25D771280a)",
+    "node": "v26.0.0",
+    "npm": "11.12.1",
+    "cpuModel": null,
+    "coreCount": null,
+    "memoryBytes": null,
+    "browser": null,
+    "notes": [
+      "CPU, core count, and memory were not captured in the Codex sandbox because sysctl returned Operation not permitted.",
+      "Browser version must be recorded manually from chrome://version during a real browser baseline run."
+    ]
+  },
+  "baselines": [
+    {
+      "id": "PERF-01",
+      "workflow": "Large Desk Map render",
+      "status": "blocked_fixture_missing",
+      "fixture": "W2 Raven Forest-scale generated fixture",
+      "fixtureChecksum": null,
+      "result": null,
+      "rawProfilePath": null,
+      "driftBudget": "+/- 15%",
+      "notes": "Requires generated W2 stress fixture before capture."
+    },
+    {
+      "id": "PERF-02",
+      "workflow": "Document registry load",
+      "status": "blocked_fixture_missing",
+      "fixture": "W2 Raven Forest-scale generated fixture with stubbed blobs",
+      "fixtureChecksum": null,
+      "result": null,
+      "rawProfilePath": null,
+      "driftBudget": "+/- 15%",
+      "notes": "Requires generated W2 stress fixture before capture."
+    },
+    {
+      "id": "PERF-03",
+      "workflow": "Packet preview build",
+      "status": "blocked_fixture_missing",
+      "fixture": "W2 Raven Forest-scale generated fixture",
+      "fixtureChecksum": null,
+      "result": null,
+      "rawProfilePath": null,
+      "driftBudget": "+/- 15%",
+      "notes": "Requires generated W2 stress fixture before capture."
+    },
+    {
+      "id": "PERF-04",
+      "workflow": ".landroid round trip",
+      "status": "blocked_fixture_missing",
+      "fixture": "W2 Raven Forest-scale generated fixture",
+      "fixtureChecksum": null,
+      "result": null,
+      "rawProfilePath": null,
+      "driftBudget": "+/- 20%",
+      "notes": "Requires generated W2 stress fixture before capture."
+    },
+    {
+      "id": "PERF-05",
+      "workflow": "Autosave debounce",
+      "status": "not_captured",
+      "fixture": "W1 Vulcan Mesa",
+      "fixtureChecksum": "fixtures/phase-0/demo.sha256",
+      "result": null,
+      "rawProfilePath": null,
+      "driftBudget": "+/- 10%",
+      "notes": "Requires browser/IndexedDB timing capture."
+    },
+    {
+      "id": "PERF-06",
+      "workflow": "Flowchart print",
+      "status": "blocked_fixture_missing",
+      "fixture": "W2 Raven Forest-scale generated fixture",
+      "fixtureChecksum": null,
+      "result": null,
+      "rawProfilePath": null,
+      "driftBudget": "+/- 15%",
+      "notes": "Requires generated W2 stress fixture before capture."
+    },
+    {
+      "id": "PERF-07",
+      "workflow": "Spreadsheet import parse only",
+      "status": "blocked_fixture_missing",
+      "fixture": "fixtures/phase-0/import-stress.csv",
+      "fixtureChecksum": null,
+      "result": null,
+      "rawProfilePath": null,
+      "driftBudget": "+/- 20%",
+      "notes": "Requires deterministic 5000-row import-stress CSV fixture before capture."
+    },
+    {
+      "id": "PERF-08",
+      "workflow": "Leasehold transfer-order build",
+      "status": "blocked_fixture_missing",
+      "fixture": "W2 Raven Forest-scale generated fixture",
+      "fixtureChecksum": null,
+      "result": null,
+      "rawProfilePath": null,
+      "driftBudget": "+/- 15%",
+      "notes": "Requires generated W2 stress fixture before capture."
+    }
+  ]
+}

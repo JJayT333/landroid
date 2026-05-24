@@ -3,6 +3,13 @@
 This file records meaningful project changes so `CONTINUATION-PROMPT.md` can
 stay short.
 
+## 2026-05-24
+
+- Added the Phase 0 performance-baseline capture walkthrough and perf status
+  template, explicitly marking PERF-01 through PERF-08 as not captured or
+  blocked until the W2 stress fixture, browser profiles, machine context, and
+  measured results exist.
+
 ## 2026-05-23
 
 - Reconciled the Phase 0 planning track around `docs/phase-0-inventory.md` as
