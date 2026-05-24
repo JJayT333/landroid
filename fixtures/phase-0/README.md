@@ -18,6 +18,7 @@ Generated reference artifacts for the Phase 0 behavior inventory.
 - `raven-forest-stress-manifest.sha256`: SHA-256 checksum for `raven-forest-stress-manifest.json`.
 - `ai/system-prompt.snapshot.md`: AI-036 golden snapshot for the ten non-negotiable system-prompt rules.
 - `perf/`: Phase 0 performance baseline capture status and future raw/summarized profiles.
+- `manual-smoke/`: small manual/browser smoke evidence manifests.
 
 The fixture uses deterministic stub PDF blobs so the document registry, packet manifest, and `.landroid` side-store shape are testable without committing the large TORS document corpus.
 

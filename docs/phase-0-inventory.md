@@ -727,6 +727,14 @@ docs/phase-0-manual-smoke-checks.md
 Manual smoke results should link back to this inventory by row id or mark the
 row `needs verification` if the observed behavior is ambiguous.
 
+Current smoke evidence:
+```
+fixtures/phase-0/manual-smoke/2026-05-24-local-browser-smoke.json
+```
+
+This is a lightweight Vulcan Mesa demo-load browser smoke, not completion of
+the full manual runbook.
+
 ---
 
 ## Sequencing Notes for Phase 0.5 / 0.75 / 1

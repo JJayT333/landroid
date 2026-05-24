@@ -22,6 +22,9 @@ stay short.
 - Extended the Phase 0 fixture generator so it preserves the current fixture
   README, emits a deterministic W2 Raven Forest stress manifest/checksum, and
   keeps the W1 Vulcan Mesa `.landroid` checksum stable.
+- Captured a lightweight local browser smoke artifact showing Vulcan Mesa loads
+  from the Demo Data menu with tract tabs, cards, document chips, and no
+  console/page errors.
 
 ## 2026-05-23
 

@@ -32,6 +32,8 @@ direction is safer only if backup/export, local-first, private-storage,
 AI/citation, sync-conflict, and threat-model gates are actually implemented.
 The fixture generator now also emits a deterministic W2 Raven Forest stress
 manifest/checksum without committing a full large `.landroid` export.
+A lightweight local browser smoke artifact now exists for the Vulcan Mesa demo
+load, but the full manual smoke runbook is still not complete.
 
 Rebuild planning is now documented and amended, but implementation has not
 started. The current planning source of truth is `docs/rebuild-plan.md`. It
@@ -147,6 +149,10 @@ validation:
   manual smoke runbook.
 - `./node_modules/.bin/tsx scripts/generate-phase-0-fixtures.ts` - passed after
   adding W2 stress-manifest generation; W1 `.landroid` checksum remained stable.
+- Local Playwright Chromium smoke against `npm run dev -- --host 127.0.0.1` -
+  passed after rerunning outside the macOS sandbox: Vulcan Mesa loaded from
+  Demo Data with no console/page errors. Evidence:
+  `fixtures/phase-0/manual-smoke/2026-05-24-local-browser-smoke.json`.
 - Targeted inventory-risk tests passed:
   - `npm test -- src/components/deskmap/__tests__/deskmap-coverage.test.ts src/storage/__tests__/workspace-persistence.test.ts src/storage/__tests__/document-migration.test.ts`
     - passed, 3 files / 54 tests.
@@ -281,7 +287,7 @@ Prior validation from the audit/rebuild-planning checkpoint:
   `src/ai/__tests__/system-prompt.test.ts`.
 - Manual smoke-check instructions are documented in
   `docs/phase-0-manual-smoke-checks.md`; no browser smoke evidence has been
-  captured yet.
+  captured beyond the lightweight Vulcan Mesa demo-load smoke artifact.
 - Security direction is clarified in `SECURITY.md`; backend work still requires
   a concrete threat model before implementation.
 - Next Phase 0 work: generate the deterministic W2 stress fixture, capture
@@ -303,7 +309,8 @@ It also includes `scripts/capture-phase-0-baselines.md` and
 but PERF-01 through PERF-08 are not measured yet.
 AI-036 has a system-prompt snapshot fixture and test.
 Manual smoke-check instructions live in
-`docs/phase-0-manual-smoke-checks.md`, with no smoke-run artifact captured yet.
+`docs/phase-0-manual-smoke-checks.md`; only a lightweight Vulcan Mesa demo-load
+smoke artifact has been captured so far.
 `SECURITY.md` clarifies that hosted/backend work can be safer than today's
 browser-only durability story only if the documented safety gates ship.
 `docs/phase-0-inventory.md` is the draft master Phase 0 inventory after
