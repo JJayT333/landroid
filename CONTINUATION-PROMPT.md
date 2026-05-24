@@ -127,7 +127,7 @@ validation:
   tests.
 - `npm run lint` - passed after fixing one single-quote syntax issue in the
   renamed Vulcan Mesa seed.
-- `npm test` - passed, 79 files / 634 tests. Existing intentional stderr
+- `npm test` - passed, 80 files / 639 tests. Existing intentional stderr
   coverage for simulated Dexie failures appeared.
 - `npm run build` - passed with existing Vite dynamic/static import warnings,
   chunk-size warning, and Node `module.register()` deprecation warning.

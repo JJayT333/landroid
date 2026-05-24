@@ -44,7 +44,7 @@ Validation run during reconciliation:
 - `npm test -- src/store/__tests__/workspace-store-doc-actions.test.ts src/engine/__tests__/fraction-display.test.ts src/storage/__tests__/runsheet-export.test.ts`
   - passed, 3 files / 40 tests.
 - `npm run lint` - passed.
-- `npm test` - passed, 78 files / 627 tests. Existing intentional stderr
+- `npm test` - passed, 80 files / 639 tests. Existing intentional stderr
   coverage for simulated Dexie failures appeared.
 - `npm run build` - passed with existing Vite dynamic/static import warnings,
   chunk-size warning, and Node `module.register()` deprecation warning.
