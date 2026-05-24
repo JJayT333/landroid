@@ -784,7 +784,7 @@ Status against the Phase 0 exit gate from `docs/rebuild-plan.md` (lines 657–66
   exact workspace export
 - [x] Author `fixtures/phase-0/migration-v7-orphan.landroid` + expected
 - [ ] Add the 18 new test files listed in §"Golden Master Fixture Plan"
-- [ ] Snapshot AI system prompt rules (AI-036)
+- [x] Snapshot AI system prompt rules (AI-036)
 - [x] Commit `scripts/capture-phase-0-baselines.md` and `fixtures/phase-0/perf/baseline-status.json`
 - [ ] Capture all 8 PERF-* baselines on a declared machine and attach raw profiles/results
 - [x] Run `npm test` and confirm green or document failing rows here

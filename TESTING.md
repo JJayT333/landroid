@@ -74,6 +74,9 @@ Do not describe a workflow as verified unless it is active in
 - The working master behavior catalog is `docs/phase-0-inventory.md`. Treat it
   as a draft until high-risk rows are verified and uncertain rows are marked
   `needs verification`.
+- AI-036 system-prompt rule integrity is frozen by
+  `fixtures/phase-0/ai/system-prompt.snapshot.md` and guarded by
+  `src/ai/__tests__/system-prompt.test.ts`.
 - Before Phase 0.5 starts, the catalog must identify committed or documented
   reference workspaces for the demo fixture, a Raven Forest-scale fixture, and a
   migration-stress `.landroid`; each needs a checksum policy and expected

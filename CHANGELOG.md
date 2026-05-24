@@ -9,6 +9,9 @@ stay short.
   template, explicitly marking PERF-01 through PERF-08 as not captured or
   blocked until the W2 stress fixture, browser profiles, machine context, and
   measured results exist.
+- Added the AI-036 Phase 0 system-prompt golden snapshot and test coverage for
+  the ten non-negotiable rules, critical safety language, mutating-tool prompt
+  coverage, and hosted-blocked focus switching.
 
 ## 2026-05-23
 

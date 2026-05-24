@@ -15,6 +15,8 @@ Generated reference artifacts for the Phase 0 behavior inventory.
 - `migration-v7-orphan.expected.json`: expected migration behavior for the orphaned legacy PDF.
 - `raven-forest-stress-recipe.md`: W2 instructions for rebuilding a
   Raven Forest-sized stress fixture later without committing today's exact seed.
+- `ai/system-prompt.snapshot.md`: AI-036 golden snapshot for the ten
+  non-negotiable system-prompt rules.
 - `perf/`: Phase 0 performance baseline capture status and future raw/summarized
   profiles.
 
