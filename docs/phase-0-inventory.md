@@ -773,7 +773,7 @@ Status against the Phase 0 exit gate from `docs/rebuild-plan.md` (lines 657–66
 | Gate | Status | Missing |
 |---|---|---|
 | Current branch has a documented page/workflow inventory | **Partially met** (this document is the draft master and is now cross-linked from source docs) | Commit decision; lead-thread row review |
-| Frozen reference workspaces and expected outputs checked in (or explicitly documented if too large) | **Partially met** (W1 Vulcan Mesa export, checksum, and expected outputs exist under `fixtures/phase-0/`) | W2 needs a deterministic seed; W3 needs to be hand-crafted; checksum manifest beyond W1 pending |
+| Frozen reference workspaces and expected outputs checked in (or explicitly documented if too large) | **Partially met** (W1 Vulcan Mesa export/goldens and W3 migration-stress fixture/checksum/expected output exist under `fixtures/phase-0/`) | W2 needs a deterministic generated seed or explicit continued deferral |
 | Performance baselines recorded with command, fixture, machine, drift | **Not met** | Capture walkthrough and status template exist; all 8 PERF-* measurements remain unfilled |
 | Full relevant tests pass | **Partially met** (`npm test`, `npm run lint`, and `npm run build` pass on this branch) | Proposed new golden-master tests still need implementation before Phase 0 can close |
 | Missing coverage listed in `docs/rebuild-plan.md` or `TESTING.md` | **Met for draft inventory** | Keep list updated as rows are verified or marked `needs verification` |
