@@ -48,6 +48,32 @@ stay short.
   manifest downloaded and parsed cleanly, but it contains 32 runsheet-source
   items versus 64 full-registry items in the committed packet manifest golden,
   so future packet goldens must be named by packet source mode.
+- Captured AI panel smoke evidence showing the panel opens on W1, defaults to
+  local Ollama (`gpt-oss:20b`), exposes Ollama/OpenAI/Anthropic settings, and
+  keeps Send disabled while input is empty. Mutating approval boundaries were
+  validated with targeted AI tests rather than a live LLM call.
+- Captured Flowchart/print surface smoke evidence showing Desk Map import
+  produces React Flow nodes/edges, page-size controls, tool controls, and a
+  Print action, while preserving the current `OwnershipEdge` DOM-prop console
+  warnings as Phase 0 evidence.
+- Captured `.landroid` round-trip smoke evidence showing the readiness-gated
+  UI export contains the v8 package shape, side-store keys, 64 documents, 64
+  attachments, and no legacy `pdfData` key, then re-imports behind the typed
+  `LOAD WORKSPACE` destructive confirmation. A prior immediate-export attempt
+  before the Documents registry was visibly ready produced zero exported
+  documents, so export timing is now a named Phase 0 risk.
+- Captured Curative/Maps/Sales Deck smoke evidence showing Curative empty-state
+  filters, Maps present/edit/upload controls, and the native 10-slide Sales
+  Deck plus legacy PDF/PowerPoint actions without attempting mutations.
+- Captured future-version rejection smoke evidence showing a version `999`
+  `.landroid` probe fails visibly after `LOAD WORKSPACE` confirmation and
+  leaves Vulcan Mesa intact.
+- Captured multi-tab boundary smoke evidence showing a second same-context tab
+  opens the same workspace with no visible lock, read-only banner, conflict
+  prompt, or editing-elsewhere warning.
+- Captured v7 orphan import smoke evidence showing W3 replaces the prior W1
+  document side store, preserves both legacy PDFs, and surfaces the orphan PDF
+  as linked to `node legacy-orphan-node`.
 
 ## 2026-05-23
 

@@ -570,6 +570,7 @@ Areas where Phase 0 confirmed there is **no current test or golden master**:
 18. **Federal math isolation** — no explicit golden test asserting Texas math filters by jurisdiction. (FED-016, CL-20)
 19. **GeoJSON schema validation** — accepted as any-JSON; no FeatureCollection enforcement. (MAP-004)
 20. **RRC fixed-width 1-indexed position drift** — sliceFixedWidthValue not tested with off-by-one fixtures. (RES-024)
+21. **`.landroid` export readiness timing** — browser smoke showed a complete v8 package only after the Documents registry rendered its ready state; an immediate post-demo export attempt produced zero exported documents. Add a deterministic readiness/race test before sharding or backup work. (PER-010, DOC-033, CL-17)
 
 ---
 
@@ -749,6 +750,13 @@ fixtures/phase-0/manual-smoke/2026-05-24-lane-detail-export-smoke.json
 fixtures/phase-0/manual-smoke/2026-05-24-runsheet-export-smoke.json
 fixtures/phase-0/manual-smoke/2026-05-24-document-preview-smoke.json
 fixtures/phase-0/manual-smoke/2026-05-24-packet-manifest-smoke.json
+fixtures/phase-0/manual-smoke/2026-05-24-ai-panel-boundary-smoke.json
+fixtures/phase-0/manual-smoke/2026-05-24-flowchart-print-surface-smoke.json
+fixtures/phase-0/manual-smoke/2026-05-24-landroid-roundtrip-smoke.json
+fixtures/phase-0/manual-smoke/2026-05-24-curative-maps-sales-smoke.json
+fixtures/phase-0/manual-smoke/2026-05-24-future-version-rejection-smoke.json
+fixtures/phase-0/manual-smoke/2026-05-24-multi-tab-boundary-smoke.json
+fixtures/phase-0/manual-smoke/2026-05-24-v7-orphan-import-smoke.json
 ```
 
 These are lightweight Vulcan Mesa browser smokes, not completion of the full
@@ -772,6 +780,44 @@ golden gap: `Packet: Runsheet` downloads 32 manifest items while the committed
 full-registry `demo.packet-manifest.json` contains 64 items. Treat packet
 manifests like Runsheet exports: future goldens must name the packet source
 mode they protect.
+The AI panel smoke confirms the panel opens on W1, defaults to local Ollama
+(`gpt-oss:20b`), distinguishes Ollama/OpenAI/Anthropic providers in settings,
+and keeps Send disabled while input is empty. No LLM call or mutating proposal
+was attempted in the browser smoke; approval boundaries were validated with
+targeted AI tests instead.
+The Flowchart/print surface smoke confirms the Flowchart renders after Desk Map
+import with React Flow nodes/edges, page-size options, tool controls, and Print
+available. It also records current React DOM-prop console errors from
+`src/components/canvas/OwnershipEdge.tsx`; no print visual-diff assertion has
+been captured yet.
+The `.landroid` round-trip smoke confirms that, after the Documents view has
+rendered the registry ready state (`64 docs`, `64 links`), File -> Save
+workspace downloads a parseable v8 package with `documentData`, `ownerData`,
+`mapData`, `researchData`, `curativeData`, canvas data, and no legacy
+`pdfData` key; re-import requires the typed `LOAD WORKSPACE` confirmation and
+restores the Documents registry. A prior immediate-export attempt before the
+Documents readiness gate produced a much smaller package with zero exported
+documents, so Phase 0 should treat export-before-side-store-ready timing as a
+behavior/risk to verify before rebuild implementation.
+The Curative/Maps/Sales Deck smoke records current empty-state and reference
+surface behavior: Curative opens with zero active issues and search/status/
+priority filters, Maps opens in present/edit mode with Upload Asset, and Sales
+Deck exposes the native 10-slide status deck plus legacy PDF/PowerPoint actions.
+No curative issue, GIS record, or deck export mutation was attempted.
+The future-version rejection smoke confirms a version `999` `.landroid` probe
+requires the destructive `LOAD WORKSPACE` confirmation, then fails visibly with
+`Import Failed` / `Unsupported .landroid file version 999` and leaves the
+current Vulcan Mesa workspace intact.
+The multi-tab boundary smoke confirms two tabs in the same browser context can
+open the same local workspace with no visible lock, read-only banner, conflict
+prompt, or editing-elsewhere warning. It did not intentionally perform
+conflicting edits; it records the current missing-protection surface for
+PER-024.
+The v7 orphan import smoke confirms that importing W3 after W1 replaces the
+prior 64-document registry with the two migrated legacy PDFs, preserves
+`legacy-orphan.pdf`, and surfaces it as linked to `node legacy-orphan-node`.
+That proves the orphan blob is not lost, while preserving the known gap that
+there is no dedicated orphan-discovery/recovery UI.
 
 ---
 

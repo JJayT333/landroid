@@ -1,0 +1,42 @@
+{
+  "schema": 1,
+  "capturedAt": "2026-05-24",
+  "branch": "codex/phase-0-reconcile-2026-05-23",
+  "fixture": "W1 Vulcan Mesa loaded, then W3 migration-v7-orphan.landroid imported through File load confirmation",
+  "command": "npm run dev -- --host 127.0.0.1",
+  "browser": "Playwright Chromium headless",
+  "viewport": {
+    "width": 1440,
+    "height": 1000
+  },
+  "beforeImport": {
+    "projectHasVulcanMesa": true,
+    "documentsViewHas64Docs": true,
+    "documentsViewHas64Links": true
+  },
+  "confirmation": {
+    "dialogTextIncludesReplaceWarning": true,
+    "requiredPhrase": "LOAD WORKSPACE",
+    "replaceInitiallyDisabled": true,
+    "replaceEnabledAfterPhrase": true
+  },
+  "afterImport": {
+    "projectNameVisible": true,
+    "documentsViewHas2Docs": true,
+    "documentsViewHas2Links": true,
+    "oldW1CountGone": true,
+    "linkedPdfVisible": true,
+    "orphanPdfVisible": true,
+    "orphanNodeIdVisible": true,
+    "bodySample": "LANDroid\nPhase 0 Migration Stress\nDesk Map\nLeasehold\nFlowchart\nRunsheet\nDocuments\nOwners\nCurative\nMaps\nSales Deck\nFederal Leasing\nResearch\nFile ▾\nDemo Data ▾\nDocuments\nPhase 0 Migration Stress\n2 docs\n2 links\n662 B\nPacket: Filter\nPacket: Selected\nPacket: Runsheet\nAll\nInbox / Needs review\nRunsheet / Mineral Title\nLeasehold\nCurative\nResearch\nGIS / Map Support\nFederal Reference\nUnlinked\nMissing metadata\nDuplicates\nNeeds OCR\nSEARCH\nKIND\nAll kinds\nDeed\nLease\nObituary\nAffidavit\nProbate\nRelated\nOther\nTRACT\nAll tracts\nLINK\nAll links\nLinked\nUnlinked\nFROM\nTO\nSelect\n\tDOCUMENT\tAREA\tMETADATA\tLINKS\tSTATUS\tOPEN\n\t\nlegacy-orphan.pdf\nlegacy-orphan.pdf\n331 B | 2025-12-02\n\tInbox\nOther\n\t\nOther\nNo county/reference\nNo parties\n\t\n1 linked\nnode legacy-orphan-node\n\t\nMissing\nNeeds OCR\n\tPDF\n\t\nlegacy-linked.pdf\nlegacy-linked.pdf\n331 B | 2025-12-01\n\tInbox\nOther\n\t\nOther\nNo county/reference\nNo parties\n\t\n1 linked\nWarranty Deed #LEGACY-001\n\t\nMissing\nNeeds OCR\n\tPDF\nlegacy-orphan.pdf\n\nbe3192183425f189d0dd864f9bce7b5ca8a4f65ffdf99a854db42c90e982263c\n\nPDF\nSIZE\n331 B\nUPDATED\n2025-12-02\nMetadata\nSave\nDISPLAY TITLE\nAREA\nInbox\nRunsheet / Mineral Title\nLeasehold\nCurative\nResearch\nGIS / Map Support\nFederal Reference\nKIND\nDeed\nLease\nObituary\nAffidavit\nProbate\nRelated\nOther\nINSTRUMENT TYPE\nCOUNTY\nINSTRUMENT NO.\nVOLUME\nPAGE\nEFFECTIVE\nRECORDED\nGRANTOR\nGRANTEE / LESSOR / LESSEE\nSOURCE REFERENCE\nOCR STATUS\nnot started\nnot needed\ncomplete\nfailed\nNOTES\nLinked Entities\nnode legacy-orphan-node\nlegacy-orphan-node\nDesk Map\nDuplicate Status\n\nNo duplicate hash match.\n\nMissing: instrument type, county, recording reference, date, parties\nPacket Preview\nManifest JSON\nDOCS\n2\nSIZE\n662 B\nMISSING\n2\nDUPLICATES\n0\n1.legacy-orphan.pdf\n2.legacy-linked.pdf\nAsk LANDroid AI"
+  },
+  "console": {
+    "errorCount": 0,
+    "errors": []
+  },
+  "notes": [
+    "Smoke confirms importing W3 v7 migration fixture replaces the prior W1 document registry instead of leaving the 64-doc side store visible.",
+    "The two legacy PDFs are visible after import; the orphan file is preserved by migration, though the current UI does not provide a dedicated orphan-discovery/recovery surface.",
+    "This browser smoke complements the unit golden that asserts the orphan attachment retains the original orphan node ID."
+  ]
+}

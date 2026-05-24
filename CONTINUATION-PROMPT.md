@@ -56,6 +56,32 @@ Packet manifest smoke now records that `Packet: Runsheet` downloads 32 items
 while the committed full-registry packet manifest golden contains 64 items; this
 is a named packet-source golden gap, not an implementation fix to make during
 Phase 0 inventory.
+AI panel smoke now records the visible local-first AI surface: the panel opens
+on W1, defaults to Ollama `gpt-oss:20b`, exposes Ollama/OpenAI/Anthropic
+settings, and keeps Send disabled with empty input. No browser LLM call or
+mutating proposal was attempted; targeted AI tests cover approval boundaries.
+Flowchart/print surface smoke now records Desk Map import into React Flow,
+toolbar/page-size/Print controls, and current `OwnershipEdge` DOM-prop console
+errors. Print visual fidelity still lacks screenshot/PDF evidence.
+`.landroid` round-trip smoke now records that a readiness-gated UI export
+contains the v8 package shape, side-store keys, 64 documents, 64 attachments,
+canvas data, and no legacy `pdfData` key, then re-imports behind the typed
+`LOAD WORKSPACE` destructive confirmation. A prior immediate-export attempt
+before the Documents registry was visibly ready produced zero exported
+documents; treat export timing as a Phase 0 risk/evidence item, not as a
+current-phase implementation fix.
+Curative/Maps/Sales Deck smoke now records current empty-state/reference
+surface behavior: Curative issue filters, Maps present/edit/upload controls,
+and the native 10-slide Sales Deck plus legacy PDF/PowerPoint actions.
+Future-version rejection smoke now records that a version `999` `.landroid`
+probe fails visibly with `Import Failed` after the destructive `LOAD WORKSPACE`
+confirmation and leaves Vulcan Mesa intact. Multi-tab boundary smoke now
+records that a second same-context tab opens the same workspace with no visible
+lock, read-only banner, conflict prompt, or editing-elsewhere warning.
+V7 orphan import smoke now records that W3 replaces W1's 64-document side store
+with 2 migrated PDFs and surfaces `legacy-orphan.pdf` as linked to
+`node legacy-orphan-node`; the orphan blob is preserved, but there is still no
+dedicated orphan-discovery/recovery UI.
 
 Rebuild planning is now documented and amended, but implementation has not
 started. The current planning source of truth is `docs/rebuild-plan.md`. It
@@ -199,6 +225,59 @@ validation:
   downloaded and parsed as JSON, but did not match the full-registry packet
   golden because the packet source item set differs. Evidence:
   `fixtures/phase-0/manual-smoke/2026-05-24-packet-manifest-smoke.json`.
+- AI panel Playwright Chromium smoke - panel opened, local Ollama defaults and
+  hosted provider options were visible, and Send remained disabled while input
+  was empty. Evidence:
+  `fixtures/phase-0/manual-smoke/2026-05-24-ai-panel-boundary-smoke.json`.
+- Targeted AI approval-boundary tests - `npm test -- src/ai/__tests__/approval-preview.test.ts src/ai/__tests__/approval-store.test.ts src/ai/__tests__/action-journal.test.ts src/ai/__tests__/chat-context.test.ts src/ai/__tests__/system-prompt.test.ts`
+  passed, 4 files / 12 tests. The named approval-store path did not correspond
+  to a runnable file; Vitest ran the existing matching files.
+- Flowchart/print surface Playwright Chromium smoke - Desk Map import rendered
+  React Flow nodes/edges, page-size controls, toolbar controls, and Print
+  action; current `OwnershipEdge` DOM-prop console errors were recorded.
+  Evidence:
+  `fixtures/phase-0/manual-smoke/2026-05-24-flowchart-print-surface-smoke.json`.
+- `.landroid` round-trip Playwright Chromium smoke - after waiting for the
+  Documents registry ready state, File -> Save workspace exported a parseable
+  v8 package with 64 documents, 64 attachments, side-store keys, canvas data,
+  and no legacy `pdfData`; File -> Load workspace required `LOAD WORKSPACE` and
+  restored the registry. Evidence:
+  `fixtures/phase-0/manual-smoke/2026-05-24-landroid-roundtrip-smoke.json`.
+- Curative/Maps/Sales Deck Playwright Chromium smoke - Curative empty-state
+  filters, Maps present/edit/upload controls, and the native 10-slide Sales
+  Deck plus legacy PDF/PowerPoint actions were recorded without attempting
+  mutations. Evidence:
+  `fixtures/phase-0/manual-smoke/2026-05-24-curative-maps-sales-smoke.json`.
+- Future-version rejection Playwright Chromium smoke - a temp version `999`
+  `.landroid` probe failed visibly after `LOAD WORKSPACE` confirmation and left
+  Vulcan Mesa intact. Evidence:
+  `fixtures/phase-0/manual-smoke/2026-05-24-future-version-rejection-smoke.json`.
+- Multi-tab boundary Playwright Chromium smoke - two same-context tabs opened
+  the same local workspace with no visible lock/read-only/conflict warning.
+  Evidence:
+  `fixtures/phase-0/manual-smoke/2026-05-24-multi-tab-boundary-smoke.json`.
+- V7 orphan import Playwright Chromium smoke - W3 import replaced W1's
+  64-document registry with 2 migrated PDFs, preserved `legacy-orphan.pdf`, and
+  showed it linked to `node legacy-orphan-node`. Evidence:
+  `fixtures/phase-0/manual-smoke/2026-05-24-v7-orphan-import-smoke.json`.
+- Targeted storage/fixture tests - `npm test -- src/phase0/__tests__/vulcan-mesa-fixtures.test.ts src/storage/__tests__/workspace-persistence.test.ts src/storage/__tests__/document-migration.test.ts src/storage/__tests__/autosave-change-detection.test.ts`
+  passed, 4 files / 44 tests.
+- Full unit test suite - `npm test` passed, 80 files / 640 tests. Expected
+  stderr from tests that intentionally simulate Dexie failures was observed.
+- Type/lint check - `npm run lint` passed.
+- Production build - `npm run build` passed. Vite reported existing
+  chunk-size/dynamic-import warnings for large app chunks and mixed static/
+  dynamic imports; no build failure.
+- E2E workflow suite - `npm run test:e2e` passed, 11 Chromium tests. It reused
+  the local dev server and covered seeded document chips, document registry
+  metadata/packet preview, inline project rename, export/import preservation,
+  branch-scoped lease deletion, curative issues, research records/imports, and
+  federal leasing workflows.
+- Hosted predeploy repo check - `bash scripts/predeploy-check.sh` passed. The
+  script confirmed required hosted files, Cognito build guards, Lambda package
+  script/dependencies, Lambda zip contents, and durable usage-store guard. It
+  also reported the expected `REPLACE_WITH_FUNCTION_URL_HOST` rewrite-template
+  placeholder; AWS console setup is still required for deployment.
 - Targeted inventory-risk tests passed:
   - `npm test -- src/components/deskmap/__tests__/deskmap-coverage.test.ts src/storage/__tests__/workspace-persistence.test.ts src/storage/__tests__/document-migration.test.ts`
     - passed, 3 files / 54 tests.
@@ -368,7 +447,9 @@ AI-036 has a system-prompt snapshot fixture and test.
 Manual smoke-check instructions live in
 `docs/phase-0-manual-smoke-checks.md`; only lightweight Vulcan Mesa demo-load,
 main-tab, lane-detail/export, Runsheet export, document-preview, and
-packet-manifest smoke artifacts have been captured so far.
+packet-manifest, AI-panel, Flowchart/print-surface, `.landroid` round-trip,
+Curative/Maps/Sales Deck, future-version rejection, and multi-tab boundary
+smoke artifacts, plus W3 v7 orphan import smoke, have been captured so far.
 `SECURITY.md` clarifies that hosted/backend work can be safer than today's
 browser-only durability story only if the documented safety gates ship.
 `docs/phase-0-inventory.md` is the draft master Phase 0 inventory after
