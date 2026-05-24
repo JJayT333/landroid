@@ -25,6 +25,10 @@ stay short.
 - Captured a lightweight local browser smoke artifact showing Vulcan Mesa loads
   from the Demo Data menu with tract tabs, cards, document chips, and no
   console/page errors.
+- Captured a broader main-tab smoke artifact across Desk Map, Leasehold,
+  Flowchart, Runsheet, Documents, Owners, Curative, Maps, Sales Deck, Federal
+  Leasing, and Research. All tabs rendered recognizable content; Flowchart
+  emitted current React DOM-prop warnings from `OwnershipEdge`.
 
 ## 2026-05-23
 

@@ -730,10 +730,13 @@ row `needs verification` if the observed behavior is ambiguous.
 Current smoke evidence:
 ```
 fixtures/phase-0/manual-smoke/2026-05-24-local-browser-smoke.json
+fixtures/phase-0/manual-smoke/2026-05-24-main-tabs-smoke.json
 ```
 
-This is a lightweight Vulcan Mesa demo-load browser smoke, not completion of
-the full manual runbook.
+These are lightweight Vulcan Mesa browser smokes, not completion of the full
+manual runbook. The main-tabs smoke found current Flowchart React DOM-prop
+warnings from `src/components/canvas/OwnershipEdge.tsx`; record that as current
+behavior unless a later implementation phase explicitly fixes it.
 
 ---
 

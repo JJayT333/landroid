@@ -36,6 +36,23 @@ The active application surface is the repository root (`/`).
 
 ## Delivery process
 
+## Efficiency and reporting mode
+Use the lightest process that still protects the repository.
+
+For docs-only, fixture-only, planning-only, or evidence-capture changes:
+- Do not repeat stable project context unless it changed.
+- Summarize deltas instead of restating the full workstream.
+- Run targeted validation instead of the full pipeline unless risk warrants more.
+- Batch `CHANGELOG.md`, `CONTINUATION-PROMPT.md`, and PR-body updates when possible.
+- Update `CONTINUATION-PROMPT.md` only when branch state, validation state, open risks, or next steps changed materially.
+
+For app code, persistence, math, AI mutation, security, deployment, data-shape, or architecture changes:
+- Use the full delivery process.
+- Run the relevant automated checks and broaden validation when practical.
+- Update the matching source-of-truth docs when behavior, architecture, validation, security, or roadmap changes.
+
+The user is building LANDroid for the first time and benefits from brief orientation each turn. Provide a concise explanation of where the work is, what is next, and what is being deliberately deferred. If the user introduces new ideas mid-phase, capture them as deferred scope unless they explicitly redirect the current phase.
+
 ### 1) Before coding
 Restate the current phase in 1 to 3 bullets:
 - phase goal

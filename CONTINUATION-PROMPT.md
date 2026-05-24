@@ -20,6 +20,10 @@ checkpoint adopted Claude's `docs/phase-0-inventory.md` as the draft master
 Phase 0 inventory and updated source-of-truth docs. A follow-up cleanup renamed
 the second demo fixture to Vulcan Mesa and archived the ultrareview prompt; no
 rebuild implementation has started.
+`AGENTS.md` now includes an efficiency/reporting rule: use targeted validation
+and delta summaries for docs/fixtures/planning work, keep full rigor for risky
+code/data/security/architecture work, and give the user brief orientation each
+turn without reopening settled scope.
 The branch now also includes a Phase 0 performance-baseline capture walkthrough
 and status template. The walkthrough is committed, but PERF-01 through PERF-08
 measurements are still not captured.
@@ -34,6 +38,8 @@ The fixture generator now also emits a deterministic W2 Raven Forest stress
 manifest/checksum without committing a full large `.landroid` export.
 A lightweight local browser smoke artifact now exists for the Vulcan Mesa demo
 load, but the full manual smoke runbook is still not complete.
+A broader main-tab smoke artifact also exists; it found current Flowchart React
+DOM-prop warnings from `src/components/canvas/OwnershipEdge.tsx`.
 
 Rebuild planning is now documented and amended, but implementation has not
 started. The current planning source of truth is `docs/rebuild-plan.md`. It
@@ -153,6 +159,10 @@ validation:
   passed after rerunning outside the macOS sandbox: Vulcan Mesa loaded from
   Demo Data with no console/page errors. Evidence:
   `fixtures/phase-0/manual-smoke/2026-05-24-local-browser-smoke.json`.
+- Broad local Playwright Chromium tab smoke - rendered all 11 main tabs with
+  recognizable content; recorded current Flowchart React DOM-prop warnings.
+  Evidence:
+  `fixtures/phase-0/manual-smoke/2026-05-24-main-tabs-smoke.json`.
 - Targeted inventory-risk tests passed:
   - `npm test -- src/components/deskmap/__tests__/deskmap-coverage.test.ts src/storage/__tests__/workspace-persistence.test.ts src/storage/__tests__/document-migration.test.ts`
     - passed, 3 files / 54 tests.
@@ -287,7 +297,8 @@ Prior validation from the audit/rebuild-planning checkpoint:
   `src/ai/__tests__/system-prompt.test.ts`.
 - Manual smoke-check instructions are documented in
   `docs/phase-0-manual-smoke-checks.md`; no browser smoke evidence has been
-  captured beyond the lightweight Vulcan Mesa demo-load smoke artifact.
+  captured beyond the lightweight Vulcan Mesa demo-load and main-tab smoke
+  artifacts.
 - Security direction is clarified in `SECURITY.md`; backend work still requires
   a concrete threat model before implementation.
 - Next Phase 0 work: generate the deterministic W2 stress fixture, capture
@@ -310,7 +321,7 @@ but PERF-01 through PERF-08 are not measured yet.
 AI-036 has a system-prompt snapshot fixture and test.
 Manual smoke-check instructions live in
 `docs/phase-0-manual-smoke-checks.md`; only a lightweight Vulcan Mesa demo-load
-smoke artifact has been captured so far.
+and main-tab smoke artifact have been captured so far.
 `SECURITY.md` clarifies that hosted/backend work can be safer than today's
 browser-only durability story only if the documented safety gates ship.
 `docs/phase-0-inventory.md` is the draft master Phase 0 inventory after
