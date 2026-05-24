@@ -718,6 +718,14 @@ Rows must remain `not_captured` or `blocked_*` until raw browser profiles,
 commands, machine context, fixture checksums, and measured results exist. Do not
 convert a row to `captured` from observation or judgment alone.
 
+Manual smoke-check runbook:
+```
+docs/phase-0-manual-smoke-checks.md
+```
+
+Manual smoke results should link back to this inventory by row id or mark the
+row `needs verification` if the observed behavior is ambiguous.
+
 ---
 
 ## Sequencing Notes for Phase 0.5 / 0.75 / 1

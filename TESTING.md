@@ -77,6 +77,8 @@ Do not describe a workflow as verified unless it is active in
 - AI-036 system-prompt rule integrity is frozen by
   `fixtures/phase-0/ai/system-prompt.snapshot.md` and guarded by
   `src/ai/__tests__/system-prompt.test.ts`.
+- Phase 0 manual smoke checks are documented in
+  `docs/phase-0-manual-smoke-checks.md`.
 - Before Phase 0.5 starts, the catalog must identify committed or documented
   reference workspaces for the demo fixture, a Raven Forest-scale fixture, and a
   migration-stress `.landroid`; each needs a checksum policy and expected

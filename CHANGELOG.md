@@ -12,6 +12,9 @@ stay short.
 - Added the AI-036 Phase 0 system-prompt golden snapshot and test coverage for
   the ten non-negotiable rules, critical safety language, mutating-tool prompt
   coverage, and hosted-blocked focus switching.
+- Added the Phase 0 manual smoke-check runbook covering Desk Map, Leasehold,
+  Documents, Runsheet, Flowchart/print, Owners, Curative, Maps/GIS, Research,
+  Federal Leasing, AI approval, and import/export recovery stop conditions.
 
 ## 2026-05-23
 
