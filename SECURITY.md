@@ -37,6 +37,48 @@ Treat these as sensitive:
 - AI prompts and chat context
 - cloud provider API keys
 
+## Rebuild Security Direction
+
+The planned rebuild direction should be more secure than the current app only
+if the safety gates in the rebuild plan are implemented. The current app has
+good local containment, but it still depends heavily on one browser profile and
+manual `.landroid` exports. That is a durability risk, not a privacy win.
+
+Security improvements the rebuild should preserve or add:
+
+- sharded local records instead of one opaque workspace blob
+- stable record IDs, `workspaceId` scoping, and `lastModified` / version fields
+  for future sync conflict detection
+- content-hash addressing for document blobs and packet artifacts
+- immutable original document bytes plus derivative OCR/index records
+- visible storage health: last saved, last exported, browser storage status,
+  and backup/export warnings
+- rolling `.landroid` auto-export where the browser platform supports it
+- persistent-storage requests for PWA/iPad use, with visible fallback when the
+  browser refuses
+- multi-tab or concurrent-writer protection before sharded storage is treated
+  as production-safe
+- private backend object storage, signed URLs, server-side authorization, and
+  encryption at rest when a backend is triggered
+- citation-verified AI answers and approval-gated mutations with undo
+
+Security risks that do not disappear just because LANDroid is hosted:
+
+- cloud storage creates custody duties for title documents, leases, owner
+  contact information, and AI context
+- OCR, embeddings, and search indexes become sensitive derived data
+- sharing links require authorization, expiry, and revocation rules
+- multi-device sync creates stale-write and conflict risks
+- cloud AI can disclose project context to third-party providers unless each
+  provider path is explicitly approved
+- server logs can accidentally retain sensitive prompts, owner data, or document
+  references if logging is too broad
+
+Before backend implementation starts, create a threat model for the actual
+backend design. At minimum, cover assets, actors, trust boundaries, document
+upload/download paths, sync conflicts, backup/export, AI provider calls, OCR
+jobs, sharing links, audit events, and incident recovery.
+
 ## AI Providers
 
 - Ollama/local models are the preferred default.

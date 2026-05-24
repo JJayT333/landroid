@@ -15,6 +15,10 @@ stay short.
 - Added the Phase 0 manual smoke-check runbook covering Desk Map, Leasehold,
   Documents, Runsheet, Flowchart/print, Owners, Curative, Maps/GIS, Research,
   Federal Leasing, AI approval, and import/export recovery stop conditions.
+- Clarified the rebuild security direction in `SECURITY.md`: hosted/backend
+  work can improve durability and controlled access, but only with explicit
+  backup/export, local-first, private-storage, AI/citation, sync-conflict, and
+  threat-model gates.
 
 ## 2026-05-23
 
