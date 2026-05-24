@@ -14,6 +14,7 @@ import {
   buildPacketManifest,
 } from '../../documents/document-registry';
 import { buildRunsheetCsv } from '../../storage/runsheet-export';
+import { importLandroidFile } from '../../storage/workspace-persistence';
 import type { DocumentAttachment, DocumentRecord } from '../../types/document';
 import type { DeskMap, OwnershipNode } from '../../types/node';
 import type { Lease, Owner } from '../../types/owner';
@@ -165,5 +166,51 @@ describe('Phase 0 Vulcan Mesa fixture goldens', () => {
         };
       }),
     });
+  });
+
+  it('freezes the v7 orphaned-PDF migration fixture behavior', async () => {
+    const expected = readJson<{
+      workspaceId: string;
+      expectedDocumentCount: number;
+      expectedAttachmentCount: number;
+      linkedEntityIds: string[];
+      orphanNodeId: string;
+    }>('migration-v7-orphan.expected.json');
+    const originalCrypto = globalThis.crypto;
+    let idCounter = 0;
+
+    Object.defineProperty(globalThis, 'crypto', {
+      configurable: true,
+      value: {
+        subtle: originalCrypto.subtle,
+        randomUUID: () => `phase0-migration-id-${++idCounter}`,
+      },
+    });
+
+    try {
+      const file = new File(
+        [readText('migration-v7-orphan.landroid')],
+        'migration-v7-orphan.landroid',
+        { type: 'application/json' }
+      );
+      const imported = await importLandroidFile(file);
+
+      expect(imported.workspaceId).toBe(expected.workspaceId);
+      expect(imported.documentData?.documents).toHaveLength(expected.expectedDocumentCount);
+      expect(imported.documentData?.attachments).toHaveLength(expected.expectedAttachmentCount);
+      expect(imported.documentData?.attachments.map((row) => row.entityId).sort()).toEqual(
+        [...expected.linkedEntityIds].sort()
+      );
+      expect(
+        imported.documentData?.attachments.find(
+          (row) => row.entityId === expected.orphanNodeId
+        )?.workspaceId
+      ).toBe(expected.workspaceId);
+    } finally {
+      Object.defineProperty(globalThis, 'crypto', {
+        configurable: true,
+        value: originalCrypto,
+      });
+    }
   });
 });

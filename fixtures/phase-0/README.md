@@ -11,6 +11,8 @@ Generated reference artifacts for the Phase 0 behavior inventory.
 - `demo.leasehold-decimals.json`: leasehold decimal and transfer-order review golden.
 - `demo.coverage-summary.json`: Desk Map mineral coverage summary golden per tract.
 - `demo.fixture-manifest.json`: counts, generator name, and checksum metadata.
+- `migration-v7-orphan.landroid`: hand-crafted legacy v7 import fixture with one linked PDF and one orphaned PDF.
+- `migration-v7-orphan.expected.json`: expected migration behavior for the orphaned legacy PDF.
 
 The fixture uses deterministic stub PDF blobs so the document registry, packet manifest, and `.landroid` side-store shape are testable without committing the large TORS document corpus.
 

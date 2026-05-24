@@ -16,7 +16,7 @@ import { buildVulcanMesaWorkspaceData } from '../src/storage/seed-vulcan-mesa';
 import { buildRunsheetCsv } from '../src/storage/runsheet-export';
 import { exportLandroidFile } from '../src/storage/workspace-persistence';
 import type { DocumentAttachment, DocumentRecord } from '../src/types/document';
-import type { OwnershipNode } from '../src/types/node';
+import { createBlankNode, type OwnershipNode } from '../src/types/node';
 import type { Lease } from '../src/types/owner';
 
 const FIXTURE_TIMESTAMP = '2026-05-23T17:00:00.000Z';
@@ -65,6 +65,13 @@ function makeStubPdfBytes(label: string) {
     ].join('\n'),
     'utf8'
   );
+}
+
+function makeSerializedPdf(label: string) {
+  return {
+    mimeType: 'application/pdf',
+    base64: makeStubPdfBytes(label).toString('base64'),
+  };
 }
 
 function hashBytes(bytes: Buffer) {
@@ -167,6 +174,71 @@ function stableJson(value: unknown) {
 
 async function writeJson(path: string, value: unknown) {
   await writeFile(path, stableJson(value), 'utf8');
+}
+
+async function writeMigrationStressFixture() {
+  const workspaceId = 'ws-phase0-migration';
+  const linkedNode = {
+    ...createBlankNode('legacy-node-1', null),
+    instrument: 'Warranty Deed',
+    docNo: 'LEGACY-001',
+    date: '1965-01-15',
+    fileDate: '1965-01-20',
+    grantor: 'Jupiter Flats Ranch',
+    grantee: 'Vulcan Mesa Petroleum, LLC',
+    landDesc: 'Legacy Survey, Walker County, Texas',
+    initialFraction: '1.000000000',
+    fraction: '1.000000000',
+  };
+  const payload = {
+    version: 7,
+    exportedAt: FIXTURE_TIMESTAMP,
+    workspaceId,
+    projectName: 'Phase 0 Migration Stress',
+    nodes: [linkedNode],
+    deskMaps: [],
+    activeDeskMapId: null,
+    activeUnitCode: null,
+    instrumentTypes: ['Warranty Deed'],
+    pdfData: {
+      pdfs: [
+        {
+          nodeId: linkedNode.id,
+          fileName: 'legacy-linked.pdf',
+          mimeType: 'application/pdf',
+          blob: makeSerializedPdf('legacy linked pdf'),
+          createdAt: '2025-12-01T00:00:00.000Z',
+        },
+        {
+          nodeId: 'legacy-orphan-node',
+          fileName: 'legacy-orphan.pdf',
+          mimeType: 'application/pdf',
+          blob: makeSerializedPdf('legacy orphan pdf'),
+          createdAt: '2025-12-02T00:00:00.000Z',
+        },
+      ],
+    },
+  };
+  const text = stableJson(payload);
+  await writeFile(join(OUTPUT_DIR, 'migration-v7-orphan.landroid'), text, 'utf8');
+  const hash = createHash('sha256').update(text).digest('hex');
+  await writeFile(
+    join(OUTPUT_DIR, 'migration-v7-orphan.sha256'),
+    `${hash}  migration-v7-orphan.landroid\n`,
+    'utf8'
+  );
+  await writeJson(join(OUTPUT_DIR, 'migration-v7-orphan.expected.json'), {
+    sourceVersion: 7,
+    workspaceId,
+    expectedDocumentCount: 2,
+    expectedAttachmentCount: 2,
+    linkedEntityIds: [linkedNode.id, 'legacy-orphan-node'],
+    orphanNodeId: 'legacy-orphan-node',
+    orphanBehavior:
+      'Importer preserves the orphan PDF by assigning it to the fallback workspace and retaining the original orphan node ID on the attachment.',
+    fileNames: ['legacy-linked.pdf', 'legacy-orphan.pdf'],
+    landroidSha256: hash,
+  });
 }
 
 async function main() {
@@ -293,6 +365,8 @@ async function main() {
       '- `demo.leasehold-decimals.json`: leasehold decimal and transfer-order review golden.',
       '- `demo.coverage-summary.json`: Desk Map mineral coverage summary golden per tract.',
       '- `demo.fixture-manifest.json`: counts, generator name, and checksum metadata.',
+      '- `migration-v7-orphan.landroid`: hand-crafted legacy v7 import fixture with one linked PDF and one orphaned PDF.',
+      '- `migration-v7-orphan.expected.json`: expected migration behavior for the orphaned legacy PDF.',
       '',
       'The fixture uses deterministic stub PDF blobs so the document registry, packet manifest, and `.landroid` side-store shape are testable without committing the large TORS document corpus.',
       '',
@@ -305,6 +379,8 @@ async function main() {
     ].join('\n'),
     'utf8'
   );
+
+  await writeMigrationStressFixture();
 
   console.log(`Wrote ${OUTPUT_DIR}/demo.landroid (${Buffer.byteLength(landroidText)} bytes)`);
   console.log(`SHA-256 ${landroidHash}`);

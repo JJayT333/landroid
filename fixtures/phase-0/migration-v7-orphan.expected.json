@@ -1,0 +1,17 @@
+{
+  "sourceVersion": 7,
+  "workspaceId": "ws-phase0-migration",
+  "expectedDocumentCount": 2,
+  "expectedAttachmentCount": 2,
+  "linkedEntityIds": [
+    "legacy-node-1",
+    "legacy-orphan-node"
+  ],
+  "orphanNodeId": "legacy-orphan-node",
+  "orphanBehavior": "Importer preserves the orphan PDF by assigning it to the fallback workspace and retaining the original orphan node ID on the attachment.",
+  "fileNames": [
+    "legacy-linked.pdf",
+    "legacy-orphan.pdf"
+  ],
+  "landroidSha256": "24c6dbbffa6581788bb7a410b3cdcae03e461031bd6464044ef65e058f1f267b"
+}

@@ -26,7 +26,8 @@ stay short.
   regeneration script.
 - Added a Phase 0 golden-master test that consumes the committed Vulcan Mesa
   fixture files and verifies checksum, export counts, runsheet CSV, packet
-  manifest, leasehold decimal output, and Desk Map coverage summaries.
+  manifest, leasehold decimal output, Desk Map coverage summaries, and the W3
+  v7 orphaned-PDF migration fixture.
 
 ## 2026-05-20
 

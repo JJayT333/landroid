@@ -651,7 +651,9 @@ Implemented W1 fixture guard:
 - `src/phase0/__tests__/vulcan-mesa-fixtures.test.ts` validates the committed
   Vulcan Mesa `.landroid` checksum, exported workspace counts, runsheet CSV,
   packet manifest, leasehold decimal/transfer-order output, and Desk Map
-  coverage summary against the generated goldens.
+  coverage summary against the generated goldens. It also imports the W3 v7
+  migration-stress fixture and asserts the orphaned legacy PDF stays attached
+  through the fallback workspace path.
 
 | Lane | Test file (existing or new) | New goldens |
 |---|---|---|
@@ -769,7 +771,7 @@ Status against the Phase 0 exit gate from `docs/rebuild-plan.md` (lines 657–66
 - [x] Add W1 golden-master test coverage for the committed fixture files
 - [ ] Generate or document W2 Raven Forest-scale fixture artifacts from
   `buildCombinatorialWorkspaceData()`
-- [ ] Author `fixtures/phase-0/migration-v7-orphan.landroid` + expected
+- [x] Author `fixtures/phase-0/migration-v7-orphan.landroid` + expected
 - [ ] Add the 18 new test files listed in §"Golden Master Fixture Plan"
 - [ ] Snapshot AI system prompt rules (AI-036)
 - [ ] Capture all 8 PERF-* baselines on a declared machine; commit `scripts/capture-phase-0-baselines.md`

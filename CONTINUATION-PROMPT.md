@@ -111,7 +111,7 @@ validation:
 - `shasum -a 256 fixtures/phase-0/demo.landroid fixtures/phase-0/demo.runsheet.csv fixtures/phase-0/demo.packet-manifest.json fixtures/phase-0/demo.leasehold-decimals.json fixtures/phase-0/demo.coverage-summary.json`
   - passed; `demo.landroid` matched `fixtures/phase-0/demo.sha256`.
 - `npm test -- src/phase0/__tests__/vulcan-mesa-fixtures.test.ts` - passed, 1
-  file / 6 tests.
+  file / 7 tests.
 - `git diff --check -- *.md docs/**/*.md` - passed.
 - `rg -n "[ \t]+$" docs/phase-0-inventory.md docs/phase-0-ultrareview-prompt.md`
   - passed after removing one trailing space from the inventory draft.
@@ -120,7 +120,7 @@ validation:
   tests.
 - `npm run lint` - passed after fixing one single-quote syntax issue in the
   renamed Vulcan Mesa seed.
-- `npm test` - passed, 79 files / 633 tests. Existing intentional stderr
+- `npm test` - passed, 79 files / 634 tests. Existing intentional stderr
   coverage for simulated Dexie failures appeared.
 - `npm run build` - passed with existing Vite dynamic/static import warnings,
   chunk-size warning, and Node `module.register()` deprecation warning.
@@ -243,10 +243,11 @@ Prior validation from the audit/rebuild-planning checkpoint:
 - W1 Vulcan Mesa fixture freezing is now partly complete: `.landroid`,
   checksum, runsheet CSV, packet manifest, leasehold decimals, coverage summary,
   fixture manifest, and regeneration script exist under `fixtures/phase-0/`.
-- Next Phase 0 work: add tests that consume the W1 goldens, create or document
-  W2 Raven Forest-scale fixture strategy, create W3 migration-stress fixture,
-  capture performance baselines, and mark remaining inventory rows as verified
-  or `needs verification`.
+- W3 migration-stress fixture now exists and is covered by the Phase 0 fixture
+  test.
+- Next Phase 0 work: create or document the W2 Raven Forest-scale fixture
+  strategy, capture performance baselines, and mark remaining inventory rows as
+  verified or `needs verification`.
 - Do not start the full runsheet walkthrough wizard unless the user explicitly
   redirects to that scope.
 
