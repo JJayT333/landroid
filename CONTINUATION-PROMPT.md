@@ -138,6 +138,8 @@ validation:
   tests.
 - `git diff --check -- *.md docs/**/*.md fixtures/phase-0/* fixtures/phase-0/ai/* fixtures/phase-0/perf/* src/**/*.ts scripts/*`
   - passed after adding the AI snapshot and manual smoke runbook.
+- `npm run lint` - passed after adding the AI system-prompt snapshot test and
+  manual smoke runbook.
 - Targeted inventory-risk tests passed:
   - `npm test -- src/components/deskmap/__tests__/deskmap-coverage.test.ts src/storage/__tests__/workspace-persistence.test.ts src/storage/__tests__/document-migration.test.ts`
     - passed, 3 files / 54 tests.
