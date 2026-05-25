@@ -188,6 +188,50 @@ describe('deskmap-coverage', () => {
     ]);
   });
 
+  it('uses created, updated, and id tie-breakers when lease effective dates match', () => {
+    const result = allocateLeaseCoverage(
+      [
+        createBlankLease('ws-1', 'owner-1', {
+          id: 'lease-b',
+          leaseName: 'Second By Created Date',
+          leasedInterest: '0.25',
+          effectiveDate: '2026-03-01',
+          createdAt: '2026-03-02T00:00:00.000Z',
+          updatedAt: '2026-03-01T00:00:00.000Z',
+        }),
+        createBlankLease('ws-1', 'owner-1', {
+          id: 'lease-a',
+          leaseName: 'First By Created Date',
+          leasedInterest: '0.25',
+          effectiveDate: '2026-03-01',
+          createdAt: '2026-03-01T00:00:00.000Z',
+          updatedAt: '2026-03-10T00:00:00.000Z',
+        }),
+        createBlankLease('ws-1', 'owner-1', {
+          id: 'lease-c',
+          leaseName: 'Third By Id',
+          leasedInterest: '0.25',
+          effectiveDate: '2026-03-01',
+          createdAt: '2026-03-02T00:00:00.000Z',
+          updatedAt: '2026-03-01T00:00:00.000Z',
+        }),
+      ],
+      '0.5'
+    );
+
+    expect(result.allocations.map((allocation) => allocation.lease.id)).toEqual([
+      'lease-a',
+      'lease-b',
+    ]);
+    expect(result.overlaps).toEqual([
+      expect.objectContaining({
+        leaseId: 'lease-c',
+        allocatedFraction: '0',
+        clippedFraction: '0.25',
+      }),
+    ]);
+  });
+
   it('flags a fully-clipped follow-on lease when an earlier lease already took the owner share', () => {
     const result = allocateLeaseCoverage(
       [

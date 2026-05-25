@@ -39,7 +39,7 @@ describe('AI undo snapshots', () => {
   });
 
   it('captures node document workspace data alongside store state', async () => {
-    const { captureSnapshot } = await import('../undo-store');
+    const { captureSnapshot, AI_UNDO_SNAPSHOT_SECTIONS } = await import('../undo-store');
     const node = {
       ...createBlankNode('node-1'),
       attachments: [
@@ -82,6 +82,13 @@ describe('AI undo snapshots', () => {
 
     const snapshot = await captureSnapshot('before AI');
 
+    expect(AI_UNDO_SNAPSHOT_SECTIONS).toEqual([
+      'workspace',
+      'owner',
+      'curative',
+      'map',
+      'documents',
+    ]);
     expect(persistenceMocks.exportDocumentWorkspaceData).toHaveBeenCalledWith(
       'ws-1',
       [node]

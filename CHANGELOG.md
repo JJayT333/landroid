@@ -3,6 +3,26 @@
 This file records meaningful project changes so `CONTINUATION-PROMPT.md` can
 stay short.
 
+## 2026-05-25
+
+- Closed the Phase 0 export-readiness decision for rebuild use: no Phase 0 UI
+  export block, but future normal export must be readiness-gated before real
+  work/storage/backup use.
+- Recorded the Phase 0.5 multi-tab protection contract: pessimistic
+  single-writer behavior with later tabs read-only and an explicit takeover
+  path.
+- Added Phase 0 closeout guards for AI mutating-tool registry drift, AI undo
+  snapshot sections, the local AI 8-step cap, AI app-context omission
+  disclosure, AI approval document-metadata details, packet-manifest shape,
+  document-export workspace scoping, lease-allocation tie-breaks, federal lease
+  exclusion from Texas math, GeoJSON permissive-mode behavior, RRC fixed-width
+  slicing, and performance-baseline artifact linkage.
+- Fixed `.landroid` document export so cross-workspace attachment rows are not
+  included even when they point at an exported workspace document.
+- Reclassified remaining Phase 0 golden-master work into current-behavior
+  tests now covered versus future-contract goldens for Phase 0.5 / Phase 0.75 /
+  Phase 1.
+
 ## 2026-05-24
 
 - Added the Phase 0 performance-baseline capture walkthrough and perf status

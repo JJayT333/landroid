@@ -926,7 +926,7 @@ export const landroidTools = {
  * single-level AI undo. Focus-only tools intentionally stay out of this set so
  * switching context does not burn the user's undo slot.
  */
-export const UNDO_MUTATING_TOOL_NAMES: ReadonlySet<string> = new Set([
+export const AI_UNDO_MUTATING_TOOL_NAMES = [
   'createRootNode',
   'convey',
   'createNpri',
@@ -940,7 +940,11 @@ export const UNDO_MUTATING_TOOL_NAMES: ReadonlySet<string> = new Set([
   // setActiveDeskMap intentionally excluded — changing focus is not a
   // workspace-data mutation and should not burn the undo slot on its own.
   // previewDeleteNode intentionally excluded — read-only.
-]);
+] as const satisfies ReadonlyArray<keyof typeof landroidTools>;
+
+export const UNDO_MUTATING_TOOL_NAMES: ReadonlySet<string> = new Set(
+  AI_UNDO_MUTATING_TOOL_NAMES
+);
 
 /**
  * Names blocked from hosted read-only mode. This is broader than

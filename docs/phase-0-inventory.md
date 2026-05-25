@@ -1,9 +1,9 @@
 # Phase 0 Behavior Inventory and Golden Masters
 
-Status: draft master inventory (produced by Phase 0 ultra-review on `main` checkpoint 2026-05-22; adopted for reconciliation on `codex/phase-0-reconcile-2026-05-23`).
+Status: Phase 0 closeout inventory (produced by Phase 0 ultra-review on `main` checkpoint 2026-05-22; adopted for reconciliation on `codex/phase-0-reconcile-2026-05-23`; closeout decisions and current-behavior goldens updated 2026-05-25).
 Source of truth: [`docs/rebuild-plan.md`](rebuild-plan.md), sections "Phase 0 Operating Plan" and "Phase 0: Current Behavior Inventory And Golden Masters". Where this doc and the rebuild plan disagree, the rebuild plan wins.
 
-This document is the single consolidated master inventory for Phase 0. It freezes current observable behavior on `main` before any rebuild implementation begins. It is read-only review output: no app code is proposed for change here.
+This document is the single consolidated master inventory for Phase 0. It freezes current observable behavior before rebuild implementation begins. Phase 0 closeout added current-behavior tests and one document-export workspace-scoping safety fix; it did not implement Phase 0.5 storage, locking, or product-surface changes.
 
 ## Reconciliation Status
 
@@ -12,7 +12,7 @@ inventory targets until they are verified by the lead thread. High-risk rows
 reviewed during reconciliation should be marked `verified` or `needs
 verification` rather than promoted by assumption.
 
-Verified high-risk claims as of 2026-05-23:
+Verified high-risk claims as of 2026-05-25:
 
 - PER-018: current core workspace persistence is a single JSON string in the
   `workspaces.data` row (`src/storage/workspace-persistence.ts`,
@@ -24,11 +24,11 @@ Verified high-risk claims as of 2026-05-23:
 - DM-016 / LH-002 / CL-03: lease allocation sorts by effective date, then
   `createdAt`, `updatedAt`, and `id` in `src/components/deskmap/deskmap-coverage.ts`.
 - AI-027 / CL-12: mutating-tool undo behavior depends on explicit tool-name
-  sets in `src/ai/tools.ts`, with tests proving hosted-blocked coverage but not
-  a compile-time registry guard.
-- DOC-017: packet manifest generation exists in `src/documents/document-registry.ts`
-  and `src/views/DocumentsView.tsx`; Phase 0 still needs a frozen schema
-  golden.
+  sets in `src/ai/tools.ts`; Phase 0 now guards the registry with
+  `AI_UNDO_MUTATING_TOOL_NAMES` and tests hosted/read-only alignment.
+- DOC-017: packet manifest generation exists in
+  `src/documents/document-registry.ts` and `src/views/DocumentsView.tsx`;
+  Phase 0 now asserts the manifest output shape.
 - FED-016 / CL-20: federal/reference lease records are separate from Texas math
   through jurisdiction helpers and filters; Phase 1 should centralize this as a
   `MathInputView` precondition.
@@ -48,6 +48,17 @@ Validation run during reconciliation:
   coverage for simulated Dexie failures appeared.
 - `npm run build` - passed with existing Vite dynamic/static import warnings,
   chunk-size warning, and Node `module.register()` deprecation warning.
+
+Closeout validation on 2026-05-25:
+
+- `npm test` - passed, 84 files / 652 tests. Existing intentional stderr
+  coverage for simulated Dexie failures appeared.
+- `npm run lint` - passed.
+- `npm run build` - passed with existing Vite dynamic/static import warnings,
+  chunk-size warning, and Node `module.register()` deprecation warning.
+- `npm run test:e2e` - passed, 11 Chromium workflows.
+- `npm run deploy:check` - passed; AWS console setup is still required and the
+  Amplify rewrite template placeholder remains expected.
 
 Corrected during reconciliation:
 
@@ -548,31 +559,109 @@ Cross-cutting implicit behaviors users (and the rebuild) need to know:
 
 ## Known Coverage Gaps (explicit)
 
-Areas where Phase 0 confirmed there is **no current test or golden master**:
+Areas Phase 0 is tracking as missing, partial, or recently closed coverage.
+Closeout decisions and newly added tests are recorded immediately after this
+list so closed items do not get confused with waived work.
 
-1. **Multi-tab concurrent-write behavior** — no detection, no lock, no test. (PER-024)
+1. **Multi-tab concurrent-write behavior** — no detection, no lock, no test.
+   Decision recorded 2026-05-25: Phase 0.5 should implement pessimistic
+   single-writer protection. The first tab stays writable; later tabs open
+   read-only with a visible "editing elsewhere" banner and an explicit takeover
+   confirmation. Last-write-wins is acceptable only as a documented Phase 0
+   dev/non-production boundary. (PER-024)
 2. **Canvas viewport persistence across page reload** — saved in store but not persisted to IndexedDB. (FC-027)
-3. **Document manifest JSON schema** — output not validated against a fixture. (DOC-017)
-4. **Cross-workspace document isolation** — `workspaceId` filter present in queries but not asserted in tests. (DOC-033)
+3. **Document manifest JSON schema** — Phase 0 now asserts the packet-manifest
+   output shape in `src/documents/__tests__/document-registry.test.ts`; broader
+   package/source-mode manifest contracts remain open. (DOC-017)
+4. **Cross-workspace document isolation** — Phase 0 now asserts `.landroid`
+   document export excludes cross-workspace attachment rows in
+   `src/storage/__tests__/document-export-workspace-scope.test.ts`; continue
+   expanding registry/list/store isolation coverage as storage is sharded.
+   (DOC-033)
 5. **`.landroid` orphaned-PDF discovery UI** — v7 migration records orphaned node IDs and keeps affected PDFs via a fallback workspace path, but there is no user-facing discovery/recovery UI. (DOC-039, PER-009)
-6. **AI snapshot completeness vs. growing store list** — no compile-time check that all stores get captured. (CL-13, AI-030)
-7. **`UNDO_MUTATING_TOOL_NAMES` ↔ `tools.ts` registry drift** — no compile-time check. (CL-12, AI-027)
-8. **AI app-context truncation log** — silent at 40 nodes; no warning. (AI-021)
-9. **AI 8-step cap behavior** — no test asserting 9-step loop stops. (AI-025)
-10. **Approval preview vs. document-metadata completeness** — no joint check. (CL-14)
-11. **System prompt rule integrity** — 10 non-negotiable rules not snapshot-tested. (AI-036)
-12. **Hosted 401 token-refresh path** — no test; session logout is the only handler. (AI-024)
-13. **Lease-allocation tie-break determinism** — timestamps tie-break, no test fixture for same-effective-date leases. (DM-016, LH-002)
-14. **NRI ORRI stacking order** — no fixture explicitly proving order matters. (LH-010)
+6. **AI snapshot completeness vs. growing store list** — Phase 0 now declares
+   the AI undo snapshot sections in `AI_UNDO_SNAPSHOT_SECTIONS` and asserts the
+   current restore set in `src/ai/__tests__/undo-store.test.ts`. Future AI
+   mutators that touch new stores must update this list and restore path.
+   (CL-13, AI-030)
+7. **`UNDO_MUTATING_TOOL_NAMES` ↔ `tools.ts` registry drift** — Phase 0 now
+   exports `AI_UNDO_MUTATING_TOOL_NAMES` with a `keyof typeof landroidTools`
+   TypeScript guard and asserts registry alignment in
+   `src/ai/__tests__/read-only-tools.test.ts`. (CL-12, AI-027)
+8. **AI app-context truncation disclosure** — Phase 0 now asserts the compact
+   app-context packet says how many visible Desk Map cards were omitted after
+   the 40-card cap in `src/ai/__tests__/app-context.test.ts`. There is still no
+   separate UI/log warning. (AI-021)
+9. **AI 8-step cap behavior** — Phase 0 now asserts the local provider path
+   passes `stepCountIs(8)` to the AI SDK in `src/ai/__tests__/runChat.test.ts`.
+   (AI-025)
+10. **Approval preview vs. document-metadata completeness** — Phase 0 now
+    surfaces node document metadata (`instrument`, document number,
+    volume/page, instrument date, file date, and land description) in AI
+    approval details and asserts it in
+    `src/ai/__tests__/approval-preview.test.ts`. (CL-14)
+11. **System prompt rule integrity** — Phase 0 now snapshots the 10 core rules
+    in `fixtures/phase-0/ai/system-prompt.snapshot.md` and guards them with
+    `src/ai/__tests__/system-prompt.test.ts`. (AI-036)
+12. **Hosted 401 token-refresh path** — existing hosted chat tests assert the
+    current 401 behavior: trigger the unauthorized/session handler and surface
+    the proxy error. Silent token refresh remains a Phase 0.75/backend-session
+    decision, not Phase 0 behavior. (AI-024)
+13. **Lease-allocation tie-break determinism** — Phase 0 now asserts
+    same-effective-date leases sort by created timestamp, updated timestamp,
+    then id in `src/components/deskmap/__tests__/deskmap-coverage.test.ts`.
+    (DM-016, LH-002)
+14. **NRI ORRI stacking order** — Phase 0 already asserts gross, WI, and
+    NRI-basis ORRI stacking, multiple NRI-basis sequential order, focused
+    decimal rows, and fixed-NPRI-before-NRI-ORRI behavior in
+    `src/components/leasehold/__tests__/leasehold-summary.test.ts`. (LH-010)
 15. **Print/screen styling drift** — PrintCard duplication vs. OwnershipNode; no visual-diff guard. (FC-012, CL-25)
 16. **Multi-sheet wizard classification** — full Parse→Analyze→Stage→Apply not tested end-to-end. (AI-039, AI-040)
 17. **Performance regression enforcement** — PERF-01 through PERF-08 now have
-    baseline artifacts, but there is no automated drift comparison in CI.
-    (See §Performance Baseline Plan.)
-18. **Federal math isolation** — no explicit golden test asserting Texas math filters by jurisdiction. (FED-016, CL-20)
-19. **GeoJSON schema validation** — accepted as any-JSON; no FeatureCollection enforcement. (MAP-004)
-20. **RRC fixed-width 1-indexed position drift** — sliceFixedWidthValue not tested with off-by-one fixtures. (RES-024)
-21. **`.landroid` export readiness timing** — browser smoke showed a complete v8 package only after the Documents registry rendered its ready state; an immediate post-demo export attempt produced zero exported documents. Add a deterministic readiness/race test before sharding or backup work. (PER-010, DOC-033, CL-17)
+    baseline artifacts, and
+    `src/phase0/__tests__/performance-baselines.test.ts` guards that the
+    baseline catalog is complete and linked to raw artifacts. Numeric drift
+    comparison in CI remains a later policy/harness decision. (See
+    §Performance Baseline Plan.)
+18. **Federal math isolation** — Phase 0 now asserts non-Texas/federal leases
+    are excluded from Desk Map lease coverage and Leasehold summary math. Keep
+    `Jurisdiction === 'Texas'` as an explicit Phase 1 type-design precondition
+    for any new math entry points. (FED-016, CL-20)
+19. **GeoJSON schema validation** — Phase 0 now characterizes current permissive
+    behavior in `src/maps/__tests__/geojson-summary.test.ts`: single Feature
+    objects summarize, while non-feature JSON returns an empty summary rather
+    than failing FeatureCollection validation. (MAP-004)
+20. **RRC fixed-width 1-indexed position drift** — Phase 0 now asserts
+    1-indexed, end-inclusive slicing and `trim: false` spacing preservation in
+    `src/research/__tests__/rrc-fixed-width.test.ts`. (RES-024)
+21. **`.landroid` export readiness timing** — browser smoke showed a complete
+    v8 package only after the Documents registry rendered its ready state; an
+    immediate post-demo export attempt produced zero exported documents.
+    Decision recorded 2026-05-25: do not add a Phase 0 export block because the
+    app is not being used for real production work during rebuild. Before
+    real-use storage/backup work, normal export must be readiness-gated:
+    disabled or hard-blocked until document side stores are hydrated, with any
+    partial diagnostic export clearly labeled as partial. Add a deterministic
+    readiness/race test before sharding or backup work. (PER-010, DOC-033,
+    CL-17)
+
+### Closeout Decisions Recorded 2026-05-25
+
+- **Export readiness:** no Phase 0 UI change. The current app can remain usable
+  for review/smoke checks during rebuild, but the production/rebuild contract is
+  readiness-gated normal export.
+- **Multi-tab protection:** Phase 0.5 contract is pessimistic single-writer
+  protection: one writable tab per workspace, additional tabs read-only with a
+  visible warning and explicit takeover path. Optimistic merge/conflict UI is
+  deferred unless real collaboration requirements appear.
+- **Print proof:** current screenshots prove the W2 print surface renders and
+  is nonblank. They are not final print-fidelity proof or an automated
+  visual-diff guard; user visual review remains acceptable evidence for Phase 0,
+  while automated print regression can remain a later hardening item.
+- **Golden-master policy:** remaining goldens are not waived. Phase 0 should
+  implement tests that freeze current behavior. Goldens requiring new product
+  behavior should be recorded as future contracts and implemented with that
+  behavior, not faked in Phase 0.
 
 ---
 
@@ -697,6 +786,13 @@ Implemented W1 fixture guard:
 | FC | `src/storage/__tests__/canvas-viewport-persistence.test.ts` (new) | viewport restored on reload |
 | RES | `src/research/__tests__/rrc-catalog-integrity.test.ts` (new) | 35 datasets, all fields present |
 | FED | `src/federal-leasing/__tests__/math-isolation.test.ts` (new) | jurisdiction filter on every Texas-math entry point |
+
+Closeout classification:
+
+| Status | Golden/test scope | Reason |
+|---|---|---|
+| **Implemented in Phase 0 closeout** | AI mutating-tool registry alignment, AI undo snapshot section guard, AI 8-step cap configuration, AI app-context omission disclosure, AI approval document-metadata details, hosted 401 current-behavior characterization, packet-manifest output shape, document export workspace scoping, lease-allocation tie-break, NRI/ORRI stacking order, federal lease exclusion from Texas math, GeoJSON permissive-mode characterization, RRC fixed-width position slicing, performance-baseline artifact guard | Current behavior exists and can be frozen without adding product features |
+| **Future-contract goldens** | multi-tab lock, canvas viewport persistence, orphaned-PDF discovery UI, Runsheet named ordering modes, packet source-mode goldens, full wizard Parse→Analyze→Stage→Apply, automated Flowchart print visual-diff, numeric performance drift gate, silent hosted token refresh if selected | These require explicit product behavior, backend/session policy, or screenshot/performance infrastructure first. Do not fake them as Phase 0 goldens; carry them into Phase 0.5/Phase 0.75/Phase 1 acceptance as applicable |
 
 ---
 
@@ -882,11 +978,11 @@ Status against the Phase 0 exit gate from `docs/rebuild-plan.md` (lines 657–66
 
 | Gate | Status | Missing |
 |---|---|---|
-| Current branch has a documented page/workflow inventory | **Partially met** (this document is the draft master and is now cross-linked from source docs) | Commit decision; lead-thread row review |
-| Frozen reference workspaces and expected outputs checked in (or explicitly documented if too large) | **Partially met** (W1 Vulcan Mesa export/goldens, W2 stress manifest/checksum, and W3 migration-stress fixture/checksum/expected output exist under `fixtures/phase-0/`) | W2 full export remains intentionally uncommitted until baseline capture or a reviewably small artifact policy |
-| Performance baselines recorded with command, fixture, machine, drift | **Met** (PERF-01 through PERF-06 and PERF-08 captured under `fixtures/phase-0/perf/2026-05-24-codex-closeout/`; PERF-07 captured under `fixtures/phase-0/perf/2026-05-25-codex-perf07/`) | No automated drift gate yet |
-| Full relevant tests pass | **Partially met** (`npm test`, `npm run lint`, and `npm run build` pass on this branch) | Proposed new golden-master tests still need implementation before Phase 0 can close |
-| Missing coverage listed in `docs/rebuild-plan.md` or `TESTING.md` | **Met for draft inventory** | Keep list updated as rows are verified or marked `needs verification` |
+| Current branch has a documented page/workflow inventory | **Met for Phase 0 closeout** (this document is the master inventory and is cross-linked from source docs) | None for Phase 0; continue row-level verification as the rebuild touches each lane |
+| Frozen reference workspaces and expected outputs checked in (or explicitly documented if too large) | **Met** (W1 Vulcan Mesa export/goldens, W2 stress manifest/checksum/documented full-export policy, and W3 migration-stress fixture/checksum/expected output exist under `fixtures/phase-0/`) | None for Phase 0 |
+| Performance baselines recorded with command, fixture, machine, drift | **Met** (PERF-01 through PERF-06 and PERF-08 captured under `fixtures/phase-0/perf/2026-05-24-codex-closeout/`; PERF-07 captured under `fixtures/phase-0/perf/2026-05-25-codex-perf07/`; catalog guarded by `src/phase0/__tests__/performance-baselines.test.ts`) | Numeric CI drift gate is future hardening |
+| Full relevant tests pass | **Met** (`npm test`, `npm run lint`, `npm run build`, `npm run test:e2e`, and `npm run deploy:check` passed on 2026-05-25) | None |
+| Missing coverage listed in `docs/rebuild-plan.md` or `TESTING.md` | **Met for Phase 0 closeout** | Future-contract goldens are parked for Phase 0.5 / Phase 0.75 / Phase 1 |
 
 ### Concrete Checklist to Close the Gate
 
@@ -894,11 +990,11 @@ Status against the Phase 0 exit gate from `docs/rebuild-plan.md` (lines 657–66
 - [x] Cross-link from `TESTING.md` and `docs/rebuild-plan.md` Phase 0 section
 - [x] Generate `fixtures/phase-0/demo.landroid` + `.sha256` after the demo workspace is renamed
 - [x] Produce `fixtures/phase-0/demo.runsheet.csv` and freeze as legacy golden
-- [ ] Split Runsheet goldens into named order modes after the ordering contract
-  is implemented
+- [x] Record Runsheet named order-mode goldens as a future-contract item for
+  the phase that implements ordering modes
 - [x] Produce `fixtures/phase-0/demo.packet-manifest.json` and freeze as golden
-- [ ] Split packet manifest goldens into named source modes after the packet
-  source contract is implemented
+- [x] Record packet manifest named source-mode goldens as a future-contract item
+  for the phase that implements packet source contracts
 - [x] Produce `fixtures/phase-0/demo.leasehold-decimals.json` and freeze as golden
 - [x] Produce `fixtures/phase-0/demo.coverage-summary.json` and freeze as golden
 - [x] Add W1 golden-master test coverage for the committed fixture files
@@ -907,12 +1003,21 @@ Status against the Phase 0 exit gate from `docs/rebuild-plan.md` (lines 657–66
 - [x] Generate W2 Raven Forest stress manifest + checksum without committing a
   full large `.landroid` export
 - [x] Author `fixtures/phase-0/migration-v7-orphan.landroid` + expected
-- [ ] Add the 18 new test files listed in §"Golden Master Fixture Plan"
+- [x] Classify proposed new golden-master tests into current-behavior tests vs.
+  future-contract tests
+- [x] Implement the remaining current-behavior golden tests identified in
+  §"Golden Master Fixture Plan"
+- [x] Carry future-contract goldens into the Phase 0.5 / Phase 1 acceptance
+  criteria when their behavior is implemented
 - [x] Snapshot AI system prompt rules (AI-036)
 - [x] Commit `scripts/capture-phase-0-baselines.md` and `fixtures/phase-0/perf/baseline-status.json`
 - [x] Capture PERF-01 through PERF-06 and PERF-08 on a declared machine and attach raw profiles/results
 - [x] Capture PERF-07 spreadsheet parse after the deterministic 5,000-row CSV fixture exists
 - [x] Run `npm test` and confirm green or document failing rows here
+- [x] Run `npm run lint`
+- [x] Run `npm run build`
+- [x] Run `npm run test:e2e`
+- [x] Run `npm run deploy:check`
 - [x] Update `docs/rebuild-plan.md` Phase 0.5 / 0.75 / 1 exit-gate language per §"Sequencing Notes"
 
 When every box is checked, Phase 0 is complete and the rebuild plan may be revisited before Phase 0.5 implementation begins, per `docs/rebuild-plan.md` Phase 0 Operating Plan item 6.

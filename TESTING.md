@@ -96,6 +96,15 @@ Do not describe a workflow as verified unless it is active in
   Do not treat the full-registry `demo.packet-manifest.json` as proof for
   `Packet: Runsheet`, `Packet: Filter`, or `Packet: Selected`; each source can
   have a different item set and needs explicit expected output.
+- Phase 0 closeout should not fake goldens for behavior LANDroid does not yet
+  have. Implement goldens for current behavior before closeout; carry future
+  contracts such as multi-tab locking, canvas viewport persistence, orphan-PDF
+  recovery UI, named Runsheet ordering modes, named packet source modes, and
+  automated Flowchart visual-diff proof into the phase that implements them.
+- Phase 0 performance baselines are guarded by
+  `src/phase0/__tests__/performance-baselines.test.ts`, which verifies PERF-01
+  through PERF-08 are cataloged and linked to raw artifacts. Numeric drift
+  comparison is a later CI policy/harness decision.
 
 ## Regression Expectations
 

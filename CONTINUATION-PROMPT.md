@@ -175,6 +175,17 @@ The full runsheet walkthrough wizard has not been started.
 
 ## Latest Validation
 
+Closeout validation on 2026-05-25:
+
+- `npm test` - passed, 84 files / 652 tests. Existing intentional stderr
+  coverage for simulated Dexie failures appeared.
+- `npm run lint` - passed.
+- `npm run build` - passed with existing Vite dynamic/static import warnings,
+  chunk-size warning, and Node `module.register()` deprecation warning.
+- `npm run test:e2e` - passed, 11 Chromium workflows.
+- `npm run deploy:check` - passed; AWS console setup is still required and the
+  Amplify rewrite template placeholder remains expected.
+
 Commands run on this branch before this reconciliation remain from the prior
 audit/rebuild-planning handoff. Current reconciliation and demo-rename
 validation:
@@ -437,10 +448,15 @@ Prior validation from the audit/rebuild-planning checkpoint:
   explicit layout/visual-diff decision.
 - Closeout W2 export/import timing was captured after waiting for Documents
   readiness. The earlier zero-document immediate export remains a timing risk
-  to decide before implementation work proceeds.
+  before real-use storage/backup work, but the 2026-05-25 decision is not to
+  add a Phase 0 UI block because the app is not being used for production work
+  during rebuild. Future normal export should be disabled or hard-blocked until
+  document side stores are hydrated, with any partial diagnostic export clearly
+  labeled as partial.
 - Multi-tab smoke currently shows no visible lock, read-only banner, conflict
-  prompt, or editing-elsewhere warning. Phase 0.5 must make an explicit
-  protection decision instead of leaving this implicit.
+  prompt, or editing-elsewhere warning. The 2026-05-25 Phase 0.5 contract is
+  pessimistic single-writer protection: first tab writable, later tabs
+  read-only with a visible warning and explicit takeover confirmation.
 - `docs/landroid-rebuild-plan-reviews.pdf` is currently untracked local input
   from the user; do not delete or commit it unless the user explicitly asks.
 - The action journal is in-memory session context, not a durable audit log.
@@ -479,6 +495,13 @@ Prior validation from the audit/rebuild-planning checkpoint:
 - AI-036 system-prompt rule integrity is covered by
   `fixtures/phase-0/ai/system-prompt.snapshot.md` and
   `src/ai/__tests__/system-prompt.test.ts`.
+- Phase 0 closeout now also adds current-behavior guards for AI mutating-tool
+  registry drift, AI undo snapshot sections, local AI `stepCountIs(8)`
+  configuration, AI app-context omission disclosure, AI approval document
+  metadata details, packet-manifest output shape, `.landroid` document-export
+  workspace scoping, lease-allocation tie-breaks, federal lease exclusion from
+  Texas math, GeoJSON permissive-mode behavior, RRC fixed-width 1-index
+  slicing, and performance-baseline artifact linkage.
 - Manual smoke-check instructions are documented in
   `docs/phase-0-manual-smoke-checks.md`; browser smoke evidence now covers
   Vulcan Mesa demo-load, main tabs, lane-detail/export, Runsheet export,
@@ -487,11 +510,11 @@ Prior validation from the audit/rebuild-planning checkpoint:
   multi-tab boundary, and W3 v7 orphan import.
 - Security direction is clarified in `SECURITY.md`; backend work still requires
   a concrete threat model before implementation.
-- Next Phase 0 work: decide the export-readiness timing risk, decide the
-  multi-tab protection contract for Phase 0.5, split Runsheet goldens into
-  named ordering modes when that contract is implemented, split packet manifest
-  goldens into named source modes when that contract is implemented, and mark
-  remaining inventory rows as verified or `needs verification`.
+- Next Phase 0 work: run the full validation gate after the closeout additions,
+  review the user-confirmed print screenshots if provided, then checkpoint the
+  branch. Future-contract goldens are now parked in
+  `docs/phase-0-inventory.md` for Phase 0.5 / Phase 0.75 / Phase 1 instead of
+  being faked as Phase 0 tests.
 - Do not start the full runsheet walkthrough wizard unless the user explicitly
   redirects to that scope.
 
@@ -510,6 +533,15 @@ PERF-08 are captured under
 `fixtures/phase-0/perf/2026-05-24-codex-closeout/`, and PERF-07 is captured
 under `fixtures/phase-0/perf/2026-05-25-codex-perf07/`.
 AI-036 has a system-prompt snapshot fixture and test.
+Phase 0 closeout decisions are recorded: no Phase 0 export UI block, future
+normal export must be readiness-gated before real use, and Phase 0.5 should use
+pessimistic single-writer multi-tab protection. Closeout also added guards for
+AI mutating-tool registry drift, AI undo snapshot sections, the local AI
+8-step cap, AI app-context omission disclosure, AI approval document metadata
+details, packet-manifest shape, document-export workspace scoping,
+lease-allocation tie-breaks, federal lease exclusion from Texas math, GeoJSON
+permissive-mode behavior, RRC fixed-width slicing, and performance-baseline
+artifact linkage.
 Manual smoke-check instructions live in
 `docs/phase-0-manual-smoke-checks.md`; smoke artifacts now cover Vulcan Mesa
 demo-load, main tabs, lane-detail/export, Runsheet export, document preview,

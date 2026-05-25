@@ -933,9 +933,12 @@ export async function exportDocumentWorkspaceData(
     .equals('node')
     .and((row) => nodeIds.includes(row.entityId))
     .toArray();
-  if (attachments.length === 0) return { documents: [], attachments: [] };
+  const scopedAttachments = attachments.filter(
+    (row) => row.workspaceId === workspaceId
+  );
+  if (scopedAttachments.length === 0) return { documents: [], attachments: [] };
 
-  const docIds = [...new Set(attachments.map((a) => a.docId))];
+  const docIds = [...new Set(scopedAttachments.map((a) => a.docId))];
   const docs = await db.documents.bulkGet(docIds);
   const documents: DocumentRecord[] = [];
   const docIdSeen = new Set<string>();
@@ -947,7 +950,7 @@ export async function exportDocumentWorkspaceData(
   }
   return {
     documents,
-    attachments: attachments.filter((a) => docIdSeen.has(a.docId)),
+    attachments: scopedAttachments.filter((a) => docIdSeen.has(a.docId)),
   };
 }
 

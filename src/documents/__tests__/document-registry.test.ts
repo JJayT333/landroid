@@ -145,6 +145,30 @@ describe('document registry rows', () => {
 
     const manifest = buildPacketManifest(rows);
     const deedManifest = manifest.find((entry) => entry.docId === 'doc-1');
+    expect(Object.keys(deedManifest ?? {})).toEqual([
+      'packetOrder',
+      'docId',
+      'fileName',
+      'displayTitle',
+      'documentArea',
+      'kind',
+      'byteLength',
+      'contentHash',
+      'instrumentType',
+      'county',
+      'instrumentNumber',
+      'volume',
+      'page',
+      'effectiveDate',
+      'recordingDate',
+      'grantor',
+      'grantee',
+      'sourceReference',
+      'linkedEntities',
+      'missingMetadata',
+      'duplicateDocIds',
+      'needsOcr',
+    ]);
     expect(deedManifest).toMatchObject({
       docId: 'doc-1',
       displayTitle: 'Recorded Deed',
