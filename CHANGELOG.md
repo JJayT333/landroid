@@ -22,6 +22,9 @@ stay short.
 - Reclassified remaining Phase 0 golden-master work into current-behavior
   tests now covered versus future-contract goldens for Phase 0.5 / Phase 0.75 /
   Phase 1.
+- Recorded the user print confirmation for Flowchart: print preview is visible,
+  saving works, and manual node rearrangement after Desk Map import is expected
+  current behavior rather than a Phase 0 blocker.
 
 ## 2026-05-24
 

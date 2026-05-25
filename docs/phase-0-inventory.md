@@ -615,7 +615,11 @@ list so closed items do not get confused with waived work.
     NRI-basis ORRI stacking, multiple NRI-basis sequential order, focused
     decimal rows, and fixed-NPRI-before-NRI-ORRI behavior in
     `src/components/leasehold/__tests__/leasehold-summary.test.ts`. (LH-010)
-15. **Print/screen styling drift** — PrintCard duplication vs. OwnershipNode; no visual-diff guard. (FC-012, CL-25)
+15. **Print/screen styling drift** — PrintCard duplication vs. OwnershipNode;
+    no automated visual-diff guard. User confirmation on 2026-05-25 accepts the
+    current Flowchart print preview/save path for Phase 0, with manual node
+    rearrangement after Desk Map import understood as expected current behavior.
+    (FC-012, CL-25)
 16. **Multi-sheet wizard classification** — full Parse→Analyze→Stage→Apply not tested end-to-end. (AI-039, AI-040)
 17. **Performance regression enforcement** — PERF-01 through PERF-08 now have
     baseline artifacts, and
@@ -655,9 +659,10 @@ list so closed items do not get confused with waived work.
   visible warning and explicit takeover path. Optimistic merge/conflict UI is
   deferred unless real collaboration requirements appear.
 - **Print proof:** current screenshots prove the W2 print surface renders and
-  is nonblank. They are not final print-fidelity proof or an automated
-  visual-diff guard; user visual review remains acceptable evidence for Phase 0,
-  while automated print regression can remain a later hardening item.
+  is nonblank, and the user confirmed on 2026-05-25 that Flowchart print preview
+  is visible and saves correctly. Manual rearrangement after Desk Map import is
+  expected current behavior. Automated print regression remains a later
+  hardening item.
 - **Golden-master policy:** remaining goldens are not waived. Phase 0 should
   implement tests that freeze current behavior. Goldens requiring new product
   behavior should be recorded as future contracts and implemented with that
@@ -894,9 +899,10 @@ available. It also records current React DOM-prop console errors from
 `src/components/canvas/OwnershipEdge.tsx`. The closeout performance capture adds
 print-media screenshot artifacts for all 8 W2 print pages, with page 5 as the
 largest screenshot. A 2026-05-25 visual review confirms the screenshots are
-nonblank print proof, but several pages are sparse and cards are clipped at tile
-boundaries. That is visual proof, not a print-fidelity or automated
-visual-diff pass. Review artifact:
+nonblank print proof. The user also confirmed that the Flowchart file is visible
+in print preview and saves correctly, while manual node rearrangement after Desk
+Map import is expected. This closes the Phase 0 print-proof requirement without
+adding an automated visual-diff guard. Review artifact:
 `fixtures/phase-0/perf/2026-05-24-codex-closeout/perf-06-print-visual-review.json`.
 The `.landroid` round-trip smoke confirms that, after the Documents view has
 rendered the registry ready state (`64 docs`, `64 links`), File -> Save

@@ -66,8 +66,9 @@ Flowchart/print surface smoke now records Desk Map import into React Flow,
 toolbar/page-size/Print controls, and current `OwnershipEdge` DOM-prop console
 errors. Closeout perf evidence also includes print-media screenshots for all
 8 W2 print pages. A 2026-05-25 visual review found the pages are nonblank print
-proof, but several tiles are sparse and cards clip at tile boundaries; this is
-not an automated visual-diff or final print-fidelity pass.
+proof, and the user confirmed print preview is visible and saves correctly.
+Manual node rearrangement after Desk Map import is understood as expected
+current behavior; automated visual-diff remains future hardening.
 `.landroid` round-trip smoke now records that a readiness-gated UI export
 contains the v8 package shape, side-store keys, 64 documents, 64 attachments,
 canvas data, and no legacy `pdfData` key, then re-imports behind the typed
@@ -312,8 +313,9 @@ validation:
 - Flowchart print visual review - inspected all 8 W2 print screenshots from
   `fixtures/phase-0/perf/2026-05-24-codex-closeout/` and recorded findings in
   `fixtures/phase-0/perf/2026-05-24-codex-closeout/perf-06-print-visual-review.json`.
-  The pages are nonblank print proof, but sparse/clipped tiles mean print
-  fidelity still needs a later explicit pass or visual-diff guard.
+  The pages are nonblank print proof. The user confirmed on 2026-05-25 that
+  print preview is visible and saves correctly, with manual node rearrangement
+  after Desk Map import expected.
 - `node --check scripts/capture-phase-0-closeout-evidence.mjs` - passed.
 - `git diff --check -- AGENTS.md PROJECT_CONTEXT.md CONTINUATION-PROMPT.md CHANGELOG.md TESTING.md docs/phase-0-inventory.md fixtures/phase-0/perf scripts/capture-phase-0-closeout-evidence.mjs`
   - passed.
@@ -442,10 +444,9 @@ Prior validation from the audit/rebuild-planning checkpoint:
 - The W1 packet manifest UI export for `Packet: Runsheet` and the committed
   full-registry packet manifest golden do not currently match. Treat this as a
   named packet-source contract gap; add packet-source-specific goldens later.
-- Closeout print screenshots prove W2 print pages render, but they are not an
-  automated visual-diff contract. The 2026-05-25 screenshot review found
-  sparse/clipped tiles, so print fidelity should remain open until a later
-  explicit layout/visual-diff decision.
+- Closeout print screenshots prove W2 print pages render, and the user
+  confirmed the Flowchart print preview/save path works for Phase 0. Automated
+  visual-diff remains later hardening rather than a Phase 0 blocker.
 - Closeout W2 export/import timing was captured after waiting for Documents
   readiness. The earlier zero-document immediate export remains a timing risk
   before real-use storage/backup work, but the 2026-05-25 decision is not to
@@ -510,9 +511,9 @@ Prior validation from the audit/rebuild-planning checkpoint:
   multi-tab boundary, and W3 v7 orphan import.
 - Security direction is clarified in `SECURITY.md`; backend work still requires
   a concrete threat model before implementation.
-- Next Phase 0 work: run the full validation gate after the closeout additions,
-  review the user-confirmed print screenshots if provided, then checkpoint the
-  branch. Future-contract goldens are now parked in
+- Next Phase 0 work: Phase 0 is checkpointed with full validation and user
+  print confirmation. Revisit the rebuild plan, then run the Phase 0.75 backend
+  decision before starting Phase 0.5. Future-contract goldens are now parked in
   `docs/phase-0-inventory.md` for Phase 0.5 / Phase 0.75 / Phase 1 instead of
   being faked as Phase 0 tests.
 - Do not start the full runsheet walkthrough wizard unless the user explicitly
@@ -547,8 +548,9 @@ Manual smoke-check instructions live in
 demo-load, main tabs, lane-detail/export, Runsheet export, document preview,
 packet manifest, AI panel, Flowchart/print surface, `.landroid` round trip,
 Curative/Maps/Sales Deck, future-version rejection, multi-tab boundary, and W3
-v7 orphan import. Closeout print screenshots and a manual visual review exist,
-but no visual-diff guard has been added and print fidelity remains open.
+v7 orphan import. Closeout print screenshots, manual visual review, and user
+print-preview/save confirmation exist; no automated visual-diff guard has been
+added.
 `SECURITY.md` clarifies that hosted/backend work can be safer than today's
 browser-only durability story only if the documented safety gates ship.
 `docs/phase-0-inventory.md` is the draft master Phase 0 inventory after
