@@ -1,0 +1,69 @@
+{
+  "id": "PERF-06",
+  "workflow": "Flowchart print",
+  "fixture": "W2 Raven Forest via Combinatorial Demo seed",
+  "fixtureChecksum": "fixtures/phase-0/raven-forest-stress-manifest.sha256",
+  "timing": {
+    "wallClockMs": 511,
+    "browserDeltaMs": 511.2
+  },
+  "nodeCountText": "129 nodes on canvas",
+  "printPageCount": 8,
+  "screenshots": [
+    {
+      "page": 1,
+      "path": "fixtures/phase-0/perf/2026-05-24-codex-closeout/perf-06-flowchart-print-page-1.png",
+      "sizeBytes": 4593,
+      "sha256": "add2c75bf104a7170c5973b63b93cc28b675ac5957030f8cca50858895225366"
+    },
+    {
+      "page": 2,
+      "path": "fixtures/phase-0/perf/2026-05-24-codex-closeout/perf-06-flowchart-print-page-2.png",
+      "sizeBytes": 13454,
+      "sha256": "5dac05d4b4fcc482dec18c9e9afc1e05b791a3c8a6fe39db7a259bff998ae741"
+    },
+    {
+      "page": 3,
+      "path": "fixtures/phase-0/perf/2026-05-24-codex-closeout/perf-06-flowchart-print-page-3.png",
+      "sizeBytes": 7019,
+      "sha256": "007d739d27bd6de7d830be1efc361adc082709e163870f60f28055b7438a4cf8"
+    },
+    {
+      "page": 4,
+      "path": "fixtures/phase-0/perf/2026-05-24-codex-closeout/perf-06-flowchart-print-page-4.png",
+      "sizeBytes": 4617,
+      "sha256": "7eae9626ebe779aa6da6bf27ad1c00c4894c790b3a31a26db26bd4e45dc46061"
+    },
+    {
+      "page": 5,
+      "path": "fixtures/phase-0/perf/2026-05-24-codex-closeout/perf-06-flowchart-print-page-5.png",
+      "sizeBytes": 40158,
+      "sha256": "be609d88b55a80b13e1f421b564a87023fae8ef7534be2a748d925d9fec25ed6"
+    },
+    {
+      "page": 6,
+      "path": "fixtures/phase-0/perf/2026-05-24-codex-closeout/perf-06-flowchart-print-page-6.png",
+      "sizeBytes": 18235,
+      "sha256": "ed93acf8d8e569d39a25b6571e675d33b92e5afc4ee808b094eb4a4d0e4a5bf7"
+    },
+    {
+      "page": 7,
+      "path": "fixtures/phase-0/perf/2026-05-24-codex-closeout/perf-06-flowchart-print-page-7.png",
+      "sizeBytes": 26154,
+      "sha256": "d9544afe5746b30ea4a97e7f171bc274f8e33772e886628b03cd93b817f38158"
+    },
+    {
+      "page": 8,
+      "path": "fixtures/phase-0/perf/2026-05-24-codex-closeout/perf-06-flowchart-print-page-8.png",
+      "sizeBytes": 15331,
+      "sha256": "8a4f4b6cbebeb2993c09b8d382e92554ca5fd7548bd8b61606a8a0209d0c83d9"
+    }
+  ],
+  "largestScreenshot": {
+    "page": 5,
+    "path": "fixtures/phase-0/perf/2026-05-24-codex-closeout/perf-06-flowchart-print-page-5.png",
+    "sizeBytes": 40158,
+    "sha256": "be609d88b55a80b13e1f421b564a87023fae8ef7534be2a748d925d9fec25ed6"
+  },
+  "capturedAt": "2026-05-24T23:41:27.917Z"
+}

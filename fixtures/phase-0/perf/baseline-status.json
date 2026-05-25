@@ -3,87 +3,134 @@
   "purpose": "Phase 0 performance baseline status for docs/phase-0-inventory.md PERF-01 through PERF-08.",
   "branch": "codex/phase-0-reconcile-2026-05-23",
   "lastUpdated": "2026-05-24",
-  "gitCommitAtLastUpdate": null,
+  "gitCommitAtLastUpdate": "1d422e1f3f835c2a88b5ed067cfaf1aa53848105",
   "machineProfile": {
-    "status": "partial",
+    "status": "captured",
     "os": "macOS 26.3.1 (25D771280a)",
     "node": "v26.0.0",
     "npm": "11.12.1",
-    "cpuModel": null,
-    "coreCount": null,
-    "memoryBytes": null,
-    "browser": null,
+    "cpuModel": "Apple M4 Pro",
+    "coreCount": 14,
+    "memoryBytes": 51539607552,
+    "browser": "Playwright Chromium 147.0.7727.15",
+    "profilePath": "fixtures/phase-0/perf/2026-05-24-codex-closeout/machine-profile.txt",
     "notes": [
-      "CPU, core count, and memory were not captured in the Codex sandbox because sysctl returned Operation not permitted.",
-      "Browser version must be recorded manually from chrome://version during a real browser baseline run."
+      "Captured by scripts/capture-phase-0-closeout-evidence.mjs against the local Vite dev server at http://127.0.0.1:5174/.",
+      "The capture command ran outside the macOS sandbox because headless Chromium launch is blocked inside the default sandbox."
     ]
   },
   "baselines": [
     {
       "id": "PERF-01",
       "workflow": "Large Desk Map render",
-      "status": "blocked_fixture_missing",
-      "fixture": "W2 Raven Forest-scale generated fixture",
+      "status": "captured",
+      "fixture": "W2 Raven Forest via Combinatorial Demo seed",
       "fixtureChecksum": "fixtures/phase-0/raven-forest-stress-manifest.sha256",
-      "result": null,
-      "rawProfilePath": null,
+      "command": "node scripts/capture-phase-0-closeout-evidence.mjs http://127.0.0.1:5174/ 2026-05-24-codex-closeout",
+      "machineProfilePath": "fixtures/phase-0/perf/2026-05-24-codex-closeout/machine-profile.txt",
+      "result": {
+        "appFcpMs": null,
+        "demoLoadWallClockMs": 193,
+        "largestTractActivationWallClockMs": 106,
+        "largestTractVisibleCards": "188 cards"
+      },
+      "rawProfilePath": "fixtures/phase-0/perf/2026-05-24-codex-closeout/perf-01-large-desk-map-render.json",
       "driftBudget": "+/- 15%",
-      "notes": "W2 deterministic manifest exists; full browser-loaded stress fixture/export and raw performance profile are not captured yet."
+      "reviewerDate": "Codex, 2026-05-24",
+      "notes": "Captured as browser wall-clock timings against the W2 Combinatorial seed; first-contentful-paint was unavailable from the browser performance entries and remains null in the raw file."
     },
     {
       "id": "PERF-02",
       "workflow": "Document registry load",
-      "status": "blocked_fixture_missing",
-      "fixture": "W2 Raven Forest-scale generated fixture with stubbed blobs",
+      "status": "captured",
+      "fixture": "W2 Raven Forest via Combinatorial Demo seed with stubbed blobs",
       "fixtureChecksum": "fixtures/phase-0/raven-forest-stress-manifest.sha256",
-      "result": null,
-      "rawProfilePath": null,
+      "command": "node scripts/capture-phase-0-closeout-evidence.mjs http://127.0.0.1:5174/ 2026-05-24-codex-closeout",
+      "machineProfilePath": "fixtures/phase-0/perf/2026-05-24-codex-closeout/machine-profile.txt",
+      "result": {
+        "wallClockMs": 4490,
+        "documentRowCount": 145,
+        "firstRowsThreshold": 25
+      },
+      "rawProfilePath": "fixtures/phase-0/perf/2026-05-24-codex-closeout/perf-02-document-registry-load.json",
       "driftBudget": "+/- 15%",
-      "notes": "W2 deterministic manifest exists; full browser-loaded stress fixture/export and raw performance profile are not captured yet."
+      "reviewerDate": "Codex, 2026-05-24",
+      "notes": "Captured first render of the Documents view until 145 docs and at least 25 table rows were visible."
     },
     {
       "id": "PERF-03",
       "workflow": "Packet preview build",
-      "status": "blocked_fixture_missing",
-      "fixture": "W2 Raven Forest-scale generated fixture",
+      "status": "captured",
+      "fixture": "W2 Raven Forest via Combinatorial Demo seed",
       "fixtureChecksum": "fixtures/phase-0/raven-forest-stress-manifest.sha256",
-      "result": null,
-      "rawProfilePath": null,
+      "command": "node scripts/capture-phase-0-closeout-evidence.mjs http://127.0.0.1:5174/ 2026-05-24-codex-closeout",
+      "machineProfilePath": "fixtures/phase-0/perf/2026-05-24-codex-closeout/machine-profile.txt",
+      "result": {
+        "wallClockMs": 42,
+        "packetPreviewDocs": 145,
+        "packetPreviewSize": "9.7 MB"
+      },
+      "rawProfilePath": "fixtures/phase-0/perf/2026-05-24-codex-closeout/perf-03-packet-preview-build.json",
       "driftBudget": "+/- 15%",
-      "notes": "W2 deterministic manifest exists; full browser-loaded stress fixture/export and raw performance profile are not captured yet."
+      "reviewerDate": "Codex, 2026-05-24",
+      "notes": "Captured the Filter packet preview surface after Documents was loaded."
     },
     {
       "id": "PERF-04",
       "workflow": ".landroid round trip",
-      "status": "blocked_fixture_missing",
-      "fixture": "W2 Raven Forest-scale generated fixture",
+      "status": "captured",
+      "fixture": "W2 Raven Forest via Combinatorial Demo seed",
       "fixtureChecksum": "fixtures/phase-0/raven-forest-stress-manifest.sha256",
-      "result": null,
-      "rawProfilePath": null,
+      "command": "node scripts/capture-phase-0-closeout-evidence.mjs http://127.0.0.1:5174/ 2026-05-24-codex-closeout",
+      "machineProfilePath": "fixtures/phase-0/perf/2026-05-24-codex-closeout/machine-profile.txt",
+      "result": {
+        "exportWallClockMs": 175,
+        "importWallClockMs": 47,
+        "packageSizeBytes": 16538636,
+        "packageSha256": "c54c203f27903861b78bf4cf49719bd7eb891d095b72a257402d0f357e15328b",
+        "packageRetained": false
+      },
+      "rawProfilePath": "fixtures/phase-0/perf/2026-05-24-codex-closeout/perf-04-landroid-round-trip.json",
       "driftBudget": "+/- 20%",
-      "notes": "W2 deterministic manifest exists; full browser-loaded stress fixture/export and raw performance profile are not captured yet."
+      "reviewerDate": "Codex, 2026-05-24",
+      "notes": "The 15.8 MB UI export was imported successfully, then removed from git working tree because it exceeded the 5 MB reviewability threshold; checksum and size are retained."
     },
     {
       "id": "PERF-05",
       "workflow": "Autosave debounce",
-      "status": "not_captured",
-      "fixture": "W1 Vulcan Mesa",
+      "status": "captured",
+      "fixture": "W1 Vulcan Mesa via Demo Data seed",
       "fixtureChecksum": "fixtures/phase-0/demo.sha256",
-      "result": null,
-      "rawProfilePath": null,
+      "command": "node scripts/capture-phase-0-closeout-evidence.mjs http://127.0.0.1:5174/ 2026-05-24-codex-closeout",
+      "machineProfilePath": "fixtures/phase-0/perf/2026-05-24-codex-closeout/machine-profile.txt",
+      "result": {
+        "editWallClockMs": 59,
+        "observedPersistenceDelayMs": 2062,
+        "targetDebounceMs": 2000
+      },
+      "rawProfilePath": "fixtures/phase-0/perf/2026-05-24-codex-closeout/perf-05-autosave-debounce.json",
       "driftBudget": "+/- 10%",
-      "notes": "Requires browser/IndexedDB timing capture."
+      "reviewerDate": "Codex, 2026-05-24",
+      "notes": "Captured project-name edit persistence in IndexedDB. Raw file also records that the pre-edit saved row still referenced the prior W2 project, so demo-load autosave timing remains a risk separate from edit debounce."
     },
     {
       "id": "PERF-06",
       "workflow": "Flowchart print",
-      "status": "blocked_fixture_missing",
-      "fixture": "W2 Raven Forest-scale generated fixture",
+      "status": "captured",
+      "fixture": "W2 Raven Forest via Combinatorial Demo seed",
       "fixtureChecksum": "fixtures/phase-0/raven-forest-stress-manifest.sha256",
-      "result": null,
-      "rawProfilePath": null,
+      "command": "node scripts/capture-phase-0-closeout-evidence.mjs http://127.0.0.1:5174/ 2026-05-24-codex-closeout",
+      "machineProfilePath": "fixtures/phase-0/perf/2026-05-24-codex-closeout/machine-profile.txt",
+      "result": {
+        "wallClockMs": 511,
+        "nodeCountText": "129 nodes on canvas",
+        "printPageCount": 8,
+        "largestScreenshot": "fixtures/phase-0/perf/2026-05-24-codex-closeout/perf-06-flowchart-print-page-5.png"
+      },
+      "rawProfilePath": "fixtures/phase-0/perf/2026-05-24-codex-closeout/perf-06-flowchart-print.json",
       "driftBudget": "+/- 15%",
-      "notes": "W2 deterministic manifest exists; full browser-loaded stress fixture/export and raw performance profile are not captured yet."
+      "reviewerDate": "Codex, 2026-05-24",
+      "notes": "Captured print-media screenshots for all 8 pages. This is visual proof, not an automated visual-diff guard."
     },
     {
       "id": "PERF-07",
@@ -99,13 +146,19 @@
     {
       "id": "PERF-08",
       "workflow": "Leasehold transfer-order build",
-      "status": "blocked_fixture_missing",
-      "fixture": "W2 Raven Forest-scale generated fixture",
+      "status": "captured",
+      "fixture": "W2 Raven Forest via Combinatorial Demo seed",
       "fixtureChecksum": "fixtures/phase-0/raven-forest-stress-manifest.sha256",
-      "result": null,
-      "rawProfilePath": null,
+      "command": "node scripts/capture-phase-0-closeout-evidence.mjs http://127.0.0.1:5174/ 2026-05-24-codex-closeout",
+      "machineProfilePath": "fixtures/phase-0/perf/2026-05-24-codex-closeout/machine-profile.txt",
+      "result": {
+        "wallClockMs": 179,
+        "visibleSignal": "Raven Forest Unit A is isolated here; Texas Energy Acquisitions LP"
+      },
+      "rawProfilePath": "fixtures/phase-0/perf/2026-05-24-codex-closeout/perf-08-leasehold-transfer-order.json",
       "driftBudget": "+/- 15%",
-      "notes": "W2 deterministic manifest exists; full browser-loaded stress fixture/export and raw performance profile are not captured yet."
+      "reviewerDate": "Codex, 2026-05-24",
+      "notes": "Captured Leasehold view render for Unit A after selecting the C1 Baseline Splits tract."
     }
   ]
 }

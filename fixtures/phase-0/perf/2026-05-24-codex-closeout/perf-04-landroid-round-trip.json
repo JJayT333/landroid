@@ -1,0 +1,21 @@
+{
+  "id": "PERF-04",
+  "workflow": ".landroid round trip",
+  "fixture": "W2 Raven Forest via Combinatorial Demo seed",
+  "fixtureChecksum": "fixtures/phase-0/raven-forest-stress-manifest.sha256",
+  "exportTiming": {
+    "wallClockMs": 175,
+    "browserDeltaMs": 174.6
+  },
+  "importTiming": {
+    "wallClockMs": 47,
+    "browserDeltaMs": 46.1
+  },
+  "packagePath": null,
+  "packageRetained": false,
+  "packageRemovedAfterImport": true,
+  "packageArtifactPolicy": "Removed after import because package exceeded 5242880 bytes; checksum and size are retained so the package can be regenerated with this script.",
+  "packageSizeBytes": 16538636,
+  "packageSha256": "c54c203f27903861b78bf4cf49719bd7eb891d095b72a257402d0f357e15328b",
+  "capturedAt": "2026-05-24T23:41:21.948Z"
+}

@@ -1,0 +1,21 @@
+{
+  "id": "PERF-05",
+  "workflow": "Autosave debounce",
+  "fixture": "W1 Vulcan Mesa via Demo Data seed",
+  "fixtureChecksum": "fixtures/phase-0/demo.sha256",
+  "beforeEditRecord": {
+    "projectName": "Combinatorial Demo — Raven Forest (10 Tracts, 1476 nodes)",
+    "savedAt": "2026-05-24T23:41:24.280Z"
+  },
+  "editTiming": {
+    "wallClockMs": 59,
+    "browserDeltaMs": 58.6
+  },
+  "persistencePoll": {
+    "saved": true,
+    "elapsedMs": 2062,
+    "savedAt": "2026-05-24T23:41:26.695Z"
+  },
+  "targetDebounceMs": 2000,
+  "capturedAt": "2026-05-24T23:41:26.775Z"
+}

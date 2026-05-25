@@ -2,8 +2,9 @@
 
 This folder is reserved for Phase 0 performance capture outputs.
 
-Current status: baseline capture is documented, but the PERF-01 through PERF-08
-measurements are not captured yet.
+Current status: the 2026-05-24 closeout capture records PERF-01 through
+PERF-06 and PERF-08 under `2026-05-24-codex-closeout/`. PERF-07 remains
+blocked until `fixtures/phase-0/import-stress.csv` exists.
 
 Use:
 
@@ -18,3 +19,7 @@ deferred with a documented reason.
 Do not commit large browser trace files unless they are small enough to review.
 If a Chrome trace is too large, store it outside git and commit a summary row
 with the local path, file size, checksum, and capture date.
+
+The W2 `.landroid` UI export produced during the 2026-05-24 closeout run was
+about 15.8 MB, so the capture script imported it, recorded its checksum and
+size, then removed it from the working tree instead of committing the package.

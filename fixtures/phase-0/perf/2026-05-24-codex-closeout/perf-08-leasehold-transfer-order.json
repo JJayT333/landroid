@@ -1,0 +1,12 @@
+{
+  "id": "PERF-08",
+  "workflow": "Leasehold transfer-order build",
+  "fixture": "W2 Raven Forest via Combinatorial Demo seed",
+  "fixtureChecksum": "fixtures/phase-0/raven-forest-stress-manifest.sha256",
+  "timing": {
+    "wallClockMs": 124,
+    "browserDeltaMs": 124.3
+  },
+  "visibleSignal": "Raven Forest Unit A is isolated here; Texas Energy Acquisitions LP",
+  "capturedAt": "2026-05-24T23:41:28.188Z"
+}

@@ -566,7 +566,9 @@ Areas where Phase 0 confirmed there is **no current test or golden master**:
 14. **NRI ORRI stacking order** — no fixture explicitly proving order matters. (LH-010)
 15. **Print/screen styling drift** — PrintCard duplication vs. OwnershipNode; no visual-diff guard. (FC-012, CL-25)
 16. **Multi-sheet wizard classification** — full Parse→Analyze→Stage→Apply not tested end-to-end. (AI-039, AI-040)
-17. **Performance baselines** — no recorded baseline for autosave, packet preview, `.landroid` round trip, print, or large Desk Map. (See §Performance Baseline Plan.)
+17. **Performance baselines** — PERF-01 through PERF-06 and PERF-08 now have
+    closeout capture artifacts; PERF-07 spreadsheet parse remains blocked
+    until a deterministic 5,000-row CSV exists. (See §Performance Baseline Plan.)
 18. **Federal math isolation** — no explicit golden test asserting Texas math filters by jurisdiction. (FED-016, CL-20)
 19. **GeoJSON schema validation** — accepted as any-JSON; no FeatureCollection enforcement. (MAP-004)
 20. **RRC fixed-width 1-indexed position drift** — sliceFixedWidthValue not tested with off-by-one fixtures. (RES-024)
@@ -700,10 +702,12 @@ Implemented W1 fixture guard:
 
 ## Performance Baseline Plan
 
-Phase 0 now has a repeatable capture walkthrough, but it still has **no
-recorded PERF-01 through PERF-08 baseline measurements** on the current branch.
-To close the exit gate, capture the following with a single fixed machine
-profile (declared in the fixture README) and a deterministic seed.
+Phase 0 now has a repeatable capture walkthrough and a closeout browser capture
+for PERF-01 through PERF-06 and PERF-08. PERF-07 remains **blocked** until the
+deterministic 5,000-row CSV fixture exists. To close the exit gate completely,
+capture the remaining spreadsheet parse row and keep future captures on a
+single fixed machine profile (declared in the fixture README) and deterministic
+seed.
 
 Machine profile (record at capture time): CPU model, core count, total RAM, OS version, Node version, Chrome version, dev-server mode (Vite dev vs prod build).
 
@@ -728,6 +732,11 @@ scripts/capture-phase-0-baselines.md
 Current status template:
 ```
 fixtures/phase-0/perf/baseline-status.json
+```
+
+Current raw capture folder:
+```
+fixtures/phase-0/perf/2026-05-24-codex-closeout/
 ```
 
 Rows must remain `not_captured` or `blocked_*` until raw browser profiles,
@@ -788,8 +797,9 @@ targeted AI tests instead.
 The Flowchart/print surface smoke confirms the Flowchart renders after Desk Map
 import with React Flow nodes/edges, page-size options, tool controls, and Print
 available. It also records current React DOM-prop console errors from
-`src/components/canvas/OwnershipEdge.tsx`; no print visual-diff assertion has
-been captured yet.
+`src/components/canvas/OwnershipEdge.tsx`. The closeout performance capture adds
+print-media screenshot artifacts for all 8 W2 print pages, with page 5 as the
+largest screenshot. That is visual proof, not an automated visual-diff guard.
 The `.landroid` round-trip smoke confirms that, after the Documents view has
 rendered the registry ready state (`64 docs`, `64 links`), File -> Save
 workspace downloads a parseable v8 package with `documentData`, `ownerData`,
@@ -799,6 +809,9 @@ restores the Documents registry. A prior immediate-export attempt before the
 Documents readiness gate produced a much smaller package with zero exported
 documents, so Phase 0 should treat export-before-side-store-ready timing as a
 behavior/risk to verify before rebuild implementation.
+The closeout performance capture also times a W2 `.landroid` UI export/import;
+the 15.8 MB package was imported successfully, then removed from the working
+tree while retaining checksum and size evidence.
 The Curative/Maps/Sales Deck smoke records current empty-state and reference
 surface behavior: Curative opens with zero active issues and search/status/
 priority filters, Maps opens in present/edit mode with Upload Asset, and Sales
@@ -869,7 +882,7 @@ Status against the Phase 0 exit gate from `docs/rebuild-plan.md` (lines 657–66
 |---|---|---|
 | Current branch has a documented page/workflow inventory | **Partially met** (this document is the draft master and is now cross-linked from source docs) | Commit decision; lead-thread row review |
 | Frozen reference workspaces and expected outputs checked in (or explicitly documented if too large) | **Partially met** (W1 Vulcan Mesa export/goldens, W2 stress manifest/checksum, and W3 migration-stress fixture/checksum/expected output exist under `fixtures/phase-0/`) | W2 full export remains intentionally uncommitted until baseline capture or a reviewably small artifact policy |
-| Performance baselines recorded with command, fixture, machine, drift | **Not met** | Capture walkthrough and status template exist; all 8 PERF-* measurements remain unfilled |
+| Performance baselines recorded with command, fixture, machine, drift | **Partially met** (PERF-01 through PERF-06 and PERF-08 captured under `fixtures/phase-0/perf/2026-05-24-codex-closeout/`) | PERF-07 spreadsheet parse remains blocked until `fixtures/phase-0/import-stress.csv` exists |
 | Full relevant tests pass | **Partially met** (`npm test`, `npm run lint`, and `npm run build` pass on this branch) | Proposed new golden-master tests still need implementation before Phase 0 can close |
 | Missing coverage listed in `docs/rebuild-plan.md` or `TESTING.md` | **Met for draft inventory** | Keep list updated as rows are verified or marked `needs verification` |
 
@@ -895,7 +908,8 @@ Status against the Phase 0 exit gate from `docs/rebuild-plan.md` (lines 657–66
 - [ ] Add the 18 new test files listed in §"Golden Master Fixture Plan"
 - [x] Snapshot AI system prompt rules (AI-036)
 - [x] Commit `scripts/capture-phase-0-baselines.md` and `fixtures/phase-0/perf/baseline-status.json`
-- [ ] Capture all 8 PERF-* baselines on a declared machine and attach raw profiles/results
+- [x] Capture PERF-01 through PERF-06 and PERF-08 on a declared machine and attach raw profiles/results
+- [ ] Capture PERF-07 spreadsheet parse after the deterministic 5,000-row CSV fixture exists
 - [x] Run `npm test` and confirm green or document failing rows here
 - [x] Update `docs/rebuild-plan.md` Phase 0.5 / 0.75 / 1 exit-gate language per §"Sequencing Notes"
 

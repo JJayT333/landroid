@@ -1,0 +1,12 @@
+{
+  "id": "PERF-03",
+  "workflow": "Packet preview build",
+  "fixture": "W2 Raven Forest via Combinatorial Demo seed",
+  "fixtureChecksum": "fixtures/phase-0/raven-forest-stress-manifest.sha256",
+  "timing": {
+    "wallClockMs": 38,
+    "browserDeltaMs": 37.2
+  },
+  "packetPreviewTextSample": "Packet Preview\nManifest JSON\nDOCS\n145\nSIZE\n9.9 MB\nMISSING\n145\nDUPLICATES\n145\n1.C10-ST-11044-affidavit-of-heirship.pdf\n2.C10-ST-11044-obituary.pdf\n3.C10-ST-11044-deed.pdf\n4.C5-ST-10370-affidavit-of-heirship.pdf\n5.C5-ST-10370-obituary.pdf\n6.C5-ST-10370-deed.pdf\n7.C2-ST-10079-affidavit-of-heirship.pdf\n8.C2-ST-10079-obituary.pdf\n9.C2-ST-10079-deed.pdf\n10.P2025-4.pdf\n11.P2018-68.pdf\n12.OGML-Tyra_R.pdf\n13.OGML-LCT-Trust.pdf\n14.OGML-ElmoreFamilyPartners.pdf\n15.OGML_Trapp_Robt.pdf\n16.OGML_Trapp_Downey.pdf\n17.OGML_Tinabeth_Keasling.pdf\n18.OGML_Powell.pdf\n19.OGML_McRorie.pdf\n20.OGML_McClanahan.pdf\n21.OGML_Mayo-Henson.pdf\n22.OGML_Kraft.pdf\n23.OGML_Harman_Donald.pdf\n24.OGML_Harman_Claude.pdf\n25.OGML_Few.pdf",
+  "capturedAt": "2026-05-24T23:41:21.714Z"
+}

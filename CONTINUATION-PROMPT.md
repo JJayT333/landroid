@@ -24,13 +24,15 @@ rebuild implementation has started.
 and delta summaries for docs/fixtures/planning work, keep full rigor for risky
 code/data/security/architecture work, and give the user brief orientation each
 turn without reopening settled scope.
-The branch now also includes a Phase 0 performance-baseline capture walkthrough
-and status template. The walkthrough is committed, but PERF-01 through PERF-08
-measurements are still not captured.
+The branch now also includes a Phase 0 performance-baseline capture walkthrough,
+status template, reproducible closeout capture script, and closeout evidence.
+PERF-01 through PERF-06 and PERF-08 are captured under
+`fixtures/phase-0/perf/2026-05-24-codex-closeout/`; PERF-07 remains blocked
+until a deterministic 5,000-row spreadsheet import fixture exists.
 AI-036 system-prompt rule integrity is also frozen with a Phase 0 snapshot and
 targeted test.
-The Phase 0 manual smoke-check runbook is documented, but no manual browser
-smoke run has been captured yet.
+The Phase 0 manual smoke-check runbook is documented, and the branch now
+contains browser smoke artifacts for the highest-risk current surfaces.
 `SECURITY.md` now states the rebuild security verdict explicitly: the planned
 direction is safer only if backup/export, local-first, private-storage,
 AI/citation, sync-conflict, and threat-model gates are actually implemented.
@@ -62,7 +64,8 @@ settings, and keeps Send disabled with empty input. No browser LLM call or
 mutating proposal was attempted; targeted AI tests cover approval boundaries.
 Flowchart/print surface smoke now records Desk Map import into React Flow,
 toolbar/page-size/Print controls, and current `OwnershipEdge` DOM-prop console
-errors. Print visual fidelity still lacks screenshot/PDF evidence.
+errors. Closeout perf evidence also includes print-media screenshots for all
+8 W2 print pages; this is visual proof, not an automated visual-diff guard.
 `.landroid` round-trip smoke now records that a readiness-gated UI export
 contains the v8 package shape, side-store keys, 64 documents, 64 attachments,
 canvas data, and no legacy `pdfData` key, then re-imports behind the typed
@@ -82,6 +85,11 @@ V7 orphan import smoke now records that W3 replaces W1's 64-document side store
 with 2 migrated PDFs and surfaces `legacy-orphan.pdf` as linked to
 `node legacy-orphan-node`; the orphan blob is preserved, but there is still no
 dedicated orphan-discovery/recovery UI.
+Closeout performance capture now records W2 Desk Map render, Documents load,
+packet preview, `.landroid` export/import timing, Flowchart print screenshots,
+W1 autosave debounce, and W2 Leasehold transfer-order timing. The W2 UI
+`.landroid` export was imported successfully, but the 15.8 MB package was
+removed from the working tree after recording its size and checksum.
 
 Rebuild planning is now documented and amended, but implementation has not
 started. The current planning source of truth is `docs/rebuild-plan.md`. It
@@ -260,6 +268,18 @@ validation:
   64-document registry with 2 migrated PDFs, preserved `legacy-orphan.pdf`, and
   showed it linked to `node legacy-orphan-node`. Evidence:
   `fixtures/phase-0/manual-smoke/2026-05-24-v7-orphan-import-smoke.json`.
+- Closeout performance/print Playwright Chromium capture -
+  `node scripts/capture-phase-0-closeout-evidence.mjs http://127.0.0.1:5174/ 2026-05-24-codex-closeout`
+  passed after running outside the macOS sandbox. It captured PERF-01 through
+  PERF-06 and PERF-08, machine profile, W2 `.landroid` export/import size and
+  checksum, and print-media screenshots for 8 W2 Flowchart pages. PERF-07
+  remains blocked pending `fixtures/phase-0/import-stress.csv`. Evidence:
+  `fixtures/phase-0/perf/2026-05-24-codex-closeout/`.
+- `node --check scripts/capture-phase-0-closeout-evidence.mjs` - passed.
+- `git diff --check -- AGENTS.md PROJECT_CONTEXT.md CONTINUATION-PROMPT.md CHANGELOG.md TESTING.md docs/phase-0-inventory.md fixtures/phase-0/perf scripts/capture-phase-0-closeout-evidence.mjs`
+  - passed.
+- `npm test -- src/phase0/__tests__/vulcan-mesa-fixtures.test.ts src/storage/__tests__/autosave-change-detection.test.ts`
+  - passed, 2 files / 10 tests.
 - Targeted storage/fixture tests - `npm test -- src/phase0/__tests__/vulcan-mesa-fixtures.test.ts src/storage/__tests__/workspace-persistence.test.ts src/storage/__tests__/document-migration.test.ts src/storage/__tests__/autosave-change-detection.test.ts`
   passed, 4 files / 44 tests.
 - Full unit test suite - `npm test` passed, 80 files / 640 tests. Expected
@@ -329,8 +349,8 @@ Prior validation from the audit/rebuild-planning checkpoint:
 
 - P0 before rebuild: `docs/phase-0-inventory.md` is the draft master behavior
   inventory. It still needs lead-thread verification for high-risk rows,
-  reference fixture creation, performance baseline capture, and source-doc
-  cross-links before Phase 0 can be called done.
+  PERF-07 fixture/capture, remaining source-doc cross-links, and named
+  golden-master expansion before Phase 0 can be called done.
 - P0.5 before rebuild schema work: workspace persistence needs sharding inside
   Dexie before broad record-schema work so Raven Forest scale does not depend
   on one large autosaved JSON workspace row. Phase 0.5 must also cover
@@ -382,6 +402,15 @@ Prior validation from the audit/rebuild-planning checkpoint:
 - The W1 packet manifest UI export for `Packet: Runsheet` and the committed
   full-registry packet manifest golden do not currently match. Treat this as a
   named packet-source contract gap; add packet-source-specific goldens later.
+- Closeout print screenshots prove W2 print pages render, but they are not an
+  automated visual-diff contract. Page screenshots should be reviewed before
+  treating print fidelity as closed.
+- Closeout W2 export/import timing was captured after waiting for Documents
+  readiness. The earlier zero-document immediate export remains a timing risk
+  to decide before implementation work proceeds.
+- Multi-tab smoke currently shows no visible lock, read-only banner, conflict
+  prompt, or editing-elsewhere warning. Phase 0.5 must make an explicit
+  protection decision instead of leaving this implicit.
 - `docs/landroid-rebuild-plan-reviews.pdf` is currently untracked local input
   from the user; do not delete or commit it unless the user explicitly asks.
 - The action journal is in-memory session context, not a durable audit log.
@@ -414,21 +443,27 @@ Prior validation from the audit/rebuild-planning checkpoint:
   reviewably small.
 - Phase 0 performance capture is documented in
   `scripts/capture-phase-0-baselines.md`; current PERF status lives at
-  `fixtures/phase-0/perf/baseline-status.json`.
+  `fixtures/phase-0/perf/baseline-status.json`. The closeout script
+  `scripts/capture-phase-0-closeout-evidence.mjs` captured PERF-01 through
+  PERF-06 and PERF-08; PERF-07 still needs the deterministic import-stress CSV.
 - AI-036 system-prompt rule integrity is covered by
   `fixtures/phase-0/ai/system-prompt.snapshot.md` and
   `src/ai/__tests__/system-prompt.test.ts`.
 - Manual smoke-check instructions are documented in
-  `docs/phase-0-manual-smoke-checks.md`; no browser smoke evidence has been
-  captured beyond the lightweight Vulcan Mesa demo-load, main-tab, and
-  lane-detail/export smoke artifacts plus the Runsheet export mismatch smoke.
+  `docs/phase-0-manual-smoke-checks.md`; browser smoke evidence now covers
+  Vulcan Mesa demo-load, main tabs, lane-detail/export, Runsheet export,
+  document previews, packet manifest, AI panel, Flowchart/print surface,
+  `.landroid` round trip, Curative/Maps/Sales Deck, future-version rejection,
+  multi-tab boundary, and W3 v7 orphan import.
 - Security direction is clarified in `SECURITY.md`; backend work still requires
   a concrete threat model before implementation.
-- Next Phase 0 work: generate the deterministic W2 stress fixture, capture
-  performance baselines, split Runsheet goldens into named ordering modes when
-  that contract is implemented, split packet manifest goldens into named source
-  modes when that contract is implemented, and mark remaining inventory rows as
-  verified or `needs verification`.
+- Next Phase 0 work: add the deterministic PERF-07 import-stress CSV, capture
+  PERF-07, review W2 print screenshots, decide the export-readiness timing
+  risk, decide the multi-tab protection contract for Phase 0.5, split Runsheet
+  goldens into named ordering modes when that contract is implemented, split
+  packet manifest goldens into named source modes when that contract is
+  implemented, and mark remaining inventory rows as verified or
+  `needs verification`.
 - Do not start the full runsheet walkthrough wizard unless the user explicitly
   redirects to that scope.
 
@@ -440,16 +475,20 @@ Resume in `/Users/abstractmapping/projects/landroid` on
 This is a Phase 0 reconciliation branch with the draft master inventory,
 Vulcan Mesa demo rename, archived ultrareview prompt, W1 Vulcan Mesa fixture
 set, W3 migration-stress fixture, and W2 Raven Forest stress-test recipe.
-It also includes `scripts/capture-phase-0-baselines.md` and
-`fixtures/phase-0/perf/baseline-status.json`; the capture process is documented,
-but PERF-01 through PERF-08 are not measured yet.
+It also includes `scripts/capture-phase-0-baselines.md`,
+`scripts/capture-phase-0-closeout-evidence.mjs`, and
+`fixtures/phase-0/perf/baseline-status.json`; PERF-01 through PERF-06 and
+PERF-08 are captured under
+`fixtures/phase-0/perf/2026-05-24-codex-closeout/`, while PERF-07 remains
+blocked until a deterministic import-stress CSV exists.
 AI-036 has a system-prompt snapshot fixture and test.
 Manual smoke-check instructions live in
-`docs/phase-0-manual-smoke-checks.md`; only lightweight Vulcan Mesa demo-load,
-main-tab, lane-detail/export, Runsheet export, document-preview, and
-packet-manifest, AI-panel, Flowchart/print-surface, `.landroid` round-trip,
-Curative/Maps/Sales Deck, future-version rejection, and multi-tab boundary
-smoke artifacts, plus W3 v7 orphan import smoke, have been captured so far.
+`docs/phase-0-manual-smoke-checks.md`; smoke artifacts now cover Vulcan Mesa
+demo-load, main tabs, lane-detail/export, Runsheet export, document preview,
+packet manifest, AI panel, Flowchart/print surface, `.landroid` round trip,
+Curative/Maps/Sales Deck, future-version rejection, multi-tab boundary, and W3
+v7 orphan import. Closeout print screenshots exist, but no visual-diff guard
+has been added.
 `SECURITY.md` clarifies that hosted/backend work can be safer than today's
 browser-only durability story only if the documented safety gates ship.
 `docs/phase-0-inventory.md` is the draft master Phase 0 inventory after

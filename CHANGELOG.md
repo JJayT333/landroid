@@ -74,6 +74,12 @@ stay short.
 - Captured v7 orphan import smoke evidence showing W3 replaces the prior W1
   document side store, preserves both legacy PDFs, and surfaces the orphan PDF
   as linked to `node legacy-orphan-node`.
+- Added a reproducible Phase 0 closeout browser capture script and recorded
+  PERF-01 through PERF-06 plus PERF-08 under
+  `fixtures/phase-0/perf/2026-05-24-codex-closeout/`. The run captured W2
+  Desk Map, Documents, packet preview, `.landroid` export/import, Flowchart
+  print screenshots, W1 autosave debounce, and W2 Leasehold timing. PERF-07
+  remains blocked until the deterministic 5,000-row CSV fixture exists.
 
 ## 2026-05-23
 

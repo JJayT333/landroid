@@ -1,0 +1,13 @@
+{
+  "id": "PERF-02",
+  "workflow": "Document registry load",
+  "fixture": "W2 Raven Forest via Combinatorial Demo seed",
+  "fixtureChecksum": "fixtures/phase-0/raven-forest-stress-manifest.sha256",
+  "timing": {
+    "wallClockMs": 4500,
+    "browserDeltaMs": 4499.7
+  },
+  "documentRowCount": 145,
+  "firstRowsThreshold": 25,
+  "capturedAt": "2026-05-24T23:41:21.669Z"
+}

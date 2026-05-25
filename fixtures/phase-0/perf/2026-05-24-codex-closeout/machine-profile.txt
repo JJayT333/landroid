@@ -1,0 +1,25 @@
+runId: 2026-05-24-codex-closeout
+baseUrl: http://127.0.0.1:5174/
+capturedAt: 2026-05-24T23:41:16.347Z
+gitHead: 1d422e1f3f835c2a88b5ed067cfaf1aa53848105
+gitStatus: ## codex/phase-0-reconcile-2026-05-23...origin/codex/phase-0-reconcile-2026-05-23 | ?? fixtures/phase-0/perf/2026-05-24-codex-closeout/ | ?? scripts/capture-phase-0-closeout-evidence.mjs
+
+[sw_vers]
+ProductName:		macOS
+ProductVersion:		26.3.1
+ProductVersionExtra:	(a)
+BuildVersion:		25D771280a
+
+[node] v26.0.0
+[npm] 11.12.1
+[platform] darwin 25.3.0 arm64
+[cpuModel] Apple M4 Pro
+[coreCount] 14
+[memoryBytes] 51539607552
+
+[sysctl machdep.cpu.brand_string]
+Apple M4 Pro
+[sysctl hw.ncpu]
+14
+[sysctl hw.memsize]
+51539607552

@@ -1,0 +1,17 @@
+{
+  "id": "PERF-01",
+  "workflow": "Large Desk Map render",
+  "fixture": "W2 Raven Forest via Combinatorial Demo seed",
+  "fixtureChecksum": "fixtures/phase-0/raven-forest-stress-manifest.sha256",
+  "appFcpMs": null,
+  "demoLoadTiming": {
+    "wallClockMs": 209,
+    "browserDeltaMs": 209
+  },
+  "largestTractActivationTiming": {
+    "wallClockMs": 200,
+    "browserDeltaMs": 200.4
+  },
+  "largestTractVisibleCards": "188 cards",
+  "capturedAt": "2026-05-24T23:41:17.165Z"
+}
