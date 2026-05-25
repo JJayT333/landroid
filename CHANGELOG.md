@@ -78,8 +78,16 @@ stay short.
   PERF-01 through PERF-06 plus PERF-08 under
   `fixtures/phase-0/perf/2026-05-24-codex-closeout/`. The run captured W2
   Desk Map, Documents, packet preview, `.landroid` export/import, Flowchart
-  print screenshots, W1 autosave debounce, and W2 Leasehold timing. PERF-07
-  remains blocked until the deterministic 5,000-row CSV fixture exists.
+  print screenshots, W1 autosave debounce, and W2 Leasehold timing.
+- Added the deterministic PERF-07 import-stress CSV fixture, checksum, expected
+  parse-shape metadata, fixture test coverage, and a `--perf07-only` capture
+  path. The browser evidence under
+  `fixtures/phase-0/perf/2026-05-25-codex-perf07/` records the Import wizard
+  parsing 5,000 data rows before Analyze, Stage, or Apply.
+- Added a print visual-review artifact for the W2 Flowchart screenshots. The
+  review confirms the pages are nonblank print proof while keeping print
+  fidelity open because sparse/clipped tiles still need an explicit later
+  visual-diff or layout decision.
 
 ## 2026-05-23
 

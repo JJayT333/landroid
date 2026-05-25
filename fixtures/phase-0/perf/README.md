@@ -2,9 +2,10 @@
 
 This folder is reserved for Phase 0 performance capture outputs.
 
-Current status: the 2026-05-24 closeout capture records PERF-01 through
-PERF-06 and PERF-08 under `2026-05-24-codex-closeout/`. PERF-07 remains
-blocked until `fixtures/phase-0/import-stress.csv` exists.
+Current status: PERF-01 through PERF-06 and PERF-08 were captured under
+`2026-05-24-codex-closeout/`. PERF-07 was captured under
+`2026-05-25-codex-perf07/` with the deterministic
+`fixtures/phase-0/import-stress.csv` fixture.
 
 Use:
 
@@ -23,3 +24,7 @@ with the local path, file size, checksum, and capture date.
 The W2 `.landroid` UI export produced during the 2026-05-24 closeout run was
 about 15.8 MB, so the capture script imported it, recorded its checksum and
 size, then removed it from the working tree instead of committing the package.
+
+The W2 Flowchart print screenshots have a manual visual-review artifact at
+`2026-05-24-codex-closeout/perf-06-print-visual-review.json`. It confirms the
+screenshots are nonblank print proof but does not close print fidelity.

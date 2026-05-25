@@ -189,9 +189,9 @@ Drift budget: +/- 15%.
 
 ### PERF-07 - Spreadsheet Import Parse Only
 
-Fixture: `fixtures/phase-0/import-stress.csv` once created.
+Fixture: `fixtures/phase-0/import-stress.csv`.
 
-1. Generate or load a deterministic 5,000-row CSV fixture.
+1. Generate or load the deterministic 5,000 data-row CSV fixture.
 2. Open the spreadsheet import wizard.
 3. Upload the CSV.
 4. Stop before applying rows to the workspace.
@@ -203,6 +203,8 @@ Fixture: `fixtures/phase-0/import-stress.csv` once created.
    - command output or profile path
 
 Drift budget: +/- 20%.
+
+Current capture: `fixtures/phase-0/perf/2026-05-25-codex-perf07/perf-07-spreadsheet-parse.json`.
 
 ### PERF-08 - Leasehold Transfer-Order Build
 

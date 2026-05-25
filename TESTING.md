@@ -169,6 +169,7 @@ The Phase 0 capture walkthrough lives at
 `fixtures/phase-0/perf/baseline-status.json`. A PERF row is not complete until
 its raw profile or command output is attached or referenced with checksum,
 machine context, and reviewer/date.
-The 2026-05-24 closeout run records PERF-01 through PERF-06 and PERF-08 under
-`fixtures/phase-0/perf/2026-05-24-codex-closeout/`; PERF-07 remains blocked
-until `fixtures/phase-0/import-stress.csv` exists.
+The Phase 0 closeout captures now record PERF-01 through PERF-06 and PERF-08
+under `fixtures/phase-0/perf/2026-05-24-codex-closeout/`, plus PERF-07 under
+`fixtures/phase-0/perf/2026-05-25-codex-perf07/` using
+`fixtures/phase-0/import-stress.csv`.

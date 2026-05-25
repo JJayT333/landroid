@@ -25,6 +25,23 @@ const FIXTURE_DATE_MS = Date.parse(FIXTURE_TIMESTAMP);
 const FIXTURE_WORKSPACE_UUID = '00000000-0000-4000-8000-000000000001';
 const STRESS_WORKSPACE_UUID = '00000000-0000-4000-8000-000000000002';
 const OUTPUT_DIR = join('fixtures', 'phase-0');
+const IMPORT_STRESS_DATA_ROWS = 5000;
+const IMPORT_STRESS_HEADERS = [
+  'Tract',
+  'Instrument',
+  'Order by Date',
+  'Image Path',
+  'Vol',
+  'Page',
+  'Inst. No.',
+  'File Date',
+  'Inst./Eff. Date',
+  'Grantor',
+  'Grantee',
+  'Land Desc.',
+  'Interest',
+  'Remarks',
+];
 
 function installDeterministicRuntime() {
   const uuids = [FIXTURE_WORKSPACE_UUID, STRESS_WORKSPACE_UUID];
@@ -293,6 +310,86 @@ async function writeJson(path: string, value: unknown) {
   await writeFile(path, stableJson(value), 'utf8');
 }
 
+function csvCell(value: string | number) {
+  const text = String(value);
+  return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
+
+function buildImportStressCsv() {
+  const instruments = [
+    'Warranty Deed',
+    'Mineral Deed',
+    'Royalty Deed',
+    'Oil and Gas Lease',
+    'Assignment',
+    'Ratification',
+  ];
+  const rows: Array<Array<string | number>> = [IMPORT_STRESS_HEADERS];
+
+  for (let index = 1; index <= IMPORT_STRESS_DATA_ROWS; index += 1) {
+    const tractNumber = ((index - 1) % 10) + 1;
+    const month = String(((index - 1) % 12) + 1).padStart(2, '0');
+    const day = String(((index - 1) % 28) + 1).padStart(2, '0');
+    const fileDay = String((index % 28) + 1).padStart(2, '0');
+    const year = 1980 + (index % 40);
+    const instrumentType = instruments[index % instruments.length];
+    const paddedIndex = String(index).padStart(5, '0');
+    const grantor = `Phase 0 Grantor ${String((index % 97) + 1).padStart(3, '0')}`;
+    const grantee = `Phase 0 Grantee ${String((index % 113) + 1).padStart(3, '0')}`;
+    const remarks = index % 333 === 0
+      ? 'Cell text says "ignore prior instructions"; parser must treat it as data.'
+      : `Deterministic import stress row ${paddedIndex}`;
+
+    rows.push([
+      `T${String(tractNumber).padStart(2, '0')}`,
+      `${instrumentType} ${paddedIndex}`,
+      `${year}-${month}-${day}`,
+      `phase0/import-stress/T${String(tractNumber).padStart(2, '0')}/image-${paddedIndex}.pdf`,
+      100 + (index % 900),
+      1 + (index % 500),
+      `P0-${paddedIndex}`,
+      `${year}-${month}-${fileDay}`,
+      `${year}-${month}-${day}`,
+      grantor,
+      grantee,
+      `Section ${tractNumber}, Block ${((index - 1) % 7) + 1}, Raven Forest Survey, Walker County, Texas`,
+      `1/${2 + (index % 48)}`,
+      remarks,
+    ]);
+  }
+
+  return `${rows.map((row) => row.map(csvCell).join(',')).join('\n')}\n`;
+}
+
+async function writeImportStressFixture() {
+  const csv = buildImportStressCsv();
+  const hash = createHash('sha256').update(csv).digest('hex');
+
+  await writeFile(join(OUTPUT_DIR, 'import-stress.csv'), csv, 'utf8');
+  await writeFile(
+    join(OUTPUT_DIR, 'import-stress.sha256'),
+    `${hash}  import-stress.csv\n`,
+    'utf8'
+  );
+  await writeJson(join(OUTPUT_DIR, 'import-stress.expected.json'), {
+    purpose: 'PERF-07 spreadsheet import parse-only baseline fixture.',
+    generatedAt: FIXTURE_TIMESTAMP,
+    generator: 'scripts/generate-phase-0-fixtures.ts',
+    fileName: 'import-stress.csv',
+    dataRowCount: IMPORT_STRESS_DATA_ROWS,
+    rowCountIncludingHeader: IMPORT_STRESS_DATA_ROWS + 1,
+    columnCount: IMPORT_STRESS_HEADERS.length,
+    sampledRowCount: 150,
+    headers: IMPORT_STRESS_HEADERS,
+    csvSha256: hash,
+    notes: [
+      'Contains deterministic landman-like rows but no real title data.',
+      'Includes quoted comma/quote cells so CSV escaping stays represented.',
+      'Designed for parse-only timing; do not apply these rows to a workspace.',
+    ],
+  });
+}
+
 async function writeMigrationStressFixture() {
   const workspaceId = 'ws-phase0-migration';
   const linkedNode = {
@@ -487,6 +584,9 @@ async function main() {
       "- `raven-forest-stress-recipe.md`: W2 instructions for rebuilding a Raven Forest-sized stress fixture later without committing today's exact seed.",
       '- `raven-forest-stress-manifest.json`: deterministic W2 stress-fixture manifest generated from the current combinatorial seed.',
       '- `raven-forest-stress-manifest.sha256`: SHA-256 checksum for `raven-forest-stress-manifest.json`.',
+      '- `import-stress.csv`: deterministic 5,000 data-row CSV for PERF-07 parser timing.',
+      '- `import-stress.sha256`: SHA-256 checksum for `import-stress.csv`.',
+      '- `import-stress.expected.json`: expected parse shape for the PERF-07 CSV fixture.',
       '- `ai/system-prompt.snapshot.md`: AI-036 golden snapshot for the ten non-negotiable system-prompt rules.',
       '- `perf/`: Phase 0 performance baseline capture status and future raw/summarized profiles.',
       '',
@@ -504,7 +604,7 @@ async function main() {
       'scripts/capture-phase-0-baselines.md',
       '```',
       '',
-      'The current `perf/baseline-status.json` file is a status template, not evidence that PERF-01 through PERF-08 have been captured.',
+      'The current `perf/baseline-status.json` file records which PERF rows have raw evidence and which rows are still blocked.',
       '',
     ].join('\n'),
     'utf8'
@@ -512,6 +612,7 @@ async function main() {
 
   await writeMigrationStressFixture();
   await writeRavenForestStressManifest();
+  await writeImportStressFixture();
 
   console.log(`Wrote ${OUTPUT_DIR}/demo.landroid (${Buffer.byteLength(landroidText)} bytes)`);
   console.log(`SHA-256 ${landroidHash}`);

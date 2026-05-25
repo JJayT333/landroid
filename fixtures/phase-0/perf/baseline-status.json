@@ -128,20 +128,34 @@
         "largestScreenshot": "fixtures/phase-0/perf/2026-05-24-codex-closeout/perf-06-flowchart-print-page-5.png"
       },
       "rawProfilePath": "fixtures/phase-0/perf/2026-05-24-codex-closeout/perf-06-flowchart-print.json",
+      "visualReviewPath": "fixtures/phase-0/perf/2026-05-24-codex-closeout/perf-06-print-visual-review.json",
       "driftBudget": "+/- 15%",
       "reviewerDate": "Codex, 2026-05-24",
-      "notes": "Captured print-media screenshots for all 8 pages. This is visual proof, not an automated visual-diff guard."
+      "notes": "Captured print-media screenshots for all 8 pages. The 2026-05-25 visual review confirms nonblank print proof but leaves print fidelity open because sparse/clipped tiles still need a later explicit decision."
     },
     {
       "id": "PERF-07",
       "workflow": "Spreadsheet import parse only",
-      "status": "blocked_fixture_missing",
+      "status": "captured",
       "fixture": "fixtures/phase-0/import-stress.csv",
-      "fixtureChecksum": null,
-      "result": null,
-      "rawProfilePath": null,
+      "fixtureChecksum": "fixtures/phase-0/import-stress.sha256",
+      "command": "node scripts/capture-phase-0-closeout-evidence.mjs http://127.0.0.1:5173/ 2026-05-25-codex-perf07 --perf07-only",
+      "machineProfilePath": "fixtures/phase-0/perf/2026-05-25-codex-perf07/machine-profile.txt",
+      "result": {
+        "wallClockMs": 198,
+        "browserDeltaMs": 197.4,
+        "maxFrameGapMs": 16.7,
+        "over50MsFrameGaps": 0,
+        "rowCountIncludingHeader": 5001,
+        "dataRowCount": 5000,
+        "columnCount": 14,
+        "parseWarningCount": 0,
+        "fixtureSizeBytes": 1307644
+      },
+      "rawProfilePath": "fixtures/phase-0/perf/2026-05-25-codex-perf07/perf-07-spreadsheet-parse.json",
       "driftBudget": "+/- 20%",
-      "notes": "Requires deterministic 5000-row import-stress CSV fixture before capture."
+      "reviewerDate": "Codex, 2026-05-25",
+      "notes": "Captured by uploading the deterministic CSV through the Import wizard and stopping before Analyze, Stage, or Apply. Frame-gap metrics approximate main-thread responsiveness while worker parsing runs."
     },
     {
       "id": "PERF-08",

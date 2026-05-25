@@ -9,9 +9,11 @@ import path from 'node:path';
 const BASE_URL = process.argv[2] ?? 'http://127.0.0.1:5174/';
 const RUN_ID = process.argv[3] ?? '2026-05-24-codex-closeout';
 const OUTPUT_DIR = path.join('fixtures', 'phase-0', 'perf', RUN_ID);
+const PERF07_ONLY = process.argv.includes('--perf07-only');
 const LOAD_DEMO_CONFIRMATION_TEXT = 'LOAD DEMO';
 const LOAD_WORKSPACE_CONFIRMATION_TEXT = 'LOAD WORKSPACE';
 const MAX_RETAINED_PACKAGE_BYTES = 5 * 1024 * 1024;
+const IMPORT_STRESS_CSV_PATH = path.join('fixtures', 'phase-0', 'import-stress.csv');
 
 function runCommand(command, args = []) {
   try {
@@ -165,6 +167,86 @@ async function activateDeskMapTab(page, name) {
   await tab.waitFor({ state: 'visible' });
 }
 
+async function startFrameGapMonitor(page) {
+  await page.evaluate(() => {
+    window.__phase0Perf07FrameGaps = [];
+    window.__phase0Perf07FrameMonitorActive = true;
+    let last = performance.now();
+    const tick = (now) => {
+      window.__phase0Perf07FrameGaps.push(now - last);
+      last = now;
+      if (window.__phase0Perf07FrameMonitorActive) {
+        requestAnimationFrame(tick);
+      }
+    };
+    requestAnimationFrame(tick);
+  });
+}
+
+async function stopFrameGapMonitor(page) {
+  return page.evaluate(() => {
+    window.__phase0Perf07FrameMonitorActive = false;
+    const gaps = Array.isArray(window.__phase0Perf07FrameGaps)
+      ? window.__phase0Perf07FrameGaps
+      : [];
+    return {
+      sampleCount: gaps.length,
+      maxFrameGapMs: gaps.length ? Number(Math.max(...gaps).toFixed(2)) : null,
+      over50MsFrameGaps: gaps.filter((gap) => gap > 50).length,
+      over100MsFrameGaps: gaps.filter((gap) => gap > 100).length,
+    };
+  });
+}
+
+async function capturePerf07SpreadsheetParse(page) {
+  const fixtureStats = await stat(IMPORT_STRESS_CSV_PATH);
+  const fixtureSha256 = await sha256File(IMPORT_STRESS_CSV_PATH);
+
+  await startFrameGapMonitor(page);
+  const parseTiming = await timed(page, async () => {
+    const openAiButton = page.getByRole('button', { name: 'Open LANDroid AI' });
+    if ((await openAiButton.count()) > 0) {
+      await openAiButton.click();
+    }
+    await page.getByRole('button', { name: 'Import wizard' }).click();
+    await page.locator('input[type="file"][accept=".csv"]').setInputFiles(IMPORT_STRESS_CSV_PATH);
+    await page.getByText(/import-stress\.csv.*1 sheet/).waitFor({
+      state: 'visible',
+      timeout: 45_000,
+    });
+    await page.getByText(/5001r\s+.\s+14c/).waitFor({
+      state: 'visible',
+      timeout: 45_000,
+    });
+  });
+  const frameGapMetrics = await stopFrameGapMonitor(page);
+  const workbookSummaryText = await textOrNull(
+    page.locator('details').filter({ hasText: 'import-stress.csv' })
+  );
+  const closeAiButton = page.getByRole('button', { name: 'Close AI panel' });
+  if ((await closeAiButton.count()) > 0) {
+    await closeAiButton.click();
+  }
+
+  await writeJson('perf-07-spreadsheet-parse.json', {
+    id: 'PERF-07',
+    workflow: 'Spreadsheet import parse only',
+    fixture: IMPORT_STRESS_CSV_PATH,
+    fixtureChecksum: 'fixtures/phase-0/import-stress.sha256',
+    fixtureSizeBytes: fixtureStats.size,
+    fixtureSha256,
+    timing: parseTiming,
+    frameGapMetrics,
+    rowCountIncludingHeader: 5001,
+    dataRowCount: 5000,
+    columnCount: 14,
+    parseWarningCount: 0,
+    workbookSummaryText,
+    stoppedBeforeApply: true,
+    capturedAt: new Date().toISOString(),
+  });
+}
+
 async function main() {
   await mkdir(OUTPUT_DIR, { recursive: true });
   await writeMachineProfile();
@@ -179,6 +261,27 @@ async function main() {
 
   await page.goto(BASE_URL, { waitUntil: 'load', timeout: 30_000 });
   await page.getByRole('button', { name: 'Desk Map' }).waitFor({ state: 'visible' });
+
+  if (PERF07_ONLY) {
+    await capturePerf07SpreadsheetParse(page);
+    await writeJson('closeout-browser-run-summary.json', {
+      runId: RUN_ID,
+      baseUrl: BASE_URL,
+      capturedAt: new Date().toISOString(),
+      browser: await browser.version(),
+      viewport: { width: 1440, height: 1000 },
+      mode: 'perf07-only',
+      consoleMessages: capture.consoleMessages,
+      pageErrors: capture.pageErrors,
+      artifacts: [
+        'machine-profile.txt',
+        'perf-07-spreadsheet-parse.json',
+      ],
+    });
+    await context.close();
+    await browser.close();
+    return;
+  }
 
   const appFcpMs = await page.evaluate(() => {
     const entry = performance.getEntriesByName('first-contentful-paint')[0];
@@ -333,6 +436,8 @@ async function main() {
     capturedAt: new Date().toISOString(),
   });
 
+  await capturePerf07SpreadsheetParse(page);
+
   await loadDemo(
     page,
     /Combinatorial/,
@@ -423,6 +528,7 @@ async function main() {
       'perf-03-packet-preview-build.json',
       'perf-04-landroid-round-trip.json',
       'perf-05-autosave-debounce.json',
+      'perf-07-spreadsheet-parse.json',
       'perf-06-flowchart-print.json',
       'perf-08-leasehold-transfer-order.json',
       ...printScreenshotArtifacts.map((artifact) => path.basename(artifact.path)),

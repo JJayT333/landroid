@@ -1,0 +1,51 @@
+{
+  "id": "PERF-06",
+  "review": "Flowchart print visual screenshot review",
+  "reviewedAt": "2026-05-25",
+  "reviewer": "Codex",
+  "sourceProfile": "fixtures/phase-0/perf/2026-05-24-codex-closeout/perf-06-flowchart-print.json",
+  "summary": "All 8 print-page screenshots render the print overlay with page labels and connector/card content where that tile intersects the W2 flowchart. This is visual proof that the print overlay is nonblank, but it is not a fidelity pass.",
+  "observations": [
+    {
+      "page": 1,
+      "path": "fixtures/phase-0/perf/2026-05-24-codex-closeout/perf-06-flowchart-print-page-1.png",
+      "observation": "Mostly blank tile with one horizontal connector and page label A1."
+    },
+    {
+      "page": 2,
+      "path": "fixtures/phase-0/perf/2026-05-24-codex-closeout/perf-06-flowchart-print-page-2.png",
+      "observation": "Contains a visible card at the right edge plus connector; card is clipped by the tile boundary."
+    },
+    {
+      "page": 3,
+      "path": "fixtures/phase-0/perf/2026-05-24-codex-closeout/perf-06-flowchart-print-page-3.png",
+      "observation": "Contains a partial card at the left edge plus connector; card is clipped by the tile boundary."
+    },
+    {
+      "page": 4,
+      "path": "fixtures/phase-0/perf/2026-05-24-codex-closeout/perf-06-flowchart-print-page-4.png",
+      "observation": "Mostly blank tile with one horizontal connector and page label A4."
+    },
+    {
+      "page": 5,
+      "path": "fixtures/phase-0/perf/2026-05-24-codex-closeout/perf-06-flowchart-print-page-5.png",
+      "observation": "Largest screenshot; multiple cards and connectors are visible, with bottom-row cards clipped by the tile boundary."
+    },
+    {
+      "page": 6,
+      "path": "fixtures/phase-0/perf/2026-05-24-codex-closeout/perf-06-flowchart-print-page-6.png",
+      "observation": "Contains lower-edge partial cards and connectors; content is clipped by the tile boundary."
+    },
+    {
+      "page": 7,
+      "path": "fixtures/phase-0/perf/2026-05-24-codex-closeout/perf-06-flowchart-print-page-7.png",
+      "observation": "Contains right-edge and bottom-edge partial cards plus connectors; content is clipped by the tile boundary."
+    },
+    {
+      "page": 8,
+      "path": "fixtures/phase-0/perf/2026-05-24-codex-closeout/perf-06-flowchart-print-page-8.png",
+      "observation": "Contains left-edge and bottom-edge partial cards plus connectors; content is clipped by the tile boundary."
+    }
+  ],
+  "phase0Conclusion": "The screenshots are sufficient as print visual proof for Phase 0 evidence capture, but they do not close print fidelity. A future visual-diff or print-layout pass should decide whether edge clipping is acceptable tiling behavior or needs a layout adjustment."
+}

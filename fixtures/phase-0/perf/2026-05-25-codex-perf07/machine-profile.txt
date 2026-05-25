@@ -1,0 +1,25 @@
+runId: 2026-05-25-codex-perf07
+baseUrl: http://127.0.0.1:5173/
+capturedAt: 2026-05-25T13:38:09.353Z
+gitHead: fc574b1ffc0c656da8d6cb6ababdedf6858ee62a
+gitStatus: ## codex/phase-0-reconcile-2026-05-23...origin/codex/phase-0-reconcile-2026-05-23 | M  CHANGELOG.md | M  CONTINUATION-PROMPT.md | M  TESTING.md | M  docs/phase-0-inventory.md | M  fixtures/phase-0/README.md | AM fixtures/phase-0/import-stress.csv | AM fixtures/phase-0/import-stress.expected.json | AM fixtures/phase-0/import-stress.sha256 | A  fixtures/phase-0/perf/2026-05-24-codex-closeout/perf-06-print-visual-review.json | A  fixtures/phase-0/perf/2026-05-25-codex-perf07/closeout-browser-run-summary.json | A  fixtures/phase-0/perf/2026-05-25-codex-perf07/machine-profile.txt | A  fixtures/phase-0/perf/2026-05-25-codex-perf07/perf-07-spreadsheet-parse.json | M  fixtures/phase-0/perf/README.md | M  fixtures/phase-0/perf/baseline-status.json | M  scripts/capture-phase-0-baselines.md | M  scripts/capture-phase-0-closeout-evidence.mjs | MM scripts/generate-phase-0-fixtures.ts | M  src/phase0/__tests__/vulcan-mesa-fixtures.test.ts
+
+[sw_vers]
+ProductName:		macOS
+ProductVersion:		26.3.1
+ProductVersionExtra:	(a)
+BuildVersion:		25D771280a
+
+[node] v26.0.0
+[npm] 11.12.1
+[platform] darwin 25.3.0 arm64
+[cpuModel] Apple M4 Pro
+[coreCount] 14
+[memoryBytes] 51539607552
+
+[sysctl machdep.cpu.brand_string]
+Apple M4 Pro
+[sysctl hw.ncpu]
+14
+[sysctl hw.memsize]
+51539607552

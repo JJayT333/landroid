@@ -13,6 +13,7 @@ import {
   buildDocumentRegistryRows,
   buildPacketManifest,
 } from '../../documents/document-registry';
+import { parseWorkbookSync } from '../../ai/wizard/parse-workbook-impl';
 import { buildRunsheetCsv } from '../../storage/runsheet-export';
 import { importLandroidFile } from '../../storage/workspace-persistence';
 import type { DocumentAttachment, DocumentRecord } from '../../types/document';
@@ -46,6 +47,10 @@ interface SerializedLandroidFixture {
 
 function readText(fileName: string) {
   return readFileSync(join(FIXTURE_DIR, fileName), 'utf8');
+}
+
+function readBuffer(fileName: string) {
+  return readFileSync(join(FIXTURE_DIR, fileName));
 }
 
 function readJson<T>(fileName: string): T {
@@ -272,5 +277,36 @@ describe('Phase 0 Vulcan Mesa fixture goldens', () => {
       'PERF-06',
       'PERF-08',
     ]);
+  });
+
+  it('freezes the PERF-07 import stress CSV parse shape', () => {
+    const csv = readText('import-stress.csv');
+    const checksum = createHash('sha256').update(csv).digest('hex');
+    const expected = readJson<{
+      fileName: string;
+      rowCountIncludingHeader: number;
+      dataRowCount: number;
+      columnCount: number;
+      sampledRowCount: number;
+      headers: string[];
+      csvSha256: string;
+    }>('import-stress.expected.json');
+    const buffer = readBuffer('import-stress.csv');
+    const arrayBuffer = buffer.buffer.slice(
+      buffer.byteOffset,
+      buffer.byteOffset + buffer.byteLength
+    ) as ArrayBuffer;
+    const parsed = parseWorkbookSync(expected.fileName, arrayBuffer);
+    const sheet = parsed.sheets[0];
+
+    expect(readText('import-stress.sha256')).toBe(`${checksum}  import-stress.csv\n`);
+    expect(expected.csvSha256).toBe(checksum);
+    expect(sheet.rawRowCount).toBe(expected.rowCountIncludingHeader);
+    expect(sheet.allRows).toHaveLength(expected.rowCountIncludingHeader);
+    expect(sheet.rawColCount).toBe(expected.columnCount);
+    expect(sheet.rows).toHaveLength(expected.sampledRowCount);
+    expect(sheet.allRows[0]).toEqual(expected.headers);
+    expect(sheet.allRows[1][0]).toBe('T01');
+    expect(sheet.allRows[expected.dataRowCount][6]).toBe('P0-05000');
   });
 });
