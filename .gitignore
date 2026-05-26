@@ -5,6 +5,7 @@ CHATGPTFAIL.pdf
 TORS_Documents/
 dist/
 dist-node/
+backend/*/lambda.zip
 playwright-report/
 test-results/
 

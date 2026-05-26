@@ -10,11 +10,11 @@ summarizes how the app is put together and where changes should live.
 - State: Zustand stores in `src/store`.
 - Persistence: IndexedDB/Dexie helpers in `src/storage`, plus browser storage
   for selected local settings.
-- Target storage planning: keep Dexie as the current runtime path, add
-  workspace sharding before broad rebuild work, design records as
-  backend-ready, and treat SQLite/OPFS, Tauri/native filesystem, backend object
-  storage, or cloud object storage as explicit implementation gates, not
-  current defaults.
+- Target storage planning: keep Dexie as the current runtime path, add a
+  minimal backend spine before workspace sharding, shard workspace data around
+  backend-shaped records, and treat SQLite/OPFS, Tauri/native filesystem,
+  backend object storage, or cloud object storage as explicit implementation
+  gates, not current defaults.
 - Runtime target: hosted web app first, with PWA/iPad support as a product
   target. Native iOS and desktop installers are deferred unless a later
   decision gate proves they are needed.
@@ -92,23 +92,32 @@ Target rebuild boundaries:
 - Runtime adapters: blob storage, OCR job dispatch, AI inference, and hosted
   persistence should have adapter boundaries before any backend/cloud or Tauri
   pivot becomes the source of truth.
-- Backend spine: after Phase 0, LANDroid has a decision gate for whether to add
-  backend infrastructure. The current decision is backend-approved in
-  principle, implementation deferred until OCR/search/sync or another hard
-  trigger forces it. The backend supports sync, backup, object storage,
-  background jobs, search, AI/RAG policy, audit logs, sharing, and future
-  permissions while keeping local project semantics and `.landroid` export
-  mandatory.
+- Backend spine: Phase 0.75 adds the minimal backend contract before Phase 0.5
+  sharding. The current scope is shared record/API schemas, a record envelope,
+  local/hosted adapter boundaries, Cognito-backed session proof, and
+  health/record-validation endpoints. The app also runs a non-user-facing
+  startup contract check through the adapter after local startup or hosted auth;
+  it sends health, session, and a synthetic project-record validation probe only and
+  does not block local workflows. Durable server project storage, object
+  storage, OCR/search jobs, sync, sharing, collaboration, and future
+  permissions remain later gates. Local project semantics and complete
+  `.landroid` export stay mandatory. Implementation files are
+  `src/backend-spine/contracts.ts`, `src/backend-spine/adapter.ts`,
+  `src/backend-spine/app-contract-check.ts`, `backend/spine/src/handler.ts`,
+  and `backend/spine/src/lambda.ts`. Hosted routing is prepared via
+  `/api/spine/<*>` Amplify rewrites to a separate `landroid-backend-spine`
+  Lambda Function URL.
 
 Target projections include Desk Map, Runsheet, Leasehold, Documents, Owners,
 Curative, packet export, AI context, `OpinionDraft`, `ObligationCalendar`, and
 `AbstractorPackage`.
 
-Backend-ready rebuild records should carry stable IDs, `workspaceId` scoping,
-`lastModified` / version metadata where needed, and content-hash references for
-blob-backed evidence. This lets a later backend sync engine move intentional
-records and action/audit data instead of reverse-engineering opaque workspace
-snapshots.
+Backend-shaped rebuild records should carry stable IDs, `workspaceId` and
+`projectId` scoping, `lastModified` / version metadata where needed,
+revision/tombstone hooks for future sync, and content-hash references for
+blob-backed evidence. This lets Phase 0.5 sharding and a later backend sync
+engine move intentional records and action/audit data instead of
+reverse-engineering opaque workspace snapshots.
 
 ## Data Flow
 
@@ -181,10 +190,11 @@ Document originals, checksums, and source metadata are canonical. OCR text,
 embeddings, FTS rows, page images, and packet exports are derived artifacts that
 must be rebuildable from the canonical vault state.
 
-The approved-but-deferred backend should make sync, backup, jobs, search,
-sharing, and AI policy more durable. It must not make the app unusable offline
-for core workflows, and it must not make LANDroid unable to produce a complete
-local project package.
+The minimal Phase 0.75 backend spine should make the record/API contract
+explicit before Dexie sharding. Later backend expansion should make sync,
+backup, jobs, search, sharing, and AI policy more durable. Neither the spine nor
+later expansion may make the app unusable offline for core workflows, and
+neither may make LANDroid unable to produce a complete local project package.
 
 Generated folders are not source of truth:
 

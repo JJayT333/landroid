@@ -1,7 +1,7 @@
 # LANDroid Incremental Rebuild Plan
 
 Status: planning source of truth.
-Last updated: 2026-05-22.
+Last updated: 2026-05-26.
 
 This document consolidates the current rebuild direction. It is not approval to
 rewrite the app in one pass. It is the working plan for rebuilding LANDroid
@@ -70,9 +70,10 @@ Added from the repo-grounded analysis:
 - Phase 0 work is sectioned and consolidated by one lead thread; parallel agents
   may perform read-only lane reviews, but they do not edit competing master
   plans
-- Phase 0.75 is a backend architecture decision gate: if future-proofing still
-  points to a backend after Phase 0 evidence, LANDroid adds a backend spine
-  before Phase 0.5 storage work or Phase 1 schema implementation
+- Phase 0.75 now starts a minimal backend-spine phase before Phase 0.5 storage
+  work: shared record contracts, adapter boundaries, auth/session proof, and
+  validation endpoints come now so sharded Dexie rows are backend-shaped from
+  the start
 - federal/private and horizontal-well project records without turning on
   federal/private math until an explicit gate
 
@@ -88,8 +89,8 @@ Deferred or left out for now:
 - cloud OCR as a default path; cloud OCR must be per-document opt-in after a
   provider/security decision
 - SQLite/Tauri/object-storage cutover before explicit storage and runtime gates
-- backend implementation before Phase 0 evidence and the Phase 0.75 backend
-  architecture decision
+- full backend storage/sync/OCR/search/collaboration before the minimal
+  Phase 0.75 spine proves the record and deployment contract
 - federal/private calculation math before the explicit Phase 2 math gate in
   `PROJECT_CONTEXT.md`
 - detailed Texas math-engine expansion until the dedicated math pass
@@ -704,104 +705,196 @@ Exit gate:
 - full relevant tests pass
 - missing coverage is listed in this document or `TESTING.md`
 
-### Phase 0.75: Backend Architecture Decision
+### Phase 0.75: Minimal Backend Spine
 
-Goal: record the backend architecture decision with Phase 0 evidence in hand,
-without starting backend implementation prematurely.
+Goal: add the smallest backend spine and backend-shaped record contract before
+Phase 0.5 storage sharding, so Dexie sharding does not have to be redesigned
+around server records later.
 
 Decision:
 
-- backend architecture is approved in principle
-- backend implementation is deferred until OCR/search/sync scale forces it,
-  expected no earlier than Phase 2.5 unless a hard trigger appears first
-- Phase 0.5 and Phase 1 must be built local-first and backend-ready so the
-  later backend is a sync/job/search layer, not a rewrite
+- start Phase 0.75 now as a backend-spine planning and implementation phase
+- do not build the full collaboration/OCR/search/multi-user backend yet
+- keep LANDroid local-first; core title, math, document review, project work,
+  and `.landroid` package export remain usable without the network
+- make Phase 0.5 Dexie sharding mirror backend-shaped records from the start
 
-This gate occurs immediately after Phase 0 and before Phase 0.5 storage work
-because the backend-ready decision changes what storage sharding needs to
-preserve.
+This gate occurs immediately after Phase 0 and before Phase 0.5 because the
+record envelope, IDs, version metadata, document-object references, and audit
+shape must be known before splitting the monolithic `workspaces.data` payload.
 
-Default assumption:
+Minimal backend spine to add now:
 
-- local-first project semantics and `.landroid` package export remain mandatory
-- LANDroid is a hosted web app first, with PWA/iPad support as a product
-  target; native iOS and desktop installers are deferred unless a later decision
-  gate proves they are necessary
-- the backend supports sync, backup, jobs, search, AI/RAG, sharing, and future
-  collaboration; it does not erase the local project package model
-- the app must remain functional without network access for core title, math,
-  document, and project workflows
+- shared TypeScript/Zod contract for backend-shaped records and API payloads
+- versioned `RecordEnvelope` carrying `recordId`, `recordType`, `workspaceId`,
+  `projectId`, `schemaVersion`, `lastModified`, `revision`, `deletedAt`,
+  `source`, and optional `syncState`
+- minimal server package separate from `backend/ai-proxy` unless reuse is
+  explicitly cheaper; the current AI proxy remains an AI gateway, not the
+  project-record backend
+- Cognito-authenticated health/session endpoint so the app can prove auth,
+  tenant/user identity, server contract version, and deployment wiring
+- project manifest and record-validation endpoints before durable server
+  project storage; these prove the contract without making the backend the
+  source of truth
+- local adapter boundary so the frontend can talk to `local-only`, `mock`, or
+  hosted backend modes without changing domain code
+- CI validation for the shared contract, backend handler, auth/session policy,
+  and no-secrets/no-generated-artifact boundaries
 
-Backend responsibilities when implementation is triggered:
+Remain local-first:
 
-- durable project-record storage
-- object storage for original documents, derivatives, and packet artifacts
+- active workspace editing and autosave source of truth during Phase 0.75 and
+  Phase 0.5
+- Desk Map, Leasehold, Runsheet, Documents, Owners, Curative, Maps, Research,
+  Federal Leasing, Flowchart, and AI approval UI behavior
+- document preview from local IndexedDB / local package state
+- `.landroid` import/export, future-version rejection, rollback-safe side-store
+  replacement, and complete package export
+- local AI/Ollama and approval-gated mutation flow
+- Texas math engine and `MathInputView` parity contracts
+
+Full backend responsibilities remain later gates:
+
+- durable shared project storage as source of truth
+- object storage for originals, derivatives, OCR text, and packet artifacts
 - signed document access URLs
 - OCR, extraction, indexing, and packet-export background jobs
-- search indexes for exact/keyword search and later vector recall
-- server-controlled AI/RAG retrieval and provider access
-- durable action/audit records
+- exact/keyword search and later vector recall
+- server-controlled AI/RAG retrieval over document text
 - backup and multi-device sync
-- future multi-user permission boundaries
-- future cross-project party identity indexes
+- sharing, multi-user permissions, and collaboration conflict resolution
+- cross-project party identity indexes
 
-Backend-ready requirements for Phase 0.5 through Phase 6:
+Record models that must be defined before Phase 0.5 sharding:
 
-- stable record IDs across stores and exports
-- `workspaceId` scoping on every persisted project record
-- `lastModified` / version metadata where records can sync later
-- content-hash addressing for document blobs and vault objects
-- sharded per-record or per-table local storage instead of one workspace JSON
-  payload
-- local mutation/action records where practical so later sync can send
-  intentional changes instead of opaque snapshots
-- `.landroid` export remains complete regardless of sync status
+- `Project`
+- `WorkspaceManifest`
+- `RecordEnvelope`
+- `Party`
+- `PartyAlias`
+- `Document`
+- `DocumentVersion`
+- `VaultObject`
+- `DocumentLink`
+- `SourceCitation`
+- `CitationAnchor`
+- `SourceAttestation`
+- `InstrumentRecord`
+- `Tract`
+- `DeskMap`
+- `Lease`
+- `Unit`
+- `Wellbore`
+- `InterestReference`
+- `CurativeIssue`
+- `LeaseObligation`
+- `ObligationEvent`
+- `ImportSession`
+- `ActionPlan`
+- `ActionRecord`
+- `AuditEvent`
+- `Packet`
+- `PacketItem`
+- `PacketExport`
 
-Implementation trigger questions:
+Dexie/backend compatibility rules:
 
-- does Phase 0 show browser-only persistence is already too fragile for the
-  expected project size?
-- does OCR/search/export need background jobs earlier than expected?
-- does the user need multi-device sync or backup soon enough to justify the
-  added complexity?
-- should the hosted AWS POC evolve into the backend spine, or should a cleaner
-  backend be designed separately?
-- what stays available offline, and what requires network access?
-- how will `.landroid` package export remain complete and attorney-defensible?
+- every sharded Dexie row must be representable as a backend record or a
+  declared local-only projection/cache row
+- all project records carry stable IDs and `workspaceId`/`projectId` scoping
+- records that can later sync carry `lastModified`, `revision`, and optional
+  `deletedAt` tombstone metadata
+- document bytes stay content-hash addressed; Dexie blobs, `.landroid` package
+  files, and later object-storage objects refer to the same hash identity
+- `.landroid` export includes complete local state even when sync metadata
+  exists or the backend is unreachable
+- import/export adapters preserve v8 read compatibility and introduce any new
+  write format with explicit version dispatch and rollback tests
+- actions/audit records describe intentional changes; snapshots remain backup
+  and migration artifacts, not the only durable story
 
-Likely backend shape when triggered:
+Security/deployment/test gates before coding beyond the first slice:
 
-```text
-Frontend: React/Vite LANDroid
-Local cache: Dexie
-Backend API: Node/Fastify or similar
-Database: Postgres
-Object storage: S3/R2-compatible
-Jobs: OCR, indexing, packet export
-Search: Postgres FTS first, vector later
-Auth: Cognito or replacement auth provider
-AI gateway: server-controlled provider access and policy
-Export: .landroid package remains mandatory
-```
+- threat-model note for the minimal spine covering Cognito auth, user/project
+  boundaries, API body caps, logging, document metadata, record validation, and
+  `.landroid` export/backups
+- deployment note deciding whether the spine is a new Lambda, an extension of
+  existing hosted infrastructure, or a local/mock-only contract until the first
+  hosted test
+- tests proving unauthenticated requests fail, authenticated session shape is
+  stable, client-supplied tenant/user IDs are not trusted, request bodies are
+  size-limited, and record validation rejects unknown/future schemas safely
+- root validation plus backend-package tests/build for any server code
+- no deploy claim unless `DEPLOYMENT_STATE.md` is updated and hosted smoke
+  evidence exists
 
-Tradeoff:
+Smallest safe first implementation slice:
 
-- a backend is more future-proof for document-heavy, OCR-heavy,
-  multi-project, multi-device, AI/RAG-heavy growth
-- a backend also adds API contracts, schema migrations, auth, deployment,
-  cloud cost, job monitoring, backup/security responsibility, and more failure
-  modes
+1. Update source-of-truth docs and ADRs with this decision.
+2. Add shared contract types/schemas for `RecordEnvelope`, `Project`,
+   `WorkspaceManifest`, `Document`, `DocumentLink`, `VaultObject`, `Party`,
+   `SourceAttestation`, `ImportSession`, `ActionPlan`, `ActionRecord`, and
+   `AuditEvent`; add serialization tests only.
+3. Add a local backend adapter interface with `local-only` and `mock` modes so
+   Phase 0.5 can call the same boundary without network dependency.
+4. Add a minimal backend service package with health/session and
+   record-validation endpoints; reuse Cognito verification patterns, but do not
+   add project storage or document upload yet.
+5. Wire a non-user-facing contract check from the app to the adapter only after
+   tests prove no behavior changes.
+
+Token/time tradeoff:
+
+- doing the contract and minimal spine now costs one extra planning pass and a
+  small implementation slice before sharding
+- it avoids reworking every Phase 0.5 Dexie table, `.landroid` version, record
+  ID, action/audit path, and document-hash rule after the fact
+- it also keeps the expensive parts out of scope: no database migration, no
+  object storage custody, no OCR/search workers, no collaboration semantics,
+  and no full sync conflict UI yet
+- given limited work windows, this is the lower total-context path: spend more
+  upfront on the record/server contract, then let Phase 0.5 and Phase 1 reuse it
+  instead of repeatedly reopening the backend question
 
 Exit gate:
 
-- written backend decision: approved in principle, build deferred until a hard
-  trigger
+- written backend decision updated: minimal spine now, full backend later
 - backend responsibilities and non-responsibilities documented
 - local-first/export contract reaffirmed
-- backend-ready record requirements added to Phase 0.5 and Phase 1 acceptance
-  criteria
-- security, deployment, and testing docs updated before any backend
-  implementation starts
+- record-envelope and core record requirements added to Phase 0.5 and Phase 1
+  acceptance criteria
+- security, deployment, and testing gates documented before server coding
+- smallest first implementation slice is limited to shared contracts, adapter
+  boundary, and health/session/validation endpoints
+
+Implementation checkpoint, 2026-05-25:
+
+- shared contract schemas live in `src/backend-spine/contracts.ts`
+- every declared `recordType` is represented in the validation union. Record
+  types whose full body schema is not defined yet use strict envelope-only
+  stubs so Phase 0.5 can shard against a canonical envelope without accepting
+  arbitrary payloads.
+- local-only, mock, and hosted adapter boundaries live in
+  `src/backend-spine/adapter.ts`
+- the non-user-facing app startup contract check lives in
+  `src/backend-spine/app-contract-check.ts`; it runs from `src/main.tsx` in
+  local mode and from `src/auth/AuthProvider.tsx` after hosted auth. It sends
+  health, session, and a synthetic project-record validation probe only
+- the minimal backend proof package lives in `backend/spine`
+- the package currently exposes pure health, session, and record-validation
+  handler logic plus a Lambda wrapper at `backend/spine/src/lambda.ts`; it does
+  not persist project records, upload document bytes, run OCR/search, sync
+  projects, or provide collaboration
+- repo-side hosted wiring now includes a `/api/spine/<*>` Amplify rewrite
+  template, render helper support, deployment guide/checklist updates, and
+  smoke-test coverage for public health plus unauthenticated session/
+  validation rejection
+- live hosted wiring was deployed on 2026-05-26: the separate
+  `landroid-backend-spine` Lambda Function URL is routed through Amplify
+  `/api/spine/<*>`, and hosted smoke passed for health, unauthenticated
+  rejection, oversized-body rejection, SPA fallback, and Cognito metadata
+- the initial threat-model note is `docs/backend-spine-threat-model.md`
 
 ### Phase 0.5: Workspace Storage Sharding
 
@@ -860,9 +953,10 @@ Required work:
 - keep current Zustand stores operational
 - add adapter/projection helpers instead of forcing a UI migration
 - add Zod schemas at import/export boundaries
-- design records as backend-ready even though the backend is deferred: stable
-  IDs, `workspaceId`, `lastModified` / version fields where needed, and
-  content-hash references for blob-backed records
+- design records against the Phase 0.75 backend-spine contract: stable IDs,
+  `workspaceId`, `projectId`, `lastModified` / version fields where needed,
+  revisions/tombstones for future sync, and content-hash references for
+  blob-backed records
 - add a guard so every mutating AI tool that can change project state is covered
   by the approval/undo policy
 - make Texas/federal/private isolation a `MathInputView` projection

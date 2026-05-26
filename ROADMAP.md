@@ -6,31 +6,24 @@ session handoff lives in `CONTINUATION-PROMPT.md`.
 ## Now
 
 - Treat `docs/rebuild-plan.md` as the planning source of truth for any rebuild
-  work: current behavior inventory first, then workspace storage sharding,
-  project record schema, evidence-grade document vault, source attestations,
-  import/action layers, and only then workflow cutovers. Preserve dual decimal
-  plus fraction display, print fidelity, in-flight migration safety, and
-  citation verification as rebuild contracts.
-- Before Phase 1 rebuild implementation, define the Phase 0 exit artifacts:
-  frozen reference workspaces, atomic behavior catalog rows, measured
-  performance baselines, CI-running golden masters, and the `.landroid`
-  migration/backup rule for in-flight projects.
-- Run the next deep review as a Phase 0 ultra-review, not another broad rebuild
-  audit. It should define the inventory lanes, behavior catalog format, fixture
-  plan, baselines, validation commands, and Phase 0 exit gate.
-- Execute Phase 0 lane by lane under one lead source-of-truth thread. Secondary
-  agents may do read-only lane reviews, but the lead thread consolidates
-  findings into the master inventory and docs.
-- Reconcile `docs/phase-0-inventory.md` as the draft master Phase 0 behavior
-  catalog. Verify the highest-risk rows before treating them as binding:
-  monolithic workspace storage, multi-tab overwrite risk, canvas viewport
-  persistence, lease allocation tie-breaks, AI mutating-tool undo coverage,
-  legacy document migration/orphan handling, federal math isolation, unit-focus
-  transfer-order behavior, packet manifest behavior, and performance gaps.
-- Phase 0.75 decision: approve backend architecture in principle, but defer
-  backend implementation until a hard trigger such as OCR/search scale,
-  multi-device sync, live sharing, a second user, or browser storage limits.
-  Phase 0.5 through Phase 6 must be local-first and backend-ready.
+  work: Phase 0 current-behavior inventory is closed, Phase 0.75 minimal
+  backend spine comes next, then Phase 0.5 workspace sharding, project record
+  schema, evidence-grade document vault, source attestations, import/action
+  layers, and only then workflow cutovers. Preserve dual decimal plus fraction
+  display, print fidelity, in-flight migration safety, and citation
+  verification as rebuild contracts.
+- Keep `docs/phase-0-inventory.md` as the closed Phase 0 behavior catalog.
+  Future-contract goldens remain parked for the implementation phase that
+  creates each behavior, and lane rows should be re-verified before that lane is
+  changed.
+- Phase 0.75 active work: continue the minimal backend-spine phase before
+  Phase 0.5. The first slice now adds shared backend-shaped record/API
+  contracts, local/mock/hosted adapter boundaries, a minimal backend-spine
+  health/session/record-validation package, a non-user-facing app startup
+  contract check, hosted `/api/spine/*` Lambda/rewrite packaging, and a
+  threat-model note. Keep full backend storage, object storage, OCR/search
+  jobs, sync, sharing, collaboration, and multi-user permissions behind later
+  gates.
 - Plan Phase 0.5 workspace sharding in Dexie before broad record-schema work so
   Raven Forest scale does not depend on one large autosaved JSON workspace row.
   Phase 0.5 must also cover multi-tab protection, autosave timing, persistent
@@ -109,10 +102,11 @@ session handoff lives in `CONTINUATION-PROMPT.md`.
 
 - Evaluate SQLite WASM in OPFS, cloud object storage, and Tauri 2 desktop shell
   only at documented decision gates; do not make them Phase 1 defaults.
-- Build the approved backend spine only when a hard trigger appears. It should
-  provide sync, backup, object storage, OCR/jobs, search, AI/RAG policy, audit,
-  sharing, and future permissions, not a wholesale SaaS rewrite that removes
-  local project semantics.
+- Expand the backend beyond the Phase 0.75 spine only when a hard trigger
+  appears. Later expansion should provide durable project storage, sync,
+  backup, object storage, OCR/jobs, search, AI/RAG policy, audit, sharing, and
+  future permissions, not a wholesale SaaS rewrite that removes local project
+  semantics.
 - Federal/private Phase 2 math only after the reference workspace and source
   packet workflow are stable enough for that gate.
 - Revisit the Texas math-engine expansion plan in detail before implementation:

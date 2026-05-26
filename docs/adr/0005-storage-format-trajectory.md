@@ -39,11 +39,11 @@ Storage changes are staged:
    Finder-visible project packages, native SQLite, or corpus size forces it.
 7. Treat cloud object storage as an adapter boundary, not the Phase 1 source of
    truth.
-8. Treat backend implementation as approved in principle but deferred until a
-   hard trigger such as OCR/search scale, multi-device sync, live sharing,
-   second-user access, or browser storage limits. Phase 0.5 through Phase 6
-   must use backend-ready local data shapes so the later backend is a sync/job
-   layer rather than a rewrite.
+8. Add a minimal Phase 0.75 backend spine before Phase 0.5 sharding: shared
+   record/API contracts, a record envelope, local/hosted adapter boundary, and
+   health/session/record-validation endpoints. Full backend storage, object
+   storage, OCR/search jobs, sync, sharing, and collaboration remain later
+   gates.
 
 ## Consequences
 
@@ -52,7 +52,7 @@ Storage changes are staged:
 - `.landroid` import/export and in-flight migration safety stay part of the
   contract.
 - Complete `.landroid` export stays permanent even after backend/sync work.
-- Backend-ready record shape matters before backend code exists: stable IDs,
-  `workspaceId`, `lastModified` / version metadata where needed, and
-  content-hash references for blobs.
+- Backend-shaped records matter before storage sharding: stable IDs,
+  `workspaceId`, `projectId`, `lastModified` / version metadata where needed,
+  revisions/tombstones for future sync, and content-hash references for blobs.
 - Future SQLite, Tauri, or object-storage work needs its own decision gate.

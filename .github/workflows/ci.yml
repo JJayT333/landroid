@@ -34,6 +34,20 @@ jobs:
       - name: Unit tests
         run: npm test
 
+      - name: Install backend spine runtime dependencies
+        run: npm ci
+        working-directory: backend/spine
+
+      - name: Audit backend spine production dependencies
+        run: npm audit --omit=dev
+        working-directory: backend/spine
+
+      - name: Backend spine tests
+        run: npm test -- --config backend/spine/vitest.config.ts
+
+      - name: Backend spine build
+        run: ./node_modules/.bin/tsc -p backend/spine/tsconfig.json --noEmit
+
       - name: Build
         run: npm run build
 

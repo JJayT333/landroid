@@ -24,7 +24,8 @@ npm run test:e2e
 | Rebuild schema/storage/vault planning change | docs diff check, then update `docs/rebuild-plan.md`, `ARCHITECTURE.md`, `ROADMAP.md`, `TESTING.md`, `SECURITY.md`, and `CONTINUATION-PROMPT.md` together |
 | Phase 0 inventory lane | document current behavior, identify existing tests, list missing tests, define golden-master fixture expectations, record manual smoke steps, and run the smallest existing validation command that proves the inspected behavior |
 | Phase 0 inventory reconciliation | docs diff check, verify highest-risk inventory rows against code before marking them binding, and update `docs/rebuild-plan.md`, `docs/phase-0-inventory.md`, `ROADMAP.md`, `ARCHITECTURE.md`, `SECURITY.md`, and `CONTINUATION-PROMPT.md` together |
-| Backend architecture decision | docs diff check, threat-model/security review notes, data-flow/API boundary review, local/export contract review, backend-ready local schema review, and explicit implementation trigger before backend coding |
+| Backend-spine planning | docs diff check, threat-model/security review notes, data-flow/API boundary review, local/export contract review, backend-shaped local schema review, and explicit smallest implementation slice before backend coding |
+| Minimal backend-spine implementation | `npm run lint`, targeted shared-schema/adapter/app-contract tests, `cd backend/spine && npm ci && npm audit --omit=dev && npm test && npm run build && npm run bundle`, `npm run deploy:check`, root `npm test` if frontend contract code changes, and no hosted-deploy claim without `DEPLOYMENT_STATE.md` plus smoke evidence |
 | Evidence vault, OCR, packet, or AI citation implementation | `npm run lint`, relevant storage/document tests, package round-trip tests, citation-verifier tests, AI tests when answer behavior changes, and targeted browser/e2e smoke for impacted flows |
 | AI tool/provider change | `npm run lint`, AI tests, relevant wizard/tool tests, approval-queue tests, and rollback check |
 | Hosted AI proxy/deploy change | `npm run deploy:check`, `cd backend/ai-proxy && npm test && npx tsc -p tsconfig.json --noEmit`, plus root `npm test` if frontend policy changes; run `bash scripts/smoke-test-hosted.sh` when network/AWS access is available |
@@ -131,6 +132,8 @@ For AI/import work, tests should cover:
 For rebuild storage and evidence-vault work, tests should cover:
 
 - existing `.landroid` workspaces still load after migration
+- sharded Dexie rows conform to the Phase 0.75 record envelope or are explicitly
+  declared local-only projection/cache rows
 - sharded workspace persistence preserves autosave and side-store reset behavior
 - future-version rejection and rollback-safe import still work
 - multi-tab or concurrent-writer behavior is blocked or conflict-visible
@@ -152,6 +155,22 @@ For rebuild storage and evidence-vault work, tests should cover:
   citations
 - packet manifests, checksums, unresolved-issue files, and load-file sidecars
   are deterministic
+
+For minimal backend-spine work, tests should cover:
+
+- unauthenticated requests fail closed
+- authenticated session responses do not trust client-supplied user/project IDs
+- health/session/record-validation response shapes match the shared schemas
+- request body caps and unknown/future schema rejection are enforced
+- local-only and mock adapters preserve offline app behavior
+- hidden app contract checks send only health, session, and synthetic project-record validation
+  probes, never real project records or document payloads
+- hosted `/api/spine/*` wiring serves health, rejects unauthenticated session
+  and validation requests, and packages the Lambda with `aws-jwt-verify` and
+  `zod`
+- backend-spine logs are structured and do not include request bodies or record
+  payloads
+- no document bytes, OCR text, owner PII, API keys, or full prompts are logged
 
 For AI cited-answer work, tests should cover:
 

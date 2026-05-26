@@ -1,0 +1,22 @@
+{
+  "name": "landroid-backend-spine",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Minimal LANDroid backend spine contract proof endpoints.",
+  "type": "module",
+  "main": "dist/backend/spine/src/lambda.js",
+  "engines": {
+    "node": ">=22 <26",
+    "npm": ">=10"
+  },
+  "scripts": {
+    "build": "cd ../.. && tsc -p backend/spine/tsconfig.json",
+    "test": "cd ../.. && vitest run --config backend/spine/vitest.config.ts",
+    "package": "npm run bundle",
+    "bundle": "rm -rf dist lambda.zip && npm run build && cp package.json dist/ && cp -r node_modules dist/ && cd dist && zip -qr ../lambda.zip . && cd .. && ls -lh lambda.zip"
+  },
+  "dependencies": {
+    "aws-jwt-verify": "^5.1.1",
+    "zod": "^4.4.3"
+  }
+}

@@ -951,29 +951,30 @@ Phase 0 findings that should reshape the rebuild plan:
 5. **Canvas viewport persistence belongs in 0.5**. Viewport-on-reload is a current bug (FC-027); sharding canvas state without fixing this would freeze the gap.
 6. **Carry forward the v8 import-rejection contract**. Phase 0.5 must keep "version > 8" rejection and add a `v10` write path; do not break the v8 read path. *(PER-008, CL-19)*
 
-### Phase 0.75 (Backend Architecture Decision)
+### Phase 0.75 (Minimal Backend Spine)
 
-7. **Federal lease documents are currently in-memory only** (`FederalLeaseDocument` registry). If the backend decision is "yes," document-metadata persistence belongs server-side; if "no," it must migrate into Dexie via `ResearchProjectRecord` extension. *(FED-003)*
-8. **Hosted-mode 401 mid-stream is unaddressed**. Phase 0.75 should decide whether the answer is (a) silent token refresh in the proxy, (b) explicit re-auth modal mid-chat, or (c) server-side session anchoring. Current behavior is "session logout" — destructive. *(AI-024)*
-9. **AI app-context 40-node cap warrants backend-side context assembly**. If backend lands, server-side context with full-record awareness sidesteps the silent truncation. *(AI-021, CL-13)*
-10. **RRC dataset catalog is static**. Backend changes whether refresh becomes server-pushed or stays client-bundled. *(RES-022)*
+7. **Backend-shaped record envelope comes before sharding**. Phase 0.5 should not split `workspaces.data` into ad hoc browser tables. Define the shared record envelope, IDs, `workspaceId`/`projectId`, revisions, tombstones, and content-hash references first, then shard Dexie against that contract. *(PER-018, CL-15, CL-17)*
+8. **Federal lease documents are currently in-memory only** (`FederalLeaseDocument` registry). The minimal spine should define whether federal document metadata is a backend-shaped `Document`/`DocumentLink`/`SourceAttestation` record, then Phase 0.5 can persist it locally without a later model rewrite. *(FED-003)*
+9. **Hosted-mode 401 mid-stream is unaddressed**. Phase 0.75 should decide whether the minimal spine exposes session refresh/status metadata, explicit re-auth UI state, or server-side session anchoring. Current behavior is "session logout" — destructive. *(AI-024)*
+10. **AI app-context 40-node cap warrants backend-shaped context assembly**. The spine should define server/local context-envelope limits before full backend retrieval exists, so later server-side context can replace silent truncation without changing answer contracts. *(AI-021, CL-13)*
+11. **RRC dataset catalog is static**. Backend-shaped records should decide whether refresh metadata remains client-bundled or becomes a later server-fed projection. *(RES-022)*
 
 ### Phase 1 (Project Record Schema Foundations)
 
-11. **`UNDO_MUTATING_TOOL_NAMES` ↔ `tools.ts` drift needs a compile-time guard**, not just a list. Add a TypeScript discriminated-union check or test that every mutating tool registered in `tools.ts` appears in the list. Without it, every new Phase 1 typed-command is a silent undo regression. *(AI-027, CL-12)*
-12. **`MathInputView` projection must preserve current display contracts**, including the "Remaining hidden when initial == remaining" rule (FC-016) and the lease-allocation tie-break (DM-016, LH-002, CL-03). These are display+math joints, not pure math.
-13. **CSV column order (RS-001) is a Phase 1 schema-level contract**, not a Phase 0 UI behavior. The runsheet column list is what landman import templates depend on; record it as a typed `RunsheetColumn` enum tied to schema migrations.
-14. **Runsheet ordering is a named-view contract**, not a single CSV fixture. The rebuild must support global instrument-date, global file-date, single-tract, grouped-by-tract, and later manual/custom package order. Goldens should be named by order mode. *(RS-019, RS-020)*
-15. **Packet manifests are named-source contracts**, not one generic JSON fixture. `Packet: Runsheet` and full-registry packet manifests legitimately contain different item sets; Phase 1/2 document-vault work should add source-mode-specific goldens. *(DOC-015, DOC-017, DOC-019)*
-16. **Federal math isolation belongs in Phase 1 type design**. The jurisdiction filter is currently spread across multiple math entry points; the rebuild should put `Jurisdiction === 'Texas'` as a precondition on the `MathInputView` projection rather than re-checking per surface. *(FED-016, CL-20)*
-17. **Phase 1 should preserve, not improve, the "lease delete cleans up record only if no other links" rule** (DM-029) — it's an invariant of the current `Lease ↔ DocumentLink` relation.
+12. **`UNDO_MUTATING_TOOL_NAMES` ↔ `tools.ts` drift needs a compile-time guard**, not just a list. Add a TypeScript discriminated-union check or test that every mutating tool registered in `tools.ts` appears in the list. Without it, every new Phase 1 typed-command is a silent undo regression. *(AI-027, CL-12)*
+13. **`MathInputView` projection must preserve current display contracts**, including the "Remaining hidden when initial == remaining" rule (FC-016) and the lease-allocation tie-break (DM-016, LH-002, CL-03). These are display+math joints, not pure math.
+14. **CSV column order (RS-001) is a Phase 1 schema-level contract**, not a Phase 0 UI behavior. The runsheet column list is what landman import templates depend on; record it as a typed `RunsheetColumn` enum tied to schema migrations.
+15. **Runsheet ordering is a named-view contract**, not a single CSV fixture. The rebuild must support global instrument-date, global file-date, single-tract, grouped-by-tract, and later manual/custom package order. Goldens should be named by order mode. *(RS-019, RS-020)*
+16. **Packet manifests are named-source contracts**, not one generic JSON fixture. `Packet: Runsheet` and full-registry packet manifests legitimately contain different item sets; Phase 1/2 document-vault work should add source-mode-specific goldens. *(DOC-015, DOC-017, DOC-019)*
+17. **Federal math isolation belongs in Phase 1 type design**. The jurisdiction filter is currently spread across multiple math entry points; the rebuild should put `Jurisdiction === 'Texas'` as a precondition on the `MathInputView` projection rather than re-checking per surface. *(FED-016, CL-20)*
+18. **Phase 1 should preserve, not improve, the "lease delete cleans up record only if no other links" rule** (DM-029) — it's an invariant of the current `Lease ↔ DocumentLink` relation.
 
 ### Plan File Updates Recommended
 
 Reconciliation status for the plan-file updates:
 
 - Reflected in `docs/rebuild-plan.md`: Phase 0.5 now includes multi-tab conflict behavior, autosave timing, canvas viewport persistence, PWA/iPad persistent storage, lazy PDF loading, and Raven Forest-scale acceptance.
-- Reflected in `docs/rebuild-plan.md` and `docs/adr/0008-backend-spine-decision-gate.md`: Phase 0.75 now records backend architecture approved in principle, implementation deferred until a hard trigger, and backend-ready local record requirements.
+- Reflected in `docs/rebuild-plan.md` and `docs/adr/0008-backend-spine-decision-gate.md`: Phase 0.75 now starts a minimal backend-spine phase before Phase 0.5, while keeping full backend storage, OCR/search, sync, sharing, collaboration, and multi-user permissions behind later gates.
 - Reflected in `docs/rebuild-plan.md` and `TESTING.md`: Phase 1 now requires a mutating-tool approval/undo drift guard and `MathInputView` preservation of Phase 0 display/math contracts.
 
 ---

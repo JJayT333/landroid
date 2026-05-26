@@ -17,6 +17,7 @@ import { saveWorkspaceToDb, loadWorkspaceFromDb } from './storage/workspace-pers
 import { saveCanvasToDb, loadCanvasFromDb } from './storage/canvas-persistence';
 import { awaitWorkspaceKeyReady } from './storage/active-workspace-key';
 import { runPostV8BackupIfNeeded } from './storage/post-v8-backup';
+import { runBackendSpineContractCheck } from './backend-spine/app-contract-check';
 import {
   buildCanvasAutosavePayload,
   buildWorkspaceAutosavePayload,
@@ -89,6 +90,10 @@ async function bootstrapApp() {
   useWorkspaceStore.getState().setStartupWarning(
     startupWarnings.length > 0 ? startupWarnings.join(' ') : null
   );
+
+  if (!isHostedMode()) {
+    void runBackendSpineContractCheck({ logger: console });
+  }
 }
 
 void bootstrapApp();

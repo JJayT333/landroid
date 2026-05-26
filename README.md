@@ -150,3 +150,5 @@ Older stress and 8-tract leasehold demos have been retired.
 - Paste-ready Amplify rewrites: `amplify-rewrites.json`.
 - Post-deploy verification: `bash scripts/smoke-test-hosted.sh`.
 - Lambda AI proxy source: `backend/ai-proxy/`.
+- Minimal backend-spine Lambda source: `backend/spine/`; this is contract proof
+  only, not project storage or sync.

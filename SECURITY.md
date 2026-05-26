@@ -12,15 +12,16 @@ file records the security assumptions future changes should preserve or revisit.
 - Hosted deployment is a POC surface: Cognito gates the app, AI calls go
   through the Lambda proxy, and workspace autosave remains browser IndexedDB
   scoped by Cognito `sub` rather than a shared backend project database.
-- Rebuild planning keeps LANDroid local-first. The backend architecture is
-  approved in principle, but backend implementation is deferred until OCR,
-  search, sync, sharing, multi-user, or storage scale forces it. Workspace
-  sharding, evidence-vault packaging, backend-ready record shapes, and citation
-  verification come first.
+- Rebuild planning keeps LANDroid local-first. Phase 0.75 now adds a minimal
+  backend spine before Phase 0.5 storage sharding: shared record/API contracts,
+  local/hosted adapter boundaries, hosted auth/session proof, and
+  health/record-validation endpoints. Full backend storage, object storage,
+  OCR/search jobs, sync, sharing, collaboration, and multi-user permissions
+  remain later gates.
 - Backend sync must not become an excuse to remove offline core workflows or
-  complete `.landroid` package export. A backend spine must have an explicit
-  threat model before implementation and must preserve complete local
-  project-package export.
+  complete `.landroid` package export. The minimal backend spine must have an
+  explicit threat-model note before implementation and must preserve complete
+  local project-package export.
 - PWA/iPad support is a product target. Browser storage must be treated as
   evictable unless persistent storage is requested and granted; the app should
   surface storage/export health instead of hiding durability risk.
@@ -58,8 +59,11 @@ Security improvements the rebuild should preserve or add:
   browser refuses
 - multi-tab or concurrent-writer protection before sharded storage is treated
   as production-safe
-- private backend object storage, signed URLs, server-side authorization, and
-  encryption at rest when a backend is triggered
+- a minimal backend spine with server-side authorization, body limits,
+  tenant/user boundary checks, and strict record validation before any hosted
+  project data path expands
+- private backend object storage, signed URLs, and encryption at rest when
+  later object storage is triggered
 - citation-verified AI answers and approval-gated mutations with undo
 
 Security risks that do not disappear just because LANDroid is hosted:
@@ -74,10 +78,18 @@ Security risks that do not disappear just because LANDroid is hosted:
 - server logs can accidentally retain sensitive prompts, owner data, or document
   references if logging is too broad
 
-Before backend implementation starts, create a threat model for the actual
-backend design. At minimum, cover assets, actors, trust boundaries, document
-upload/download paths, sync conflicts, backup/export, AI provider calls, OCR
-jobs, sharing links, audit events, and incident recovery.
+The Phase 0.75 minimal-spine threat-model note lives at
+`docs/backend-spine-threat-model.md`. It covers the current contract/adapter/
+health/session/validation slice plus the hidden app startup contract check. The
+startup check must not send document bytes, OCR text, owner PII, AI prompts, or
+real project records; its validation probe is a synthetic project record with placeholder IDs only. The hosted
+spine deploy path uses a separate Lambda Function URL behind the
+`/api/spine/<*>` Amplify rewrite; health is public but session and validation
+must verify the Cognito ID token server-side. Hosted spine logging is structured
+but must never include request bodies, record payloads, document bytes, OCR
+text, owner PII, or AI prompts. Before later backend expansion, extend that
+model for document upload/download paths, object storage, sync conflicts, OCR
+jobs, search indexes, sharing links, audit events, and collaboration.
 
 ## AI Providers
 
@@ -185,9 +197,10 @@ Known risk:
   server-side authorization, short-lived signed URLs where needed, encryption at
   rest, and manifest/hash verification. Do not make browser-public object paths
   part of the trust model.
-- Backend-ready local records should include stable IDs, `workspaceId` scoping,
-  `lastModified` / version metadata where needed, and content hashes for blobs
-  before any sync engine is implemented. These fields are security-relevant
+- Backend-shaped local records should include stable IDs, `workspaceId` and
+  `projectId` scoping, `lastModified` / version metadata where needed,
+  revisions/tombstones for future sync, and content hashes for blobs before
+  Phase 0.5 sharding or any sync engine. These fields are security-relevant
   because they constrain accidental cross-project bleed, stale writes, and
   unverifiable document replacement.
 - AI document query should be read-only by default and return cited source
@@ -223,5 +236,6 @@ Do not assume local-first safety carries over to hosted deployments.
 - Keep federal/private records reference-only until the Phase 2 math gate opens.
 - Add validation and size limits to import paths before broadening file support.
 - Do not add backend storage, OCR jobs, cloud object storage, server-side RAG,
-  sharing links, sync, or multi-user permissions without updating the security
-  model, threat model, deployment docs, and validation plan in the same phase.
+  sharing links, sync, collaboration, or multi-user permissions without
+  updating the security model, threat model, deployment docs, and validation
+  plan in the same phase.

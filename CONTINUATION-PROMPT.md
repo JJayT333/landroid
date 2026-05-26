@@ -95,10 +95,11 @@ Leasehold transfer-order timing. The W2 UI
 `.landroid` export was imported successfully, but the 15.8 MB package was
 removed from the working tree after recording its size and checksum.
 
-Rebuild planning is now documented and amended, but implementation has not
-started. The current planning source of truth is `docs/rebuild-plan.md`. It
-consolidates the incremental rebuild direction: inventory current page/workflow
-behavior first, then Phase 0.5 workspace sharding, project record schema,
+Rebuild implementation has started only for the Phase 0.75 minimal backend
+spine; no user-facing app behavior has changed. The current planning source of
+truth is `docs/rebuild-plan.md`. It consolidates the incremental rebuild
+direction: inventory current page/workflow behavior first, then Phase 0.75
+minimal backend spine, Phase 0.5 workspace sharding, project record schema,
 evidence-grade document vault, source attestations, import sessions, action
 plans/action records, citation-verified AI, project-wide party identity,
 well/unit/obligation reference records, and only later gated math expansion.
@@ -110,31 +111,37 @@ reconciles the outside rebuild proposal, the repo-grounded analysis, and the
 side-by-side review PDF, while locking dual decimal plus fraction display,
 print fidelity, in-flight migration safety, multi-tab conflict handling, and
 source citation proof as rebuild contracts.
-Proposed ADRs were added for storage trajectory, AI citation verification, and
-the action/audit schema. A proposed backend-spine ADR was added after the user
-decided the next deep review should focus on Phase 0 and that backend
-future-proofing should be decided immediately after Phase 0.
+ADRs were added for storage trajectory, AI citation verification, the
+action/audit schema, and the backend spine. ADR 0008 now records the updated
+Phase 0.75 decision: build the minimal spine before sharding, while deferring
+full storage/sync/OCR/search/collaboration backend scope.
+The first Phase 0.75 implementation slice is now in place: shared schemas in
+`src/backend-spine/contracts.ts`, local/mock/hosted adapters in
+`src/backend-spine/adapter.ts`, a hidden app startup contract check in
+`src/backend-spine/app-contract-check.ts`, a minimal `backend/spine` handler
+package for health/session/record-validation proof, a deployable
+`backend/spine/src/lambda.ts` wrapper, `/api/spine/<*>` Amplify rewrite
+template support, deploy/smoke checks, and
+`docs/backend-spine-threat-model.md`.
 
 Current agreed rebuild sequence:
 
-1. Reconcile `docs/phase-0-inventory.md` as the working Phase 0 master
-   inventory. It contains lane rows, cross-lane contracts, coverage gaps,
-   reference workspace plans, golden-master plans, and performance baseline
-   plans. Treat it as a draft until high-risk rows are verified.
-2. Execute Phase 0 lane by lane under one lead source-of-truth thread. Secondary
-   agents may perform read-only lane reviews, but they should not create
-   competing master plans.
-3. Close Phase 0 with checked-in inventory, frozen or documented reference
-   workspaces, expected outputs, performance baselines, manual smoke checks,
-   missing coverage, and validation status.
-4. Phase 0.75 backend decision is now: backend architecture approved in
-   principle; backend implementation deferred until OCR/search/sync scale,
-   live sharing, a second user, or browser storage limits force it. Phase 0.5
-   through Phase 6 must be local-first and backend-ready.
-5. Phase 0.5 storage sharding remains the first implementation phase after
-   Phase 0 closes: sharded Dexie rows, multi-tab protection, persistent-storage
-   request for PWA/iPad where supported, lazy PDF loading, canvas viewport
-   persistence, autosave timing, and Raven Forest iPad Pro-class scale.
+1. Phase 0 is effectively closed with checked-in inventory, frozen or
+   documented reference workspaces, expected outputs, performance baselines,
+   manual smoke evidence, full validation, and user print confirmation.
+2. Future-contract goldens remain parked for the implementation phase that
+   creates each behavior; do not fake them as Phase 0 coverage.
+3. Keep `docs/phase-0-inventory.md` as the Phase 0 behavior catalog and verify
+   lane rows again when a later phase touches that lane.
+4. Phase 0.75 now starts before Phase 0.5 as a minimal backend-spine phase:
+   shared backend-shaped record/API contracts, adapter boundaries,
+   auth/session proof, and validation endpoints. Full backend storage, object
+   storage, OCR/search jobs, sync, sharing, collaboration, and multi-user
+   permissions remain later gates.
+5. Phase 0.5 storage sharding follows the Phase 0.75 contract: sharded Dexie
+   rows, multi-tab protection, persistent-storage request for PWA/iPad where
+   supported, lazy PDF loading, canvas viewport persistence, autosave timing,
+   and Raven Forest iPad Pro-class scale.
 
 Primary report:
 
@@ -175,6 +182,92 @@ The next AI foundation chunk is also implemented:
 The full runsheet walkthrough wizard has not been started.
 
 ## Latest Validation
+
+Phase 0.75 backend-spine hosted-wiring validation on 2026-05-26:
+
+- `npm test -- src/backend-spine/__tests__/app-contract-check.test.ts src/backend-spine/__tests__/adapter.test.ts src/backend-spine/__tests__/contracts.test.ts`
+  - passed, 3 files / 15 tests.
+- `cd backend/spine && npm ci`
+  - passed; local Node v26 emitted the expected `EBADENGINE` warning because
+    the package targets Node 22 through `<26`, matching the repo/Lambda target.
+- `cd backend/spine && npm audit --omit=dev`
+  - initial sandbox run failed on registry DNS; rerun with approved network
+    access passed with 0 vulnerabilities.
+- `npm test -- --config backend/spine/vitest.config.ts`
+  - passed, 2 files / 12 tests.
+- `./node_modules/.bin/tsc -p backend/spine/tsconfig.json --noEmit`
+  - passed.
+- `cd backend/spine && npm run build`
+  - passed.
+- `cd backend/spine && npm run bundle`
+  - passed and produced ignored `backend/spine/lambda.zip` at 1.2 MB.
+- `COGNITO_USER_POOL_ID=us-east-1_TWeBB7xvQ COGNITO_CLIENT_ID=6os4uiu0b46pf74nhbrm5gsg0v node -e 'import("./backend/spine/dist/backend/spine/src/lambda.js").then(() => console.log("lambda import ok"))'`
+  - passed after fixing deployed Node ESM import extensions in
+    `backend/spine/src/lambda.ts` and `backend/spine/src/handler.ts`.
+- `bash scripts/render-amplify-rewrites.sh https://ai123.lambda-url.us-east-1.on.aws/ https://spine456.lambda-url.us-east-1.on.aws/`
+  - passed and rendered separate `/api/ai/<*>` and `/api/spine/<*>` rewrites.
+- `npm run deploy:check`
+  - passed; the repo template keeps AI/spine Function URL placeholders, while
+    the live Amplify app now has concrete `/api/ai/<*>` and `/api/spine/<*>`
+    custom rules.
+- AWS deploy via `landroid-deploy` profile:
+  - created `landroid-backend-spine-role` with
+    `AWSLambdaBasicExecutionRole`.
+  - created `landroid-backend-spine` in `us-east-1`, Node.js 22.x, arm64,
+    handler `backend/spine/src/lambda.handler`, 128 MB, 10 sec timeout.
+  - created Function URL
+    `https://pdnipzleitt4l6dihshut54is40prgzk.lambda-url.us-east-1.on.aws/`
+    with auth `NONE` and CORS for `https://landroid.abstractmapping.com`.
+  - added both required Lambda URL resource-policy permissions:
+    `lambda:InvokeFunctionUrl` with `FunctionUrlAuthType=NONE` and
+    `lambda:InvokeFunction` with `InvokedViaFunctionUrl=true`.
+  - updated Amplify app `d11pv0mh1atit4` custom rules so `/api/spine/<*>`
+    proxies to the spine Function URL before the SPA fallback.
+- Direct Function URL smoke:
+  - `/health` returned 200.
+  - unauthenticated `/session` returned 401.
+  - unauthenticated `/validate-records` returned 401.
+  - oversized `/validate-records` returned 413.
+- CloudWatch log check:
+  - structured request/reject JSON appeared for health/session/validation
+    without record payloads or request bodies.
+- `bash scripts/smoke-test-hosted.sh`
+  - passed against `https://landroid.abstractmapping.com`; coverage included
+    root HTML, security headers, `/api/ai/*` unauthenticated rejection,
+    `/api/spine/*` health/auth/body-limit checks, SPA fallback, and Cognito
+    metadata/JWKS.
+- `npm run lint` - passed.
+- `git diff --check -- '*.md' 'docs/**/*.md' 'src/**/*.ts' 'src/**/*.tsx' 'backend/spine/**/*.ts' 'backend/spine/package.json' 'backend/spine/tsconfig.json'`
+  - passed.
+- `npm test` - passed, 87 files / 667 tests. Existing intentional stderr
+  coverage for simulated Dexie failures appeared.
+- `npm run build` - passed after the AWS Lambda ESM import fix, with existing
+  Vite dynamic/static import warnings, chunk-size warning, and Node
+  `module.register()` deprecation warning.
+- `npm run test:e2e` - passed after the AWS Lambda ESM import fix, 11 Chromium
+  workflows in 27.2s, with existing Node `module.register()` and
+  FORCE_COLOR/NO_COLOR warnings.
+
+Phase 0.75 backend-spine validation on 2026-05-25:
+
+- `npm test -- src/backend-spine/__tests__/contracts.test.ts src/backend-spine/__tests__/adapter.test.ts`
+  - passed, 2 files / 8 tests.
+- `npm test -- --config backend/spine/vitest.config.ts`
+  - passed, 1 file / 7 tests.
+- `./node_modules/.bin/tsc -p backend/spine/tsconfig.json --noEmit`
+  - passed.
+- `npm run lint` - passed.
+- `npm test` - passed, 86 files / 660 tests. Existing intentional stderr
+  coverage for simulated Dexie failures appeared.
+- `npm run build` - passed with existing Vite dynamic/static import warnings,
+  chunk-size warning, and Node `module.register()` deprecation warning.
+- `npm run deploy:check` - passed; AWS console setup is still required and the
+  Amplify rewrite template placeholder remains expected.
+- `cd backend/spine && npm run build` - passed.
+- `git diff --check -- *.md docs/**/*.md src/**/*.ts backend/spine/**/*.ts backend/spine/package.json backend/spine/tsconfig.json`
+  - passed.
+- `npm run test:e2e` - passed, 11 Chromium workflows, with existing Node
+  `module.register()` and FORCE_COLOR/NO_COLOR warnings.
 
 Closeout validation on 2026-05-25:
 
@@ -388,21 +481,18 @@ Prior validation from the audit/rebuild-planning checkpoint:
 
 ## Top Findings To Carry Forward
 
-- P0 before rebuild: `docs/phase-0-inventory.md` is the draft master behavior
-  inventory. It still needs lead-thread verification for high-risk rows,
-  remaining source-doc cross-links, print screenshot review, export-readiness
-  timing decision, multi-tab protection decision, and named golden-master
-  expansion before Phase 0 can be called done.
-- P0.5 before rebuild schema work: workspace persistence needs sharding inside
-  Dexie before broad record-schema work so Raven Forest scale does not depend
-  on one large autosaved JSON workspace row. Phase 0.5 must also cover
-  multi-tab protection, persistent-storage requests for PWA/iPad where
-  supported, lazy PDF loading, canvas viewport persistence, autosave timing, and
-  an iPad Pro-class Raven Forest scale gate.
-- P0.75: Backend architecture is approved in principle, but implementation is
-  deferred until OCR/search/sync scale, live sharing, a second user, or browser
-  storage limits force it. Phase 0.5 through Phase 6 must be local-first and
-  backend-ready.
+- P0: Phase 0 is effectively closed after full validation and user print
+  confirmation. Future-contract goldens remain parked for the phase that
+  implements each behavior.
+- P0.75 before P0.5: start the minimal backend spine now so storage sharding
+  uses backend-shaped records from the start. The first implementation slice is
+  shared schemas, a record envelope, adapter boundary, and health/session/
+  validation endpoints, not full backend storage or collaboration.
+- P0.5 after P0.75: workspace persistence still needs sharding inside Dexie so
+  Raven Forest scale does not depend on one large autosaved JSON workspace row.
+  Phase 0.5 must also cover multi-tab protection, persistent-storage requests
+  for PWA/iPad where supported, lazy PDF loading, canvas viewport persistence,
+  autosave timing, and an iPad Pro-class Raven Forest scale gate.
 - Product direction: LANDroid is hosted web first with PWA/iPad support; native
   iOS and desktop installers are deferred. Complete `.landroid` export remains
   permanent.
@@ -469,9 +559,10 @@ Prior validation from the audit/rebuild-planning checkpoint:
   not be started without explicit direction.
 - SQLite/OPFS, Tauri 2, cloud object storage, and cloud OCR are documented
   decision gates only; they are not Phase 1 defaults.
-- Backend implementation is not authorized to start yet. Backend architecture
-  is approved in principle, but build is deferred until a documented hard
-  trigger and security/deployment/test updates.
+- Full backend implementation is not authorized yet. The authorized Phase 0.75
+  scope is the minimal spine: shared contracts, adapter boundary, auth/session
+  proof, and validation endpoints with matching security/deployment/test
+  updates.
 - MCP servers are relevant later for external systems such as county records,
   OCR, GIS, storage vaults, or backend-only connectors, but should not bypass
   LANDroid approval/undo/audit boundaries.
@@ -509,11 +600,19 @@ Prior validation from the audit/rebuild-planning checkpoint:
   document previews, packet manifest, AI panel, Flowchart/print surface,
   `.landroid` round trip, Curative/Maps/Sales Deck, future-version rejection,
   multi-tab boundary, and W3 v7 orphan import.
-- Security direction is clarified in `SECURITY.md`; backend work still requires
-  a concrete threat model before implementation.
-- Next Phase 0 work: Phase 0 is checkpointed with full validation and user
-  print confirmation. Revisit the rebuild plan, then run the Phase 0.75 backend
-  decision before starting Phase 0.5. Future-contract goldens are now parked in
+- Security direction is clarified in `SECURITY.md`; the minimal backend-spine
+  threat-model note is `docs/backend-spine-threat-model.md`.
+- Phase 0.75 app-side contract check is wired from startup through
+  `src/backend-spine/app-contract-check.ts`; it sends health, session, and a
+  synthetic project-record validation probe only and does not change user-facing workflows.
+- Phase 0.75 repo-side hosted wiring for `/api/spine/*` is ready: separate
+  `landroid-backend-spine` Lambda package, live Lambda Function URL, live
+  Amplify `/api/spine/<*>` rewrite, render helper, predeploy checks, smoke
+  checks, CI steps, and deployment docs. Hosted smoke evidence passed on
+  2026-05-26.
+- Next Phase 0.75 work: checkpoint the branch, then either do a signed-in
+  manual hosted app check or stop before Phase 0.5 sharding. Future-contract goldens are
+  parked in
   `docs/phase-0-inventory.md` for Phase 0.5 / Phase 0.75 / Phase 1 instead of
   being faked as Phase 0 tests.
 - Do not start the full runsheet walkthrough wizard unless the user explicitly
@@ -553,17 +652,31 @@ print-preview/save confirmation exist; no automated visual-diff guard has been
 added.
 `SECURITY.md` clarifies that hosted/backend work can be safer than today's
 browser-only durability story only if the documented safety gates ship.
+`docs/backend-spine-threat-model.md` covers the current minimal-spine slice.
 `docs/phase-0-inventory.md` is the draft master Phase 0 inventory after
 Claude's lane review. `fixtures/phase-0/` contains deterministic W1 goldens
 generated by `scripts/generate-phase-0-fixtures.ts`; W2 is documented as a
 rebuild stress recipe plus deterministic manifest/checksum instead of a
 committed exact large export. Runsheet ordering is now a user-controlled
 multi-mode contract: global instrument date, global file date, single-tract,
-grouped-by-tract, and later manual/custom package order. Backend
-architecture is approved in principle but deferred until OCR/search/sync or
-another hard trigger; LANDroid remains local-first, hosted-web/PWA first, with
-`.landroid` export permanent; Phase 0.5 must shard Dexie storage, add multi-tab
-protection, persistent-storage request, lazy PDF loading, canvas viewport
-persistence, autosave timing, and iPad Pro-class Raven Forest scale; Phase 1
-records must be backend-ready. Do not start backend, sharding, or the runsheet
-walkthrough wizard unless explicitly directed.
+grouped-by-tract, and later manual/custom package order. Phase 0.75 now has the
+first minimal backend-spine slice: `src/backend-spine/contracts.ts`,
+`src/backend-spine/adapter.ts`, `src/backend-spine/app-contract-check.ts`, and
+`backend/spine/src/handler.ts`, plus deployable Lambda wrapper
+`backend/spine/src/lambda.ts`. The app contract check is non-user-facing:
+startup calls health, session, and synthetic project-record validation through
+the adapter after local startup or hosted auth, without sending real project
+records or document payloads. Repo-side hosted wiring for `/api/spine/*` is live in AWS and prepared in
+`amplify-rewrites.json`, `scripts/render-amplify-rewrites.sh`,
+`scripts/predeploy-check.sh`, `scripts/smoke-test-hosted.sh`,
+`DEPLOYMENT_GUIDE.md`, `DEPLOYMENT_STATE.md`, and `DEPLOY_TEST_CHECKLIST.md`;
+`bash scripts/smoke-test-hosted.sh` passed against
+`https://landroid.abstractmapping.com` on 2026-05-26.
+LANDroid remains local-first, hosted-web/PWA first, with `.landroid` export
+permanent.
+Phase 0.5 must shard Dexie storage against the Phase 0.75 record envelope, add
+multi-tab protection, persistent-storage request, lazy PDF loading, canvas
+viewport persistence, autosave timing, and iPad Pro-class Raven Forest scale;
+Phase 1 records must reuse the spine contract. Do not start full backend
+storage/sync/OCR/search, sharding, or the runsheet walkthrough wizard unless
+explicitly directed.

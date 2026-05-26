@@ -18,11 +18,15 @@ document, project, and math workflows must remain usable without network access
 where practical. Complete `.landroid` package export is a permanent escape hatch
 and must not be removed by future backend/sync work.
 
-Backend architecture is approved in principle but implementation is deferred
-until a hard trigger such as OCR/search scale, multi-device sync, live sharing,
-second-user access, or browser storage limits. Until then, rebuild work should
-make data backend-ready without turning the backend into the immediate source of
-truth.
+Backend architecture is approved, and Phase 0.75 now adds a minimal backend
+spine before Phase 0.5 storage sharding. The spine is limited to shared
+backend-shaped record contracts, adapter boundaries, hosted auth/session proof,
+validation endpoints, and a non-user-facing app startup contract check so Dexie
+sharding does not have to be redesigned later. Full backend storage, object
+storage, OCR/search jobs, sync,
+collaboration, sharing, and multi-user permissions remain later gates. The
+backend must not become the immediate source of truth for core workflows until
+an explicit future phase approves that cutover.
 
 ## Jurisdictional scope
 LANDroid is **Texas-only for math today**. Texas fee and Texas state leases are the only jurisdictions modeled in calculation logic, leasehold review, and title-math UI today.

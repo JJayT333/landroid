@@ -3,8 +3,40 @@
 This file records meaningful project changes so `CONTINUATION-PROMPT.md` can
 stay short.
 
+## 2026-05-26
+
+- Wired the non-user-facing Phase 0.75 app contract check through the
+  backend-spine adapter. Startup now runs a hidden health/session/synthetic
+  project-record validation probe after local startup or hosted auth without
+  changing user workflows, project storage, document handling, sync, or
+  `.landroid` export.
+- Added repo-side hosted wiring for the minimal backend spine: a deployable
+  `backend/spine` Lambda wrapper/package, `/api/spine/<*>` Amplify rewrite
+  template support, predeploy/smoke checks, and deployment docs. The spine
+  remains contract proof only and does not add project storage, document upload,
+  OCR/search, sync, collaboration, or permissions.
+- Hardened the Phase 0.75 spine after read-only review: every declared
+  `recordType` now has a validation-union schema, unfinished domain records use
+  strict envelope-only stubs, the app probe validates a synthetic project record,
+  hosted startup waits for auth, and the backend-spine handler logs structured
+  request/reject events without payloads.
+- Deployed the minimal backend spine to AWS as a separate
+  `landroid-backend-spine` Lambda and added the live Amplify `/api/spine/<*>`
+  rewrite. Hosted smoke now proves spine health, unauthenticated auth rejection,
+  oversized-body rejection, and structured CloudWatch logging.
+
 ## 2026-05-25
 
+- Updated the rebuild sequence for Phase 0.75: LANDroid should add a minimal
+  backend spine before Phase 0.5 storage sharding, limited to shared
+  backend-shaped records/API contracts, adapter boundaries, auth/session proof,
+  and validation endpoints. Full backend storage, object storage, OCR/search,
+  sync, sharing, collaboration, and multi-user permissions remain later gates.
+- Added the first Phase 0.75 minimal-spine implementation slice: shared
+  backend-spine schemas and adapters under `src/backend-spine`, a minimal
+  `backend/spine` health/session/record-validation handler package, tests for
+  offline adapters and hosted auth boundaries, and
+  `docs/backend-spine-threat-model.md`.
 - Closed the Phase 0 export-readiness decision for rebuild use: no Phase 0 UI
   export block, but future normal export must be readiness-gated before real
   work/storage/backup use.

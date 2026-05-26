@@ -1,33 +1,45 @@
 #!/usr/bin/env bash
-# Render Amplify rewrite JSON with a real Lambda Function URL host.
+# Render Amplify rewrite JSON with real Lambda Function URL hosts.
 #
 # Usage:
-#   bash scripts/render-amplify-rewrites.sh abc123.lambda-url.us-east-1.on.aws
-#   bash scripts/render-amplify-rewrites.sh https://abc123.lambda-url.us-east-1.on.aws/
+#   bash scripts/render-amplify-rewrites.sh <ai-lambda-host-or-url> <spine-lambda-host-or-url>
+#   bash scripts/render-amplify-rewrites.sh https://abc123.lambda-url.us-east-1.on.aws/ https://def456.lambda-url.us-east-1.on.aws/
 
 set -euo pipefail
 
-if [[ $# -ne 1 ]]; then
-  echo "Usage: bash scripts/render-amplify-rewrites.sh <lambda-function-url-host-or-url>" >&2
+if [[ $# -ne 2 ]]; then
+  echo "Usage: bash scripts/render-amplify-rewrites.sh <ai-lambda-host-or-url> <spine-lambda-host-or-url>" >&2
   exit 2
 fi
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-HOST="$1"
-HOST="${HOST#https://}"
-HOST="${HOST#http://}"
-HOST="${HOST%%/*}"
 
-if [[ -z "$HOST" || "$HOST" == *"REPLACE_WITH_FUNCTION_URL_HOST"* ]]; then
-  echo "ERROR: provide the concrete Lambda Function URL host, not the placeholder." >&2
-  exit 1
-fi
+normalize_host() {
+  local label="$1"
+  local host="$2"
+  host="${host#https://}"
+  host="${host#http://}"
+  host="${host%%/*}"
 
-case "$HOST" in
-  *.lambda-url.*.on.aws) ;;
-  *)
-    echo "WARNING: '$HOST' does not look like a Lambda Function URL host." >&2
-    ;;
-esac
+  if [[ -z "$host" || "$host" == *"REPLACE_WITH_"* ]]; then
+    echo "ERROR: provide the concrete $label Lambda Function URL host, not the placeholder." >&2
+    exit 1
+  fi
 
-sed "s/REPLACE_WITH_FUNCTION_URL_HOST/$HOST/g" "$ROOT/amplify-rewrites.json"
+  case "$host" in
+    *.lambda-url.*.on.aws) ;;
+    *)
+      echo "WARNING: $label host '$host' does not look like a Lambda Function URL host." >&2
+      ;;
+  esac
+
+  printf '%s' "$host"
+}
+
+AI_HOST="$(normalize_host "AI proxy" "$1")"
+SPINE_HOST="$(normalize_host "backend spine" "$2")"
+
+sed \
+  -e "s/REPLACE_WITH_AI_FUNCTION_URL_HOST/$AI_HOST/g" \
+  -e "s/REPLACE_WITH_SPINE_FUNCTION_URL_HOST/$SPINE_HOST/g" \
+  "$ROOT/amplify-rewrites.json"
