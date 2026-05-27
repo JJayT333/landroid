@@ -16,6 +16,10 @@ Rules:
   port Claude's stronger schema/test ideas, and preserve old field-name imports.
 - Document cleanup pass: archive point-in-time audit/prompt files after the
   current branch is checkpointed, then shorten the root doc list.
+- Add GitHub Actions CI: model after the archived
+  `archive/github-actions-ci-attempt-2026-05-16` tag, but update Node 20 → 22
+  and verify against current `package.json` scripts before merging. Two jobs
+  (lint/unit/build + Playwright e2e) on push, PR, and manual dispatch.
 
 ## Promising
 
