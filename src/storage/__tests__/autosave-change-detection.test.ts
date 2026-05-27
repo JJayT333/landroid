@@ -9,8 +9,13 @@ import {
   captureWorkspaceAutosaveSnapshot,
   workspaceAutosaveStateChanged,
 } from '../autosave-change-detection';
+import { AUTOSAVE_DEBOUNCE_MS } from '../autosave-config';
 
 describe('autosave-change-detection', () => {
+  it('keeps the Phase 0.5 autosave debounce contract named and stable', () => {
+    expect(AUTOSAVE_DEBOUNCE_MS).toBe(2000);
+  });
+
   it('treats unchanged workspace references as no-op autosave state', () => {
     const nodes = [
       {

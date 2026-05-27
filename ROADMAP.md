@@ -7,8 +7,9 @@ session handoff lives in `CONTINUATION-PROMPT.md`.
 
 - Treat `docs/rebuild-plan.md` as the planning source of truth for any rebuild
   work: Phase 0 current-behavior inventory is closed, Phase 0.75 minimal
-  backend spine comes next, then Phase 0.5 workspace sharding, project record
-  schema, evidence-grade document vault, source attestations, import/action
+  backend spine is implemented and deployed, Phase 0.5 workspace sharding
+  scaffolding has started, then project record schema, evidence-grade document
+  vault, source attestations, import/action
   layers, and only then workflow cutovers. Preserve dual decimal plus fraction
   display, print fidelity, in-flight migration safety, and citation
   verification as rebuild contracts.
@@ -16,19 +17,23 @@ session handoff lives in `CONTINUATION-PROMPT.md`.
   Future-contract goldens remain parked for the implementation phase that
   creates each behavior, and lane rows should be re-verified before that lane is
   changed.
-- Phase 0.75 active work: continue the minimal backend-spine phase before
-  Phase 0.5. The first slice now adds shared backend-shaped record/API
-  contracts, local/mock/hosted adapter boundaries, a minimal backend-spine
+- Phase 0.75 checkpoint: the minimal backend-spine slice is implemented,
+  deployed, committed, and pushed. It covers shared backend-shaped record/API
+  contracts, local/mock/hosted adapter boundaries, a backend-spine
   health/session/record-validation package, a non-user-facing app startup
   contract check, hosted `/api/spine/*` Lambda/rewrite packaging, and a
   threat-model note. Keep full backend storage, object storage, OCR/search
   jobs, sync, sharing, collaboration, and multi-user permissions behind later
   gates.
-- Plan Phase 0.5 workspace sharding in Dexie before broad record-schema work so
-  Raven Forest scale does not depend on one large autosaved JSON workspace row.
-  Phase 0.5 must also cover multi-tab protection, autosave timing, persistent
-  PWA/iPad storage requests, lazy PDF loading, canvas viewport persistence, and
-  an iPad Pro-class Raven Forest scale gate.
+- Phase 0.5 active implementation: shard the monolithic `workspaces.data` JSON
+  inside Dexie against the Phase 0.75 record envelope before broad
+  record-schema work, while preserving current user-visible behavior. The first
+  code slices are still behavior-preserving: backend-spine manifest and Desk
+  Map shard builders, local-only compatibility rows, autosave debounce naming,
+  write-lease decision logic, lazy document-registry guard tests, and the Dexie
+  v10 shard table upgrade. Live load/save still uses the monolithic
+  `workspaces.data` row until the shard reader/writer and write-lock gate are
+  proven.
 - Preserve `.landroid` package export permanently even after sync/backend work.
 - Promote the Evidence Vault contract: immutable originals, SHA-256 hashes,
   document versions, extraction runs, citation anchors, hash-continuity audit

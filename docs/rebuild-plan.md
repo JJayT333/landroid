@@ -923,6 +923,158 @@ Required work:
 - lazy-load document/PDF blobs from IndexedDB; never load a full document set
   into memory merely to open a workspace
 
+Kickoff inventory, 2026-05-26:
+
+| Area | Current path | Phase 0.5 treatment |
+| --- | --- | --- |
+| Core workspace | `workspaces.data` stores one JSON string for `WorkspaceData`: `workspaceId`, `projectName`, `nodes`, `deskMaps`, leasehold arrays, active IDs, and `instrumentTypes`. It is written by the debounced autosave in `src/main.tsx` through `saveWorkspaceToDb`. | Shard first. This is the main scale risk and the reason Phase 0.5 exists. |
+| Canvas | `canvases.data` stores one JSON string for React Flow nodes, edges, viewport, grid, page, spacing, snap, and tool-adjacent layout state. | Keep behavior, but split enough metadata to prove viewport persistence and avoid coupling every viewport move to the full workspace shard. |
+| Documents | `documents` stores PDF blobs plus metadata; `document_attachments` stores workspace-scoped entity links. Registry reads already omit blobs, while export/import and single-document preview read blobs intentionally. | Preserve the table shape at first, add envelope-compatible metadata/projection rows later, and add tests proving project open does not bulk-read all blobs. |
+| Owner side store | `owners`, `leases`, `contactLogs`, and `ownerDocs`; `ownerDocs` still embeds blobs. Store actions write these tables directly. | Leave table-by-table behavior intact in the first shard, then add envelope metadata and lazy owner-document blob loading only where needed. |
+| Map side store | `mapAssets`, `mapRegions`, and `mapExternalReferences`; `mapAssets` embeds blobs. | Preserve current map UX and link cleanup; treat map blobs as lazy-load candidates after primary Documents PDFs are guarded. |
+| Research side store | `researchImports`, `researchSources`, `researchFormulas`, `researchProjectRecords`, and `researchQuestions`; imports embed blobs. | Preserve current reference workspace behavior; do not promote Research imports into OCR/search or backend jobs in Phase 0.5. |
+| Curative side store | `titleIssues` rows loaded by workspace and sorted in memory. | Already sharded enough for Phase 0.5 scale; keep it as a side-store table and map it to backend `curative_issue` later. |
+| Legacy PDFs | `pdfs` is read-only rollback/migration support for v7 one-PDF-per-node workspaces. | Keep until the sharded migration has a proven backup/export path; do not write new rows. |
+| Workspace keys | Local mode uses `default` / `active-canvas`; hosted mode waits for Cognito `sub` and uses `user-{sub}` scoped keys. | Preserve exactly. Sharding must not reintroduce signed-out hosted reads of local default rows. |
+
+Initial shard order:
+
+1. Add a `WorkspaceManifest` / project metadata row that carries the Phase 0.75
+   envelope fields, `LANDROID_FILE_VERSION`, saved time, record counts, and a
+   pointer to any legacy monolith backup.
+2. Split `deskMaps` into sharded tract/desk-map rows, including unit fields,
+   acreage fields, external refs, and ordered node membership.
+3. Split `nodes` into one row per current `OwnershipNode`. These rows are
+   Phase 0.5 compatibility rows over current title-card state, not the final
+   Phase 1 semantic split into `InstrumentRecord` / `InterestReference`.
+   Where a backend record body is not defined yet, validate/send only the
+   strict envelope stub and declare the Dexie payload local-only.
+4. Split leasehold state from the workspace JSON: `leaseholdUnit`,
+   `leaseholdAssignments`, `leaseholdOrris`, and
+   `leaseholdTransferOrderEntries`. Keep the current math projections and
+   ordering contracts unchanged.
+5. Split active workspace UI state (`activeDeskMapId`, `activeUnitCode`, and
+   `instrumentTypes`) into a small local-only workspace-state row so changing
+   focus does not rewrite every title node.
+6. Handle canvas persistence separately from the core workspace shard. Viewport
+   persistence is part of Phase 0.5 acceptance, but broad Flowchart print/layout
+   behavior remains a parity target, not a redesign.
+7. Leave already-sharded side stores in place for the first implementation
+   slice. Add envelope adapters/projections around them only when the core
+   workspace split is stable.
+
+Migration and rollback strategy:
+
+- Use a Dexie schema bump after v9 for the shard tables; do not bump
+  `LANDROID_FILE_VERSION` merely because local IndexedDB is sharded.
+- During upgrade, parse every existing `workspaces.data` row with the same
+  `parsePersistedWorkspaceData` normalization used today, then write the new
+  shard rows in a single migration transaction where Dexie permits it.
+- Keep the pre-shard monolithic workspace row as a rollback/diagnostic backup
+  until sharded load, autosave, `.landroid` export, and side-store reset are
+  proven. Do not keep rewriting the monolith on every autosave, because that
+  would preserve the scale bottleneck.
+- Make sharded load idempotent: prefer complete shard rows, fall back to the
+  legacy monolith if shard rows are absent, incomplete, or fail validation, and
+  surface a startup warning rather than silently dropping data.
+- Keep `.landroid` import/export assembled through compatibility adapters.
+  Existing v7/v8 reads, `version > 8` rejection, v7 PDF migration, and
+  rollback-safe side-store replacement remain required. A future package-format
+  bump needs explicit version dispatch and round-trip tests before it writes
+  anything other than the current v8 package shape.
+- Preserve CSV and demo loaders by routing replacement through the same shard
+  writer and existing `replaceWorkspaceSideStores` boundary.
+- Treat AI undo snapshots as compatibility snapshots during Phase 0.5. Do not
+  convert them into durable audit/action records in this phase.
+
+Local-first and offline plan:
+
+- Dexie remains the active source of truth for core workflows during Phase 0.5.
+  The Phase 0.75 backend spine is a contract check, not storage, sync, or an
+  online dependency for editing.
+- Sharded load, edit, autosave, document preview, `.landroid` import/export,
+  and AI approval/undo must work without network access where they work today.
+- Hosted mode keeps Cognito-based local key scoping, but project data still
+  lives in browser IndexedDB unless a later backend-storage gate is approved.
+- Request `navigator.storage.persist()` where supported and record whether it
+  was granted or refused. A refusal is a durability warning, not a reason to
+  disable local-first workflows.
+- `.landroid` export remains the permanent escape hatch and must be available
+  even when the backend spine is unreachable.
+
+Multi-tab single-writer plan:
+
+- Add a workspace-scoped write lease before shard writes are considered
+  production-safe. The intended contract is pessimistic: one writable tab per
+  workspace, later tabs open read-only with a visible "editing elsewhere"
+  warning and an explicit takeover confirmation.
+- Store the lease in Dexie with `workspaceId`, `ownerTabId`, heartbeat time,
+  expiry, and a fencing/revision token. Use `BroadcastChannel` for fast tab
+  notice and a timer/expiry fallback for browsers that miss broadcasts.
+- Gate workspace autosave, canvas autosave, and direct side-store mutation
+  helpers behind the same writable-tab assertion. Last-write-wins remains only
+  a documented Phase 0 dev boundary until this gate lands.
+- Do not implement optimistic merge/conflict UI in Phase 0.5. That belongs with
+  later sync/collaboration scope if a real multi-user requirement appears.
+
+Lazy document/blob loading plan:
+
+- Opening a project must load document metadata and links, not every PDF/blob.
+  `listDocumentRegistryData`, `listDocsForEntity`, and
+  `listAttachmentsForNodes` already follow this pattern for the main
+  `documents` table; Phase 0.5 should turn that into a tested contract.
+- Single-document preview, `.landroid` export, package export, and explicit
+  backup flows are allowed to read blobs because the user asked for the bytes.
+- Blob-bearing side stores (`ownerDocs`, `mapAssets`, and `researchImports`)
+  should be treated as the next lazy-load candidates. Do not redesign their UI
+  in Phase 0.5; add metadata-first readers where project-open performance or
+  memory evidence requires it.
+- Blob content hashes remain the identity bridge across Dexie blobs,
+  `.landroid` package files, and later object storage.
+
+Targeted tests and performance gates before implementation:
+
+- First implemented guardrails now cover pure shard-building/round-trip,
+  active UI-state isolation, multi-tab write-lease decisions, autosave debounce
+  naming, and lazy document-registry metadata reads. These are scaffolding only
+  and are not yet wired into live Dexie shard writes.
+- The next slice performs the explicit IndexedDB gate: Dexie v10 now creates
+  shard/write-lease tables and backfills them from existing monolithic
+  `WorkspaceRecord` rows. The monolithic row is preserved and remains the live
+  load/save source until the shard reader/writer and write-lock gate are proven.
+- Add storage tests for monolith-to-shard migration, corrupt-shard fallback,
+  idempotent rerun, v7/v8 `.landroid` import compatibility, future-version
+  rejection, and rollback-safe side-store replacement.
+- Add autosave tests for the extracted debounce constant, reference-change
+  detection against the new shard writer, and separate active-focus writes.
+- Add lock tests for first-tab writable, second-tab read-only, stale lease
+  takeover, explicit takeover confirmation, and blocked writes from a
+  non-writable tab.
+- Add lazy-load tests that project open and registry listing do not fetch every
+  document blob, while preview/export still fetch the requested bytes.
+- Run the existing storage/document target set before broad validation:
+  `npm test -- src/storage/__tests__/workspace-persistence.test.ts src/storage/__tests__/workspace-side-store-reset.test.ts src/storage/__tests__/document-store.test.ts src/storage/__tests__/document-migration.test.ts src/storage/__tests__/autosave-change-detection.test.ts src/storage/__tests__/active-workspace-key.test.ts src/storage/__tests__/persistence-db-key.test.ts src/phase0/__tests__/vulcan-mesa-fixtures.test.ts`.
+- Re-run `npm run lint`, `npm test`, `npm run build`, `npm run test:e2e`, and
+  `npm run deploy:check` before declaring Phase 0.5 implementation complete.
+- Compare autosave, project-open, document-registry, `.landroid` round-trip,
+  and Raven Forest-scale captures against Phase 0 baselines. The target remains
+  1,000-3,000 title nodes and 200-1,000 document records/PDFs on iPad
+  Pro-class hardware or a documented equivalent, without full-blob workspace
+  rewrites.
+
+Token/time tradeoff:
+
+- The higher-total-value path is to spend planning and test-design effort now:
+  table inventory, envelope mapping, migration gates, lock gates, and lazy-load
+  contracts before implementation.
+- This costs more up front than simply splitting `nodes` into a table, but it
+  avoids repeatedly reopening Dexie versions, `.landroid` compatibility,
+  backend record IDs, document hash identity, side-store reset behavior, and
+  multi-tab safety during Phase 1 and later backend work.
+- Scope stays tight by refusing the expensive parts now: no durable backend
+  project storage, object storage, OCR/search, sync, collaboration,
+  multi-user permissions, or new product workflows.
+
 Exit gate:
 
 - existing workspaces still load

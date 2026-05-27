@@ -3,8 +3,30 @@
 This file records meaningful project changes so `CONTINUATION-PROMPT.md` can
 stay short.
 
+## 2026-05-27
+
+- Added the first Phase 0.5 storage-sharding scaffolding without wiring it into
+  live persistence. The new pure shard adapter builds backend-spine
+  `workspace_manifest` and `desk_map` envelopes, keeps current title/leasehold
+  state as local-only compatibility rows, and round-trips back to the current
+  `WorkspaceData` shape.
+- Added Phase 0.5 guardrails for implementation: a named autosave debounce
+  constant, pure multi-tab write-lease evaluator with fencing-token tests, and
+  a lazy document-registry test proving registry reads omit document blobs.
+- Added the next Phase 0.5 migration slice with a live Dexie v10 schema bump.
+  The upgrade creates workspace shard/write-lease tables, derives shard rows
+  from existing monolithic `WorkspaceRecord` rows, keeps the monolithic row as
+  the live load/save and rollback source, and skips corrupt autosave rows with
+  a warning instead of blocking database open.
+
 ## 2026-05-26
 
+- Started Phase 0.5 storage-sharding planning without implementation. The
+  kickoff plan now inventories current Dexie tables and persistence paths,
+  identifies `workspaces.data` as the first shard target, defines the initial
+  shard order, migration/rollback strategy, `.landroid` compatibility rules,
+  local-first/offline constraints, pessimistic single-writer plan, lazy blob
+  loading plan, and targeted validation/performance gates.
 - Wired the non-user-facing Phase 0.75 app contract check through the
   backend-spine adapter. Startup now runs a hidden health/session/synthetic
   project-record validation probe after local startup or hosted auth without

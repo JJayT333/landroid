@@ -15,6 +15,15 @@ summarizes how the app is put together and where changes should live.
   backend-shaped records, and treat SQLite/OPFS, Tauri/native filesystem,
   backend object storage, or cloud object storage as explicit implementation
   gates, not current defaults.
+- Phase 0.5 storage scaffolding: `src/storage/workspace-shards.ts` defines the
+  pure adapter from current `WorkspaceData` into backend-spine manifest and
+  Desk Map envelopes plus local-only compatibility rows. `src/storage/db.ts`
+  now registers the v10 shard/write-lease tables and populates shard rows from
+  existing monolithic workspace rows during upgrade, but live autosave/load
+  still reads and writes `workspaces.data`. `src/storage/workspace-write-lock.ts`
+  defines the pure single-writer lease decision contract for the later
+  multi-tab write gate. `src/storage/workspace-shard-migration.ts` defines the
+  pure monolith-to-shards and shards-to-monolith rollback helpers.
 - Runtime target: hosted web app first, with PWA/iPad support as a product
   target. Native iOS and desktop installers are deferred unless a later
   decision gate proves they are needed.
@@ -195,6 +204,26 @@ explicit before Dexie sharding. Later backend expansion should make sync,
 backup, jobs, search, sharing, and AI policy more durable. Neither the spine nor
 later expansion may make the app unusable offline for core workflows, and
 neither may make LANDroid unable to produce a complete local project package.
+
+Phase 0.5 planning treats the current storage surface as follows:
+
+- the primary shard target is `workspaces.data`, which currently stores
+  `WorkspaceData` as one JSON string (`nodes`, `deskMaps`, leasehold arrays,
+  active IDs, and `instrumentTypes`)
+- `canvases.data` is a separate JSON blob and must keep Flowchart parity while
+  proving viewport persistence
+- side stores such as owners, leases, maps, research, curative issues,
+  documents, and document attachments already live in separate Dexie tables and
+  should not be rewritten in the first shard unless they are needed for
+  envelope metadata, lazy blob loading, or lock coverage
+- sharded rows should carry or derive the Phase 0.75 envelope metadata; current
+  title-node rows may remain local-only compatibility payloads until Phase 1
+  defines the final `InstrumentRecord` / `InterestReference` split
+- `.landroid` export/import remains the compatibility boundary, so local Dexie
+  sharding must assemble and read the existing package shape before any package
+  version bump is considered
+- pessimistic single-writer protection and metadata-first blob loading are
+  Phase 0.5 acceptance gates, not later backend features
 
 Generated folders are not source of truth:
 

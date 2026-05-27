@@ -26,6 +26,7 @@ import {
   captureWorkspaceAutosaveSnapshot,
   workspaceAutosaveStateChanged,
 } from './storage/autosave-change-detection';
+import { AUTOSAVE_DEBOUNCE_MS } from './storage/autosave-config';
 
 // ── Auto-load saved workspace and canvas on startup ─────
 async function bootstrapApp() {
@@ -114,7 +115,7 @@ useWorkspaceStore.subscribe((state) => {
   if (saveTimer) clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
     saveWorkspaceToDb(buildWorkspaceAutosavePayload(state));
-  }, 2000);
+  }, AUTOSAVE_DEBOUNCE_MS);
 });
 
 // ── Auto-save canvas on changes (debounced 2s) ───────────
@@ -133,7 +134,7 @@ useCanvasStore.subscribe((state) => {
   if (canvasSaveTimer) clearTimeout(canvasSaveTimer);
   canvasSaveTimer = setTimeout(() => {
     saveCanvasToDb(buildCanvasAutosavePayload(state));
-  }, 2000);
+  }, AUTOSAVE_DEBOUNCE_MS);
 });
 
 createRoot(document.getElementById('root')!).render(

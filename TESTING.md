@@ -26,6 +26,7 @@ npm run test:e2e
 | Phase 0 inventory reconciliation | docs diff check, verify highest-risk inventory rows against code before marking them binding, and update `docs/rebuild-plan.md`, `docs/phase-0-inventory.md`, `ROADMAP.md`, `ARCHITECTURE.md`, `SECURITY.md`, and `CONTINUATION-PROMPT.md` together |
 | Backend-spine planning | docs diff check, threat-model/security review notes, data-flow/API boundary review, local/export contract review, backend-shaped local schema review, and explicit smallest implementation slice before backend coding |
 | Minimal backend-spine implementation | `npm run lint`, targeted shared-schema/adapter/app-contract tests, `cd backend/spine && npm ci && npm audit --omit=dev && npm test && npm run build && npm run bundle`, `npm run deploy:check`, root `npm test` if frontend contract code changes, and no hosted-deploy claim without `DEPLOYMENT_STATE.md` plus smoke evidence |
+| Phase 0.5 storage sharding implementation | `npm run lint`, targeted storage migration/lock/lazy-blob tests, `.landroid` round-trip tests, side-store reset tests, `npm test`, `npm run build`, relevant e2e, and Phase 0 performance-baseline comparison for project open, autosave, document registry, and `.landroid` round trip |
 | Evidence vault, OCR, packet, or AI citation implementation | `npm run lint`, relevant storage/document tests, package round-trip tests, citation-verifier tests, AI tests when answer behavior changes, and targeted browser/e2e smoke for impacted flows |
 | AI tool/provider change | `npm run lint`, AI tests, relevant wizard/tool tests, approval-queue tests, and rollback check |
 | Hosted AI proxy/deploy change | `npm run deploy:check`, `cd backend/ai-proxy && npm test && npx tsc -p tsconfig.json --noEmit`, plus root `npm test` if frontend policy changes; run `bash scripts/smoke-test-hosted.sh` when network/AWS access is available |
@@ -155,6 +156,26 @@ For rebuild storage and evidence-vault work, tests should cover:
   citations
 - packet manifests, checksums, unresolved-issue files, and load-file sidecars
   are deterministic
+
+For Phase 0.5 storage sharding specifically, start with targeted coverage for:
+
+- pure shard building from current `WorkspaceData` into backend-spine manifest
+  and Desk Map envelopes plus local-only compatibility rows
+- Dexie v10 shard table/index definitions plus upgrade backfill tests
+- v9 monolithic `workspaces.data` rows migrating into complete sharded rows
+  without changing loaded `WorkspaceData`
+- corrupt or incomplete shard rows falling back to the preserved monolithic
+  backup with a visible startup warning
+- sharded autosave preserving the extracted debounce timing and not rewriting
+  every title row for focus-only changes
+- `.landroid` v7/v8 import/export compatibility, future-version rejection, and
+  rollback-safe side-store replacement after sharding
+- first-tab writable, second-tab read-only, stale-lock expiry, explicit
+  takeover, and blocked writes from a non-writable tab
+- project open and registry listing loading document metadata/links without
+  bulk-reading every PDF/blob
+- W2/Raven Forest-scale project-open, document-registry, autosave, and
+  `.landroid` round-trip metrics compared with the Phase 0 baseline artifacts
 
 For minimal backend-spine work, tests should cover:
 

@@ -81,6 +81,8 @@ import type { CurativeWorkspaceData } from './curative-persistence';
 import { normalizeTitleIssues, type TitleIssue } from '../types/title-issue';
 import { resolveActiveUnitCode } from '../utils/desk-map-units';
 import { getWorkspaceDbKey } from './active-workspace-key';
+import { LANDROID_FILE_VERSION } from './landroid-file-version';
+export { LANDROID_FILE_VERSION } from './landroid-file-version';
 const PAGE_SIZE_ID_SET = new Set<PageSizeId>(
   PAGE_SIZE_DEFINITIONS.map((definition) => definition.id)
 );
@@ -838,8 +840,6 @@ async function serializeResearchData(
  * omits the legacy `pdfData` field. Imports of v7 (or earlier) files
  * are migrated inline by {@link importLandroidFile}.
  */
-export const LANDROID_FILE_VERSION = 8;
-
 export async function exportLandroidFile(data: LandroidFileData): Promise<Blob> {
   const payload = {
     version: LANDROID_FILE_VERSION,

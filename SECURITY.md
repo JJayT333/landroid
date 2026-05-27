@@ -66,6 +66,32 @@ Security improvements the rebuild should preserve or add:
   later object storage is triggered
 - citation-verified AI answers and approval-gated mutations with undo
 
+Phase 0.5 storage-sharding security rules:
+
+- Sharded Dexie rows must preserve `workspaceId` and future `projectId`
+  scoping on every record or be explicitly declared local-only cache/projection
+  rows.
+- The monolithic workspace row may be retained as a migration/rollback backup,
+  but it should not keep receiving every autosave after the shard writer is
+  proven, because that would preserve the large-blob failure mode.
+- The live IndexedDB/Dexie version is now bumped to v10 only to create and
+  backfill shard tables. The upgrade preserves the monolithic workspace row and
+  skips corrupt autosave JSON with a warning, so current load/save and recovery
+  behavior still depends on the proven v9 monolith path until the shard
+  reader/writer is explicitly enabled.
+- Multi-tab protection is a security and data-integrity gate, not only UX.
+  Phase 0.5 should use pessimistic single-writer behavior with heartbeat,
+  expiry, and explicit takeover so a stale or background tab cannot silently
+  overwrite title work. The first implementation slice has only the pure lease
+  evaluator and tests; live autosave/write blocking still must be wired before
+  sharded writes are production-safe.
+- Project open must stay metadata-first for document/PDF rows. Blob reads are
+  allowed for explicit preview, export, package backup, or import workflows, but
+  not merely because a project is opened.
+- Hosted mode must continue waiting for the Cognito `sub` before any sharded
+  IndexedDB read/write. Sharding must not fall back to the local `default`
+  workspace key for signed-out hosted users.
+
 Security risks that do not disappear just because LANDroid is hosted:
 
 - cloud storage creates custody duties for title documents, leases, owner

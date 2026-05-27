@@ -95,11 +95,18 @@ Leasehold transfer-order timing. The W2 UI
 `.landroid` export was imported successfully, but the 15.8 MB package was
 removed from the working tree after recording its size and checksum.
 
-Rebuild implementation has started only for the Phase 0.75 minimal backend
-spine; no user-facing app behavior has changed. The current planning source of
-truth is `docs/rebuild-plan.md`. It consolidates the incremental rebuild
-direction: inventory current page/workflow behavior first, then Phase 0.75
-minimal backend spine, Phase 0.5 workspace sharding, project record schema,
+Rebuild implementation has started for the Phase 0.75 minimal backend spine,
+which is now implemented, deployed, committed, and pushed. Phase 0.5
+storage-sharding implementation has also started with pure/unwired scaffolding:
+`src/storage/workspace-shards.ts`, `src/storage/workspace-write-lock.ts`, a
+named autosave debounce constant, `src/storage/workspace-shard-migration.ts`,
+Dexie v10 shard/write-lease tables, and focused tests. No live Dexie shard
+write path, shard load path, write-lock gate, or user-visible behavior change
+is wired yet; current app load/save still uses the monolithic `workspaces.data`
+row. The current planning source of truth is `docs/rebuild-plan.md`. It
+consolidates the incremental rebuild direction:
+inventory current page/workflow behavior first, then Phase 0.75 minimal backend
+spine, Phase 0.5 workspace sharding, project record schema,
 evidence-grade document vault, source attestations, import sessions, action
 plans/action records, citation-verified AI, project-wide party identity,
 well/unit/obligation reference records, and only later gated math expansion.
@@ -123,6 +130,22 @@ package for health/session/record-validation proof, a deployable
 `backend/spine/src/lambda.ts` wrapper, `/api/spine/<*>` Amplify rewrite
 template support, deploy/smoke checks, and
 `docs/backend-spine-threat-model.md`.
+Phase 0.5 kickoff planning now inventories the current Dexie/storage surface,
+identifies `workspaces.data` as the first shard target, keeps existing
+side-store tables intact for the first slice, defines migration/rollback and
+`.landroid` compatibility rules, preserves local-first/offline behavior, and
+requires pessimistic single-writer protection plus lazy blob loading before the
+storage shard can be called complete. The first Phase 0.5 code slice builds
+backend-spine `workspace_manifest` and `desk_map` envelopes from current
+`WorkspaceData`, keeps current ownership/leasehold/UI state as local-only
+compatibility rows, round-trips back to `WorkspaceData`, tests UI-state-only
+changes separately from title/Desk Map shards, and tests the future multi-tab
+write-lease contract plus lazy document-registry metadata reads. The second
+Phase 0.5 code slice adds deterministic monolith-to-shards migration plus
+shards-to-monolith rollback helpers. The third slice bumps Dexie to v10,
+creates the shard/write-lease tables, backfills shard rows from existing
+monolithic `WorkspaceRecord` rows, preserves the monolith for fallback, and
+skips corrupt autosave rows with a warning instead of blocking database open.
 
 Current agreed rebuild sequence:
 
@@ -133,15 +156,20 @@ Current agreed rebuild sequence:
    creates each behavior; do not fake them as Phase 0 coverage.
 3. Keep `docs/phase-0-inventory.md` as the Phase 0 behavior catalog and verify
    lane rows again when a later phase touches that lane.
-4. Phase 0.75 now starts before Phase 0.5 as a minimal backend-spine phase:
-   shared backend-shaped record/API contracts, adapter boundaries,
-   auth/session proof, and validation endpoints. Full backend storage, object
-   storage, OCR/search jobs, sync, sharing, collaboration, and multi-user
-   permissions remain later gates.
+4. Phase 0.75 is complete for the minimal backend-spine slice: shared
+   backend-shaped record/API contracts, adapter boundaries, auth/session proof,
+   validation endpoints, hosted `/api/spine/*` routing, smoke evidence, and
+   deployment docs are in place. Full backend storage, object storage,
+   OCR/search jobs, sync, sharing, collaboration, and multi-user permissions
+   remain later gates.
 5. Phase 0.5 storage sharding follows the Phase 0.75 contract: sharded Dexie
    rows, multi-tab protection, persistent-storage request for PWA/iPad where
-   supported, lazy PDF loading, canvas viewport persistence, autosave timing,
-   and Raven Forest iPad Pro-class scale.
+   supported, lazy PDF/blob loading, canvas viewport persistence, autosave
+   timing, and Raven Forest iPad Pro-class scale.
+6. Phase 0.5 implementation has begun with tests and pure migration adapters,
+   not a semantic project-record rewrite. Current `OwnershipNode` rows remain
+   local-only compatibility payloads until Phase 1 defines the final
+   `InstrumentRecord` / `InterestReference` split.
 
 Primary report:
 
@@ -182,6 +210,75 @@ The next AI foundation chunk is also implemented:
 The full runsheet walkthrough wizard has not been started.
 
 ## Latest Validation
+
+Phase 0.5 Dexie v10 shard-table upgrade validation on 2026-05-27:
+
+- `npm test -- src/storage/__tests__/workspace-shard-dexie-migration.test.ts src/storage/__tests__/workspace-shards.test.ts`
+  - passed, 2 files / 10 tests.
+- `npm run lint`
+  - passed.
+- `npm test`
+  - passed, 90 files / 684 tests. Existing intentional stderr coverage for
+    simulated Dexie failures appeared.
+- `npm run build`
+  - passed with existing Vite dynamic/static import warnings, chunk-size
+    warning, and Node `module.register()` deprecation warning. The build now
+    emits a small `workspace-shard-migration` chunk from the dynamic v10
+    upgrade import.
+- `npm run test:e2e`
+  - passed, 11 Chromium workflows in 24.6s, with existing Node
+    `module.register()` and FORCE_COLOR/NO_COLOR warnings.
+- `npm run deploy:check`
+  - passed; repo template still intentionally contains AI/spine Function URL
+    placeholders for fresh deploy rendering.
+
+Phase 0.5 first scaffolding validation on 2026-05-27:
+
+- `npm test -- src/storage/__tests__/autosave-change-detection.test.ts src/storage/__tests__/workspace-shards.test.ts src/storage/__tests__/workspace-write-lock.test.ts src/storage/__tests__/document-store.test.ts`
+  - passed, 4 files / 14 tests.
+- `npm run lint`
+  - passed.
+- `npm test`
+  - passed, 89 files / 678 tests. Existing intentional stderr coverage for
+    simulated Dexie failures appeared.
+- `npm run build`
+  - passed with existing Vite dynamic/static import warnings, chunk-size
+    warning, and Node `module.register()` deprecation warning.
+- `npm run test:e2e`
+  - passed, 11 Chromium workflows in 29.2s, with existing Node
+    `module.register()` and FORCE_COLOR/NO_COLOR warnings.
+- `npm run deploy:check`
+  - passed; repo template still intentionally contains AI/spine Function URL
+    placeholders for fresh deploy rendering.
+- `git diff --check`
+  - passed.
+
+Phase 0.5 migration-helper validation on 2026-05-27:
+
+- `npm test -- src/storage/__tests__/workspace-shards.test.ts src/storage/__tests__/workspace-write-lock.test.ts src/storage/__tests__/autosave-change-detection.test.ts src/storage/__tests__/document-store.test.ts`
+  - passed, 4 files / 17 tests after fixing the migration fixture to use
+    persisted-valid decimal node fractions.
+- `npm run lint`
+  - passed.
+- `npm test`
+  - passed, 89 files / 681 tests. Existing intentional stderr coverage for
+    simulated Dexie failures appeared.
+- `npm run build`
+  - passed with existing Vite dynamic/static import warnings, chunk-size
+    warning, and Node `module.register()` deprecation warning.
+- `npm run test:e2e`
+  - passed, 11 Chromium workflows in 27.7s, with existing Node
+    `module.register()` and FORCE_COLOR/NO_COLOR warnings.
+- `npm run deploy:check`
+  - passed; repo template still intentionally contains AI/spine Function URL
+    placeholders for fresh deploy rendering.
+- `git diff --check`
+  - passed.
+
+Phase 0.5 storage-sharding kickoff planning validation on 2026-05-26:
+
+- `git diff --check -- '*.md' 'docs/**/*.md'`
+  - passed after the Phase 0.5 planning and handoff doc updates.
 
 Phase 0.75 backend-spine hosted-wiring validation on 2026-05-26:
 
@@ -484,15 +581,21 @@ Prior validation from the audit/rebuild-planning checkpoint:
 - P0: Phase 0 is effectively closed after full validation and user print
   confirmation. Future-contract goldens remain parked for the phase that
   implements each behavior.
-- P0.75 before P0.5: start the minimal backend spine now so storage sharding
-  uses backend-shaped records from the start. The first implementation slice is
-  shared schemas, a record envelope, adapter boundary, and health/session/
-  validation endpoints, not full backend storage or collaboration.
+- P0.75 before P0.5: the minimal backend spine is implemented and deployed so
+  storage sharding can use backend-shaped records from the start. The completed
+  slice is shared schemas, a record envelope, adapter boundary, and
+  health/session/validation endpoints, not full backend storage or
+  collaboration.
 - P0.5 after P0.75: workspace persistence still needs sharding inside Dexie so
   Raven Forest scale does not depend on one large autosaved JSON workspace row.
   Phase 0.5 must also cover multi-tab protection, persistent-storage requests
   for PWA/iPad where supported, lazy PDF loading, canvas viewport persistence,
   autosave timing, and an iPad Pro-class Raven Forest scale gate.
+- P0.5 kickoff planning: `docs/rebuild-plan.md` now records the concrete
+  current persistence inventory, initial shard order, migration/rollback rules,
+  `.landroid` compatibility strategy, local-first/offline constraints,
+  pessimistic single-writer plan, lazy blob-loading plan, and targeted
+  test/performance gates. No sharding code has been started.
 - Product direction: LANDroid is hosted web first with PWA/iPad support; native
   iOS and desktop installers are deferred. Complete `.landroid` export remains
   permanent.
@@ -610,9 +713,10 @@ Prior validation from the audit/rebuild-planning checkpoint:
   Amplify `/api/spine/<*>` rewrite, render helper, predeploy checks, smoke
   checks, CI steps, and deployment docs. Hosted smoke evidence passed on
   2026-05-26.
-- Next Phase 0.75 work: checkpoint the branch, then either do a signed-in
-  manual hosted app check or stop before Phase 0.5 sharding. Future-contract goldens are
-  parked in
+- Next Phase 0.5 work: before coding, turn the kickoff plan into the smallest
+  implementation slice: storage migration tests, shard read/write adapters,
+  autosave debounce extraction, write-lock tests, and lazy document/blob
+  contract tests. Future-contract goldens are parked in
   `docs/phase-0-inventory.md` for Phase 0.5 / Phase 0.75 / Phase 1 instead of
   being faked as Phase 0 tests.
 - Do not start the full runsheet walkthrough wizard unless the user explicitly
@@ -674,9 +778,17 @@ records or document payloads. Repo-side hosted wiring for `/api/spine/*` is live
 `https://landroid.abstractmapping.com` on 2026-05-26.
 LANDroid remains local-first, hosted-web/PWA first, with `.landroid` export
 permanent.
-Phase 0.5 must shard Dexie storage against the Phase 0.75 record envelope, add
-multi-tab protection, persistent-storage request, lazy PDF loading, canvas
-viewport persistence, autosave timing, and iPad Pro-class Raven Forest scale;
-Phase 1 records must reuse the spine contract. Do not start full backend
-storage/sync/OCR/search, sharding, or the runsheet walkthrough wizard unless
-explicitly directed.
+Phase 0.5 kickoff planning is recorded in `docs/rebuild-plan.md`, with aligned
+updates in `ARCHITECTURE.md`, `SECURITY.md`, `TESTING.md`, `ROADMAP.md`, and
+`CHANGELOG.md`. The plan inventories current persistence paths and Dexie
+tables, identifies `workspaces.data` as the first shard target, preserves
+existing side stores for the first slice, defines the migration/rollback and
+`.landroid` compatibility strategy, keeps local-first/offline behavior,
+requires pessimistic single-writer protection, adds a lazy blob-loading plan,
+and lists targeted tests/performance gates. Phase 0.5 must shard Dexie storage
+against the Phase 0.75 record envelope, add multi-tab protection,
+persistent-storage request, lazy PDF/blob loading, canvas viewport persistence,
+autosave timing, and iPad Pro-class Raven Forest scale; Phase 1 records must
+reuse the spine contract. Do not start full backend storage/sync/OCR/search,
+runtime sharding, or the runsheet walkthrough wizard unless explicitly
+directed.
