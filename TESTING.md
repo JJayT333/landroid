@@ -166,6 +166,8 @@ For Phase 0.5 storage sharding specifically, start with targeted coverage for:
   without changing loaded `WorkspaceData`
 - corrupt or incomplete shard rows falling back to the preserved monolithic
   backup with a visible startup warning
+- pure shard-reader coverage for complete shard loads, monolith-only loads,
+  incomplete/corrupt-shard fallback, and unrecoverable corruption
 - sharded autosave preserving the extracted debounce timing and not rewriting
   every title row for focus-only changes
 - `.landroid` v7/v8 import/export compatibility, future-version rejection, and

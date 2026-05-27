@@ -103,8 +103,9 @@ named autosave debounce constant, `src/storage/workspace-shard-migration.ts`,
 Dexie v10 shard/write-lease tables, and focused tests. No live Dexie shard
 write path, shard load path, write-lock gate, or user-visible behavior change
 is wired yet; current app load/save still uses the monolithic `workspaces.data`
-row. The current planning source of truth is `docs/rebuild-plan.md`. It
-consolidates the incremental rebuild direction:
+row. The new shard reader is pure/tested but not wired into bootstrap. The
+current planning source of truth is `docs/rebuild-plan.md`. It consolidates the
+incremental rebuild direction:
 inventory current page/workflow behavior first, then Phase 0.75 minimal backend
 spine, Phase 0.5 workspace sharding, project record schema,
 evidence-grade document vault, source attestations, import sessions, action
@@ -146,6 +147,10 @@ shards-to-monolith rollback helpers. The third slice bumps Dexie to v10,
 creates the shard/write-lease tables, backfills shard rows from existing
 monolithic `WorkspaceRecord` rows, preserves the monolith for fallback, and
 skips corrupt autosave rows with a warning instead of blocking database open.
+The shard-runtime branch adds a pure shard reader with monolith fallback:
+complete shards load, incomplete/corrupt shards recover from the monolith, and
+unrecoverable missing/corrupt fallback rows report corruption. Runtime load
+still uses the monolithic path.
 
 Current agreed rebuild sequence:
 
@@ -227,6 +232,25 @@ Phase 0.5 Dexie v10 shard-table upgrade validation on 2026-05-27:
     upgrade import.
 - `npm run test:e2e`
   - passed, 11 Chromium workflows in 24.6s, with existing Node
+    `module.register()` and FORCE_COLOR/NO_COLOR warnings.
+- `npm run deploy:check`
+  - passed; repo template still intentionally contains AI/spine Function URL
+    placeholders for fresh deploy rendering.
+
+Phase 0.5 shard-reader validation on 2026-05-27:
+
+- `npm test -- src/storage/__tests__/workspace-shard-reader.test.ts src/storage/__tests__/workspace-shards.test.ts src/storage/__tests__/workspace-shard-dexie-migration.test.ts`
+  - passed, 3 files / 16 tests.
+- `npm run lint`
+  - passed.
+- `npm test`
+  - passed, 91 files / 690 tests. Existing intentional stderr coverage for
+    simulated Dexie failures appeared.
+- `npm run build`
+  - passed with existing Vite dynamic/static import warnings, chunk-size
+    warning, and Node `module.register()` deprecation warning.
+- `npm run test:e2e`
+  - passed, 11 Chromium workflows in 25.6s, with existing Node
     `module.register()` and FORCE_COLOR/NO_COLOR warnings.
 - `npm run deploy:check`
   - passed; repo template still intentionally contains AI/spine Function URL

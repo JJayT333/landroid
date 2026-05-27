@@ -18,6 +18,10 @@ stay short.
   from existing monolithic `WorkspaceRecord` rows, keeps the monolithic row as
   the live load/save and rollback source, and skips corrupt autosave rows with
   a warning instead of blocking database open.
+- Started the Phase 0.5 shard-runtime branch with a pure shard read adapter.
+  Complete shard sets can now reconstruct `WorkspaceData`; incomplete or
+  corrupt shard sets fall back to the preserved monolithic workspace row, and
+  unrecoverable cases report corruption instead of silently opening bad data.
 
 ## 2026-05-26
 

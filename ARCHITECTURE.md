@@ -24,6 +24,10 @@ summarizes how the app is put together and where changes should live.
   defines the pure single-writer lease decision contract for the later
   multi-tab write gate. `src/storage/workspace-shard-migration.ts` defines the
   pure monolith-to-shards and shards-to-monolith rollback helpers.
+  `src/storage/workspace-shard-reader.ts` defines the pure read adapter:
+  complete shard rows reconstruct `WorkspaceData`, while incomplete/corrupt
+  shard rows fall back to the preserved monolith or report corruption when no
+  valid fallback exists.
 - Runtime target: hosted web app first, with PWA/iPad support as a product
   target. Native iOS and desktop installers are deferred unless a later
   decision gate proves they are needed.

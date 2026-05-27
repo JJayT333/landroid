@@ -1042,6 +1042,11 @@ Targeted tests and performance gates before implementation:
   shard/write-lease tables and backfills them from existing monolithic
   `WorkspaceRecord` rows. The monolithic row is preserved and remains the live
   load/save source until the shard reader/writer and write-lock gate are proven.
+- The shard reader is now implemented as a pure adapter. Complete shard rows
+  reconstruct `WorkspaceData`; incomplete/corrupt shard rows fall back to the
+  preserved monolith; missing or corrupt fallback rows report corruption. The
+  app bootstrap still does not load from shards until the runtime switch is
+  made deliberately.
 - Add storage tests for monolith-to-shard migration, corrupt-shard fallback,
   idempotent rerun, v7/v8 `.landroid` import compatibility, future-version
   rejection, and rollback-safe side-store replacement.
