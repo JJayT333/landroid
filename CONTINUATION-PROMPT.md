@@ -100,12 +100,13 @@ which is now implemented, deployed, committed, and pushed. Phase 0.5
 storage-sharding implementation has also started with pure/unwired scaffolding:
 `src/storage/workspace-shards.ts`, `src/storage/workspace-write-lock.ts`, a
 named autosave debounce constant, `src/storage/workspace-shard-migration.ts`,
-Dexie v10 shard/write-lease tables, and focused tests. No live Dexie shard
-write path, shard load path, write-lock gate, or user-visible behavior change
-is wired yet; current app load/save still uses the monolithic `workspaces.data`
-row. The new shard reader is pure/tested but not wired into bootstrap. The
-current planning source of truth is `docs/rebuild-plan.md`. It consolidates the
-incremental rebuild direction:
+Dexie v10 shard/write-lease tables, shard-first runtime workspace load, and
+focused tests. No live Dexie shard write path or write-lock gate is wired yet;
+autosave still writes the monolithic `workspaces.data` row. Runtime workspace
+load now reads complete shards first and falls back to the monolith with a
+startup warning when shards are incomplete/corrupt. The current planning source
+of truth is `docs/rebuild-plan.md`. It consolidates the incremental rebuild
+direction:
 inventory current page/workflow behavior first, then Phase 0.75 minimal backend
 spine, Phase 0.5 workspace sharding, project record schema,
 evidence-grade document vault, source attestations, import sessions, action
@@ -149,8 +150,9 @@ monolithic `WorkspaceRecord` rows, preserves the monolith for fallback, and
 skips corrupt autosave rows with a warning instead of blocking database open.
 The shard-runtime branch adds a pure shard reader with monolith fallback:
 complete shards load, incomplete/corrupt shards recover from the monolith, and
-unrecoverable missing/corrupt fallback rows report corruption. Runtime load
-still uses the monolithic path.
+unrecoverable missing/corrupt fallback rows report corruption. The
+`codex/phase-0-5-runtime-load-2026-05-28` branch wires `loadWorkspaceFromDb`
+to use the shard reader first, while keeping autosave monolith-only.
 
 Current agreed rebuild sequence:
 
@@ -251,6 +253,25 @@ Phase 0.5 shard-reader validation on 2026-05-27:
     warning, and Node `module.register()` deprecation warning.
 - `npm run test:e2e`
   - passed, 11 Chromium workflows in 25.6s, with existing Node
+    `module.register()` and FORCE_COLOR/NO_COLOR warnings.
+- `npm run deploy:check`
+  - passed; repo template still intentionally contains AI/spine Function URL
+    placeholders for fresh deploy rendering.
+
+Phase 0.5 runtime load-switch validation on 2026-05-28:
+
+- `npm test -- src/storage/__tests__/persistence-db-key.test.ts src/storage/__tests__/workspace-shard-reader.test.ts`
+  - passed, 2 files / 12 tests.
+- `npm run lint`
+  - passed.
+- `npm test`
+  - passed, 91 files / 693 tests. Existing intentional stderr coverage for
+    simulated Dexie failures appeared.
+- `npm run build`
+  - passed with existing Vite dynamic/static import warnings, chunk-size
+    warning, and Node `module.register()` deprecation warning.
+- `npm run test:e2e`
+  - passed, 11 Chromium workflows in 26.6s, with existing Node
     `module.register()` and FORCE_COLOR/NO_COLOR warnings.
 - `npm run deploy:check`
   - passed; repo template still intentionally contains AI/spine Function URL

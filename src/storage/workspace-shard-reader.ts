@@ -1,8 +1,4 @@
-import type { WorkspaceRecord } from './db';
-import {
-  parsePersistedWorkspaceData,
-  type WorkspaceData,
-} from './workspace-persistence';
+import type { WorkspaceData } from './workspace-persistence';
 import {
   restoreWorkspaceDataFromShards,
   type DeskMapShard,
@@ -19,7 +15,12 @@ export interface WorkspaceShardRows {
   nodes?: OwnershipNodeCompatShard[];
   leaseholdState?: LeaseholdStateShard | null;
   uiState?: WorkspaceUiStateShard | null;
-  monolith?: WorkspaceRecord | null;
+  monolithData?: WorkspaceData | null;
+  monolithError?: string | null;
+}
+
+export interface WorkspaceShardReaderOptions {
+  validateWorkspaceData?: (data: WorkspaceData) => WorkspaceData;
 }
 
 export type WorkspaceShardReadResult =
@@ -92,16 +93,27 @@ function requireCompleteShardSet(rows: WorkspaceShardRows): WorkspaceShardSet {
 }
 
 function readMonolith(
-  record: WorkspaceRecord | null | undefined,
+  data: WorkspaceData | null | undefined,
+  monolithError: string | null | undefined,
   warning: string | null
 ): WorkspaceShardReadResult {
-  if (!record) {
+  if (!data) {
     if (warning) {
       return {
         status: 'corrupt',
         data: null,
         warning: null,
-        error: `${warning}; no monolithic workspace backup was available.`,
+        error: monolithError
+          ? `${warning}; monolithic workspace backup was corrupt: ${monolithError}.`
+          : `${warning}; no monolithic workspace backup was available.`,
+      };
+    }
+    if (monolithError) {
+      return {
+        status: 'corrupt',
+        data: null,
+        warning: null,
+        error: `Saved workspace could not be restored because ${monolithError}.`,
       };
     }
     return {
@@ -112,38 +124,28 @@ function readMonolith(
     };
   }
 
-  try {
-    return {
-      status: warning ? 'fallback_to_monolith' : 'loaded_from_monolith',
-      data: parsePersistedWorkspaceData(record.data),
-      warning,
-      error: null,
-    };
-  } catch (error) {
-    const reason = error instanceof Error ? error.message : 'unknown corruption';
-    return {
-      status: 'corrupt',
-      data: null,
-      warning: null,
-      error: warning
-        ? `${warning}; monolithic workspace backup was corrupt: ${reason}.`
-        : `Saved workspace could not be restored because ${reason}.`,
-    };
-  }
+  return {
+    status: warning ? 'fallback_to_monolith' : 'loaded_from_monolith',
+    data,
+    warning,
+    error: null,
+  };
 }
 
 export function readWorkspaceFromShardRows(
-  rows: WorkspaceShardRows
+  rows: WorkspaceShardRows,
+  options: WorkspaceShardReaderOptions = {}
 ): WorkspaceShardReadResult {
   if (!hasAnyShardRows(rows)) {
-    return readMonolith(rows.monolith, null);
+    return readMonolith(rows.monolithData, rows.monolithError, null);
   }
 
   try {
     const shards = requireCompleteShardSet(rows);
-    const data = parsePersistedWorkspaceData(
-      JSON.stringify(restoreWorkspaceDataFromShards(shards))
-    );
+    const restored = restoreWorkspaceDataFromShards(shards);
+    const data = options.validateWorkspaceData
+      ? options.validateWorkspaceData(restored)
+      : restored;
     return {
       status: 'loaded_from_shards',
       data,
@@ -153,7 +155,8 @@ export function readWorkspaceFromShardRows(
   } catch (error) {
     const reason = error instanceof Error ? error.message : 'unknown shard error';
     return readMonolith(
-      rows.monolith,
+      rows.monolithData,
+      rows.monolithError,
       `Workspace shards could not be restored because ${reason}. LANDroid restored the preserved monolithic workspace instead`
     );
   }

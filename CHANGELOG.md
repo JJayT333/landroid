@@ -22,6 +22,10 @@ stay short.
   Complete shard sets can now reconstruct `WorkspaceData`; incomplete or
   corrupt shard sets fall back to the preserved monolithic workspace row, and
   unrecoverable cases report corruption instead of silently opening bad data.
+- Wired runtime workspace load to use the shard reader first. Complete v10
+  shards now load before the monolith; incomplete/corrupt shards fall back to
+  the monolithic row with a startup warning. Autosave still writes only the
+  monolith until the write-lease-gated shard writer lands.
 
 ## 2026-05-26
 

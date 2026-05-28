@@ -1,12 +1,21 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { CanvasSaveData } from '../../store/canvas-store';
-import type { WorkspaceData } from '../workspace-persistence';
+import {
+  LANDROID_FILE_VERSION,
+  type WorkspaceData,
+} from '../workspace-persistence';
+import { buildWorkspaceShards, type WorkspaceShardSet } from '../workspace-shards';
 
 type WorkspaceRecord = {
   id: string;
   projectName: string;
   data: string;
   savedAt: string;
+};
+
+type ShardRow = {
+  id: string;
+  workspaceId: string;
 };
 
 type CanvasRecord = {
@@ -43,16 +52,53 @@ function canvasData(): CanvasSaveData {
   };
 }
 
+function makeShardTable<Row extends ShardRow>(rows: Row[] = []) {
+  const tableRows = [...rows];
+  return {
+    toArray: vi.fn(async () => [...tableRows]),
+    where: vi.fn((field: string) => ({
+      equals: vi.fn((value: string) => ({
+        toArray: vi.fn(async () =>
+          tableRows.filter((row) =>
+            (row as unknown as Record<string, unknown>)[field] === value
+          )
+        ),
+      })),
+    })),
+  };
+}
+
+function shardRowsFromWorkspace(
+  workspace: WorkspaceData,
+  savedAt = '2026-04-25T00:00:00.000Z'
+): WorkspaceShardSet {
+  return buildWorkspaceShards(workspace, {
+    lastModified: savedAt,
+    landroidFileVersion: LANDROID_FILE_VERSION,
+    source: 'migration',
+    syncState: 'local_only',
+    legacyWorkspaceDataJson: JSON.stringify(workspace),
+  });
+}
+
 async function loadPersistenceWithKeys({
   workspaceKey,
   canvasKey,
   workspaceRecords = new Map<string, WorkspaceRecord>(),
   canvasRecords = new Map<string, CanvasRecord>(),
+  shards,
 }: {
   workspaceKey: string;
   canvasKey: string;
   workspaceRecords?: Map<string, WorkspaceRecord>;
   canvasRecords?: Map<string, CanvasRecord>;
+  shards?: WorkspaceShardSet | {
+    manifest?: WorkspaceShardSet['manifest'] | null;
+    deskMaps?: WorkspaceShardSet['deskMaps'];
+    nodes?: WorkspaceShardSet['nodes'];
+    leaseholdState?: WorkspaceShardSet['leaseholdState'] | null;
+    uiState?: WorkspaceShardSet['uiState'] | null;
+  };
 }) {
   vi.resetModules();
 
@@ -77,6 +123,17 @@ async function loadPersistenceWithKeys({
     default: {
       workspaces,
       canvases,
+      workspaceManifestShards: makeShardTable(
+        shards?.manifest ? [shards.manifest] : []
+      ),
+      deskMapShards: makeShardTable(shards?.deskMaps ?? []),
+      ownershipNodeCompatShards: makeShardTable(shards?.nodes ?? []),
+      leaseholdStateShards: makeShardTable(
+        shards?.leaseholdState ? [shards.leaseholdState] : []
+      ),
+      workspaceUiStateShards: makeShardTable(
+        shards?.uiState ? [shards.uiState] : []
+      ),
     },
   }));
 
@@ -160,5 +217,67 @@ describe('persistence db keys (audit M-1)', () => {
 
     expect(result.status).toBe('loaded');
     expect(result.data?.projectName).toBe('Alice Workspace');
+    expect(result.source).toBe('monolith');
+  });
+
+  it('loads complete shard rows before the monolithic row for the active workspace', async () => {
+    const monolithWorkspace = workspaceData('Alice Monolith Workspace');
+    const shardWorkspace = workspaceData('Alice Sharded Workspace');
+    const workspaceRecords = new Map([
+      [
+        'user-alice',
+        {
+          id: 'user-alice',
+          projectName: monolithWorkspace.projectName,
+          data: JSON.stringify(monolithWorkspace),
+          savedAt: '2026-04-25T00:00:00.000Z',
+        },
+      ],
+    ]);
+    const { workspacePersistence } = await loadPersistenceWithKeys({
+      workspaceKey: 'user-alice',
+      canvasKey: 'user-alice-canvas',
+      workspaceRecords,
+      shards: shardRowsFromWorkspace(shardWorkspace),
+    });
+
+    const result = await workspacePersistence.loadWorkspaceFromDb();
+
+    expect(result.status).toBe('loaded');
+    expect(result.source).toBe('shards');
+    expect(result.warning).toBeNull();
+    expect(result.data?.projectName).toBe('Alice Sharded Workspace');
+  });
+
+  it('falls back to the monolith with a warning when active workspace shards are incomplete', async () => {
+    const workspace = workspaceData('Alice Monolith Workspace');
+    const shards = shardRowsFromWorkspace(workspace);
+    const workspaceRecords = new Map([
+      [
+        'user-alice',
+        {
+          id: 'user-alice',
+          projectName: workspace.projectName,
+          data: JSON.stringify(workspace),
+          savedAt: '2026-04-25T00:00:00.000Z',
+        },
+      ],
+    ]);
+    const { workspacePersistence } = await loadPersistenceWithKeys({
+      workspaceKey: 'user-alice',
+      canvasKey: 'user-alice-canvas',
+      workspaceRecords,
+      shards: {
+        ...shards,
+        uiState: null,
+      },
+    });
+
+    const result = await workspacePersistence.loadWorkspaceFromDb();
+
+    expect(result.status).toBe('loaded');
+    expect(result.source).toBe('monolith');
+    expect(result.warning).toMatch(/workspace UI state shard is missing/);
+    expect(result.data?.projectName).toBe('Alice Monolith Workspace');
   });
 });

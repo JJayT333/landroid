@@ -77,6 +77,9 @@ async function bootstrapApp() {
   if (workspaceResult.status === 'corrupt' && workspaceResult.error) {
     startupWarnings.push(workspaceResult.error);
   }
+  if (workspaceResult.warning) {
+    startupWarnings.push(workspaceResult.warning);
+  }
 
   if (canvasResult.status === 'loaded' && canvasResult.data) {
     useCanvasStore.getState().loadCanvas(canvasResult.data);

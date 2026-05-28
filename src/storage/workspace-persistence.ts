@@ -1,7 +1,7 @@
 /**
  * Workspace persistence — auto-save to IndexedDB, export/import .landroid files.
  */
-import db, { type PdfAttachment } from './db';
+import db, { type PdfAttachment, type WorkspaceRecord } from './db';
 import {
   deserializeBlob,
   deserializePdfBlob,
@@ -82,6 +82,7 @@ import { normalizeTitleIssues, type TitleIssue } from '../types/title-issue';
 import { resolveActiveUnitCode } from '../utils/desk-map-units';
 import { getWorkspaceDbKey } from './active-workspace-key';
 import { LANDROID_FILE_VERSION } from './landroid-file-version';
+import { readWorkspaceFromShardRows } from './workspace-shard-reader';
 export { LANDROID_FILE_VERSION } from './landroid-file-version';
 const PAGE_SIZE_ID_SET = new Set<PageSizeId>(
   PAGE_SIZE_DEFINITIONS.map((definition) => definition.id)
@@ -125,6 +126,8 @@ export interface WorkspaceLoadResult {
   status: 'missing' | 'loaded' | 'corrupt';
   data: WorkspaceData | null;
   error: string | null;
+  warning: string | null;
+  source: 'shards' | 'monolith' | null;
 }
 
 interface SerializedOwnerDoc extends Omit<OwnerDoc, 'blob'> {
@@ -564,6 +567,86 @@ export function parsePersistedWorkspaceData(raw: string): WorkspaceData {
   return normalizeWorkspaceDataRecord(parsed as Partial<WorkspaceData>, 'Invalid saved workspace');
 }
 
+function parseWorkspaceRecord(
+  record: WorkspaceRecord | null | undefined
+): {
+  data: WorkspaceData | null;
+  error: string | null;
+} {
+  if (!record) {
+    return { data: null, error: null };
+  }
+  try {
+    return {
+      data: parsePersistedWorkspaceData(record.data),
+      error: null,
+    };
+  } catch (error) {
+    return {
+      data: null,
+      error: error instanceof Error ? error.message : 'unknown corruption',
+    };
+  }
+}
+
+async function loadWorkspaceShardRows(workspaceId: string | null): Promise<
+  Pick<
+    Parameters<typeof readWorkspaceFromShardRows>[0],
+    'manifest' | 'deskMaps' | 'nodes' | 'leaseholdState' | 'uiState'
+  >
+> {
+  let resolvedWorkspaceId = workspaceId;
+  let manifest = null;
+
+  if (resolvedWorkspaceId) {
+    const manifests = await db.workspaceManifestShards
+      .where('workspaceId')
+      .equals(resolvedWorkspaceId)
+      .toArray();
+    manifest = manifests[0] ?? null;
+  } else {
+    const manifests = await db.workspaceManifestShards.toArray();
+    if (manifests.length === 1) {
+      manifest = manifests[0];
+      resolvedWorkspaceId = manifest.workspaceId;
+    }
+  }
+
+  if (!resolvedWorkspaceId) {
+    return {
+      manifest: null,
+      deskMaps: [],
+      nodes: [],
+      leaseholdState: null,
+      uiState: null,
+    };
+  }
+
+  const [deskMaps, nodes, leaseholdStates, uiStates] = await Promise.all([
+    db.deskMapShards.where('workspaceId').equals(resolvedWorkspaceId).toArray(),
+    db.ownershipNodeCompatShards
+      .where('workspaceId')
+      .equals(resolvedWorkspaceId)
+      .toArray(),
+    db.leaseholdStateShards
+      .where('workspaceId')
+      .equals(resolvedWorkspaceId)
+      .toArray(),
+    db.workspaceUiStateShards
+      .where('workspaceId')
+      .equals(resolvedWorkspaceId)
+      .toArray(),
+  ]);
+
+  return {
+    manifest,
+    deskMaps,
+    nodes,
+    leaseholdState: leaseholdStates[0] ?? null,
+    uiState: uiStates[0] ?? null,
+  };
+}
+
 // ── Auto-save to IndexedDB ─────────────────────────────
 
 export async function saveWorkspaceToDb(data: WorkspaceData): Promise<void> {
@@ -577,28 +660,50 @@ export async function saveWorkspaceToDb(data: WorkspaceData): Promise<void> {
 
 export async function loadWorkspaceFromDb(): Promise<WorkspaceLoadResult> {
   const record = await db.workspaces.get(getWorkspaceDbKey());
-  if (!record) {
+  const monolith = parseWorkspaceRecord(record);
+  const shardRows = await loadWorkspaceShardRows(monolith.data?.workspaceId ?? null);
+  const readResult = readWorkspaceFromShardRows(
+    {
+      ...shardRows,
+      monolithData: monolith.data,
+      monolithError: monolith.error,
+    },
+    {
+      validateWorkspaceData: (data) =>
+        parsePersistedWorkspaceData(JSON.stringify(data)),
+    }
+  );
+
+  if (readResult.status === 'missing') {
     return {
       status: 'missing',
       data: null,
       error: null,
+      warning: null,
+      source: null,
     };
   }
 
-  try {
+  if (readResult.status !== 'corrupt') {
     return {
       status: 'loaded',
-      data: parsePersistedWorkspaceData(record.data),
+      data: readResult.data,
       error: null,
-    };
-  } catch (error) {
-    const reason = error instanceof Error ? error.message : 'unknown corruption';
-    return {
-      status: 'corrupt',
-      data: null,
-      error: `Saved workspace could not be restored because ${reason}. LANDroid opened a fresh workspace instead.`,
+      warning: readResult.warning,
+      source:
+        readResult.status === 'loaded_from_shards'
+          ? 'shards'
+          : 'monolith',
     };
   }
+
+  return {
+    status: 'corrupt',
+    data: null,
+    error: `${readResult.error} LANDroid opened a fresh workspace instead.`,
+    warning: null,
+    source: null,
+  };
 }
 
 // ── Export .landroid file ───────────────────────────────

@@ -31,9 +31,9 @@ session handoff lives in `CONTINUATION-PROMPT.md`.
   code slices are still behavior-preserving: backend-spine manifest and Desk
   Map shard builders, local-only compatibility rows, autosave debounce naming,
   write-lease decision logic, lazy document-registry guard tests, and the Dexie
-  v10 shard table upgrade. A pure shard reader now proves complete-shard load
-  and monolith fallback behavior, but live load/save still uses the monolithic
-  `workspaces.data` row until the runtime load switch, shard writer, and
+  v10 shard table upgrade. Runtime workspace load is now shard-first with
+  monolith fallback and startup warnings for shard fallback. Autosave still
+  writes the monolithic `workspaces.data` row until the shard writer and
   write-lock gate are proven.
 - Preserve `.landroid` package export permanently even after sync/backend work.
 - Promote the Evidence Vault contract: immutable originals, SHA-256 hashes,

@@ -19,15 +19,14 @@ summarizes how the app is put together and where changes should live.
   pure adapter from current `WorkspaceData` into backend-spine manifest and
   Desk Map envelopes plus local-only compatibility rows. `src/storage/db.ts`
   now registers the v10 shard/write-lease tables and populates shard rows from
-  existing monolithic workspace rows during upgrade, but live autosave/load
-  still reads and writes `workspaces.data`. `src/storage/workspace-write-lock.ts`
+  existing monolithic workspace rows during upgrade. Live workspace load now
+  reads complete shard rows first through `src/storage/workspace-shard-reader.ts`
+  and falls back to `workspaces.data` with a startup warning when shards are
+  incomplete/corrupt. Autosave still writes `workspaces.data` until the shard
+  writer and write-lock gate land. `src/storage/workspace-write-lock.ts`
   defines the pure single-writer lease decision contract for the later
   multi-tab write gate. `src/storage/workspace-shard-migration.ts` defines the
   pure monolith-to-shards and shards-to-monolith rollback helpers.
-  `src/storage/workspace-shard-reader.ts` defines the pure read adapter:
-  complete shard rows reconstruct `WorkspaceData`, while incomplete/corrupt
-  shard rows fall back to the preserved monolith or report corruption when no
-  valid fallback exists.
 - Runtime target: hosted web app first, with PWA/iPad support as a product
   target. Native iOS and desktop installers are deferred unless a later
   decision gate proves they are needed.

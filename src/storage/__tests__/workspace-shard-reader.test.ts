@@ -47,15 +47,6 @@ function buildWorkspace(overrides: Partial<WorkspaceData> = {}): WorkspaceData {
   };
 }
 
-function monolithRecord(workspace = buildWorkspace()) {
-  return {
-    id: 'user-alice',
-    projectName: workspace.projectName,
-    data: JSON.stringify(workspace),
-    savedAt: SAVED_AT,
-  };
-}
-
 function shardRows(workspace = buildWorkspace()) {
   const shards = buildWorkspaceShards(workspace, {
     lastModified: SAVED_AT,
@@ -70,7 +61,7 @@ function shardRows(workspace = buildWorkspace()) {
     nodes: shards.nodes,
     leaseholdState: shards.leaseholdState,
     uiState: shards.uiState,
-    monolith: monolithRecord(workspace),
+    monolithData: workspace,
   };
 }
 
@@ -87,7 +78,7 @@ describe('workspace-shard-reader', () => {
   it('loads the monolith when no shard rows exist yet', () => {
     const workspace = buildWorkspace();
     const result = readWorkspaceFromShardRows({
-      monolith: monolithRecord(workspace),
+      monolithData: workspace,
     });
 
     expect(result.status).toBe('loaded_from_monolith');
@@ -128,7 +119,7 @@ describe('workspace-shard-reader', () => {
 
     const result = readWorkspaceFromShardRows({
       ...rows,
-      monolith: null,
+      monolithData: null,
       leaseholdState: null,
     });
 
@@ -137,22 +128,33 @@ describe('workspace-shard-reader', () => {
     expect(result.error).toMatch(/no monolithic workspace backup/);
   });
 
-  it('reports corruption when fallback monolith JSON is invalid', () => {
+  it('reports corruption when fallback monolith data is invalid', () => {
     const rows = shardRows();
 
     const result = readWorkspaceFromShardRows({
       ...rows,
       uiState: null,
-      monolith: {
-        id: 'user-alice',
-        projectName: 'Broken',
-        data: '{"workspaceId":',
-        savedAt: SAVED_AT,
-      },
+      monolithData: null,
+      monolithError: 'saved workspace is not valid JSON',
     });
 
     expect(result.status).toBe('corrupt');
     expect(result.error).toMatch(/workspace UI state shard is missing/);
     expect(result.error).toMatch(/monolithic workspace backup was corrupt/);
+  });
+
+  it('validates restored shard data when a validator is supplied', () => {
+    const workspace = buildWorkspace();
+    const rows = shardRows(workspace);
+
+    const result = readWorkspaceFromShardRows(rows, {
+      validateWorkspaceData: (data) => ({
+        ...data,
+        projectName: `${data.projectName} Validated`,
+      }),
+    });
+
+    expect(result.status).toBe('loaded_from_shards');
+    expect(result.data?.projectName).toBe('Shard Reader Fixture Validated');
   });
 });
