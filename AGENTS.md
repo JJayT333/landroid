@@ -28,10 +28,61 @@ The active application surface is the repository root (`/`).
 - Do not expose or move sensitive data outside the repository unless explicitly requested.
 - Do not hand-edit generated build artifacts under `/dist` or `/dist-node` unless explicitly requested.
 
+## Conventions
+
+These are locked-in repo conventions. Do not relitigate them per session.
+
+### Commits
+- Conventional Commits, strict: `type(scope): subject`. Subject in imperative mood ("add", not "added").
+- Allowed types: `feat`, `fix`, `docs`, `chore`, `refactor`, `test`, `perf`, `ci`.
+- Scope is optional but encouraged (`feat(storage): ...`, `docs(agents): ...`).
+- Reference issues/PRs in the body, not the subject.
+- One logical change per commit. If a PR contains multiple concerns, commit them separately.
+
+### Branches
+- Pattern: `type/short-slug` (e.g. `feat/shard-writer`, `docs/conventions-lock-in`, `fix/leasehold-orri-filter`).
+- The type prefix mirrors the Conventional Commit type.
+- Slug is lowercase, hyphenated, descriptive of the work.
+- Do not use AI-generated or auto-named branches like `claude/funny-diffie-ce806a` or `codex/<random>-<date>`. If an agent tool creates such a branch, rename it before pushing or before opening a PR.
+
+### Pull requests and merging
+- All changes land via PR. Direct pushes to `main` are not allowed; `main` has branch protection.
+- Default merge strategy is squash-merge so `main`'s history stays one-commit-per-PR.
+- The squash commit message must itself be a valid Conventional Commit.
+- Auto-delete the head branch on merge.
+- PR title should be the eventual squash subject.
+
+### Tags
+- Archive branches before deletion as `archive/<slug>-<yyyy-mm-dd>` (already in use; do not delete these tags).
+- Releases use `v<semver>` (e.g. `v0.3.0`). No releases cut yet.
+
+### Phase naming
+- Use feature-named workstream tracks, not decimal phase numbers, in new docs, branches, and commit subjects.
+- Current tracks: `backend-spine`, `shard-runtime`, `doc-registry`, `evidence-vault`. Add new tracks as work begins.
+- Legacy "Phase 0", "Phase 0.5", "Phase 0.75", "Phase 5", "Phase 7A.5" references in older docs are retained for history but should not be propagated into new prose.
+
+### Documentation lifecycle
+- Active source-of-truth docs live at root or under `docs/` while their workstream is in flight.
+- Point-in-time artifacts (audit reports, handoff prompts, completed plans) move to `docs/archive/<yyyy>/` when their workstream closes.
+- Nothing inactive should sit at the repo root for more than 30 days. Either revive it, merge it into a live doc, or archive it.
+- The current target root doc set is: `AGENTS.md`, `README.md`, `ARCHITECTURE.md`, `ROADMAP.md`, `IDEAS.md`, `TESTING.md`, `SECURITY.md`, `LANDMAN-MATH-REFERENCE.md`, `CHANGELOG.md`, `CONTINUATION-PROMPT.md`. Everything else belongs under `docs/`.
+
+### Changelog
+- `CHANGELOG.md` will transition to auto-generated from Conventional Commits. Until that lands, manual entries continue.
+- Do not write a manual CHANGELOG entry that contradicts the squash commit it describes.
+
+### CI baseline
+- GitHub Actions runs on Node.js 22 against root and `backend/spine`: `npm ci`, `npm audit --omit=dev`, `npm run lint`, `npm test`, `npm run build` (root), plus backend-spine install/audit/test/build. See `.github/workflows/ci.yml`.
+- Do not propose adding CI; it exists. Propose adjustments to the existing workflow instead.
+
+### Aesthetic
+- Lean professional. No emoji in code, docs, commit messages, or PR descriptions unless the user explicitly asks for them.
+- Prefer prose with concrete file paths and short paragraphs over decorated lists.
+
 ## Instruction precedence
 - If instructions conflict, follow this order:
   1. system/developer/user chat instructions
-  2. AGENTS.md
+  2. AGENTS.md (including the Conventions section above)
   3. PROJECT_CONTEXT.md
 
 ## Delivery process
