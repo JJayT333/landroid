@@ -7,8 +7,23 @@ Use this file to resume the active workstream in a new chat. Read it with
 
 ## Current Branch
 
-Current checked-out branch:
-`codex/phase-0-5-runtime-load-2026-05-28`.
+Current checked-out branch: `feat/single-writer-readonly-ui`, stacked on
+`feat/shard-runtime-load`.
+
+Two open PRs (2026-05-29), both fully validated (lint, full test suite, build,
+e2e, deploy:check):
+
+- PR #82 (`feat/shard-runtime-load` -> `main`): the shard writer that closes the
+  edit-stranding data-loss regression. Autosave now writes the shard set in one
+  transaction behind the single-writer lease; the monolith is a frozen backup;
+  the reader is recency-aware and per-user-DB-key scoped, closing the cross-user
+  shard leak (Bug 001).
+- PR #83 (`feat/single-writer-readonly-ui` -> `feat/shard-runtime-load`, stacked):
+  the multi-tab read-only UI. A second tab opens read-only with an "editing
+  elsewhere" banner and explicit takeover; canvas autosave shares the lease gate.
+  Retarget this PR to `main` after #82 merges.
+
+Merge order: #82 first, then retarget and merge #83.
 
 Do not commit directly to `main` unless the user explicitly asks for a direct
 main push/deploy.
@@ -769,32 +784,39 @@ Prior validation from the audit/rebuild-planning checkpoint:
 
 ## Paste-Ready Next Chat Prompt
 
-Resume in `/Users/abstractmapping/projects/landroid` on
-`codex/phase-0-5-runtime-load-2026-05-28`. Read `AGENTS.md` (including the
-Conventions section), `PROJECT_CONTEXT.md`, `docs/README.md`,
+Resume in `/Users/abstractmapping/projects/landroid`. Read `AGENTS.md`
+(including the Conventions section), `PROJECT_CONTEXT.md`, `docs/README.md`,
 `DEPLOYMENT_STATE.md`, and this file before touching code.
 
-Active workstream: `shard-runtime` (Phase 0.5 storage sharding). The most
-recent slice wired `loadWorkspaceFromDb` to use the v10 shard reader first
-and fall back to the monolithic `workspaces.data` row with a startup warning
-when shards are incomplete or corrupt. Autosave still writes the monolith
-only; the shard writer and write-lease gate are the next slice.
+Active workstream: `shard-runtime` (Phase 0.5 storage sharding). The shard
+writer slice and the multi-tab read-only UI slice are both done and pushed as
+two stacked PRs (2026-05-29):
 
-Already shipped on this branch and main: Phase 0 current-behavior inventory
-closed, Phase 0.75 backend spine deployed at `/api/spine/*` against
-`landroid.abstractmapping.com`, Dexie v10 shard/write-lease tables with
-backfill from monolith, pure shard reader with monolith fallback, runtime
-load switch. Hosted smoke passed 2026-05-26.
+- PR #82 (`feat/shard-runtime-load` -> `main`): autosave writes the shard set in
+  one transaction behind the single-writer lease; the monolith is a frozen
+  backup; the reader is recency-aware and per-user-DB-key scoped (closes
+  edit-stranding data loss and the cross-user shard leak, Bug 001).
+- PR #83 (`feat/single-writer-readonly-ui` -> `feat/shard-runtime-load`,
+  stacked): a second tab opens read-only with an "editing elsewhere" banner +
+  explicit takeover; canvas autosave shares the lease gate.
 
-Latest validation (2026-05-28): `npm run lint`, full `npm test` (91 files /
-693 tests), `npm run build`, `npm run test:e2e` (11 workflows),
-`npm run deploy:check`, plus targeted reader/persistence tests.
+Merge #82 first, then retarget #83 to `main` and merge.
 
-Next slice (recommended Extra High): implement the shard writer gated by the
-single-writer lease in `src/storage/workspace-write-lock.ts`. Test the
-non-writable-tab blocked-write path, keep monolith export/import
-compatibility, and compare autosave timing against the Phase 0 perf
-baselines under `fixtures/phase-0/perf/`.
+Latest validation (2026-05-29, on `feat/single-writer-readonly-ui`):
+`npm run lint`, full `npm test` (94 files / 710 tests), `npm run build`,
+`npm run test:e2e` (11 workflows), `npm run deploy:check` — all green.
+`buildWorkspaceShards` is 0.18 ms at 1476 nodes.
+
+Recommended next slice (Extra High): lazy document/blob loading on workspace
+open (project open must not bulk-read every PDF/blob), plus a
+`navigator.storage.persist()` request for PWA/iPad. Then the browser autosave
+perf recapture at Raven Forest scale via the closeout capture script (run
+outside the sandbox), and per-view edit-control disabling for read-only tabs.
+
+Known follow-up edge: after a `.landroid` import the frozen monolith still
+points at the pre-import workspace, so a later shard corruption falls back to
+the old workspace (with a loud warning). Consider clearing/refreshing the
+monolith anchor on replacement.
 
 Holds: do not start full backend storage/sync, OCR/search, the runsheet
 walkthrough wizard, or any federal/private math without explicit direction.
