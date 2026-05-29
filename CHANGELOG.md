@@ -5,6 +5,13 @@ stay short.
 
 ## 2026-05-29
 
+- Locked the document-vault lazy-load contract with tests
+  (`document-store-lazy.test.ts`). Project open and registry listing
+  (`listDocumentRegistryData`, `listDocsForEntity`, `listAttachmentsForNodes`,
+  `getDocMeta`) return blob-free metadata; `getDocBlob` is the only explicit
+  byte path for preview/export. A reader that leaks a blob into project open now
+  fails the contract test. The blob-bearing side stores (owner docs, map assets,
+  research imports) remain a deliberately deferred, evidence-gated follow-up.
 - Added the multi-tab read-only UI on top of the single-writer lease. The lease
   is engaged at startup and after a workspace swap, and a second tab now opens
   read-only with a visible "editing elsewhere" banner and an explicit takeover

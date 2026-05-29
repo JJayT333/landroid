@@ -41,9 +41,12 @@ session handoff lives in `CONTINUATION-PROMPT.md`.
   backup the reader falls back to with a loud warning. The lease now also has a
   runtime UI: a second tab opens read-only with a visible "editing elsewhere"
   banner and an explicit takeover confirmation, and canvas autosave shares the
-  same lease gate. Remaining Phase 0.5 work: lazy blob loading,
-  persistent-storage requests, and a browser autosave-timing recapture at Raven
-  Forest scale.
+  same lease gate. The document-vault lazy-load contract is locked by tests:
+  project open and registry listing return blob-free metadata, and blob bytes
+  load only on explicit preview/export. Remaining Phase 0.5 work:
+  persistent-storage requests, a browser autosave-timing recapture at Raven
+  Forest scale, and (deferred, evidence-gated) a metadata-first conversion of
+  the blob-bearing side stores (owner docs, map assets, research imports).
 - Preserve `.landroid` package export permanently even after sync/backend work.
 - Promote the Evidence Vault contract: immutable originals, SHA-256 hashes,
   document versions, extraction runs, citation anchors, hash-continuity audit

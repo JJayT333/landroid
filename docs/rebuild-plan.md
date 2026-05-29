@@ -1027,15 +1027,26 @@ Multi-tab single-writer plan:
 Lazy document/blob loading plan:
 
 - Opening a project must load document metadata and links, not every PDF/blob.
-  `listDocumentRegistryData`, `listDocsForEntity`, and
-  `listAttachmentsForNodes` already follow this pattern for the main
-  `documents` table; Phase 0.5 should turn that into a tested contract.
+  `listDocumentRegistryData`, `listDocsForEntity`, and `listAttachmentsForNodes`
+  follow this pattern for the main `documents` table, and that behavior is now
+  locked by `document-store-lazy.test.ts`: every project-open listing reader
+  returns blob-free metadata (`Omit<DocumentRecord, 'blob'>` / attachment
+  summaries), the workspace store never retains blob bytes, and `getDocBlob` is
+  the only explicit byte path. A future reader change that leaks a blob into
+  project open now fails the contract test.
 - Single-document preview, `.landroid` export, package export, and explicit
   backup flows are allowed to read blobs because the user asked for the bytes.
 - Blob-bearing side stores (`ownerDocs`, `mapAssets`, and `researchImports`)
-  should be treated as the next lazy-load candidates. Do not redesign their UI
-  in Phase 0.5; add metadata-first readers where project-open performance or
-  memory evidence requires it.
+  remain the next lazy-load candidates and are deliberately deferred. Their
+  views (`MapsView`, `DeskMapView`, `OwnerDocsTab`, `ResearchView`) read
+  `asset.blob` / `doc.blob` synchronously, so a metadata-first conversion means
+  an async preview/parse refactor across those views — explicitly out of scope
+  for Phase 0.5 ("do not redesign their UI"). The stores currently retain the
+  Dexie Blob objects, which are lazy IndexedDB references (no bytes are read
+  until preview/export), so there is no measured project-open memory regression
+  forcing the conversion yet. Revisit when memory evidence requires it, ideally
+  by denormalizing `fileName`/`kind` onto attachment-style rows so open never
+  reads the blob-bearing tables at all.
 - Blob content hashes remain the identity bridge across Dexie blobs,
   `.landroid` package files, and later object storage.
 
