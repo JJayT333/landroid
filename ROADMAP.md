@@ -34,7 +34,11 @@ session handoff lives in `CONTINUATION-PROMPT.md`.
   v10 shard table upgrade. Runtime workspace load is now shard-first with
   monolith fallback and startup warnings for shard fallback. Autosave still
   writes the monolithic `workspaces.data` row until the shard writer and
-  write-lock gate are proven.
+  write-lock gate are proven. This interim is not safe to ship as-is: with
+  shard-first reads and monolith-only writes, the shards freeze at migration
+  time and the next reload silently discards every post-migration edit. The
+  shard-first read switch must not merge ahead of the shard writer (or a
+  monolith-newer recency check).
 - Preserve `.landroid` package export permanently even after sync/backend work.
 - Promote the Evidence Vault contract: immutable originals, SHA-256 hashes,
   document versions, extraction runs, citation anchors, hash-continuity audit

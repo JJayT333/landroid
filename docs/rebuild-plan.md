@@ -974,9 +974,15 @@ Migration and rollback strategy:
   until sharded load, autosave, `.landroid` export, and side-store reset are
   proven. Do not keep rewriting the monolith on every autosave, because that
   would preserve the scale bottleneck.
-- Make sharded load idempotent: prefer complete shard rows, fall back to the
-  legacy monolith if shard rows are absent, incomplete, or fail validation, and
-  surface a startup warning rather than silently dropping data.
+- Make sharded load idempotent and recency-aware: prefer complete shard rows
+  only when they are at least as fresh as the monolith, fall back to the legacy
+  monolith if shard rows are absent, incomplete, stale, or fail validation, and
+  surface a startup warning rather than silently dropping data. Caution: while
+  the read path is shard-first but autosave still writes only the monolith, the
+  monolith is the newer copy after any edit. Preferring shards unconditionally
+  in that window silently discards every post-migration edit on the next
+  reload. Do not switch reads to shard-first ahead of the shard writer unless a
+  monolith-newer recency check is in place first.
 - Keep `.landroid` import/export assembled through compatibility adapters.
   Existing v7/v8 reads, `version > 8` rejection, v7 PDF migration, and
   rollback-safe side-store replacement remain required. A future package-format
