@@ -7,23 +7,25 @@ Use this file to resume the active workstream in a new chat. Read it with
 
 ## Current Branch
 
-Current checked-out branch: `feat/single-writer-readonly-ui`, stacked on
-`feat/shard-runtime-load`.
+Current checked-out branch: `test/lazy-blob-contract`, top of a 3-PR stack.
 
-Two open PRs (2026-05-29), both fully validated (lint, full test suite, build,
-e2e, deploy:check):
+Three open PRs (2026-05-29), each validated (lint, test suite, build; #82/#83
+also e2e + deploy:check):
 
 - PR #82 (`feat/shard-runtime-load` -> `main`): the shard writer that closes the
-  edit-stranding data-loss regression. Autosave now writes the shard set in one
+  edit-stranding data-loss regression. Autosave writes the shard set in one
   transaction behind the single-writer lease; the monolith is a frozen backup;
   the reader is recency-aware and per-user-DB-key scoped, closing the cross-user
   shard leak (Bug 001).
-- PR #83 (`feat/single-writer-readonly-ui` -> `feat/shard-runtime-load`, stacked):
-  the multi-tab read-only UI. A second tab opens read-only with an "editing
+- PR #83 (`feat/single-writer-readonly-ui` -> `feat/shard-runtime-load`): the
+  multi-tab read-only UI. A second tab opens read-only with an "editing
   elsewhere" banner and explicit takeover; canvas autosave shares the lease gate.
-  Retarget this PR to `main` after #82 merges.
+- PR #84 (`test/lazy-blob-contract` -> `feat/single-writer-readonly-ui`): locks
+  the document-vault lazy-load contract with tests (project open returns
+  blob-free metadata; `getDocBlob` is the only byte path). Side-store
+  metadata-first conversion is deferred with rationale.
 
-Merge order: #82 first, then retarget and merge #83.
+Merge order: #82, then retarget+merge #83, then retarget+merge #84.
 
 Do not commit directly to `main` unless the user explicitly asks for a direct
 main push/deploy.
@@ -788,30 +790,24 @@ Resume in `/Users/abstractmapping/projects/landroid`. Read `AGENTS.md`
 (including the Conventions section), `PROJECT_CONTEXT.md`, `docs/README.md`,
 `DEPLOYMENT_STATE.md`, and this file before touching code.
 
-Active workstream: `shard-runtime` (Phase 0.5 storage sharding). The shard
-writer slice and the multi-tab read-only UI slice are both done and pushed as
-two stacked PRs (2026-05-29):
+Active workstream: `shard-runtime` (Phase 0.5 storage sharding). Three slices
+are done and pushed as a 3-PR stack (2026-05-29): the shard writer (#82), the
+multi-tab read-only UI (#83), and the document-vault lazy-load contract lock
+(#84). See the Current Branch section for details and merge order.
 
-- PR #82 (`feat/shard-runtime-load` -> `main`): autosave writes the shard set in
-  one transaction behind the single-writer lease; the monolith is a frozen
-  backup; the reader is recency-aware and per-user-DB-key scoped (closes
-  edit-stranding data loss and the cross-user shard leak, Bug 001).
-- PR #83 (`feat/single-writer-readonly-ui` -> `feat/shard-runtime-load`,
-  stacked): a second tab opens read-only with an "editing elsewhere" banner +
-  explicit takeover; canvas autosave shares the lease gate.
-
-Merge #82 first, then retarget #83 to `main` and merge.
-
-Latest validation (2026-05-29, on `feat/single-writer-readonly-ui`):
-`npm run lint`, full `npm test` (94 files / 710 tests), `npm run build`,
-`npm run test:e2e` (11 workflows), `npm run deploy:check` — all green.
+Latest validation (2026-05-29): `npm run lint`, full `npm test` (95 files /
+715 tests), `npm run build` — all green on `test/lazy-blob-contract`; #82/#83
+also passed `npm run test:e2e` (11 workflows) and `npm run deploy:check`.
 `buildWorkspaceShards` is 0.18 ms at 1476 nodes.
 
-Recommended next slice (Extra High): lazy document/blob loading on workspace
-open (project open must not bulk-read every PDF/blob), plus a
-`navigator.storage.persist()` request for PWA/iPad. Then the browser autosave
-perf recapture at Raven Forest scale via the closeout capture script (run
-outside the sandbox), and per-view edit-control disabling for read-only tabs.
+Recommended next slice (Extra High or medium): request
+`navigator.storage.persist()` for PWA/iPad durability (record granted/refused),
+and run the browser autosave perf recapture at Raven Forest scale via the
+closeout capture script (outside the sandbox). Lower priority and explicitly
+deferred: a metadata-first conversion of the blob-bearing side stores (owner
+docs, map assets, research imports) — needs an async preview/parse refactor of
+`MapsView`/`DeskMapView`/`OwnerDocsTab`/`ResearchView` and is evidence-gated;
+and per-view edit-control disabling for read-only tabs.
 
 Known follow-up edge: after a `.landroid` import the frozen monolith still
 points at the pre-import workspace, so a later shard corruption falls back to
