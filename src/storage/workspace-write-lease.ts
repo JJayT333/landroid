@@ -5,16 +5,20 @@
  * wires those decisions to Dexie (`workspaceWriteLeases`) and a
  * `BroadcastChannel`, so exactly one tab per workspace may write shards. The
  * contract is pessimistic: the first tab acquires the lease and stays writable;
- * later tabs are blocked until the lease expires (or is explicitly taken over)
- * and must not write. A `BroadcastChannel` gives live tabs fast notice of a
- * takeover; the TTL/expiry stored on the lease is the fallback for browsers
- * that drop broadcasts or for crashed/closed tabs.
+ * later tabs open read-only and must not write until they explicitly take over
+ * (or the writer's lease expires). A `BroadcastChannel` gives live tabs fast
+ * notice of a claim/release; the TTL/expiry stored on the lease is the fallback
+ * for browsers that drop broadcasts or for crashed/closed tabs.
  */
 import db from './db';
+import { useWriteLeaseStore } from '../store/write-lease-store';
 import {
   evaluateWorkspaceWriteLease,
   type WorkspaceWriteLease,
 } from './workspace-write-lock';
+
+/** This tab's relationship to the active workspace's write lease. */
+export type WorkspaceWriteRole = 'idle' | 'writer' | 'reader';
 
 /** Minimal `BroadcastChannel` surface so tests can inject a stub. */
 export interface LeaseBroadcastChannel {
@@ -30,6 +34,12 @@ export interface WorkspaceWriteLeaseEnv {
   saveLease: (lease: WorkspaceWriteLease) => Promise<void>;
   deleteLease: (workspaceId: string) => Promise<void>;
   createChannel?: (name: string) => LeaseBroadcastChannel | null;
+  onRoleChange?: (role: WorkspaceWriteRole, workspaceId: string | null) => void;
+}
+
+export interface EnsureWritableOptions {
+  /** Force a takeover of a peer's still-fresh lease (explicit user action). */
+  force?: boolean;
 }
 
 interface LeasePeerMessage {
@@ -43,54 +53,67 @@ function isLeasePeerMessage(value: unknown): value is LeasePeerMessage {
   return (
     typeof value === 'object'
     && value !== null
-    && (value as LeasePeerMessage).type !== undefined
+    && ((value as LeasePeerMessage).type === 'claim'
+      || (value as LeasePeerMessage).type === 'release')
     && typeof (value as LeasePeerMessage).workspaceId === 'string'
     && typeof (value as LeasePeerMessage).ownerTabId === 'string'
   );
 }
 
 export class WorkspaceWriteLeaseController {
-  private writableWorkspaceId: string | null = null;
+  private role: WorkspaceWriteRole = 'idle';
+  private engagedWorkspaceId: string | null = null;
   private channel: LeaseBroadcastChannel | null = null;
   private channelName: string | null = null;
 
   constructor(private readonly env: WorkspaceWriteLeaseEnv) {}
 
   /**
-   * Acquire or refresh the write lease for the workspace. Resolves true when
-   * this tab is the single writer, false when another live tab still holds a
-   * fresh lease and this tab must stay read-only.
+   * Acquire or refresh this tab's write lease for the workspace. Resolves true
+   * when this tab is the single writer, false when another live tab holds a
+   * fresh lease (and this tab stays read-only). Pass `{ force: true }` for an
+   * explicit user takeover of a peer's still-fresh lease.
    */
-  async ensureWritable(workspaceId: string): Promise<boolean> {
+  async ensureWritable(
+    workspaceId: string,
+    options: EnsureWritableOptions = {}
+  ): Promise<boolean> {
+    // Listen on the channel even when we end up read-only, so a reader tab
+    // hears the writer's claim/release broadcasts.
+    this.ensureChannel(workspaceId);
+
     const existing = await this.env.loadLease(workspaceId);
     const decision = evaluateWorkspaceWriteLease(existing, {
       workspaceId,
       ownerTabId: this.env.tabId,
       now: this.env.now(),
+      forceTakeover: options.force,
     });
 
     if (decision.status === 'blocked') {
-      if (this.writableWorkspaceId === workspaceId) {
-        this.writableWorkspaceId = null;
-      }
+      this.setRole('reader', workspaceId);
       return false;
     }
 
+    const wasWriter = this.role === 'writer' && this.engagedWorkspaceId === workspaceId;
     await this.env.saveLease(decision.lease);
-    this.writableWorkspaceId = workspaceId;
-    this.ensureChannel(workspaceId);
-    this.broadcast({
-      type: 'claim',
-      workspaceId,
-      ownerTabId: this.env.tabId,
-      fencingToken: decision.lease.fencingToken,
-    });
+    this.setRole('writer', workspaceId);
+    if (!wasWriter) {
+      // Only announce on a genuine transition to writer, so per-autosave
+      // refreshes do not flood peers with redundant claims.
+      this.broadcast({
+        type: 'claim',
+        workspaceId,
+        ownerTabId: this.env.tabId,
+        fencingToken: decision.lease.fencingToken,
+      });
+    }
     return true;
   }
 
-  /** Last known writable state for the workspace, without touching storage. */
+  /** True when this tab currently holds the write lease for the workspace. */
   canWrite(workspaceId: string): boolean {
-    return this.writableWorkspaceId === workspaceId;
+    return this.role === 'writer' && this.engagedWorkspaceId === workspaceId;
   }
 
   /** Release the lease if this tab owns it, so a peer can take over at once. */
@@ -105,8 +128,17 @@ export class WorkspaceWriteLeaseController {
         fencingToken: existing.fencingToken,
       });
     }
-    if (this.writableWorkspaceId === workspaceId) {
-      this.writableWorkspaceId = null;
+    if (this.engagedWorkspaceId === workspaceId) {
+      this.setRole('idle', null);
+    }
+  }
+
+  private setRole(role: WorkspaceWriteRole, workspaceId: string | null): void {
+    const changed = this.role !== role || this.engagedWorkspaceId !== workspaceId;
+    this.role = role;
+    this.engagedWorkspaceId = workspaceId;
+    if (changed) {
+      this.env.onRoleChange?.(role, workspaceId);
     }
   }
 
@@ -125,10 +157,16 @@ export class WorkspaceWriteLeaseController {
   private handlePeerMessage(data: unknown): void {
     if (!isLeasePeerMessage(data)) return;
     if (data.ownerTabId === this.env.tabId) return;
-    if (data.type === 'claim' && data.workspaceId === this.writableWorkspaceId) {
-      // A peer claimed the lease for the workspace we believed we owned. Step
-      // down to read-only; the next write re-evaluates against Dexie.
-      this.writableWorkspaceId = null;
+    if (data.workspaceId !== this.engagedWorkspaceId) return;
+
+    if (data.type === 'claim' && this.role === 'writer') {
+      // A peer claimed the lease we held; step down to read-only. The next
+      // write re-evaluates against Dexie.
+      this.setRole('reader', this.engagedWorkspaceId);
+    } else if (data.type === 'release' && this.role === 'reader') {
+      // The writer released; try to promote this read-only tab without making
+      // the user click takeover.
+      void this.ensureWritable(this.engagedWorkspaceId);
     }
   }
 
@@ -160,6 +198,9 @@ function defaultEnv(): WorkspaceWriteLeaseEnv {
       typeof BroadcastChannel !== 'undefined'
         ? (new BroadcastChannel(name) as unknown as LeaseBroadcastChannel)
         : null,
+    onRoleChange: (role, workspaceId) => {
+      useWriteLeaseStore.getState().setRole(role, workspaceId);
+    },
   };
 }
 
@@ -175,9 +216,23 @@ function getController(): WorkspaceWriteLeaseController {
 /**
  * Acquire or refresh the active tab's write lease for the workspace. Returns
  * false when another live tab holds the lease and this tab must not write.
+ * This is the gate the shard/canvas autosave paths call before writing.
  */
 export async function ensureWorkspaceWritable(workspaceId: string): Promise<boolean> {
   return getController().ensureWritable(workspaceId);
+}
+
+/**
+ * Engage the lease for the active workspace at startup / after a workspace
+ * swap, so this tab's read-only state is known before the first edit.
+ */
+export async function initWorkspaceWriteLease(workspaceId: string): Promise<boolean> {
+  return getController().ensureWritable(workspaceId);
+}
+
+/** Explicit user takeover: force this tab to become the single writer. */
+export async function takeoverWorkspaceWrite(workspaceId: string): Promise<boolean> {
+  return getController().ensureWritable(workspaceId, { force: true });
 }
 
 export async function releaseWorkspaceWriteLease(workspaceId: string): Promise<void> {
