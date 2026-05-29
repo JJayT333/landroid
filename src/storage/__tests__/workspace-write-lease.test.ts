@@ -50,7 +50,8 @@ function makeEnv(
   store: ReturnType<typeof makeLeaseStore>,
   tabId: string,
   clock: { value: number },
-  createChannel?: WorkspaceWriteLeaseEnv['createChannel']
+  createChannel?: WorkspaceWriteLeaseEnv['createChannel'],
+  onRoleChange?: WorkspaceWriteLeaseEnv['onRoleChange']
 ): WorkspaceWriteLeaseEnv {
   return {
     tabId,
@@ -59,6 +60,7 @@ function makeEnv(
     saveLease: store.save,
     deleteLease: store.del,
     createChannel,
+    onRoleChange,
   };
 }
 
@@ -142,5 +144,71 @@ describe('WorkspaceWriteLeaseController', () => {
     expect(store.leases.has('ws-1')).toBe(false);
 
     await expect(tabB.ensureWritable('ws-1')).resolves.toBe(true);
+  });
+
+  it('reports writer then reader role transitions to the UI', async () => {
+    const store = makeLeaseStore();
+    const clock = { value: 1000 };
+    const hub = makeChannelHub();
+    const rolesA: string[] = [];
+    const tabA = new WorkspaceWriteLeaseController(
+      makeEnv(store, 'tab-a', clock, hub.createFor('tab-a'), (role) =>
+        rolesA.push(role)
+      )
+    );
+    const tabB = new WorkspaceWriteLeaseController(
+      makeEnv(store, 'tab-b', clock, hub.createFor('tab-b'))
+    );
+
+    await tabA.ensureWritable('ws-1');
+    clock.value = 1000 + WORKSPACE_WRITE_LEASE_TTL_MS + 1;
+    await tabB.ensureWritable('ws-1');
+
+    // Per-autosave refreshes do not re-fire; only genuine transitions report.
+    expect(rolesA).toEqual(['writer', 'reader']);
+  });
+
+  it('lets a read-only tab force a takeover on explicit request', async () => {
+    const store = makeLeaseStore();
+    const clock = { value: 1000 };
+    const hub = makeChannelHub();
+    const tabA = new WorkspaceWriteLeaseController(
+      makeEnv(store, 'tab-a', clock, hub.createFor('tab-a'))
+    );
+    const tabB = new WorkspaceWriteLeaseController(
+      makeEnv(store, 'tab-b', clock, hub.createFor('tab-b'))
+    );
+
+    await tabA.ensureWritable('ws-1');
+    // Lease is still fresh, so a normal attempt is blocked.
+    await expect(tabB.ensureWritable('ws-1')).resolves.toBe(false);
+    // Explicit takeover forces it through and steps tab-a down.
+    await expect(tabB.ensureWritable('ws-1', { force: true })).resolves.toBe(true);
+    expect(tabB.canWrite('ws-1')).toBe(true);
+    expect(tabA.canWrite('ws-1')).toBe(false);
+    expect(store.leases.get('ws-1')).toMatchObject({ ownerTabId: 'tab-b' });
+  });
+
+  it('auto-promotes a read-only tab when the writer releases', async () => {
+    const store = makeLeaseStore();
+    const clock = { value: 1000 };
+    const hub = makeChannelHub();
+    const tabA = new WorkspaceWriteLeaseController(
+      makeEnv(store, 'tab-a', clock, hub.createFor('tab-a'))
+    );
+    const tabB = new WorkspaceWriteLeaseController(
+      makeEnv(store, 'tab-b', clock, hub.createFor('tab-b'))
+    );
+
+    await tabA.ensureWritable('ws-1');
+    await tabB.ensureWritable('ws-1'); // blocked -> reader, listening
+    expect(tabB.canWrite('ws-1')).toBe(false);
+
+    await tabA.release('ws-1');
+    // tab-a's release broadcast prompts tab-b to claim without user action.
+    // The promotion runs fire-and-forget from the message handler; flush it.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(tabB.canWrite('ws-1')).toBe(true);
+    expect(store.leases.get('ws-1')).toMatchObject({ ownerTabId: 'tab-b' });
   });
 });
