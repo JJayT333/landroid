@@ -31,14 +31,17 @@ session handoff lives in `CONTINUATION-PROMPT.md`.
   code slices are still behavior-preserving: backend-spine manifest and Desk
   Map shard builders, local-only compatibility rows, autosave debounce naming,
   write-lease decision logic, lazy document-registry guard tests, and the Dexie
-  v10 shard table upgrade. Runtime workspace load is now shard-first with
-  monolith fallback and startup warnings for shard fallback. Autosave still
-  writes the monolithic `workspaces.data` row until the shard writer and
-  write-lock gate are proven. This interim is not safe to ship as-is: with
-  shard-first reads and monolith-only writes, the shards freeze at migration
-  time and the next reload silently discards every post-migration edit. The
-  shard-first read switch must not merge ahead of the shard writer (or a
-  monolith-newer recency check).
+  v10 shard table upgrade. Runtime workspace load is shard-first with monolith
+  fallback and startup warnings for shard fallback. The edit-stranding
+  regression is now resolved: autosave writes the shard set (gated by the
+  single-writer lease) instead of the monolith, the reader is recency-aware
+  (a strictly newer monolith wins over stale shards), and shard reads/writes
+  are scoped by the active per-user DB key, which also closes the cross-user
+  shard leak. The monolithic `workspaces.data` row is now a frozen migration
+  backup the reader falls back to with a loud warning. Remaining Phase 0.5
+  work: a visible read-only/"editing elsewhere" banner for non-writer tabs,
+  canvas-autosave lease gating, lazy blob loading, and persistent-storage
+  requests.
 - Preserve `.landroid` package export permanently even after sync/backend work.
 - Promote the Evidence Vault contract: immutable originals, SHA-256 hashes,
   document versions, extraction runs, citation anchors, hash-continuity audit

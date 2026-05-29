@@ -3,6 +3,25 @@
 This file records meaningful project changes so `CONTINUATION-PROMPT.md` can
 stay short.
 
+## 2026-05-29
+
+- Landed the Phase 0.5 shard writer and closed the edit-stranding data-loss
+  regression. Workspace autosave now rebuilds the shard set with
+  `buildWorkspaceShards` and writes all five shard tables in one Dexie
+  transaction, so edit then reload returns the edit instead of the
+  v10-migration snapshot. The monolithic `workspaces` row is no longer
+  rewritten on autosave; it stays a frozen migration backup the reader falls
+  back to with a loud warning.
+- Made the shard reader recency-aware: a strictly newer monolith now wins over
+  stale shards instead of being discarded.
+- Gated shard writes behind the single-writer lease (`BroadcastChannel` plus
+  Dexie expiry). The first tab is the single writer; later tabs stay read-only
+  and write nothing until the lease expires or is taken over.
+- Scoped shard reads and writes by the active per-user DB key, stamped on the
+  manifest, and clear the active key's shard rows on workspace replacement and
+  sign-out. This closes the cross-user shard leak (Bug 001): a fresh hosted
+  user can no longer adopt the previous user's workspace.
+
 ## 2026-05-27
 
 - Added the first Phase 0.5 storage-sharding scaffolding without wiring it into

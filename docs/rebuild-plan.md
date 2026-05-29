@@ -977,12 +977,13 @@ Migration and rollback strategy:
 - Make sharded load idempotent and recency-aware: prefer complete shard rows
   only when they are at least as fresh as the monolith, fall back to the legacy
   monolith if shard rows are absent, incomplete, stale, or fail validation, and
-  surface a startup warning rather than silently dropping data. Caution: while
-  the read path is shard-first but autosave still writes only the monolith, the
-  monolith is the newer copy after any edit. Preferring shards unconditionally
-  in that window silently discards every post-migration edit on the next
-  reload. Do not switch reads to shard-first ahead of the shard writer unless a
-  monolith-newer recency check is in place first.
+  surface a startup warning rather than silently dropping data. This recency
+  check is now implemented in `readWorkspaceFromShardRows` and was the gate that
+  made the shard-first read safe to pair with the shard writer. (History: while
+  the read path was shard-first but autosave still wrote only the monolith, the
+  monolith was the newer copy after any edit, so preferring shards
+  unconditionally stranded every post-migration edit on reload. The shard writer
+  plus the recency check close that window.)
 - Keep `.landroid` import/export assembled through compatibility adapters.
   Existing v7/v8 reads, `version > 8` rejection, v7 PDF migration, and
   rollback-safe side-store replacement remain required. A future package-format
@@ -1051,9 +1052,25 @@ Targeted tests and performance gates before implementation:
 - The shard reader is now implemented as a pure adapter. Complete shard rows
   reconstruct `WorkspaceData`; incomplete/corrupt shard rows fall back to the
   preserved monolith; missing or corrupt fallback rows report corruption. The
-  runtime load path now uses this reader shard-first and surfaces fallback
-  warnings through the startup warning channel. Autosave still writes the
-  monolith until the shard writer and write-lock gate land.
+  runtime load path uses this reader shard-first and surfaces fallback warnings
+  through the startup warning channel.
+- The shard writer slice is now landed and the edit-stranding regression is
+  resolved. Autosave (`src/main.tsx`) calls `saveWorkspaceShardsToDb`, which
+  rebuilds the shard set with `buildWorkspaceShards` and writes all five shard
+  tables in one `db.transaction('rw', …)` so a mid-write failure cannot leave a
+  partial set. The monolith is no longer rewritten on autosave; it stays a
+  frozen migration backup the reader falls back to with a loud warning. The
+  reader is recency-aware — a strictly newer monolith wins over stale shards —
+  and resolves shards by the active per-user DB key (`getWorkspaceDbKey()`)
+  stamped on the manifest. That key scoping plus a refusal to adopt a foreign
+  manifest when the current user's monolith is absent closes the cross-user
+  shard leak (Bug 001). Shard writes are gated by the single-writer lease
+  (`workspace-write-lease.ts`, `BroadcastChannel` + Dexie expiry); a non-writer
+  tab returns `blocked` and writes nothing. `replaceWorkspaceSideStores` clears
+  the active key's shard rows on workspace replacement / sign-out. Deferred to a
+  follow-up: a visible read-only/"editing elsewhere" banner, canvas-autosave
+  lease gating, and a browser autosave-timing recapture against the Raven Forest
+  perf baseline (`buildWorkspaceShards` itself is sub-millisecond at 1476 nodes).
 - Add storage tests for monolith-to-shard migration, corrupt-shard fallback,
   idempotent rerun, v7/v8 `.landroid` import compatibility, future-version
   rejection, and rollback-safe side-store replacement.
