@@ -38,10 +38,12 @@ session handoff lives in `CONTINUATION-PROMPT.md`.
   (a strictly newer monolith wins over stale shards), and shard reads/writes
   are scoped by the active per-user DB key, which also closes the cross-user
   shard leak. The monolithic `workspaces.data` row is now a frozen migration
-  backup the reader falls back to with a loud warning. Remaining Phase 0.5
-  work: a visible read-only/"editing elsewhere" banner for non-writer tabs,
-  canvas-autosave lease gating, lazy blob loading, and persistent-storage
-  requests.
+  backup the reader falls back to with a loud warning. The lease now also has a
+  runtime UI: a second tab opens read-only with a visible "editing elsewhere"
+  banner and an explicit takeover confirmation, and canvas autosave shares the
+  same lease gate. Remaining Phase 0.5 work: lazy blob loading,
+  persistent-storage requests, and a browser autosave-timing recapture at Raven
+  Forest scale.
 - Preserve `.landroid` package export permanently even after sync/backend work.
 - Promote the Evidence Vault contract: immutable originals, SHA-256 hashes,
   document versions, extraction runs, citation anchors, hash-continuity audit
