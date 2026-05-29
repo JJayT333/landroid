@@ -59,32 +59,40 @@ function makeTable(initial: FakeRow[] = []): FakeTable {
   return table;
 }
 
-function makeWriterDb(seed: Partial<Record<ShardTableName, FakeRow[]>> = {}) {
+function makeWriterDb(
+  seed: Partial<Record<ShardTableName | 'workspaces', FakeRow[]>> = {}
+) {
   const tables = {} as Record<ShardTableName, FakeTable>;
   for (const name of SHARD_TABLE_NAMES) {
     tables[name] = makeTable(seed[name] ?? []);
   }
+  // The shard writer also anchors the monolithic backup row on a workspace
+  // change. No prior load ran in these tests, so every write re-anchors it.
+  const workspaces = makeTable(seed.workspaces ?? []);
+  const snapshotNames = [...SHARD_TABLE_NAMES, 'workspaces'] as const;
+  const allTables: Record<string, FakeTable> = { ...tables, workspaces };
   const db = {
     ...tables,
+    workspaces,
     // Emulate Dexie transaction atomicity: snapshot every table before the
     // callback runs and restore on throw so a failed write rolls back.
     transaction: vi.fn(async (_mode: string, ...args: unknown[]) => {
       const callback = args.at(-1);
       if (typeof callback !== 'function') throw new Error('missing callback');
-      const snapshots = SHARD_TABLE_NAMES.map(
-        (name) => new Map(tables[name].rows)
+      const snapshots = snapshotNames.map(
+        (name) => new Map(allTables[name].rows)
       );
       try {
         return await callback();
       } catch (error) {
-        SHARD_TABLE_NAMES.forEach((name, index) => {
-          tables[name].rows = snapshots[index];
+        snapshotNames.forEach((name, index) => {
+          allTables[name].rows = snapshots[index];
         });
         throw error;
       }
     }),
   };
-  return { db, tables };
+  return { db, tables, workspaces };
 }
 
 function workspaceWithContent(projectName = 'Writer Workspace'): WorkspaceData {

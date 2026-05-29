@@ -676,16 +676,28 @@ function defaultShardTimestamp(): string {
 }
 
 /**
+ * The workspace id the monolithic backup row for the active DB key currently
+ * describes, tracked in-memory so the shard writer can re-anchor it exactly
+ * once when the active workspace changes (import / CSV / fresh install).
+ * `loadWorkspaceFromDb` seeds it from the row it reads; `undefined` means
+ * "not yet observed this session".
+ */
+let anchoredMonolithWorkspaceId: string | null | undefined;
+
+/**
  * Autosave path (Phase 0.5): rebuild the workspace shard set from the current
  * {@link WorkspaceData} and write all five shard tables in a single Dexie
  * transaction so a mid-write failure cannot leave an incomplete set. The write
  * is gated by the single-writer lease — a read-only tab returns
  * `{ status: 'blocked' }` without touching storage.
  *
- * The monolithic `workspaces` row is intentionally NOT rewritten here. It stays
- * a frozen migration-time backup; rewriting it on every autosave would preserve
- * the scale bottleneck Phase 0.5 exists to remove. The reader treats that
- * frozen row as a last-resort fallback and warns loudly when it is used.
+ * The monolithic `workspaces` row is not rewritten on every autosave (that
+ * would preserve the scale bottleneck Phase 0.5 removes). It is re-anchored at
+ * most once per workspace change so the frozen backup always describes the
+ * CURRENT workspace: after a `.landroid` import replaces workspace A with B, a
+ * later shard corruption must fall back to B, not the stale pre-import A. For a
+ * migrated workspace edited in place, the workspace id is unchanged so the
+ * migration-time backup is left untouched.
  */
 export async function saveWorkspaceShardsToDb(
   data: WorkspaceData,
@@ -706,10 +718,14 @@ export async function saveWorkspaceShardsToDb(
   });
   const manifest: WorkspaceManifestShard = { ...shards.manifest, dbKey };
   const { workspaceId } = data;
+  // Re-anchor the monolithic backup only when it does not already describe this
+  // workspace (a fresh install, or an import/CSV that swapped the workspace).
+  const shouldAnchorMonolith = anchoredMonolithWorkspaceId !== workspaceId;
 
   await db.transaction(
     'rw',
     [
+      db.workspaces,
       db.workspaceManifestShards,
       db.deskMapShards,
       db.ownershipNodeCompatShards,
@@ -735,9 +751,20 @@ export async function saveWorkspaceShardsToDb(
       }
       await db.leaseholdStateShards.put(shards.leaseholdState);
       await db.workspaceUiStateShards.put(shards.uiState);
+      if (shouldAnchorMonolith) {
+        await db.workspaces.put({
+          id: dbKey,
+          projectName: data.projectName,
+          data: JSON.stringify(data),
+          savedAt: lastModified,
+        });
+      }
     }
   );
 
+  if (shouldAnchorMonolith) {
+    anchoredMonolithWorkspaceId = workspaceId;
+  }
   return { status: 'written' };
 }
 
@@ -795,6 +822,9 @@ export async function loadWorkspaceFromDb(): Promise<WorkspaceLoadResult> {
   const dbKey = getWorkspaceDbKey();
   const record = await db.workspaces.get(dbKey);
   const monolith = parseWorkspaceRecord(record);
+  // Seed the anchor tracker from the row we just read so the next shard write
+  // only re-anchors the backup if the active workspace actually changes.
+  anchoredMonolithWorkspaceId = monolith.data?.workspaceId ?? null;
   const shardRows = await loadWorkspaceShardRows({
     dbKey,
     monolithWorkspaceId: monolith.data?.workspaceId ?? null,

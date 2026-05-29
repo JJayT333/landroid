@@ -419,4 +419,78 @@ describe('persistence db keys (audit M-1)', () => {
     expect(reloaded.source).toBe('shards');
     expect(reloaded.data?.projectName).toBe('Edited Workspace');
   });
+
+  it('leaves the migration backup untouched when the same workspace is edited', async () => {
+    const migrated = workspaceData('Original Workspace');
+    const workspaceRecords = new Map([
+      [
+        'user-alice',
+        {
+          id: 'user-alice',
+          projectName: migrated.projectName,
+          data: JSON.stringify(migrated),
+          savedAt: '2026-04-25T00:00:00.000Z',
+        },
+      ],
+    ]);
+    const { workspacePersistence } = await loadPersistenceWithKeys({
+      workspaceKey: 'user-alice',
+      canvasKey: 'user-alice-canvas',
+      workspaceRecords,
+      shards: shardRowsFromWorkspace(migrated, '2026-04-25T00:00:00.000Z'),
+    });
+
+    await workspacePersistence.loadWorkspaceFromDb();
+    await workspacePersistence.saveWorkspaceShardsToDb(
+      { ...migrated, projectName: 'Edited In Place' },
+      { ensureWritable: async () => true, now: () => '2026-06-01T00:00:00.000Z' }
+    );
+
+    // Same workspace id -> the frozen migration backup is not rewritten.
+    const monolith = workspaceRecords.get('user-alice')!;
+    expect(monolith.savedAt).toBe('2026-04-25T00:00:00.000Z');
+    expect(JSON.parse(monolith.data).projectName).toBe('Original Workspace');
+  });
+
+  it('re-anchors the monolith to an imported workspace and falls back to it, not the pre-import one', async () => {
+    const original = workspaceData('Original Workspace');
+    const workspaceRecords = new Map([
+      [
+        'user-alice',
+        {
+          id: 'user-alice',
+          projectName: original.projectName,
+          data: JSON.stringify(original),
+          savedAt: '2026-04-25T00:00:00.000Z',
+        },
+      ],
+    ]);
+    const { workspacePersistence, db } = await loadPersistenceWithKeys({
+      workspaceKey: 'user-alice',
+      canvasKey: 'user-alice-canvas',
+      workspaceRecords,
+      shards: shardRowsFromWorkspace(original, '2026-04-25T00:00:00.000Z'),
+    });
+
+    await workspacePersistence.loadWorkspaceFromDb();
+
+    // Import replaces the active workspace (different workspaceId).
+    const imported = { ...workspaceData('Imported Workspace'), workspaceId: 'ws-imported' };
+    await workspacePersistence.saveWorkspaceShardsToDb(imported, {
+      ensureWritable: async () => true,
+      now: () => '2026-06-01T00:00:00.000Z',
+    });
+
+    // The backup row now describes the imported workspace, not the old one.
+    const monolith = workspaceRecords.get('user-alice')!;
+    expect(JSON.parse(monolith.data).workspaceId).toBe('ws-imported');
+
+    // Force the imported shard set to be incomplete, then reload: the fallback
+    // must land on the imported workspace, never the stale pre-import one.
+    db.workspaceUiStateShards.rows.clear();
+    const reloaded = await workspacePersistence.loadWorkspaceFromDb();
+    expect(reloaded.status).toBe('loaded');
+    expect(reloaded.source).toBe('monolith');
+    expect(reloaded.data?.projectName).toBe('Imported Workspace');
+  });
 });
