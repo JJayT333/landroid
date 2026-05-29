@@ -21,6 +21,9 @@ jobs:
         with:
           node-version: 22
           cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            backend/spine/package-lock.json
 
       - name: Install
         run: npm ci
