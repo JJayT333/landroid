@@ -17,6 +17,8 @@ export interface WorkspaceShardRows {
   uiState?: WorkspaceUiStateShard | null;
   monolithData?: WorkspaceData | null;
   monolithError?: string | null;
+  /** ISO timestamp of the preserved monolithic backup row, for the recency guard. */
+  monolithSavedAt?: string | null;
 }
 
 export interface WorkspaceShardReaderOptions {
@@ -153,6 +155,23 @@ export function readWorkspaceFromShardRows(
 
   try {
     const shards = requireCompleteShardSet(rows);
+    // Recency guard. Autosave writes shards, not the monolith, so shards are
+    // normally at least as fresh as the preserved backup. If the monolith is
+    // strictly newer, the shards are stale (e.g. an older monolith-only build
+    // saved after these shards were written). Prefer the newer monolith and
+    // warn loudly rather than silently reloading a stale pre-edit snapshot.
+    if (
+      rows.monolithData
+      && rows.monolithSavedAt
+      && shards.manifest.backendRecord.lastModified < rows.monolithSavedAt
+    ) {
+      return readMonolith(
+        rows.monolithData,
+        rows.monolithError,
+        'Workspace shards were older than the preserved monolithic workspace backup. '
+          + 'LANDroid restored the newer saved workspace instead'
+      );
+    }
     const restored = restoreWorkspaceDataFromShards(shards);
     const data = options.validateWorkspaceData
       ? options.validateWorkspaceData(restored)

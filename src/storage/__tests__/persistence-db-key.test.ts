@@ -52,18 +52,38 @@ function canvasData(): CanvasSaveData {
   };
 }
 
-function makeShardTable<Row extends ShardRow>(rows: Row[] = []) {
-  const tableRows = [...rows];
+// A small in-memory Dexie table double that supports the read/write surface
+// the shard reader and shard writer touch: toArray, get, put, bulkPut, and
+// where(field).equals(value).{toArray,delete}.
+function makeShardTable<Row extends ShardRow>(initial: Row[] = []) {
+  const rows = new Map<string, Row>();
+  for (const row of initial) rows.set(row.id, row);
+
+  const collection = (predicate: (row: Row) => boolean) => ({
+    toArray: vi.fn(async () => [...rows.values()].filter(predicate)),
+    delete: vi.fn(async () => {
+      for (const [key, row] of [...rows.entries()]) {
+        if (predicate(row)) rows.delete(key);
+      }
+    }),
+  });
+
   return {
-    toArray: vi.fn(async () => [...tableRows]),
+    rows,
+    toArray: vi.fn(async () => [...rows.values()]),
+    get: vi.fn(async (id: string) => rows.get(id)),
+    put: vi.fn(async (row: Row) => {
+      rows.set(row.id, row);
+    }),
+    bulkPut: vi.fn(async (newRows: Row[]) => {
+      for (const row of newRows) rows.set(row.id, row);
+    }),
     where: vi.fn((field: string) => ({
-      equals: vi.fn((value: string) => ({
-        toArray: vi.fn(async () =>
-          tableRows.filter((row) =>
-            (row as unknown as Record<string, unknown>)[field] === value
-          )
-        ),
-      })),
+      equals: vi.fn((value: unknown) =>
+        collection(
+          (row) => (row as unknown as Record<string, unknown>)[field] === value
+        )
+      ),
     })),
   };
 }
@@ -115,32 +135,41 @@ async function loadPersistenceWithKeys({
     get: vi.fn(async (id: string) => canvasRecords.get(id)),
   };
 
+  const db = {
+    workspaces,
+    canvases,
+    workspaceManifestShards: makeShardTable(
+      shards?.manifest ? [shards.manifest] : []
+    ),
+    deskMapShards: makeShardTable(shards?.deskMaps ?? []),
+    ownershipNodeCompatShards: makeShardTable(shards?.nodes ?? []),
+    leaseholdStateShards: makeShardTable(
+      shards?.leaseholdState ? [shards.leaseholdState] : []
+    ),
+    workspaceUiStateShards: makeShardTable(
+      shards?.uiState ? [shards.uiState] : []
+    ),
+    transaction: vi.fn(async (_mode: string, ...args: unknown[]) => {
+      const callback = args.at(-1);
+      if (typeof callback !== 'function') {
+        throw new Error('transaction callback missing');
+      }
+      return callback();
+    }),
+  };
+
   vi.doMock('../active-workspace-key', () => ({
     getWorkspaceDbKey: () => workspaceKey,
     getCanvasDbKey: () => canvasKey,
   }));
-  vi.doMock('../db', () => ({
-    default: {
-      workspaces,
-      canvases,
-      workspaceManifestShards: makeShardTable(
-        shards?.manifest ? [shards.manifest] : []
-      ),
-      deskMapShards: makeShardTable(shards?.deskMaps ?? []),
-      ownershipNodeCompatShards: makeShardTable(shards?.nodes ?? []),
-      leaseholdStateShards: makeShardTable(
-        shards?.leaseholdState ? [shards.leaseholdState] : []
-      ),
-      workspaceUiStateShards: makeShardTable(
-        shards?.uiState ? [shards.uiState] : []
-      ),
-    },
-  }));
+  vi.doMock('../db', () => ({ default: db }));
 
   const workspacePersistence = await import('../workspace-persistence');
   const canvasPersistence = await import('../canvas-persistence');
-  return { workspacePersistence, canvasPersistence, workspaces, canvases };
+  return { workspacePersistence, canvasPersistence, db, workspaces, canvases };
 }
+
+const ALWAYS_WRITABLE = { ensureWritable: async () => true };
 
 describe('persistence db keys (audit M-1)', () => {
   afterEach(() => {
@@ -149,18 +178,24 @@ describe('persistence db keys (audit M-1)', () => {
     vi.resetModules();
   });
 
-  it('writes workspace and canvas rows under the active per-user keys', async () => {
-    const { workspacePersistence, canvasPersistence, workspaces, canvases } =
+  it('writes workspace shard rows and the canvas row under the active per-user keys', async () => {
+    const { workspacePersistence, canvasPersistence, db, canvases } =
       await loadPersistenceWithKeys({
         workspaceKey: 'user-alice',
         canvasKey: 'user-alice-canvas',
       });
 
-    await workspacePersistence.saveWorkspaceToDb(workspaceData());
+    const result = await workspacePersistence.saveWorkspaceShardsToDb(
+      workspaceData(),
+      ALWAYS_WRITABLE
+    );
     await canvasPersistence.saveCanvasToDb(canvasData());
 
-    expect(workspaces.put).toHaveBeenCalledWith(
-      expect.objectContaining({ id: 'user-alice' })
+    expect(result.status).toBe('written');
+    const manifests = await db.workspaceManifestShards.toArray();
+    expect(manifests).toHaveLength(1);
+    expect(manifests[0]).toEqual(
+      expect.objectContaining({ workspaceId: 'ws-1', dbKey: 'user-alice' })
     );
     expect(canvases.put).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'user-alice-canvas' })
@@ -220,7 +255,40 @@ describe('persistence db keys (audit M-1)', () => {
     expect(result.source).toBe('monolith');
   });
 
-  it('loads complete shard rows before the monolithic row for the active workspace', async () => {
+  it('prefers a newer monolith over stale shards instead of stranding the edit', async () => {
+    // Post-fix recency contract. Before the shard writer landed, the reader
+    // preferred complete shards unconditionally — so a newer monolith (the only
+    // copy autosave updated) was silently discarded on reload. The reader must
+    // now keep the newer copy.
+    const monolithWorkspace = workspaceData('Newer Monolith Workspace');
+    const shardWorkspace = workspaceData('Stale Sharded Workspace');
+    const workspaceRecords = new Map([
+      [
+        'user-alice',
+        {
+          id: 'user-alice',
+          projectName: monolithWorkspace.projectName,
+          data: JSON.stringify(monolithWorkspace),
+          savedAt: '2026-05-01T00:00:00.000Z',
+        },
+      ],
+    ]);
+    const { workspacePersistence } = await loadPersistenceWithKeys({
+      workspaceKey: 'user-alice',
+      canvasKey: 'user-alice-canvas',
+      workspaceRecords,
+      shards: shardRowsFromWorkspace(shardWorkspace, '2026-04-25T00:00:00.000Z'),
+    });
+
+    const result = await workspacePersistence.loadWorkspaceFromDb();
+
+    expect(result.status).toBe('loaded');
+    expect(result.source).toBe('monolith');
+    expect(result.warning).toMatch(/older than the preserved monolithic/);
+    expect(result.data?.projectName).toBe('Newer Monolith Workspace');
+  });
+
+  it('loads complete shard rows when they are at least as fresh as the monolith', async () => {
     const monolithWorkspace = workspaceData('Alice Monolith Workspace');
     const shardWorkspace = workspaceData('Alice Sharded Workspace');
     const workspaceRecords = new Map([
@@ -238,7 +306,7 @@ describe('persistence db keys (audit M-1)', () => {
       workspaceKey: 'user-alice',
       canvasKey: 'user-alice-canvas',
       workspaceRecords,
-      shards: shardRowsFromWorkspace(shardWorkspace),
+      shards: shardRowsFromWorkspace(shardWorkspace, '2026-05-10T00:00:00.000Z'),
     });
 
     const result = await workspacePersistence.loadWorkspaceFromDb();
@@ -279,5 +347,76 @@ describe('persistence db keys (audit M-1)', () => {
     expect(result.source).toBe('monolith');
     expect(result.warning).toMatch(/workspace UI state shard is missing/);
     expect(result.data?.projectName).toBe('Alice Monolith Workspace');
+  });
+
+  it('surfaces a fresh hosted user as missing instead of adopting another user\'s shards (Bug 001)', async () => {
+    // Alice has saved shards stamped with her own DB key. Bob signs in on the
+    // same browser profile with no monolith of his own. The reader must not
+    // hand Bob the only manifest in the table.
+    const aliceWorkspace = workspaceData('Alice Private Workspace');
+    const aliceShards = shardRowsFromWorkspace(aliceWorkspace);
+    aliceShards.manifest.dbKey = 'user-alice';
+    const workspaceRecords = new Map([
+      [
+        'user-alice',
+        {
+          id: 'user-alice',
+          projectName: aliceWorkspace.projectName,
+          data: JSON.stringify(aliceWorkspace),
+          savedAt: '2026-04-25T00:00:00.000Z',
+        },
+      ],
+    ]);
+    const { workspacePersistence } = await loadPersistenceWithKeys({
+      workspaceKey: 'user-bob',
+      canvasKey: 'user-bob-canvas',
+      workspaceRecords,
+      shards: aliceShards,
+    });
+
+    const result = await workspacePersistence.loadWorkspaceFromDb();
+
+    expect(result.status).toBe('missing');
+    expect(result.data).toBeNull();
+  });
+
+  it('keeps a post-migration edit on reload (v9->v10 regression)', async () => {
+    // Simulate a v9->v10 migrated workspace: a frozen monolith plus migration
+    // -time shards (no dbKey) that match the monolith. After an edit is
+    // autosaved through the shard writer, reload must return the edit.
+    const migrated = workspaceData('Migrated Workspace');
+    const workspaceRecords = new Map([
+      [
+        'user-alice',
+        {
+          id: 'user-alice',
+          projectName: migrated.projectName,
+          data: JSON.stringify(migrated),
+          savedAt: '2026-04-25T00:00:00.000Z',
+        },
+      ],
+    ]);
+    const { workspacePersistence } = await loadPersistenceWithKeys({
+      workspaceKey: 'user-alice',
+      canvasKey: 'user-alice-canvas',
+      workspaceRecords,
+      shards: shardRowsFromWorkspace(migrated, '2026-04-25T00:00:00.000Z'),
+    });
+
+    const initial = await workspacePersistence.loadWorkspaceFromDb();
+    expect(initial.status).toBe('loaded');
+    expect(initial.data?.projectName).toBe('Migrated Workspace');
+
+    const edited = { ...migrated, projectName: 'Edited Workspace' };
+    const writeResult = await workspacePersistence.saveWorkspaceShardsToDb(edited, {
+      ensureWritable: async () => true,
+      now: () => '2026-06-01T00:00:00.000Z',
+    });
+    expect(writeResult.status).toBe('written');
+
+    const reloaded = await workspacePersistence.loadWorkspaceFromDb();
+    expect(reloaded.status).toBe('loaded');
+    expect(reloaded.source).toBe('shards');
+    expect(reloaded.data?.projectName).toBe('Edited Workspace');
   });
 });

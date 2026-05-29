@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   exportMapWorkspaceData: vi.fn(),
   exportResearchWorkspaceData: vi.fn(),
   exportCurativeWorkspaceData: vi.fn(),
+  clearWorkspaceShardsForActiveKey: vi.fn(async () => undefined),
   clearApprovals: vi.fn(),
   clearActionJournal: vi.fn(),
   clearUndo: vi.fn(),
@@ -79,6 +80,7 @@ vi.mock('../../ai/undo-store', () => ({
 vi.mock('../workspace-persistence', () => ({
   exportDocumentWorkspaceData: mocks.exportDocumentWorkspaceData,
   replaceDocumentWorkspaceData: mocks.replaceDocumentWorkspaceData,
+  clearWorkspaceShardsForActiveKey: mocks.clearWorkspaceShardsForActiveKey,
 }));
 
 import {
@@ -124,6 +126,7 @@ describe('replaceWorkspaceSideStores', () => {
     expect(mocks.replaceCurativeWorkspaceData).toHaveBeenCalledWith('ws-reset', {
       titleIssues: [],
     });
+    expect(mocks.clearWorkspaceShardsForActiveKey).toHaveBeenCalledOnce();
     expect(mocks.clearApprovals).toHaveBeenCalledOnce();
     expect(mocks.clearActionJournal).toHaveBeenCalledOnce();
     expect(mocks.clearUndo).toHaveBeenCalledOnce();
@@ -205,6 +208,7 @@ describe('replaceWorkspaceSideStores', () => {
       'ws-old',
       previousCurativeData
     );
+    expect(mocks.clearWorkspaceShardsForActiveKey).toHaveBeenCalledOnce();
     expect(mocks.clearApprovals).toHaveBeenCalledOnce();
     expect(mocks.clearActionJournal).toHaveBeenCalledOnce();
     expect(mocks.clearUndo).toHaveBeenCalledOnce();

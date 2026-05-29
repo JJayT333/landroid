@@ -13,7 +13,7 @@ import { useResearchStore } from './store/research-store';
 import { useCurativeStore } from './store/curative-store';
 import { useWorkspaceStore } from './store/workspace-store';
 import { useCanvasStore } from './store/canvas-store';
-import { saveWorkspaceToDb, loadWorkspaceFromDb } from './storage/workspace-persistence';
+import { saveWorkspaceShardsToDb, loadWorkspaceFromDb } from './storage/workspace-persistence';
 import { saveCanvasToDb, loadCanvasFromDb } from './storage/canvas-persistence';
 import { awaitWorkspaceKeyReady } from './storage/active-workspace-key';
 import { runPostV8BackupIfNeeded } from './storage/post-v8-backup';
@@ -117,7 +117,7 @@ useWorkspaceStore.subscribe((state) => {
 
   if (saveTimer) clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
-    saveWorkspaceToDb(buildWorkspaceAutosavePayload(state));
+    void saveWorkspaceShardsToDb(buildWorkspaceAutosavePayload(state));
   }, AUTOSAVE_DEBOUNCE_MS);
 });
 

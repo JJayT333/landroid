@@ -9,10 +9,13 @@
  *   document_attachments — v8 polymorphic join (node | owner | lease |
  *                          curative | research). Only `'node'` rows are
  *                          written by this pass.
- *   workspaces           — auto-saved workspace state
- *   workspace*Shards     — v10 Phase 0.5 workspace-sharding rows, populated
- *                          from `workspaces` but not yet the live load/save
- *                          source of truth.
+ *   workspaces           — pre-shard monolithic workspace row. As of the
+ *                          Phase 0.5 shard writer it is a frozen migration-time
+ *                          backup: autosave writes shards, not this row.
+ *   workspace*Shards     — v10 Phase 0.5 workspace-sharding rows. These are now
+ *                          the live load/save source of truth; the monolith is
+ *                          a fallback only.
+ *   workspaceWriteLeases — single-writer lease rows guarding shard writes.
  */
 import Dexie, { type EntityTable, type Transaction } from 'dexie';
 import type {
@@ -323,8 +326,8 @@ db.version(9)
  *
  * Adds backend-spine-shaped workspace manifest and Desk Map shard rows, plus
  * local-only compatibility rows for current title, leasehold, and UI state.
- * The monolithic `workspaces` row remains intact and remains the live app
- * load/save path until the shard reader/writer and write-lock gate are proven.
+ * The monolithic `workspaces` row is preserved as a frozen rollback/diagnostic
+ * backup; the shard reader/writer and write-lease gate are the live path.
  */
 db.version(10)
   .stores({
@@ -451,9 +454,12 @@ export async function runV9ToV10WorkspaceShardMigration(
       continue;
     }
 
+    // Stamp the per-user DB key (the monolithic row's primary key) on the
+    // manifest so the runtime reader can resolve this workspace by key without
+    // adopting another user's shards (Bug 001).
     await tx
       .table<WorkspaceManifestShard, 'id'>('workspaceManifestShards')
-      .put(migration.shards.manifest);
+      .put({ ...migration.shards.manifest, dbKey: record.id });
 
     if (migration.shards.deskMaps.length > 0) {
       await tx

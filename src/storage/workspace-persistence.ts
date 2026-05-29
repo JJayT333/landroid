@@ -83,6 +83,11 @@ import { resolveActiveUnitCode } from '../utils/desk-map-units';
 import { getWorkspaceDbKey } from './active-workspace-key';
 import { LANDROID_FILE_VERSION } from './landroid-file-version';
 import { readWorkspaceFromShardRows } from './workspace-shard-reader';
+import {
+  buildWorkspaceShards,
+  type WorkspaceManifestShard,
+} from './workspace-shards';
+import { ensureWorkspaceWritable } from './workspace-write-lease';
 export { LANDROID_FILE_VERSION } from './landroid-file-version';
 const PAGE_SIZE_ID_SET = new Set<PageSizeId>(
   PAGE_SIZE_DEFINITIONS.map((definition) => definition.id)
@@ -589,39 +594,45 @@ function parseWorkspaceRecord(
   }
 }
 
-async function loadWorkspaceShardRows(workspaceId: string | null): Promise<
-  Pick<
-    Parameters<typeof readWorkspaceFromShardRows>[0],
-    'manifest' | 'deskMaps' | 'nodes' | 'leaseholdState' | 'uiState'
-  >
-> {
-  let resolvedWorkspaceId = workspaceId;
-  let manifest = null;
+type LoadedWorkspaceShardRows = Pick<
+  Parameters<typeof readWorkspaceFromShardRows>[0],
+  'manifest' | 'deskMaps' | 'nodes' | 'leaseholdState' | 'uiState'
+>;
 
-  if (resolvedWorkspaceId) {
-    const manifests = await db.workspaceManifestShards
-      .where('workspaceId')
-      .equals(resolvedWorkspaceId)
-      .toArray();
-    manifest = manifests[0] ?? null;
-  } else {
-    const manifests = await db.workspaceManifestShards.toArray();
-    if (manifests.length === 1) {
-      manifest = manifests[0];
-      resolvedWorkspaceId = manifest.workspaceId;
-    }
+const EMPTY_SHARD_ROWS: LoadedWorkspaceShardRows = {
+  manifest: null,
+  deskMaps: [],
+  nodes: [],
+  leaseholdState: null,
+  uiState: null,
+};
+
+async function loadWorkspaceShardRows(args: {
+  dbKey: string;
+  monolithWorkspaceId: string | null;
+}): Promise<LoadedWorkspaceShardRows> {
+  const manifests = await db.workspaceManifestShards.toArray();
+  // Prefer the manifest written under the active per-user DB key. Only fall
+  // back to a legacy v10 manifest (written before the dbKey field existed) when
+  // it matches THIS user's monolith workspace id — never adopt a foreign user's
+  // manifest, which previously leaked another user's workspace to a fresh
+  // hosted sign-in (Bug 001).
+  const manifest =
+    manifests.find((row) => row.dbKey === args.dbKey)
+    ?? (args.monolithWorkspaceId
+      ? manifests.find(
+          (row) =>
+            (row.dbKey === undefined || row.dbKey === null)
+            && row.workspaceId === args.monolithWorkspaceId
+        )
+      : undefined)
+    ?? null;
+
+  if (!manifest) {
+    return EMPTY_SHARD_ROWS;
   }
 
-  if (!resolvedWorkspaceId) {
-    return {
-      manifest: null,
-      deskMaps: [],
-      nodes: [],
-      leaseholdState: null,
-      uiState: null,
-    };
-  }
-
+  const resolvedWorkspaceId = manifest.workspaceId;
   const [deskMaps, nodes, leaseholdStates, uiStates] = await Promise.all([
     db.deskMapShards.where('workspaceId').equals(resolvedWorkspaceId).toArray(),
     db.ownershipNodeCompatShards
@@ -649,24 +660,151 @@ async function loadWorkspaceShardRows(workspaceId: string | null): Promise<
 
 // ── Auto-save to IndexedDB ─────────────────────────────
 
-export async function saveWorkspaceToDb(data: WorkspaceData): Promise<void> {
-  await db.workspaces.put({
-    id: getWorkspaceDbKey(),
-    projectName: data.projectName,
-    data: JSON.stringify(data),
-    savedAt: new Date().toISOString(),
+export interface SaveWorkspaceShardsResult {
+  status: 'written' | 'blocked';
+}
+
+export interface SaveWorkspaceShardsDeps {
+  /** Override the manifest `lastModified` timestamp source (tests). */
+  now?: () => string;
+  /** Override the single-writer lease gate (tests). */
+  ensureWritable?: (workspaceId: string) => Promise<boolean>;
+}
+
+function defaultShardTimestamp(): string {
+  return new Date().toISOString();
+}
+
+/**
+ * Autosave path (Phase 0.5): rebuild the workspace shard set from the current
+ * {@link WorkspaceData} and write all five shard tables in a single Dexie
+ * transaction so a mid-write failure cannot leave an incomplete set. The write
+ * is gated by the single-writer lease — a read-only tab returns
+ * `{ status: 'blocked' }` without touching storage.
+ *
+ * The monolithic `workspaces` row is intentionally NOT rewritten here. It stays
+ * a frozen migration-time backup; rewriting it on every autosave would preserve
+ * the scale bottleneck Phase 0.5 exists to remove. The reader treats that
+ * frozen row as a last-resort fallback and warns loudly when it is used.
+ */
+export async function saveWorkspaceShardsToDb(
+  data: WorkspaceData,
+  deps: SaveWorkspaceShardsDeps = {}
+): Promise<SaveWorkspaceShardsResult> {
+  const ensureWritable = deps.ensureWritable ?? ensureWorkspaceWritable;
+  if (!(await ensureWritable(data.workspaceId))) {
+    return { status: 'blocked' };
+  }
+
+  const dbKey = getWorkspaceDbKey();
+  const lastModified = (deps.now ?? defaultShardTimestamp)();
+  const shards = buildWorkspaceShards(data, {
+    lastModified,
+    landroidFileVersion: LANDROID_FILE_VERSION,
+    source: 'local',
+    syncState: 'local_only',
   });
+  const manifest: WorkspaceManifestShard = { ...shards.manifest, dbKey };
+  const { workspaceId } = data;
+
+  await db.transaction(
+    'rw',
+    [
+      db.workspaceManifestShards,
+      db.deskMapShards,
+      db.ownershipNodeCompatShards,
+      db.leaseholdStateShards,
+      db.workspaceUiStateShards,
+    ],
+    async () => {
+      // Replace the per-workspace child rows wholesale so removed desk maps or
+      // nodes cannot linger as orphans, then write the fresh complete set. A
+      // throw anywhere here rolls the whole transaction back, leaving the prior
+      // complete shard set intact.
+      await db.deskMapShards.where('workspaceId').equals(workspaceId).delete();
+      await db.ownershipNodeCompatShards
+        .where('workspaceId')
+        .equals(workspaceId)
+        .delete();
+      await db.workspaceManifestShards.put(manifest);
+      if (shards.deskMaps.length > 0) {
+        await db.deskMapShards.bulkPut(shards.deskMaps);
+      }
+      if (shards.nodes.length > 0) {
+        await db.ownershipNodeCompatShards.bulkPut(shards.nodes);
+      }
+      await db.leaseholdStateShards.put(shards.leaseholdState);
+      await db.workspaceUiStateShards.put(shards.uiState);
+    }
+  );
+
+  return { status: 'written' };
+}
+
+/**
+ * Drop every workspace shard row written under the active per-user DB key.
+ * Called on workspace replacement / sign-out so the next workspace (or hosted
+ * user) starts from a clean shard set instead of inheriting stale rows. Legacy
+ * rows without a dbKey are left untouched because they may belong to another
+ * hosted user on the same browser profile.
+ */
+export async function clearWorkspaceShardsForActiveKey(): Promise<void> {
+  const dbKey = getWorkspaceDbKey();
+  const manifests = await db.workspaceManifestShards.toArray();
+  const workspaceIds = manifests
+    .filter((row) => row.dbKey === dbKey)
+    .map((row) => row.workspaceId);
+  if (workspaceIds.length === 0) {
+    return;
+  }
+
+  await db.transaction(
+    'rw',
+    [
+      db.workspaceManifestShards,
+      db.deskMapShards,
+      db.ownershipNodeCompatShards,
+      db.leaseholdStateShards,
+      db.workspaceUiStateShards,
+    ],
+    async () => {
+      for (const workspaceId of workspaceIds) {
+        await db.workspaceManifestShards
+          .where('workspaceId')
+          .equals(workspaceId)
+          .delete();
+        await db.deskMapShards.where('workspaceId').equals(workspaceId).delete();
+        await db.ownershipNodeCompatShards
+          .where('workspaceId')
+          .equals(workspaceId)
+          .delete();
+        await db.leaseholdStateShards
+          .where('workspaceId')
+          .equals(workspaceId)
+          .delete();
+        await db.workspaceUiStateShards
+          .where('workspaceId')
+          .equals(workspaceId)
+          .delete();
+      }
+    }
+  );
 }
 
 export async function loadWorkspaceFromDb(): Promise<WorkspaceLoadResult> {
-  const record = await db.workspaces.get(getWorkspaceDbKey());
+  const dbKey = getWorkspaceDbKey();
+  const record = await db.workspaces.get(dbKey);
   const monolith = parseWorkspaceRecord(record);
-  const shardRows = await loadWorkspaceShardRows(monolith.data?.workspaceId ?? null);
+  const shardRows = await loadWorkspaceShardRows({
+    dbKey,
+    monolithWorkspaceId: monolith.data?.workspaceId ?? null,
+  });
   const readResult = readWorkspaceFromShardRows(
     {
       ...shardRows,
       monolithData: monolith.data,
       monolithError: monolith.error,
+      monolithSavedAt: record?.savedAt ?? null,
     },
     {
       validateWorkspaceData: (data) =>

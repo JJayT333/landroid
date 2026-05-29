@@ -41,6 +41,16 @@ export interface WorkspaceManifestShard {
   backendRecord: WorkspaceManifestRecord;
   legacyWorkspaceDataJson?: string;
   /**
+   * Per-user IndexedDB namespace key (`getWorkspaceDbKey()`) the shard set was
+   * written under. Local mode uses `default`; hosted mode uses `user-{sub}`.
+   * The runtime reader resolves the active workspace by matching this key so a
+   * fresh hosted user can never adopt another user's manifest (Bug 001).
+   * Optional for backward compatibility with v10 manifests written by the
+   * migration before this field existed; those are resolved by the reader's
+   * monolith-workspaceId fallback instead.
+   */
+  dbKey?: string;
+  /**
    * Local-only integrity counter for the `ownership_node_compat` shard rows.
    * It is not part of `backendRecord.recordCounts` because that map is keyed by
    * `BackendSpineRecordTypeSchema`, which has no `ownership_node_compat` member
