@@ -40,6 +40,16 @@ export interface WorkspaceManifestShard {
   projectId: string;
   backendRecord: WorkspaceManifestRecord;
   legacyWorkspaceDataJson?: string;
+  /**
+   * Local-only integrity counter for the `ownership_node_compat` shard rows.
+   * It is not part of `backendRecord.recordCounts` because that map is keyed by
+   * `BackendSpineRecordTypeSchema`, which has no `ownership_node_compat` member
+   * (node compat rows are a local-only shard kind). Stored on the wrapper so
+   * the reader can detect truncated node shards the same way it checks desk
+   * maps. Optional for backward compatibility with v10 manifests written before
+   * this field existed.
+   */
+  nodeCount?: number;
 }
 
 export interface DeskMapShard {
@@ -214,6 +224,7 @@ export function buildWorkspaceShards(
       projectId,
       backendRecord: buildManifestRecord(data, buildOptions),
       legacyWorkspaceDataJson: options.legacyWorkspaceDataJson,
+      nodeCount: data.nodes.length,
     },
     deskMaps: data.deskMaps.map((deskMap, position) => ({
       id: `${data.workspaceId}:desk-map:${deskMap.id}`,

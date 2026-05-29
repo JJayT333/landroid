@@ -83,6 +83,17 @@ function requireCompleteShardSet(rows: WorkspaceShardRows): WorkspaceShardSet {
     );
   }
 
+  // Node compat rows have no `recordCounts` entry (not a backend record type),
+  // so the integrity count lives on the manifest wrapper. The `?? nodes.length`
+  // fallback keeps pre-existing v10 manifests (written without `nodeCount`)
+  // loading rather than failing closed.
+  const expectedNodeCount = rows.manifest.nodeCount ?? nodes.length;
+  if (nodes.length !== expectedNodeCount) {
+    throw new Error(
+      `ownership node shard count ${nodes.length} did not match manifest count ${expectedNodeCount}`
+    );
+  }
+
   return {
     manifest: rows.manifest,
     deskMaps,

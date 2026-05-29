@@ -114,6 +114,20 @@ describe('workspace-shard-reader', () => {
     expect(result.data).toEqual(workspace);
   });
 
+  it('falls back to the monolith when node shards are truncated', () => {
+    const workspace = buildWorkspace();
+    const rows = shardRows(workspace);
+
+    const result = readWorkspaceFromShardRows({
+      ...rows,
+      nodes: [],
+    });
+
+    expect(result.status).toBe('fallback_to_monolith');
+    expect(result.warning).toMatch(/ownership node shard count 0 did not match/);
+    expect(result.data).toEqual(workspace);
+  });
+
   it('reports corruption when shards are incomplete and the monolith is missing', () => {
     const rows = shardRows();
 
