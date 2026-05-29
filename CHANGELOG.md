@@ -5,6 +5,12 @@ stay short.
 
 ## 2026-05-29
 
+- Added the multi-tab read-only UI on top of the single-writer lease. The lease
+  is engaged at startup and after a workspace swap, and a second tab now opens
+  read-only with a visible "editing elsewhere" banner and an explicit takeover
+  confirmation. A writer steps down when a peer claims the lease; a reader
+  auto-promotes when the writer releases. Canvas autosave now shares the same
+  lease gate so a read-only tab cannot overwrite the writer's viewport/layout.
 - Landed the Phase 0.5 shard writer and closed the edit-stranding data-loss
   regression. Workspace autosave now rebuilds the shard set with
   `buildWorkspaceShards` and writes all five shard tables in one Dexie
