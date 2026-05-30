@@ -1,0 +1,17 @@
+{
+  "runId": "2026-05-30-shard-autosave",
+  "baseUrl": "http://127.0.0.1:5173/",
+  "capturedAt": "2026-05-30T15:36:41.458Z",
+  "browser": "147.0.7727.15",
+  "viewport": {
+    "width": 1440,
+    "height": 1000
+  },
+  "mode": "autosave-only",
+  "consoleMessages": [],
+  "pageErrors": [],
+  "artifacts": [
+    "machine-profile.txt",
+    "perf-05-autosave-debounce.json"
+  ]
+}

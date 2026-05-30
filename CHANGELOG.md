@@ -3,8 +3,32 @@
 This file records meaningful project changes so `CONTINUATION-PROMPT.md` can
 stay short.
 
+## 2026-05-30
+
+- Fixed a data-integrity edge in the shard writer: the monolithic backup row is
+  now re-anchored when the active workspace changes (import / CSV / fresh
+  install), so a later shard corruption falls back to the current workspace
+  instead of the stale pre-import one. A workspace edited in place keeps its
+  original migration-time backup.
+- Added a two-tab Playwright e2e that exercises the single-writer lease in a
+  real browser: the second tab opens read-only with the editing-elsewhere
+  banner, an explicit takeover makes it the writer, and the original tab is
+  stepped down by the claim broadcast.
+- Recaptured autosave timing for the sharded write. At 1476-node Raven Forest
+  scale the workspace persists 2276 ms after an edit (2000 ms debounce + ~276 ms
+  shard write), versus the 2062 ms monolith baseline — ~210 ms slower, entirely
+  off the debounced interaction path. The closeout capture script now measures
+  the shard manifest and has an `--autosave-only` mode.
+
 ## 2026-05-29
 
+- Locked the document-vault lazy-load contract with tests
+  (`document-store-lazy.test.ts`). Project open and registry listing
+  (`listDocumentRegistryData`, `listDocsForEntity`, `listAttachmentsForNodes`,
+  `getDocMeta`) return blob-free metadata; `getDocBlob` is the only explicit
+  byte path for preview/export. A reader that leaks a blob into project open now
+  fails the contract test. The blob-bearing side stores (owner docs, map assets,
+  research imports) remain a deliberately deferred, evidence-gated follow-up.
 - Added the multi-tab read-only UI on top of the single-writer lease. The lease
   is engaged at startup and after a workspace swap, and a second tab now opens
   read-only with a visible "editing elsewhere" banner and an explicit takeover

@@ -1,0 +1,25 @@
+runId: 2026-05-30-shard-autosave
+baseUrl: http://127.0.0.1:5173/
+capturedAt: 2026-05-30T15:36:35.537Z
+gitHead: 7f1538a7d40da80b64b6934d0403d193321c7ae9
+gitStatus: ## test/lazy-blob-contract...origin/test/lazy-blob-contract [ahead 8, behind 6] |  M scripts/capture-phase-0-closeout-evidence.mjs | ?? fixtures/phase-0/perf/2026-05-30-shard-autosave/
+
+[sw_vers]
+ProductName:		macOS
+ProductVersion:		26.3.1
+ProductVersionExtra:	(a)
+BuildVersion:		25D771280a
+
+[node] v26.0.0
+[npm] 11.12.1
+[platform] darwin 25.3.0 arm64
+[cpuModel] Apple M4 Pro
+[coreCount] 14
+[memoryBytes] 51539607552
+
+[sysctl machdep.cpu.brand_string]
+Apple M4 Pro
+[sysctl hw.ncpu]
+14
+[sysctl hw.memsize]
+51539607552

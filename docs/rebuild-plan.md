@@ -1027,15 +1027,26 @@ Multi-tab single-writer plan:
 Lazy document/blob loading plan:
 
 - Opening a project must load document metadata and links, not every PDF/blob.
-  `listDocumentRegistryData`, `listDocsForEntity`, and
-  `listAttachmentsForNodes` already follow this pattern for the main
-  `documents` table; Phase 0.5 should turn that into a tested contract.
+  `listDocumentRegistryData`, `listDocsForEntity`, and `listAttachmentsForNodes`
+  follow this pattern for the main `documents` table, and that behavior is now
+  locked by `document-store-lazy.test.ts`: every project-open listing reader
+  returns blob-free metadata (`Omit<DocumentRecord, 'blob'>` / attachment
+  summaries), the workspace store never retains blob bytes, and `getDocBlob` is
+  the only explicit byte path. A future reader change that leaks a blob into
+  project open now fails the contract test.
 - Single-document preview, `.landroid` export, package export, and explicit
   backup flows are allowed to read blobs because the user asked for the bytes.
 - Blob-bearing side stores (`ownerDocs`, `mapAssets`, and `researchImports`)
-  should be treated as the next lazy-load candidates. Do not redesign their UI
-  in Phase 0.5; add metadata-first readers where project-open performance or
-  memory evidence requires it.
+  remain the next lazy-load candidates and are deliberately deferred. Their
+  views (`MapsView`, `DeskMapView`, `OwnerDocsTab`, `ResearchView`) read
+  `asset.blob` / `doc.blob` synchronously, so a metadata-first conversion means
+  an async preview/parse refactor across those views — explicitly out of scope
+  for Phase 0.5 ("do not redesign their UI"). The stores currently retain the
+  Dexie Blob objects, which are lazy IndexedDB references (no bytes are read
+  until preview/export), so there is no measured project-open memory regression
+  forcing the conversion yet. Revisit when memory evidence requires it, ideally
+  by denormalizing `fileName`/`kind` onto attachment-style rows so open never
+  reads the blob-bearing tables at all.
 - Blob content hashes remain the identity bridge across Dexie blobs,
   `.landroid` package files, and later object storage.
 
@@ -1076,10 +1087,16 @@ Targeted tests and performance gates before implementation:
   takeover confirmation; a writer steps down to read-only on a peer's claim
   broadcast and a reader auto-promotes when the writer releases. Canvas autosave
   shares the same lease gate. The banner is signalling plus a write gate — it
-  does not yet disable individual edit controls across every view. Deferred:
-  per-view edit-control disabling, lazy blob loading, persistent-storage
-  requests, and a browser autosave-timing recapture against the Raven Forest
-  perf baseline (`buildWorkspaceShards` itself is sub-millisecond at 1476 nodes).
+  does not yet disable individual edit controls across every view (deferred).
+- Follow-up hardening landed: the monolithic backup is re-anchored when the
+  active workspace changes (import / CSV / fresh install) so a corruption
+  fallback lands on the current workspace, not the stale pre-import one; a
+  two-tab Playwright e2e exercises the lease/banner/takeover end to end; and the
+  sharded autosave was re-measured at 1476-node scale — 2276 ms to persist after
+  an edit (2000 ms debounce + ~276 ms shard write) versus a 2062 ms monolith
+  baseline, ~210 ms slower and off the debounced interaction path. Evidence:
+  `fixtures/phase-0/perf/2026-05-30-shard-autosave/`. Still deferred:
+  `navigator.storage.persist()` and the side-store metadata-first conversion.
 - Add storage tests for monolith-to-shard migration, corrupt-shard fallback,
   idempotent rerun, v7/v8 `.landroid` import compatibility, future-version
   rejection, and rollback-safe side-store replacement.
