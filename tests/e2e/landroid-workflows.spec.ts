@@ -631,3 +631,58 @@ test('federal leasing tracks leases, targets, expirations, sources, and maps', a
 
   expect(browserErrors).toEqual([]);
 });
+
+test('a second tab opens read-only and can take over the single-writer lease', async ({
+  context,
+}) => {
+  // Two pages in one browser context share IndexedDB and BroadcastChannel, so
+  // they contend for the same Phase 0.5 single-writer lease.
+  const writerPage = await context.newPage();
+  const writerErrors = collectBrowserErrors(writerPage);
+  await openApp(writerPage);
+  await loadCombinatorialDemo(writerPage);
+
+  const projectNameButton = (page: Page) =>
+    page.getByRole('button', { name: /Combinatorial Demo — / });
+  const writerBanner = writerPage.getByText(
+    /open and being edited in another tab/i
+  );
+  // The first tab holds the lease, so it shows no read-only banner.
+  await expect(writerBanner).toBeHidden();
+
+  // Let the debounced autosave persist the sharded workspace so the second tab
+  // loads the same workspace id and contends for the same lease (rather than
+  // booting a fresh empty workspace with its own id). The 1476-node shard write
+  // runs ~2s after load; wait comfortably past it but well under the lease TTL.
+  await writerPage.waitForTimeout(5000);
+
+  const readerPage = await context.newPage();
+  const readerErrors = collectBrowserErrors(readerPage);
+  await openApp(readerPage);
+  await expect(projectNameButton(readerPage)).toBeVisible({ timeout: 45_000 });
+
+  // The second tab opens read-only with the editing-elsewhere banner.
+  const readerBanner = readerPage.getByText(
+    /open and being edited in another tab/i
+  );
+  await expect(readerBanner).toBeVisible();
+
+  // Explicit takeover from the second tab.
+  await readerPage
+    .getByRole('button', { name: 'Take over editing here' })
+    .click();
+  await expect(
+    readerPage.getByRole('dialog', { name: 'Take over editing here?' })
+  ).toBeVisible();
+  await readerPage
+    .getByRole('button', { name: 'Take over editing', exact: true })
+    .click();
+
+  // The second tab becomes the writer (banner clears) and the original writer
+  // is stepped down to read-only by the claim broadcast.
+  await expect(readerBanner).toBeHidden();
+  await expect(writerBanner).toBeVisible();
+
+  expect(writerErrors, writerErrors.join('\n')).toEqual([]);
+  expect(readerErrors, readerErrors.join('\n')).toEqual([]);
+});

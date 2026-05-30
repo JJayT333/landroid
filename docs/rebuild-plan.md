@@ -1067,9 +1067,18 @@ Targeted tests and performance gates before implementation:
   shard leak (Bug 001). Shard writes are gated by the single-writer lease
   (`workspace-write-lease.ts`, `BroadcastChannel` + Dexie expiry); a non-writer
   tab returns `blocked` and writes nothing. `replaceWorkspaceSideStores` clears
-  the active key's shard rows on workspace replacement / sign-out. Deferred to a
-  follow-up: a visible read-only/"editing elsewhere" banner, canvas-autosave
-  lease gating, and a browser autosave-timing recapture against the Raven Forest
+  the active key's shard rows on workspace replacement / sign-out.
+- The single-writer lease now has a runtime UI. The controller in
+  `workspace-write-lease.ts` engages the lease at startup and after a workspace
+  swap (`src/main.tsx`), tracks a writer/reader/idle role, and pushes role
+  transitions to `store/write-lease-store.ts`. A second tab opens read-only with
+  a visible "editing elsewhere" banner (`WriteLeaseBanner`) and an explicit
+  takeover confirmation; a writer steps down to read-only on a peer's claim
+  broadcast and a reader auto-promotes when the writer releases. Canvas autosave
+  shares the same lease gate. The banner is signalling plus a write gate — it
+  does not yet disable individual edit controls across every view. Deferred:
+  per-view edit-control disabling, lazy blob loading, persistent-storage
+  requests, and a browser autosave-timing recapture against the Raven Forest
   perf baseline (`buildWorkspaceShards` itself is sub-millisecond at 1476 nodes).
 - Add storage tests for monolith-to-shard migration, corrupt-shard fallback,
   idempotent rerun, v7/v8 `.landroid` import compatibility, future-version

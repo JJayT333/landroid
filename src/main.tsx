@@ -15,6 +15,11 @@ import { useWorkspaceStore } from './store/workspace-store';
 import { useCanvasStore } from './store/canvas-store';
 import { saveWorkspaceShardsToDb, loadWorkspaceFromDb } from './storage/workspace-persistence';
 import { saveCanvasToDb, loadCanvasFromDb } from './storage/canvas-persistence';
+import {
+  ensureWorkspaceWritable,
+  initWorkspaceWriteLease,
+  releaseWorkspaceWriteLease,
+} from './storage/workspace-write-lease';
 import { awaitWorkspaceKeyReady } from './storage/active-workspace-key';
 import { runPostV8BackupIfNeeded } from './storage/post-v8-backup';
 import { runBackendSpineContractCheck } from './backend-spine/app-contract-check';
@@ -136,8 +141,27 @@ useCanvasStore.subscribe((state) => {
 
   if (canvasSaveTimer) clearTimeout(canvasSaveTimer);
   canvasSaveTimer = setTimeout(() => {
-    saveCanvasToDb(buildCanvasAutosavePayload(state));
+    // Canvas autosave shares the workspace's single-writer lease, so a
+    // read-only tab cannot overwrite the active writer's viewport/layout.
+    const workspaceId = useWorkspaceStore.getState().workspaceId;
+    void ensureWorkspaceWritable(workspaceId).then((writable) => {
+      if (writable) saveCanvasToDb(buildCanvasAutosavePayload(state));
+    });
   }, AUTOSAVE_DEBOUNCE_MS);
+});
+
+// ── Engage the single-writer lease for the active workspace ──
+// Acquiring at load (and re-acquiring after a workspace swap) makes a second
+// tab's read-only state known before the first edit, and releases the prior
+// workspace's lease so a peer can claim it without waiting for expiry.
+let leaseWorkspaceId: string | null = null;
+useWorkspaceStore.subscribe((state) => {
+  if (!state._hydrated) return;
+  if (state.workspaceId === leaseWorkspaceId) return;
+  const previous = leaseWorkspaceId;
+  leaseWorkspaceId = state.workspaceId;
+  if (previous) void releaseWorkspaceWriteLease(previous);
+  void initWorkspaceWriteLease(state.workspaceId);
 });
 
 createRoot(document.getElementById('root')!).render(
