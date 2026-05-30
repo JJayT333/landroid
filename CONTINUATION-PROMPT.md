@@ -7,25 +7,29 @@ Use this file to resume the active workstream in a new chat. Read it with
 
 ## Current Branch
 
-Current checked-out branch: `test/lazy-blob-contract`, top of a 3-PR stack.
+Current checked-out branch: `feat/persistent-storage-request`, top of a 4-PR
+stack.
 
-Three open PRs (2026-05-29), each validated (lint, test suite, build; #82/#83
-also e2e + deploy:check):
+Four open PRs (2026-05-30), each validated (lint, test suite, build, e2e,
+deploy:check):
 
 - PR #82 (`feat/shard-runtime-load` -> `main`): the shard writer that closes the
   edit-stranding data-loss regression. Autosave writes the shard set in one
-  transaction behind the single-writer lease; the monolith is a frozen backup;
-  the reader is recency-aware and per-user-DB-key scoped, closing the cross-user
-  shard leak (Bug 001).
+  transaction behind the single-writer lease; the monolith is a frozen backup
+  re-anchored on workspace change; the reader is recency-aware and
+  per-user-DB-key scoped, closing the cross-user shard leak (Bug 001).
 - PR #83 (`feat/single-writer-readonly-ui` -> `feat/shard-runtime-load`): the
-  multi-tab read-only UI. A second tab opens read-only with an "editing
-  elsewhere" banner and explicit takeover; canvas autosave shares the lease gate.
+  multi-tab read-only UI (editing-elsewhere banner + explicit takeover; canvas
+  autosave shares the lease gate) plus a two-tab Playwright e2e.
 - PR #84 (`test/lazy-blob-contract` -> `feat/single-writer-readonly-ui`): locks
-  the document-vault lazy-load contract with tests (project open returns
-  blob-free metadata; `getDocBlob` is the only byte path). Side-store
-  metadata-first conversion is deferred with rationale.
+  the document-vault lazy-load contract with tests, and recaptures sharded
+  autosave timing at 1476-node scale. Side-store metadata-first conversion is
+  deferred with rationale.
+- PR #85 (`feat/persistent-storage-request` -> `test/lazy-blob-contract`):
+  requests persistent browser storage on startup (Storage API, recorded,
+  non-blocking).
 
-Merge order: #82, then retarget+merge #83, then retarget+merge #84.
+Merge order: #82, then retarget+merge #83, then #84, then #85.
 
 Do not commit directly to `main` unless the user explicitly asks for a direct
 main push/deploy.
@@ -790,30 +794,31 @@ Resume in `/Users/abstractmapping/projects/landroid`. Read `AGENTS.md`
 (including the Conventions section), `PROJECT_CONTEXT.md`, `docs/README.md`,
 `DEPLOYMENT_STATE.md`, and this file before touching code.
 
-Active workstream: `shard-runtime` (Phase 0.5 storage sharding). Three slices
-are done and pushed as a 3-PR stack (2026-05-29): the shard writer (#82), the
-multi-tab read-only UI (#83), and the document-vault lazy-load contract lock
-(#84). See the Current Branch section for details and merge order.
+Active workstream: `shard-runtime` (Phase 0.5 storage sharding). Four slices are
+done and pushed as a 4-PR stack (2026-05-30): the shard writer (#82), the
+multi-tab read-only UI (#83), the document-vault lazy-load contract lock (#84),
+and the persistent-storage request (#85). See the Current Branch section for
+details and merge order.
 
-Latest validation (2026-05-30): `npm run lint`, full `npm test` (95 files /
-717 tests), `npm run build`, `npm run test:e2e` (12 workflows incl. the two-tab
-lease test), `npm run deploy:check` — all green.
-Sharded autosave re-measured at 1476-node scale: 2276 ms persist (2000 ms
-debounce + ~276 ms write) vs a 2062 ms monolith baseline, evidence under
-`fixtures/phase-0/perf/2026-05-30-shard-autosave/`. The import-edge fix, the
-two-tab e2e, and the perf recapture are committed on the stack (C in #82, A and
-the recapture script in #83/#84).
+Latest validation (2026-05-30, on `feat/persistent-storage-request`):
+`npm run lint`, full `npm test` (96 files / 723 tests), `npm run build`,
+`npm run test:e2e` (12 workflows incl. the two-tab lease test),
+`npm run deploy:check` — all green. Sharded autosave re-measured at 1476-node
+scale: 2276 ms persist (2000 ms debounce + ~276 ms write) vs a 2062 ms monolith
+baseline, evidence under `fixtures/phase-0/perf/2026-05-30-shard-autosave/`.
 
-Recommended next slice (medium): request `navigator.storage.persist()` for
-PWA/iPad durability (record granted/refused). Lower priority and explicitly
-deferred: a metadata-first conversion of the blob-bearing side stores (owner
-docs, map assets, research imports) — needs an async preview/parse refactor of
-`MapsView`/`DeskMapView`/`OwnerDocsTab`/`ResearchView` and is evidence-gated;
-and per-view edit-control disabling for read-only tabs.
+Phase 0.5 is effectively complete. The only remaining work is deliberately
+deferred and evidence-gated: a metadata-first conversion of the blob-bearing
+side stores (owner docs, map assets, research imports) — which needs an async
+preview/parse refactor of `MapsView`/`DeskMapView`/`OwnerDocsTab`/`ResearchView`
+and has no measured open-time memory regression forcing it — and per-view
+edit-control disabling for read-only tabs. Do not start either without the
+user's explicit go-ahead.
 
-Resolved: the post-import monolith edge — the shard writer now re-anchors the
-backup row when the active workspace changes, so a corruption fallback lands on
-the current workspace, not the stale pre-import one.
+Resolved this session: the edit-stranding data-loss regression, the cross-user
+shard leak (Bug 001), the single-writer multi-tab UI, the document-vault lazy
+contract, the post-import monolith edge, autosave perf recapture, and the
+persistent-storage request.
 
 Holds: do not start full backend storage/sync, OCR/search, the runsheet
 walkthrough wizard, or any federal/private math without explicit direction.

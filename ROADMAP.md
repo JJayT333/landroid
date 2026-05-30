@@ -47,11 +47,11 @@ session handoff lives in `CONTINUATION-PROMPT.md`.
   workspace change so a corruption fallback lands on the current (e.g. imported)
   workspace, a two-tab e2e covers the lease end to end, and the sharded autosave
   was re-measured at 1476-node scale (2276 ms persist vs a 2062 ms monolith
-  baseline — ~210 ms slower, off the interaction path). Remaining Phase 0.5
-  work: a `navigator.storage.persist()` request for PWA/iPad, and (deferred,
-  evidence-gated) a metadata-first conversion of the blob-bearing side stores
-  (owner docs, map assets, research imports) plus per-view edit-control
-  disabling for read-only tabs.
+  baseline — ~210 ms slower, off the interaction path). Persistent browser
+  storage is now requested on startup (Storage API, recorded, non-blocking).
+  Remaining Phase 0.5 work is deferred and evidence-gated: a metadata-first
+  conversion of the blob-bearing side stores (owner docs, map assets, research
+  imports) and per-view edit-control disabling for read-only tabs.
 - Preserve `.landroid` package export permanently even after sync/backend work.
 - Promote the Evidence Vault contract: immutable originals, SHA-256 hashes,
   document versions, extraction runs, citation anchors, hash-continuity audit

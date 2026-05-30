@@ -21,6 +21,7 @@ import {
   releaseWorkspaceWriteLease,
 } from './storage/workspace-write-lease';
 import { awaitWorkspaceKeyReady } from './storage/active-workspace-key';
+import { requestPersistentStorage } from './storage/persistent-storage';
 import { runPostV8BackupIfNeeded } from './storage/post-v8-backup';
 import { runBackendSpineContractCheck } from './backend-spine/app-contract-check';
 import {
@@ -40,6 +41,21 @@ async function bootstrapApp() {
   // the first read uses the per-user key, not the legacy 'default' row.
   // In local mode awaitWorkspaceKeyReady resolves at module load.
   await awaitWorkspaceKeyReady();
+
+  // Phase 0.5: ask the browser to keep this origin's IndexedDB persistent so
+  // it is not evicted under storage pressure (PWA / iPad durability). Fire and
+  // forget — a refusal is recorded, never a reason to block local-first work.
+  void requestPersistentStorage().then((result) => {
+    if (result.status === 'denied') {
+      console.warn(
+        '[landroid] Persistent storage was not granted; the browser may evict '
+          + 'local data under storage pressure. Export a .landroid backup to keep '
+          + 'a permanent copy.'
+      );
+    } else {
+      console.info(`[landroid] Persistent storage: ${result.status}.`);
+    }
+  });
 
   // Phase 5 / A5b: one-shot v7 `.landroid` backup the first time the user
   // boots into a v8 schema. The Dexie v7→v8 migration is non-destructive
