@@ -1,0 +1,18 @@
+{
+  "id": "PERF-05",
+  "workflow": "Autosave debounce (sharded write)",
+  "fixture": "W2 Raven Forest via Combinatorial Demo seed (10 tracts, 1476 nodes)",
+  "editTiming": {
+    "wallClockMs": 41,
+    "browserDeltaMs": 41.7
+  },
+  "shardPersistencePoll": {
+    "saved": true,
+    "elapsedMs": 2276,
+    "lastModified": "2026-05-30T15:36:41.175Z",
+    "nodeCount": 1476,
+    "dbKey": "default"
+  },
+  "targetDebounceMs": 2000,
+  "capturedAt": "2026-05-30T15:36:41.457Z"
+}

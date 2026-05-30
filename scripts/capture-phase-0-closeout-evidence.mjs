@@ -10,6 +10,7 @@ const BASE_URL = process.argv[2] ?? 'http://127.0.0.1:5174/';
 const RUN_ID = process.argv[3] ?? '2026-05-24-codex-closeout';
 const OUTPUT_DIR = path.join('fixtures', 'phase-0', 'perf', RUN_ID);
 const PERF07_ONLY = process.argv.includes('--perf07-only');
+const AUTOSAVE_ONLY = process.argv.includes('--autosave-only');
 const LOAD_DEMO_CONFIRMATION_TEXT = 'LOAD DEMO';
 const LOAD_WORKSPACE_CONFIRMATION_TEXT = 'LOAD WORKSPACE';
 const MAX_RETAINED_PACKAGE_BYTES = 5 * 1024 * 1024;
@@ -133,26 +134,92 @@ async function readWorkspaceRecord(page) {
   });
 }
 
-async function pollSavedProjectName(page, expectedName, timeoutMs = 8_000) {
+async function readShardManifests(page) {
+  return page.evaluate(async () => {
+    const request = indexedDB.open('landroid-v2');
+    const db = await new Promise((resolve, reject) => {
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve(request.result);
+    });
+    try {
+      const tx = db.transaction('workspaceManifestShards', 'readonly');
+      const store = tx.objectStore('workspaceManifestShards');
+      const getAll = store.getAll();
+      return await new Promise((resolve, reject) => {
+        getAll.onerror = () => reject(getAll.error);
+        getAll.onsuccess = () => resolve(getAll.result ?? []);
+      });
+    } finally {
+      db.close();
+    }
+  });
+}
+
+// As of the shard writer, autosave persists the shard set (not the monolith),
+// so autosave timing must be measured by watching the shard manifest's
+// projectName / lastModified rather than the monolithic workspaces row.
+async function pollSavedShardManifest(page, expectedName, timeoutMs = 12_000) {
   const start = Date.now();
-  let lastRecord = null;
+  let last = null;
   while (Date.now() - start < timeoutMs) {
-    lastRecord = await readWorkspaceRecord(page);
-    if (lastRecord?.projectName === expectedName) {
+    const manifests = await readShardManifests(page);
+    const match = manifests.find(
+      (manifest) => manifest?.backendRecord?.projectName === expectedName
+    );
+    if (match) {
       return {
         saved: true,
         elapsedMs: Date.now() - start,
-        savedAt: lastRecord.savedAt,
+        lastModified: match.backendRecord.lastModified ?? null,
+        nodeCount: match.nodeCount ?? null,
+        dbKey: match.dbKey ?? null,
       };
     }
+    last = manifests[0] ?? null;
     await page.waitForTimeout(50);
   }
   return {
     saved: false,
     elapsedMs: Date.now() - start,
-    lastProjectName: lastRecord?.projectName ?? null,
-    savedAt: lastRecord?.savedAt ?? null,
+    lastProjectName: last?.backendRecord?.projectName ?? null,
   };
+}
+
+// Autosave-only capture at Raven Forest scale (10 tracts / 1476 nodes): load the
+// combinatorial demo, rename the project, and time how long the sharded write
+// takes to land in the manifest. Comparable to the pre-shard PERF-05 baseline.
+async function captureRavenForestAutosave(page) {
+  await loadDemo(
+    page,
+    /Combinatorial/,
+    'Load Combinatorial Demo?',
+    /Project name: .*Combinatorial Demo/
+  );
+  // Let the first autosave anchor the monolith and write the initial shard set.
+  await page.waitForTimeout(3_000);
+
+  const autosaveName = `Raven Forest Autosave ${Date.now()}`;
+  const editTiming = await timed(page, async () => {
+    await page.getByRole('button', { name: /Project name:/ }).click();
+    const projectNameInput = page.getByRole('textbox', { name: 'Project name' });
+    await projectNameInput.fill(autosaveName);
+    await projectNameInput.press('Enter');
+    await page
+      .getByRole('button', { name: new RegExp(`Project name: ${autosaveName}`) })
+      .waitFor({ state: 'visible' });
+  });
+  const shardPersist = await pollSavedShardManifest(page, autosaveName, 15_000);
+
+  await writeJson('perf-05-autosave-debounce.json', {
+    id: 'PERF-05',
+    workflow: 'Autosave debounce (sharded write)',
+    fixture: 'W2 Raven Forest via Combinatorial Demo seed (10 tracts, 1476 nodes)',
+    editTiming,
+    shardPersistencePoll: shardPersist,
+    targetDebounceMs: 2000,
+    capturedAt: new Date().toISOString(),
+  });
+  return { editTiming, shardPersist };
 }
 
 async function textOrNull(locator) {
@@ -276,6 +343,27 @@ async function main() {
       artifacts: [
         'machine-profile.txt',
         'perf-07-spreadsheet-parse.json',
+      ],
+    });
+    await context.close();
+    await browser.close();
+    return;
+  }
+
+  if (AUTOSAVE_ONLY) {
+    await captureRavenForestAutosave(page);
+    await writeJson('closeout-browser-run-summary.json', {
+      runId: RUN_ID,
+      baseUrl: BASE_URL,
+      capturedAt: new Date().toISOString(),
+      browser: await browser.version(),
+      viewport: { width: 1440, height: 1000 },
+      mode: 'autosave-only',
+      consoleMessages: capture.consoleMessages,
+      pageErrors: capture.pageErrors,
+      artifacts: [
+        'machine-profile.txt',
+        'perf-05-autosave-debounce.json',
       ],
     });
     await context.close();
@@ -417,11 +505,11 @@ async function main() {
       state: 'visible',
     });
   });
-  const autosavePersistResult = await pollSavedProjectName(page, autosaveName, 12_000);
+  const autosavePersistResult = await pollSavedShardManifest(page, autosaveName, 12_000);
 
   await writeJson('perf-05-autosave-debounce.json', {
     id: 'PERF-05',
-    workflow: 'Autosave debounce',
+    workflow: 'Autosave debounce (sharded write)',
     fixture: 'W1 Vulcan Mesa via Demo Data seed',
     fixtureChecksum: 'fixtures/phase-0/demo.sha256',
     beforeEditRecord: autosaveBeforeEditRecord
@@ -431,7 +519,7 @@ async function main() {
         }
       : null,
     editTiming: autosaveTiming,
-    persistencePoll: autosavePersistResult,
+    shardPersistencePoll: autosavePersistResult,
     targetDebounceMs: 2000,
     capturedAt: new Date().toISOString(),
   });
