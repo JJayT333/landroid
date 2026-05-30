@@ -6,29 +6,43 @@ session handoff lives in `CONTINUATION-PROMPT.md`.
 ## Now
 
 - Treat `docs/rebuild-plan.md` as the planning source of truth for any rebuild
-  work: current behavior inventory first, then workspace storage sharding,
-  project record schema, evidence-grade document vault, source attestations,
-  import/action layers, and only then workflow cutovers. Preserve dual decimal
-  plus fraction display, print fidelity, in-flight migration safety, and
-  citation verification as rebuild contracts.
-- Before Phase 1 rebuild implementation, define the Phase 0 exit artifacts:
-  frozen reference workspaces, atomic behavior catalog rows, measured
-  performance baselines, CI-running golden masters, and the `.landroid`
-  migration/backup rule for in-flight projects.
-- Run the next deep review as a Phase 0 ultra-review, not another broad rebuild
-  audit. It should define the inventory lanes, behavior catalog format, fixture
-  plan, baselines, validation commands, and Phase 0 exit gate.
-- Execute Phase 0 lane by lane under one lead source-of-truth thread. Secondary
-  agents may do read-only lane reviews, but the lead thread consolidates
-  findings into the master inventory and docs.
-- After Phase 0, run a Phase 0.75 backend architecture decision before storage
-  or schema implementation. If approved, add a backend spine for durable
-  records, object storage, background jobs, search, server-controlled AI/RAG,
-  audit logs, backup/sync, and future permissions while keeping `.landroid`
-  package export mandatory.
-- Plan Phase 0.5 workspace sharding in Dexie before broad record-schema work so
-  Raven Forest scale does not depend on one large autosaved JSON workspace row;
-  revise this step if the Phase 0.75 backend decision changes the storage path.
+  work: Phase 0 current-behavior inventory is closed, Phase 0.75 minimal
+  backend spine is implemented and deployed, Phase 0.5 workspace sharding
+  scaffolding has started, then project record schema, evidence-grade document
+  vault, source attestations, import/action
+  layers, and only then workflow cutovers. Preserve dual decimal plus fraction
+  display, print fidelity, in-flight migration safety, and citation
+  verification as rebuild contracts.
+- Keep `docs/phase-0-inventory.md` as the closed Phase 0 behavior catalog.
+  Future-contract goldens remain parked for the implementation phase that
+  creates each behavior, and lane rows should be re-verified before that lane is
+  changed.
+- Phase 0.75 checkpoint: the minimal backend-spine slice is implemented,
+  deployed, committed, and pushed. It covers shared backend-shaped record/API
+  contracts, local/mock/hosted adapter boundaries, a backend-spine
+  health/session/record-validation package, a non-user-facing app startup
+  contract check, hosted `/api/spine/*` Lambda/rewrite packaging, and a
+  threat-model note. Keep full backend storage, object storage, OCR/search
+  jobs, sync, sharing, collaboration, and multi-user permissions behind later
+  gates.
+- Phase 0.5 active implementation: shard the monolithic `workspaces.data` JSON
+  inside Dexie against the Phase 0.75 record envelope before broad
+  record-schema work, while preserving current user-visible behavior. The first
+  code slices are still behavior-preserving: backend-spine manifest and Desk
+  Map shard builders, local-only compatibility rows, autosave debounce naming,
+  write-lease decision logic, lazy document-registry guard tests, and the Dexie
+  v10 shard table upgrade. Runtime workspace load is shard-first with monolith
+  fallback and startup warnings for shard fallback. The edit-stranding
+  regression is now resolved: autosave writes the shard set (gated by the
+  single-writer lease) instead of the monolith, the reader is recency-aware
+  (a strictly newer monolith wins over stale shards), and shard reads/writes
+  are scoped by the active per-user DB key, which also closes the cross-user
+  shard leak. The monolithic `workspaces.data` row is now a frozen migration
+  backup the reader falls back to with a loud warning. Remaining Phase 0.5
+  work: a visible read-only/"editing elsewhere" banner for non-writer tabs,
+  canvas-autosave lease gating, lazy blob loading, and persistent-storage
+  requests.
+- Preserve `.landroid` package export permanently even after sync/backend work.
 - Promote the Evidence Vault contract: immutable originals, SHA-256 hashes,
   document versions, extraction runs, citation anchors, hash-continuity audit
   events, and deterministic packet manifests.
@@ -68,9 +82,13 @@ session handoff lives in `CONTINUATION-PROMPT.md`.
 - Design the hybrid retrieval contract for future AI Q&A: exact/keyword search,
   vector recall, graph/schema traversal tools, deterministic math tools, rank
   fusion, and a `CitationVerifier` gate before answers display.
-- Execute Phase 0/1 of `DEPLOYMENT_PLAN.md`: hosted frontend, backend boundary,
-  auth, cloud save path, and server-side AI proxy before any broad internet
-  exposure.
+- Keep LANDroid hosted-web/PWA first. Native iOS and desktop installers remain
+  deferred; Capacitor is a future option only if app-store distribution becomes
+  a product requirement.
+- Add safety-oriented storage UX after the inventory gates: rolling auto-export
+  to a user-selected local folder where supported, a manual Backup Now path, and
+  a visible storage health indicator showing last saved, last exported, and
+  browser storage status.
 - Design the project picker landing page after adding a real multi-workspace
   saved-project index instead of the current single autosave slot.
 - Promote unit metadata to first-class records if future units need separate
@@ -82,14 +100,26 @@ session handoff lives in `CONTINUATION-PROMPT.md`.
   workflows after the document vault and import-session foundations are ready.
 - Design `OpinionDraft`, `ObligationCalendar`, and `AbstractorPackage`
   projections after the record schema and evidence vault are explicit.
+- Plan template-driven communication generation as a later product lane:
+  workspace `.docx` templates, `{{variable}}` placeholders, variable manifest
+  sidecars, manual fill fallback, AI-assisted fill through approval previews,
+  and generated output saved back to the Evidence Vault.
+- Plan universal command/search and inline AI as later product lanes: cross-app
+  Cmd+K search over records/documents and contextual "Ask AI about this" on
+  cards, rows, chips, documents, and fractions.
+- Plan a professional three-pane Documents workflow after the vault model is
+  explicit: filter tree, dense document list, metadata/preview panel, and
+  saved views modeled after legal/eDiscovery document-management workflows.
 
 ## Later
 
 - Evaluate SQLite WASM in OPFS, cloud object storage, and Tauri 2 desktop shell
   only at documented decision gates; do not make them Phase 1 defaults.
-- If Phase 0.75 approves a backend spine, build it as infrastructure for
-  storage, jobs, search, AI policy, audit, backup, and sync, not as a wholesale
-  SaaS rewrite that removes local project semantics.
+- Expand the backend beyond the Phase 0.75 spine only when a hard trigger
+  appears. Later expansion should provide durable project storage, sync,
+  backup, object storage, OCR/jobs, search, AI/RAG policy, audit, sharing, and
+  future permissions, not a wholesale SaaS rewrite that removes local project
+  semantics.
 - Federal/private Phase 2 math only after the reference workspace and source
   packet workflow are stable enough for that gate.
 - Revisit the Texas math-engine expansion plan in detail before implementation:

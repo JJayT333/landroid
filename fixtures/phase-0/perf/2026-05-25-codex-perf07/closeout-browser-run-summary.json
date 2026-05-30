@@ -1,0 +1,17 @@
+{
+  "runId": "2026-05-25-codex-perf07",
+  "baseUrl": "http://127.0.0.1:5173/",
+  "capturedAt": "2026-05-25T13:38:10.291Z",
+  "browser": "147.0.7727.15",
+  "viewport": {
+    "width": 1440,
+    "height": 1000
+  },
+  "mode": "perf07-only",
+  "consoleMessages": [],
+  "pageErrors": [],
+  "artifacts": [
+    "machine-profile.txt",
+    "perf-07-spreadsheet-parse.json"
+  ]
+}

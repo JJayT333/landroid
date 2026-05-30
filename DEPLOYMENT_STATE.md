@@ -2,7 +2,7 @@
 
 Point-in-time hosted deployment map for the current POC.
 
-Last updated: 2026-05-20.
+Last updated: 2026-05-26.
 
 ## Frontend
 
@@ -62,6 +62,43 @@ npm run bundle
 
 Then upload `backend/ai-proxy/lambda.zip` to `landroid-ai-proxy`.
 
+## Backend Spine
+
+- AWS service: Lambda
+- AWS region: `us-east-1`
+- Function name: `landroid-backend-spine`
+- Runtime: Node.js 22.x
+- Architecture: `arm64`
+- Handler: `backend/spine/src/lambda.handler`
+- Execution role: `landroid-backend-spine-role`
+- Function URL host:
+  `pdnipzleitt4l6dihshut54is40prgzk.lambda-url.us-east-1.on.aws`
+- Amplify rewrite: `/api/spine/<*>` proxies to the Backend Spine Lambda
+  Function URL before the SPA fallback rule.
+
+Required Lambda environment variables:
+
+```text
+COGNITO_USER_POOL_ID=us-east-1_TWeBB7xvQ
+COGNITO_CLIENT_ID=6os4uiu0b46pf74nhbrm5gsg0v
+```
+
+Lambda deploy behavior:
+
+- Frontend changes auto-deploy from `main`.
+- Backend spine changes under `backend/spine` do not auto-deploy yet.
+- Latest manual Lambda deploy: 2026-05-26 from
+  `backend/spine/lambda.zip`.
+- To build the deployable zip manually:
+
+```bash
+cd backend/spine
+npm ci
+npm run bundle
+```
+
+Then upload `backend/spine/lambda.zip` to `landroid-backend-spine`.
+
 ## Usage Tracking
 
 - AWS service: DynamoDB
@@ -98,12 +135,26 @@ Automated hosted smoke:
 bash scripts/smoke-test-hosted.sh
 ```
 
+Latest automated hosted smoke:
+
+- Date: 2026-05-26
+- Result: passed.
+- Coverage: root HTML, security headers, unauthenticated `/api/ai/*`
+  rejection, `/api/spine/health` 200, unauthenticated `/api/spine/session`
+  401, unauthenticated `/api/spine/validate-records` 401, oversized
+  `/api/spine/validate-records` 413, SPA fallback, and Cognito metadata/JWKS.
+- Direct backend-spine Function URL checks also passed for health 200,
+  unauthenticated session/validation 401, oversized validation 413, and
+  structured CloudWatch request/reject logs.
+
 Manual hosted smoke:
 
 1. Open `https://landroid.abstractmapping.com`.
 2. Sign in with Cognito.
 3. Confirm the app loads and the hosted user menu appears.
 4. Open `Ask LANDroid AI` and send `hello`.
-5. Confirm CloudWatch logs show an authenticated `evt: "request"` and
+5. Confirm `/api/spine/health` returns the backend-spine health JSON and that
+   `/api/spine/session` rejects without a token.
+6. Confirm CloudWatch logs show an authenticated `evt: "request"` and
    DynamoDB records a usage row.
-6. Use `Demo Data` to load `Crackbaby Carnival — Demo`.
+7. Use `Demo Data` to load `Vulcan Mesa — Demo`.

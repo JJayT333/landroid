@@ -1,0 +1,46 @@
+{
+  "schema": 1,
+  "capturedAt": "2026-05-24",
+  "branch": "codex/phase-0-reconcile-2026-05-23",
+  "fixture": "Two Playwright tabs sharing one browser context after W1 Vulcan Mesa demo load",
+  "command": "npm run dev -- --host 127.0.0.1",
+  "browser": "Playwright Chromium headless",
+  "viewport": {
+    "width": 1440,
+    "height": 1000
+  },
+  "setup": {
+    "sharedBrowserContext": true,
+    "tab1LoadedDemo": true,
+    "tab2OpenedSameOriginAfterAutosaveWaitMs": 2500
+  },
+  "tab1": {
+    "hasVulcanMesa": true,
+    "hasVm1": true,
+    "saveWorkspaceButtonVisible": false,
+    "addRootVisible": true,
+    "warningTermsVisible": []
+  },
+  "tab2": {
+    "hasVulcanMesa": true,
+    "hasVm1": true,
+    "saveWorkspaceButtonVisible": false,
+    "addRootVisible": true,
+    "warningTermsVisible": [],
+    "bodySample": "LANDroid\nVulcan Mesa — Demo (10 Tracts, 79 nodes)\nDesk Map\nLeasehold\nFlowchart\nRunsheet\nDocuments\nOwners\nCurative\nMaps\nSales Deck\nFederal Leasing\nResearch\nFile ▾\nDemo Data ▾\nJUPITER FLATS UNIT\nVM1 — Apollo Draw\n×\nVM2 — Widow's Aegis\nVM3 — Mercury Cutoff\nVM4 — Vulcan Gulch\nVM5 — Last Centurion\nMINERVA DRAW UNIT\nVM6 — Jupiter Spur\nVM7 — Minotaur Fork\nVM8 — Probate Styx\nVM9 — Minerva's Bequest\nVM10 — Roughneck Olympus\n+ Add Tract\n▾\n+ Add Root\nClear Map\n7 cards\nℹ\nAdd more than one root when title starts from separate families. Temporary coverage over 100% is okay until you reconcile farther back in title.\nFIND MINERAL OWNER\nMINERAL COVERAGE\nFOUND IN CHAIN\n1/1\n100.00%\nBalanced at 100%\nLINKED OWNERS\n1/1\n100.00%\nAll current owners linked\nLEASED\n1/1\n100.00%\nFully leased\n3 present owners\n3 linked\n3 leased\nFit\nPATENT\n1872-03-15\nVol. 1 / Pg. 101 — Doc# VM1-PAT\nFrom: State of Texas\nP. T. Broncus\nGRANTED\n1/1\nOF WHOLE\n1/1\nCONVEYED ALL\n—\nWARRANTY DEED\n1948-04-12\nVol. 201 / Pg. 36 — Doc# VM1-WD-001\nFrom: P. T. Broncus\nBuster 'Janus' McGraw\nPDF\n09-4292.pdf\nGRANTED\n1/2\nOF WHOLE\n1/2\nOIL & GAS LEASE\nLESSEE\n2024-01-01 • Doc# VM1-OGL-001\nLessor: Buster 'Janus' McGraw\nVulcan Mesa Petroleum, LLC\nLease: VM"
+  },
+  "observedProtection": {
+    "lockOrReadOnlyBannerVisible": false,
+    "secondTabAppearsEditable": true,
+    "conflictResolutionPromptVisible": false
+  },
+  "console": {
+    "errorCount": 0,
+    "errors": []
+  },
+  "notes": [
+    "Smoke records current multi-tab surface only; it does not intentionally perform conflicting edits.",
+    "Both tabs opened against the same browser context so IndexedDB/local storage are shared.",
+    "Absence of a visible lock/read-only/conflict warning matches the Phase 0 inventory risk that multi-tab overwrite behavior lacks protection."
+  ]
+}

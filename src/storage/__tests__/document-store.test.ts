@@ -50,6 +50,14 @@ async function loadDocumentStoreWithRows({
   );
   const db = {
     documents: {
+      where: vi.fn((field: string) => ({
+        equals: vi.fn((workspaceId: string) => ({
+          toArray: vi.fn(async () => {
+            if (field !== 'workspaceId') return [];
+            return [...docRows.values()].filter((doc) => doc.workspaceId === workspaceId);
+          }),
+        })),
+      })),
       bulkDelete: vi.fn(async (docIds: string[]) => {
         for (const docId of docIds) docRows.delete(docId);
       }),
@@ -131,5 +139,36 @@ describe('document-store', () => {
     expect(attachmentRows.has('att-shared-survivor')).toBe(true);
     expect(docRows.has('doc-shared')).toBe(true);
     expect(docRows.has('doc-orphan')).toBe(false);
+  });
+
+  it('lists registry metadata without loading document blobs', async () => {
+    const { documentStore } = await loadDocumentStoreWithRows({
+      documents: [
+        fakeDocument({
+          docId: 'doc-1',
+          workspaceId: 'ws-1',
+          fileName: 'deed.pdf',
+        }),
+      ],
+      attachments: [fakeAttachment({ docId: 'doc-1', workspaceId: 'ws-1' })],
+    });
+
+    const registryData = await documentStore.listDocumentRegistryData('ws-1');
+
+    expect(registryData.documents).toEqual([
+      expect.objectContaining({
+        docId: 'doc-1',
+        workspaceId: 'ws-1',
+        fileName: 'deed.pdf',
+      }),
+    ]);
+    expect('blob' in registryData.documents[0]!).toBe(false);
+    expect(registryData.attachments).toEqual([
+      expect.objectContaining({
+        attachmentId: 'att-1',
+        docId: 'doc-1',
+        workspaceId: 'ws-1',
+      }),
+    ]);
   });
 });

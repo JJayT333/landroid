@@ -1,7 +1,7 @@
 /**
  * Workspace persistence — auto-save to IndexedDB, export/import .landroid files.
  */
-import db, { type PdfAttachment } from './db';
+import db, { type PdfAttachment, type WorkspaceRecord } from './db';
 import {
   deserializeBlob,
   deserializePdfBlob,
@@ -81,6 +81,14 @@ import type { CurativeWorkspaceData } from './curative-persistence';
 import { normalizeTitleIssues, type TitleIssue } from '../types/title-issue';
 import { resolveActiveUnitCode } from '../utils/desk-map-units';
 import { getWorkspaceDbKey } from './active-workspace-key';
+import { LANDROID_FILE_VERSION } from './landroid-file-version';
+import { readWorkspaceFromShardRows } from './workspace-shard-reader';
+import {
+  buildWorkspaceShards,
+  type WorkspaceManifestShard,
+} from './workspace-shards';
+import { ensureWorkspaceWritable } from './workspace-write-lease';
+export { LANDROID_FILE_VERSION } from './landroid-file-version';
 const PAGE_SIZE_ID_SET = new Set<PageSizeId>(
   PAGE_SIZE_DEFINITIONS.map((definition) => definition.id)
 );
@@ -123,6 +131,8 @@ export interface WorkspaceLoadResult {
   status: 'missing' | 'loaded' | 'corrupt';
   data: WorkspaceData | null;
   error: string | null;
+  warning: string | null;
+  source: 'shards' | 'monolith' | null;
 }
 
 interface SerializedOwnerDoc extends Omit<OwnerDoc, 'blob'> {
@@ -562,41 +572,306 @@ export function parsePersistedWorkspaceData(raw: string): WorkspaceData {
   return normalizeWorkspaceDataRecord(parsed as Partial<WorkspaceData>, 'Invalid saved workspace');
 }
 
-// ── Auto-save to IndexedDB ─────────────────────────────
-
-export async function saveWorkspaceToDb(data: WorkspaceData): Promise<void> {
-  await db.workspaces.put({
-    id: getWorkspaceDbKey(),
-    projectName: data.projectName,
-    data: JSON.stringify(data),
-    savedAt: new Date().toISOString(),
-  });
-}
-
-export async function loadWorkspaceFromDb(): Promise<WorkspaceLoadResult> {
-  const record = await db.workspaces.get(getWorkspaceDbKey());
+function parseWorkspaceRecord(
+  record: WorkspaceRecord | null | undefined
+): {
+  data: WorkspaceData | null;
+  error: string | null;
+} {
   if (!record) {
-    return {
-      status: 'missing',
-      data: null,
-      error: null,
-    };
+    return { data: null, error: null };
   }
-
   try {
     return {
-      status: 'loaded',
       data: parsePersistedWorkspaceData(record.data),
       error: null,
     };
   } catch (error) {
-    const reason = error instanceof Error ? error.message : 'unknown corruption';
     return {
-      status: 'corrupt',
       data: null,
-      error: `Saved workspace could not be restored because ${reason}. LANDroid opened a fresh workspace instead.`,
+      error: error instanceof Error ? error.message : 'unknown corruption',
     };
   }
+}
+
+type LoadedWorkspaceShardRows = Pick<
+  Parameters<typeof readWorkspaceFromShardRows>[0],
+  'manifest' | 'deskMaps' | 'nodes' | 'leaseholdState' | 'uiState'
+>;
+
+const EMPTY_SHARD_ROWS: LoadedWorkspaceShardRows = {
+  manifest: null,
+  deskMaps: [],
+  nodes: [],
+  leaseholdState: null,
+  uiState: null,
+};
+
+async function loadWorkspaceShardRows(args: {
+  dbKey: string;
+  monolithWorkspaceId: string | null;
+}): Promise<LoadedWorkspaceShardRows> {
+  const manifests = await db.workspaceManifestShards.toArray();
+  // Prefer the manifest written under the active per-user DB key. Only fall
+  // back to a legacy v10 manifest (written before the dbKey field existed) when
+  // it matches THIS user's monolith workspace id — never adopt a foreign user's
+  // manifest, which previously leaked another user's workspace to a fresh
+  // hosted sign-in (Bug 001).
+  const manifest =
+    manifests.find((row) => row.dbKey === args.dbKey)
+    ?? (args.monolithWorkspaceId
+      ? manifests.find(
+          (row) =>
+            (row.dbKey === undefined || row.dbKey === null)
+            && row.workspaceId === args.monolithWorkspaceId
+        )
+      : undefined)
+    ?? null;
+
+  if (!manifest) {
+    return EMPTY_SHARD_ROWS;
+  }
+
+  const resolvedWorkspaceId = manifest.workspaceId;
+  const [deskMaps, nodes, leaseholdStates, uiStates] = await Promise.all([
+    db.deskMapShards.where('workspaceId').equals(resolvedWorkspaceId).toArray(),
+    db.ownershipNodeCompatShards
+      .where('workspaceId')
+      .equals(resolvedWorkspaceId)
+      .toArray(),
+    db.leaseholdStateShards
+      .where('workspaceId')
+      .equals(resolvedWorkspaceId)
+      .toArray(),
+    db.workspaceUiStateShards
+      .where('workspaceId')
+      .equals(resolvedWorkspaceId)
+      .toArray(),
+  ]);
+
+  return {
+    manifest,
+    deskMaps,
+    nodes,
+    leaseholdState: leaseholdStates[0] ?? null,
+    uiState: uiStates[0] ?? null,
+  };
+}
+
+// ── Auto-save to IndexedDB ─────────────────────────────
+
+export interface SaveWorkspaceShardsResult {
+  status: 'written' | 'blocked';
+}
+
+export interface SaveWorkspaceShardsDeps {
+  /** Override the manifest `lastModified` timestamp source (tests). */
+  now?: () => string;
+  /** Override the single-writer lease gate (tests). */
+  ensureWritable?: (workspaceId: string) => Promise<boolean>;
+}
+
+function defaultShardTimestamp(): string {
+  return new Date().toISOString();
+}
+
+/**
+ * The workspace id the monolithic backup row for the active DB key currently
+ * describes, tracked in-memory so the shard writer can re-anchor it exactly
+ * once when the active workspace changes (import / CSV / fresh install).
+ * `loadWorkspaceFromDb` seeds it from the row it reads; `undefined` means
+ * "not yet observed this session".
+ */
+let anchoredMonolithWorkspaceId: string | null | undefined;
+
+/**
+ * Autosave path (Phase 0.5): rebuild the workspace shard set from the current
+ * {@link WorkspaceData} and write all five shard tables in a single Dexie
+ * transaction so a mid-write failure cannot leave an incomplete set. The write
+ * is gated by the single-writer lease — a read-only tab returns
+ * `{ status: 'blocked' }` without touching storage.
+ *
+ * The monolithic `workspaces` row is not rewritten on every autosave (that
+ * would preserve the scale bottleneck Phase 0.5 removes). It is re-anchored at
+ * most once per workspace change so the frozen backup always describes the
+ * CURRENT workspace: after a `.landroid` import replaces workspace A with B, a
+ * later shard corruption must fall back to B, not the stale pre-import A. For a
+ * migrated workspace edited in place, the workspace id is unchanged so the
+ * migration-time backup is left untouched.
+ */
+export async function saveWorkspaceShardsToDb(
+  data: WorkspaceData,
+  deps: SaveWorkspaceShardsDeps = {}
+): Promise<SaveWorkspaceShardsResult> {
+  const ensureWritable = deps.ensureWritable ?? ensureWorkspaceWritable;
+  if (!(await ensureWritable(data.workspaceId))) {
+    return { status: 'blocked' };
+  }
+
+  const dbKey = getWorkspaceDbKey();
+  const lastModified = (deps.now ?? defaultShardTimestamp)();
+  const shards = buildWorkspaceShards(data, {
+    lastModified,
+    landroidFileVersion: LANDROID_FILE_VERSION,
+    source: 'local',
+    syncState: 'local_only',
+  });
+  const manifest: WorkspaceManifestShard = { ...shards.manifest, dbKey };
+  const { workspaceId } = data;
+  // Re-anchor the monolithic backup only when it does not already describe this
+  // workspace (a fresh install, or an import/CSV that swapped the workspace).
+  const shouldAnchorMonolith = anchoredMonolithWorkspaceId !== workspaceId;
+
+  await db.transaction(
+    'rw',
+    [
+      db.workspaces,
+      db.workspaceManifestShards,
+      db.deskMapShards,
+      db.ownershipNodeCompatShards,
+      db.leaseholdStateShards,
+      db.workspaceUiStateShards,
+    ],
+    async () => {
+      // Replace the per-workspace child rows wholesale so removed desk maps or
+      // nodes cannot linger as orphans, then write the fresh complete set. A
+      // throw anywhere here rolls the whole transaction back, leaving the prior
+      // complete shard set intact.
+      await db.deskMapShards.where('workspaceId').equals(workspaceId).delete();
+      await db.ownershipNodeCompatShards
+        .where('workspaceId')
+        .equals(workspaceId)
+        .delete();
+      await db.workspaceManifestShards.put(manifest);
+      if (shards.deskMaps.length > 0) {
+        await db.deskMapShards.bulkPut(shards.deskMaps);
+      }
+      if (shards.nodes.length > 0) {
+        await db.ownershipNodeCompatShards.bulkPut(shards.nodes);
+      }
+      await db.leaseholdStateShards.put(shards.leaseholdState);
+      await db.workspaceUiStateShards.put(shards.uiState);
+      if (shouldAnchorMonolith) {
+        await db.workspaces.put({
+          id: dbKey,
+          projectName: data.projectName,
+          data: JSON.stringify(data),
+          savedAt: lastModified,
+        });
+      }
+    }
+  );
+
+  if (shouldAnchorMonolith) {
+    anchoredMonolithWorkspaceId = workspaceId;
+  }
+  return { status: 'written' };
+}
+
+/**
+ * Drop every workspace shard row written under the active per-user DB key.
+ * Called on workspace replacement / sign-out so the next workspace (or hosted
+ * user) starts from a clean shard set instead of inheriting stale rows. Legacy
+ * rows without a dbKey are left untouched because they may belong to another
+ * hosted user on the same browser profile.
+ */
+export async function clearWorkspaceShardsForActiveKey(): Promise<void> {
+  const dbKey = getWorkspaceDbKey();
+  const manifests = await db.workspaceManifestShards.toArray();
+  const workspaceIds = manifests
+    .filter((row) => row.dbKey === dbKey)
+    .map((row) => row.workspaceId);
+  if (workspaceIds.length === 0) {
+    return;
+  }
+
+  await db.transaction(
+    'rw',
+    [
+      db.workspaceManifestShards,
+      db.deskMapShards,
+      db.ownershipNodeCompatShards,
+      db.leaseholdStateShards,
+      db.workspaceUiStateShards,
+    ],
+    async () => {
+      for (const workspaceId of workspaceIds) {
+        await db.workspaceManifestShards
+          .where('workspaceId')
+          .equals(workspaceId)
+          .delete();
+        await db.deskMapShards.where('workspaceId').equals(workspaceId).delete();
+        await db.ownershipNodeCompatShards
+          .where('workspaceId')
+          .equals(workspaceId)
+          .delete();
+        await db.leaseholdStateShards
+          .where('workspaceId')
+          .equals(workspaceId)
+          .delete();
+        await db.workspaceUiStateShards
+          .where('workspaceId')
+          .equals(workspaceId)
+          .delete();
+      }
+    }
+  );
+}
+
+export async function loadWorkspaceFromDb(): Promise<WorkspaceLoadResult> {
+  const dbKey = getWorkspaceDbKey();
+  const record = await db.workspaces.get(dbKey);
+  const monolith = parseWorkspaceRecord(record);
+  // Seed the anchor tracker from the row we just read so the next shard write
+  // only re-anchors the backup if the active workspace actually changes.
+  anchoredMonolithWorkspaceId = monolith.data?.workspaceId ?? null;
+  const shardRows = await loadWorkspaceShardRows({
+    dbKey,
+    monolithWorkspaceId: monolith.data?.workspaceId ?? null,
+  });
+  const readResult = readWorkspaceFromShardRows(
+    {
+      ...shardRows,
+      monolithData: monolith.data,
+      monolithError: monolith.error,
+      monolithSavedAt: record?.savedAt ?? null,
+    },
+    {
+      validateWorkspaceData: (data) =>
+        parsePersistedWorkspaceData(JSON.stringify(data)),
+    }
+  );
+
+  if (readResult.status === 'missing') {
+    return {
+      status: 'missing',
+      data: null,
+      error: null,
+      warning: null,
+      source: null,
+    };
+  }
+
+  if (readResult.status !== 'corrupt') {
+    return {
+      status: 'loaded',
+      data: readResult.data,
+      error: null,
+      warning: readResult.warning,
+      source:
+        readResult.status === 'loaded_from_shards'
+          ? 'shards'
+          : 'monolith',
+    };
+  }
+
+  return {
+    status: 'corrupt',
+    data: null,
+    error: `${readResult.error} LANDroid opened a fresh workspace instead.`,
+    warning: null,
+    source: null,
+  };
 }
 
 // ── Export .landroid file ───────────────────────────────
@@ -838,8 +1113,6 @@ async function serializeResearchData(
  * omits the legacy `pdfData` field. Imports of v7 (or earlier) files
  * are migrated inline by {@link importLandroidFile}.
  */
-export const LANDROID_FILE_VERSION = 8;
-
 export async function exportLandroidFile(data: LandroidFileData): Promise<Blob> {
   const payload = {
     version: LANDROID_FILE_VERSION,
@@ -933,9 +1206,12 @@ export async function exportDocumentWorkspaceData(
     .equals('node')
     .and((row) => nodeIds.includes(row.entityId))
     .toArray();
-  if (attachments.length === 0) return { documents: [], attachments: [] };
+  const scopedAttachments = attachments.filter(
+    (row) => row.workspaceId === workspaceId
+  );
+  if (scopedAttachments.length === 0) return { documents: [], attachments: [] };
 
-  const docIds = [...new Set(attachments.map((a) => a.docId))];
+  const docIds = [...new Set(scopedAttachments.map((a) => a.docId))];
   const docs = await db.documents.bulkGet(docIds);
   const documents: DocumentRecord[] = [];
   const docIdSeen = new Set<string>();
@@ -947,7 +1223,7 @@ export async function exportDocumentWorkspaceData(
   }
   return {
     documents,
-    attachments: attachments.filter((a) => docIdSeen.has(a.docId)),
+    attachments: scopedAttachments.filter((a) => docIdSeen.has(a.docId)),
   };
 }
 

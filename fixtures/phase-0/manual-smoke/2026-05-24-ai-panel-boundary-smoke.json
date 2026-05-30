@@ -1,0 +1,61 @@
+{
+  "schema": 1,
+  "capturedAt": "2026-05-24",
+  "branch": "codex/phase-0-reconcile-2026-05-23",
+  "fixture": "Vulcan Mesa demo via Demo Data menu",
+  "command": "npm run dev -- --host 127.0.0.1",
+  "browser": "Playwright Chromium headless",
+  "viewport": {
+    "width": 1440,
+    "height": 1000
+  },
+  "loadGuard": {
+    "requiredPhrase": "LOAD DEMO",
+    "confirmed": true
+  },
+  "aiPanel": {
+    "opened": true,
+    "header": "LANDroid AI",
+    "defaultProviderBadge": "OLLAMA · GPT-OSS:20B",
+    "tabs": [
+      "Chat",
+      "Import wizard"
+    ],
+    "promptCopy": "Ask about the current project, a tract, a lessor, or a mineral-math scenario. All active calculations assume Texas oil-and-gas rules.",
+    "chatInputPlaceholder": "Ask LANDroid AI...",
+    "sendDisabledWhenInputEmpty": true
+  },
+  "settingsPanel": {
+    "opened": true,
+    "providers": [
+      "Ollama (local)",
+      "OpenAI",
+      "Anthropic"
+    ],
+    "selectedProvider": "ollama",
+    "model": "gpt-oss:20b",
+    "ollamaBaseUrl": "http://localhost:11434/v1",
+    "ollamaCorsCopyPresent": true
+  },
+  "approvalBoundaryValidation": {
+    "llmMutationAttempted": false,
+    "reason": "Phase 0 smoke should not depend on a live LLM or external provider. Approval boundaries were validated by targeted AI unit tests instead.",
+    "command": "npm test -- src/ai/__tests__/approval-preview.test.ts src/ai/__tests__/approval-store.test.ts src/ai/__tests__/action-journal.test.ts src/ai/__tests__/chat-context.test.ts src/ai/__tests__/system-prompt.test.ts",
+    "result": {
+      "passedFiles": 4,
+      "passedTests": 12,
+      "note": "The approval-store path in the command did not correspond to a runnable test file in this checkout; Vitest ran the existing matching files."
+    }
+  },
+  "console": {
+    "warningCount": 0,
+    "errorCount": 0,
+    "messages": [],
+    "pageErrors": []
+  },
+  "notes": [
+    "This smoke records visible AI panel and provider settings behavior.",
+    "It does not call a cloud model, local Ollama, or create a mutating proposal.",
+    "Mutating proposal approval, blocked-preview behavior, action-journal context, and system-prompt integrity are covered by targeted unit tests."
+  ]
+}

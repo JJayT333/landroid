@@ -1,0 +1,32 @@
+{
+  "purpose": "PERF-07 spreadsheet import parse-only baseline fixture.",
+  "generatedAt": "2026-05-23T17:00:00.000Z",
+  "generator": "scripts/generate-phase-0-fixtures.ts",
+  "fileName": "import-stress.csv",
+  "dataRowCount": 5000,
+  "rowCountIncludingHeader": 5001,
+  "columnCount": 14,
+  "sampledRowCount": 150,
+  "headers": [
+    "Tract",
+    "Instrument",
+    "Order by Date",
+    "Image Path",
+    "Vol",
+    "Page",
+    "Inst. No.",
+    "File Date",
+    "Inst./Eff. Date",
+    "Grantor",
+    "Grantee",
+    "Land Desc.",
+    "Interest",
+    "Remarks"
+  ],
+  "csvSha256": "3b01c53a75765af9e98efef00204837c880109caaf271b8ecd632ac23d4c92d3",
+  "notes": [
+    "Contains deterministic landman-like rows but no real title data.",
+    "Includes quoted comma/quote cells so CSV escaping stays represented.",
+    "Designed for parse-only timing; do not apply these rows to a workspace."
+  ]
+}

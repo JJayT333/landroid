@@ -12,12 +12,19 @@ file records the security assumptions future changes should preserve or revisit.
 - Hosted deployment is a POC surface: Cognito gates the app, AI calls go
   through the Lambda proxy, and workspace autosave remains browser IndexedDB
   scoped by Cognito `sub` rather than a shared backend project database.
-- Rebuild planning keeps LANDroid local-first for now. Workspace sharding,
-  evidence-vault packaging, and citation verification come before any backend,
-  Tauri, cloud object-storage, or cloud OCR source-of-truth change.
-- After Phase 0, LANDroid has a Phase 0.75 backend architecture decision gate.
-  If a backend spine is approved, it must have an explicit threat model before
-  implementation and must preserve complete local project-package export.
+- Rebuild planning keeps LANDroid local-first. Phase 0.75 now adds a minimal
+  backend spine before Phase 0.5 storage sharding: shared record/API contracts,
+  local/hosted adapter boundaries, hosted auth/session proof, and
+  health/record-validation endpoints. Full backend storage, object storage,
+  OCR/search jobs, sync, sharing, collaboration, and multi-user permissions
+  remain later gates.
+- Backend sync must not become an excuse to remove offline core workflows or
+  complete `.landroid` package export. The minimal backend spine must have an
+  explicit threat-model note before implementation and must preserve complete
+  local project-package export.
+- PWA/iPad support is a product target. Browser storage must be treated as
+  evictable unless persistent storage is requested and granted; the app should
+  surface storage/export health instead of hiding durability risk.
 
 ## Sensitive Data
 
@@ -30,6 +37,85 @@ Treat these as sensitive:
 - research notes and project records
 - AI prompts and chat context
 - cloud provider API keys
+
+## Rebuild Security Direction
+
+The planned rebuild direction should be more secure than the current app only
+if the safety gates in the rebuild plan are implemented. The current app has
+good local containment, but it still depends heavily on one browser profile and
+manual `.landroid` exports. That is a durability risk, not a privacy win.
+
+Security improvements the rebuild should preserve or add:
+
+- sharded local records instead of one opaque workspace blob
+- stable record IDs, `workspaceId` scoping, and `lastModified` / version fields
+  for future sync conflict detection
+- content-hash addressing for document blobs and packet artifacts
+- immutable original document bytes plus derivative OCR/index records
+- visible storage health: last saved, last exported, browser storage status,
+  and backup/export warnings
+- rolling `.landroid` auto-export where the browser platform supports it
+- persistent-storage requests for PWA/iPad use, with visible fallback when the
+  browser refuses
+- multi-tab or concurrent-writer protection before sharded storage is treated
+  as production-safe
+- a minimal backend spine with server-side authorization, body limits,
+  tenant/user boundary checks, and strict record validation before any hosted
+  project data path expands
+- private backend object storage, signed URLs, and encryption at rest when
+  later object storage is triggered
+- citation-verified AI answers and approval-gated mutations with undo
+
+Phase 0.5 storage-sharding security rules:
+
+- Sharded Dexie rows must preserve `workspaceId` and future `projectId`
+  scoping on every record or be explicitly declared local-only cache/projection
+  rows.
+- The monolithic workspace row may be retained as a migration/rollback backup,
+  but it should not keep receiving every autosave after the shard writer is
+  proven, because that would preserve the large-blob failure mode.
+- The live IndexedDB/Dexie version is now bumped to v10 only to create and
+  backfill shard tables. The upgrade preserves the monolithic workspace row and
+  skips corrupt autosave JSON with a warning, so current load/save and recovery
+  behavior still depends on the proven v9 monolith path until the shard
+  reader/writer is explicitly enabled.
+- Multi-tab protection is a security and data-integrity gate, not only UX.
+  Phase 0.5 should use pessimistic single-writer behavior with heartbeat,
+  expiry, and explicit takeover so a stale or background tab cannot silently
+  overwrite title work. The first implementation slice has only the pure lease
+  evaluator and tests; live autosave/write blocking still must be wired before
+  sharded writes are production-safe.
+- Project open must stay metadata-first for document/PDF rows. Blob reads are
+  allowed for explicit preview, export, package backup, or import workflows, but
+  not merely because a project is opened.
+- Hosted mode must continue waiting for the Cognito `sub` before any sharded
+  IndexedDB read/write. Sharding must not fall back to the local `default`
+  workspace key for signed-out hosted users.
+
+Security risks that do not disappear just because LANDroid is hosted:
+
+- cloud storage creates custody duties for title documents, leases, owner
+  contact information, and AI context
+- OCR, embeddings, and search indexes become sensitive derived data
+- sharing links require authorization, expiry, and revocation rules
+- multi-device sync creates stale-write and conflict risks
+- cloud AI can disclose project context to third-party providers unless each
+  provider path is explicitly approved
+- server logs can accidentally retain sensitive prompts, owner data, or document
+  references if logging is too broad
+
+The Phase 0.75 minimal-spine threat-model note lives at
+`docs/backend-spine-threat-model.md`. It covers the current contract/adapter/
+health/session/validation slice plus the hidden app startup contract check. The
+startup check must not send document bytes, OCR text, owner PII, AI prompts, or
+real project records; its validation probe is a synthetic project record with placeholder IDs only. The hosted
+spine deploy path uses a separate Lambda Function URL behind the
+`/api/spine/<*>` Amplify rewrite; health is public but session and validation
+must verify the Cognito ID token server-side. Hosted spine logging is structured
+but must never include request bodies, record payloads, document bytes, OCR
+text, owner PII, or AI prompts. Before later backend expansion, extend that
+model for document upload/download paths, object storage, sync conflicts, OCR
+jobs, search indexes, sharing links, audit events, and collaboration.
 
 ## AI Providers
 
@@ -133,10 +219,16 @@ Known risk:
 - Cloud OCR must be per-document opt-in, with provider, retention, logging,
   training-use, region/data-residency, and deletion expectations documented
   before upload.
-- Cloud object storage, if added later, must use private buckets/containers,
+- Backend object storage, if added later, must use private buckets/containers,
   server-side authorization, short-lived signed URLs where needed, encryption at
   rest, and manifest/hash verification. Do not make browser-public object paths
   part of the trust model.
+- Backend-shaped local records should include stable IDs, `workspaceId` and
+  `projectId` scoping, `lastModified` / version metadata where needed,
+  revisions/tombstones for future sync, and content hashes for blobs before
+  Phase 0.5 sharding or any sync engine. These fields are security-relevant
+  because they constrain accidental cross-project bleed, stale writes, and
+  unverifiable document replacement.
 - AI document query should be read-only by default and return cited source
   references. Automatic title updates from OCR or AI remain out of scope until
   separately designed.
@@ -170,5 +262,6 @@ Do not assume local-first safety carries over to hosted deployments.
 - Keep federal/private records reference-only until the Phase 2 math gate opens.
 - Add validation and size limits to import paths before broadening file support.
 - Do not add backend storage, OCR jobs, cloud object storage, server-side RAG,
-  or multi-user permissions without updating the security model, threat model,
-  deployment docs, and validation plan in the same phase.
+  sharing links, sync, collaboration, or multi-user permissions without
+  updating the security model, threat model, deployment docs, and validation
+  plan in the same phase.

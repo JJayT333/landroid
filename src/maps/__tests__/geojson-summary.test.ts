@@ -40,4 +40,29 @@ describe('geojson-summary', () => {
     ]);
     expect(summary.bbox).toEqual([-104, 32, -102, 34]);
   });
+
+  it('characterizes current permissive non-FeatureCollection handling', () => {
+    expect(
+      parseGeoJsonSummary(
+        JSON.stringify({
+          type: 'Feature',
+          id: 'single-tract',
+          properties: { title: 'Single Tract' },
+          geometry: { type: 'Point', coordinates: [-100, 31] },
+        })
+      )
+    ).toEqual({
+      featureCount: 1,
+      features: [
+        { id: 'single-tract', label: 'Single Tract', geometryType: 'Point' },
+      ],
+      bbox: [-100, 31, -100, 31],
+    });
+
+    expect(parseGeoJsonSummary(JSON.stringify({ type: 'GeometryCollection' }))).toEqual({
+      featureCount: 0,
+      features: [],
+      bbox: null,
+    });
+  });
 });

@@ -1,0 +1,42 @@
+{
+  "schema": 1,
+  "capturedAt": "2026-05-24",
+  "branch": "codex/phase-0-reconcile-2026-05-23",
+  "commit": "1061e29",
+  "fixture": "Vulcan Mesa demo via Demo Data menu",
+  "command": "npm run dev -- --host 127.0.0.1",
+  "browser": "Playwright Chromium headless",
+  "viewport": {
+    "width": 1440,
+    "height": 1000
+  },
+  "actions": [
+    "open http://127.0.0.1:5173/",
+    "open Demo Data menu",
+    "select Vulcan Mesa demo",
+    "type LOAD DEMO into confirmation field",
+    "click Load Demo Data"
+  ],
+  "result": {
+    "title": "LANDroid v2",
+    "hasVulcanMesa": true,
+    "hasVmCode": true,
+    "hasCards": true,
+    "consoleErrors": []
+  },
+  "visibleSignals": [
+    "Vulcan Mesa — Demo (10 Tracts, 79 nodes)",
+    "JUPITER FLATS UNIT",
+    "MINERVA DRAW UNIT",
+    "VM1 — Apollo Draw",
+    "VM10 — Roughneck Olympus",
+    "7 cards",
+    "Balanced at 100%",
+    "PDF document chips"
+  ],
+  "notes": [
+    "This is a lightweight browser smoke, not the full manual smoke runbook.",
+    "Initial sandboxed Playwright launch failed due to macOS Chromium sandbox permissions; the smoke was rerun outside the sandbox with approval.",
+    "No console or page errors were observed during the successful load."
+  ]
+}

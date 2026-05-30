@@ -525,6 +525,56 @@ describe('leasehold-summary', () => {
     );
   });
 
+  it('excludes federal leases from Texas leasehold math', () => {
+    const summary = buildLeaseholdUnitSummary({
+      deskMaps: [
+        {
+          id: 'dm-1',
+          name: 'Tract 1',
+          code: 'T1',
+          tractId: 'T1',
+          grossAcres: '100',
+          pooledAcres: '100',
+          description: '',
+          nodeIds: ['n1', 'l1'],
+        },
+      ],
+      nodes: [
+        {
+          ...createBlankNode('n1', null),
+          grantee: 'A Owner',
+          linkedOwnerId: 'owner-1',
+          fraction: '1',
+          initialFraction: '1',
+        },
+        {
+          ...createBlankNode('l1', 'n1'),
+          type: 'related' as const,
+          relatedKind: 'lease' as const,
+          linkedLeaseId: 'lease-federal',
+        },
+      ],
+      owners: [createBlankOwner('ws-1', { id: 'owner-1', name: 'A Owner' })],
+      leases: [
+        createBlankLease('ws-1', 'owner-1', {
+          id: 'lease-federal',
+          leaseName: 'Federal Reference Lease',
+          lessee: 'Federal Operator',
+          royaltyRate: '1/8',
+          leasedInterest: '1',
+          jurisdiction: 'federal',
+        }),
+      ],
+      leaseholdAssignments: [],
+      leaseholdOrris: [],
+    });
+
+    expect(summary.fullyLeasedTractCount).toBe(0);
+    expect(summary.tracts[0]?.leasedOwnership).toBe('0');
+    expect(summary.tracts[0]?.unitRoyaltyDecimal).toBe('0');
+    expect(summary.totalRoyaltyDecimal).toBe('0');
+  });
+
   it('applies working-interest ORRI basis to the full leased WI, independent of royalty rate', () => {
     // Standard convention: a "1/80 of WI" ORRI is 1/80 of the 8/8 leasehold estate.
     // Result must be the same 0.0125 burden whether the lease royalty is 1/8 or 3/16.

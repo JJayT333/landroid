@@ -1,0 +1,25 @@
+{
+  "id": "PERF-07",
+  "workflow": "Spreadsheet import parse only",
+  "fixture": "fixtures/phase-0/import-stress.csv",
+  "fixtureChecksum": "fixtures/phase-0/import-stress.sha256",
+  "fixtureSizeBytes": 1307644,
+  "fixtureSha256": "3b01c53a75765af9e98efef00204837c880109caaf271b8ecd632ac23d4c92d3",
+  "timing": {
+    "wallClockMs": 198,
+    "browserDeltaMs": 197.4
+  },
+  "frameGapMetrics": {
+    "sampleCount": 23,
+    "maxFrameGapMs": 16.7,
+    "over50MsFrameGaps": 0,
+    "over100MsFrameGaps": 0
+  },
+  "rowCountIncludingHeader": 5001,
+  "dataRowCount": 5000,
+  "columnCount": 14,
+  "parseWarningCount": 0,
+  "workbookSummaryText": "import-stress.csv · 1 sheet\nimport-stress\n5001r × 14c",
+  "stoppedBeforeApply": true,
+  "capturedAt": "2026-05-25T13:38:10.290Z"
+}

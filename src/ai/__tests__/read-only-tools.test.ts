@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  AI_UNDO_MUTATING_TOOL_NAMES,
   HOSTED_BLOCKED_TOOL_NAMES,
   landroidTools,
   readOnlyLandroidTools,
@@ -37,6 +38,16 @@ describe('readOnlyLandroidTools (hosted-mode guard)', () => {
   it('hosted blocked tools include every undo-mutating tool', () => {
     for (const name of UNDO_MUTATING_TOOL_NAMES) {
       expect(HOSTED_BLOCKED_TOOL_NAMES.has(name)).toBe(true);
+    }
+  });
+
+  it('keeps the undo-mutating registry aligned with registered tools', () => {
+    expect([...UNDO_MUTATING_TOOL_NAMES].sort()).toEqual(
+      [...AI_UNDO_MUTATING_TOOL_NAMES].sort()
+    );
+
+    for (const name of AI_UNDO_MUTATING_TOOL_NAMES) {
+      expect(landroidTools).toHaveProperty(name);
     }
   });
 

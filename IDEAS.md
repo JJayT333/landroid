@@ -16,7 +16,6 @@ Rules:
   port Claude's stronger schema/test ideas, and preserve old field-name imports.
 - Document cleanup pass: archive point-in-time audit/prompt files after the
   current branch is checkpointed, then shorten the root doc list.
-
 ## Promising
 
 - Incremental rebuild target: current behavior inventory, Phase 0.5 workspace
@@ -68,6 +67,33 @@ Rules:
   document registry.
 - Saved named packet selections.
 - Import ledger for spreadsheet and document-source staging.
+- Template-driven communication generation: workspace `.docx` templates with
+  `{{variable}}` placeholders, variable manifest sidecars, manual fill fallback,
+  AI-assisted fill through approval previews, and generated output saved back to
+  the Evidence Vault. Candidate templates include lease forms, offer letters,
+  extensions, ratifications, releases, affidavits of heirship, memoranda,
+  division-order recommendations, stipulations, curative letters, mineral deeds,
+  probate inquiries, and demand letters.
+- Professional three-pane Documents workflow inspired by legal/eDiscovery DMS
+  patterns: filter tree, dense document list, metadata/preview panel, saved
+  views, bulk operations, history/links/packet tabs, and required metadata at
+  ingestion once the vault model can enforce it.
+- Universal command/search palette: cross-surface search over owners,
+  documents, instruments, leases, curative issues, maps, research records, and
+  project records, with eventual tokenized filters and navigation actions.
+- Inline AI entry points: contextual "Ask AI about this" on Desk Map cards,
+  document rows/chips, fractional values, leasehold rows, curative issues, and
+  research records. Entity context should be preloaded and citation-verified
+  before answers are displayed.
+- Persistent workspace chat history: local IndexedDB storage first, exportable
+  with the workspace when intended, and still governed by provider/security
+  policy.
+- Field/iPad mode: PWA-first, offline-capable, read-heavy/light-edit workflows
+  for courthouse and field use, with Ollama/local AI as the offline path.
+- Rolling auto-export and storage health UX: user-selected backup folder where
+  the File System Access API supports it, timestamped `.landroid` snapshots,
+  manual Backup Now, last saved / last exported / browser storage status, and
+  warnings when export is overdue.
 
 ## Math Engine Revisit
 

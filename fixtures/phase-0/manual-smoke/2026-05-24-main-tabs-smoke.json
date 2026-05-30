@@ -1,0 +1,105 @@
+{
+  "schema": 1,
+  "capturedAt": "2026-05-24",
+  "branch": "codex/phase-0-reconcile-2026-05-23",
+  "baseCommit": "850af5c",
+  "fixture": "Vulcan Mesa demo via Demo Data menu",
+  "command": "npm run dev -- --host 127.0.0.1",
+  "browser": "Playwright Chromium headless",
+  "viewport": {
+    "width": 1440,
+    "height": 1000
+  },
+  "actions": [
+    "load Vulcan Mesa demo",
+    "visit Desk Map",
+    "visit Leasehold",
+    "visit Flowchart",
+    "visit Runsheet",
+    "visit Documents",
+    "visit Owners",
+    "visit Curative",
+    "visit Maps",
+    "visit Sales Deck",
+    "visit Federal Leasing",
+    "visit Research"
+  ],
+  "result": {
+    "title": "LANDroid v2",
+    "tabCount": 11,
+    "allTabsRenderedRecognizableContent": true,
+    "pageErrors": [],
+    "consoleWarningCount": 9
+  },
+  "tabSignals": [
+    {
+      "tab": "Desk Map",
+      "signals": ["Vulcan Mesa", "JUPITER FLATS UNIT", "VM1", "7 cards"]
+    },
+    {
+      "tab": "Leasehold",
+      "signals": ["Leasehold", "Pooled acres", "ORRI", "working-interest"]
+    },
+    {
+      "tab": "Flowchart",
+      "signals": ["Flowchart", "Import Desk Map", "PAPER", "ANSI A"]
+    },
+    {
+      "tab": "Runsheet",
+      "signals": ["TRACT FILTER", "79 entries", "Export Runsheet"]
+    },
+    {
+      "tab": "Documents",
+      "signals": ["Documents", "64 docs", "64 links", "3.8 MB"]
+    },
+    {
+      "tab": "Owners",
+      "signals": ["Owners", "15/21 records", "Unit Focus"]
+    },
+    {
+      "tab": "Curative",
+      "signals": ["Curative", "0 active title issues"]
+    },
+    {
+      "tab": "Maps",
+      "signals": ["Maps", "Upload Asset", "featured prospect map"]
+    },
+    {
+      "tab": "Sales Deck",
+      "signals": ["LANDroid Sales Deck", "Slide 1 / 10"]
+    },
+    {
+      "tab": "Federal Leasing",
+      "signals": ["Federal Leasing", "Reference-only lease inventory"]
+    },
+    {
+      "tab": "Research",
+      "signals": ["Research", "Source library", "saved questions"]
+    }
+  ],
+  "consoleWarnings": [
+    {
+      "surface": "Flowchart",
+      "component": "src/components/canvas/OwnershipEdge.tsx",
+      "summary": "React warns that edge props are reaching a DOM path element as non-boolean or unrecognized attributes.",
+      "propNamesObserved": [
+        "animated",
+        "selectable",
+        "deletable",
+        "sourceX",
+        "sourceY",
+        "sourcePosition",
+        "targetPosition",
+        "sourceHandleId",
+        "targetHandleId",
+        "pathOptions"
+      ],
+      "phase0Action": "Record as current Flowchart smoke evidence; do not fix during Phase 0 inventory unless explicitly approved."
+    }
+  ],
+  "notes": [
+    "This is a broad lightweight tab smoke, not completion of the full manual smoke runbook.",
+    "The full console messages are intentionally summarized to keep the committed artifact reviewable.",
+    "No page crash or uncaught pageerror was observed."
+  ]
+}

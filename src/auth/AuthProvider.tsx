@@ -7,11 +7,12 @@
  *
  * Only active in hosted mode — local dev bypasses this entirely.
  */
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { UserManager, type User } from 'oidc-client-ts';
 import { buildCognitoConfig } from './cognito-config';
 import { setIdToken, setUnauthorizedHandler } from './session';
 import { setActiveUserSub } from '../storage/active-workspace-key';
+import { runBackendSpineContractCheck } from '../backend-spine/app-contract-check';
 
 interface AuthContextValue {
   user: User | null;
@@ -40,6 +41,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const lastBackendSpineCheckToken = useRef<string | null>(null);
 
   useEffect(() => {
     if (!manager) {
@@ -53,7 +55,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const syncUser = (next: User | null) => {
       if (cancelled) return;
       setUser(next);
-      setIdToken(next?.id_token ?? null);
+      const token = next?.id_token ?? null;
+      setIdToken(token);
       // Audit M-1: namespace IndexedDB on the Cognito sub claim. Setting
       // the value (even null) flips the workspace-key ready promise so
       // bootstrap can run; signed-out hosted users wait at LoginGate but
@@ -61,6 +64,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // is current.
       const sub = typeof next?.profile?.sub === 'string' ? next.profile.sub : null;
       setActiveUserSub(sub);
+      if (!token) {
+        lastBackendSpineCheckToken.current = null;
+      } else if (lastBackendSpineCheckToken.current !== token) {
+        lastBackendSpineCheckToken.current = token;
+        void runBackendSpineContractCheck({ logger: console });
+      }
     };
 
     (async () => {

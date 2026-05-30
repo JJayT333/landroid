@@ -1,6 +1,8 @@
 # LANDroid Deployment Guide
 
-**Goal:** take LANDroid live at `https://landroid.abstractmapping.com` with Cognito login, OpenAI-backed AI via a server proxy, and a monthly cost of roughly $0–15 at POC usage.
+**Goal:** take LANDroid live at `https://landroid.abstractmapping.com` with
+Cognito login, OpenAI-backed AI via a server proxy, a minimal backend-spine
+contract proof, and a monthly cost of roughly $0–15 at POC usage.
 
 **Architecture picked for POC:**
 
@@ -12,6 +14,9 @@ AWS Amplify Hosting  (React SPA; auto-deploys from GitHub)
      │
      ├──  /api/ai/*   ─ rewrite ─▶  Lambda Function URL  ─▶  OpenAI (gpt-4o-mini)
      │                             (verifies Cognito ID token)
+     │
+     ├──  /api/spine/* ─ rewrite ─▶  Backend Spine Lambda Function URL
+     │                             (health/session/record-validation proof only)
      │
      └──  login flow  ─────────▶  Cognito Hosted UI
 ```
@@ -150,22 +155,99 @@ Function → **Configuration → Function URL → Create function URL**:
 
 ---
 
-## Step 3 — Amplify Hosting (20 minutes)
+## Step 3 — Backend Spine Lambda (10 minutes)
 
-### 3a. Connect the repo
+This is the Phase 0.75 contract proof backend. It does **not** store projects,
+upload documents, run OCR/search, sync, or collaborate. It only serves
+`/api/spine/health`, `/api/spine/session`, and `/api/spine/validate-records`.
+
+### 3a. Build the package locally
+
+```bash
+cd backend/spine
+npm ci
+npm run bundle
+# produces backend/spine/lambda.zip
+```
+
+### 3b. Create the Lambda
+
+1. AWS console → **Lambda** (us-east-1) → **Create function**.
+2. **Author from scratch.**
+3. Name: `landroid-backend-spine`.
+4. Runtime: **Node.js 22.x**. Architecture: **arm64**.
+5. Execution role: "Create a new role with basic Lambda permissions".
+6. Create.
+
+### 3c. Upload the code
+
+1. Function → **Code** tab → **Upload from** → `.zip file` → select `backend/spine/lambda.zip`.
+2. After upload, **Runtime settings → Edit** → Handler: `backend/spine/src/lambda.handler` → Save.
+
+### 3d. Environment variables
+
+Function → **Configuration → Environment variables → Edit → Add**:
+
+| Key | Value |
+| --- | --- |
+| `COGNITO_USER_POOL_ID` | `us-east-1_TWeBB7xvQ` |
+| `COGNITO_CLIENT_ID` | `6os4uiu0b46pf74nhbrm5gsg0v` |
+
+### 3e. Memory, timeout, and Function URL
+
+General configuration:
+- Memory: **128 MB**.
+- Timeout: **10 sec**.
+
+Function URL:
+- Auth type: **NONE** (the handler verifies Cognito ID tokens for session and validation).
+- Invoke mode: **BUFFERED**.
+- CORS:
+  - Allow origin: `https://landroid.abstractmapping.com`
+  - Allow methods: `GET, POST`
+  - Allow headers: `authorization, content-type`
+  - Max age: `3600`
+
+If creating the Function URL through the AWS CLI, confirm the Lambda resource
+policy includes both public URL permissions:
+
+```bash
+aws lambda add-permission \
+  --function-name landroid-backend-spine \
+  --statement-id FunctionURLAllowPublicAccess \
+  --action lambda:InvokeFunctionUrl \
+  --principal "*" \
+  --function-url-auth-type NONE
+
+aws lambda add-permission \
+  --function-name landroid-backend-spine \
+  --statement-id FunctionURLAllowPublicInvokeFunction \
+  --action lambda:InvokeFunction \
+  --principal "*" \
+  --invoked-via-function-url
+```
+
+**Copy the Function URL.** You need both this URL and the AI proxy Function URL
+for the Amplify rewrites.
+
+---
+
+## Step 4 — Amplify Hosting (20 minutes)
+
+### 4a. Connect the repo
 
 1. AWS console → **AWS Amplify** → **Create new app** → **Host web app**.
 2. Source: **GitHub**. Authorize and pick `JJayT333/landroid`.
 3. Branch: **`main`**. Amplify is configured so merging to `main` rebuilds
    and redeploys the hosted frontend automatically.
 
-### 3b. Build settings
+### 4b. Build settings
 
 Amplify auto-detects Vite. The `amplify.yml` committed at repo root will be used. Confirm:
 - Base directory: `dist`
 - Build command: `npm run build`
 
-### 3c. Environment variables (build-time)
+### 4c. Environment variables (build-time)
 
 **Advanced settings → Environment variables → Add:**
 
@@ -178,31 +260,35 @@ Amplify auto-detects Vite. The `amplify.yml` committed at repo root will be used
 
 Save and deploy. First build takes ~3 minutes.
 
-### 3d. API rewrite to Lambda
+### 4d. API rewrites to Lambda
 
 After the first deploy, Amplify app → **Hosting → Rewrites and redirects → Manage rewrites** → open the **JSON editor** and paste rendered rewrite JSON.
 
 From the repo root, render a paste-ready copy with:
 
 ```bash
-bash scripts/render-amplify-rewrites.sh <lambda-function-url-host-or-url>
+bash scripts/render-amplify-rewrites.sh <ai-lambda-function-url-host-or-url> <spine-lambda-function-url-host-or-url>
 ```
 
-The helper accepts the full Function URL or just the host and strips `https://`
-plus any trailing path. It replaces `REPLACE_WITH_FUNCTION_URL_HOST` in
-[`amplify-rewrites.json`](./amplify-rewrites.json) with a host such as
-`abc123xyz.lambda-url.us-east-1.on.aws`.
+The helper accepts each full Function URL or just the host and strips
+`https://` plus any trailing path. It replaces
+`REPLACE_WITH_AI_FUNCTION_URL_HOST` and
+`REPLACE_WITH_SPINE_FUNCTION_URL_HOST` in
+[`amplify-rewrites.json`](./amplify-rewrites.json).
 
-The JSON encodes two rules, in order:
+The JSON encodes three rules, in order:
 
 1. `/api/ai/<*>` → Lambda Function URL (the AI proxy)
-2. SPA catch-all (excludes common asset extensions) → `/index.html`
+2. `/api/spine/<*>` → Lambda Function URL (the backend spine proof)
+3. SPA catch-all (excludes common asset extensions) → `/index.html`
 
-Order matters — the API rule must come first.
+Order matters — the API rules must come before the SPA fallback.
 
-> **Gotcha:** when you paste the Function URL, **strip the `https://` prefix and any trailing slash**; the JSON file has `https://` in front already.
+> **Gotcha:** when manually editing the JSON, strip the `https://` prefix and
+> any trailing slash from each Function URL host; the JSON file has `https://`
+> in front already.
 
-### 3e. Custom headers (CSP, HSTS)
+### 4e. Custom headers (CSP, HSTS)
 
 The `customHttp.yml` at the repo root will be picked up automatically on the next build. No console action needed.
 
@@ -210,9 +296,9 @@ Verify after next deploy: in Amplify → **Hosting → Custom headers**, you sho
 
 ---
 
-## Step 4 — Custom domain `landroid.abstractmapping.com` (15 minutes + ~5 min DNS)
+## Step 5 — Custom domain `landroid.abstractmapping.com` (15 minutes + ~5 min DNS)
 
-### 4a. Add the domain in Amplify
+### 5a. Add the domain in Amplify
 
 1. Amplify app → **Hosting → Custom domains → Add domain**.
 2. Domain: `abstractmapping.com` → **Exclude root** → add subdomain **`landroid`** → **map to the deployed branch**.
@@ -221,7 +307,7 @@ Verify after next deploy: in Amplify → **Hosting → Custom headers**, you sho
    - A **CNAME for `landroid`** pointing at the Amplify default domain.
 4. Leave this page open.
 
-### 4b. Add the DNS records in GoDaddy
+### 5b. Add the DNS records in GoDaddy
 
 GoDaddy → **My Products → DNS (on `abstractmapping.com`) → Add record**:
 
@@ -232,7 +318,7 @@ GoDaddy → **My Products → DNS (on `abstractmapping.com`) → Add record**:
 
 **Important:** when GoDaddy asks for "name", paste only the prefix before `.abstractmapping.com`. If Amplify gives you `_abc123.landroid.abstractmapping.com`, in GoDaddy the name is `_abc123.landroid`.
 
-### 4c. Wait for validation
+### 5c. Wait for validation
 
 - Cert validation usually finishes in 5–30 minutes.
 - Amplify will flip from "Pending" to "Available".
@@ -240,7 +326,7 @@ GoDaddy → **My Products → DNS (on `abstractmapping.com`) → Add record**:
 
 ---
 
-## Step 5 — Smoke test
+## Step 6 — Smoke test
 
 Automated pass first:
 
@@ -248,7 +334,12 @@ Automated pass first:
 bash scripts/smoke-test-hosted.sh
 ```
 
-This checks the root page loads, security headers are applied, `/api/ai/*` rejects unauthenticated requests (NOT returning 200 or 404), the SPA catch-all works, and the Cognito user-pool OIDC metadata plus JWKS endpoints respond. Any failure points to a specific remediation in the output.
+This checks the root page loads, security headers are applied, `/api/ai/*`
+rejects unauthenticated requests, `/api/spine/health` responds,
+`/api/spine/session` and `/api/spine/validate-records` reject unauthenticated
+requests, oversized spine validation requests return 413, the SPA catch-all
+works, and the Cognito user-pool OIDC metadata plus JWKS endpoints respond. Any
+failure points to a specific remediation in the output.
 
 Then manual end-to-end:
 
@@ -263,6 +354,7 @@ Then manual end-to-end:
 If any step fails, check in order:
 - **Login redirect fails with "Invalid request":** the `redirect_uri` in Cognito pool settings must exactly match `VITE_COGNITO_REDIRECT_URI`.
 - **AI panel shows "Not found":** the `/api/ai/*` rewrite rule is missing or the Function URL is wrong.
+- **Backend spine health returns 404:** the `/api/spine/*` rewrite rule is missing or the Function URL is wrong.
 - **AI returns 401:** the Lambda env vars `COGNITO_USER_POOL_ID` / `COGNITO_CLIENT_ID` don't match the pool you logged into.
 - **AI returns 502 with an upstream authentication message:** the browser session is fine; check the Lambda `OPENAI_API_KEY` server env var.
 - **CSP error in DevTools console:** review `customHttp.yml` and adjust the `connect-src` directive.
@@ -278,7 +370,7 @@ import that file manually.
 
 ---
 
-## Step 6 — Everyday workflow
+## Step 7 — Everyday workflow
 
 - **Local development:** `npm run dev` — no auth, no proxy, direct OpenAI/Ollama. Zero change from today.
 - **Push a change:** `git push` to the branch Amplify is watching → auto-build → live in ~3 minutes.

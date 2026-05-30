@@ -1,0 +1,88 @@
+{
+  "schema": 1,
+  "capturedAt": "2026-05-24",
+  "branch": "codex/phase-0-reconcile-2026-05-23",
+  "fixture": "Vulcan Mesa demo exported from UI after Documents readiness, then re-imported through File -> Load workspace",
+  "command": "npm run dev -- --host 127.0.0.1",
+  "browser": "Playwright Chromium headless",
+  "viewport": {
+    "width": 1440,
+    "height": 1000
+  },
+  "readinessGate": {
+    "deskMapHadPdfChipsBeforeExport": false,
+    "documentsViewHad64DocsBeforeExport": true,
+    "documentsViewHad64LinksBeforeExport": true
+  },
+  "export": {
+    "downloaded": true,
+    "suggestedFilename": "Vulcan Mesa — Demo (10 Tracts, 79 nodes).landroid",
+    "savedAs": "/private/tmp/landroid-phase0-roundtrip-ready.landroid",
+    "byteLength": 5548009,
+    "sha256": "bf1f81a1c2c037e953cc60fda9ab818bf71ea36f3c4e5fb642dbea7b196bd6b8",
+    "parsedVersion": 8,
+    "projectName": "Vulcan Mesa — Demo (10 Tracts, 79 nodes)",
+    "workspaceId": "ws-edf25ddb-60ce-4944-b643-42d2a1ee4a3f",
+    "topLevelKeys": [
+      "activeDeskMapId",
+      "activeUnitCode",
+      "canvas",
+      "curativeData",
+      "deskMaps",
+      "documentData",
+      "exportedAt",
+      "instrumentTypes",
+      "leaseholdAssignments",
+      "leaseholdOrris",
+      "leaseholdTransferOrderEntries",
+      "leaseholdUnit",
+      "mapData",
+      "nodes",
+      "ownerData",
+      "projectName",
+      "researchData",
+      "version",
+      "workspaceId"
+    ],
+    "sideStoreKeysPresent": [
+      "documentData",
+      "ownerData",
+      "mapData",
+      "researchData",
+      "curativeData"
+    ],
+    "documentCount": 64,
+    "attachmentCount": 64,
+    "ownerCount": 21,
+    "mapRecordCount": null,
+    "researchSourceCount": 0,
+    "curativeIssueCount": null,
+    "hasCanvas": true,
+    "hasPdfDataLegacyKey": false
+  },
+  "importConfirmation": {
+    "dialogAriaLabel": "Load landroid-phase0-roundtrip-ready.landroid?",
+    "dialogTextIncludesReplaceWarning": true,
+    "requiredPhrase": "LOAD WORKSPACE",
+    "initiallyDisabled": true,
+    "wrongTextDisabled": true,
+    "correctTextEnabled": true
+  },
+  "afterImport": {
+    "hasVulcanMesa": true,
+    "documentsViewHas64Docs": true,
+    "documentsViewHas64Links": true,
+    "documentsViewHasPacketFilter": true,
+    "bodySample": "LANDroid\nVulcan Mesa — Demo (10 Tracts, 79 nodes)\nDesk Map\nLeasehold\nFlowchart\nRunsheet\nDocuments\nOwners\nCurative\nMaps\nSales Deck\nFederal Leasing\nResearch\nFile ▾\nDemo Data ▾\nDocuments\nVulcan Mesa — Demo (10 Tracts, 79 nodes)\n64 docs\n64 links\n3.8 MB\nPacket: Filter\nPacket: Selected\nPacket: Runsheet\nAll\nInbox / Needs review\nRunsheet / Mineral Title\nLeasehold\nCurative\nResearch\nGIS / Map Support\nFederal Reference\nUnlinked\nMissing metadata\nDuplicates\nNeeds OCR\nSEARCH\nKIND\nAll kinds\nDeed\nLease\nObituary\nAffidavit\nProbate\nRelated\nOther\nTRACT\nAll tracts\nVM1 — Apollo Draw\nVM2 — Widow's Aegis\nVM3 — Mercury Cutoff\nVM4 — Vulcan Gulch\nVM5 — Last Centurion\nVM6 — Jupiter Spur\nVM7 — Minotaur Fork\nVM8 — Probate Styx\nVM9 — Minerva's Bequest\nVM10 — Roughneck Olympus\nLINK\nAll links\nLinked\nUnlinked\nFROM\nTO\nSelect\n\tDOCUMENT\tAREA\tMETADATA\tLINKS\tSTATUS\tOPEN\n\t\n20216717.pdf\n20216717.pdf\n57 KB | 2026-05-24\n\tLeasehold\nLease\n\t\nLease\nNo county/reference\nNo parties\n\t\n1 linked\nOil & Gas Lease #VM10-OGL-004\n\t\nMissing\nDuplicate\nNeeds OCR\n\tPDF\n\t\n20216715.pdf\n20216715.pdf\n108 KB | 2026-05-24\n\tLeasehold\nLease\n\t\nLease\nNo county/reference\nNo parties\n\t\n1 linked\nOil & Gas Lease #VM10-OGL-003\n\t\nMissing\nDuplicate\nNeeds OCR\n\tPDF\n\t\n20216714.pdf\n20216714.pdf\n90 KB | 2026-05-24\n\tLeasehold\nLease\n\t\nLease\nNo county/reference\nNo parties\n\t\n1 linked\nOil & Gas Lease #VM10-OGL-002\n\t\nMissing\nDuplicate\nNeeds OCR\n\tPDF\n\t\n20216713.pdf\n20216713.pdf\n27 KB | 2026-05-24\n\tLeasehold\nLease\n\t\nLease\nNo county/reference\nNo parties\n\t\n1 linked\nOil "
+  },
+  "console": {
+    "errorCount": 0,
+    "errors": []
+  },
+  "notes": [
+    "Smoke proves current UI export creates a parseable v8 .landroid package with side-store keys and no legacy pdfData key after the Documents registry readiness gate is observed.",
+    "Smoke proves destructive .landroid import uses typed LOAD WORKSPACE confirmation and rejects incorrect confirmation text before replacement.",
+    "A prior immediate-export attempt, before waiting for Documents readiness, produced a much smaller package with zero exported documents; Phase 0 should treat early export timing as a behavior/risk to verify before rebuild.",
+    "This does not prove future-version rejection or v7 orphan recovery; those remain unit/golden fixture concerns."
+  ]
+}

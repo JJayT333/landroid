@@ -21,7 +21,7 @@ import {
 import { importCSV } from '../../storage/csv-io';
 import { assertFileSize, FILE_SIZE_LIMITS } from '../../utils/file-validation';
 import { seedCombinatorialData } from '../../storage/seed-test-data';
-import { seedCrackbabyCarnivalData } from '../../storage/seed-crackbaby-carnival';
+import { seedVulcanMesaData } from '../../storage/seed-vulcan-mesa';
 import { isHostedMode } from '../../utils/deploy-env';
 import HostedUserMenu from '../../auth/HostedUserMenu';
 import { useConfirmation } from './ConfirmationProvider';
@@ -140,12 +140,12 @@ export default function Navbar() {
     setSeedLoading(false);
   };
 
-  const handleCrackbaby = async () => {
+  const handleVulcanMesa = async () => {
     setDemoMenuOpen(false);
     const confirmed = await requestConfirmation({
-      title: 'Load Crackbaby Carnival Demo?',
+      title: 'Load Vulcan Mesa Demo?',
       message:
-        'This replaces the current workspace with the Crackbaby Carnival demo fixture. Save first if you need to keep the current workspace.',
+        'This replaces the current workspace with the Vulcan Mesa demo fixture. Save first if you need to keep the current workspace.',
       confirmLabel: 'Load Demo Data',
       tone: 'danger',
       requiredConfirmationText: LOAD_DEMO_CONFIRMATION_TEXT,
@@ -156,12 +156,12 @@ export default function Navbar() {
 
     setSeedLoading(true);
     try {
-      const { nodeCount, pdfCount } = await seedCrackbabyCarnivalData();
+      const { nodeCount, pdfCount } = await seedVulcanMesaData();
       console.log(
-        `[crackbaby] Loaded ${nodeCount} nodes, attached ${pdfCount} PDFs`
+        `[vulcan-mesa] Loaded ${nodeCount} nodes, attached ${pdfCount} PDFs`
       );
     } catch (err) {
-      console.error('[crackbaby] Failed:', err);
+      console.error('[vulcan-mesa] Failed:', err);
     }
     setSeedLoading(false);
   };
@@ -436,11 +436,11 @@ export default function Navbar() {
                   <button
                     type="button"
                     role="menuitem"
-                    onClick={handleCrackbaby}
+                    onClick={handleVulcanMesa}
                     disabled={seedLoading}
                     className="block w-full px-3 py-2 text-left text-xs text-parchment/80 hover:bg-ink-light/40 hover:text-parchment disabled:opacity-50"
                   >
-                    Crackbaby Carnival — Demo
+                    Vulcan Mesa — Demo
                   </button>
                 </div>
               )}

@@ -111,7 +111,7 @@ as input warnings in the leasehold focus that they affect.
 
 ## Demo Data
 
-Use `Demo Data -> Crackbaby Carnival` or the Raven Forest sample to load the
+Use `Demo Data -> Vulcan Mesa` or the Raven Forest sample to load the
 current sample workspaces. The hosted POC site keeps Demo Data visible for
 signed-in fixture review. Demo loading replaces the active browser workspace,
 so it requires the typed phrase `LOAD DEMO` before it runs. Demo loading resets
@@ -150,3 +150,5 @@ Older stress and 8-tract leasehold demos have been retired.
 - Paste-ready Amplify rewrites: `amplify-rewrites.json`.
 - Post-deploy verification: `bash scripts/smoke-test-hosted.sh`.
 - Lambda AI proxy source: `backend/ai-proxy/`.
+- Minimal backend-spine Lambda source: `backend/spine/`; this is contract proof
+  only, not project storage or sync.

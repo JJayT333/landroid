@@ -3,6 +3,224 @@
 This file records meaningful project changes so `CONTINUATION-PROMPT.md` can
 stay short.
 
+## 2026-05-29
+
+- Landed the Phase 0.5 shard writer and closed the edit-stranding data-loss
+  regression. Workspace autosave now rebuilds the shard set with
+  `buildWorkspaceShards` and writes all five shard tables in one Dexie
+  transaction, so edit then reload returns the edit instead of the
+  v10-migration snapshot. The monolithic `workspaces` row is no longer
+  rewritten on autosave; it stays a frozen migration backup the reader falls
+  back to with a loud warning.
+- Made the shard reader recency-aware: a strictly newer monolith now wins over
+  stale shards instead of being discarded.
+- Gated shard writes behind the single-writer lease (`BroadcastChannel` plus
+  Dexie expiry). The first tab is the single writer; later tabs stay read-only
+  and write nothing until the lease expires or is taken over.
+- Scoped shard reads and writes by the active per-user DB key, stamped on the
+  manifest, and clear the active key's shard rows on workspace replacement and
+  sign-out. This closes the cross-user shard leak (Bug 001): a fresh hosted
+  user can no longer adopt the previous user's workspace.
+
+## 2026-05-27
+
+- Added the first Phase 0.5 storage-sharding scaffolding without wiring it into
+  live persistence. The new pure shard adapter builds backend-spine
+  `workspace_manifest` and `desk_map` envelopes, keeps current title/leasehold
+  state as local-only compatibility rows, and round-trips back to the current
+  `WorkspaceData` shape.
+- Added Phase 0.5 guardrails for implementation: a named autosave debounce
+  constant, pure multi-tab write-lease evaluator with fencing-token tests, and
+  a lazy document-registry test proving registry reads omit document blobs.
+- Added the next Phase 0.5 migration slice with a live Dexie v10 schema bump.
+  The upgrade creates workspace shard/write-lease tables, derives shard rows
+  from existing monolithic `WorkspaceRecord` rows, keeps the monolithic row as
+  the live load/save and rollback source, and skips corrupt autosave rows with
+  a warning instead of blocking database open.
+- Started the Phase 0.5 shard-runtime branch with a pure shard read adapter.
+  Complete shard sets can now reconstruct `WorkspaceData`; incomplete or
+  corrupt shard sets fall back to the preserved monolithic workspace row, and
+  unrecoverable cases report corruption instead of silently opening bad data.
+- Wired runtime workspace load to use the shard reader first. Complete v10
+  shards now load before the monolith; incomplete/corrupt shards fall back to
+  the monolithic row with a startup warning. Autosave still writes only the
+  monolith until the write-lease-gated shard writer lands.
+
+## 2026-05-26
+
+- Started Phase 0.5 storage-sharding planning without implementation. The
+  kickoff plan now inventories current Dexie tables and persistence paths,
+  identifies `workspaces.data` as the first shard target, defines the initial
+  shard order, migration/rollback strategy, `.landroid` compatibility rules,
+  local-first/offline constraints, pessimistic single-writer plan, lazy blob
+  loading plan, and targeted validation/performance gates.
+- Wired the non-user-facing Phase 0.75 app contract check through the
+  backend-spine adapter. Startup now runs a hidden health/session/synthetic
+  project-record validation probe after local startup or hosted auth without
+  changing user workflows, project storage, document handling, sync, or
+  `.landroid` export.
+- Added repo-side hosted wiring for the minimal backend spine: a deployable
+  `backend/spine` Lambda wrapper/package, `/api/spine/<*>` Amplify rewrite
+  template support, predeploy/smoke checks, and deployment docs. The spine
+  remains contract proof only and does not add project storage, document upload,
+  OCR/search, sync, collaboration, or permissions.
+- Hardened the Phase 0.75 spine after read-only review: every declared
+  `recordType` now has a validation-union schema, unfinished domain records use
+  strict envelope-only stubs, the app probe validates a synthetic project record,
+  hosted startup waits for auth, and the backend-spine handler logs structured
+  request/reject events without payloads.
+- Deployed the minimal backend spine to AWS as a separate
+  `landroid-backend-spine` Lambda and added the live Amplify `/api/spine/<*>`
+  rewrite. Hosted smoke now proves spine health, unauthenticated auth rejection,
+  oversized-body rejection, and structured CloudWatch logging.
+
+## 2026-05-25
+
+- Updated the rebuild sequence for Phase 0.75: LANDroid should add a minimal
+  backend spine before Phase 0.5 storage sharding, limited to shared
+  backend-shaped records/API contracts, adapter boundaries, auth/session proof,
+  and validation endpoints. Full backend storage, object storage, OCR/search,
+  sync, sharing, collaboration, and multi-user permissions remain later gates.
+- Added the first Phase 0.75 minimal-spine implementation slice: shared
+  backend-spine schemas and adapters under `src/backend-spine`, a minimal
+  `backend/spine` health/session/record-validation handler package, tests for
+  offline adapters and hosted auth boundaries, and
+  `docs/backend-spine-threat-model.md`.
+- Closed the Phase 0 export-readiness decision for rebuild use: no Phase 0 UI
+  export block, but future normal export must be readiness-gated before real
+  work/storage/backup use.
+- Recorded the Phase 0.5 multi-tab protection contract: pessimistic
+  single-writer behavior with later tabs read-only and an explicit takeover
+  path.
+- Added Phase 0 closeout guards for AI mutating-tool registry drift, AI undo
+  snapshot sections, the local AI 8-step cap, AI app-context omission
+  disclosure, AI approval document-metadata details, packet-manifest shape,
+  document-export workspace scoping, lease-allocation tie-breaks, federal lease
+  exclusion from Texas math, GeoJSON permissive-mode behavior, RRC fixed-width
+  slicing, and performance-baseline artifact linkage.
+- Fixed `.landroid` document export so cross-workspace attachment rows are not
+  included even when they point at an exported workspace document.
+- Reclassified remaining Phase 0 golden-master work into current-behavior
+  tests now covered versus future-contract goldens for Phase 0.5 / Phase 0.75 /
+  Phase 1.
+- Recorded the user print confirmation for Flowchart: print preview is visible,
+  saving works, and manual node rearrangement after Desk Map import is expected
+  current behavior rather than a Phase 0 blocker.
+
+## 2026-05-24
+
+- Added the Phase 0 performance-baseline capture walkthrough and perf status
+  template, explicitly marking PERF-01 through PERF-08 as not captured or
+  blocked until the W2 stress fixture, browser profiles, machine context, and
+  measured results exist.
+- Added the AI-036 Phase 0 system-prompt golden snapshot and test coverage for
+  the ten non-negotiable rules, critical safety language, mutating-tool prompt
+  coverage, and hosted-blocked focus switching.
+- Added the Phase 0 manual smoke-check runbook covering Desk Map, Leasehold,
+  Documents, Runsheet, Flowchart/print, Owners, Curative, Maps/GIS, Research,
+  Federal Leasing, AI approval, and import/export recovery stop conditions.
+- Clarified the rebuild security direction in `SECURITY.md`: hosted/backend
+  work can improve durability and controlled access, but only with explicit
+  backup/export, local-first, private-storage, AI/citation, sync-conflict, and
+  threat-model gates.
+- Extended the Phase 0 fixture generator so it preserves the current fixture
+  README, emits a deterministic W2 Raven Forest stress manifest/checksum, and
+  keeps the W1 Vulcan Mesa `.landroid` checksum stable.
+- Captured a lightweight local browser smoke artifact showing Vulcan Mesa loads
+  from the Demo Data menu with tract tabs, cards, document chips, and no
+  console/page errors.
+- Captured a broader main-tab smoke artifact across Desk Map, Leasehold,
+  Flowchart, Runsheet, Documents, Owners, Curative, Maps, Sales Deck, Federal
+  Leasing, and Research. All tabs rendered recognizable content; Flowchart
+  emitted current React DOM-prop warnings from `OwnershipEdge`.
+- Captured a lane-detail/export smoke artifact for Documents, Leasehold,
+  Owners, Runsheet, Federal Leasing, and Research. The run confirmed the Vulcan
+  Mesa load guard, recorded key lane signals, and downloaded a `.landroid`
+  export with checksum as smoke evidence.
+- Captured a Runsheet CSV export smoke artifact from the browser UI. The export
+  downloaded cleanly, but its checksum does not match the committed generated
+  W1 runsheet golden because the UI export appears globally chronological while
+  the current golden begins tract-grouped.
+- Recorded the Runsheet ordering product decision: LANDroid must support
+  user-controlled global instrument-date, global file-date, single-tract,
+  grouped-by-tract, and later manual/custom package order. Future Runsheet
+  goldens must name the ordering mode they protect.
+- Captured document preview smoke evidence showing both Documents registry PDF
+  actions and Desk Map document chips open blob-backed iframe previews with
+  `sandbox="allow-downloads"` and no console/page errors.
+- Captured packet manifest smoke evidence for `Packet: Runsheet`. The browser
+  manifest downloaded and parsed cleanly, but it contains 32 runsheet-source
+  items versus 64 full-registry items in the committed packet manifest golden,
+  so future packet goldens must be named by packet source mode.
+- Captured AI panel smoke evidence showing the panel opens on W1, defaults to
+  local Ollama (`gpt-oss:20b`), exposes Ollama/OpenAI/Anthropic settings, and
+  keeps Send disabled while input is empty. Mutating approval boundaries were
+  validated with targeted AI tests rather than a live LLM call.
+- Captured Flowchart/print surface smoke evidence showing Desk Map import
+  produces React Flow nodes/edges, page-size controls, tool controls, and a
+  Print action, while preserving the current `OwnershipEdge` DOM-prop console
+  warnings as Phase 0 evidence.
+- Captured `.landroid` round-trip smoke evidence showing the readiness-gated
+  UI export contains the v8 package shape, side-store keys, 64 documents, 64
+  attachments, and no legacy `pdfData` key, then re-imports behind the typed
+  `LOAD WORKSPACE` destructive confirmation. A prior immediate-export attempt
+  before the Documents registry was visibly ready produced zero exported
+  documents, so export timing is now a named Phase 0 risk.
+- Captured Curative/Maps/Sales Deck smoke evidence showing Curative empty-state
+  filters, Maps present/edit/upload controls, and the native 10-slide Sales
+  Deck plus legacy PDF/PowerPoint actions without attempting mutations.
+- Captured future-version rejection smoke evidence showing a version `999`
+  `.landroid` probe fails visibly after `LOAD WORKSPACE` confirmation and
+  leaves Vulcan Mesa intact.
+- Captured multi-tab boundary smoke evidence showing a second same-context tab
+  opens the same workspace with no visible lock, read-only banner, conflict
+  prompt, or editing-elsewhere warning.
+- Captured v7 orphan import smoke evidence showing W3 replaces the prior W1
+  document side store, preserves both legacy PDFs, and surfaces the orphan PDF
+  as linked to `node legacy-orphan-node`.
+- Added a reproducible Phase 0 closeout browser capture script and recorded
+  PERF-01 through PERF-06 plus PERF-08 under
+  `fixtures/phase-0/perf/2026-05-24-codex-closeout/`. The run captured W2
+  Desk Map, Documents, packet preview, `.landroid` export/import, Flowchart
+  print screenshots, W1 autosave debounce, and W2 Leasehold timing.
+- Added the deterministic PERF-07 import-stress CSV fixture, checksum, expected
+  parse-shape metadata, fixture test coverage, and a `--perf07-only` capture
+  path. The browser evidence under
+  `fixtures/phase-0/perf/2026-05-25-codex-perf07/` records the Import wizard
+  parsing 5,000 data rows before Analyze, Stage, or Apply.
+- Added a print visual-review artifact for the W2 Flowchart screenshots. The
+  review confirms the pages are nonblank print proof while keeping print
+  fidelity open because sparse/clipped tiles still need an explicit later
+  visual-diff or layout decision.
+
+## 2026-05-23
+
+- Reconciled the Phase 0 planning track around `docs/phase-0-inventory.md` as
+  the draft master behavior inventory, with cross-links from the rebuild plan,
+  testing policy, roadmap, architecture, security notes, docs map, ADRs, and
+  continuation handoff.
+- Recorded the backend decision for rebuild planning: backend architecture is
+  approved in principle, implementation is deferred until OCR/search/sync scale
+  or another hard trigger, and Phase 0.5 through Phase 6 must stay local-first
+  while using backend-ready record shapes.
+- Added Phase 0.5 planning gates for sharded Dexie storage, multi-tab
+  protection, autosave timing, canvas viewport persistence, PWA/iPad persistent
+  storage, lazy PDF loading, and Raven Forest-scale validation on iPad-class
+  hardware or a documented equivalent.
+- Renamed the internal-only second demo fixture to Vulcan Mesa, updated current
+  docs and tests to the new name, and archived the Phase 0 ultrareview prompt
+  under `docs/archive/prompts/`.
+- Added the first Phase 0 frozen fixture set under `fixtures/phase-0/`:
+  deterministic Vulcan Mesa `.landroid`, checksum, runsheet CSV, packet
+  manifest, leasehold decimals, coverage summary, fixture manifest, and a
+  regeneration script.
+- Added a Phase 0 golden-master test that consumes the committed Vulcan Mesa
+  fixture files and verifies checksum, export counts, runsheet CSV, packet
+  manifest, leasehold decimal output, Desk Map coverage summaries, and the W3
+  v7 orphaned-PDF migration fixture.
+- Documented W2 Raven Forest as a generated rebuild stress-test recipe instead
+  of committing today's exact large seed as the permanent fixture.
+
 ## 2026-05-20
 
 - Started audit remediation Phase 0: AI undo snapshot capture now fails closed
@@ -64,13 +282,13 @@ stay short.
   Cognito ID token from OIDC storage and no longer sends anonymous proxy
   requests when the in-memory auth bridge is empty.
 - Made the Demo Data menu visible in hosted mode for the signed-in POC so the
-  Crackbaby Carnival and Raven Forest fixtures can be loaded online.
+  Vulcan Mesa and Raven Forest fixtures can be loaded online.
 - Added `DEPLOYMENT_STATE.md` and refreshed deployment docs so the current AWS
   setup is explicit: Amplify deploys frontend changes from `main`, while Lambda
   AI proxy changes still require a bundle/upload until deployment automation is
   added.
 - Manual hosted browser verification confirmed the signed-in POC still loads
-  Crackbaby Carnival from the hosted Demo Data menu after PR #74. Hosted AI
+  Vulcan Mesa from the hosted Demo Data menu after PR #74. Hosted AI
   still accepted a `hello` request but stalled without an assistant response, so
   the current branch tightens hosted AI display/timeout behavior while leaving
   Lambda/CloudWatch follow-up open.

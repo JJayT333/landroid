@@ -1,7 +1,7 @@
 # LANDroid Incremental Rebuild Plan
 
 Status: planning source of truth.
-Last updated: 2026-05-22.
+Last updated: 2026-05-26.
 
 This document consolidates the current rebuild direction. It is not approval to
 rewrite the app in one pass. It is the working plan for rebuilding LANDroid
@@ -70,9 +70,10 @@ Added from the repo-grounded analysis:
 - Phase 0 work is sectioned and consolidated by one lead thread; parallel agents
   may perform read-only lane reviews, but they do not edit competing master
   plans
-- Phase 0.75 is a backend architecture decision gate: if future-proofing still
-  points to a backend after Phase 0 evidence, LANDroid adds a backend spine
-  before Phase 0.5 storage work or Phase 1 schema implementation
+- Phase 0.75 now starts a minimal backend-spine phase before Phase 0.5 storage
+  work: shared record contracts, adapter boundaries, auth/session proof, and
+  validation endpoints come now so sharded Dexie rows are backend-shaped from
+  the start
 - federal/private and horizontal-well project records without turning on
   federal/private math until an explicit gate
 
@@ -88,8 +89,8 @@ Deferred or left out for now:
 - cloud OCR as a default path; cloud OCR must be per-document opt-in after a
   provider/security decision
 - SQLite/Tauri/object-storage cutover before explicit storage and runtime gates
-- backend implementation before Phase 0 evidence and the Phase 0.75 backend
-  architecture decision
+- full backend storage/sync/OCR/search/collaboration before the minimal
+  Phase 0.75 spine proves the record and deployment contract
 - federal/private calculation math before the explicit Phase 2 math gate in
   `PROJECT_CONTEXT.md`
 - detailed Texas math-engine expansion until the dedicated math pass
@@ -519,9 +520,31 @@ The exporter should generate the same practical attorney-facing pattern:
 - Concordance/Opticon-style eDiscovery sidecar when requested
 - unresolved issue list when relevant
 
+Runsheet ordering is user-controlled. The rebuild must not hardcode one
+permanent export order. At minimum, Runsheet review and export should support:
+
+- global instrument/effective-date order
+- global file/recording-date order
+- individual tract filtering with sortable rows
+- whole-project grouped-by-tract review
+- later manual/custom package order for attorney-facing delivery
+- saved runsheet views when the workflow matures
+
+Golden masters must name the order/filter they represent, for example
+`global-instrument-date`, `global-file-date`, `vm1-instrument-date`, and
+`grouped-by-tract`. A generic `demo.runsheet.csv` is too ambiguous to be the
+long-term rebuild contract.
+
 The attorney-facing package and the eDiscovery sidecar should be generated from
 the same `Packet` / `PacketItem` manifest so the human workbook and machine
 load files cannot drift.
+
+Packet manifest goldens must be named by packet source mode. `Packet: Filter`,
+`Packet: Selected`, and `Packet: Runsheet` can legitimately produce different
+item sets from the same workspace, so a full-registry packet manifest golden
+does not prove the runsheet packet contract. Phase 1/2 document-vault tests
+should add source-mode-specific manifest fixtures before export behavior is
+changed.
 
 ## AI Answer Contract
 
@@ -635,6 +658,16 @@ Suggested Phase 0 lanes:
 The Phase 0 output should be a checked-in behavior catalog and fixture plan,
 not an implementation branch.
 
+Current Phase 0 master draft:
+
+- `docs/phase-0-inventory.md`
+
+That inventory was produced as a read-only review artifact on `main` and is the
+working catalog for Phase 0. It should be treated as a draft master inventory
+until the lead thread verifies the highest-risk rows against code and marks
+uncertain rows as `needs verification`. Secondary review agents may contribute
+lane findings, but this file remains the single consolidation target.
+
 ### Phase 0: Current Behavior Inventory And Golden Masters
 
 Goal: freeze the current observable behavior before rebuilding foundations.
@@ -642,6 +675,8 @@ Goal: freeze the current observable behavior before rebuilding foundations.
 Required work:
 
 - inventory every page and major workflow with atomic, testable behavior rows
+- reconcile the `docs/phase-0-inventory.md` draft into the checked-in master
+  catalog, preserving stable lane IDs and explicit coverage status
 - define acceptance checks for each page
 - freeze at least one reference workspace per major demo/project shape, export
   it, checksum it, and capture expected outputs as JSON where practical
@@ -653,6 +688,12 @@ Required work:
 - record implicit behavior such as sort orders, default filters, warning
   thresholds, autosave timing, destructive confirmations, and print/page layout
 - record known gaps instead of pretending they are covered
+- verify the highest-risk current-behavior claims before treating them as
+  binding: monolithic workspace storage, multi-tab overwrite risk, canvas
+  viewport persistence, lease-allocation tie-breaks, AI mutating-tool undo
+  coverage, legacy document migration/orphan handling, federal math isolation,
+  unit-focus transfer-order behavior, packet manifest behavior, and performance
+  baseline gaps
 
 Exit gate:
 
@@ -664,79 +705,201 @@ Exit gate:
 - full relevant tests pass
 - missing coverage is listed in this document or `TESTING.md`
 
-### Phase 0.75: Backend Architecture Decision
+### Phase 0.75: Minimal Backend Spine
 
-Goal: decide, with Phase 0 evidence in hand, whether LANDroid should add a
-backend spine before Phase 1 schema implementation.
+Goal: add the smallest backend spine and backend-shaped record contract before
+Phase 0.5 storage sharding, so Dexie sharding does not have to be redesigned
+around server records later.
 
-This gate occurs immediately after Phase 0, before Phase 0.5 storage work,
-because a backend decision may change what storage sharding needs to do.
+Decision:
 
-Default assumption:
+- start Phase 0.75 now as a backend-spine planning and implementation phase
+- do not build the full collaboration/OCR/search/multi-user backend yet
+- keep LANDroid local-first; core title, math, document review, project work,
+  and `.landroid` package export remain usable without the network
+- make Phase 0.5 Dexie sharding mirror backend-shaped records from the start
 
-- local-first project semantics and `.landroid` package export remain mandatory
-- the backend, if added, supports durability, jobs, search, AI, sync, and future
-  collaboration; it does not erase the project-package model
+This gate occurs immediately after Phase 0 and before Phase 0.5 because the
+record envelope, IDs, version metadata, document-object references, and audit
+shape must be known before splitting the monolithic `workspaces.data` payload.
 
-Backend responsibilities if approved:
+Minimal backend spine to add now:
 
-- durable project-record storage
-- object storage for original documents, derivatives, and packet artifacts
+- shared TypeScript/Zod contract for backend-shaped records and API payloads
+- versioned `RecordEnvelope` carrying `recordId`, `recordType`, `workspaceId`,
+  `projectId`, `schemaVersion`, `lastModified`, `revision`, `deletedAt`,
+  `source`, and optional `syncState`
+- minimal server package separate from `backend/ai-proxy` unless reuse is
+  explicitly cheaper; the current AI proxy remains an AI gateway, not the
+  project-record backend
+- Cognito-authenticated health/session endpoint so the app can prove auth,
+  tenant/user identity, server contract version, and deployment wiring
+- project manifest and record-validation endpoints before durable server
+  project storage; these prove the contract without making the backend the
+  source of truth
+- local adapter boundary so the frontend can talk to `local-only`, `mock`, or
+  hosted backend modes without changing domain code
+- CI validation for the shared contract, backend handler, auth/session policy,
+  and no-secrets/no-generated-artifact boundaries
+
+Remain local-first:
+
+- active workspace editing and autosave source of truth during Phase 0.75 and
+  Phase 0.5
+- Desk Map, Leasehold, Runsheet, Documents, Owners, Curative, Maps, Research,
+  Federal Leasing, Flowchart, and AI approval UI behavior
+- document preview from local IndexedDB / local package state
+- `.landroid` import/export, future-version rejection, rollback-safe side-store
+  replacement, and complete package export
+- local AI/Ollama and approval-gated mutation flow
+- Texas math engine and `MathInputView` parity contracts
+
+Full backend responsibilities remain later gates:
+
+- durable shared project storage as source of truth
+- object storage for originals, derivatives, OCR text, and packet artifacts
 - signed document access URLs
 - OCR, extraction, indexing, and packet-export background jobs
-- search indexes for exact/keyword search and later vector recall
-- server-controlled AI/RAG retrieval and provider access
-- durable action/audit records
+- exact/keyword search and later vector recall
+- server-controlled AI/RAG retrieval over document text
 - backup and multi-device sync
-- future multi-user permission boundaries
-- future cross-project party identity indexes
+- sharing, multi-user permissions, and collaboration conflict resolution
+- cross-project party identity indexes
 
-Decision questions:
+Record models that must be defined before Phase 0.5 sharding:
 
-- does Phase 0 show browser-only persistence is already too fragile for the
-  expected project size?
-- does OCR/search/export need background jobs earlier than expected?
-- does the user need multi-device sync or backup soon enough to justify the
-  added complexity?
-- should the hosted AWS POC evolve into the backend spine, or should a cleaner
-  backend be designed separately?
-- what stays available offline, and what requires network access?
-- how will `.landroid` package export remain complete and attorney-defensible?
+- `Project`
+- `WorkspaceManifest`
+- `RecordEnvelope`
+- `Party`
+- `PartyAlias`
+- `Document`
+- `DocumentVersion`
+- `VaultObject`
+- `DocumentLink`
+- `SourceCitation`
+- `CitationAnchor`
+- `SourceAttestation`
+- `InstrumentRecord`
+- `Tract`
+- `DeskMap`
+- `Lease`
+- `Unit`
+- `Wellbore`
+- `InterestReference`
+- `CurativeIssue`
+- `LeaseObligation`
+- `ObligationEvent`
+- `ImportSession`
+- `ActionPlan`
+- `ActionRecord`
+- `AuditEvent`
+- `Packet`
+- `PacketItem`
+- `PacketExport`
 
-Likely backend shape if approved:
+Dexie/backend compatibility rules:
 
-```text
-Frontend: React/Vite LANDroid
-Local cache: Dexie
-Backend API: Node/Fastify or similar
-Database: Postgres
-Object storage: S3/R2-compatible
-Jobs: OCR, indexing, packet export
-Search: Postgres FTS first, vector later
-Auth: Cognito or replacement auth provider
-AI gateway: server-controlled provider access and policy
-Export: .landroid package remains mandatory
-```
+- every sharded Dexie row must be representable as a backend record or a
+  declared local-only projection/cache row
+- all project records carry stable IDs and `workspaceId`/`projectId` scoping
+- records that can later sync carry `lastModified`, `revision`, and optional
+  `deletedAt` tombstone metadata
+- document bytes stay content-hash addressed; Dexie blobs, `.landroid` package
+  files, and later object-storage objects refer to the same hash identity
+- `.landroid` export includes complete local state even when sync metadata
+  exists or the backend is unreachable
+- import/export adapters preserve v8 read compatibility and introduce any new
+  write format with explicit version dispatch and rollback tests
+- actions/audit records describe intentional changes; snapshots remain backup
+  and migration artifacts, not the only durable story
 
-Tradeoff:
+Security/deployment/test gates before coding beyond the first slice:
 
-- a backend is more future-proof for document-heavy, OCR-heavy,
-  multi-project, multi-device, AI/RAG-heavy growth
-- a backend also adds API contracts, schema migrations, auth, deployment,
-  cloud cost, job monitoring, backup/security responsibility, and more failure
-  modes
+- threat-model note for the minimal spine covering Cognito auth, user/project
+  boundaries, API body caps, logging, document metadata, record validation, and
+  `.landroid` export/backups
+- deployment note deciding whether the spine is a new Lambda, an extension of
+  existing hosted infrastructure, or a local/mock-only contract until the first
+  hosted test
+- tests proving unauthenticated requests fail, authenticated session shape is
+  stable, client-supplied tenant/user IDs are not trusted, request bodies are
+  size-limited, and record validation rejects unknown/future schemas safely
+- root validation plus backend-package tests/build for any server code
+- no deploy claim unless `DEPLOYMENT_STATE.md` is updated and hosted smoke
+  evidence exists
+
+Smallest safe first implementation slice:
+
+1. Update source-of-truth docs and ADRs with this decision.
+2. Add shared contract types/schemas for `RecordEnvelope`, `Project`,
+   `WorkspaceManifest`, `Document`, `DocumentLink`, `VaultObject`, `Party`,
+   `SourceAttestation`, `ImportSession`, `ActionPlan`, `ActionRecord`, and
+   `AuditEvent`; add serialization tests only.
+3. Add a local backend adapter interface with `local-only` and `mock` modes so
+   Phase 0.5 can call the same boundary without network dependency.
+4. Add a minimal backend service package with health/session and
+   record-validation endpoints; reuse Cognito verification patterns, but do not
+   add project storage or document upload yet.
+5. Wire a non-user-facing contract check from the app to the adapter only after
+   tests prove no behavior changes.
+
+Token/time tradeoff:
+
+- doing the contract and minimal spine now costs one extra planning pass and a
+  small implementation slice before sharding
+- it avoids reworking every Phase 0.5 Dexie table, `.landroid` version, record
+  ID, action/audit path, and document-hash rule after the fact
+- it also keeps the expensive parts out of scope: no database migration, no
+  object storage custody, no OCR/search workers, no collaboration semantics,
+  and no full sync conflict UI yet
+- given limited work windows, this is the lower total-context path: spend more
+  upfront on the record/server contract, then let Phase 0.5 and Phase 1 reuse it
+  instead of repeatedly reopening the backend question
 
 Exit gate:
 
-- written backend go/no-go decision
+- written backend decision updated: minimal spine now, full backend later
 - backend responsibilities and non-responsibilities documented
 - local-first/export contract reaffirmed
-- if backend is approved, update ADRs and phase order before Phase 1 starts
+- record-envelope and core record requirements added to Phase 0.5 and Phase 1
+  acceptance criteria
+- security, deployment, and testing gates documented before server coding
+- smallest first implementation slice is limited to shared contracts, adapter
+  boundary, and health/session/validation endpoints
+
+Implementation checkpoint, 2026-05-25:
+
+- shared contract schemas live in `src/backend-spine/contracts.ts`
+- every declared `recordType` is represented in the validation union. Record
+  types whose full body schema is not defined yet use strict envelope-only
+  stubs so Phase 0.5 can shard against a canonical envelope without accepting
+  arbitrary payloads.
+- local-only, mock, and hosted adapter boundaries live in
+  `src/backend-spine/adapter.ts`
+- the non-user-facing app startup contract check lives in
+  `src/backend-spine/app-contract-check.ts`; it runs from `src/main.tsx` in
+  local mode and from `src/auth/AuthProvider.tsx` after hosted auth. It sends
+  health, session, and a synthetic project-record validation probe only
+- the minimal backend proof package lives in `backend/spine`
+- the package currently exposes pure health, session, and record-validation
+  handler logic plus a Lambda wrapper at `backend/spine/src/lambda.ts`; it does
+  not persist project records, upload document bytes, run OCR/search, sync
+  projects, or provide collaboration
+- repo-side hosted wiring now includes a `/api/spine/<*>` Amplify rewrite
+  template, render helper support, deployment guide/checklist updates, and
+  smoke-test coverage for public health plus unauthenticated session/
+  validation rejection
+- live hosted wiring was deployed on 2026-05-26: the separate
+  `landroid-backend-spine` Lambda Function URL is routed through Amplify
+  `/api/spine/<*>`, and hosted smoke passed for health, unauthenticated
+  rejection, oversized-body rejection, SPA fallback, and Cognito metadata
+- the initial threat-model note is `docs/backend-spine-threat-model.md`
 
 ### Phase 0.5: Workspace Storage Sharding
 
 Goal: remove the scale risk of one large workspace payload before rebuilding
-domain foundations.
+domain foundations and prove Raven Forest scale on iPad-class hardware.
 
 Required work:
 
@@ -751,6 +914,195 @@ Required work:
 - add migration/backup handling for in-flight projects
 - add multi-tab detection or a workspace write lock before concurrent writes can
   silently overwrite each other
+- extract the autosave debounce timing into a named constant before changing
+  persistence topology
+- persist canvas viewport state across reload if Phase 0 confirms the current
+  behavior is memory-only
+- request persistent browser storage for PWA/iPad use when the platform allows
+  it
+- lazy-load document/PDF blobs from IndexedDB; never load a full document set
+  into memory merely to open a workspace
+
+Kickoff inventory, 2026-05-26:
+
+| Area | Current path | Phase 0.5 treatment |
+| --- | --- | --- |
+| Core workspace | `workspaces.data` stores one JSON string for `WorkspaceData`: `workspaceId`, `projectName`, `nodes`, `deskMaps`, leasehold arrays, active IDs, and `instrumentTypes`. It is written by the debounced autosave in `src/main.tsx` through `saveWorkspaceToDb`. | Shard first. This is the main scale risk and the reason Phase 0.5 exists. |
+| Canvas | `canvases.data` stores one JSON string for React Flow nodes, edges, viewport, grid, page, spacing, snap, and tool-adjacent layout state. | Keep behavior, but split enough metadata to prove viewport persistence and avoid coupling every viewport move to the full workspace shard. |
+| Documents | `documents` stores PDF blobs plus metadata; `document_attachments` stores workspace-scoped entity links. Registry reads already omit blobs, while export/import and single-document preview read blobs intentionally. | Preserve the table shape at first, add envelope-compatible metadata/projection rows later, and add tests proving project open does not bulk-read all blobs. |
+| Owner side store | `owners`, `leases`, `contactLogs`, and `ownerDocs`; `ownerDocs` still embeds blobs. Store actions write these tables directly. | Leave table-by-table behavior intact in the first shard, then add envelope metadata and lazy owner-document blob loading only where needed. |
+| Map side store | `mapAssets`, `mapRegions`, and `mapExternalReferences`; `mapAssets` embeds blobs. | Preserve current map UX and link cleanup; treat map blobs as lazy-load candidates after primary Documents PDFs are guarded. |
+| Research side store | `researchImports`, `researchSources`, `researchFormulas`, `researchProjectRecords`, and `researchQuestions`; imports embed blobs. | Preserve current reference workspace behavior; do not promote Research imports into OCR/search or backend jobs in Phase 0.5. |
+| Curative side store | `titleIssues` rows loaded by workspace and sorted in memory. | Already sharded enough for Phase 0.5 scale; keep it as a side-store table and map it to backend `curative_issue` later. |
+| Legacy PDFs | `pdfs` is read-only rollback/migration support for v7 one-PDF-per-node workspaces. | Keep until the sharded migration has a proven backup/export path; do not write new rows. |
+| Workspace keys | Local mode uses `default` / `active-canvas`; hosted mode waits for Cognito `sub` and uses `user-{sub}` scoped keys. | Preserve exactly. Sharding must not reintroduce signed-out hosted reads of local default rows. |
+
+Initial shard order:
+
+1. Add a `WorkspaceManifest` / project metadata row that carries the Phase 0.75
+   envelope fields, `LANDROID_FILE_VERSION`, saved time, record counts, and a
+   pointer to any legacy monolith backup.
+2. Split `deskMaps` into sharded tract/desk-map rows, including unit fields,
+   acreage fields, external refs, and ordered node membership.
+3. Split `nodes` into one row per current `OwnershipNode`. These rows are
+   Phase 0.5 compatibility rows over current title-card state, not the final
+   Phase 1 semantic split into `InstrumentRecord` / `InterestReference`.
+   Where a backend record body is not defined yet, validate/send only the
+   strict envelope stub and declare the Dexie payload local-only.
+4. Split leasehold state from the workspace JSON: `leaseholdUnit`,
+   `leaseholdAssignments`, `leaseholdOrris`, and
+   `leaseholdTransferOrderEntries`. Keep the current math projections and
+   ordering contracts unchanged.
+5. Split active workspace UI state (`activeDeskMapId`, `activeUnitCode`, and
+   `instrumentTypes`) into a small local-only workspace-state row so changing
+   focus does not rewrite every title node.
+6. Handle canvas persistence separately from the core workspace shard. Viewport
+   persistence is part of Phase 0.5 acceptance, but broad Flowchart print/layout
+   behavior remains a parity target, not a redesign.
+7. Leave already-sharded side stores in place for the first implementation
+   slice. Add envelope adapters/projections around them only when the core
+   workspace split is stable.
+
+Migration and rollback strategy:
+
+- Use a Dexie schema bump after v9 for the shard tables; do not bump
+  `LANDROID_FILE_VERSION` merely because local IndexedDB is sharded.
+- During upgrade, parse every existing `workspaces.data` row with the same
+  `parsePersistedWorkspaceData` normalization used today, then write the new
+  shard rows in a single migration transaction where Dexie permits it.
+- Keep the pre-shard monolithic workspace row as a rollback/diagnostic backup
+  until sharded load, autosave, `.landroid` export, and side-store reset are
+  proven. Do not keep rewriting the monolith on every autosave, because that
+  would preserve the scale bottleneck.
+- Make sharded load idempotent and recency-aware: prefer complete shard rows
+  only when they are at least as fresh as the monolith, fall back to the legacy
+  monolith if shard rows are absent, incomplete, stale, or fail validation, and
+  surface a startup warning rather than silently dropping data. This recency
+  check is now implemented in `readWorkspaceFromShardRows` and was the gate that
+  made the shard-first read safe to pair with the shard writer. (History: while
+  the read path was shard-first but autosave still wrote only the monolith, the
+  monolith was the newer copy after any edit, so preferring shards
+  unconditionally stranded every post-migration edit on reload. The shard writer
+  plus the recency check close that window.)
+- Keep `.landroid` import/export assembled through compatibility adapters.
+  Existing v7/v8 reads, `version > 8` rejection, v7 PDF migration, and
+  rollback-safe side-store replacement remain required. A future package-format
+  bump needs explicit version dispatch and round-trip tests before it writes
+  anything other than the current v8 package shape.
+- Preserve CSV and demo loaders by routing replacement through the same shard
+  writer and existing `replaceWorkspaceSideStores` boundary.
+- Treat AI undo snapshots as compatibility snapshots during Phase 0.5. Do not
+  convert them into durable audit/action records in this phase.
+
+Local-first and offline plan:
+
+- Dexie remains the active source of truth for core workflows during Phase 0.5.
+  The Phase 0.75 backend spine is a contract check, not storage, sync, or an
+  online dependency for editing.
+- Sharded load, edit, autosave, document preview, `.landroid` import/export,
+  and AI approval/undo must work without network access where they work today.
+- Hosted mode keeps Cognito-based local key scoping, but project data still
+  lives in browser IndexedDB unless a later backend-storage gate is approved.
+- Request `navigator.storage.persist()` where supported and record whether it
+  was granted or refused. A refusal is a durability warning, not a reason to
+  disable local-first workflows.
+- `.landroid` export remains the permanent escape hatch and must be available
+  even when the backend spine is unreachable.
+
+Multi-tab single-writer plan:
+
+- Add a workspace-scoped write lease before shard writes are considered
+  production-safe. The intended contract is pessimistic: one writable tab per
+  workspace, later tabs open read-only with a visible "editing elsewhere"
+  warning and an explicit takeover confirmation.
+- Store the lease in Dexie with `workspaceId`, `ownerTabId`, heartbeat time,
+  expiry, and a fencing/revision token. Use `BroadcastChannel` for fast tab
+  notice and a timer/expiry fallback for browsers that miss broadcasts.
+- Gate workspace autosave, canvas autosave, and direct side-store mutation
+  helpers behind the same writable-tab assertion. Last-write-wins remains only
+  a documented Phase 0 dev boundary until this gate lands.
+- Do not implement optimistic merge/conflict UI in Phase 0.5. That belongs with
+  later sync/collaboration scope if a real multi-user requirement appears.
+
+Lazy document/blob loading plan:
+
+- Opening a project must load document metadata and links, not every PDF/blob.
+  `listDocumentRegistryData`, `listDocsForEntity`, and
+  `listAttachmentsForNodes` already follow this pattern for the main
+  `documents` table; Phase 0.5 should turn that into a tested contract.
+- Single-document preview, `.landroid` export, package export, and explicit
+  backup flows are allowed to read blobs because the user asked for the bytes.
+- Blob-bearing side stores (`ownerDocs`, `mapAssets`, and `researchImports`)
+  should be treated as the next lazy-load candidates. Do not redesign their UI
+  in Phase 0.5; add metadata-first readers where project-open performance or
+  memory evidence requires it.
+- Blob content hashes remain the identity bridge across Dexie blobs,
+  `.landroid` package files, and later object storage.
+
+Targeted tests and performance gates before implementation:
+
+- First implemented guardrails now cover pure shard-building/round-trip,
+  active UI-state isolation, multi-tab write-lease decisions, autosave debounce
+  naming, and lazy document-registry metadata reads. These are scaffolding only
+  and are not yet wired into live Dexie shard writes.
+- The next slice performs the explicit IndexedDB gate: Dexie v10 now creates
+  shard/write-lease tables and backfills them from existing monolithic
+  `WorkspaceRecord` rows. The monolithic row is preserved and remains the live
+  load/save source until the shard reader/writer and write-lock gate are proven.
+- The shard reader is now implemented as a pure adapter. Complete shard rows
+  reconstruct `WorkspaceData`; incomplete/corrupt shard rows fall back to the
+  preserved monolith; missing or corrupt fallback rows report corruption. The
+  runtime load path uses this reader shard-first and surfaces fallback warnings
+  through the startup warning channel.
+- The shard writer slice is now landed and the edit-stranding regression is
+  resolved. Autosave (`src/main.tsx`) calls `saveWorkspaceShardsToDb`, which
+  rebuilds the shard set with `buildWorkspaceShards` and writes all five shard
+  tables in one `db.transaction('rw', …)` so a mid-write failure cannot leave a
+  partial set. The monolith is no longer rewritten on autosave; it stays a
+  frozen migration backup the reader falls back to with a loud warning. The
+  reader is recency-aware — a strictly newer monolith wins over stale shards —
+  and resolves shards by the active per-user DB key (`getWorkspaceDbKey()`)
+  stamped on the manifest. That key scoping plus a refusal to adopt a foreign
+  manifest when the current user's monolith is absent closes the cross-user
+  shard leak (Bug 001). Shard writes are gated by the single-writer lease
+  (`workspace-write-lease.ts`, `BroadcastChannel` + Dexie expiry); a non-writer
+  tab returns `blocked` and writes nothing. `replaceWorkspaceSideStores` clears
+  the active key's shard rows on workspace replacement / sign-out. Deferred to a
+  follow-up: a visible read-only/"editing elsewhere" banner, canvas-autosave
+  lease gating, and a browser autosave-timing recapture against the Raven Forest
+  perf baseline (`buildWorkspaceShards` itself is sub-millisecond at 1476 nodes).
+- Add storage tests for monolith-to-shard migration, corrupt-shard fallback,
+  idempotent rerun, v7/v8 `.landroid` import compatibility, future-version
+  rejection, and rollback-safe side-store replacement.
+- Add autosave tests for the extracted debounce constant, reference-change
+  detection against the new shard writer, and separate active-focus writes.
+- Add lock tests for first-tab writable, second-tab read-only, stale lease
+  takeover, explicit takeover confirmation, and blocked writes from a
+  non-writable tab.
+- Add lazy-load tests that project open and registry listing do not fetch every
+  document blob, while preview/export still fetch the requested bytes.
+- Run the existing storage/document target set before broad validation:
+  `npm test -- src/storage/__tests__/workspace-persistence.test.ts src/storage/__tests__/workspace-side-store-reset.test.ts src/storage/__tests__/document-store.test.ts src/storage/__tests__/document-migration.test.ts src/storage/__tests__/autosave-change-detection.test.ts src/storage/__tests__/active-workspace-key.test.ts src/storage/__tests__/persistence-db-key.test.ts src/phase0/__tests__/vulcan-mesa-fixtures.test.ts`.
+- Re-run `npm run lint`, `npm test`, `npm run build`, `npm run test:e2e`, and
+  `npm run deploy:check` before declaring Phase 0.5 implementation complete.
+- Compare autosave, project-open, document-registry, `.landroid` round-trip,
+  and Raven Forest-scale captures against Phase 0 baselines. The target remains
+  1,000-3,000 title nodes and 200-1,000 document records/PDFs on iPad
+  Pro-class hardware or a documented equivalent, without full-blob workspace
+  rewrites.
+
+Token/time tradeoff:
+
+- The higher-total-value path is to spend planning and test-design effort now:
+  table inventory, envelope mapping, migration gates, lock gates, and lazy-load
+  contracts before implementation.
+- This costs more up front than simply splitting `nodes` into a table, but it
+  avoids repeatedly reopening Dexie versions, `.landroid` compatibility,
+  backend record IDs, document hash identity, side-store reset behavior, and
+  multi-tab safety during Phase 1 and later backend work.
+- Scope stays tight by refusing the expensive parts now: no durable backend
+  project storage, object storage, OCR/search, sync, collaboration,
+  multi-user permissions, or new product workflows.
 
 Exit gate:
 
@@ -758,6 +1110,10 @@ Exit gate:
 - `.landroid` round trip and side-store reset tests pass
 - autosave performance is measured against the Phase 0 baseline
 - multi-tab conflict behavior is tested or explicitly blocked
+- Raven Forest-scale fixture target is exercised on iPad Pro-class hardware or
+  an explicitly documented equivalent: 1,000-3,000 title nodes and 200-1,000
+  document records/PDFs without full-blob workspace rewrites
+- `.landroid` export remains usable as the backup/escape hatch after sharding
 
 ### Phase 1: Project Record Schema Foundations
 
@@ -778,12 +1134,49 @@ Required work:
 - keep current Zustand stores operational
 - add adapter/projection helpers instead of forcing a UI migration
 - add Zod schemas at import/export boundaries
+- design records against the Phase 0.75 backend-spine contract: stable IDs,
+  `workspaceId`, `projectId`, `lastModified` / version fields where needed,
+  revisions/tombstones for future sync, and content-hash references for
+  blob-backed records
+- add a guard so every mutating AI tool that can change project state is covered
+  by the approval/undo policy
+- make Texas/federal/private isolation a `MathInputView` projection
+  precondition instead of relying on scattered per-surface filters
 
 Exit gate:
 
 - no UI behavior changes
 - type-level tests and serialization tests pass
 - `.landroid` migration strategy is documented before format changes
+- `MathInputView` preserves Phase 0 display/math contracts, including dual
+  decimal plus fraction display, lease allocation order, warning-only states,
+  and jurisdiction isolation
+
+### Planned Product Lanes Outside Phase 0
+
+These are accepted rebuild-planning lanes, not Phase 0 blockers and not
+approval to implement them immediately:
+
+- template and communication generation: a workspace template library using
+  `.docx` templates with `{{variable}}` placeholders, a variable manifest
+  sidecar, manual fill fallback, AI-assisted fill through approval previews, and
+  generated output saved back to the Evidence Vault
+- field/iPad mode: read-heavy, light-edit PWA workflows optimized for courthouse
+  and field use, with offline operation and Ollama/local AI as the offline path
+- universal search / command palette: cross-surface search over owners,
+  documents, instruments, leases, curative issues, research records, maps, and
+  project records
+- inline AI entry points: right-click or contextual "Ask AI about this" on
+  cards, rows, chips, documents, and fractional values, using the selected
+  entity as grounded context
+- persistent workspace chat history, stored locally and exportable with the
+  project when intended
+- three-pane Documents workflow: filter tree, dense document list, metadata and
+  preview panel, with professional document-management patterns rather than
+  modal-heavy review
+- rolling auto-export and storage health surfaces: user-selected backup folder
+  where supported, timestamped `.landroid` snapshots, last-saved / last-exported
+  status, and visible IndexedDB/storage warnings
 
 ### Phase 2: Document Vault And Packet Model
 

@@ -1,7 +1,13 @@
 [
   {
     "source": "/api/ai/<*>",
-    "target": "https://REPLACE_WITH_FUNCTION_URL_HOST/<*>",
+    "target": "https://REPLACE_WITH_AI_FUNCTION_URL_HOST/<*>",
+    "status": "200",
+    "condition": null
+  },
+  {
+    "source": "/api/spine/<*>",
+    "target": "https://REPLACE_WITH_SPINE_FUNCTION_URL_HOST/<*>",
     "status": "200",
     "condition": null
   },

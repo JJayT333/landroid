@@ -11,6 +11,7 @@ import type { MapWorkspaceData } from './map-persistence';
 import type { OwnerWorkspaceData } from './owner-persistence';
 import type { ResearchWorkspaceData } from './research-persistence';
 import {
+  clearWorkspaceShardsForActiveKey,
   exportDocumentWorkspaceData,
   replaceDocumentWorkspaceData,
   type DocumentWorkspaceData,
@@ -83,6 +84,11 @@ export async function replaceWorkspaceSideStores(
       .getState()
       .replaceWorkspaceData(workspaceId, data.curativeData ?? EMPTY_CURATIVE_DATA),
   ]);
+
+  // Drop the prior workspace's shard rows for this DB key so the replacement
+  // workspace's autosave starts from a clean set and the reader cannot resolve
+  // a stale workspace under the active key.
+  await clearWorkspaceShardsForActiveKey();
 
   useAIApprovalStore.getState().clear();
   useAIActionJournalStore.getState().clear();

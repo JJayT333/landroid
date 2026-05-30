@@ -15,7 +15,7 @@ uses day-to-day. The Leasehold tab does the actual NRI / ORRI / NPRI / WI
 math; the Desk Map tab is title side. Two features were just shipped
 back-to-back on this branch:
 
-1. **Crackbaby Carnival demo fixture** (`src/storage/seed-crackbaby-carnival.ts`)
+1. **Vulcan Mesa demo fixture** (`src/storage/seed-vulcan-mesa.ts`)
    — second option in the Navbar Demo Data dropdown alongside the existing
    Raven Forest demo (`src/storage/seed-test-data.ts`).
 2. **FormulaTooltip popovers** (`src/components/leasehold/FormulaTooltip.tsx`,
@@ -32,7 +32,7 @@ auditor who can't sit in the app with the landman. Effectively a printable
 form of the FormulaTooltip popovers — every number that has a tooltip in
 the live app should appear with its derivation on the sheet.
 
-Must work for **both Raven Forest and Crackbaby Carnival** (and any future
+Must work for **both Raven Forest and Vulcan Mesa** (and any future
 tract — the implementation should be tract-agnostic).
 
 ### What the Audit Sheet should contain (per tract)
@@ -105,7 +105,7 @@ The `FormulaContent` shape is in
   `page-break-after`.
 - ✅ Render-and-print via `window.print()` — user "saves as PDF" from the
   browser dialog.
-- ✅ Works on both Raven Forest and Crackbaby Carnival without code changes.
+- ✅ Works on both Raven Forest and Vulcan Mesa without code changes.
 - ❌ No custom branding / company letterhead (v2).
 - ❌ No Excel / CSV export — printable PDF only.
 - ❌ No owner-by-owner sheets (tract-level only).
@@ -123,9 +123,9 @@ The `FormulaContent` shape is in
 4. Test C7 (deliberate over-conveyance), C3 (NPRI discrepancy), C8 (lease
    overlap), C10 (kitchen sink) — every warning that fires in the live app
    should be reflected in the audit sheet's warning panel.
-5. Load **Crackbaby Carnival** and verify the planted errors
-   (over-conveyance CC2, over-burdened NPRI CC3, malformed royalty CC4,
-   divide-by-zero ORRI CC5, lease overlap CC7, over-assigned Unit A) all
+5. Load **Vulcan Mesa** and verify the planted errors
+   (over-conveyance VM2, over-burdened NPRI VM3, malformed royalty VM4,
+   divide-by-zero ORRI VM5, lease overlap VM7, over-assigned Unit A) all
    show up.
 6. Print to PDF and visually check that the printout doesn't get truncated,
    that page breaks happen at sensible spots, and that the typography is
@@ -138,9 +138,8 @@ The `FormulaContent` shape is in
   DRY. Existing pattern is to colocate formula formatters with their domain.
 - Always start the dev server, kill old processes first, and open Chrome on
   completion.
-- User has a dark / twisted sense of humor — the Crackbaby Carnival fixture
-  has darkly funny owner names. Don't tone that down if names show up on
-  the audit sheet.
+- The Vulcan Mesa fixture is intentionally dry, Texas-flavored, and
+  mythology-adjacent. Keep it professional enough for outside review.
 
 ### Where to start
 

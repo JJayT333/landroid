@@ -1,0 +1,52 @@
+{
+  "schema": 1,
+  "capturedAt": "2026-05-24",
+  "branch": "codex/phase-0-reconcile-2026-05-23",
+  "fixture": "Vulcan Mesa loaded, then temp .landroid with version 999 imported through File load confirmation",
+  "command": "npm run dev -- --host 127.0.0.1",
+  "browser": "Playwright Chromium headless",
+  "viewport": {
+    "width": 1440,
+    "height": 1000
+  },
+  "setup": {
+    "baseFixture": "fixtures/phase-0/demo.landroid",
+    "tempFutureVersionPath": "/private/tmp/landroid-future-version-999.landroid",
+    "futureVersion": 999
+  },
+  "beforeImport": {
+    "hasVulcanMesa": true,
+    "hasVm1": true
+  },
+  "confirmation": {
+    "dialogTextIncludesReplaceWarning": true,
+    "requiredPhrase": "LOAD WORKSPACE",
+    "replaceInitiallyDisabled": true,
+    "replaceEnabledAfterPhrase": true
+  },
+  "rejection": {
+    "dialogCountAfterAttempt": 1,
+    "dialogsAfterAttempt": [
+      {
+        "aria": "Import Failed",
+        "textSample": "Import Failed×Import failed: Unsupported .landroid file version 999. This LANDroid build supports up to version 8.OK"
+      }
+    ],
+    "unsupportedVersionMessageVisible": true,
+    "importFailedVisible": true
+  },
+  "afterImportAttempt": {
+    "stillHasVulcanMesa": true,
+    "stillHasVm1": true,
+    "futureProjectNameVisible": false
+  },
+  "console": {
+    "errorCount": 0,
+    "errors": []
+  },
+  "notes": [
+    "Smoke confirms future-version .landroid rejection is visible and non-destructive after the user enters the destructive-load confirmation.",
+    "The probe file was generated in /private/tmp from the W1 fixture by changing version to 999; no committed fixture was modified.",
+    "This smoke does not test every malformed package path, only version > LANDROID_FILE_VERSION rejection."
+  ]
+}

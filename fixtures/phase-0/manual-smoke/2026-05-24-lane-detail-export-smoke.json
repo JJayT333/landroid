@@ -1,0 +1,139 @@
+{
+  "schema": 1,
+  "capturedAt": "2026-05-24",
+  "branch": "codex/phase-0-reconcile-2026-05-23",
+  "fixture": "Vulcan Mesa demo via Demo Data menu",
+  "command": "npm run dev -- --host 127.0.0.1",
+  "browser": "Playwright Chromium headless",
+  "viewport": {
+    "width": 1440,
+    "height": 1000
+  },
+  "loadGuard": {
+    "requiredPhrase": "LOAD DEMO",
+    "confirmed": true
+  },
+  "lanes": [
+    {
+      "tab": "Documents",
+      "observed": [
+        "Documents view rendered",
+        "64 docs",
+        "64 links",
+        "3.8 MB",
+        "Packet: Filter",
+        "Packet: Selected",
+        "Packet: Runsheet",
+        "Missing metadata view",
+        "Duplicates view",
+        "Needs OCR view",
+        "PDF row actions"
+      ],
+      "selects": [
+        "All kinds / Deed / Lease / Obituary / Affidavit / Probate / Related / Other",
+        "All tracts plus VM1 through VM10",
+        "All links / Linked / Unlinked"
+      ]
+    },
+    {
+      "tab": "Leasehold",
+      "observed": [
+        "Leasehold view rendered",
+        "Overview / Map / Deck modes",
+        "UNIT FOCUS selector",
+        "Jupiter Flats Unit (A)",
+        "Minerva Draw Unit (B)",
+        "5 tracts",
+        "1080 gross acres",
+        "1080 pooled acres",
+        "22.24% unit royalty",
+        "9.72% unit NPRI",
+        "ORRI overrides",
+        "WI assignments"
+      ],
+      "selects": [
+        "Jupiter Flats Unit (A)",
+        "Minerva Draw Unit (B)"
+      ]
+    },
+    {
+      "tab": "Owners",
+      "observed": [
+        "Owners view rendered",
+        "15/21 records",
+        "Unit focus selector",
+        "owner list with active lease counts",
+        "Info / Leases / Contacts / Docs detail tabs",
+        "Save Owner action",
+        "Delete Owner action"
+      ],
+      "selects": [
+        "Jupiter Flats Unit (A)",
+        "Minerva Draw Unit (B)",
+        "Name (A-Z) / Name (Z-A) / County / Prospect / Active Leases / Recently Updated"
+      ]
+    },
+    {
+      "tab": "Runsheet",
+      "observed": [
+        "Runsheet view rendered without starting walkthrough wizard",
+        "TRACT FILTER",
+        "VM1 through VM10 tract filters",
+        "79 entries",
+        "Export Runsheet",
+        "INSTRUMENT / FILE DATE / INST. DATE / VOL/PG / GRANTOR / GRANTEE headers"
+      ]
+    },
+    {
+      "tab": "Federal Leasing",
+      "observed": [
+        "Federal Leasing view rendered",
+        "Reference-only lease inventory statement",
+        "Federal math non-effect warning",
+        "Add Existing Federal Lease",
+        "Add Potential Target",
+        "Add Unit / CA Reference",
+        "Add Mapped Tract",
+        "Source Packets view",
+        "0 current / 0 targets / 0 under review / 0 expired"
+      ]
+    },
+    {
+      "tab": "Research",
+      "observed": [
+        "Research view rendered",
+        "Source library, formula cards, federal/private project records, and saved questions",
+        "Home / Sources / Formulas / Project Records / Questions / Data Imports",
+        "Cross-Library Search",
+        "Review Queue",
+        "RRC references",
+        "Federal/private records stay reference-only statement"
+      ]
+    }
+  ],
+  "fileMenu": {
+    "observed": [
+      "Save workspace",
+      "Load workspace"
+    ],
+    "exportResult": {
+      "attempted": true,
+      "downloaded": true,
+      "suggestedFilename": "Vulcan Mesa \u2014 Demo (10 Tracts, 79 nodes).landroid",
+      "byteLength": 5548009,
+      "sha256": "7732f1280072e1649f6d2794f7e049e8400cf0c246e15b8152184977a06b4b07",
+      "error": null
+    }
+  },
+  "console": {
+    "warningCount": 0,
+    "errorCount": 0,
+    "messages": [],
+    "pageErrors": []
+  },
+  "notes": [
+    "Read-only lane-detail smoke plus .landroid export download check.",
+    "This does not complete the full manual smoke runbook and does not test mutating workflows.",
+    "Export checksum is from a fresh app-generated download and is recorded as smoke evidence, not as a golden fixture replacement."
+  ]
+}

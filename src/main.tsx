@@ -13,10 +13,11 @@ import { useResearchStore } from './store/research-store';
 import { useCurativeStore } from './store/curative-store';
 import { useWorkspaceStore } from './store/workspace-store';
 import { useCanvasStore } from './store/canvas-store';
-import { saveWorkspaceToDb, loadWorkspaceFromDb } from './storage/workspace-persistence';
+import { saveWorkspaceShardsToDb, loadWorkspaceFromDb } from './storage/workspace-persistence';
 import { saveCanvasToDb, loadCanvasFromDb } from './storage/canvas-persistence';
 import { awaitWorkspaceKeyReady } from './storage/active-workspace-key';
 import { runPostV8BackupIfNeeded } from './storage/post-v8-backup';
+import { runBackendSpineContractCheck } from './backend-spine/app-contract-check';
 import {
   buildCanvasAutosavePayload,
   buildWorkspaceAutosavePayload,
@@ -25,6 +26,7 @@ import {
   captureWorkspaceAutosaveSnapshot,
   workspaceAutosaveStateChanged,
 } from './storage/autosave-change-detection';
+import { AUTOSAVE_DEBOUNCE_MS } from './storage/autosave-config';
 
 // ── Auto-load saved workspace and canvas on startup ─────
 async function bootstrapApp() {
@@ -75,6 +77,9 @@ async function bootstrapApp() {
   if (workspaceResult.status === 'corrupt' && workspaceResult.error) {
     startupWarnings.push(workspaceResult.error);
   }
+  if (workspaceResult.warning) {
+    startupWarnings.push(workspaceResult.warning);
+  }
 
   if (canvasResult.status === 'loaded' && canvasResult.data) {
     useCanvasStore.getState().loadCanvas(canvasResult.data);
@@ -89,6 +94,10 @@ async function bootstrapApp() {
   useWorkspaceStore.getState().setStartupWarning(
     startupWarnings.length > 0 ? startupWarnings.join(' ') : null
   );
+
+  if (!isHostedMode()) {
+    void runBackendSpineContractCheck({ logger: console });
+  }
 }
 
 void bootstrapApp();
@@ -108,8 +117,8 @@ useWorkspaceStore.subscribe((state) => {
 
   if (saveTimer) clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
-    saveWorkspaceToDb(buildWorkspaceAutosavePayload(state));
-  }, 2000);
+    void saveWorkspaceShardsToDb(buildWorkspaceAutosavePayload(state));
+  }, AUTOSAVE_DEBOUNCE_MS);
 });
 
 // ── Auto-save canvas on changes (debounced 2s) ───────────
@@ -128,7 +137,7 @@ useCanvasStore.subscribe((state) => {
   if (canvasSaveTimer) clearTimeout(canvasSaveTimer);
   canvasSaveTimer = setTimeout(() => {
     saveCanvasToDb(buildCanvasAutosavePayload(state));
-  }, 2000);
+  }, AUTOSAVE_DEBOUNCE_MS);
 });
 
 createRoot(document.getElementById('root')!).render(

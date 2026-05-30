@@ -67,6 +67,17 @@ export function buildAIApprovalDetails(
     if (!text) return;
     details.push(tone ? { label, value: text, tone } : { label, value: text });
   };
+  const addNodeDocumentDetails = () => {
+    add('Instrument', form.instrument);
+    add('Document', form.docNo);
+    const volumePage = [valueToText(form.vol), valueToText(form.page)]
+      .filter(Boolean)
+      .join('/');
+    add('Volume/Page', volumePage);
+    add('Instrument date', form.date);
+    add('File date', form.fileDate);
+    add('Land description', form.landDesc);
+  };
 
   switch (toolName) {
     case 'createRootNode':
@@ -74,7 +85,7 @@ export function buildAIApprovalDetails(
       add('Fraction', data.initialFraction);
       add('Grantee', form.grantee);
       add('Grantor', form.grantor);
-      add('Document', form.docNo);
+      addNodeDocumentDetails();
       add('Desk map', data.deskMapId);
       add('Owner record', data.linkedOwnerId);
       break;
@@ -82,7 +93,7 @@ export function buildAIApprovalDetails(
       add('Parent node', data.parentNodeId);
       add('Share', data.share);
       add('Grantee', form.grantee);
-      add('Document', form.docNo);
+      addNodeDocumentDetails();
       break;
     case 'createNpri':
       add('Parent node', data.parentNodeId);
@@ -90,14 +101,14 @@ export function buildAIApprovalDetails(
       add('Royalty kind', data.royaltyKind);
       add('Fixed basis', data.fixedRoyaltyBasis);
       add('Grantee', form.grantee);
-      add('Document', form.docNo);
+      addNodeDocumentDetails();
       break;
     case 'precede':
       add('Existing node', data.nodeId);
       add('Predecessor fraction', data.newInitialFraction);
       add('Grantor', form.grantor);
       add('Grantee', form.grantee);
-      add('Document', form.docNo);
+      addNodeDocumentDetails();
       break;
     case 'graftToParent':
       add('New parent', data.parentNodeId);

@@ -57,6 +57,16 @@ export interface UndoSnapshot {
   label: string;
 }
 
+export const AI_UNDO_SNAPSHOT_SECTIONS = [
+  'workspace',
+  'owner',
+  'curative',
+  'map',
+  'documents',
+] as const satisfies ReadonlyArray<
+  keyof Pick<UndoSnapshot, 'workspace' | 'owner' | 'curative' | 'map' | 'documents'>
+>;
+
 interface UndoState {
   snapshot: UndoSnapshot | null;
   setSnapshot: (snapshot: UndoSnapshot | null) => void;

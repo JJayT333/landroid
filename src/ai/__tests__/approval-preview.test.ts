@@ -103,6 +103,37 @@ describe('AI approval previews', () => {
     expect(useWorkspaceStore.getState().nodes).toHaveLength(1);
   });
 
+  it('surfaces title document metadata in approval details before approval', async () => {
+    const queued = await runTool(landroidTools.convey, {
+      parentNodeId: 'root',
+      share: '0.25',
+      form: {
+        grantee: 'Child Owner',
+        instrument: 'Mineral Deed',
+        docNo: '2026-0001',
+        vol: '120',
+        page: '44',
+        date: '2026-01-02',
+        fileDate: '2026-01-05',
+        landDesc: 'Section 10, Block A',
+      },
+    });
+    const proposal = useAIApprovalStore
+      .getState()
+      .proposals.find((item) => item.id === queued.proposalId);
+
+    expect(proposal?.details).toEqual(
+      expect.arrayContaining([
+        { label: 'Instrument', value: 'Mineral Deed' },
+        { label: 'Document', value: '2026-0001' },
+        { label: 'Volume/Page', value: '120/44' },
+        { label: 'Instrument date', value: '2026-01-02' },
+        { label: 'File date', value: '2026-01-05' },
+        { label: 'Land description', value: 'Section 10, Block A' },
+      ])
+    );
+  });
+
   it('blocks approval when the previewed title move would fail', async () => {
     const queued = await runTool(landroidTools.convey, {
       parentNodeId: 'root',

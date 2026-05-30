@@ -10,11 +10,26 @@ summarizes how the app is put together and where changes should live.
 - State: Zustand stores in `src/store`.
 - Persistence: IndexedDB/Dexie helpers in `src/storage`, plus browser storage
   for selected local settings.
-- Target storage planning: keep Dexie as the current runtime path, add
-  workspace sharding before broad rebuild work unless the Phase 0.75 backend
-  decision changes that path, and treat SQLite/OPFS, Tauri/native filesystem,
-  backend object storage, or cloud object storage as explicit decision gates,
-  not current defaults.
+- Target storage planning: keep Dexie as the current runtime path, add a
+  minimal backend spine before workspace sharding, shard workspace data around
+  backend-shaped records, and treat SQLite/OPFS, Tauri/native filesystem,
+  backend object storage, or cloud object storage as explicit implementation
+  gates, not current defaults.
+- Phase 0.5 storage scaffolding: `src/storage/workspace-shards.ts` defines the
+  pure adapter from current `WorkspaceData` into backend-spine manifest and
+  Desk Map envelopes plus local-only compatibility rows. `src/storage/db.ts`
+  now registers the v10 shard/write-lease tables and populates shard rows from
+  existing monolithic workspace rows during upgrade. Live workspace load now
+  reads complete shard rows first through `src/storage/workspace-shard-reader.ts`
+  and falls back to `workspaces.data` with a startup warning when shards are
+  incomplete/corrupt. Autosave still writes `workspaces.data` until the shard
+  writer and write-lock gate land. `src/storage/workspace-write-lock.ts`
+  defines the pure single-writer lease decision contract for the later
+  multi-tab write gate. `src/storage/workspace-shard-migration.ts` defines the
+  pure monolith-to-shards and shards-to-monolith rollback helpers.
+- Runtime target: hosted web app first, with PWA/iPad support as a product
+  target. Native iOS and desktop installers are deferred unless a later
+  decision gate proves they are needed.
 - Math: Decimal.js through `src/engine`.
 - Graph/canvas: React Flow and ELK for flowchart layout.
 - AI: Vercel AI SDK adapters in `src/ai`; Ollama is the default provider.
@@ -89,15 +104,32 @@ Target rebuild boundaries:
 - Runtime adapters: blob storage, OCR job dispatch, AI inference, and hosted
   persistence should have adapter boundaries before any backend/cloud or Tauri
   pivot becomes the source of truth.
-- Backend spine: after Phase 0, LANDroid has a decision gate for whether to add
-  backend infrastructure before Phase 1 schema implementation. If approved, the
-  backend owns durable project records, object storage, background jobs, search,
-  AI/RAG policy, audit logs, backup/sync, and future permissions while keeping
-  local project semantics and `.landroid` export mandatory.
+- Backend spine: Phase 0.75 adds the minimal backend contract before Phase 0.5
+  sharding. The current scope is shared record/API schemas, a record envelope,
+  local/hosted adapter boundaries, Cognito-backed session proof, and
+  health/record-validation endpoints. The app also runs a non-user-facing
+  startup contract check through the adapter after local startup or hosted auth;
+  it sends health, session, and a synthetic project-record validation probe only and
+  does not block local workflows. Durable server project storage, object
+  storage, OCR/search jobs, sync, sharing, collaboration, and future
+  permissions remain later gates. Local project semantics and complete
+  `.landroid` export stay mandatory. Implementation files are
+  `src/backend-spine/contracts.ts`, `src/backend-spine/adapter.ts`,
+  `src/backend-spine/app-contract-check.ts`, `backend/spine/src/handler.ts`,
+  and `backend/spine/src/lambda.ts`. Hosted routing is prepared via
+  `/api/spine/<*>` Amplify rewrites to a separate `landroid-backend-spine`
+  Lambda Function URL.
 
 Target projections include Desk Map, Runsheet, Leasehold, Documents, Owners,
 Curative, packet export, AI context, `OpinionDraft`, `ObligationCalendar`, and
 `AbstractorPackage`.
+
+Backend-shaped rebuild records should carry stable IDs, `workspaceId` and
+`projectId` scoping, `lastModified` / version metadata where needed,
+revision/tombstone hooks for future sync, and content-hash references for
+blob-backed evidence. This lets Phase 0.5 sharding and a later backend sync
+engine move intentional records and action/audit data instead of
+reverse-engineering opaque workspace snapshots.
 
 ## Data Flow
 
@@ -153,23 +185,48 @@ outputs against existing golden masters before any cutover.
 Persistence helpers live under `src/storage`. Import paths must treat external
 files as untrusted input.
 
-Current persistence is browser-local. Planned storage changes must follow the
-staged trajectory in `docs/rebuild-plan.md`:
+Current persistence is browser-local and local-first remains a product
+invariant. Planned storage changes must follow the staged trajectory in
+`docs/rebuild-plan.md`:
 
 1. Shard current workspace persistence inside Dexie.
 2. Keep `.landroid` snapshots/packages loadable with migration/backup rules.
-3. Evaluate SQLite/OPFS only after query/search needs justify it.
-4. Consider Tauri/native filesystem only when local OCR process control,
+3. Add multi-tab protection, persistent-storage requests for PWA/iPad where
+   supported, lazy document/PDF blob loading, and measured Raven Forest-scale
+   behavior before calling Phase 0.5 complete.
+4. Evaluate SQLite/OPFS only after query/search needs justify it.
+5. Consider Tauri/native filesystem only when local OCR process control,
    Finder-visible project packages, native SQLite, or corpus size forces it.
 
 Document originals, checksums, and source metadata are canonical. OCR text,
 embeddings, FTS rows, page images, and packet exports are derived artifacts that
 must be rebuildable from the canonical vault state.
 
-If Phase 0.75 approves a backend spine, this staged trajectory must be revised
-before Phase 1. The backend should make storage, jobs, search, and AI policy
-more durable; it should not make the app unable to produce a complete local
-project package.
+The minimal Phase 0.75 backend spine should make the record/API contract
+explicit before Dexie sharding. Later backend expansion should make sync,
+backup, jobs, search, sharing, and AI policy more durable. Neither the spine nor
+later expansion may make the app unusable offline for core workflows, and
+neither may make LANDroid unable to produce a complete local project package.
+
+Phase 0.5 planning treats the current storage surface as follows:
+
+- the primary shard target is `workspaces.data`, which currently stores
+  `WorkspaceData` as one JSON string (`nodes`, `deskMaps`, leasehold arrays,
+  active IDs, and `instrumentTypes`)
+- `canvases.data` is a separate JSON blob and must keep Flowchart parity while
+  proving viewport persistence
+- side stores such as owners, leases, maps, research, curative issues,
+  documents, and document attachments already live in separate Dexie tables and
+  should not be rewritten in the first shard unless they are needed for
+  envelope metadata, lazy blob loading, or lock coverage
+- sharded rows should carry or derive the Phase 0.75 envelope metadata; current
+  title-node rows may remain local-only compatibility payloads until Phase 1
+  defines the final `InstrumentRecord` / `InterestReference` split
+- `.landroid` export/import remains the compatibility boundary, so local Dexie
+  sharding must assemble and read the existing package shape before any package
+  version bump is considered
+- pessimistic single-writer protection and metadata-first blob loading are
+  Phase 0.5 acceptance gates, not later backend features
 
 Generated folders are not source of truth:
 

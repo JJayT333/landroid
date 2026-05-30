@@ -1,0 +1,184 @@
+{
+  "schema": 1,
+  "capturedAt": "2026-05-24",
+  "branch": "codex/phase-0-reconcile-2026-05-23",
+  "fixture": "Vulcan Mesa demo via Demo Data menu",
+  "command": "npm run dev -- --host 127.0.0.1",
+  "browser": "Playwright Chromium headless",
+  "viewport": {
+    "width": 1440,
+    "height": 1000
+  },
+  "loadGuard": {
+    "requiredPhrase": "LOAD DEMO",
+    "confirmed": true
+  },
+  "lanes": [
+    {
+      "tab": "Curative",
+      "textSample": "LANDroid\nVulcan Mesa — Demo (10 Tracts, 79 nodes)\nDesk Map\nLeasehold\nFlowchart\nRunsheet\nDocuments\nOwners\nCurative\nMaps\nSales Deck\nFederal Leasing\nResearch\nFile ▾\nDemo Data ▾\nCurative\n0 active title issues\n+ New Issue\n0\nHIGH RISK\n0\nOVERDUE\n0\nREVIEW\nSEARCH\nSTATUS\nActive Only\nAll Statuses\nOpen\nResearching\nCurative Requested\nWaiting on Third Party\nReady for Review\nResolved\nDeferred\nPRIORITY\nAll Priorities\nCritical\nHigh\nMedium\nLow\nShowing 0/0\nNo curative issues yet. Add probate, NPRI discrepancy, lease, lien, ratification, or title-opinion requirements here as they come up.\nNo curative issue selected\nCreate an issue for title defects, missing curative documents, lease gaps, NPRI discrepancies, or payout holds that need a landman-reviewable explanation.\nAsk LANDroid AI",
+      "observedSignals": [
+        "Vulcan Mesa",
+        "Add",
+        "Search",
+        "Issue",
+        "Deck",
+        "Status"
+      ],
+      "buttonTexts": [
+        "Vulcan Mesa — Demo (10 Tracts, 79 nodes)",
+        "Desk Map",
+        "Leasehold",
+        "Flowchart",
+        "Runsheet",
+        "Documents",
+        "Owners",
+        "Curative",
+        "Maps",
+        "Sales Deck",
+        "Federal Leasing",
+        "Research",
+        "File ▾",
+        "Demo Data ▾",
+        "+ New Issue",
+        "Ask LANDroid AI"
+      ],
+      "controls": [
+        {
+          "tag": "input",
+          "type": "file",
+          "aria": null,
+          "placeholder": null,
+          "value": ""
+        },
+        {
+          "tag": "input",
+          "type": null,
+          "aria": null,
+          "placeholder": "Owner, tract, defect, doc no., cure...",
+          "value": ""
+        },
+        {
+          "tag": "select",
+          "type": null,
+          "aria": null,
+          "placeholder": null,
+          "value": "active"
+        },
+        {
+          "tag": "select",
+          "type": null,
+          "aria": null,
+          "placeholder": null,
+          "value": "all"
+        }
+      ]
+    },
+    {
+      "tab": "Maps",
+      "textSample": "LANDroid\nVulcan Mesa — Demo (10 Tracts, 79 nodes)\nDesk Map\nLeasehold\nFlowchart\nRunsheet\nDocuments\nOwners\nCurative\nMaps\nSales Deck\nFederal Leasing\nResearch\nFile ▾\nDemo Data ▾\nMaps\nOpen to a featured prospect map first, then layer presentation-friendly regions and reference links on top of it.\nPresent\nEdit\nUpload Asset\nStart with the main prospect map\nUpload a PDF map, plat, exhibit image, or GeoJSON artifact. The first asset becomes the featured map automatically, and image exports can carry clickable presentation regions.\nAsk LANDroid AI",
+      "observedSignals": [
+        "Vulcan Mesa",
+        "Export",
+        "Search",
+        "Deck"
+      ],
+      "buttonTexts": [
+        "Vulcan Mesa — Demo (10 Tracts, 79 nodes)",
+        "Desk Map",
+        "Leasehold",
+        "Flowchart",
+        "Runsheet",
+        "Documents",
+        "Owners",
+        "Curative",
+        "Maps",
+        "Sales Deck",
+        "Federal Leasing",
+        "Research",
+        "File ▾",
+        "Demo Data ▾",
+        "Present",
+        "Edit",
+        "Upload Asset",
+        "Ask LANDroid AI"
+      ],
+      "controls": [
+        {
+          "tag": "input",
+          "type": "file",
+          "aria": null,
+          "placeholder": null,
+          "value": ""
+        },
+        {
+          "tag": "input",
+          "type": "file",
+          "aria": null,
+          "placeholder": null,
+          "value": ""
+        }
+      ]
+    },
+    {
+      "tab": "Sales Deck",
+      "textSample": "LANDroid\nVulcan Mesa — Demo (10 Tracts, 79 nodes)\nDesk Map\nLeasehold\nFlowchart\nRunsheet\nDocuments\nOwners\nCurative\nMaps\nSales Deck\nFederal Leasing\nResearch\nFile ▾\nDemo Data ▾\nLANDroid Sales Deck\n\nNative status slides for current product story, recent progress, and next milestones. Legacy pitch assets remain available below the slide controls.\n\nSlide 1 / 10\nOpen PDF\nDownload PowerPoint\n01 / OVERVIEW\nLANDroid is a working title and lease review cockpit\n02 / WORKFLOW PAIN\nLand review breaks when evidence, math, and status live apart\n03 / CURRENT PRODUCT\nThe POC is now broad enough to show real workflow gravity\n04 / DESK MAP\nDesk Map shows the title story as a living, auditable tree\n05 / LEASEHOLD\nLeasehold keeps payout review separate from title-chain editing\n06 / DOCUMENTS\nThe document registry is becoming the trust layer\n07 / AI DIRECTION\nAI is useful only when it stays contextual, reviewable, and gated\n08 / HOSTED POC\nThe hosted POC has a clear deploy boundary\n09 / RECENT PROGRESS\nRecent work tightened reset safety, hosted AI context, and deck readiness\n10 / NEXT MILESTONES\nThe near-term path is document trust, import hardening, and hosted verification\n\nOVERVIEW\n\nLANDroid is a working title and lease review cockpit\n\nThe app now combines title-tree mapping, leasehold review, document registry work, map references, research records, and hosted AI scaffolding in one signed-in workspace.\n\nTexas oil-and-gas title math is the active production baseline.\nDesk Map remains the title source of truth; Leasehold consumes it for acreage, royalty, ORRI, WI, NPRI, and transfer-order review.\nThe hosted POC gives the product a real review environment while preserving local-first workspace behavior.\n\nLANDROID\n\nStatus deck for live product conversations\n\nACTIVE SURFACES\n\n11\n\nDesk Map, Leasehold, Documents, Owners, Maps, AI, and more\n\nUP NEXT\n\nLand review breaks when evidence, math, and status live apart\n\nPrevious\nNext\nLegacy Reference Deck\n\nThe original bundled feature deck remains available for comparison and offline PowerPoint use.\n\nOpen PDF\nDownload PowerPoint\nAsk LANDroid AI",
+      "observedSignals": [
+        "Vulcan Mesa",
+        "Search",
+        "Signed",
+        "GIS",
+        "Evidence",
+        "Deck",
+        "Status"
+      ],
+      "buttonTexts": [
+        "Vulcan Mesa — Demo (10 Tracts, 79 nodes)",
+        "Desk Map",
+        "Leasehold",
+        "Flowchart",
+        "Runsheet",
+        "Documents",
+        "Owners",
+        "Curative",
+        "Maps",
+        "Sales Deck",
+        "Federal Leasing",
+        "Research",
+        "File ▾",
+        "Demo Data ▾",
+        "01 / OverviewLANDroid is a working title and lease review cockpit",
+        "02 / Workflow PainLand review breaks when evidence, math, and status live apart",
+        "03 / Current ProductThe POC is now broad enough to show real workflow gravity",
+        "04 / Desk MapDesk Map shows the title story as a living, auditable tree",
+        "05 / LeaseholdLeasehold keeps payout review separate from title-chain editing",
+        "06 / DocumentsThe document registry is becoming the trust layer",
+        "07 / AI DirectionAI is useful only when it stays contextual, reviewable, and gated",
+        "08 / Hosted POCThe hosted POC has a clear deploy boundary",
+        "09 / Recent ProgressRecent work tightened reset safety, hosted AI context, and deck readiness",
+        "10 / Next MilestonesThe near-term path is document trust, import hardening, and hosted verification",
+        "Previous",
+        "Next",
+        "Ask LANDroid AI"
+      ],
+      "controls": [
+        {
+          "tag": "input",
+          "type": "file",
+          "aria": null,
+          "placeholder": null,
+          "value": ""
+        }
+      ]
+    }
+  ],
+  "console": {
+    "errorCount": 0,
+    "errors": []
+  },
+  "notes": [
+    "Lightweight Phase 0 smoke for remaining non-mutating surfaces not covered by lane-detail export smoke.",
+    "No curative issue, GIS record, or Sales Deck edit/export mutation was attempted.",
+    "This smoke records visible controls and text signals only; it is not a full manual runbook pass."
+  ]
+}

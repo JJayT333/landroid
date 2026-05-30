@@ -1,0 +1,381 @@
+{
+  "projectName": "Vulcan Mesa — Demo (10 Tracts, 79 nodes)",
+  "tracts": [
+    {
+      "code": "VM1",
+      "name": "VM1 — Apollo Draw",
+      "summary": {
+        "currentOwnership": "1",
+        "linkedOwnership": "1",
+        "leasedOwnership": "1",
+        "missingOwnership": "0",
+        "unlinkedOwnership": "0",
+        "unleasedOwnership": "0",
+        "currentOwnerCount": 3,
+        "linkedOwnerCount": 3,
+        "leasedOwnerCount": 3,
+        "currentOwnershipContributors": [
+          {
+            "nodeId": "vm-2",
+            "grantee": "Buster 'Janus' McGraw",
+            "fraction": "0.500000000"
+          },
+          {
+            "nodeId": "vm-3",
+            "grantee": "Minerva 'Minnie' Pickens",
+            "fraction": "0.250000000"
+          },
+          {
+            "nodeId": "vm-4",
+            "grantee": "Mortimer \"Sawdust\" Hench",
+            "fraction": "0.250000000"
+          }
+        ],
+        "leaseOverlaps": []
+      }
+    },
+    {
+      "code": "VM2",
+      "name": "VM2 — Widow's Aegis",
+      "summary": {
+        "currentOwnership": "2.2",
+        "linkedOwnership": "2.2",
+        "leasedOwnership": "1",
+        "missingOwnership": "-1.2",
+        "unlinkedOwnership": "-1.2",
+        "unleasedOwnership": "0",
+        "currentOwnerCount": 5,
+        "linkedOwnerCount": 5,
+        "leasedOwnerCount": 3,
+        "currentOwnershipContributors": [
+          {
+            "nodeId": "vm-9",
+            "grantee": "The Jupiter Flats Family Mineral Trust",
+            "fraction": "0.500000000"
+          },
+          {
+            "nodeId": "vm-10",
+            "grantee": "Minerva 'Minnie' Pickens",
+            "fraction": "0.250000000"
+          },
+          {
+            "nodeId": "vm-11",
+            "grantee": "Estate of Hambone \"Lefty\" McGurkin",
+            "fraction": "0.250000000"
+          },
+          {
+            "nodeId": "vm-12",
+            "grantee": "Pinhead \"Doublecount\" Crumley",
+            "fraction": "0.600000000"
+          },
+          {
+            "nodeId": "vm-13",
+            "grantee": "Pinhead \"Doublecount\" Crumley",
+            "fraction": "0.600000000"
+          }
+        ],
+        "leaseOverlaps": []
+      }
+    },
+    {
+      "code": "VM3",
+      "name": "VM3 — Mercury Cutoff",
+      "summary": {
+        "currentOwnership": "1",
+        "linkedOwnership": "1",
+        "leasedOwnership": "0.875",
+        "missingOwnership": "0",
+        "unlinkedOwnership": "0",
+        "unleasedOwnership": "0.125",
+        "currentOwnerCount": 4,
+        "linkedOwnerCount": 4,
+        "leasedOwnerCount": 3,
+        "currentOwnershipContributors": [
+          {
+            "nodeId": "vm-18",
+            "grantee": "Vulcan Spur Holdings, LLC",
+            "fraction": "0.500000000"
+          },
+          {
+            "nodeId": "vm-19",
+            "grantee": "Mavis \"Sword-Eater\" Toomey",
+            "fraction": "0.250000000"
+          },
+          {
+            "nodeId": "vm-20",
+            "grantee": "Beauregard Plumstead",
+            "fraction": "0.125000000"
+          },
+          {
+            "nodeId": "vm-21",
+            "grantee": "Beauregard Plumstead",
+            "fraction": "0.125000000"
+          }
+        ],
+        "leaseOverlaps": [
+          {
+            "ownerNodeId": "vm-20",
+            "ownerGrantee": "Beauregard Plumstead",
+            "overlap": {
+              "leaseId": "lease-vm-27",
+              "leaseName": "VM3 — Mercury Cutoff — Beauregard Plumstead Lease",
+              "lessee": "Vulcan Mesa Petroleum, LLC",
+              "requestedFraction": "0.125",
+              "allocatedFraction": "0",
+              "clippedFraction": "0.125"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "code": "VM4",
+      "name": "VM4 — Vulcan Gulch",
+      "summary": {
+        "currentOwnership": "1",
+        "linkedOwnership": "1",
+        "leasedOwnership": "1",
+        "missingOwnership": "0",
+        "unlinkedOwnership": "0",
+        "unleasedOwnership": "0",
+        "currentOwnerCount": 3,
+        "linkedOwnerCount": 3,
+        "leasedOwnerCount": 3,
+        "currentOwnershipContributors": [
+          {
+            "nodeId": "vm-29",
+            "grantee": "Buster 'Janus' McGraw",
+            "fraction": "0.250000000"
+          },
+          {
+            "nodeId": "vm-30",
+            "grantee": "Constance \"Bone-Saw\" Whittle",
+            "fraction": "0.375000000"
+          },
+          {
+            "nodeId": "vm-31",
+            "grantee": "Reginald \"Ringmaster\" Crumley",
+            "fraction": "0.375000000"
+          }
+        ],
+        "leaseOverlaps": []
+      }
+    },
+    {
+      "code": "VM5",
+      "name": "VM5 — Last Centurion",
+      "summary": {
+        "currentOwnership": "1",
+        "linkedOwnership": "1",
+        "leasedOwnership": "1",
+        "missingOwnership": "0",
+        "unlinkedOwnership": "0",
+        "unleasedOwnership": "0",
+        "currentOwnerCount": 4,
+        "linkedOwnerCount": 4,
+        "leasedOwnerCount": 4,
+        "currentOwnershipContributors": [
+          {
+            "nodeId": "vm-36",
+            "grantee": "The Jupiter Flats Family Mineral Trust",
+            "fraction": "0.250000000"
+          },
+          {
+            "nodeId": "vm-37",
+            "grantee": "Vulcan Spur Holdings, LLC",
+            "fraction": "0.250000000"
+          },
+          {
+            "nodeId": "vm-38",
+            "grantee": "Pearl \"Knife-Catcher\" Velasquez",
+            "fraction": "0.250000000"
+          },
+          {
+            "nodeId": "vm-39",
+            "grantee": "Wendell \"Stilt-Stumble\" Krabowski",
+            "fraction": "0.250000000"
+          }
+        ],
+        "leaseOverlaps": []
+      }
+    },
+    {
+      "code": "VM6",
+      "name": "VM6 — Jupiter Spur",
+      "summary": {
+        "currentOwnership": "1",
+        "linkedOwnership": "1",
+        "leasedOwnership": "1",
+        "missingOwnership": "0",
+        "unlinkedOwnership": "0",
+        "unleasedOwnership": "0",
+        "currentOwnerCount": 2,
+        "linkedOwnerCount": 2,
+        "leasedOwnerCount": 2,
+        "currentOwnershipContributors": [
+          {
+            "nodeId": "vm-45",
+            "grantee": "The Jupiter Flats Family Mineral Trust",
+            "fraction": "0.500000000"
+          },
+          {
+            "nodeId": "vm-46",
+            "grantee": "Festus \"Pickled-Egg\" Drumheller",
+            "fraction": "0.500000000"
+          }
+        ],
+        "leaseOverlaps": []
+      }
+    },
+    {
+      "code": "VM7",
+      "name": "VM7 — Minotaur Fork",
+      "summary": {
+        "currentOwnership": "1",
+        "linkedOwnership": "1",
+        "leasedOwnership": "1",
+        "missingOwnership": "0",
+        "unlinkedOwnership": "0",
+        "unleasedOwnership": "0",
+        "currentOwnerCount": 3,
+        "linkedOwnerCount": 3,
+        "leasedOwnerCount": 3,
+        "currentOwnershipContributors": [
+          {
+            "nodeId": "vm-50",
+            "grantee": "Buster 'Janus' McGraw",
+            "fraction": "0.500000000"
+          },
+          {
+            "nodeId": "vm-51",
+            "grantee": "Vulcan Spur Holdings, LLC",
+            "fraction": "0.250000000"
+          },
+          {
+            "nodeId": "vm-52",
+            "grantee": "Lurleen \"Ares\" Sproat",
+            "fraction": "0.250000000"
+          }
+        ],
+        "leaseOverlaps": [
+          {
+            "ownerNodeId": "vm-50",
+            "ownerGrantee": "Buster 'Janus' McGraw",
+            "overlap": {
+              "leaseId": "lease-vm-56",
+              "leaseName": "VM7 — Minotaur Fork — Buster 'Janus' McGraw Top-Lease",
+              "lessee": "Labyrinth Top-Lease Partners, LP",
+              "requestedFraction": "0.5",
+              "allocatedFraction": "0",
+              "clippedFraction": "0.5"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "code": "VM8",
+      "name": "VM8 — Probate Styx",
+      "summary": {
+        "currentOwnership": "1",
+        "linkedOwnership": "1",
+        "leasedOwnership": "1",
+        "missingOwnership": "0",
+        "unlinkedOwnership": "0",
+        "unleasedOwnership": "0",
+        "currentOwnerCount": 3,
+        "linkedOwnerCount": 3,
+        "leasedOwnerCount": 3,
+        "currentOwnershipContributors": [
+          {
+            "nodeId": "vm-58",
+            "grantee": "Vulcan Spur Holdings, LLC",
+            "fraction": "0.500000000"
+          },
+          {
+            "nodeId": "vm-59",
+            "grantee": "Minerva 'Minnie' Pickens",
+            "fraction": "0.250000000"
+          },
+          {
+            "nodeId": "vm-60",
+            "grantee": "Estate of Wilbur \"The Geek\" Posthumous",
+            "fraction": "0.250000000"
+          }
+        ],
+        "leaseOverlaps": []
+      }
+    },
+    {
+      "code": "VM9",
+      "name": "VM9 — Minerva's Bequest",
+      "summary": {
+        "currentOwnership": "1",
+        "linkedOwnership": "1",
+        "leasedOwnership": "1",
+        "missingOwnership": "0",
+        "unlinkedOwnership": "0",
+        "unleasedOwnership": "0",
+        "currentOwnerCount": 3,
+        "linkedOwnerCount": 3,
+        "leasedOwnerCount": 3,
+        "currentOwnershipContributors": [
+          {
+            "nodeId": "vm-65",
+            "grantee": "Minerva 'Minnie' Pickens",
+            "fraction": "0.500000000"
+          },
+          {
+            "nodeId": "vm-66",
+            "grantee": "The Jupiter Flats Family Mineral Trust",
+            "fraction": "0.250000000"
+          },
+          {
+            "nodeId": "vm-67",
+            "grantee": "Bartholomew \"Centurion\" Pickens",
+            "fraction": "0.250000000"
+          }
+        ],
+        "leaseOverlaps": []
+      }
+    },
+    {
+      "code": "VM10",
+      "name": "VM10 — Roughneck Olympus",
+      "summary": {
+        "currentOwnership": "1",
+        "linkedOwnership": "1",
+        "leasedOwnership": "1",
+        "missingOwnership": "0",
+        "unlinkedOwnership": "0",
+        "unleasedOwnership": "0",
+        "currentOwnerCount": 4,
+        "linkedOwnerCount": 4,
+        "leasedOwnerCount": 4,
+        "currentOwnershipContributors": [
+          {
+            "nodeId": "vm-72",
+            "grantee": "Buster 'Janus' McGraw",
+            "fraction": "0.250000000"
+          },
+          {
+            "nodeId": "vm-73",
+            "grantee": "Vulcan Spur Holdings, LLC",
+            "fraction": "0.250000000"
+          },
+          {
+            "nodeId": "vm-74",
+            "grantee": "Algernon \"Fire-Breather\" Lipinski",
+            "fraction": "0.250000000"
+          },
+          {
+            "nodeId": "vm-75",
+            "grantee": "Mable \"Dunk-Tank\" Twiggs",
+            "fraction": "0.250000000"
+          }
+        ],
+        "leaseOverlaps": []
+      }
+    }
+  ]
+}

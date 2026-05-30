@@ -1,0 +1,68 @@
+{
+  "schema": 1,
+  "capturedAt": "2026-05-24",
+  "branch": "codex/phase-0-reconcile-2026-05-23",
+  "fixture": "Vulcan Mesa demo via Demo Data menu",
+  "command": "npm run dev -- --host 127.0.0.1",
+  "browser": "Playwright Chromium headless",
+  "viewport": {
+    "width": 1440,
+    "height": 1000
+  },
+  "loadGuard": {
+    "requiredPhrase": "LOAD DEMO",
+    "confirmed": true
+  },
+  "documentsRegistry": {
+    "observed": [
+      "Documents view rendered",
+      "64 docs",
+      "64 links",
+      "3.8 MB",
+      "PDF row actions"
+    ],
+    "firstPdfAction": {
+      "rowTextIncludes": [
+        "20216717.pdf",
+        "Leasehold",
+        "Lease",
+        "1 linked",
+        "Oil & Gas Lease #VM10-OGL-004",
+        "Missing",
+        "Duplicate",
+        "Needs OCR"
+      ],
+      "iframeCountAfterClick": 1,
+      "iframeTitle": "20216717.pdf",
+      "iframeSandbox": "allow-downloads",
+      "iframeSrcKind": "blob:http://127.0.0.1:5173/..."
+    }
+  },
+  "deskMapDocumentChip": {
+    "observed": [
+      "Desk Map view rendered",
+      "VM1 — Apollo Draw active",
+      "7 cards",
+      "document chips visible on title and lease cards"
+    ],
+    "pdfButtonCount": 6,
+    "firstChip": {
+      "label": "09-4292.pdf",
+      "iframeCountAfterClick": 1,
+      "iframeTitle": "09-4292.pdf",
+      "iframeSandbox": "allow-downloads",
+      "iframeSrcKind": "blob:http://127.0.0.1:5173/..."
+    }
+  },
+  "console": {
+    "warningCount": 0,
+    "errorCount": 0,
+    "messages": [],
+    "pageErrors": []
+  },
+  "notes": [
+    "Documents registry PDF action and Desk Map document chip both opened blob-backed iframe previews.",
+    "Both preview iframes used sandbox=allow-downloads.",
+    "This is smoke evidence for DOC-018 and Desk Map document-chip preview behavior, not a full PDF rendering visual diff."
+  ]
+}

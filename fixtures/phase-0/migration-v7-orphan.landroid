@@ -1,0 +1,72 @@
+{
+  "version": 7,
+  "exportedAt": "2026-05-23T17:00:00.000Z",
+  "workspaceId": "ws-phase0-migration",
+  "projectName": "Phase 0 Migration Stress",
+  "nodes": [
+    {
+      "id": "legacy-node-1",
+      "type": "conveyance",
+      "instrument": "Warranty Deed",
+      "vol": "",
+      "page": "",
+      "docNo": "LEGACY-001",
+      "fileDate": "1965-01-20",
+      "date": "1965-01-15",
+      "grantor": "Jupiter Flats Ranch",
+      "grantee": "Vulcan Mesa Petroleum, LLC",
+      "landDesc": "Legacy Survey, Walker County, Texas",
+      "remarks": "",
+      "fraction": "1.000000000",
+      "initialFraction": "1.000000000",
+      "parentId": null,
+      "conveyanceMode": "fraction",
+      "splitBasis": "initial",
+      "numerator": "0",
+      "denominator": "1",
+      "manualAmount": "0",
+      "isDeceased": false,
+      "obituary": "",
+      "graveyardLink": "",
+      "attachments": [],
+      "linkedOwnerId": null,
+      "linkedLeaseId": null,
+      "relatedKind": null,
+      "interestClass": "mineral",
+      "royaltyKind": null,
+      "fixedRoyaltyBasis": null,
+      "depthRange": "all_depths",
+      "isCollapsed": false
+    }
+  ],
+  "deskMaps": [],
+  "activeDeskMapId": null,
+  "activeUnitCode": null,
+  "instrumentTypes": [
+    "Warranty Deed"
+  ],
+  "pdfData": {
+    "pdfs": [
+      {
+        "nodeId": "legacy-node-1",
+        "fileName": "legacy-linked.pdf",
+        "mimeType": "application/pdf",
+        "blob": {
+          "mimeType": "application/pdf",
+          "base64": "JVBERi0xLjQKMSAwIG9iaiA8PCAvVHlwZSAvQ2F0YWxvZyAvUGFnZXMgMiAwIFIgPj4gZW5kb2JqCjIgMCBvYmogPDwgL1R5cGUgL1BhZ2VzIC9LaWRzIFszIDAgUl0gL0NvdW50IDEgPj4gZW5kb2JqCjMgMCBvYmogPDwgL1R5cGUgL1BhZ2UgL1BhcmVudCAyIDAgUiAvTWVkaWFCb3ggWzAgMCAzMDAgMTQ0XSAvQ29udGVudHMgNCAwIFIgPj4gZW5kb2JqCjQgMCBvYmogPDwgL0xlbmd0aCA1OSA+PiBzdHJlYW0KQlQgL0YxIDEwIFRmIDI0IDk2IFRkIChsZWdhY3kgbGlua2VkIHBkZikgVGogRVQKZW5kc3RyZWFtIGVuZG9iagp0cmFpbGVyIDw8IC9Sb290IDEgMCBSID4+CiUlRU9GCg=="
+        },
+        "createdAt": "2025-12-01T00:00:00.000Z"
+      },
+      {
+        "nodeId": "legacy-orphan-node",
+        "fileName": "legacy-orphan.pdf",
+        "mimeType": "application/pdf",
+        "blob": {
+          "mimeType": "application/pdf",
+          "base64": "JVBERi0xLjQKMSAwIG9iaiA8PCAvVHlwZSAvQ2F0YWxvZyAvUGFnZXMgMiAwIFIgPj4gZW5kb2JqCjIgMCBvYmogPDwgL1R5cGUgL1BhZ2VzIC9LaWRzIFszIDAgUl0gL0NvdW50IDEgPj4gZW5kb2JqCjMgMCBvYmogPDwgL1R5cGUgL1BhZ2UgL1BhcmVudCAyIDAgUiAvTWVkaWFCb3ggWzAgMCAzMDAgMTQ0XSAvQ29udGVudHMgNCAwIFIgPj4gZW5kb2JqCjQgMCBvYmogPDwgL0xlbmd0aCA1OSA+PiBzdHJlYW0KQlQgL0YxIDEwIFRmIDI0IDk2IFRkIChsZWdhY3kgb3JwaGFuIHBkZikgVGogRVQKZW5kc3RyZWFtIGVuZG9iagp0cmFpbGVyIDw8IC9Sb290IDEgMCBSID4+CiUlRU9GCg=="
+        },
+        "createdAt": "2025-12-02T00:00:00.000Z"
+      }
+    ]
+  }
+}

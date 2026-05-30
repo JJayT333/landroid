@@ -9,7 +9,13 @@
  *   document_attachments — v8 polymorphic join (node | owner | lease |
  *                          curative | research). Only `'node'` rows are
  *                          written by this pass.
- *   workspaces           — auto-saved workspace state
+ *   workspaces           — pre-shard monolithic workspace row. As of the
+ *                          Phase 0.5 shard writer it is a frozen migration-time
+ *                          backup: autosave writes shards, not this row.
+ *   workspace*Shards     — v10 Phase 0.5 workspace-sharding rows. These are now
+ *                          the live load/save source of truth; the monolith is
+ *                          a fallback only.
+ *   workspaceWriteLeases — single-writer lease rows guarding shard writes.
  */
 import Dexie, { type EntityTable, type Transaction } from 'dexie';
 import type {
@@ -32,6 +38,16 @@ import type {
   ResearchSource,
 } from '../types/research';
 import type { TitleIssue } from '../types/title-issue';
+import { LANDROID_FILE_VERSION } from './landroid-file-version';
+import {
+  WORKSPACE_SHARD_STORE_DEFINITIONS,
+  type DeskMapShard,
+  type LeaseholdStateShard,
+  type OwnershipNodeCompatShard,
+  type WorkspaceManifestShard,
+  type WorkspaceUiStateShard,
+} from './workspace-shards';
+import type { WorkspaceWriteLease } from './workspace-write-lock';
 
 export interface PdfAttachment {
   nodeId: string;
@@ -73,6 +89,12 @@ const db = new Dexie('landroid-v2') as Dexie & {
   researchProjectRecords: EntityTable<ResearchProjectRecord, 'id'>;
   researchQuestions: EntityTable<ResearchQuestion, 'id'>;
   titleIssues: EntityTable<TitleIssue, 'id'>;
+  workspaceManifestShards: EntityTable<WorkspaceManifestShard, 'id'>;
+  deskMapShards: EntityTable<DeskMapShard, 'id'>;
+  ownershipNodeCompatShards: EntityTable<OwnershipNodeCompatShard, 'id'>;
+  leaseholdStateShards: EntityTable<LeaseholdStateShard, 'id'>;
+  workspaceUiStateShards: EntityTable<WorkspaceUiStateShard, 'id'>;
+  workspaceWriteLeases: EntityTable<WorkspaceWriteLease, 'workspaceId'>;
 };
 
 db.version(1).stores({
@@ -300,6 +322,52 @@ db.version(9)
   });
 
 /**
+ * v10 (Phase 0.5 — workspace shard table introduction).
+ *
+ * Adds backend-spine-shaped workspace manifest and Desk Map shard rows, plus
+ * local-only compatibility rows for current title, leasehold, and UI state.
+ * The monolithic `workspaces` row is preserved as a frozen rollback/diagnostic
+ * backup; the shard reader/writer and write-lease gate are the live path.
+ */
+db.version(10)
+  .stores({
+    pdfs: 'nodeId',
+    workspaces: 'id',
+    canvases: 'id',
+    owners: 'id, workspaceId, name',
+    leases: 'id, workspaceId, ownerId, [workspaceId+ownerId]',
+    contactLogs: 'id, workspaceId, ownerId, [workspaceId+ownerId]',
+    ownerDocs:
+      'id, workspaceId, ownerId, leaseId, [workspaceId+ownerId], [workspaceId+leaseId]',
+    mapAssets:
+      'id, workspaceId, isFeatured, deskMapId, nodeId, linkedOwnerId, leaseId, researchSourceId, researchProjectRecordId, [workspaceId+isFeatured], [workspaceId+deskMapId], [workspaceId+nodeId], [workspaceId+linkedOwnerId], [workspaceId+leaseId], [workspaceId+researchSourceId], [workspaceId+researchProjectRecordId]',
+    mapRegions:
+      'id, workspaceId, assetId, deskMapId, nodeId, linkedOwnerId, leaseId, researchSourceId, researchProjectRecordId, [workspaceId+assetId], [workspaceId+deskMapId], [workspaceId+nodeId], [workspaceId+linkedOwnerId], [workspaceId+leaseId], [workspaceId+researchSourceId], [workspaceId+researchProjectRecordId]',
+    mapExternalReferences:
+      'id, workspaceId, assetId, regionId, source, [workspaceId+assetId], [workspaceId+regionId]',
+    researchImports:
+      'id, workspaceId, datasetId, detectedFormat, [workspaceId+datasetId], [workspaceId+detectedFormat]',
+    researchSources:
+      'id, workspaceId, sourceType, context, [workspaceId+sourceType], [workspaceId+context]',
+    researchFormulas:
+      'id, workspaceId, category, status, [workspaceId+category], [workspaceId+status]',
+    researchProjectRecords:
+      'id, workspaceId, recordType, jurisdiction, status, [workspaceId+recordType], [workspaceId+jurisdiction], [workspaceId+status]',
+    researchQuestions:
+      'id, workspaceId, status, [workspaceId+status]',
+    titleIssues:
+      'id, workspaceId, status, priority, issueType, affectedDeskMapId, affectedNodeId, affectedOwnerId, affectedLeaseId, [workspaceId+status], [workspaceId+priority]',
+    documents:
+      'docId, workspaceId, contentHash, [workspaceId+kind], [workspaceId+createdAt]',
+    document_attachments:
+      'attachmentId, workspaceId, docId, [workspaceId+entityKind+entityId], [entityKind+entityId], [docId+entityKind+entityId]',
+    ...WORKSPACE_SHARD_STORE_DEFINITIONS,
+  })
+  .upgrade(async (tx) => {
+    await runV9ToV10WorkspaceShardMigration(tx);
+  });
+
+/**
  * Real-implementation deps for the migration. The pure helper accepts
  * everything as injection so tests can run with deterministic stubs.
  */
@@ -357,6 +425,59 @@ async function runV7ToV8PdfMigration(tx: Transaction): Promise<void> {
       + `${result.orphans.slice(0, 10).join(', ')}`
       + (result.orphans.length > 10 ? ' …' : '')
     );
+  }
+}
+
+export async function runV9ToV10WorkspaceShardMigration(
+  tx: Transaction
+): Promise<void> {
+  const { migrateWorkspaceRecordToShards } = await import(
+    './workspace-shard-migration'
+  );
+  const workspaceRows = await tx
+    .table<WorkspaceRecord, 'id'>('workspaces')
+    .toArray();
+
+  for (const record of workspaceRows) {
+    let migration: ReturnType<typeof migrateWorkspaceRecordToShards>;
+    try {
+      migration = migrateWorkspaceRecordToShards(record, {
+        landroidFileVersion: LANDROID_FILE_VERSION,
+        source: 'migration',
+        syncState: 'local_only',
+      });
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : 'unknown error';
+      console.warn(
+        `[landroid v9→v10] Workspace row ${record.id} could not be sharded: ${reason}`
+      );
+      continue;
+    }
+
+    // Stamp the per-user DB key (the monolithic row's primary key) on the
+    // manifest so the runtime reader can resolve this workspace by key without
+    // adopting another user's shards (Bug 001).
+    await tx
+      .table<WorkspaceManifestShard, 'id'>('workspaceManifestShards')
+      .put({ ...migration.shards.manifest, dbKey: record.id });
+
+    if (migration.shards.deskMaps.length > 0) {
+      await tx
+        .table<DeskMapShard, 'id'>('deskMapShards')
+        .bulkPut(migration.shards.deskMaps);
+    }
+    if (migration.shards.nodes.length > 0) {
+      await tx
+        .table<OwnershipNodeCompatShard, 'id'>('ownershipNodeCompatShards')
+        .bulkPut(migration.shards.nodes);
+    }
+
+    await tx
+      .table<LeaseholdStateShard, 'id'>('leaseholdStateShards')
+      .put(migration.shards.leaseholdState);
+    await tx
+      .table<WorkspaceUiStateShard, 'id'>('workspaceUiStateShards')
+      .put(migration.shards.uiState);
   }
 }
 
