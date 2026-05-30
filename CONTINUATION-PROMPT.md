@@ -795,24 +795,25 @@ are done and pushed as a 3-PR stack (2026-05-29): the shard writer (#82), the
 multi-tab read-only UI (#83), and the document-vault lazy-load contract lock
 (#84). See the Current Branch section for details and merge order.
 
-Latest validation (2026-05-29): `npm run lint`, full `npm test` (95 files /
-715 tests), `npm run build` — all green on `test/lazy-blob-contract`; #82/#83
-also passed `npm run test:e2e` (11 workflows) and `npm run deploy:check`.
-`buildWorkspaceShards` is 0.18 ms at 1476 nodes.
+Latest validation (2026-05-30): `npm run lint`, full `npm test` (95 files /
+717 tests), `npm run build`, `npm run test:e2e` (12 workflows incl. the two-tab
+lease test), `npm run deploy:check` — all green.
+Sharded autosave re-measured at 1476-node scale: 2276 ms persist (2000 ms
+debounce + ~276 ms write) vs a 2062 ms monolith baseline, evidence under
+`fixtures/phase-0/perf/2026-05-30-shard-autosave/`. The import-edge fix, the
+two-tab e2e, and the perf recapture are committed on the stack (C in #82, A and
+the recapture script in #83/#84).
 
-Recommended next slice (Extra High or medium): request
-`navigator.storage.persist()` for PWA/iPad durability (record granted/refused),
-and run the browser autosave perf recapture at Raven Forest scale via the
-closeout capture script (outside the sandbox). Lower priority and explicitly
+Recommended next slice (medium): request `navigator.storage.persist()` for
+PWA/iPad durability (record granted/refused). Lower priority and explicitly
 deferred: a metadata-first conversion of the blob-bearing side stores (owner
 docs, map assets, research imports) — needs an async preview/parse refactor of
 `MapsView`/`DeskMapView`/`OwnerDocsTab`/`ResearchView` and is evidence-gated;
 and per-view edit-control disabling for read-only tabs.
 
-Known follow-up edge: after a `.landroid` import the frozen monolith still
-points at the pre-import workspace, so a later shard corruption falls back to
-the old workspace (with a loud warning). Consider clearing/refreshing the
-monolith anchor on replacement.
+Resolved: the post-import monolith edge — the shard writer now re-anchors the
+backup row when the active workspace changes, so a corruption fallback lands on
+the current workspace, not the stale pre-import one.
 
 Holds: do not start full backend storage/sync, OCR/search, the runsheet
 walkthrough wizard, or any federal/private math without explicit direction.

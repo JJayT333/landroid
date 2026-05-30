@@ -1087,10 +1087,16 @@ Targeted tests and performance gates before implementation:
   takeover confirmation; a writer steps down to read-only on a peer's claim
   broadcast and a reader auto-promotes when the writer releases. Canvas autosave
   shares the same lease gate. The banner is signalling plus a write gate — it
-  does not yet disable individual edit controls across every view. Deferred:
-  per-view edit-control disabling, lazy blob loading, persistent-storage
-  requests, and a browser autosave-timing recapture against the Raven Forest
-  perf baseline (`buildWorkspaceShards` itself is sub-millisecond at 1476 nodes).
+  does not yet disable individual edit controls across every view (deferred).
+- Follow-up hardening landed: the monolithic backup is re-anchored when the
+  active workspace changes (import / CSV / fresh install) so a corruption
+  fallback lands on the current workspace, not the stale pre-import one; a
+  two-tab Playwright e2e exercises the lease/banner/takeover end to end; and the
+  sharded autosave was re-measured at 1476-node scale — 2276 ms to persist after
+  an edit (2000 ms debounce + ~276 ms shard write) versus a 2062 ms monolith
+  baseline, ~210 ms slower and off the debounced interaction path. Evidence:
+  `fixtures/phase-0/perf/2026-05-30-shard-autosave/`. Still deferred:
+  `navigator.storage.persist()` and the side-store metadata-first conversion.
 - Add storage tests for monolith-to-shard migration, corrupt-shard fallback,
   idempotent rerun, v7/v8 `.landroid` import compatibility, future-version
   rejection, and rollback-safe side-store replacement.
