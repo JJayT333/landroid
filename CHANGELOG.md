@@ -5,6 +5,10 @@ stay short.
 
 ## 2026-05-30
 
+- Requested persistent browser storage on startup via the Storage API where
+  supported, so a workspace's IndexedDB is not silently evicted under storage
+  pressure (PWA / iPad durability). The result is recorded for diagnostics and a
+  refusal never blocks local-first editing.
 - Fixed a data-integrity edge in the shard writer: the monolithic backup row is
   now re-anchored when the active workspace changes (import / CSV / fresh
   install), so a later shard corruption falls back to the current workspace

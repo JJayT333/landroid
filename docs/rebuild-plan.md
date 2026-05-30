@@ -1095,8 +1095,10 @@ Targeted tests and performance gates before implementation:
   sharded autosave was re-measured at 1476-node scale — 2276 ms to persist after
   an edit (2000 ms debounce + ~276 ms shard write) versus a 2062 ms monolith
   baseline, ~210 ms slower and off the debounced interaction path. Evidence:
-  `fixtures/phase-0/perf/2026-05-30-shard-autosave/`. Still deferred:
-  `navigator.storage.persist()` and the side-store metadata-first conversion.
+  `fixtures/phase-0/perf/2026-05-30-shard-autosave/`. Persistent storage is now
+  requested at startup (`requestPersistentStorage` in `persistent-storage.ts`,
+  Storage API, recorded and non-blocking). Still deferred and evidence-gated:
+  the side-store metadata-first conversion and per-view read-only disabling.
 - Add storage tests for monolith-to-shard migration, corrupt-shard fallback,
   idempotent rerun, v7/v8 `.landroid` import compatibility, future-version
   rejection, and rollback-safe side-store replacement.
