@@ -4,12 +4,14 @@ import {
   deleteLease,
   deleteOwner,
   deleteOwnerDoc,
-  loadOwnerWorkspaceData,
+  loadOwnerDocsWithBlobs,
+  loadOwnerWorkspaceMetadata,
   replaceOwnerWorkspaceData,
   saveContact,
   saveLease,
   saveOwner,
   saveOwnerDoc,
+  updateOwnerDocFields,
   type OwnerWorkspaceData,
 } from '../storage/owner-persistence';
 import type {
@@ -17,6 +19,7 @@ import type {
   Lease,
   Owner,
   OwnerDoc,
+  OwnerDocMeta,
   OwnerPanelTab,
 } from '../types/owner';
 import { normalizeLease } from '../types/owner';
@@ -36,12 +39,17 @@ function normalizeLeases(leases: Lease[], workspaceId: string) {
   );
 }
 
+function toOwnerDocMeta(doc: OwnerDoc): OwnerDocMeta {
+  const { blob: _blob, ...meta } = doc;
+  return meta;
+}
+
 interface OwnerState {
   workspaceId: string | null;
   owners: Owner[];
   leases: Lease[];
   contacts: ContactLog[];
-  docs: OwnerDoc[];
+  docs: OwnerDocMeta[];
   selectedOwnerId: string | null;
   selectedOwnerTab: OwnerPanelTab;
   _hydrated: boolean;
@@ -78,7 +86,7 @@ export const useOwnerStore = create<OwnerState>()((set, get) => ({
   _hydrated: false,
 
   setWorkspace: async (workspaceId) => {
-    const data = await loadOwnerWorkspaceData(workspaceId);
+    const data = await loadOwnerWorkspaceMetadata(workspaceId);
     set({
       workspaceId,
       owners: data.owners,
@@ -102,7 +110,7 @@ export const useOwnerStore = create<OwnerState>()((set, get) => ({
       owners: data.owners.map((owner) => ({ ...owner, workspaceId })),
       leases: normalizedLeases,
       contacts: data.contacts.map((contact) => ({ ...contact, workspaceId })),
-      docs: data.docs.map((doc) => ({ ...doc, workspaceId })),
+      docs: data.docs.map((doc) => toOwnerDocMeta({ ...doc, workspaceId })),
       selectedOwnerId: null,
       selectedOwnerTab: 'info',
       _hydrated: true,
@@ -110,7 +118,11 @@ export const useOwnerStore = create<OwnerState>()((set, get) => ({
   },
 
   exportWorkspaceData: async () => {
-    const { owners, leases, contacts, docs } = get();
+    const { workspaceId, owners, leases, contacts } = get();
+    // Re-read blob-bearing docs from Dexie: the in-memory store holds
+    // metadata only, but `.landroid` export and the AI undo snapshot must
+    // carry the file bytes.
+    const docs = workspaceId ? await loadOwnerDocsWithBlobs(workspaceId) : [];
     return { owners, leases, contacts, docs };
   },
 
@@ -235,14 +247,22 @@ export const useOwnerStore = create<OwnerState>()((set, get) => ({
     const workspaceId = get().workspaceId ?? doc.workspaceId;
     const next = { ...doc, workspaceId };
     await saveOwnerDoc(next);
-    set((state) => ({ docs: [...state.docs, next] }));
+    set((state) => ({ docs: [...state.docs, toOwnerDocMeta(next)] }));
   },
 
   updateDoc: async (id, fields) => {
     const current = get().docs.find((doc) => doc.id === id);
     if (!current) return;
-    const next = touch({ ...current, ...fields, workspaceId: current.workspaceId });
-    await saveOwnerDoc(next);
+    const { blob: _blob, ...metaFields } = fields;
+    const next = touch({
+      ...current,
+      ...metaFields,
+      workspaceId: current.workspaceId,
+    });
+    await updateOwnerDocFields(id, {
+      ...metaFields,
+      updatedAt: next.updatedAt,
+    });
     set((state) => ({
       docs: state.docs.map((doc) => (doc.id === id ? next : doc)),
     }));
