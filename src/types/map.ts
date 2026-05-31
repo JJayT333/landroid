@@ -57,6 +57,14 @@ export interface MapAsset {
   updatedAt: string;
 }
 
+/**
+ * Map asset metadata without the file blob. The in-memory map store holds
+ * these so opening a project never pulls map-asset blob bytes; the bytes are
+ * fetched on demand via `getMapAssetBlob` for preview/download/render/export
+ * (mirrors the document vault's `Omit<DocumentRecord, 'blob'>` contract).
+ */
+export type MapAssetMeta = Omit<MapAsset, 'blob'>;
+
 export interface NormalizedMapRect {
   x: number;
   y: number;

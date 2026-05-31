@@ -2,12 +2,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createBlankOwner, type Lease } from '../../types/owner';
 
 const mocks = vi.hoisted(() => ({
-  loadOwnerWorkspaceData: vi.fn(),
+  loadOwnerWorkspaceMetadata: vi.fn(),
+  loadOwnerDocsWithBlobs: vi.fn(),
+  getOwnerDocBlob: vi.fn(),
   replaceOwnerWorkspaceData: vi.fn(),
   saveOwner: vi.fn(),
   saveLease: vi.fn(),
   saveContact: vi.fn(),
   saveOwnerDoc: vi.fn(),
+  updateOwnerDocFields: vi.fn(),
   deleteOwner: vi.fn(),
   deleteLease: vi.fn(),
   deleteContact: vi.fn(),
@@ -20,12 +23,15 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('../../storage/owner-persistence', () => ({
-  loadOwnerWorkspaceData: mocks.loadOwnerWorkspaceData,
+  loadOwnerWorkspaceMetadata: mocks.loadOwnerWorkspaceMetadata,
+  loadOwnerDocsWithBlobs: mocks.loadOwnerDocsWithBlobs,
+  getOwnerDocBlob: mocks.getOwnerDocBlob,
   replaceOwnerWorkspaceData: mocks.replaceOwnerWorkspaceData,
   saveOwner: mocks.saveOwner,
   saveLease: mocks.saveLease,
   saveContact: mocks.saveContact,
   saveOwnerDoc: mocks.saveOwnerDoc,
+  updateOwnerDocFields: mocks.updateOwnerDocFields,
   deleteOwner: mocks.deleteOwner,
   deleteLease: mocks.deleteLease,
   deleteContact: mocks.deleteContact,
@@ -70,7 +76,7 @@ describe('owner-store', () => {
 
   it('clears selected owner state when switching workspaces', async () => {
     const firstOwner = createBlankOwner('ws-a', { id: 'owner-a', name: 'Alpha Owner' });
-    mocks.loadOwnerWorkspaceData
+    mocks.loadOwnerWorkspaceMetadata
       .mockResolvedValueOnce({
         owners: [firstOwner],
         leases: [],
@@ -122,7 +128,7 @@ describe('owner-store', () => {
   });
 
   it('normalizes legacy leases that are missing newer text fields', async () => {
-    mocks.loadOwnerWorkspaceData.mockResolvedValue({
+    mocks.loadOwnerWorkspaceMetadata.mockResolvedValue({
       owners: [],
       leases: [
         {
@@ -206,7 +212,6 @@ describe('owner-store', () => {
           mimeType: 'text/plain',
           category: 'Other',
           notes: '',
-          blob: new Blob(['hello'], { type: 'text/plain' }),
           createdAt: '',
           updatedAt: '',
         },
@@ -268,6 +273,34 @@ describe('owner-store', () => {
     expect(mocks.clearLinkedLease).toHaveBeenCalledWith('lease-1');
     expect(mocks.unlinkLease).toHaveBeenCalledWith('lease-1');
     expect(useOwnerStore.getState().leases).toEqual([]);
+  });
+
+  it('re-reads blob-bearing docs from storage when exporting', async () => {
+    const exportedDoc = {
+      id: 'doc-1',
+      workspaceId: 'ws-a',
+      ownerId: 'owner-1',
+      leaseId: null,
+      fileName: 'notes.txt',
+      mimeType: 'text/plain',
+      category: 'Other' as const,
+      notes: '',
+      blob: new Blob(['hello'], { type: 'text/plain' }),
+      createdAt: '',
+      updatedAt: '',
+    };
+    mocks.loadOwnerDocsWithBlobs.mockResolvedValue([exportedDoc]);
+    useOwnerStore.setState({
+      workspaceId: 'ws-a',
+      // In-memory docs are metadata only (no blob); export must not rely on them.
+      docs: [{ ...exportedDoc, blob: undefined } as never],
+    });
+
+    const data = await useOwnerStore.getState().exportWorkspaceData();
+
+    expect(mocks.loadOwnerDocsWithBlobs).toHaveBeenCalledWith('ws-a');
+    expect(data.docs).toHaveLength(1);
+    expect(data.docs[0].blob).toBeInstanceOf(Blob);
   });
 
   it('refreshes linked lease nodes when a lease record is updated', async () => {

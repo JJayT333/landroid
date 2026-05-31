@@ -2,8 +2,9 @@ import { useRef, useState } from 'react';
 import AssetPreviewModal from '../modals/AssetPreviewModal';
 import OwnerDocEditModal from '../modals/OwnerDocEditModal';
 import { useConfirmation } from '../shared/ConfirmationProvider';
-import type { Lease, OwnerDoc } from '../../types/owner';
+import type { Lease, OwnerDoc, OwnerDocMeta } from '../../types/owner';
 import { createBlankOwnerDoc } from '../../types/owner';
+import { getOwnerDocBlob } from '../../storage/owner-persistence';
 import {
   OWNER_DOCUMENT_ACCEPT,
   OWNER_DOCUMENT_UPLOAD_EXTENSIONS,
@@ -29,7 +30,7 @@ function downloadBlob(blob: Blob, fileName: string) {
 interface OwnerDocsTabProps {
   workspaceId: string;
   ownerId: string;
-  docs: OwnerDoc[];
+  docs: OwnerDocMeta[];
   leases: Lease[];
   onAdd: (doc: OwnerDoc) => Promise<void>;
   onUpdate: (id: string, fields: Partial<OwnerDoc>) => Promise<void>;
@@ -50,8 +51,26 @@ export default function OwnerDocsTab({
     confirm: requestConfirmation,
   } = useConfirmation();
   const inputRef = useRef<HTMLInputElement>(null);
-  const [previewDoc, setPreviewDoc] = useState<OwnerDoc | null>(null);
-  const [editingDoc, setEditingDoc] = useState<OwnerDoc | null>(null);
+  const [previewDoc, setPreviewDoc] =
+    useState<{ meta: OwnerDocMeta; blob: Blob } | null>(null);
+  const [editingDoc, setEditingDoc] = useState<OwnerDocMeta | null>(null);
+
+  // Owner-doc blobs are loaded on demand: the store holds metadata only, so
+  // preview/download fetch the bytes from Dexie when the user asks for them.
+  async function withDocBlob(
+    doc: OwnerDocMeta,
+    use: (blob: Blob) => void
+  ): Promise<void> {
+    const blob = await getOwnerDocBlob(doc.id);
+    if (!blob) {
+      await showAlert({
+        title: 'Document Unavailable',
+        message: 'This document’s file could not be loaded.',
+      });
+      return;
+    }
+    use(blob);
+  }
 
   return (
     <div className="space-y-4">
@@ -135,7 +154,11 @@ export default function OwnerDocsTab({
                 <div className="flex flex-wrap justify-end gap-2">
                   <button
                     type="button"
-                    onClick={() => setPreviewDoc(doc)}
+                    onClick={() =>
+                      withDocBlob(doc, (blob) =>
+                        setPreviewDoc({ meta: doc, blob })
+                      )
+                    }
                     className="px-3 py-1.5 rounded-lg text-xs font-semibold text-leather hover:bg-leather/10 transition-colors"
                   >
                     Preview
@@ -149,7 +172,9 @@ export default function OwnerDocsTab({
                   </button>
                   <button
                     type="button"
-                    onClick={() => downloadBlob(doc.blob, doc.fileName)}
+                    onClick={() =>
+                      withDocBlob(doc, (blob) => downloadBlob(blob, doc.fileName))
+                    }
                     className="px-3 py-1.5 rounded-lg text-xs font-semibold text-ink hover:bg-parchment-dark transition-colors"
                   >
                     Download
@@ -179,8 +204,8 @@ export default function OwnerDocsTab({
 
       {previewDoc && (
         <AssetPreviewModal
-          fileName={previewDoc.fileName}
-          mimeType={previewDoc.mimeType}
+          fileName={previewDoc.meta.fileName}
+          mimeType={previewDoc.meta.mimeType}
           blob={previewDoc.blob}
           onClose={() => setPreviewDoc(null)}
         />
@@ -191,7 +216,11 @@ export default function OwnerDocsTab({
           doc={editingDoc}
           leases={leases}
           onClose={() => setEditingDoc(null)}
-          onPreview={() => setPreviewDoc(editingDoc)}
+          onPreview={() =>
+            withDocBlob(editingDoc, (blob) =>
+              setPreviewDoc({ meta: editingDoc, blob })
+            )
+          }
           onSave={(fields) => onUpdate(editingDoc.id, fields)}
         />
       )}

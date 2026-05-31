@@ -221,6 +221,14 @@ export interface OwnerDoc {
   updatedAt: string;
 }
 
+/**
+ * Owner document metadata without the file blob. The in-memory owner store
+ * holds these so opening a project never pulls owner-doc blob bytes; the bytes
+ * are fetched on demand via `getOwnerDocBlob` for preview/download/export
+ * (mirrors the document vault's `Omit<DocumentRecord, 'blob'>` contract).
+ */
+export type OwnerDocMeta = Omit<OwnerDoc, 'blob'>;
+
 function nowIso() {
   return new Date().toISOString();
 }

@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import Modal from '../shared/Modal';
-import type { Lease, OwnerDoc, OwnerDocCategory } from '../../types/owner';
+import type { Lease, OwnerDocCategory, OwnerDocMeta } from '../../types/owner';
 import { DOC_CATEGORY_OPTIONS } from '../../types/owner';
 
 interface OwnerDocEditModalProps {
-  doc: OwnerDoc;
+  doc: OwnerDocMeta;
   leases: Lease[];
   onClose: () => void;
   onPreview: () => void;
