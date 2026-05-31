@@ -67,7 +67,8 @@ import {
   makeUnitOptionLabel,
   resolveActiveUnitCode,
 } from '../utils/desk-map-units';
-import type { MapAsset, MapRegion } from '../types/map';
+import type { MapAssetMeta, MapRegion } from '../types/map';
+import { getMapAssetBlob } from '../storage/map-persistence';
 
 // ── Tree branch renderer ────────────────────────────────
 
@@ -671,11 +672,11 @@ function FormulaTray({
   );
 }
 
-function isImageMapAsset(asset: MapAsset): boolean {
+function isImageMapAsset(asset: MapAssetMeta): boolean {
   return asset.mimeType.toLowerCase().startsWith('image/');
 }
 
-function isPdfMapAsset(asset: MapAsset): boolean {
+function isPdfMapAsset(asset: MapAssetMeta): boolean {
   return asset.mimeType.toLowerCase().includes('pdf');
 }
 
@@ -688,7 +689,7 @@ function UnitMapReferencePanel({
   collapsed,
   onToggle,
 }: {
-  asset: MapAsset;
+  asset: MapAssetMeta;
   regions: MapRegion[];
   unitLabel: string;
   linkedTractCount: number;
@@ -696,9 +697,27 @@ function UnitMapReferencePanel({
   collapsed: boolean;
   onToggle: () => void;
 }) {
-  const objectUrl = useMemo(() => URL.createObjectURL(asset.blob), [asset.blob]);
+  // Blob bytes are fetched on demand: the map store holds metadata only.
+  const [blob, setBlob] = useState<Blob | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
+    setBlob(null);
+    getMapAssetBlob(asset.id).then((next) => {
+      if (!cancelled) setBlob(next ?? null);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [asset.id]);
+
+  const objectUrl = useMemo(
+    () => (blob ? URL.createObjectURL(blob) : null),
+    [blob]
+  );
+
+  useEffect(() => {
+    if (!objectUrl) return;
     return () => URL.revokeObjectURL(objectUrl);
   }, [objectUrl]);
 
@@ -740,15 +759,19 @@ function UnitMapReferencePanel({
       </div>
 
       <div className="min-h-0 flex-1 overflow-auto p-3">
-        {isImageMapAsset(asset) ? (
+        {(isImageMapAsset(asset) || isPdfMapAsset(asset)) && !objectUrl ? (
+          <div className="rounded-lg border border-dashed border-ledger-line bg-parchment-dark/40 px-3 py-4 text-sm text-ink-light">
+            Loading map…
+          </div>
+        ) : isImageMapAsset(asset) ? (
           <img
-            src={objectUrl}
+            src={objectUrl ?? undefined}
             alt={asset.title || asset.fileName}
             className="max-h-80 w-full rounded-lg border border-ledger-line bg-white object-contain"
           />
         ) : isPdfMapAsset(asset) ? (
           <iframe
-            src={objectUrl}
+            src={objectUrl ?? undefined}
             sandbox="allow-downloads"
             className="h-80 w-full rounded-lg border border-ledger-line bg-white"
             title={asset.fileName}

@@ -3,12 +3,12 @@ import Modal from '../shared/Modal';
 import FormField from '../shared/FormField';
 import type { DeskMap, OwnershipNode } from '../../types/node';
 import type { Lease, Owner } from '../../types/owner';
-import type { MapAsset, MapAssetKind } from '../../types/map';
+import type { MapAsset, MapAssetKind, MapAssetMeta } from '../../types/map';
 import { MAP_ASSET_KIND_OPTIONS } from '../../types/map';
 import type { ResearchProjectRecord, ResearchSource } from '../../types/research';
 
 interface MapAssetModalProps {
-  asset: MapAsset;
+  asset: MapAssetMeta;
   deskMaps: DeskMap[];
   nodes: OwnershipNode[];
   owners: Owner[];

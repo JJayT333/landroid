@@ -16,10 +16,11 @@ import {
   createBlankMapExternalReference,
   createBlankMapRegion,
   normalizeMapReferenceUrl,
-  type MapAsset,
+  type MapAssetMeta,
   type MapExternalReference,
   type MapRegion,
 } from '../types/map';
+import { getMapAssetBlob } from '../storage/map-persistence';
 
 function downloadBlob(blob: Blob, fileName: string) {
   const url = URL.createObjectURL(blob);
@@ -30,15 +31,15 @@ function downloadBlob(blob: Blob, fileName: string) {
   URL.revokeObjectURL(url);
 }
 
-function isImageAsset(asset: MapAsset | null): boolean {
+function isImageAsset(asset: MapAssetMeta | null): boolean {
   return !!asset && asset.mimeType.toLowerCase().startsWith('image/');
 }
 
-function isPdfAsset(asset: MapAsset | null): boolean {
+function isPdfAsset(asset: MapAssetMeta | null): boolean {
   return !!asset && asset.mimeType.toLowerCase().includes('pdf');
 }
 
-function isTextLikeAsset(asset: MapAsset | null): boolean {
+function isTextLikeAsset(asset: MapAssetMeta | null): boolean {
   if (!asset) return false;
   const lowerMime = asset.mimeType.toLowerCase();
   const lowerName = asset.fileName.toLowerCase();
@@ -106,7 +107,7 @@ function formatResearchProjectLabel(
 }
 
 interface FeaturedMapStageProps {
-  asset: MapAsset;
+  asset: MapAssetMeta;
   regions: MapRegion[];
   selectedRegionId: string | null;
   placingRegion: boolean;
@@ -124,17 +125,34 @@ function FeaturedMapStage({
 }: FeaturedMapStageProps) {
   const [textPreview, setTextPreview] = useState<string | null>(null);
   const [geoJsonSummary, setGeoJsonSummary] = useState<GeoJsonSummary | null>(null);
-  const objectUrl = useMemo(() => URL.createObjectURL(asset.blob), [asset.blob]);
+  // Blob bytes are fetched on demand: the store holds metadata only.
+  const [blob, setBlob] = useState<Blob | null>(null);
 
   useEffect(() => {
-    if (!isTextLikeAsset(asset)) {
+    let cancelled = false;
+    setBlob(null);
+    getMapAssetBlob(asset.id).then((next) => {
+      if (!cancelled) setBlob(next ?? null);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [asset.id]);
+
+  const objectUrl = useMemo(
+    () => (blob ? URL.createObjectURL(blob) : null),
+    [blob]
+  );
+
+  useEffect(() => {
+    if (!blob || !isTextLikeAsset(asset)) {
       setTextPreview(null);
       setGeoJsonSummary(null);
       return;
     }
 
     let cancelled = false;
-    asset.blob.text().then((text) => {
+    blob.text().then((text) => {
       if (cancelled) return;
       try {
         setTextPreview(JSON.stringify(JSON.parse(text), null, 2));
@@ -149,13 +167,22 @@ function FeaturedMapStage({
     return () => {
       cancelled = true;
     };
-  }, [asset]);
+  }, [asset, blob]);
 
   useEffect(() => {
+    if (!objectUrl) return;
     return () => {
       URL.revokeObjectURL(objectUrl);
     };
   }, [objectUrl]);
+
+  if ((isImageAsset(asset) || isPdfAsset(asset)) && !objectUrl) {
+    return (
+      <div className="rounded-xl border border-ledger-line bg-ledger p-6 text-sm text-ink-light">
+        Loading map…
+      </div>
+    );
+  }
 
   if (isImageAsset(asset)) {
     return (
@@ -174,7 +201,7 @@ function FeaturedMapStage({
             }}
           >
             <img
-              src={objectUrl}
+              src={objectUrl ?? undefined}
               alt={asset.title || asset.fileName}
               className="block max-h-[calc(100vh-17rem)] max-w-full rounded-lg shadow-sm"
             />
@@ -230,7 +257,7 @@ function FeaturedMapStage({
     return (
       <div className="space-y-3">
         <iframe
-          src={objectUrl}
+          src={objectUrl ?? undefined}
           sandbox="allow-downloads"
           className="w-full rounded-xl border border-ledger-line bg-ledger"
           style={{ height: 'calc(100vh - 17rem)' }}
@@ -336,6 +363,24 @@ export default function MapsView() {
   const [draftRegion, setDraftRegion] = useState<MapRegion | null>(null);
   const [draftReference, setDraftReference] = useState<MapExternalReference | null>(null);
   const [placingRegion, setPlacingRegion] = useState(false);
+  const [previewBlob, setPreviewBlob] = useState<Blob | null>(null);
+
+  // Map-asset blobs are loaded on demand: the store holds metadata only, so
+  // download and preview fetch the bytes from Dexie when the user asks.
+  async function withAssetBlob(
+    asset: MapAssetMeta,
+    use: (blob: Blob) => void
+  ): Promise<void> {
+    const blob = await getMapAssetBlob(asset.id);
+    if (!blob) {
+      await showAlert({
+        title: 'Map Unavailable',
+        message: 'This map asset’s file could not be loaded.',
+      });
+      return;
+    }
+    use(blob);
+  }
 
   useEffect(() => {
     if (mapAssets.length === 0) {
@@ -391,6 +436,30 @@ export default function MapsView() {
     mapAssets.find((asset) => asset.id === previewAssetId) ?? null;
   const editingAsset =
     mapAssets.find((asset) => asset.id === editingAssetId) ?? null;
+
+  useEffect(() => {
+    if (!previewAssetId) {
+      setPreviewBlob(null);
+      return;
+    }
+    let cancelled = false;
+    setPreviewBlob(null);
+    getMapAssetBlob(previewAssetId).then((blob) => {
+      if (cancelled) return;
+      if (blob) {
+        setPreviewBlob(blob);
+      } else {
+        setPreviewAssetId(null);
+        void showAlert({
+          title: 'Map Unavailable',
+          message: 'This map asset’s file could not be loaded.',
+        });
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [previewAssetId, showAlert]);
   const editingRegion =
     mapRegions.find((region) => region.id === editingRegionId) ?? draftRegion;
   const editingReference =
@@ -602,7 +671,11 @@ export default function MapsView() {
                   )}
                   <button
                     type="button"
-                    onClick={() => downloadBlob(selectedAsset.blob, selectedAsset.fileName)}
+                    onClick={() =>
+                      withAssetBlob(selectedAsset, (blob) =>
+                        downloadBlob(blob, selectedAsset.fileName)
+                      )
+                    }
                     className="px-3 py-1.5 rounded-lg text-xs font-semibold text-ink hover:bg-ledger transition-colors"
                   >
                     Download
@@ -996,11 +1069,11 @@ export default function MapsView() {
           </div>
       ) : null}
 
-      {previewAsset && (
+      {previewAsset && previewBlob && (
         <AssetPreviewModal
           fileName={previewAsset.fileName}
           mimeType={previewAsset.mimeType}
-          blob={previewAsset.blob}
+          blob={previewBlob}
           onClose={() => setPreviewAssetId(null)}
         />
       )}
