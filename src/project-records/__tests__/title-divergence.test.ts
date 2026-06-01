@@ -70,6 +70,21 @@ describe('Phase 4 title divergence is blocked', () => {
     ).toThrow(ParityDivergenceError);
   });
 
+  it('gives identical-effect commands distinct default ids (no ActionRecord collision)', () => {
+    const { delta } = beforeAfter();
+    const a = buildTitleCommand({ mutation: 'convey', origin: 'system', effects: delta.effects });
+    const b = buildTitleCommand({ mutation: 'convey', origin: 'system', effects: delta.effects });
+    expect(a.commandId).not.toBe(b.commandId);
+    // an explicit id is still honored verbatim
+    const explicit = buildTitleCommand({
+      mutation: 'convey',
+      origin: 'system',
+      effects: delta.effects,
+      commandId: 'op-123',
+    });
+    expect(explicit.commandId).toBe('op-123');
+  });
+
   it('BLOCKS a command whose effect carries a corrupted record (wrong math)', () => {
     const { beforeRecords, afterRecords, delta } = beforeAfter();
     const corruptedEffects: RecordEffect[] = delta.effects.map((effect) => {
