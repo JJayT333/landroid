@@ -221,6 +221,11 @@ Known risk:
   derivatives point back to immutable originals, and failed/canceled runs cannot
   emit derivative vault objects or citations. The app does not run OCR tools or
   upload documents in this slice.
+- Phase 3 import sessions are project-record-only staging objects. Source rows
+  and excerpts are immutable evidence, ambiguous rows become questions, dry-run
+  `ActionPlan` previews are required before approval, and approval produces
+  typed action drafts plus source citations rather than live-store or v8
+  `.landroid` mutations.
 - Cloud OCR must be per-document opt-in, with provider, retention, logging,
   training-use, region/data-residency, and deletion expectations documented
   before upload.
