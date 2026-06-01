@@ -86,6 +86,122 @@ function candidateFor(recordType: string) {
       return { ...base, sourceCitationId: 'source-citation-1' };
     case 'source_attestation':
       return { ...base, sourceType: 'title_opinion', status: 'draft' };
+    case 'instrument_record':
+      return {
+        ...base,
+        instrumentType: 'Mineral Deed',
+        instrumentDate: '2026-01-01',
+        county: 'Reeves',
+        state: 'TX',
+        grantorPartyIds: ['party-grantor'],
+        granteePartyIds: ['party-grantee'],
+        legalDescription: 'Section 12',
+      };
+    case 'tract':
+      return {
+        ...base,
+        tractId: 'tract-1',
+        name: 'Section 12',
+        code: 'T1',
+        county: 'Reeves',
+        state: 'TX',
+        grossAcres: '640',
+        pooledAcres: '640',
+        deskMapId: 'desk-map-1',
+      };
+    case 'desk_map':
+      return {
+        ...base,
+        deskMapId: 'desk-map-1',
+        name: 'Section 12 Desk Map',
+        code: 'T1',
+        tractId: 'tract-1',
+        grossAcres: '640',
+        pooledAcres: '640',
+        description: 'Contract desk map',
+        nodeIds: ['node-1'],
+      };
+    case 'lease':
+      return {
+        ...base,
+        leaseId: 'lease-1',
+        ownerId: 'owner-1',
+        leaseName: 'Contract Lease',
+        lesseeName: 'Contract Operator',
+        royaltyRate: '1/8',
+        leasedInterest: '1',
+        effectiveDate: '2026-01-01',
+        status: 'Active',
+        jurisdiction: 'tx_fee',
+        depthRange: 'all_depths',
+      };
+    case 'unit':
+      return {
+        ...base,
+        unitId: 'unit-1',
+        name: 'Contract Unit',
+        operatorName: 'Contract Operator',
+        jurisdiction: 'tx_fee',
+        effectiveDate: '2026-01-01',
+        tractIds: ['tract-1'],
+      };
+    case 'wellbore':
+      return {
+        ...base,
+        wellboreId: 'wellbore-1',
+        name: 'Contract 1H',
+        apiNumber: '42-000-00000',
+        operatorName: 'Contract Operator',
+        unitId: 'unit-1',
+        tractIds: ['tract-1'],
+        status: 'permitted',
+      };
+    case 'interest_reference':
+      return {
+        ...base,
+        interestId: 'interest-1',
+        partyId: 'party-1',
+        parentInterestId: null,
+        instrumentRecordId: 'instrument-1',
+        interestClass: 'mineral',
+        fraction: '0.5',
+        initialFraction: '0.5',
+        displayDecimal: '0.500000000',
+        displayFraction: '1/2',
+        depthRange: 'all_depths',
+        jurisdiction: 'tx_fee',
+        deskMapIds: ['desk-map-1'],
+      };
+    case 'curative_issue':
+      return {
+        ...base,
+        issueId: 'issue-1',
+        title: 'Missing probate',
+        issueType: 'Probate / heirship',
+        priority: 'medium',
+        status: 'open',
+        affectedRecordIds: ['interest-1'],
+        requiredAction: 'Find probate record',
+      };
+    case 'lease_obligation':
+      return {
+        ...base,
+        obligationId: 'obligation-1',
+        leaseId: 'lease-1',
+        obligationType: 'rental',
+        status: 'open',
+        dueDate: '2026-06-01',
+        description: 'Delay rental',
+      };
+    case 'obligation_event':
+      return {
+        ...base,
+        eventId: 'obligation-event-1',
+        obligationId: 'obligation-1',
+        eventType: 'created',
+        occurredAt: now,
+        notes: 'Created from contract probe',
+      };
     case 'import_session':
       return { ...base, importKind: 'runsheet', status: 'draft', createdAt: now };
     case 'action_plan':
@@ -113,6 +229,41 @@ function candidateFor(recordType: string) {
         actorKind: 'system',
         occurredAt: now,
         details: {},
+      };
+    case 'packet':
+      return {
+        ...base,
+        packetId: 'packet-1',
+        title: 'Attorney packet',
+        packetType: 'attorney',
+        status: 'draft',
+        itemCount: 1,
+        createdAt: now,
+        updatedAt: now,
+        sourceRecordIds: ['document-1'],
+      };
+    case 'packet_item':
+      return {
+        ...base,
+        packetItemId: 'packet-item-1',
+        packetId: 'packet-1',
+        position: 0,
+        label: 'Contract document',
+        documentId: 'document-1',
+        contentHash: hash,
+      };
+    case 'packet_export':
+      return {
+        ...base,
+        packetExportId: 'packet-export-1',
+        packetId: 'packet-1',
+        status: 'generated',
+        format: 'zip',
+        generatedAt: now,
+        itemCount: 1,
+        manifestHash: hash,
+        contentHash: hash,
+        byteLength: 12,
       };
     default:
       return base;
@@ -201,13 +352,11 @@ describe('backend spine contracts', () => {
     }
   });
 
-  it('keeps envelope-only stubs strict until their body schemas are defined', () => {
-    const parsed = BackendSpineCoreRecordSchema.parse(envelope('lease'));
-    expect(parsed.recordType).toBe('lease');
-
+  it('rejects bodyless records now that Phase 1 record schemas are defined', () => {
+    expect(BackendSpineCoreRecordSchema.safeParse(envelope('lease')).success).toBe(false);
     expect(
       BackendSpineCoreRecordSchema.safeParse({
-        ...envelope('lease'),
+        ...candidateFor('lease'),
         arbitraryLeasePayload: true,
       }).success
     ).toBe(false);
