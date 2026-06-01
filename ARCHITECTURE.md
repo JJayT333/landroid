@@ -86,7 +86,12 @@ Target rebuild boundaries:
   documents, instruments, leases, units, wells, source attestations, curative
   issues, import sessions, action plans, action records, packets, and audit
   events. The ownership tree is graph-shaped, but the implementation target is
-  records and projections, not a graph database.
+  records and projections, not a graph database. Phase 1 record body schemas now
+  live in `src/backend-spine/contracts.ts`; pure workspace-to-record adapters,
+  record-bundle validation, `MathInputView`, `OpinionDraft`,
+  `ObligationCalendar`, `AbstractorPackage`, packet export, AI context, and
+  citation-verifier contracts live under `src/project-records`. These helpers
+  are read-side/additive only and do not replace the current stores.
 - Evidence Vault: immutable originals, content hashes, document versions,
   vault objects, extraction runs, citation anchors, derivative OCR/text
   artifacts, and deterministic packet manifests. Search indexes and packet
@@ -180,6 +185,12 @@ During rebuild work, do not make the math engine consume new domain records
 directly. Add a stable `MathInputView` projection first, then compare its
 outputs against existing golden masters before any cutover.
 
+The current `MathInputView` projection is implemented behind
+`src/project-records/projections.ts`. It reuses the existing Leasehold and Desk
+Map math helpers, records dual decimal/fraction displays, carries warning-only
+states, and makes Texas/federal/private lease isolation a projection
+precondition without changing live UI behavior.
+
 ## Persistence Boundary
 
 Persistence helpers live under `src/storage`. Import paths must treat external
@@ -207,6 +218,12 @@ explicit before Dexie sharding. Later backend expansion should make sync,
 backup, jobs, search, sharing, and AI policy more durable. Neither the spine nor
 later expansion may make the app unusable offline for core workflows, and
 neither may make LANDroid unable to produce a complete local project package.
+
+The project-record `.landroid` migration strategy is documented in
+`docs/project-record-migration-strategy.md`. Phase 1 does not change the v8 file
+format; any future record-bearing package must use explicit version dispatch
+and validate both the snapshot and the project-record bundle before store
+replacement.
 
 Phase 0.5 planning treats the current storage surface as follows:
 
