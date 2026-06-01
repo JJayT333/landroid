@@ -55,7 +55,10 @@ session handoff lives in `CONTINUATION-PROMPT.md`.
 - Preserve `.landroid` package export permanently even after sync/backend work.
 - Promote the Evidence Vault contract: immutable originals, SHA-256 hashes,
   document versions, extraction runs, citation anchors, hash-continuity audit
-  events, and deterministic packet manifests.
+  events, and deterministic packet manifests. The first additive adapter now
+  projects registry documents, owner documents, map assets, and research
+  imports into shared project-record document/link/vault rows; live side-store
+  authority and package format migration remain deferred.
 - Validate and review the Phase 7A document registry MVP from
   `codex/document-registry-build-2026-05-16`: flat document index, saved
   views, metadata editing, duplicate surfacing, linked-node display, and packet
@@ -80,9 +83,10 @@ session handoff lives in `CONTINUATION-PROMPT.md`.
   sidecar.
 - Expand entity document links beyond Desk Map nodes: owners, leases, curative
   issues, and research records.
-- Unify document-like side stores before expanding the vault: owner documents,
-  PDF map assets, research file imports, and registry documents should converge
-  on shared document/entity-link semantics where practical.
+- Decide the live cutover path for document-like side stores: owner documents,
+  PDF map assets, research file imports, and registry documents now have shared
+  project-record semantics, but Dexie/runtime storage should only converge
+  after a separate migration gate.
 - Add import-manifest previews for large document sources such as ArcGIS
   attachment tables, Dropbox/local folders, and selected source packets.
 - Design OCR/text indexing after the document registry exists; AI document

@@ -7,9 +7,11 @@ Use this file to resume the active workstream in a new chat. Read it with
 
 ## Current Branch
 
-`feat/phase-1-record-schema` — Phase 1 project record schema foundations are in
-progress for review. Do not merge from this branch without reviewer approval.
-The Phase 0.5 storage-sharding stack is already merged to `main` (2026-05-30).
+`feat/phase-2-document-vault` — Evidence Vault / document packet projection work
+is in progress for review. Do not merge from this branch without reviewer
+approval. The Phase 0.5 storage-sharding stack is already merged to `main`
+(2026-05-30), and Phase 1 project-record schema foundations are merged to
+`main` before this branch.
 
 Merged to `main` (squash; each validated by CI = lint + test + build):
 
@@ -32,30 +34,38 @@ main push/deploy.
 
 ## Current Workstream
 
-Phase 1 project record schema foundations are active on this branch. The goal
-is additive durable records beside the existing app: no UI migration, no
-Zustand store migration, no `.landroid` format change, and no math/display
-behavior change.
+Evidence Vault projection work is active on this branch. The goal is additive
+document-vault and attorney-packet records beside the existing app: no UI
+migration, no Zustand store migration, no `.landroid` format change, and no
+destructive side-store rewrite.
 
-Current Phase 1 implementation state:
+Current Evidence Vault implementation state:
 
-- full backend-spine record body schemas are added in
-  `src/backend-spine/contracts.ts`
-- the Desk Map shard builder now populates the newly defined desk-map record
-  body fields while preserving current shard read/write behavior
-- pure project-record adapters, bundle validation, `MathInputView`,
-  `OpinionDraft`, `ObligationCalendar`, `AbstractorPackage`, packet export, AI
-  context, citation verifier, and AI mutation-guard projection helpers live
-  under `src/project-records`
-- `.landroid` remains v8; the future record-bearing package strategy is
-  documented in `docs/project-record-migration-strategy.md`
-- assumptions are recorded in `docs/phase-1-record-schema-notes.md`
-- targeted validation passed: `npm run lint` and
-  `npm test -- src/backend-spine/__tests__/contracts.test.ts src/project-records/__tests__/workspace-record-adapter.test.ts src/storage/__tests__/workspace-shards.test.ts src/phase0/__tests__/vulcan-mesa-fixtures.test.ts`
+- `src/project-records/evidence-vault.ts` projects registry documents, owner
+  documents, map assets, and research imports into shared `document`,
+  `document_version`, `vault_object`, and `document_link` records.
+- Existing registry document hashes are preserved; blob-backed owner/map/research
+  side-store hashes are computed from current blobs when the projection builds.
+- `document_link` removal in the project-record layer removes only links. Shared
+  documents, versions, and vault objects remain; the existing live document
+  store still deletes a document only when a node/tract delete leaves no
+  surviving links.
+- Attorney packet export is modeled as deterministic JSON manifest projection
+  with SHA-256 manifest hash, packet records/items/exports, source-citation
+  sidecars, unresolved curative issue summaries, and optional eDiscovery
+  sidecars. Native ZIP/PDF packaging is still deferred.
+- `VaultObject.derivedFromVaultObjectId` is available for later OCR/text/packet
+  derivatives but no derivative rows are emitted yet.
+- Assumptions are recorded in `docs/phase-2-evidence-vault-notes.md`.
+- Validation passed: `npm run lint`,
+  `npm test -- src/backend-spine/__tests__/contracts.test.ts src/project-records/__tests__/workspace-record-adapter.test.ts src/project-records/__tests__/evidence-vault.test.ts src/documents/__tests__/document-registry.test.ts src/storage/__tests__/document-store.test.ts src/storage/__tests__/workspace-persistence.test.ts src/storage/__tests__/document-migration.test.ts src/store/__tests__/workspace-store-doc-actions.test.ts src/phase0/__tests__/vulcan-mesa-fixtures.test.ts`.
+  Full validation also passed: `npm test`, `npm run build`, and
+  `npm run test:e2e` (after updating stale Playwright PDF-chip selectors to use
+  stable attachment IDs and visible filenames).
 
-Before handoff, finish full validation (`npm test`, `npm run build`) and commit
-reviewable chunks on this branch. Existing untracked local noise was present
-before this work and should remain excluded unless the user explicitly asks:
+Before handoff, commit reviewable chunks on this branch. Existing untracked
+local noise was present before this work and should remain excluded unless the
+user explicitly asks:
 `docs/archive/audits/LINE_BY_LINE_AUDIT_2026-05-31.md` and `scripts/springhill/`.
 
 Earlier Phase 0 rebuild planning reconciliation adopted Claude's
