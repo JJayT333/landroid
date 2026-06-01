@@ -5,5 +5,6 @@ export * from './commands';
 export * from './cutover';
 export * from './encoders';
 export * from './parity';
+export * from './persistence';
 export * from './reducer';
 export * from './undo-boundary';
