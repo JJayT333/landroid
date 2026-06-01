@@ -173,6 +173,7 @@ export const VaultObjectRecordSchema = RecordEnvelopeSchema.extend({
   recordType: z.literal('vault_object'),
   objectId: IdSchema,
   objectKind: z.enum(['original', 'derivative', 'text', 'packet_copy', 'index']),
+  derivedFromVaultObjectId: IdSchema.optional(),
   contentHash: ContentHashSchema,
   byteLength: z.number().int().nonnegative(),
   storageRef: NonEmptyStringSchema,

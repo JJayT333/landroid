@@ -5,6 +5,15 @@ stay short.
 
 ## 2026-06-01
 
+- Added the first Evidence Vault project-record adapter. Registry documents,
+  owner documents, map assets, and research imports now project into shared
+  `document`, `document_version`, `vault_object`, and `document_link` records
+  with SHA-256 hashes and deterministic workspace-scoped links, while v8
+  `.landroid` and live Dexie side stores remain authoritative.
+- Added deterministic attorney packet export modeling: manifest checksums,
+  packet records/items/exports, source-citation sidecars, unresolved issue
+  summaries, and optional eDiscovery sidecars are produced as pure
+  project-record projections. Native ZIP/PDF packaging remains a later step.
 - Added Phase 1 project-record schema foundations beside the running app. The
   backend-spine contract now defines full body schemas for instruments, tracts,
   desk maps, leases, units, wellbores, interest references, curative issues,

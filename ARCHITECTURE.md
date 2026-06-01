@@ -89,13 +89,17 @@ Target rebuild boundaries:
   records and projections, not a graph database. Phase 1 record body schemas now
   live in `src/backend-spine/contracts.ts`; pure workspace-to-record adapters,
   record-bundle validation, `MathInputView`, `OpinionDraft`,
-  `ObligationCalendar`, `AbstractorPackage`, packet export, AI context, and
-  citation-verifier contracts live under `src/project-records`. These helpers
-  are read-side/additive only and do not replace the current stores.
+  `ObligationCalendar`, `AbstractorPackage`, evidence-vault/packet export
+  adapters, AI context, and citation-verifier contracts live under
+  `src/project-records`. These helpers are read-side/additive only and do not
+  replace the current stores.
 - Evidence Vault: immutable originals, content hashes, document versions,
   vault objects, extraction runs, citation anchors, derivative OCR/text
-  artifacts, and deterministic packet manifests. Search indexes and packet
-  exports are rebuildable derivatives.
+  artifacts, and deterministic packet manifests. The current evidence-vault
+  adapter projects registry documents, owner documents, map assets, and
+  research imports into shared `document` / `document_link` / `vault_object`
+  records without changing v8 `.landroid` or Dexie side-store authority.
+  Search indexes and packet exports are rebuildable derivatives.
 - Action layer: typed `ActionPlan` previews and durable `ActionRecord`s over
   records. Meaningful approved changes should also be able to produce
   append-only audit events with hash continuity.

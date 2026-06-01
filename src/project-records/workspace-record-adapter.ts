@@ -1,5 +1,4 @@
 import {
-  BACKEND_SPINE_CONTRACT_VERSION,
   BackendSpineCoreRecordSchema,
   WorkspaceManifestRecordSchema,
   type BackendSpineCoreRecord,
@@ -17,6 +16,18 @@ import type {
 import type { TitleIssuePriority, TitleIssueStatus } from '../types/title-issue';
 import type { Owner } from '../types/owner';
 import { buildProjectRecordBundle, type ProjectRecordBundle } from './record-validation';
+import {
+  baseRecordEnvelope,
+  cleanRecordText,
+  dateOnlyRecordValue,
+  dateTimeRecordValue,
+  fallbackRecordText,
+  hashStableText,
+  requireContentHash,
+  slugRecordText,
+  stableRecordId,
+  type RecordBuildContext,
+} from './record-helpers';
 
 export interface WorkspaceRecordAdapterInput {
   workspace: WorkspaceData;
@@ -31,92 +42,6 @@ export interface WorkspaceRecordAdapterInput {
   landroidFileVersion: number;
 }
 
-interface BuildContext {
-  workspaceId: string;
-  projectId: string;
-  generatedAt: string;
-  revision: number;
-  source: BackendSpineRecordSource;
-  syncState?: BackendSpineSyncState;
-}
-
-const CONTENT_HASH_PATTERN = /^[a-f0-9]{64}$/;
-
-function clean(value: string | null | undefined): string {
-  return value?.trim() ?? '';
-}
-
-function fallbackText(value: string | null | undefined, fallback: string): string {
-  return clean(value) || fallback;
-}
-
-function hashText(value: string): string {
-  let hash = 2166136261;
-  for (let index = 0; index < value.length; index += 1) {
-    hash ^= value.charCodeAt(index);
-    hash = Math.imul(hash, 16777619);
-  }
-  return (hash >>> 0).toString(36);
-}
-
-function slug(value: string): string {
-  return (
-    value
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '')
-      .slice(0, 72)
-    || 'record'
-  );
-}
-
-function stableId(...parts: string[]): string {
-  const raw = parts.map((part) => clean(part) || 'unknown').join(':');
-  if (raw.length <= 150) return raw;
-  return `${raw.slice(0, 120)}:${hashText(raw)}`;
-}
-
-function dateOnly(value: string | null | undefined): string | undefined {
-  const candidate = clean(value);
-  if (!candidate) return undefined;
-  if (/^\d{4}-\d{2}-\d{2}$/.test(candidate)) return candidate;
-  const parsed = new Date(candidate);
-  if (!Number.isFinite(parsed.getTime())) return undefined;
-  return parsed.toISOString().slice(0, 10);
-}
-
-function dateTime(value: string | null | undefined, fallback: string): string {
-  const candidate = clean(value);
-  if (!candidate) return fallback;
-  const parsed = new Date(candidate);
-  if (!Number.isFinite(parsed.getTime())) return fallback;
-  return parsed.toISOString();
-}
-
-function requireContentHash(value: string, label: string): string {
-  const candidate = clean(value).toLowerCase();
-  if (CONTENT_HASH_PATTERN.test(candidate)) return candidate;
-  throw new Error(`${label} is missing a valid sha-256 contentHash.`);
-}
-
-function baseEnvelope(
-  recordType: BackendSpineRecordType,
-  recordId: string,
-  context: BuildContext
-) {
-  return {
-    recordId,
-    recordType,
-    workspaceId: context.workspaceId,
-    projectId: context.projectId,
-    schemaVersion: BACKEND_SPINE_CONTRACT_VERSION,
-    lastModified: context.generatedAt,
-    revision: context.revision,
-    source: context.source,
-    syncState: context.syncState,
-  };
-}
-
 function parseRecord(record: unknown): BackendSpineCoreRecord {
   return BackendSpineCoreRecordSchema.parse(record);
 }
@@ -129,7 +54,7 @@ function inferPartyType(owner: Owner): 'person' | 'company' | 'trust' | 'estate'
   if (/\b(llc|inc|corp|company|co\.|ltd|lp|llp|partners|energy|oil|gas)\b/.test(text)) {
     return 'company';
   }
-  if (clean(owner.name)) return 'person';
+  if (cleanRecordText(owner.name)) return 'person';
   return 'unknown';
 }
 
@@ -190,7 +115,7 @@ function countRecordTypes(records: BackendSpineCoreRecord[]) {
 export function buildProjectRecordsFromWorkspace(
   input: WorkspaceRecordAdapterInput
 ): ProjectRecordBundle {
-  const context: BuildContext = {
+  const context: RecordBuildContext = {
     workspaceId: input.workspace.workspaceId,
     projectId: input.projectId ?? input.workspace.workspaceId,
     generatedAt: input.generatedAt,
@@ -211,15 +136,20 @@ export function buildProjectRecordsFromWorkspace(
     preferredId: string | null,
     partyType: 'person' | 'company' | 'trust' | 'estate' | 'government' | 'unknown'
   ): string | null => {
-    const name = clean(displayName);
+    const name = cleanRecordText(displayName);
     if (!name) return null;
     const key = name.toLowerCase();
     const existing = partyIdsByName.get(key);
     if (existing) return existing;
-    const recordId = preferredId ?? stableId(context.workspaceId, 'party', slug(name), hashText(name));
+    const recordId = preferredId ?? stableRecordId(
+      context.workspaceId,
+      'party',
+      slugRecordText(name),
+      hashStableText(name)
+    );
     partyIdsByName.set(key, recordId);
     addRecord({
-      ...baseEnvelope('party', recordId, context),
+      ...baseRecordEnvelope('party', recordId, context),
       displayName: name,
       partyType,
     });
@@ -227,38 +157,38 @@ export function buildProjectRecordsFromWorkspace(
   };
 
   addRecord({
-    ...baseEnvelope('project', stableId(context.workspaceId, 'project'), context),
-    name: fallbackText(input.workspace.projectName, 'Untitled Workspace'),
+    ...baseRecordEnvelope('project', stableRecordId(context.workspaceId, 'project'), context),
+    name: fallbackRecordText(input.workspace.projectName, 'Untitled Workspace'),
     createdAt: context.generatedAt,
     updatedAt: context.generatedAt,
   });
 
   for (const owner of input.ownerData?.owners ?? []) {
-    const partyId = stableId(context.workspaceId, 'party', 'owner', owner.id);
+    const partyId = stableRecordId(context.workspaceId, 'party', 'owner', owner.id);
     const ensured = ensureParty(owner.name || owner.id, partyId, inferPartyType(owner));
     if (ensured) partyIdsByOwnerId.set(owner.id, ensured);
   }
 
   for (const deskMap of input.workspace.deskMaps) {
-    const tractId = stableId(
+    const tractId = stableRecordId(
       context.workspaceId,
       'tract',
       deskMap.tractId ?? deskMap.id
     );
     addRecord({
-      ...baseEnvelope('tract', tractId, context),
+      ...baseRecordEnvelope('tract', tractId, context),
       tractId,
-      name: fallbackText(deskMap.name, deskMap.code || deskMap.id),
+      name: fallbackRecordText(deskMap.name, deskMap.code || deskMap.id),
       code: deskMap.code,
       legalDescription: deskMap.description,
       grossAcres: deskMap.grossAcres,
       pooledAcres: deskMap.pooledAcres,
-      deskMapId: stableId(context.workspaceId, 'desk-map', deskMap.id),
+      deskMapId: stableRecordId(context.workspaceId, 'desk-map', deskMap.id),
     });
     addRecord({
-      ...baseEnvelope('desk_map', stableId(context.workspaceId, 'desk-map', deskMap.id), context),
+      ...baseRecordEnvelope('desk_map', stableRecordId(context.workspaceId, 'desk-map', deskMap.id), context),
       deskMapId: deskMap.id,
-      name: fallbackText(deskMap.name, deskMap.code || deskMap.id),
+      name: fallbackRecordText(deskMap.name, deskMap.code || deskMap.id),
       code: deskMap.code,
       tractId,
       grossAcres: deskMap.grossAcres,
@@ -272,20 +202,20 @@ export function buildProjectRecordsFromWorkspace(
 
   for (const document of input.documentData?.documents ?? []) {
     const contentHash = requireContentHash(document.contentHash, document.fileName);
-    const documentRecordId = stableId(context.workspaceId, 'document', document.docId);
-    const vaultObjectId = stableId(context.workspaceId, 'vault-object', contentHash);
+    const documentRecordId = stableRecordId(context.workspaceId, 'document', document.docId);
+    const vaultObjectId = stableRecordId(context.workspaceId, 'vault-object', contentHash);
     addRecord({
-      ...baseEnvelope('document', documentRecordId, context),
+      ...baseRecordEnvelope('document', documentRecordId, context),
       documentId: document.docId,
-      displayTitle: fallbackText(document.displayTitle, document.fileName || document.docId),
-      fileName: fallbackText(document.fileName, document.docId),
-      mimeType: fallbackText(document.mimeType, 'application/octet-stream'),
+      displayTitle: fallbackRecordText(document.displayTitle, document.fileName || document.docId),
+      fileName: fallbackRecordText(document.fileName, document.docId),
+      mimeType: fallbackRecordText(document.mimeType, 'application/octet-stream'),
       byteLength: document.byteLength,
       contentHash,
       originalVaultObjectId: vaultObjectId,
     });
     addRecord({
-      ...baseEnvelope('vault_object', vaultObjectId, context),
+      ...baseRecordEnvelope('vault_object', vaultObjectId, context),
       objectId: vaultObjectId,
       objectKind: 'original',
       contentHash,
@@ -294,27 +224,27 @@ export function buildProjectRecordsFromWorkspace(
       localOnly: true,
     });
     addRecord({
-      ...baseEnvelope(
+      ...baseRecordEnvelope(
         'document_version',
-        stableId(context.workspaceId, 'document-version', document.docId, 'original'),
+        stableRecordId(context.workspaceId, 'document-version', document.docId, 'original'),
         context
       ),
       documentId: documentRecordId,
       versionLabel: 'original',
       vaultObjectId,
       contentHash,
-      createdAt: dateTime(document.createdAt, context.generatedAt),
+      createdAt: dateTimeRecordValue(document.createdAt, context.generatedAt),
     });
   }
 
   for (const attachment of input.documentData?.attachments ?? []) {
     addRecord({
-      ...baseEnvelope(
+      ...baseRecordEnvelope(
         'document_link',
-        stableId(context.workspaceId, 'document-link', attachment.attachmentId),
+        stableRecordId(context.workspaceId, 'document-link', attachment.attachmentId),
         context
       ),
-      documentId: stableId(context.workspaceId, 'document', attachment.docId),
+      documentId: stableRecordId(context.workspaceId, 'document', attachment.docId),
       entityKind: attachment.entityKind,
       entityId: attachment.entityId,
       position: attachment.position,
@@ -322,16 +252,16 @@ export function buildProjectRecordsFromWorkspace(
   }
 
   for (const node of input.workspace.nodes) {
-    const instrumentId = stableId(context.workspaceId, 'instrument', node.id);
+    const instrumentId = stableRecordId(context.workspaceId, 'instrument', node.id);
     const granteePartyId =
       (node.linkedOwnerId ? partyIdsByOwnerId.get(node.linkedOwnerId) : null)
       ?? ensureParty(node.grantee, null, 'unknown');
     const grantorPartyId = ensureParty(node.grantor, null, 'unknown');
     addRecord({
-      ...baseEnvelope('instrument_record', instrumentId, context),
-      instrumentType: fallbackText(node.instrument, node.type === 'related' ? 'Related Record' : 'Instrument'),
-      instrumentDate: dateOnly(node.date),
-      recordingDate: dateOnly(node.fileDate),
+      ...baseRecordEnvelope('instrument_record', instrumentId, context),
+      instrumentType: fallbackRecordText(node.instrument, node.type === 'related' ? 'Related Record' : 'Instrument'),
+      instrumentDate: dateOnlyRecordValue(node.date),
+      recordingDate: dateOnlyRecordValue(node.fileDate),
       recordingReference: {
         instrumentNumber: node.docNo,
         volume: node.vol,
@@ -340,7 +270,7 @@ export function buildProjectRecordsFromWorkspace(
       grantorPartyIds: grantorPartyId ? [grantorPartyId] : [],
       granteePartyIds: granteePartyId ? [granteePartyId] : [],
       documentId: node.attachments[0]?.docId
-        ? stableId(context.workspaceId, 'document', node.attachments[0].docId)
+        ? stableRecordId(context.workspaceId, 'document', node.attachments[0].docId)
         : undefined,
       legalDescription: node.landDesc,
       summary: node.remarks,
@@ -348,12 +278,12 @@ export function buildProjectRecordsFromWorkspace(
 
     const [displayDecimal] = dualDisplay(node.fraction).split(' | ');
     addRecord({
-      ...baseEnvelope('interest_reference', stableId(context.workspaceId, 'interest', node.id), context),
+      ...baseRecordEnvelope('interest_reference', stableRecordId(context.workspaceId, 'interest', node.id), context),
       interestId: node.id,
       subjectRecordId: instrumentId,
       partyId: granteePartyId ?? undefined,
       parentInterestId: node.parentId
-        ? stableId(context.workspaceId, 'interest', node.parentId)
+        ? stableRecordId(context.workspaceId, 'interest', node.parentId)
         : null,
       instrumentRecordId: instrumentId,
       interestClass:
@@ -368,16 +298,16 @@ export function buildProjectRecordsFromWorkspace(
       jurisdiction: 'tx_fee',
       deskMapIds: input.workspace.deskMaps
         .filter((deskMap) => deskMap.nodeIds.includes(node.id))
-        .map((deskMap) => stableId(context.workspaceId, 'desk-map', deskMap.id)),
+        .map((deskMap) => stableRecordId(context.workspaceId, 'desk-map', deskMap.id)),
       leaseId: node.linkedLeaseId
-        ? stableId(context.workspaceId, 'lease', node.linkedLeaseId)
+        ? stableRecordId(context.workspaceId, 'lease', node.linkedLeaseId)
         : undefined,
     });
   }
 
   for (const lease of input.ownerData?.leases ?? []) {
     addRecord({
-      ...baseEnvelope('lease', stableId(context.workspaceId, 'lease', lease.id), context),
+      ...baseRecordEnvelope('lease', stableRecordId(context.workspaceId, 'lease', lease.id), context),
       leaseId: lease.id,
       ownerId: lease.ownerId,
       lessorPartyId: partyIdsByOwnerId.get(lease.ownerId),
@@ -385,8 +315,8 @@ export function buildProjectRecordsFromWorkspace(
       lesseeName: lease.lessee,
       royaltyRate: lease.royaltyRate,
       leasedInterest: lease.leasedInterest,
-      effectiveDate: dateOnly(lease.effectiveDate),
-      expirationDate: dateOnly(lease.expirationDate),
+      effectiveDate: dateOnlyRecordValue(lease.effectiveDate),
+      expirationDate: dateOnlyRecordValue(lease.expirationDate),
       status: lease.status,
       jurisdiction: lease.jurisdiction,
       docNo: lease.docNo,
@@ -397,34 +327,34 @@ export function buildProjectRecordsFromWorkspace(
 
   if (input.workspace.leaseholdUnit) {
     addRecord({
-      ...baseEnvelope('unit', stableId(context.workspaceId, 'unit', 'active'), context),
-      unitId: stableId(context.workspaceId, 'unit', 'active'),
-      name: fallbackText(input.workspace.leaseholdUnit.name, 'Active Unit'),
+      ...baseRecordEnvelope('unit', stableRecordId(context.workspaceId, 'unit', 'active'), context),
+      unitId: stableRecordId(context.workspaceId, 'unit', 'active'),
+      name: fallbackRecordText(input.workspace.leaseholdUnit.name, 'Active Unit'),
       operatorName: input.workspace.leaseholdUnit.operator,
       jurisdiction: input.workspace.leaseholdUnit.jurisdiction,
-      effectiveDate: dateOnly(input.workspace.leaseholdUnit.effectiveDate),
+      effectiveDate: dateOnlyRecordValue(input.workspace.leaseholdUnit.effectiveDate),
       tractIds: input.workspace.deskMaps.map((deskMap) =>
-        stableId(context.workspaceId, 'tract', deskMap.tractId ?? deskMap.id)
+        stableRecordId(context.workspaceId, 'tract', deskMap.tractId ?? deskMap.id)
       ),
     });
   }
 
   for (const issue of input.curativeData?.titleIssues ?? []) {
     const affectedRecordIds = [
-      issue.affectedNodeId ? stableId(context.workspaceId, 'interest', issue.affectedNodeId) : null,
-      issue.affectedDeskMapId ? stableId(context.workspaceId, 'desk-map', issue.affectedDeskMapId) : null,
-      issue.affectedLeaseId ? stableId(context.workspaceId, 'lease', issue.affectedLeaseId) : null,
+      issue.affectedNodeId ? stableRecordId(context.workspaceId, 'interest', issue.affectedNodeId) : null,
+      issue.affectedDeskMapId ? stableRecordId(context.workspaceId, 'desk-map', issue.affectedDeskMapId) : null,
+      issue.affectedLeaseId ? stableRecordId(context.workspaceId, 'lease', issue.affectedLeaseId) : null,
       issue.affectedOwnerId ? partyIdsByOwnerId.get(issue.affectedOwnerId) ?? null : null,
     ].filter((value): value is string => Boolean(value));
     addRecord({
-      ...baseEnvelope('curative_issue', stableId(context.workspaceId, 'curative-issue', issue.id), context),
+      ...baseRecordEnvelope('curative_issue', stableRecordId(context.workspaceId, 'curative-issue', issue.id), context),
       issueId: issue.id,
-      title: fallbackText(issue.title, issue.issueType),
+      title: fallbackRecordText(issue.title, issue.issueType),
       issueType: issue.issueType,
       priority: mapCurativePriority(issue.priority),
       status: mapCurativeStatus(issue.status),
       affectedRecordIds,
-      dueDate: dateOnly(issue.dueDate),
+      dueDate: dateOnlyRecordValue(issue.dueDate),
       requiredAction: issue.requiredCurativeAction,
       notes: issue.notes,
       resolutionNotes: issue.resolutionNotes,
@@ -434,9 +364,9 @@ export function buildProjectRecordsFromWorkspace(
   const recordCounts = countRecordTypes(records);
   recordCounts.workspace_manifest = 1;
   const manifest = WorkspaceManifestRecordSchema.parse({
-    ...baseEnvelope('workspace_manifest', stableId(context.workspaceId, 'workspace-manifest'), context),
+    ...baseRecordEnvelope('workspace_manifest', stableRecordId(context.workspaceId, 'workspace-manifest'), context),
     landroidFileVersion: input.landroidFileVersion,
-    projectName: fallbackText(input.workspace.projectName, 'Untitled Workspace'),
+    projectName: fallbackRecordText(input.workspace.projectName, 'Untitled Workspace'),
     generatedAt: context.generatedAt,
     recordCounts,
   });
@@ -448,4 +378,3 @@ export function buildProjectRecordsFromWorkspace(
     records: [manifest, ...records],
   });
 }
-
