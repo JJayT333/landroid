@@ -26,6 +26,7 @@ Use this map to decide which Markdown file to read or update.
 | `docs/backend-spine-threat-model.md` | Phase 0.75 minimal backend-spine threat-model note. | Backend-spine assets, boundaries, controls, or validation gates change. |
 | `docs/project-record-migration-strategy.md` | `.landroid` migration strategy for future project-record bundles. | Project records are written into packages or file-version dispatch changes. |
 | `docs/phase-1-record-schema-notes.md` | Phase 1 additive-record implementation assumptions and reviewer notes. | Phase 1 assumptions, adapter scope, or projection guardrails change. |
+| `docs/phase-3-import-session-notes.md` | Phase 3 import-session assumptions, exit-gate evidence, and review questions. | Import-session staging, approval, rejection, or source-review guardrails change. |
 | `CHANGELOG.md` | Completed meaningful work. | A meaningful feature, fix, or docs rail lands. |
 | `CONTINUATION-PROMPT.md` | Current short handoff. | Before switching chats or after meaningful work. |
 | `PATCH_PLAN.md` | Audit remediation status and sequence. | Remediation status changes. |

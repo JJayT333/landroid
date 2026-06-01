@@ -7,10 +7,10 @@ Use this file to resume the active workstream in a new chat. Read it with
 
 ## Current Branch
 
-`feat/phase-2.5-ocr-citation-anchors` — OCR/text extraction and citation-anchor
-record foundation is ready for Claude review. Do not merge from this branch in
-Codex. Phases 0, 0.5, 0.75, 1, and 2 are already merged to `main`; this branch
-was created from local `main` on 2026-06-01.
+`feat/phase-3-import-session` — Phase 3 ImportSession / source-review /
+ActionPlan staging is ready for Claude review. Do not merge from this branch in
+Codex. Phases 0, 0.5, 0.75, 1, 2, and 2.5 are already merged to `main`; this
+branch was created from local `main` on 2026-06-01.
 
 Merged to `main` (squash; each validated by CI = lint + test + build):
 
@@ -33,46 +33,45 @@ main push/deploy.
 
 ## Current Workstream
 
-OCR/text citation foundation is active on this branch. The goal is to make
-document text evidence citeable without sending project documents to cloud
-services by default. This branch is additive only: no UI migration, no Zustand
-store migration, no `.landroid` format change, no OCR subprocess execution, no
-cloud upload path, and no destructive side-store rewrite.
+Phase 3 import-session staging is active on this branch. The goal is to turn
+uploads into reviewable staged work, not blind mutation. This branch is additive
+only: no UI migration, no Zustand store mutation, no `.landroid` format change,
+no OCR execution, no cloud upload path, and no Phase 4 apply path.
 
 Current implementation state:
 
-- `src/backend-spine/contracts.ts` adds `extraction_run`, local/cloud provider
-  decision metadata, confidence summaries, derivative OCR/text vault-object
-  kinds, source-citation creation metadata, and citation-anchor `vaultObjectId`
-  plus polygon support.
-- `src/project-records/extraction-runs.ts` adds a pure local-first builder for
-  extraction-run lineage, derivative vault objects, source citations, and
-  anchors. It keeps `selectable_pdf_text` separate from `scanned_pdf_ocr`.
-- Derivative objects reference the original via `derivedFromVaultObjectId`.
-  Failed or canceled runs cannot emit derivatives or citations.
-- Cloud OCR remains interface-only. The schema requires per-document user
-  opt-in, provider, data-residency warning acceptance, and retention-policy
-  acknowledgement, but no upload path or fallback exists.
-- `verifyCitationSupport` now rejects document-text citations until the record
-  set includes a successful/partial extraction run, an output vault object, and
-  page plus character-span anchors.
-- AI document-text answers remain disabled. This branch only tightens the
-  record/verifier prerequisites.
-
-Local Mac tooling checkpoint:
-
-- Present: Tesseract 5.5.2 with `eng`, `osd`, `snum`.
-- Present: Poppler 26.04.0 tools `pdftotext`, `pdfimages`, `pdftoppm`.
-- Present: qpdf 12.3.2, Ghostscript 10.07.0, Python 3.13.9.
-- Missing: `ocrmypdf` and `mutool`. Searchable PDF generation should wait for
-  `ocrmypdf` or an equivalent local pipeline before engine integration.
+- `src/project-records/import-sessions.ts` adds pure Phase 3 helpers for
+  immutable import source packages, source rows, source excerpts, staged
+  candidates, dry-run `ActionPlan` previews, source review, candidate rejection,
+  and approval into typed action drafts.
+- Recurring runsheet packages retain package series/occurrence metadata.
+- Title-opinion-as-root imports create a Phase 1 `source_attestation` draft tied
+  to the staged candidates.
+- Staged candidates carry confidence and questions. Malformed/missing fraction
+  fields become blocking questions rather than guessed values.
+- `buildImportSessionDryRunActionPlan` emits a Phase 1 `action_plan` record with
+  `dryRun: true`, typed actions, candidate questions, and explicit
+  no-live-store/no-v8 flags.
+- `rejectImportSessionCandidates` returns no records, target drafts, citations,
+  action drafts, links, or mutation count, and removes the rejected candidate
+  from the remaining staged session.
+- `approveImportSessionCandidates` requires a dry-run `ActionPlan`, blocks
+  candidates with unanswered questions, and produces typed action drafts plus
+  source-citation/citation-anchor project records. It does not produce
+  `action_record`, instrument, interest, lease, tract, live-store, or
+  `.landroid` mutations.
+- `buildImportSourceReview` supports side-by-side source-row/OCR-text review
+  when Phase 2.5 extraction-run and vault-object records are available.
+- `docs/phase-3-import-session-notes.md` records assumptions, exit-gate
+  evidence, and open questions for review.
 
 Validation passed:
 
-- `npm test -- src/backend-spine/__tests__/contracts.test.ts src/project-records/__tests__/workspace-record-adapter.test.ts src/project-records/__tests__/evidence-vault.test.ts src/project-records/__tests__/extraction-runs.test.ts`
-  - passed, 4 files / 20 tests.
 - `npm run lint` - passed.
-- `npm test` - passed, 99 files / 737 tests. Existing intentional stderr
+- `npm test -- src/project-records/__tests__/import-sessions.test.ts` - passed,
+  1 file / 7 tests.
+- `npm test -- src/phase0/__tests__` - passed, 2 files / 10 tests.
+- `npm test` - passed, 100 files / 744 tests. Existing intentional stderr
   coverage for simulated Dexie failures appeared.
 - `npm run build` - passed with existing Vite dynamic/static import warnings,
   chunk-size warning, and Node `module.register()` deprecation warning.
@@ -83,11 +82,16 @@ Not run: Playwright e2e, because this branch does not change UI workflows.
 
 Open review notes:
 
-- Check whether the additive `extraction_run` schema should remain contract
-  version 1 until a server storage/sync cutover, or whether the reviewer wants a
-  version bump before any hosted validation path accepts these records.
-- Actual OCR engine execution, searchable PDF generation, storage writes,
-  indexes, and AI document Q&A are intentionally deferred.
+- Should Phase 4 persist `ActionRecord` drafts as a new draft-capable schema, or
+  keep drafts outside durable `action_record` rows until apply time?
+- Should source rows/excerpts become first-class backend-spine record types
+  before hosted storage, or remain immutable sidecar evidence under
+  `ImportSession`?
+- Which recurring runsheet identifiers should be canonical in production:
+  package series/occurrence keys, source file hashes, or user-named package
+  labels?
+- How should answered questions be represented in Phase 4: candidate revision,
+  supplemental source citation, or separate audit event?
 - Existing untracked local noise was present before this work and should remain
   excluded unless the user explicitly asks:
   `docs/archive/audits/LINE_BY_LINE_AUDIT_2026-05-31.md` and

@@ -29,6 +29,7 @@ npm run test:e2e
 | Project record schema foundation | `npm run lint`, `npm test -- src/backend-spine/__tests__/contracts.test.ts src/project-records/__tests__/workspace-record-adapter.test.ts src/storage/__tests__/workspace-shards.test.ts src/phase0/__tests__/vulcan-mesa-fixtures.test.ts`, then `npm test` and `npm run build` before handoff |
 | Phase 0.5 storage sharding implementation | `npm run lint`, targeted storage migration/lock/lazy-blob tests, `.landroid` round-trip tests, side-store reset tests, `npm test`, `npm run build`, relevant e2e, and Phase 0 performance-baseline comparison for project open, autosave, document registry, and `.landroid` round trip |
 | Evidence vault, OCR, packet, or AI citation implementation | `npm run lint`, `npm test -- src/project-records/__tests__/evidence-vault.test.ts src/project-records/__tests__/extraction-runs.test.ts src/project-records/__tests__/workspace-record-adapter.test.ts` plus relevant storage/document tests, package round-trip tests, citation-verifier tests, AI tests when answer behavior changes, and targeted browser/e2e smoke for impacted flows |
+| ImportSession / staged-import implementation | `npm run lint`, `npm test -- src/project-records/__tests__/import-sessions.test.ts`, Phase 0 golden tests, then `npm test`; add storage/UI/e2e checks only if the implementation crosses the project-record boundary |
 | AI tool/provider change | `npm run lint`, AI tests, relevant wizard/tool tests, approval-queue tests, and rollback check |
 | Hosted AI proxy/deploy change | `npm run deploy:check`, `cd backend/ai-proxy && npm test && npx tsc -p tsconfig.json --noEmit`, plus root `npm test` if frontend policy changes; run `bash scripts/smoke-test-hosted.sh` when network/AWS access is available |
 | Release/checkpoint | full default commands plus `npm run deploy:check` for hosted deploy candidates |
@@ -213,6 +214,22 @@ For AI cited-answer work, tests should cover:
 - every mutating tool that can change project state is covered by approval and
   undo policy; registry drift between tool definitions and undo/approval lists
   must fail a test
+
+For Phase 3 import-session work, tests should cover:
+
+- recurring runsheet packages preserve package series/occurrence metadata
+- source rows and excerpts are immutable and content-hashed
+- title-opinion-as-root imports produce `SourceAttestation` drafts before apply
+- every staged candidate has confidence and can carry blocking questions
+- malformed or ambiguous fraction fields become questions instead of guessed
+  values
+- dry-run `ActionPlan` previews exist before approval and explicitly mark the
+  no-live-store/no-v8 boundary
+- rejected candidates produce no target records, links, citations, action
+  drafts, or other mutation residue
+- approved candidates cite immutable source row IDs and source documents
+- OCR/text side-by-side review appears only when extraction-run and vault-object
+  evidence is available
 
 For Phase 1 project-record schema foundations, tests should cover:
 

@@ -5,6 +5,13 @@ stay short.
 
 ## 2026-06-01
 
+- Added Phase 3 import-session staging. Synthetic uploads can now be modeled as
+  recurring runsheet or title-opinion source packages with immutable source rows
+  and excerpts, staged candidates with confidence and blocking questions,
+  `ActionPlan` dry-run previews, side-by-side OCR/text review projections, and
+  batch approval into typed action drafts plus source citations. The phase
+  remains project-record-only and does not apply target records to live Zustand
+  stores or v8 `.landroid` packages.
 - Added the local-first OCR/text citation foundation. Backend-spine records now
   model `extraction_run` lineage, derivative OCR/text vault objects, source
   citation creation metadata, and page/span/polygon anchors. The pure extraction

@@ -105,6 +105,15 @@ Target rebuild boundaries:
   helpers only. No OCR subprocess, cloud OCR upload, store migration, or
   `.landroid` format change is wired yet. Search indexes and packet exports are
   rebuildable derivatives.
+- Import sessions: uploads become immutable source packages, source rows,
+  source excerpts, staged candidates, and Phase 1 `ActionPlan` dry-run previews
+  before approval. Phase 3 supports recurring runsheet packages,
+  title-opinion-as-root `SourceAttestation` drafts, candidate confidence plus
+  blocking questions, side-by-side OCR/text review when Phase 2.5 text records
+  exist, and batch approval into typed action drafts. It remains
+  project-record-only: approved candidates can create source citations and
+  citation anchors, but do not apply instruments, interests, leases, tracts,
+  live Zustand writes, or `.landroid` format changes.
 - Action layer: typed `ActionPlan` previews and durable `ActionRecord`s over
   records. Meaningful approved changes should also be able to produce
   append-only audit events with hash continuity.

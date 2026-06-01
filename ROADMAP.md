@@ -65,6 +65,11 @@ session handoff lives in `CONTINUATION-PROMPT.md`.
   requires extraction-run plus page/span anchors. Actual OCR engine execution,
   searchable PDF generation, search indexes, and AI document Q&A remain
   deferred gates.
+- Promote staged imports through `ImportSession`: uploads should become
+  immutable source rows/excerpts, reviewable candidates with confidence and
+  questions, dry-run `ActionPlan` previews, and approval-time typed action
+  drafts. Phase 3 keeps this behind the project-record boundary; applying those
+  actions to live stores or `.landroid` packages remains a later gate.
 - Validate and review the Phase 7A document registry MVP from
   `codex/document-registry-build-2026-05-16`: flat document index, saved
   views, metadata editing, duplicate surfacing, linked-node display, and packet
