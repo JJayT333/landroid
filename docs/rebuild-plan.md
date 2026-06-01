@@ -872,9 +872,9 @@ Implementation checkpoint, 2026-05-25:
 
 - shared contract schemas live in `src/backend-spine/contracts.ts`
 - every declared `recordType` is represented in the validation union. Record
-  types whose full body schema is not defined yet use strict envelope-only
-  stubs so Phase 0.5 can shard against a canonical envelope without accepting
-  arbitrary payloads.
+  types whose full body schema was not defined yet used strict envelope-only
+  stubs so Phase 0.5 could shard against a canonical envelope without accepting
+  arbitrary payloads. Phase 1 replaces those stubs with body schemas.
 - local-only, mock, and hosted adapter boundaries live in
   `src/backend-spine/adapter.ts`
 - the non-user-facing app startup contract check lives in
@@ -1179,6 +1179,24 @@ Exit gate:
 - `MathInputView` preserves Phase 0 display/math contracts, including dual
   decimal plus fraction display, lease allocation order, warning-only states,
   and jurisdiction isolation
+
+Implementation checkpoint, 2026-06-01:
+
+- full Phase 1 record body schemas extend the existing backend-spine envelope in
+  `src/backend-spine/contracts.ts`
+- pure workspace-to-record and record-bundle validation helpers live under
+  `src/project-records`
+- projection contracts for `MathInputView`, `OpinionDraft`,
+  `ObligationCalendar`, `AbstractorPackage`, packet export, AI context, and
+  structural citation verification live in `src/project-records/projections.ts`
+- `MathInputView` is read-side only: it reuses existing Leasehold/Desk Map math
+  helpers, records dual decimal/fraction displays, carries warning-only states,
+  and enforces Texas-only math isolation as a projection precondition without
+  rewiring UI surfaces
+- the AI mutation coverage guard is behind the projection layer and audits the
+  existing approval/undo/hosted-read-only registries
+- `.landroid` file format remains v8; the future migration strategy is
+  documented in `docs/project-record-migration-strategy.md`
 
 ### Planned Product Lanes Outside Phase 0
 

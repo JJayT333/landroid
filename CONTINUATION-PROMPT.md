@@ -7,8 +7,9 @@ Use this file to resume the active workstream in a new chat. Read it with
 
 ## Current Branch
 
-`main` — the Phase 0.5 storage-sharding stack is fully merged (2026-05-30). No
-active feature branch.
+`feat/phase-1-record-schema` — Phase 1 project record schema foundations are in
+progress for review. Do not merge from this branch without reviewer approval.
+The Phase 0.5 storage-sharding stack is already merged to `main` (2026-05-30).
 
 Merged to `main` (squash; each validated by CI = lint + test + build):
 
@@ -31,11 +32,36 @@ main push/deploy.
 
 ## Current Workstream
 
-Phase 0 rebuild planning reconciliation is active on this branch. The first
-checkpoint adopted Claude's `docs/phase-0-inventory.md` as the draft master
-Phase 0 inventory and updated source-of-truth docs. A follow-up cleanup renamed
-the second demo fixture to Vulcan Mesa and archived the ultrareview prompt; no
-rebuild implementation has started.
+Phase 1 project record schema foundations are active on this branch. The goal
+is additive durable records beside the existing app: no UI migration, no
+Zustand store migration, no `.landroid` format change, and no math/display
+behavior change.
+
+Current Phase 1 implementation state:
+
+- full backend-spine record body schemas are added in
+  `src/backend-spine/contracts.ts`
+- the Desk Map shard builder now populates the newly defined desk-map record
+  body fields while preserving current shard read/write behavior
+- pure project-record adapters, bundle validation, `MathInputView`,
+  `OpinionDraft`, `ObligationCalendar`, `AbstractorPackage`, packet export, AI
+  context, citation verifier, and AI mutation-guard projection helpers live
+  under `src/project-records`
+- `.landroid` remains v8; the future record-bearing package strategy is
+  documented in `docs/project-record-migration-strategy.md`
+- assumptions are recorded in `docs/phase-1-record-schema-notes.md`
+- targeted validation passed: `npm run lint` and
+  `npm test -- src/backend-spine/__tests__/contracts.test.ts src/project-records/__tests__/workspace-record-adapter.test.ts src/storage/__tests__/workspace-shards.test.ts src/phase0/__tests__/vulcan-mesa-fixtures.test.ts`
+
+Before handoff, finish full validation (`npm test`, `npm run build`) and commit
+reviewable chunks on this branch. Existing untracked local noise was present
+before this work and should remain excluded unless the user explicitly asks:
+`docs/archive/audits/LINE_BY_LINE_AUDIT_2026-05-31.md` and `scripts/springhill/`.
+
+Earlier Phase 0 rebuild planning reconciliation adopted Claude's
+`docs/phase-0-inventory.md` as the draft master Phase 0 inventory and updated
+source-of-truth docs. A follow-up cleanup renamed the second demo fixture to
+Vulcan Mesa and archived the ultrareview prompt.
 `AGENTS.md` now includes an efficiency/reporting rule: use targeted validation
 and delta summaries for docs/fixtures/planning work, keep full rigor for risky
 code/data/security/architecture work, and give the user brief orientation each

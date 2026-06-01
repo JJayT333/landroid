@@ -3,6 +3,21 @@
 This file records meaningful project changes so `CONTINUATION-PROMPT.md` can
 stay short.
 
+## 2026-06-01
+
+- Added Phase 1 project-record schema foundations beside the running app. The
+  backend-spine contract now defines full body schemas for instruments, tracts,
+  desk maps, leases, units, wellbores, interest references, curative issues,
+  lease obligations/events, and packet records instead of envelope-only stubs.
+- Added pure project-record adapters and projections under
+  `src/project-records`: current `WorkspaceData` can be validated into
+  backend-spine records without serializing blobs, and `MathInputView`,
+  `OpinionDraft`, `ObligationCalendar`, `AbstractorPackage`, packet export, AI
+  context, and structural citation-verifier contracts are defined read-side.
+- Documented the future `.landroid` project-record migration strategy. Phase 1
+  keeps the live package format at v8 and makes no UI/store/runtime source of
+  truth change.
+
 ## 2026-05-30
 
 - Requested persistent browser storage on startup via the Storage API where
