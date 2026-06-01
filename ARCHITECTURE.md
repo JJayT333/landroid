@@ -98,8 +98,13 @@ Target rebuild boundaries:
   artifacts, and deterministic packet manifests. The current evidence-vault
   adapter projects registry documents, owner documents, map assets, and
   research imports into shared `document` / `document_link` / `vault_object`
-  records without changing v8 `.landroid` or Dexie side-store authority.
-  Search indexes and packet exports are rebuildable derivatives.
+  records without changing v8 `.landroid` or Dexie side-store authority. The
+  OCR/text citation foundation adds `extraction_run` records, separate
+  selectable-PDF text versus scanned-PDF OCR modes, derivative vault-object
+  kinds, and page/span/polygon citation anchors through pure project-record
+  helpers only. No OCR subprocess, cloud OCR upload, store migration, or
+  `.landroid` format change is wired yet. Search indexes and packet exports are
+  rebuildable derivatives.
 - Action layer: typed `ActionPlan` previews and durable `ActionRecord`s over
   records. Meaningful approved changes should also be able to produce
   append-only audit events with hash continuity.
@@ -295,6 +300,9 @@ Target AI evidence policy:
 - Every displayed answer should pass a `CitationVerifier` boundary. Material
   claims must trace to a source citation, record ID, deterministic math result,
   approved action record, or explicit curative issue.
+- Document-text citations with an `extractionRunId` must also have a successful
+  or partial extraction run, at least one derivative vault object, and a page
+  plus character-span anchor before the verifier treats them as supported.
 - Retrieval should be hybrid: exact/keyword search, vector recall, record
   traversal tools, deterministic math tools, and rank fusion before answer
   generation.

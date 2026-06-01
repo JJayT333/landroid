@@ -1276,6 +1276,18 @@ Exit gate:
 - AI document-text answers remain disabled until citations can be verified
 - cloud OCR data residency and retention risks are documented before any upload
 
+Implementation state:
+
+- The record foundation is additive: `extraction_run`, OCR/text derivative
+  vault-object kinds, and page/span/polygon citation anchors are modeled without
+  changing live stores or `.landroid` package format.
+- Local extraction remains the default. Selectable-PDF text and scanned-PDF OCR
+  are separate modes; no OCR subprocess is invoked by the app yet.
+- Cloud OCR is interface-only and requires explicit per-document opt-in risk
+  fields before any future upload path can exist.
+- AI document-text answers remain disabled; the citation verifier now rejects
+  document-text citations that lack extraction-run output and page/span anchors.
+
 ### Phase 3: ImportSession, Source Review, And ActionPlan
 
 Goal: turn uploads into reviewable staged work, not blind mutation.

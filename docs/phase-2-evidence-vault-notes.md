@@ -35,3 +35,49 @@ Assumptions recorded during implementation:
   writer is still a later packaging step.
 - `VaultObject.derivedFromVaultObjectId` is optional and backward-compatible;
   no derivative objects are emitted until OCR/text/packet-copy artifacts exist.
+
+## OCR/Text Citation Foundation
+
+The OCR/text citation workstream is still additive and rollback-safe:
+
+- `src/backend-spine/contracts.ts` now includes an `extraction_run` record type,
+  OCR/text derivative object kinds, citation `createdAt` / `createdBy`, and
+  citation-anchor `vaultObjectId` plus polygon support.
+- `src/project-records/extraction-runs.ts` is a pure record builder only. It
+  records local extraction lineage and derivative vault objects but does not
+  invoke OCR tools, mutate originals, write Dexie rows, change `.landroid`
+  package format, or call any cloud service.
+- Selectable-PDF extraction is modeled separately from scanned-PDF OCR:
+  `selectable_pdf_text` emits text derivatives, while `scanned_pdf_ocr` can emit
+  searchable PDF, hOCR JSON, text JSON/text file, and page-image derivatives.
+- Every derivative vault object emitted by the builder references the original
+  object through `derivedFromVaultObjectId`; original vault objects are never
+  replaced.
+- Failed or canceled runs are allowed to emit only the failed `extraction_run`
+  record. Derivative vault objects and citations are rejected for failed or
+  canceled runs.
+- Source citations produced from document text carry `documentVersionId`,
+  `extractionRunId`, page, quoted-text hash, and one or more `citation_anchor`
+  records with page and character span.
+
+Local Mac tooling checkpoint from this workspace on 2026-06-01:
+
+- Present: Tesseract 5.5.2 with `eng`, `osd`, and `snum` language data.
+- Present: Poppler 26.04.0 tools `pdftotext`, `pdfimages`, and `pdftoppm`.
+- Present: qpdf 12.3.2.
+- Present: Ghostscript 10.07.0.
+- Present: Python 3.13.9 from Anaconda.
+- Missing: `ocrmypdf`.
+- Missing: `mutool`.
+
+Implementation implication:
+
+- `pdftotext` is the local default path for embedded/selectable PDF text.
+- `pdftoppm`/`pdfimages` plus Tesseract are the local default path for scanned
+  PDF OCR text/hOCR/page images.
+- Searchable PDF output should wait for `ocrmypdf` or an equivalent local
+  pipeline before engine integration claims that derivative.
+- Cloud OCR remains interface-only. No upload path exists. Any future cloud
+  provider must be explicit per document and must record provider name,
+  user approval, data-residency warning acceptance, and retention-policy
+  acknowledgement before upload.

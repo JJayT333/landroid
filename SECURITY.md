@@ -216,9 +216,18 @@ Known risk:
 - OCR text, extracted JSON, hOCR, embeddings, and vector/keyword indexes are
   sensitive derived data. Treat them as project data even if they can be
   rebuilt from originals.
+- The current OCR/text citation foundation is local-first and record-only:
+  selectable-PDF extraction and scanned-PDF OCR are separate local modes,
+  derivatives point back to immutable originals, and failed/canceled runs cannot
+  emit derivative vault objects or citations. The app does not run OCR tools or
+  upload documents in this slice.
 - Cloud OCR must be per-document opt-in, with provider, retention, logging,
   training-use, region/data-residency, and deletion expectations documented
   before upload.
+- Cloud OCR is currently interface-only. Any future cloud extraction run must
+  record a per-document user opt-in, provider name, data-residency warning
+  acceptance, and retention-policy acknowledgement before an upload path exists
+  in code. There is no ambient cloud fallback.
 - Backend object storage, if added later, must use private buckets/containers,
   server-side authorization, short-lived signed URLs where needed, encryption at
   rest, and manifest/hash verification. Do not make browser-public object paths

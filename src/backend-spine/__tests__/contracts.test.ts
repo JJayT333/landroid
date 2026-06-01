@@ -72,6 +72,24 @@ function candidateFor(recordType: string) {
         byteLength: 1,
         storageRef: 'documents/originals/contract.pdf',
       };
+    case 'extraction_run':
+      return {
+        ...base,
+        extractionRunId: 'extraction-run-1',
+        documentId: 'document-1',
+        inputDocumentVersionId: 'document-version-1',
+        inputVaultObjectId: 'vault-1',
+        extractionMode: 'selectable_pdf_text',
+        engine: 'pdftotext',
+        engineVersion: '26.04.0',
+        parameters: { layout: true },
+        providerDecision: { providerKind: 'local', providerName: 'pdftotext' },
+        status: 'succeeded',
+        startedAt: now,
+        completedAt: now,
+        confidenceSummary: { pageCount: 1 },
+        outputVaultObjectIds: ['vault-text-1'],
+      };
     case 'document_link':
       return {
         ...base,
@@ -358,6 +376,33 @@ describe('backend spine contracts', () => {
       BackendSpineCoreRecordSchema.safeParse({
         ...candidateFor('lease'),
         arbitraryLeasePayload: true,
+      }).success
+    ).toBe(false);
+  });
+
+  it('requires cloud extraction runs to carry explicit document opt-in risk fields', () => {
+    expect(
+      BackendSpineCoreRecordSchema.safeParse({
+        ...candidateFor('extraction_run'),
+        providerDecision: {
+          providerKind: 'cloud',
+          providerName: 'Cloud OCR',
+          optInDocumentId: 'document-1',
+          approvedAt: now,
+          approvedBy: 'user',
+          dataResidencyWarningAccepted: true,
+          retentionPolicyAcknowledged: true,
+          retentionPolicyNote: 'Provider retention reviewed for this document.',
+        },
+      }).success
+    ).toBe(true);
+    expect(
+      BackendSpineCoreRecordSchema.safeParse({
+        ...candidateFor('extraction_run'),
+        providerDecision: {
+          providerKind: 'cloud',
+          providerName: 'Cloud OCR',
+        },
       }).success
     ).toBe(false);
   });

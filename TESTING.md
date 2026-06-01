@@ -28,7 +28,7 @@ npm run test:e2e
 | Minimal backend-spine implementation | `npm run lint`, targeted shared-schema/adapter/app-contract tests, `cd backend/spine && npm ci && npm audit --omit=dev && npm test && npm run build && npm run bundle`, `npm run deploy:check`, root `npm test` if frontend contract code changes, and no hosted-deploy claim without `DEPLOYMENT_STATE.md` plus smoke evidence |
 | Project record schema foundation | `npm run lint`, `npm test -- src/backend-spine/__tests__/contracts.test.ts src/project-records/__tests__/workspace-record-adapter.test.ts src/storage/__tests__/workspace-shards.test.ts src/phase0/__tests__/vulcan-mesa-fixtures.test.ts`, then `npm test` and `npm run build` before handoff |
 | Phase 0.5 storage sharding implementation | `npm run lint`, targeted storage migration/lock/lazy-blob tests, `.landroid` round-trip tests, side-store reset tests, `npm test`, `npm run build`, relevant e2e, and Phase 0 performance-baseline comparison for project open, autosave, document registry, and `.landroid` round trip |
-| Evidence vault, OCR, packet, or AI citation implementation | `npm run lint`, `npm test -- src/project-records/__tests__/evidence-vault.test.ts` plus relevant storage/document tests, package round-trip tests, citation-verifier tests, AI tests when answer behavior changes, and targeted browser/e2e smoke for impacted flows |
+| Evidence vault, OCR, packet, or AI citation implementation | `npm run lint`, `npm test -- src/project-records/__tests__/evidence-vault.test.ts src/project-records/__tests__/extraction-runs.test.ts src/project-records/__tests__/workspace-record-adapter.test.ts` plus relevant storage/document tests, package round-trip tests, citation-verifier tests, AI tests when answer behavior changes, and targeted browser/e2e smoke for impacted flows |
 | AI tool/provider change | `npm run lint`, AI tests, relevant wizard/tool tests, approval-queue tests, and rollback check |
 | Hosted AI proxy/deploy change | `npm run deploy:check`, `cd backend/ai-proxy && npm test && npx tsc -p tsconfig.json --noEmit`, plus root `npm test` if frontend policy changes; run `bash scripts/smoke-test-hosted.sh` when network/AWS access is available |
 | Release/checkpoint | full default commands plus `npm run deploy:check` for hosted deploy candidates |
@@ -155,6 +155,10 @@ For rebuild storage and evidence-vault work, tests should cover:
 - OCR/text extraction failures leave originals usable
 - extraction runs trace from document version to derivative artifacts and source
   citations
+- selectable-PDF text extraction stays separate from scanned-PDF OCR in record
+  mode, tooling expectations, and derivative object kinds
+- cloud OCR records require explicit per-document opt-in risk fields and never
+  run as an ambient fallback
 - packet manifests, checksums, unresolved-issue files, and load-file sidecars
   are deterministic
 

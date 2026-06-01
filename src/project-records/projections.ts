@@ -9,7 +9,9 @@ import {
 import { dualDisplay, formatAsFraction } from '../engine/fraction-display';
 import type {
   BackendSpineCoreRecord,
+  CitationAnchorRecord,
   CurativeIssueRecord,
+  ExtractionRunRecord,
   InstrumentRecord,
   LeaseObligationRecord,
   ObligationEventRecord,
@@ -17,6 +19,7 @@ import type {
   PacketItemRecord,
   PacketRecord,
   SourceCitationRecord,
+  VaultObjectRecord,
 } from '../backend-spine/contracts';
 import type { OwnerWorkspaceData } from '../storage/owner-persistence';
 import type { WorkspaceData } from '../storage/workspace-persistence';
@@ -116,6 +119,7 @@ export interface CitationVerifierResult {
   confidence: SourceCitationRecord['confidence'];
   supportedCitationIds: string[];
   missingCitationIds: string[];
+  unverifiedCitationIds: string[];
 }
 
 export interface CitationVerifierOutput {
@@ -331,13 +335,61 @@ export function verifyCitationSupport(
       .filter((record): record is SourceCitationRecord => record.recordType === 'source_citation')
       .map((citation) => [citation.recordId, citation])
   );
+  const extractionRuns = new Map(
+    input.records
+      .filter((record): record is ExtractionRunRecord => record.recordType === 'extraction_run')
+      .map((run) => [run.recordId, run])
+  );
+  const vaultObjectIds = new Set(
+    input.records
+      .filter((record): record is VaultObjectRecord => record.recordType === 'vault_object')
+      .map((record) => record.recordId)
+  );
+  const anchorsByCitationId = new Map<string, CitationAnchorRecord[]>();
+  input.records
+    .filter((record): record is CitationAnchorRecord => record.recordType === 'citation_anchor')
+    .forEach((anchor) => {
+      anchorsByCitationId.set(anchor.sourceCitationId, [
+        ...(anchorsByCitationId.get(anchor.sourceCitationId) ?? []),
+        anchor,
+      ]);
+    });
+
+  const hasVerifiableDocumentTextAnchor = (citation: SourceCitationRecord): boolean => {
+    if (!citation.extractionRunId) return true;
+    const run = extractionRuns.get(citation.extractionRunId);
+    if (!run || !['succeeded', 'partial'].includes(run.status)) return false;
+    if (!run.outputVaultObjectIds.some((vaultObjectId) => vaultObjectIds.has(vaultObjectId))) {
+      return false;
+    }
+    return (anchorsByCitationId.get(citation.recordId) ?? []).some((anchor) =>
+      typeof anchor.pageNumber === 'number'
+      && typeof anchor.charStart === 'number'
+      && typeof anchor.charEnd === 'number'
+      && anchor.charEnd > anchor.charStart
+    );
+  };
+
   const results = input.claims.map((claim): CitationVerifierResult => {
-    const supportedCitationIds = claim.citationIds.filter((id) => citations.has(id));
+    const supportedCitationIds = claim.citationIds.filter((id) => {
+      const citation = citations.get(id);
+      if (!citation) return false;
+      if (citation.confidence === 'insufficient' || citation.confidence === 'conflicting') {
+        return false;
+      }
+      return hasVerifiableDocumentTextAnchor(citation);
+    });
     const missingCitationIds = claim.citationIds.filter((id) => !citations.has(id));
+    const unverifiedCitationIds = claim.citationIds.filter((id) => {
+      const citation = citations.get(id);
+      return citation
+        ? !supportedCitationIds.includes(id) && !missingCitationIds.includes(id)
+        : false;
+    });
     const confidence: SourceCitationRecord['confidence'] =
       supportedCitationIds.length === 0
         ? 'insufficient'
-        : missingCitationIds.length > 0
+        : missingCitationIds.length > 0 || unverifiedCitationIds.length > 0
           ? 'partial'
           : 'supported';
 
@@ -346,6 +398,7 @@ export function verifyCitationSupport(
       confidence,
       supportedCitationIds,
       missingCitationIds,
+      unverifiedCitationIds,
     };
   });
   const unsupported = results.filter((result) => result.confidence === 'insufficient');
@@ -362,4 +415,3 @@ export function verifyCitationSupport(
     results,
   };
 }
-

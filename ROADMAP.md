@@ -58,7 +58,13 @@ session handoff lives in `CONTINUATION-PROMPT.md`.
   events, and deterministic packet manifests. The first additive adapter now
   projects registry documents, owner documents, map assets, and research
   imports into shared project-record document/link/vault rows; live side-store
-  authority and package format migration remain deferred.
+  authority and package format migration remain deferred. OCR/text citation
+  record foundations are now local-first and additive: selectable-PDF text and
+  scanned-PDF OCR are separate extraction modes, derivatives point back to
+  originals, failed runs emit no derivatives, and document-text verifier support
+  requires extraction-run plus page/span anchors. Actual OCR engine execution,
+  searchable PDF generation, search indexes, and AI document Q&A remain
+  deferred gates.
 - Validate and review the Phase 7A document registry MVP from
   `codex/document-registry-build-2026-05-16`: flat document index, saved
   views, metadata editing, duplicate surfacing, linked-node display, and packet
@@ -89,10 +95,11 @@ session handoff lives in `CONTINUATION-PROMPT.md`.
   after a separate migration gate.
 - Add import-manifest previews for large document sources such as ArcGIS
   attachment tables, Dropbox/local folders, and selected source packets.
-- Design OCR/text indexing after the document registry exists; AI document
-  query should return citations and stay read-only by default. Until OCR/text
-  anchors exist, AI may cite structured records and source attestations but not
-  unsupported document text spans.
+- Build the local OCR/text engine integration after the record foundation:
+  use local tooling first, support embedded/selectable PDF extraction separately
+  from scanned-PDF OCR, add searchable PDF generation only after a local tool
+  path is available, and keep AI document query disabled until citation
+  verification is wired through the UI path.
 - Design the hybrid retrieval contract for future AI Q&A: exact/keyword search,
   vector recall, graph/schema traversal tools, deterministic math tools, rank
   fusion, and a `CitationVerifier` gate before answers display.
