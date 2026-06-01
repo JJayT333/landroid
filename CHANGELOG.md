@@ -5,6 +5,15 @@ stay short.
 
 ## 2026-06-01
 
+- Added native attorney-packet packaging (finishes the deferred Phase 2 export
+  step). `buildAttorneyPacketArchive` turns the deterministic packet projection
+  into a downloadable, reproducible store-only ZIP: native originals (unaltered),
+  the manifest JSON, a `checksums.sha256` file, and source-citation /
+  unresolved-issue / optional eDiscovery sidecars. Every native file is verified
+  against its recorded SHA-256 while packing (a mismatch throws rather than
+  emitting a corrupt packet). Dependency-free, local-only, additive; the live
+  store cutover remains deferred to Phase 4.
+
 - Added Phase 3 import-session staging. Synthetic uploads can now be modeled as
   recurring runsheet or title-opinion source packages with immutable source rows
   and excerpts, staged candidates with confidence and blocking questions,
