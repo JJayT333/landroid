@@ -85,6 +85,14 @@ Rules:
   document rows/chips, fractional values, leasehold rows, curative issues, and
   research records. Entity context should be preloaded and citation-verified
   before answers are displayed.
+- Workspace-wide AI query from any screen (user request, 2026-05-31): let the AI
+  answer about anything in the project -- owners, leases, documents, curative,
+  maps, research, federal leasing, and the full ownership graph -- not just the
+  active Desk Map, and make the Ask AI panel reachable from every screen. Today
+  `buildAIAppContext` (`src/ai/app-context.ts`) is Desk-Map-scoped, so this needs
+  a broader, scoped context builder. Watch the token budget and the hosted
+  context-minimization/privacy concern from the 2026-05-31 audit (LLA-M09): keep
+  it opt-in/scoped rather than dumping the whole workspace every turn.
 - Persistent workspace chat history: local IndexedDB storage first, exportable
   with the workspace when intended, and still governed by provider/security
   policy.
