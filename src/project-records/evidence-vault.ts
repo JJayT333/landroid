@@ -211,6 +211,7 @@ function sortRecords(records: BackendSpineCoreRecord[]): BackendSpineCoreRecord[
     [
       'document',
       'vault_object',
+      'extraction_run',
       'document_version',
       'document_link',
       'source_citation',

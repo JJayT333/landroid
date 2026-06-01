@@ -7,11 +7,10 @@ Use this file to resume the active workstream in a new chat. Read it with
 
 ## Current Branch
 
-`feat/phase-2-document-vault` — Evidence Vault / document packet projection work
-is in progress for review. Do not merge from this branch without reviewer
-approval. The Phase 0.5 storage-sharding stack is already merged to `main`
-(2026-05-30), and Phase 1 project-record schema foundations are merged to
-`main` before this branch.
+`feat/phase-2.5-ocr-citation-anchors` — OCR/text extraction and citation-anchor
+record foundation is ready for Claude review. Do not merge from this branch in
+Codex. Phases 0, 0.5, 0.75, 1, and 2 are already merged to `main`; this branch
+was created from local `main` on 2026-06-01.
 
 Merged to `main` (squash; each validated by CI = lint + test + build):
 
@@ -34,39 +33,65 @@ main push/deploy.
 
 ## Current Workstream
 
-Evidence Vault projection work is active on this branch. The goal is additive
-document-vault and attorney-packet records beside the existing app: no UI
-migration, no Zustand store migration, no `.landroid` format change, and no
-destructive side-store rewrite.
+OCR/text citation foundation is active on this branch. The goal is to make
+document text evidence citeable without sending project documents to cloud
+services by default. This branch is additive only: no UI migration, no Zustand
+store migration, no `.landroid` format change, no OCR subprocess execution, no
+cloud upload path, and no destructive side-store rewrite.
 
-Current Evidence Vault implementation state:
+Current implementation state:
 
-- `src/project-records/evidence-vault.ts` projects registry documents, owner
-  documents, map assets, and research imports into shared `document`,
-  `document_version`, `vault_object`, and `document_link` records.
-- Existing registry document hashes are preserved; blob-backed owner/map/research
-  side-store hashes are computed from current blobs when the projection builds.
-- `document_link` removal in the project-record layer removes only links. Shared
-  documents, versions, and vault objects remain; the existing live document
-  store still deletes a document only when a node/tract delete leaves no
-  surviving links.
-- Attorney packet export is modeled as deterministic JSON manifest projection
-  with SHA-256 manifest hash, packet records/items/exports, source-citation
-  sidecars, unresolved curative issue summaries, and optional eDiscovery
-  sidecars. Native ZIP/PDF packaging is still deferred.
-- `VaultObject.derivedFromVaultObjectId` is available for later OCR/text/packet
-  derivatives but no derivative rows are emitted yet.
-- Assumptions are recorded in `docs/phase-2-evidence-vault-notes.md`.
-- Validation passed: `npm run lint`,
-  `npm test -- src/backend-spine/__tests__/contracts.test.ts src/project-records/__tests__/workspace-record-adapter.test.ts src/project-records/__tests__/evidence-vault.test.ts src/documents/__tests__/document-registry.test.ts src/storage/__tests__/document-store.test.ts src/storage/__tests__/workspace-persistence.test.ts src/storage/__tests__/document-migration.test.ts src/store/__tests__/workspace-store-doc-actions.test.ts src/phase0/__tests__/vulcan-mesa-fixtures.test.ts`.
-  Full validation also passed: `npm test`, `npm run build`, and
-  `npm run test:e2e` (after updating stale Playwright PDF-chip selectors to use
-  stable attachment IDs and visible filenames).
+- `src/backend-spine/contracts.ts` adds `extraction_run`, local/cloud provider
+  decision metadata, confidence summaries, derivative OCR/text vault-object
+  kinds, source-citation creation metadata, and citation-anchor `vaultObjectId`
+  plus polygon support.
+- `src/project-records/extraction-runs.ts` adds a pure local-first builder for
+  extraction-run lineage, derivative vault objects, source citations, and
+  anchors. It keeps `selectable_pdf_text` separate from `scanned_pdf_ocr`.
+- Derivative objects reference the original via `derivedFromVaultObjectId`.
+  Failed or canceled runs cannot emit derivatives or citations.
+- Cloud OCR remains interface-only. The schema requires per-document user
+  opt-in, provider, data-residency warning acceptance, and retention-policy
+  acknowledgement, but no upload path or fallback exists.
+- `verifyCitationSupport` now rejects document-text citations until the record
+  set includes a successful/partial extraction run, an output vault object, and
+  page plus character-span anchors.
+- AI document-text answers remain disabled. This branch only tightens the
+  record/verifier prerequisites.
 
-Before handoff, commit reviewable chunks on this branch. Existing untracked
-local noise was present before this work and should remain excluded unless the
-user explicitly asks:
-`docs/archive/audits/LINE_BY_LINE_AUDIT_2026-05-31.md` and `scripts/springhill/`.
+Local Mac tooling checkpoint:
+
+- Present: Tesseract 5.5.2 with `eng`, `osd`, `snum`.
+- Present: Poppler 26.04.0 tools `pdftotext`, `pdfimages`, `pdftoppm`.
+- Present: qpdf 12.3.2, Ghostscript 10.07.0, Python 3.13.9.
+- Missing: `ocrmypdf` and `mutool`. Searchable PDF generation should wait for
+  `ocrmypdf` or an equivalent local pipeline before engine integration.
+
+Validation passed:
+
+- `npm test -- src/backend-spine/__tests__/contracts.test.ts src/project-records/__tests__/workspace-record-adapter.test.ts src/project-records/__tests__/evidence-vault.test.ts src/project-records/__tests__/extraction-runs.test.ts`
+  - passed, 4 files / 20 tests.
+- `npm run lint` - passed.
+- `npm test` - passed, 99 files / 737 tests. Existing intentional stderr
+  coverage for simulated Dexie failures appeared.
+- `npm run build` - passed with existing Vite dynamic/static import warnings,
+  chunk-size warning, and Node `module.register()` deprecation warning.
+- `git diff --check` - passed.
+- `git diff --check -- '*.md' 'docs/**/*.md'` - passed.
+
+Not run: Playwright e2e, because this branch does not change UI workflows.
+
+Open review notes:
+
+- Check whether the additive `extraction_run` schema should remain contract
+  version 1 until a server storage/sync cutover, or whether the reviewer wants a
+  version bump before any hosted validation path accepts these records.
+- Actual OCR engine execution, searchable PDF generation, storage writes,
+  indexes, and AI document Q&A are intentionally deferred.
+- Existing untracked local noise was present before this work and should remain
+  excluded unless the user explicitly asks:
+  `docs/archive/audits/LINE_BY_LINE_AUDIT_2026-05-31.md` and
+  `scripts/springhill/`.
 
 Earlier Phase 0 rebuild planning reconciliation adopted Claude's
 `docs/phase-0-inventory.md` as the draft master Phase 0 inventory and updated

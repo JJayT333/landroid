@@ -292,5 +292,99 @@ describe('Phase 1 project-record adapter', () => {
       ],
     });
   });
-});
 
+  it('blocks document-text citations until extraction runs and span anchors verify', () => {
+    const citation = BackendSpineCoreRecordSchema.parse({
+      ...envelope('source_citation'),
+      documentId: 'document-1',
+      documentVersionId: 'document-version-1',
+      extractionRunId: 'extraction_run-1',
+      pageNumber: 1,
+      confidence: 'supported',
+    }) as BackendSpineCoreRecord;
+    const blocked = verifyCitationSupport({
+      records: [citation],
+      claims: [
+        {
+          claimId: 'claim-1',
+          text: 'The document says the royalty is one-eighth.',
+          citationIds: [citation.recordId],
+        },
+      ],
+    });
+
+    expect(blocked).toMatchObject({
+      ok: false,
+      failureBehavior: 'block_answer',
+      results: [
+        {
+          claimId: 'claim-1',
+          confidence: 'insufficient',
+          unverifiedCitationIds: [citation.recordId],
+        },
+      ],
+    });
+
+    const run = BackendSpineCoreRecordSchema.parse({
+      ...envelope('extraction_run'),
+      extractionRunId: 'extraction_run-1',
+      documentId: 'document-1',
+      inputDocumentVersionId: 'document-version-1',
+      inputVaultObjectId: 'vault-original-1',
+      extractionMode: 'selectable_pdf_text',
+      engine: 'pdftotext',
+      engineVersion: '26.04.0',
+      parameters: {},
+      providerDecision: { providerKind: 'local', providerName: 'pdftotext' },
+      status: 'succeeded',
+      startedAt: NOW,
+      completedAt: NOW,
+      confidenceSummary: { pageCount: 1 },
+      outputVaultObjectIds: ['vault-text-1'],
+    }) as BackendSpineCoreRecord;
+    const textVaultObject = BackendSpineCoreRecordSchema.parse({
+      ...envelope('vault_object'),
+      recordId: 'vault-text-1',
+      objectId: 'vault-text-1',
+      objectKind: 'text_file',
+      derivedFromVaultObjectId: 'vault-original-1',
+      contentHash: HASH,
+      byteLength: 128,
+      storageRef: 'documents/document-1/extractions/text.txt',
+      localOnly: true,
+    }) as BackendSpineCoreRecord;
+    const anchor = BackendSpineCoreRecordSchema.parse({
+      ...envelope('citation_anchor'),
+      sourceCitationId: citation.recordId,
+      vaultObjectId: 'vault-text-1',
+      pageNumber: 1,
+      charStart: 10,
+      charEnd: 42,
+      bbox: [10, 20, 200, 40],
+    }) as BackendSpineCoreRecord;
+
+    expect(
+      verifyCitationSupport({
+        records: [citation, run, textVaultObject, anchor],
+        claims: [
+          {
+            claimId: 'claim-1',
+            text: 'The document says the royalty is one-eighth.',
+            citationIds: [citation.recordId],
+          },
+        ],
+      })
+    ).toMatchObject({
+      ok: true,
+      failureBehavior: 'allow_answer',
+      results: [
+        {
+          claimId: 'claim-1',
+          confidence: 'supported',
+          supportedCitationIds: [citation.recordId],
+          unverifiedCitationIds: [],
+        },
+      ],
+    });
+  });
+});

@@ -5,6 +5,13 @@ stay short.
 
 ## 2026-06-01
 
+- Added the local-first OCR/text citation foundation. Backend-spine records now
+  model `extraction_run` lineage, derivative OCR/text vault objects, source
+  citation creation metadata, and page/span/polygon anchors. The pure extraction
+  builder keeps selectable-PDF text separate from scanned-PDF OCR, preserves
+  originals through `derivedFromVaultObjectId`, records failures without
+  derivatives, and leaves cloud OCR as per-document opt-in metadata only. AI
+  document-text answers remain disabled until the UI path can verify citations.
 - Added the first Evidence Vault project-record adapter. Registry documents,
   owner documents, map assets, and research imports now project into shared
   `document`, `document_version`, `vault_object`, and `document_link` records
