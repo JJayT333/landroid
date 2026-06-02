@@ -7,11 +7,13 @@ import {
   deleteMapAsset,
   deleteMapReference,
   deleteMapRegion,
-  loadMapWorkspaceData,
+  loadMapAssetsWithBlobs,
+  loadMapWorkspaceMetadata,
   replaceMapWorkspaceData,
   saveMapAsset,
   saveMapReference,
   saveMapRegion,
+  updateMapAssetFields,
   type MapWorkspaceData,
 } from '../storage/map-persistence';
 import {
@@ -19,6 +21,7 @@ import {
   normalizeMapExternalReference,
   normalizeMapRegion,
   type MapAsset,
+  type MapAssetMeta,
   type MapExternalReference,
   type MapRegion,
 } from '../types/map';
@@ -30,9 +33,14 @@ function touch<T extends { updatedAt: string }>(record: T): T {
   };
 }
 
+function toMapAssetMeta(asset: MapAsset): MapAssetMeta {
+  const { blob: _blob, ...meta } = asset;
+  return meta;
+}
+
 interface MapState {
   workspaceId: string | null;
-  mapAssets: MapAsset[];
+  mapAssets: MapAssetMeta[];
   mapRegions: MapRegion[];
   mapReferences: MapExternalReference[];
   _hydrated: boolean;
@@ -61,7 +69,9 @@ interface MapState {
   unlinkLease: (id: string) => Promise<void>;
 }
 
-function ensureFeaturedAsset(assets: MapAsset[]): MapAsset[] {
+function ensureFeaturedAsset<T extends { id: string; isFeatured: boolean }>(
+  assets: T[]
+): T[] {
   if (assets.length === 0) return [];
   if (assets.some((asset) => asset.isFeatured)) return assets;
   return assets.map((asset, index) =>
@@ -69,7 +79,10 @@ function ensureFeaturedAsset(assets: MapAsset[]): MapAsset[] {
   );
 }
 
-function sameFeaturedState(left: MapAsset[], right: MapAsset[]): boolean {
+function sameFeaturedState<T extends { id: string; isFeatured: boolean }>(
+  left: T[],
+  right: T[]
+): boolean {
   if (left.length !== right.length) return false;
   return left.every((asset, index) => {
     const candidate = right[index];
@@ -81,8 +94,20 @@ function sameFeaturedState(left: MapAsset[], right: MapAsset[]): boolean {
   });
 }
 
-async function persistAssets(assets: MapAsset[]): Promise<void> {
-  await Promise.all(assets.map((asset) => saveMapAsset(asset)));
+/**
+ * Persist only the `isFeatured` flag for each asset via a blob-preserving
+ * partial update. Replaces the old full-row `put` so the metadata-first store
+ * (which holds blob-free assets) never wipes stored blobs on a featured
+ * toggle. Asset rows must already exist in Dexie.
+ */
+async function persistFeaturedFlags(
+  assets: ReadonlyArray<{ id: string; isFeatured: boolean }>
+): Promise<void> {
+  await Promise.all(
+    assets.map((asset) =>
+      updateMapAssetFields(asset.id, { isFeatured: asset.isFeatured })
+    )
+  );
 }
 
 export const useMapStore = create<MapState>()((set, get) => ({
@@ -93,10 +118,10 @@ export const useMapStore = create<MapState>()((set, get) => ({
   _hydrated: false,
 
   setWorkspace: async (workspaceId) => {
-    const data = await loadMapWorkspaceData(workspaceId);
+    const data = await loadMapWorkspaceMetadata(workspaceId);
     const featuredAssets = ensureFeaturedAsset(data.mapAssets);
     if (!sameFeaturedState(data.mapAssets, featuredAssets)) {
-      await persistAssets(featuredAssets);
+      await persistFeaturedFlags(featuredAssets);
     }
     set({
       workspaceId,
@@ -123,34 +148,44 @@ export const useMapStore = create<MapState>()((set, get) => ({
     await replaceMapWorkspaceData(workspaceId, normalizedData);
     set({
       workspaceId,
-      mapAssets: normalizedData.mapAssets,
+      mapAssets: normalizedData.mapAssets.map(toMapAssetMeta),
       mapRegions: normalizedData.mapRegions,
       mapReferences: normalizedData.mapReferences,
       _hydrated: true,
     });
   },
 
-  exportWorkspaceData: async () => ({
-    mapAssets: get().mapAssets,
-    mapRegions: get().mapRegions,
-    mapReferences: get().mapReferences,
-  }),
+  exportWorkspaceData: async () => {
+    const { workspaceId, mapRegions, mapReferences } = get();
+    // Re-read blob-bearing assets from Dexie: the in-memory store holds
+    // metadata only, but `.landroid` export and the AI undo snapshot must
+    // carry the file bytes.
+    const mapAssets = workspaceId
+      ? await loadMapAssetsWithBlobs(workspaceId)
+      : [];
+    return { mapAssets, mapRegions, mapReferences };
+  },
 
   addAsset: async (asset) => {
     const workspaceId = get().workspaceId ?? asset.workspaceId;
     const state = get();
+    // `next` keeps the blob for the Dexie insert; the store holds metadata.
     const next = normalizeMapAsset({
       ...asset,
       workspaceId,
       isFeatured:
         asset.isFeatured || !state.mapAssets.some((candidate) => candidate.isFeatured),
     });
+    const nextMeta = toMapAssetMeta(next);
     const nextAssets = ensureFeaturedAsset(
-      [next, ...state.mapAssets].map((candidate) =>
-        next.isFeatured ? { ...candidate, isFeatured: candidate.id === next.id } : candidate
+      [nextMeta, ...state.mapAssets].map((candidate) =>
+        nextMeta.isFeatured
+          ? { ...candidate, isFeatured: candidate.id === nextMeta.id }
+          : candidate
       )
     );
-    await persistAssets(nextAssets);
+    await saveMapAsset(next); // insert the new row WITH its blob first
+    await persistFeaturedFlags(nextAssets); // then sync featured flags
     set({ mapAssets: nextAssets });
   },
 
@@ -158,8 +193,11 @@ export const useMapStore = create<MapState>()((set, get) => ({
     const state = get();
     const current = state.mapAssets.find((asset) => asset.id === id);
     if (!current) return;
-    const next = normalizeMapAsset(
-      touch({ ...current, ...fields, workspaceId: current.workspaceId })
+    const { blob: _blob, ...metaFields } = fields;
+    const next = toMapAssetMeta(
+      normalizeMapAsset(
+        touch({ ...current, ...metaFields, workspaceId: current.workspaceId })
+      )
     );
     const nextAssets = ensureFeaturedAsset(
       state.mapAssets.map((asset) => {
@@ -170,7 +208,9 @@ export const useMapStore = create<MapState>()((set, get) => ({
         return candidate;
       })
     );
-    await persistAssets(nextAssets);
+    // Metadata-only partial update preserves the stored blob.
+    await updateMapAssetFields(id, next);
+    await persistFeaturedFlags(nextAssets);
     set({ mapAssets: nextAssets });
   },
 
@@ -180,7 +220,7 @@ export const useMapStore = create<MapState>()((set, get) => ({
     const nextAssets = ensureFeaturedAsset(
       state.mapAssets.filter((asset) => asset.id !== id)
     );
-    await persistAssets(nextAssets);
+    await persistFeaturedFlags(nextAssets);
     set({
       mapAssets: nextAssets,
       mapRegions: state.mapRegions.filter((region) => region.assetId !== id),
@@ -196,7 +236,7 @@ export const useMapStore = create<MapState>()((set, get) => ({
         isFeatured: asset.id === id,
       }))
     );
-    await persistAssets(nextAssets);
+    await persistFeaturedFlags(nextAssets);
     set({ mapAssets: nextAssets });
   },
 

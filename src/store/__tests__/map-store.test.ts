@@ -6,9 +6,12 @@ import {
 } from '../../types/map';
 
 const mocks = vi.hoisted(() => ({
-  loadMapWorkspaceData: vi.fn(),
+  loadMapWorkspaceMetadata: vi.fn(),
+  loadMapAssetsWithBlobs: vi.fn(),
+  getMapAssetBlob: vi.fn(),
   replaceMapWorkspaceData: vi.fn(),
   saveMapAsset: vi.fn(),
+  updateMapAssetFields: vi.fn(),
   saveMapRegion: vi.fn(),
   saveMapReference: vi.fn(),
   deleteMapAsset: vi.fn(),
@@ -21,9 +24,12 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('../../storage/map-persistence', () => ({
-  loadMapWorkspaceData: mocks.loadMapWorkspaceData,
+  loadMapWorkspaceMetadata: mocks.loadMapWorkspaceMetadata,
+  loadMapAssetsWithBlobs: mocks.loadMapAssetsWithBlobs,
+  getMapAssetBlob: mocks.getMapAssetBlob,
   replaceMapWorkspaceData: mocks.replaceMapWorkspaceData,
   saveMapAsset: mocks.saveMapAsset,
+  updateMapAssetFields: mocks.updateMapAssetFields,
   saveMapRegion: mocks.saveMapRegion,
   saveMapReference: mocks.saveMapReference,
   deleteMapAsset: mocks.deleteMapAsset,
@@ -73,8 +79,9 @@ describe('map-store', () => {
       label: 'RRC GIS',
     });
 
-    mocks.loadMapWorkspaceData.mockResolvedValueOnce({
-      mapAssets: [asset],
+    const { blob: _blob, ...assetMeta } = asset;
+    mocks.loadMapWorkspaceMetadata.mockResolvedValueOnce({
+      mapAssets: [assetMeta],
       mapRegions: [region],
       mapReferences: [reference],
     });
@@ -84,11 +91,14 @@ describe('map-store', () => {
     expect(useMapStore.getState().workspaceId).toBe('ws-a');
     expect(useMapStore.getState().mapAssets).toHaveLength(1);
     expect(useMapStore.getState().mapAssets[0]?.isFeatured).toBe(true);
+    // Project open holds metadata only, never the blob.
+    expect('blob' in (useMapStore.getState().mapAssets[0] ?? {})).toBe(false);
     expect(useMapStore.getState().mapRegions[0]?.id).toBe('region-1');
     expect(useMapStore.getState().mapReferences[0]?.id).toBe('ref-1');
-    expect(mocks.saveMapAsset).toHaveBeenCalledTimes(1);
-    expect(mocks.saveMapAsset.mock.calls[0]?.[0]).toMatchObject({
-      id: 'map-1',
+    // Backfilling the featured flag uses a blob-preserving partial update,
+    // not a full-row put.
+    expect(mocks.saveMapAsset).not.toHaveBeenCalled();
+    expect(mocks.updateMapAssetFields).toHaveBeenCalledWith('map-1', {
       isFeatured: true,
     });
   });
@@ -182,6 +192,68 @@ describe('map-store', () => {
     expect(useMapStore.getState().mapAssets[0]?.leaseId).toBeNull();
     expect(useMapStore.getState().mapRegions[0]?.nodeId).toBeNull();
     expect(useMapStore.getState().mapRegions[0]?.leaseId).toBeNull();
+  });
+
+  it('re-reads blob-bearing assets from storage when exporting', async () => {
+    const exported = createBlankMapAsset(
+      'ws-a',
+      new Blob(['featured'], { type: 'image/png' }),
+      {
+        fileName: 'featured.png',
+        mimeType: 'image/png',
+        overrides: { id: 'map-1', isFeatured: true },
+      }
+    );
+    mocks.loadMapAssetsWithBlobs.mockResolvedValue([exported]);
+    const { blob: _blob, ...meta } = exported;
+    useMapStore.setState({
+      workspaceId: 'ws-a',
+      // In-memory assets are metadata only; export must not rely on them.
+      mapAssets: [meta],
+      mapRegions: [],
+      mapReferences: [],
+      _hydrated: true,
+    });
+
+    const data = await useMapStore.getState().exportWorkspaceData();
+
+    expect(mocks.loadMapAssetsWithBlobs).toHaveBeenCalledWith('ws-a');
+    expect(data.mapAssets).toHaveLength(1);
+    expect(data.mapAssets[0]?.blob).toBeInstanceOf(Blob);
+  });
+
+  it('inserts a new asset with its blob, then toggles featured via partial update', async () => {
+    mocks.saveMapAsset.mockResolvedValue(undefined);
+    mocks.updateMapAssetFields.mockResolvedValue(1);
+    useMapStore.setState({
+      workspaceId: 'ws-a',
+      mapAssets: [],
+      mapRegions: [],
+      mapReferences: [],
+      _hydrated: true,
+    });
+
+    const asset = createBlankMapAsset(
+      'ws-a',
+      new Blob(['png-bytes'], { type: 'image/png' }),
+      {
+        fileName: 'new.png',
+        mimeType: 'image/png',
+        overrides: { id: 'map-new' },
+      }
+    );
+
+    await useMapStore.getState().addAsset(asset);
+
+    // The new row is inserted WITH its blob (full put)...
+    expect(mocks.saveMapAsset).toHaveBeenCalledTimes(1);
+    expect(mocks.saveMapAsset.mock.calls[0]?.[0]?.blob).toBeInstanceOf(Blob);
+    // ...and featured flags are synced via blob-preserving partial updates.
+    expect(mocks.updateMapAssetFields).toHaveBeenCalledWith('map-new', {
+      isFeatured: true,
+    });
+    // The in-memory store holds metadata only.
+    expect('blob' in (useMapStore.getState().mapAssets[0] ?? {})).toBe(false);
   });
 
   it('normalizes reference URLs before persisting them', async () => {
