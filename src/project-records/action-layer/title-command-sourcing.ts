@@ -178,13 +178,9 @@ export const TitleActionResultSchema = z
   .strict();
 export type TitleActionResult = z.infer<typeof TitleActionResultSchema>;
 
-/**
- * Monotonic fallback counter for the convenience `commandId` default. Production
- * callers SHOULD pass an explicit stable `commandId` (e.g. the store operation
- * id); the default only guarantees that two mutations with the same effect set —
- * or two no-ops — never collide into the same ActionRecord id within a process.
- */
-let titleCommandSeq = 0;
+function createDefaultTitleCommandId(mutation: TitleMutation): string {
+  return `title:${mutation}:${crypto.randomUUID()}`;
+}
 
 /** Build the typed command for a title mutation from its record-level effects. */
 export function buildTitleCommand(input: {
@@ -198,7 +194,7 @@ export function buildTitleCommand(input: {
   return parseActionCommand({
     commandId:
       input.commandId ??
-      `title:${input.mutation}:${(titleCommandSeq += 1)}:${stableEffectsKey(input.effects)}`,
+      createDefaultTitleCommandId(input.mutation),
     commandKind: COMMAND_KIND_BY_TITLE_MUTATION[input.mutation],
     surface: 'title_tree',
     origin: input.origin,
@@ -208,13 +204,6 @@ export function buildTitleCommand(input: {
     recordEffects: input.effects,
     sourceCitationIds: input.sourceCitationIds ?? [],
   });
-}
-
-function stableEffectsKey(effects: readonly RecordEffect[]): string {
-  const ids = effects.map((effect) =>
-    effect.op === 'upsert' ? effect.record.recordId : effect.recordId
-  );
-  return ids.sort().join('|').slice(0, 60) || 'noop';
 }
 
 export interface TitleMaterialization {

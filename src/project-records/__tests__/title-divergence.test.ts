@@ -75,6 +75,12 @@ describe('Phase 4 title divergence is blocked', () => {
     const a = buildTitleCommand({ mutation: 'convey', origin: 'system', effects: delta.effects });
     const b = buildTitleCommand({ mutation: 'convey', origin: 'system', effects: delta.effects });
     expect(a.commandId).not.toBe(b.commandId);
+    expect(a.commandId).toMatch(
+      /^title:convey:[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+    );
+    expect(b.commandId).toMatch(
+      /^title:convey:[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+    );
     // an explicit id is still honored verbatim
     const explicit = buildTitleCommand({
       mutation: 'convey',
