@@ -1,14 +1,16 @@
 # Phase 4 — Title-Tree Cutover (Option B, command-sourcing) — Notes
 
-Status: cutover MECHANISM built and proven in shadow. The current Zustand store
-stays canonical and the engine stays the math authority. **No live workflow was
-flipped** — `title_tree` remains `shadow`, the read path defaults to the store,
-and no live call site was rewired. Hand back to the reviewer for the flip.
+Status: cutover MECHANISM built and proven in shadow, **and the WRITE path is now
+wired live** (recording-only). The current Zustand store stays canonical for all
+READS and the engine stays the math authority. **No READ flip happened** —
+`title_tree` stays `shadow`, the read path defaults to the store. Hand back to the
+reviewer for the read-path flip.
 
-Branch: `feat/phase-4-title-cutover` (off `feat/phase-4-action-layer`).
-Additive only; **one** existing file touched (`action-layer/index.ts`, a
-re-export). Commit range: see `git log feat/phase-4-action-layer..HEAD`
-(impl → tests → docs).
+Branch: `feat/phase-4-title-cutover` (off `feat/phase-4-action-layer`). Commit
+range: see `git log feat/phase-4-action-layer..HEAD`. The first four commits are
+additive-only (one existing file touched: `action-layer/index.ts`); a later
+follow-up commit wires the live write-path journal (see "Live write-path wiring"
+below), which touches `workspace-store.ts` and `main.tsx`.
 
 ## What this delivers (maps to the brief's required work)
 
@@ -120,48 +122,87 @@ that extends the chain (history is never rewritten; double-undo is refused). The
 snapshot, not by replaying records. `title-undo.test.ts` covers append-only,
 chain extension, double-undo refusal, and non-title refusal.
 
-## Confirmation: NO live flip happened
+## Live write-path wiring (recording-only, follow-up step)
+
+After the mechanism was proven, the reviewer authorized wiring it live. The live
+WRITE path now records every successful title mutation as a durable ActionRecord;
+the READ path is untouched (still the store). Design:
+
+- **Single choke point.** Both the UI and the AI tools mutate the title tree
+  through the seven `useWorkspaceStore` methods, so the journal is wired there
+  (plus `batchAttachConveyance`, recorded as `graftToParent`). One hook captures
+  everything.
+- **Dependency-injected hook (no cycle).** `workspace-store.ts` exposes
+  `setTitleJournalHook` and calls the hook fire-and-forget AFTER its canonical
+  `set()`; it never imports the action layer. `src/store/title-action-log.ts`
+  registers the hook at app startup (`main.tsx` side-effect import) and turns each
+  mutation into a durable record via `recordTitleMutation`.
+- **Canonical store is never affected.** The hook runs after `set()`, is wrapped
+  so it cannot throw into the store, and recording is fire-and-forget + serialized
+  (so the append-only chain threads its head hash even under rapid edits).
+- **Divergence is surfaced, not swallowed (guardrail 3), and never rolls back.**
+  On a parity divergence the recorder sets `lastDivergence` + `console.error`s and
+  keeps the diverged record OUT of the ledger; the canonical store already
+  committed and reads still come from it, so surfacing (not rollback) is correct.
+- **Reversible.** `useTitleActionLog.setEnabled(false)` is a kill switch;
+  removing the `main.tsx` import unregisters the hook entirely (prior behavior).
+- **Provenance simplification (noted).** At the store choke point AI vs UI origin
+  is not distinguishable, so live records are tagged `origin: 'user'`. The gate
+  assertion still supports `origin: 'ai'` (tested in the wrapper); per-origin live
+  tagging is a later refinement (see open question 1).
+- **Scope (noted).** Only the seven typed mutations are journaled. Field-level
+  edits (`updateNode`, `rebalance`, `clearLinked*`, `syncLeaseNodesFromRecord`)
+  are not in the typed catalog and are intentionally not recorded — this is a
+  structural-mutation ledger, not yet a complete node source-of-truth (which the
+  READ-path cutover would require). See open question 6.
+
+`src/store/__tests__/title-action-log.test.ts` drives the real store for all
+seven mutations + a delete and asserts the ledger fills with a verified chain, the
+store stays canonical, a forced divergence is surfaced without rollback, and the
+kill switch works.
+
+## Confirmation: NO read flip / NO cutover happened
 
 - `LIVE_CUTOVER_DISABLED = true`; `title_tree` stays `shadow`.
-- `DEFAULT_TITLE_READ_PATH_MODE = 'shadow'`; no call site sets `cutover`.
-- The live store, AI tools, engine, adapter, and contracts are **unmodified**
-  (`git diff --name-only` shows only `action-layer/index.ts`).
-- The wrapper is proven end-to-end by driving the real store in tests, but the
-  live AI-tool/UI call sites still call the store directly — **rewiring the live
-  write path is the reviewer's flip**, the same class of decision as the read-path
-  flip (see open question 1).
+- `DEFAULT_TITLE_READ_PATH_MODE = 'shadow'`; no call site sets `cutover`; reads
+  still come from the store.
+- The write-path journal is **recording-only** and reversible (kill switch /
+  remove the startup import). The engine, adapter, and contracts are unmodified.
 
-## Existing files modified (behavior-preserving)
+## Existing files modified
 
-- `src/project-records/action-layer/index.ts` — added re-exports for the seven
-  new `title-*` modules. Pure additive barrel change; no existing export altered,
-  nothing executes at import beyond module evaluation of additive pure code (the
-  barrel already pulled `ai/tools` via `undo-boundary`, so no new side effect).
+- `src/project-records/action-layer/index.ts` — additive barrel re-exports for the
+  seven new `title-*` modules. Behavior-preserving (no existing export changed).
+- `src/store/workspace-store.ts` — added `setTitleJournalHook` + a fire-and-forget
+  `journalTitleMutation` call at the end of each successful title mutation.
+  Behavior-preserving: the hook defaults to null, runs only after the canonical
+  `set()`, and is wrapped so it can never alter the store's result or state.
+- `src/main.tsx` — one side-effect import to register the journal hook at startup.
+  Behavior-preserving: recording-only; reads and all existing flows unchanged.
 
-No other existing file changed. PII rule held: `scripts/springhill/` and all real
-`.landroid` data were never touched; every fixture is synthetic.
+PII rule held: `scripts/springhill/` and all real `.landroid` data were never
+touched; every fixture is synthetic.
 
 ## Commands & results
 
 - `npm run lint` (tsc --noEmit): clean.
-- `npm run test` (full vitest suite): **807 passing / 114 files**, including the
-  Phase 0 goldens, all Phase 4 action-layer suites, and the 23 new title-cutover
-  tests across 7 files.
+- `npm run test` (full vitest suite): **811 passing / 115 files**, including the
+  Phase 0 goldens, all Phase 4 action-layer suites, the 24 title-cutover tests
+  (7 files), and the 3 live-journal tests.
 - New suites: `title-command-sourcing`, `title-replay`, `title-divergence`,
-  `title-math-parity`, `title-cutover-gate`, `title-read-path`, `title-undo`.
+  `title-math-parity`, `title-cutover-gate`, `title-read-path`, `title-undo`,
+  `title-action-log` (live wiring).
 
 ## Open questions for the reviewer (batched, non-blocking)
 
-1. **Live write-path wiring (the headline call).** The wrapper is built and
-   proven against the real store, but the live AI tools / UI still call
-   `useWorkspaceStore` directly. Wiring `applyTitleMutation` into those call sites
-   makes "every live title mutation produces a durable record" literally true —
-   but it inserts an async, throw-on-divergence step into the (today synchronous)
-   store mutations, which is a live behavior change. Guardrails 1 & 2 ("store
-   stays canonical", "build the flip; stop before pulling it") pointed me to
-   **build + prove, don't rewire**. Confirm you want the write-path wiring done as
-   the cutover step (and whether it should block the live mutation on divergence,
-   or record-and-alert).
+1. **Read-path flip (the remaining headline call).** The write path now records
+   live (recording-only); the read path is still the store. Flipping reads to the
+   action-derived projection is the actual cutover. It is blocked until the ledger
+   is a *complete* node source-of-truth (open question 6) and a full real-data
+   parity soak is green. Also confirm the live divergence behavior is what you want
+   (currently: surface + keep the record out of the ledger, never roll back the
+   canonical store) and whether live records should distinguish AI vs UI origin
+   (currently all `'user'` at the store choke point).
 2. **Desk-map / leasehold scope at cutover.** Math parity holds the live desk
    maps + leasehold unit/assignments/orris fixed and only swaps the title node
    set, because those are not Phase 4 title surfaces. Confirm desk_map/unit stay
@@ -177,3 +218,10 @@ No other existing file changed. PII rule held: `scripts/springhill/` and all rea
    step (Phase 4 open question #4 names v9 but does not define it)?
 5. **PII.** No `scripts/springhill/` or real `.landroid` data was touched; all
    fixtures synthetic. Confirm that remains the rule through cutover.
+6. **Ledger completeness for the read flip.** The live journal records only the
+   seven structural mutations. Field-level edits (`updateNode`, `rebalance`,
+   `clearLinked*`, `syncLeaseNodesFromRecord`) are not in the typed command
+   catalog, so the ledger is not yet a complete node source-of-truth — the read
+   flip cannot be pulled until those are captured (either as new typed commands or
+   as a generic `title.update` command). This is the natural next step after this
+   one, and is the same boundary that motivates the eventual Option A reducer.

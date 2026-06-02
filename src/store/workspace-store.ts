@@ -71,6 +71,7 @@ import {
 import type { Audit } from '../types/result';
 import { createWorkspaceId } from '../utils/workspace-id';
 import { resolveActiveUnitCode } from '../utils/desk-map-units';
+import type { WorkspaceData } from '../storage/workspace-persistence';
 
 const DEFAULT_INSTRUMENT_TYPES = [
   'Deed',
@@ -361,6 +362,67 @@ function collectAncestorIds(
   }
 
   return ancestors;
+}
+
+/**
+ * Phase 4 title cutover — shadow journal hook (write-path ledger).
+ *
+ * `title-action-log.ts` registers this at app startup so every successful title
+ * mutation is recorded as a durable ActionRecord alongside the canonical store.
+ * It is dependency-injected (not imported here) to avoid a cycle, defaults to
+ * null (no recording), and is invoked fire-and-forget AFTER the canonical
+ * `set()` — it can never change the store's result or state. See
+ * docs/phase-4-title-cutover-notes.md.
+ */
+export type TitleJournalHook = (
+  mutation: string,
+  beforeWorkspace: WorkspaceData,
+  afterWorkspace: WorkspaceData
+) => void;
+
+let titleJournalHook: TitleJournalHook | null = null;
+
+export function setTitleJournalHook(hook: TitleJournalHook | null): void {
+  titleJournalHook = hook;
+}
+
+function snapshotWorkspaceData(state: WorkspaceState): WorkspaceData {
+  return {
+    workspaceId: state.workspaceId,
+    projectName: state.projectName,
+    nodes: state.nodes,
+    deskMaps: state.deskMaps,
+    leaseholdUnit: state.leaseholdUnit,
+    leaseholdAssignments: state.leaseholdAssignments,
+    leaseholdOrris: state.leaseholdOrris,
+    leaseholdTransferOrderEntries: state.leaseholdTransferOrderEntries,
+    activeDeskMapId: state.activeDeskMapId,
+    activeUnitCode: state.activeUnitCode,
+    instrumentTypes: state.instrumentTypes,
+  };
+}
+
+/**
+ * Fire-and-forget hand-off to the shadow journal. `beforeState` is the store
+ * state captured before `set()` (its arrays are retained, not mutated, by
+ * Zustand's replace), `afterState` is the post-`set()` state. Wrapped so a
+ * journal failure can never affect the canonical store.
+ */
+function journalTitleMutation(
+  mutation: string,
+  beforeState: WorkspaceState,
+  afterState: WorkspaceState
+): void {
+  if (!titleJournalHook) return;
+  try {
+    titleJournalHook(
+      mutation,
+      snapshotWorkspaceData(beforeState),
+      snapshotWorkspaceData(afterState)
+    );
+  } catch (err) {
+    console.error('[workspace-store] title journal hook threw (ignored):', err);
+  }
 }
 
 export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
@@ -776,6 +838,7 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
         lastError: null,
         ...dmUpdate,
       });
+      journalTitleMutation('convey', state, get());
       return true;
     }
     set({ lastError: result.error.message });
@@ -811,6 +874,7 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
         lastError: null,
         ...dmUpdate,
       });
+      journalTitleMutation('createNpri', state, get());
       return true;
     }
     set({ lastError: result.error.message });
@@ -856,6 +920,7 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
         lastError: null,
         ...dmUpdate,
       });
+      journalTitleMutation('createRootNode', state, get());
       return true;
     }
     set({ lastError: result.error.message });
@@ -910,6 +975,7 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
         lastError: null,
         ...dmUpdate,
       });
+      journalTitleMutation('precede', state, get());
       return true;
     }
     set({ lastError: result.error.message });
@@ -917,14 +983,15 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
   },
 
   attachConveyance: (activeNodeId, attachParentId, calcShare, form) => {
-    const { nodes } = get();
-    const result = executeAttachConveyance({ allNodes: nodes, activeNodeId, attachParentId, calcShare, form });
+    const state = get();
+    const result = executeAttachConveyance({ allNodes: state.nodes, activeNodeId, attachParentId, calcShare, form });
     if (result.ok) {
       set({
         nodes: result.data.map((node) => normalizeOwnershipNode(node)),
         lastAudit: result.audit,
         lastError: null,
       });
+      journalTitleMutation('graftToParent', state, get());
       return true;
     }
     set({ lastError: result.error.message });
@@ -935,7 +1002,8 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
     // Audit M1: either every item attaches or the store is not mutated.
     // We simulate the batch on an in-memory candidate graph; only after all
     // grafts succeed do we commit the result with a single set().
-    const initial = get().nodes;
+    const before = get();
+    const initial = before.nodes;
     let candidate: OwnershipNode[] = initial;
     const attached: string[] = [];
     const failed: Array<{ nodeId: string; reason: string }> = [];
@@ -970,6 +1038,7 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
       lastAudit: lastAudit,
       lastError: null,
     });
+    journalTitleMutation('graftToParent', before, get());
     return { ok: true, attached, failed: [] };
   },
 
@@ -1031,6 +1100,7 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
       activeDeskMapId: targetDeskMapId ?? state.activeDeskMapId,
       lastError: null,
     });
+    journalTitleMutation('attachLease', state, get());
     return newId;
   },
 
@@ -1066,6 +1136,7 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
       lastAudit: result.audit,
       lastError: null,
     });
+    journalTitleMutation('deleteNode', state, get());
     void cascadeDeleteDocsForRemovedNodes(removedNodes).catch((err) => {
       const message = err instanceof Error ? err.message : String(err);
       console.warn('[workspace-store] document cascade delete failed:', err);
