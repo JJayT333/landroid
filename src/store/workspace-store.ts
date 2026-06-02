@@ -379,11 +379,17 @@ export type TitleJournalHook = (
   beforeWorkspace: WorkspaceData,
   afterWorkspace: WorkspaceData
 ) => void;
+export type TitleActionLogResetHook = () => void;
 
 let titleJournalHook: TitleJournalHook | null = null;
+let titleActionLogResetHook: TitleActionLogResetHook | null = null;
 
 export function setTitleJournalHook(hook: TitleJournalHook | null): void {
   titleJournalHook = hook;
+}
+
+export function setTitleActionLogResetHook(hook: TitleActionLogResetHook | null): void {
+  titleActionLogResetHook = hook;
 }
 
 function snapshotWorkspaceData(state: WorkspaceState): WorkspaceData {
@@ -423,6 +429,10 @@ function journalTitleMutation(
   } catch (err) {
     console.error('[workspace-store] title journal hook threw (ignored):', err);
   }
+}
+
+function resetTitleActionLogForWorkspaceReplacement(): void {
+  titleActionLogResetHook?.();
 }
 
 export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
@@ -1371,7 +1381,8 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
   setHydrated: () => set({ _hydrated: true }),
   setStartupWarning: (startupWarning) => set({ startupWarning }),
 
-  loadWorkspace: (data) =>
+  loadWorkspace: (data) => {
+    resetTitleActionLogForWorkspaceReplacement();
     set(() => {
       const normalizedNodes = data.nodes.map((node) => normalizeOwnershipNode(node));
       const nodeIdSet = new Set(normalizedNodes.map((node) => node.id));
@@ -1431,5 +1442,6 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
         lastError: null,
         startupWarning: null,
       };
-    }),
+    });
+  },
 }));

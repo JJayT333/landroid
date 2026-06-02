@@ -41,7 +41,7 @@ import {
   type TitleMutation,
 } from '../project-records/action-layer/title-command-sourcing';
 import { useOwnerStore } from './owner-store';
-import { setTitleJournalHook } from './workspace-store';
+import { setTitleActionLogResetHook, setTitleJournalHook } from './workspace-store';
 
 type OwnerSlice = Pick<OwnerWorkspaceData, 'owners' | 'leases'>;
 
@@ -80,6 +80,11 @@ function isTitleMutation(value: string): value is TitleMutation {
   return (TITLE_MUTATIONS as readonly string[]).includes(value);
 }
 
+// Incremented on reset so in-flight recordings from a replaced workspace cannot append late.
+let ledgerGeneration = 0;
+let recordingChain: Promise<void> = Promise.resolve();
+const pending = new Set<Promise<unknown>>();
+
 export const useTitleActionLog = create<TitleActionLogState>()((set, get) => ({
   enabled: true,
   actionRecords: [],
@@ -91,7 +96,9 @@ export const useTitleActionLog = create<TitleActionLogState>()((set, get) => ({
 
   setEnabled: (enabled) => set({ enabled }),
 
-  reset: () =>
+  reset: () => {
+    ledgerGeneration += 1;
+    recordingChain = Promise.resolve();
     set({
       actionRecords: [],
       auditEvents: [],
@@ -99,9 +106,11 @@ export const useTitleActionLog = create<TitleActionLogState>()((set, get) => ({
       recordedMutationCount: 0,
       lastDivergence: null,
       lastError: null,
-    }),
+    });
+  },
 
   record: async ({ mutation, beforeWorkspace, afterWorkspace, ownerData, origin = 'user', aiToolName }) => {
+    const generationAtStart = ledgerGeneration;
     // Only mutations in the typed title catalog are representable as commands.
     if (!isTitleMutation(mutation)) return;
 
@@ -128,6 +137,7 @@ export const useTitleActionLog = create<TitleActionLogState>()((set, get) => ({
         aiToolName,
         priorHeadHash: get().headHash,
       });
+      if (generationAtStart !== ledgerGeneration) return;
       // A mutation that did not change any projected title record (e.g. an edit
       // that touched only non-projected fields, or set a field to its current
       // value) produces no effects — keep it out of the ledger.
@@ -140,6 +150,7 @@ export const useTitleActionLog = create<TitleActionLogState>()((set, get) => ({
         lastError: null,
       }));
     } catch (err) {
+      if (generationAtStart !== ledgerGeneration) return;
       const message = err instanceof Error ? err.message : String(err);
       if (err instanceof ParityDivergenceError) {
         // Guardrail 3: surface, never silently shadow. The canonical store has
@@ -163,15 +174,8 @@ function readOwnerData(): OwnerSlice {
   return { owners: owner.owners, leases: owner.leases };
 }
 
-// ---------------------------------------------------------------------------
-// Live wiring: register the workspace-store journal hook. Recordings are
-// serialized so the append-only audit chain threads its head hash correctly even
-// under rapid edits, and tracked so tests can await them (`settleTitleActionLog`).
-// ---------------------------------------------------------------------------
-
-let recordingChain: Promise<void> = Promise.resolve();
-const pending = new Set<Promise<unknown>>();
-
+// Queue recordings so the audit chain threads head hashes in mutation order.
+// Generation checks drop any queued work from a replaced workspace.
 function track(promise: Promise<unknown>): void {
   pending.add(promise);
   void promise.finally(() => pending.delete(promise));
@@ -186,14 +190,20 @@ export async function settleTitleActionLog(): Promise<void> {
 
 setTitleJournalHook((mutation, beforeWorkspace, afterWorkspace) => {
   if (!useTitleActionLog.getState().enabled) return;
+  const generationAtEnqueue = ledgerGeneration;
   const ownerData = readOwnerData();
-  recordingChain = recordingChain.then(() =>
-    useTitleActionLog.getState().record({
+  recordingChain = recordingChain.then(() => {
+    if (generationAtEnqueue !== ledgerGeneration) return;
+    return useTitleActionLog.getState().record({
       mutation,
       beforeWorkspace,
       afterWorkspace,
       ownerData,
-    })
-  );
+    });
+  });
   track(recordingChain);
+});
+
+setTitleActionLogResetHook(() => {
+  useTitleActionLog.getState().reset();
 });

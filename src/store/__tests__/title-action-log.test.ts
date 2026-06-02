@@ -59,7 +59,7 @@ vi.mock('../../project-records/action-layer/title-command-sourcing', async (impo
 import { useWorkspaceStore } from '../workspace-store';
 import { useOwnerStore } from '../owner-store';
 import { useTitleActionLog, settleTitleActionLog } from '../title-action-log';
-import { verifyAuditChain } from '../../project-records/action-layer/audit-chain';
+import { AUDIT_GENESIS_HASH, verifyAuditChain } from '../../project-records/action-layer/audit-chain';
 import { ParityDivergenceError } from '../../project-records/action-layer/parity';
 import { titleRecordsFromWorkspace } from '../../project-records/action-layer/title-projection';
 import { replayTitleProjection } from '../../project-records/action-layer/title-replay';
@@ -236,6 +236,75 @@ describe('Phase 4 LIVE title journal (real store auto-records)', () => {
     await settleTitleActionLog();
 
     expect(useTitleActionLog.getState().recordedMutationCount).toBe(countAfterCreate);
+  });
+
+  it('resets the ledger and audit chain when a workspace is replaced', async () => {
+    const store = () => useWorkspaceStore.getState();
+    store().createRootNode('root-a', '1', { grantee: 'Root A', linkedOwnerId: 'owner-1' });
+    await settleTitleActionLog();
+
+    const workspaceAHeadHash = useTitleActionLog.getState().headHash;
+    expect(workspaceAHeadHash).toBeDefined();
+
+    let releaseOldRecording: () => void = () => {};
+    let markOldRecordingStarted: () => void = () => {};
+    const oldRecordingStarted = new Promise<void>((resolve) => {
+      markOldRecordingStarted = resolve;
+    });
+    const releaseOldRecordingWait = new Promise<void>((resolve) => {
+      releaseOldRecording = resolve;
+    });
+    recordSpy.current = vi.fn(async (...args: Parameters<NonNullable<typeof recordSpy.real>>) => {
+      markOldRecordingStarted();
+      await releaseOldRecordingWait;
+      return recordSpy.real!(...args);
+    });
+
+    store().convey('root-a', 'child-a', '0.5', { grantee: 'Child A' });
+    await oldRecordingStarted;
+
+    useWorkspaceStore.getState().loadWorkspace({
+      workspaceId: 'ws-b',
+      projectName: 'Workspace B',
+      nodes: [],
+      deskMaps: [
+        {
+          id: 'dm-b',
+          name: 'Tract B',
+          code: 'TB',
+          tractId: 'TB',
+          grossAcres: '',
+          pooledAcres: '',
+          description: '',
+          nodeIds: [],
+        },
+      ],
+      activeDeskMapId: 'dm-b',
+      instrumentTypes: ['Deed'],
+    });
+
+    expect(useTitleActionLog.getState().actionRecords).toHaveLength(0);
+    expect(useTitleActionLog.getState().auditEvents).toHaveLength(0);
+    expect(useTitleActionLog.getState().headHash).toBeUndefined();
+
+    releaseOldRecording();
+    await settleTitleActionLog();
+    expect(useTitleActionLog.getState().actionRecords).toHaveLength(0);
+
+    recordSpy.current = vi.fn(recordSpy.real!);
+    useOwnerStore.setState({
+      owners: [createBlankOwner('ws-b', { id: 'owner-b', name: 'Workspace B Owner', entityType: 'Company' })],
+      leases: [],
+    });
+    store().createRootNode('root-b', '1', { grantee: 'Root B', linkedOwnerId: 'owner-b' });
+    await settleTitleActionLog();
+
+    const log = useTitleActionLog.getState();
+    expect(log.actionRecords).toHaveLength(1);
+    expect(log.actionRecords[0]?.workspaceId).toBe('ws-b');
+    expect(log.auditEvents).toHaveLength(1);
+    expect(log.auditEvents[0]?.previousHash).toBe(AUDIT_GENESIS_HASH);
+    expect(log.auditEvents[0]?.previousHash).not.toBe(workspaceAHeadHash);
   });
 
   it('kill switch: setEnabled(false) stops all recording', async () => {
