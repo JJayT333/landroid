@@ -162,6 +162,58 @@ describe('AI approval previews', () => {
     expect(useAIUndoStore.getState().snapshot).toBeNull();
   });
 
+  it('blocks NPRI previews until royalty kind and fixed basis are explicit', () => {
+    const missingBranchKind = buildAIApprovalPreview('createNpri', {
+      parentNodeId: 'root',
+      share: '1/16',
+    });
+    expect(missingBranchKind).toMatchObject({
+      canApprove: false,
+      validation: expect.objectContaining({
+        status: 'blocked',
+        message: expect.stringContaining('NPRI royalty kind'),
+      }),
+    });
+
+    const missingBranchBasis = buildAIApprovalPreview('createNpri', {
+      parentNodeId: 'root',
+      share: '1/16',
+      royaltyKind: 'fixed',
+    });
+    expect(missingBranchBasis).toMatchObject({
+      canApprove: false,
+      validation: expect.objectContaining({
+        status: 'blocked',
+        message: expect.stringContaining('Fixed NPRI basis'),
+      }),
+    });
+
+    const missingRootKind = buildAIApprovalPreview('createRootNode', {
+      kind: 'npri',
+      initialFraction: '1/16',
+    });
+    expect(missingRootKind).toMatchObject({
+      canApprove: false,
+      validation: expect.objectContaining({
+        status: 'blocked',
+        message: expect.stringContaining('NPRI royalty kind'),
+      }),
+    });
+
+    const missingRootBasis = buildAIApprovalPreview('createRootNode', {
+      kind: 'npri',
+      initialFraction: '1/16',
+      royaltyKind: 'fixed',
+    });
+    expect(missingRootBasis).toMatchObject({
+      canApprove: false,
+      validation: expect.objectContaining({
+        status: 'blocked',
+        message: expect.stringContaining('Fixed NPRI basis'),
+      }),
+    });
+  });
+
   it('previews non-graph owner and lease proposals with typed blockers', () => {
     const owner = {
       ...createBlankOwner('ws-1'),

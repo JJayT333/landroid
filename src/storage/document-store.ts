@@ -197,8 +197,8 @@ export async function saveDoc(
     db.document_attachments,
     async (): Promise<SaveDocumentResult> => {
       const existingCount = await db.document_attachments
-        .where('[entityKind+entityId]')
-        .equals([input.entityKind, input.entityId])
+        .where('[workspaceId+entityKind+entityId]')
+        .equals([input.workspaceId, input.entityKind, input.entityId])
         .count();
       const attachment: DocumentAttachment = {
         attachmentId,
@@ -232,8 +232,8 @@ export async function attachDocToEntity(
       throw new Error(`attachDocToEntity: document ${docId} not found`);
     }
     const existingCount = await db.document_attachments
-      .where('[entityKind+entityId]')
-      .equals([entityKind, entityId])
+      .where('[workspaceId+entityKind+entityId]')
+      .equals([doc.workspaceId, entityKind, entityId])
       .count();
     const attachment: DocumentAttachment = {
       attachmentId: newId(),
@@ -261,7 +261,11 @@ export async function detachDocFromEntity(
     const existing = await db.document_attachments.get(attachmentId);
     if (!existing) return;
     await db.document_attachments.delete(attachmentId);
-    await compactAttachmentPositions(existing.entityKind, existing.entityId);
+    await compactAttachmentPositions(
+      existing.workspaceId,
+      existing.entityKind,
+      existing.entityId
+    );
   });
 }
 
@@ -546,14 +550,15 @@ export async function listAttachmentsForNodes(
  * appended at the end in their existing order.
  */
 export async function reorderAttachments(
+  workspaceId: string,
   entityKind: DocumentEntityKind,
   entityId: string,
   orderedAttachmentIds: ReadonlyArray<string>
 ): Promise<void> {
   await db.transaction('rw', db.document_attachments, async () => {
     const existing = await db.document_attachments
-      .where('[entityKind+entityId]')
-      .equals([entityKind, entityId])
+      .where('[workspaceId+entityKind+entityId]')
+      .equals([workspaceId, entityKind, entityId])
       .toArray();
     const byId = new Map(existing.map((a) => [a.attachmentId, a] as const));
     const seen = new Set<string>();
@@ -591,12 +596,13 @@ export async function reorderAttachments(
  * outside one.
  */
 async function compactAttachmentPositions(
+  workspaceId: string,
   entityKind: DocumentEntityKind,
   entityId: string
 ): Promise<void> {
   const remaining = await db.document_attachments
-    .where('[entityKind+entityId]')
-    .equals([entityKind, entityId])
+    .where('[workspaceId+entityKind+entityId]')
+    .equals([workspaceId, entityKind, entityId])
     .toArray();
   remaining.sort((a, b) => a.position - b.position);
   for (let i = 0; i < remaining.length; i += 1) {

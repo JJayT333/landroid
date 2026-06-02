@@ -65,6 +65,11 @@ describe('AI settings store', () => {
       model: 'gpt-4o',
       ollamaBaseURL: 'http://localhost:11434/v1',
     });
+    expect(Object.keys(persisted).sort()).toEqual([
+      'model',
+      'ollamaBaseURL',
+      'provider',
+    ]);
     expect(persisted).not.toHaveProperty('openaiApiKey');
     expect(persisted).not.toHaveProperty('anthropicApiKey');
   });

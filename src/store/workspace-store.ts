@@ -282,7 +282,7 @@ interface WorkspaceState {
    * `.landroid` import) so chips render with the current data.
    * No-op when there are no nodes in state.
    */
-  hydrateNodeAttachments: () => Promise<void>;
+  hydrateNodeAttachments: (options?: { strict?: boolean }) => Promise<void>;
   setHydrated: () => void;
   setStartupWarning: (message: string | null) => void;
   loadWorkspace: (data: {
@@ -1231,7 +1231,7 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
     const state = get();
     const node = state.nodes.find((n) => n.id === nodeId);
     if (!node) return;
-    await reorderAttachments('node', nodeId, orderedAttachmentIds);
+    await reorderAttachments(state.workspaceId, 'node', nodeId, orderedAttachmentIds);
     const byId = new Map(node.attachments.map((a) => [a.attachmentId, a] as const));
     const seen = new Set<string>();
     const reordered: NodeAttachmentSummary[] = [];
@@ -1252,12 +1252,13 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
     }));
   },
 
-  hydrateNodeAttachments: async () => {
+  hydrateNodeAttachments: async (options) => {
+    const strict = options?.strict ?? false;
     const state = get();
     if (state.nodes.length === 0) return;
     const nodeIds = state.nodes.map((n) => n.id);
     const byNodeId = await listAttachmentsForNodes(state.workspaceId, nodeIds);
-    if (byNodeId.size === 0) {
+    if (byNodeId.size === 0 && !strict) {
       // No documents touched anything in this workspace — leave the
       // existing in-memory attachments[] alone so a transient Dexie
       // read miss doesn't blank the badges for an already-loaded view.
@@ -1266,7 +1267,11 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
     set((current) => ({
       nodes: current.nodes.map((node) => {
         const fresh = byNodeId.get(node.id);
-        if (!fresh) return node;
+        if (!fresh) {
+          return strict && node.attachments.length > 0
+            ? { ...node, attachments: [] }
+            : node;
+        }
         return {
           ...node,
           attachments: fresh.map((entry) => ({

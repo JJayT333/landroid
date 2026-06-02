@@ -131,14 +131,14 @@ function previewCreateRootNode(input: unknown): AIApprovalPreview {
   const kind = enumValue<InterestClass>(data.kind, ['mineral', 'npri']) ?? 'mineral';
   const royaltyKind =
     kind === 'npri'
-      ? enumValue<Exclude<RoyaltyKind, null>>(data.royaltyKind, ['fixed', 'floating']) ?? 'fixed'
+      ? enumValue<Exclude<RoyaltyKind, null>>(data.royaltyKind, ['fixed', 'floating'])
       : null;
   const fixedRoyaltyBasis =
     kind === 'npri' && royaltyKind === 'fixed'
       ? enumValue<Exclude<FixedRoyaltyBasis, null>>(data.fixedRoyaltyBasis, [
           'burdened_branch',
           'whole_tract',
-        ]) ?? 'burdened_branch'
+        ])
       : null;
   const initialFraction = text(data.initialFraction);
   const explicitDeskMapId = optionalText(data.deskMapId);
@@ -150,6 +150,26 @@ function previewCreateRootNode(input: unknown): AIApprovalPreview {
       [
         change('Node count', state.nodes.length, state.nodes.length),
         change('Target desk map', 'missing', explicitDeskMapId, 'danger'),
+      ]
+    );
+  }
+  if (kind === 'npri' && !royaltyKind) {
+    return blockedPreview(
+      'Create root node',
+      'NPRI root',
+      'NPRI royalty kind must be explicit: fixed or floating.',
+      [change('Interest class', 'none', kind, 'danger')]
+    );
+  }
+  if (kind === 'npri' && royaltyKind === 'fixed' && !fixedRoyaltyBasis) {
+    return blockedPreview(
+      'Create root node',
+      'NPRI root',
+      'Fixed NPRI basis must be explicit: burdened_branch or whole_tract.',
+      [
+        change('Interest class', 'none', kind),
+        change('Royalty kind', 'none', royaltyKind),
+        change('Fixed basis', 'missing', 'missing', 'danger'),
       ]
     );
   }
@@ -217,16 +237,34 @@ function previewCreateNpri(input: unknown): AIApprovalPreview {
   const parentNodeId = text(data.parentNodeId);
   const share = text(data.share);
   const royaltyKind =
-    enumValue<Exclude<RoyaltyKind, null>>(data.royaltyKind, ['fixed', 'floating'])
-    ?? 'fixed';
+    enumValue<Exclude<RoyaltyKind, null>>(data.royaltyKind, ['fixed', 'floating']);
   const fixedRoyaltyBasis =
     royaltyKind === 'fixed'
       ? enumValue<Exclude<FixedRoyaltyBasis, null>>(data.fixedRoyaltyBasis, [
           'burdened_branch',
           'whole_tract',
-        ]) ?? 'burdened_branch'
+        ])
       : null;
   const parent = state.nodes.find((node) => node.id === parentNodeId) ?? null;
+  if (!royaltyKind) {
+    return blockedPreview(
+      'Create NPRI branch',
+      labelNode(parent, parentNodeId),
+      'NPRI royalty kind must be explicit: fixed or floating.',
+      [change('Royalty kind', 'none', 'missing', 'danger')]
+    );
+  }
+  if (royaltyKind === 'fixed' && !fixedRoyaltyBasis) {
+    return blockedPreview(
+      'Create NPRI branch',
+      labelNode(parent, parentNodeId),
+      'Fixed NPRI basis must be explicit: burdened_branch or whole_tract.',
+      [
+        change('Royalty kind', 'none', royaltyKind),
+        change('Fixed basis', 'missing', 'missing', 'danger'),
+      ]
+    );
+  }
   const result = executeCreateNpri({
     allNodes: state.nodes,
     parentId: parentNodeId,
@@ -248,10 +286,6 @@ function previewCreateNpri(input: unknown): AIApprovalPreview {
       change('Fixed basis', 'none', fixedRoyaltyBasis ?? 'not applicable'),
       change('Node count', state.nodes.length, result.ok ? result.data.length : state.nodes.length),
     ],
-    warnings:
-      royaltyKind === 'fixed' && !optionalText(data.fixedRoyaltyBasis)
-        ? ['Fixed NPRI basis was not explicit; LANDroid will use burdened_branch if approved.']
-        : [],
   });
 }
 
