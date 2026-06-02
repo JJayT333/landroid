@@ -37,6 +37,10 @@ import {
 } from './record-helpers';
 import { buildProjectRecordBundle, type ProjectRecordBundle } from './record-validation';
 import {
+  selectTitleProjection,
+  type TitleReadPathMode,
+} from './action-layer/title-read-path';
+import {
   buildProjectRecordsFromWorkspace,
   type WorkspaceRecordAdapterInput,
 } from './workspace-record-adapter';
@@ -58,6 +62,17 @@ export interface EvidenceVaultAdapterInput {
   syncState?: BackendSpineSyncState;
   landroidFileVersion: number;
   hashBlob?: HashBlob;
+  /**
+   * Phase 4 title read-path flip (DEFAULT shadow). Omit, or set `mode: 'shadow'`,
+   * to source title records from the current adapter (canonical). Set
+   * `mode: 'cutover'` to source them from the durable action-layer ledger
+   * (`actionRecords`) instead — the reversible read cutover. Reads are unchanged
+   * unless a caller explicitly opts in; no live caller sets `cutover`.
+   */
+  titleReadPath?: {
+    mode: TitleReadPathMode;
+    actionRecords: readonly BackendSpineCoreRecord[];
+  };
 }
 
 interface VaultLinkDraft {
@@ -593,6 +608,24 @@ export async function buildProjectRecordsWithEvidenceVault(
     if (record.recordType !== 'workspace_manifest') {
       recordsById.set(record.recordId, record);
     }
+  }
+  // Phase 4 title read-path flip (default shadow). When a caller opts into
+  // 'cutover', the title records come from the durable action-layer ledger
+  // (replayed) instead of the adapter; every other record is unchanged and the
+  // flip is reversible by `mode` alone. No live caller sets 'cutover'.
+  if (input.titleReadPath?.mode === 'cutover') {
+    const storeTitleRecords = baseBundle.records.filter(
+      (record) =>
+        record.recordType === 'instrument_record' ||
+        record.recordType === 'interest_reference'
+    );
+    const titleRecords = selectTitleProjection({
+      mode: 'cutover',
+      storeTitleRecords,
+      actionRecords: input.titleReadPath.actionRecords,
+    });
+    for (const record of storeTitleRecords) recordsById.delete(record.recordId);
+    for (const record of titleRecords) recordsById.set(record.recordId, record);
   }
   for (const record of await buildEvidenceVaultRecordsFromWorkspace(input)) {
     recordsById.set(record.recordId, record);
