@@ -73,6 +73,7 @@ export const TITLE_MUTATIONS = [
   'graftToParent',
   'deleteNode',
   'attachLease',
+  'baseline',
   // generic node field edit (updateNode / rebalance / link clears / lease resync)
   'update',
 ] as const;
@@ -88,13 +89,14 @@ export const COMMAND_KIND_BY_TITLE_MUTATION: Record<TitleMutation, ActionCommand
   graftToParent: 'title.graft_to_parent',
   deleteNode: 'title.delete_node',
   attachLease: 'title.attach_lease',
+  baseline: 'title.baseline',
   update: 'title.update',
 };
 
 /**
- * The gated AI tool each title mutation corresponds to. Every one of these is a
- * member of {@link HOSTED_BLOCKED_TOOL_NAMES}, so an AI-proposed title mutation
- * is forced through the same approval/undo/hosted gate as the live tool.
+ * The AI tool each title mutation corresponds to. AI-origin mutations must map
+ * to a member of {@link HOSTED_BLOCKED_TOOL_NAMES}; system/user-only mutations
+ * use non-gated placeholders so a mislabeled AI-origin call fails closed.
  */
 export const AI_TOOL_NAME_BY_TITLE_MUTATION: Record<TitleMutation, string> = {
   createRootNode: 'createRootNode',
@@ -104,6 +106,9 @@ export const AI_TOOL_NAME_BY_TITLE_MUTATION: Record<TitleMutation, string> = {
   graftToParent: 'graftToParent',
   deleteNode: 'deleteNode',
   attachLease: 'attachLease',
+  // Baseline is system/user-origin only. If it is ever mislabeled as AI-origin,
+  // this non-gated placeholder makes the gate fail closed.
+  baseline: 'titleBaseline',
   // No AI tool performs a generic field update through this path, so an
   // ai-origin 'update' maps to a non-gated name and is correctly rejected by
   // assertTitleCommandRoutesThroughGate. Field edits are user-origin.
@@ -361,7 +366,7 @@ type OwnerSlice = Pick<OwnerWorkspaceData, 'owners' | 'leases'>;
 export async function recordTitleMutation(input: {
   mutation: TitleMutation;
   origin: ActionCommand['origin'];
-  approvedBy: ActionRecord['approvedBy'];
+  approvedBy?: ActionRecord['approvedBy'];
   context: RecordBuildContext;
   appliedAt: string;
   beforeWorkspace: WorkspaceData;
@@ -418,7 +423,7 @@ export async function recordTitleMutation(input: {
     delta,
     context: input.context,
     mutation: input.mutation,
-    approvedBy: input.approvedBy,
+    approvedBy: input.approvedBy ?? 'user',
     appliedAt: input.appliedAt,
     aiToolName: input.aiToolName,
     priorHeadHash: input.priorHeadHash,

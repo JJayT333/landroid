@@ -4,53 +4,51 @@ Use this file to resume the active workstream in a new chat. Read it with
 `AGENTS.md`, `PROJECT_CONTEXT.md`, and `docs/README.md` before touching code.
 Keep long history in `CHANGELOG.md`.
 
-## Current Audit-Cleanup Handoff - 2026-06-02
+## Current Title-Ledger Baseline Handoff - 2026-06-02
 
-Branch: `fix/title-action-cleanup`
+Branch: `fix/act-h01-title-baseline`
 
-Workstream: audit-cleanup Branch A, based on local
-`feat/phase-4-title-cutover`.
+Workstream: title-ledger lazy baseline, based on `main`.
 
 Completed in this branch:
 
-- ACT-H02: malformed active title action rows now fail closed with
-  `InvalidTitleActionReplayError`, including invalid record IDs; replay and
-  node reconstruction propagate the failure.
-- ACT-H04: `loadWorkspace` is the reset choke point for title action logs.
-  Workspace replacement now clears action records, audit events, and head hash,
-  and invalidates in-flight old-workspace recordings.
-- ACT-M03: default title command IDs now use a `crypto.randomUUID()` suffix with
-  the existing `title:<mutation>:` prefix; explicit command IDs remain honored.
-- ACT-L01: action-log and nearby title-cutover comments now reflect that
-  projected field edits record as `title.update`.
-- `docs/audit-backlog.md` rows for those four IDs are marked
-  `Fixed (audit-cleanup batch)` with one-line status notes.
+- ACT-H01: added a lazy, idempotent `title.baseline` command kind for loaded
+  workspaces whose live title store already has nodes but whose action ledger is
+  empty.
+- `ensureTitleBaseline(workspace, ownerData)` is exported from
+  `src/store/title-action-log.ts`. Future title-ledger read callers must call it
+  with the current workspace snapshot and loaded owner data, then await
+  `settleTitleActionLog()` before reading `actionRecords`.
+- The live journal hook now baselines the mutation's `beforeWorkspace` before
+  recording the first mutation, serialized on the existing recording chain and
+  guarded by the existing workspace-generation reset behavior.
+- Baselines use the same `recordTitleMutation` path, parity handling, audit
+  chain append, and divergence surfacing as normal title mutations.
+- Added focused acceptance coverage for first-mutation baseline, direct
+  baseline/replay, idempotence, empty workspaces, loaded-owner party IDs, and
+  workspace-switch reset behavior.
 
 Latest validation:
 
-- `npm test -- src/project-records/__tests__/title-replay.test.ts`
-  - passed, 1 file / 4 tests.
-- `npm test -- src/project-records/__tests__/title-divergence.test.ts`
-  - passed, 1 file / 4 tests.
 - `npm test -- src/store/__tests__/title-action-log.test.ts`
-  - passed, 1 file / 6 tests. Existing intentional title-divergence stderr
-    appeared.
-- `npm test -- src/store/__tests__/workspace-store.test.ts`
-  - passed, 1 file / 14 tests. Existing simulated Dexie failure stderr
+  - passed, 1 file / 12 tests. Existing intentional title-divergence stderr
     appeared.
 - `npm run lint`
   - passed.
 - `npm run test`
-  - passed, 116 files / 818 tests. Existing intentional stderr coverage for
+  - passed, 121 files / 846 tests. Existing intentional stderr coverage for
     title divergence, simulated Dexie failures, and post-v8 backup failure
     appeared.
+- `git diff --check`
+  - passed.
 
 Open risks / deliberately deferred:
 
-- ACT-H01, ACT-H03, and ACT-H05 remain open and are outside this cleanup batch.
-  Do not claim title-ledger read-cutover readiness while those blockers remain.
-- Branch B (`chore/audit-cleanup` from `main`) is still pending: LLA-H04,
-  LLA-M02, LLA-M03, LLA-M05, LLA-M13, LLA-M14, LLA-L01, LLA-L04, and LLA-L05.
+- No read-flip enablement, live read caller, `.landroid` persistence work,
+  divergence UX, load-flow wiring, math-engine work, `scripts/springhill/`
+  changes, or real-data changes were made.
+- ACT-H03 and ACT-H05 remain separate work. Do not claim title-ledger cutover
+  readiness until their gates are complete.
 - Existing untracked local artifacts remain intentionally uncommitted unless
   the user asks otherwise:
   `docs/.audit-backlog.md.swp`,
@@ -59,21 +57,19 @@ Open risks / deliberately deferred:
 
 Likely next steps:
 
-1. Push `fix/title-action-cleanup` and open its PR against
-   `feat/phase-4-title-cutover`.
-2. Start Branch B from `main` as `chore/audit-cleanup` after preserving or
-   committing any current handoff changes.
-3. Keep Branch B independent from title-stack-only files.
+1. Commit `fix(act): add lazy title baseline`.
+2. Push `fix/act-h01-title-baseline`.
+3. Open a PR against `main` and keep it unmerged pending review.
 
 Paste-ready next chat prompt:
 
 > Read `/Users/abstractmapping/projects/landroid/AGENTS.md`,
 > `/Users/abstractmapping/projects/landroid/PROJECT_CONTEXT.md`, and
 > `/Users/abstractmapping/projects/landroid/CONTINUATION-PROMPT.md`. Continue
-> the audit-cleanup batch. Branch A is `fix/title-action-cleanup` based on
-> `feat/phase-4-title-cutover`; it fixed ACT-H02, ACT-H04, ACT-M03, and
-> ACT-L01 and passed `npm run lint` plus `npm run test`. Branch B from `main`
-> is still pending as `chore/audit-cleanup`.
+> the title-ledger baseline work on `fix/act-h01-title-baseline`. ACT-H01 adds
+> lazy `title.baseline` recording and passed `npm test --
+> src/store/__tests__/title-action-log.test.ts`, `npm run lint`, `npm run test`,
+> and `git diff --check`. ACT-H03 and ACT-H05 remain deferred.
 
 ## Historical Branch Notes
 
