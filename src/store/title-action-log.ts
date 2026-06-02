@@ -21,11 +21,11 @@
  *   off stops all recording without a code change; not importing this module at
  *   all leaves the hook unregistered (the prior behavior).
  *
- * Scope: only the seven typed title mutations are journaled. Field-level edits
- * (updateNode, rebalance, clearLinked*, syncLeaseNodesFromRecord) are NOT in the
- * typed command catalog and are intentionally not recorded here — see the notes
- * doc; this is a structural-mutation ledger, not yet a complete node
- * source-of-truth (that is the later read-path cutover's precondition).
+ * Scope: only mutations in the typed title catalog are journaled. That catalog
+ * includes structural title mutations plus projected field edits recorded as
+ * `title.update` (updateNode, rebalance, clearLinked*, syncLeaseNodesFromRecord).
+ * This remains a shadow write-side ledger; reads stay on the canonical store
+ * until the explicit read-path cutover gate.
  */
 import { create } from 'zustand';
 import type {
@@ -102,7 +102,7 @@ export const useTitleActionLog = create<TitleActionLogState>()((set, get) => ({
     }),
 
   record: async ({ mutation, beforeWorkspace, afterWorkspace, ownerData, origin = 'user', aiToolName }) => {
-    // Only the seven typed title mutations are representable as commands.
+    // Only mutations in the typed title catalog are representable as commands.
     if (!isTitleMutation(mutation)) return;
 
     const generatedAt = new Date().toISOString();

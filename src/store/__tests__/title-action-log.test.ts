@@ -207,7 +207,11 @@ describe('Phase 4 LIVE title journal (real store auto-records)', () => {
     const log = useTitleActionLog.getState();
     expect(log.lastDivergence).toBeNull();
     expect(log.recordedMutationCount).toBe(3); // create, convey, update
-    expect(log.actionRecords.map((r) => r.actionKind)).toContain('title.update');
+    expect(log.actionRecords.map((r) => r.actionKind)).toEqual([
+      'title.create_root_node',
+      'title.convey',
+      'title.update',
+    ]);
 
     // COMPLETENESS: replaying the durable ledger reproduces the live adapter
     // projection exactly — including the field edit. The ledger is now a

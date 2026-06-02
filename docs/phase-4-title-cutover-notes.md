@@ -41,9 +41,9 @@ below), which touches `workspace-store.ts` and `main.tsx`.
 
 ## The command-sourcing wrapper — how a mutation becomes a durable record
 
-`applyTitleMutation` is the single entry point around the seven title mutations
+`applyTitleMutation` is the single entry point around the typed title mutations
 (`createRootNode`, `convey`, `createNpri`, `precede`, `graftToParent`,
-`deleteNode`, `attachLease`). For each mutation it:
+`deleteNode`, `attachLease`, `update`). For each mutation it:
 
 1. **Snapshots** the live workspace (`readWorkspace`).
 2. **Performs** the mutation through the caller's thunk (`runMutation`) — the

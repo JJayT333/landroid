@@ -1,7 +1,7 @@
 /**
  * Phase 4 title cutover — command-sourcing wrapper (SHADOW).
  *
- * One entry point around the seven title-tree mutations. For each mutation it:
+ * One entry point around the title-tree mutation catalog. For each mutation it:
  *   (a) lets the existing store/engine perform the mutation (the store stays
  *       canonical — this module never mutates it; the caller supplies a thunk),
  *   (b) reads back the affected node(s) by diffing the store's title projection
@@ -64,7 +64,7 @@ import {
   type TitleMutationDelta,
 } from './title-projection';
 
-/** The seven title-tree mutations Phase 4 routes through typed commands. */
+/** The title-tree mutations Phase 4 routes through typed commands. */
 export const TITLE_MUTATIONS = [
   'createRootNode',
   'convey',
