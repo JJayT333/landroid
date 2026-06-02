@@ -1231,7 +1231,7 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
     const state = get();
     const node = state.nodes.find((n) => n.id === nodeId);
     if (!node) return;
-    await reorderAttachments('node', nodeId, orderedAttachmentIds);
+    await reorderAttachments(state.workspaceId, 'node', nodeId, orderedAttachmentIds);
     const byId = new Map(node.attachments.map((a) => [a.attachmentId, a] as const));
     const seen = new Set<string>();
     const reordered: NodeAttachmentSummary[] = [];

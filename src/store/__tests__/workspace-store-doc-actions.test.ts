@@ -317,6 +317,7 @@ describe('workspace-store document actions (Phase 5)', () => {
       ]);
 
       expect(docMocks.reorderAttachments).toHaveBeenCalledWith(
+        'ws-test',
         'node',
         'node-1',
         ['a3', 'a1', 'a2']
