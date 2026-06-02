@@ -48,10 +48,19 @@ Open `http://localhost:5173/`.
 ## Validation
 
 ```bash
+npm run validate
+```
+
+`npm run validate` runs the full local validation set: root typecheck, root
+unit tests, production build, Playwright e2e, backend spine audit/test/build,
+and AI proxy audit/test/build. For narrower local checks:
+
+```bash
 npm run lint
 npm test
 npm run build
 npm run test:e2e
+npm run validate:backend
 ```
 
 `npm run test:e2e` uses Playwright Chromium and starts the local Vite server

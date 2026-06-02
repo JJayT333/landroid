@@ -5,10 +5,19 @@ Use this file to choose the smallest useful validation set for a change.
 ## Default Commands
 
 ```bash
+npm run validate
+```
+
+`npm run validate` is the full local aggregate: root typecheck, root unit tests,
+production build, Playwright e2e, backend spine audit/test/build, and AI proxy
+audit/test/build. For targeted validation, run the narrower commands directly:
+
+```bash
 npm run lint
 npm test
 npm run build
 npm run test:e2e
+npm run validate:backend
 ```
 
 ## When To Run What
@@ -32,7 +41,7 @@ npm run test:e2e
 | ImportSession / staged-import implementation | `npm run lint`, `npm test -- src/project-records/__tests__/import-sessions.test.ts`, Phase 0 golden tests, then `npm test`; add storage/UI/e2e checks only if the implementation crosses the project-record boundary |
 | AI tool/provider change | `npm run lint`, AI tests, relevant wizard/tool tests, approval-queue tests, and rollback check |
 | Hosted AI proxy/deploy change | `npm run deploy:check`, `cd backend/ai-proxy && npm test && npx tsc -p tsconfig.json --noEmit`, plus root `npm test` if frontend policy changes; run `bash scripts/smoke-test-hosted.sh` when network/AWS access is available |
-| Release/checkpoint | full default commands plus `npm run deploy:check` for hosted deploy candidates |
+| Release/checkpoint | `npm run validate` plus `npm run deploy:check` for hosted deploy candidates |
 
 For hosted persistence-key changes, include
 `npm test -- src/storage/__tests__/active-workspace-key.test.ts src/storage/__tests__/persistence-db-key.test.ts`.
