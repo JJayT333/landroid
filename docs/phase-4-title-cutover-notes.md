@@ -1,13 +1,26 @@
 # Phase 4 — Title-Tree Cutover (Option B, command-sourcing) — Notes
 
 Status: cutover MECHANISM built and proven in shadow; the WRITE path is wired
-live (recording-only); the ledger now captures **all** title-node mutations
-(structural + field edits), so it is a complete title source-of-truth; and the
-READ-path flip is **wired into the one live record consumer** (evidence-vault),
-default shadow + reversible. The Zustand store stays canonical for all reads and
-the engine stays the math authority. **No live read flip is enabled** — every
-read path defaults to the store; no call site sets `cutover`. Hand back to the
-reviewer to enable the read flip after a real-data soak.
+live (recording-only); and the READ-path flip is wired into the one live record
+consumer (evidence-vault), default shadow + reversible.
+
+**Scope / accuracy note (post 2026-06-02 Codex audit).** The live ledger is
+**in-memory shadow instrumentation** held in a Zustand store. The ActionRecords
+are durable-*class* (schema-valid) but are **not yet persisted** to Dexie,
+`.landroid`, or a record bundle (ACT-H03). It captures title mutations made
+**in-session from an empty baseline**; it does **not** yet snapshot a
+loaded/imported workspace's pre-existing nodes (ACT-H01) and is **not** reset on
+workspace switch (ACT-H04). So it is a faithful *in-session* shadow — **not** yet
+a durable or complete read source. Treat any "durable" / "complete
+source-of-truth" wording elsewhere in this doc as aspirational until ACT-H01/H03/
+H04 land. Full gap list + ownership is in `docs/audit-backlog.md` (ACT-H01…ACT-L01):
+the Codex cleanup batch takes ACT-H02/H04/M03/L01; ACT-H01/H03/H05/M01/M02/M04 are
+paired (baseline, durable persistence/v9, divergence UX, provenance, ordering).
+
+The Zustand store stays canonical for all reads and the engine stays the math
+authority. **No live read flip is enabled** — every read path defaults to the
+store; no call site sets `cutover`. Hand back for the durability/baseline/reset
+fixes + a real-data soak before enabling the read flip.
 
 Branch: `feat/phase-4-title-cutover` (off `feat/phase-4-action-layer`). Commit
 range: see `git log feat/phase-4-action-layer..HEAD`. The first four commits are
@@ -153,11 +166,10 @@ the READ path is untouched (still the store). Design:
   is not distinguishable, so live records are tagged `origin: 'user'`. The gate
   assertion still supports `origin: 'ai'` (tested in the wrapper); per-origin live
   tagging is a later refinement (see open question 1).
-- **Scope (noted).** Only the seven typed mutations are journaled. Field-level
-  edits (`updateNode`, `rebalance`, `clearLinked*`, `syncLeaseNodesFromRecord`)
-  are not in the typed catalog and are intentionally not recorded — this is a
-  structural-mutation ledger, not yet a complete node source-of-truth (which the
-  READ-path cutover would require). See open question 6.
+- **Scope (at this step).** When this step landed, only the seven structural
+  mutations were journaled. The next step ("Ledger completeness") added field
+  edits via `title.update`, so field edits ARE now recorded. (Even so, the ledger
+  remains in-session and in-memory — see the Status note and ACT-H01/H03/H04.)
 
 `src/store/__tests__/title-action-log.test.ts` drives the real store for all
 seven mutations + a delete and asserts the ledger fills with a verified chain, the
@@ -166,8 +178,11 @@ kill switch works.
 
 ## Ledger completeness + read-path flip at the consumer (follow-up step)
 
-After the live write path landed, two more steps made the ledger a complete
-source-of-truth and wired the read flip at the real consumer.
+After the live write path landed, two more steps broadened ledger coverage to
+field edits and wired the read flip at the real consumer. Coverage is now complete
+for *in-session* mutations; it is **not** complete across a load/import or a
+workspace switch, and it is in-memory only — see the Status note and ACT-H01/H03/
+H04.
 
 **Ledger completeness (`title.update`).** The seven structural mutations weren't
 enough — the app also edits node fields via `updateNode`, `rebalance`,
@@ -255,10 +270,13 @@ touched; every fixture is synthetic.
    step (Phase 4 open question #4 names v9 but does not define it)?
 5. **PII.** No `scripts/springhill/` or real `.landroid` data was touched; all
    fixtures synthetic. Confirm that remains the rule through cutover.
-6. **Ledger completeness — DONE.** Field-level edits (`updateNode`, `rebalance`,
-   `clearLinked*`, `syncLeaseNodesFromRecord`) are now captured as `title.update`
-   commands, so the ledger is a complete title-node source-of-truth (proven:
-   replay == adapter after a field edit). Remaining nuance for the reviewer: a
-   `title.update` records the full node delta as effects + snapshots; if you later
-   want field-level provenance (which field changed, by whom) that would be a
-   richer command payload, not required for cutover parity.
+6. **Ledger completeness — PARTIAL (not DONE).** Field-level edits (`updateNode`,
+   `rebalance`, `clearLinked*`, `syncLeaseNodesFromRecord`) are now captured as
+   `title.update` commands, so *in-session* mutations replay faithfully (replay ==
+   adapter after a field edit). But the 2026-06-02 audit correctly flags that full
+   completeness is not reached: a loaded/imported workspace's pre-existing nodes
+   are not captured (ACT-H01), the log is not reset on workspace switch (ACT-H04),
+   and it is in-memory only (ACT-H03). Those three (plus replay failing closed,
+   ACT-H02) must land before the ledger is a complete or durable read source.
+   Separately, if you later want field-level provenance (which field changed, by
+   whom) that is a richer `title.update` payload — not required for cutover parity.
