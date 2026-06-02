@@ -280,6 +280,23 @@ function summariseValidation() {
   };
 }
 
+function missingNpriCharacterizationMessage(input: {
+  royaltyKind: unknown;
+  fixedRoyaltyBasis: unknown;
+}): string | null {
+  if (input.royaltyKind !== 'fixed' && input.royaltyKind !== 'floating') {
+    return 'NPRI royalty kind must be explicit: fixed or floating.';
+  }
+  if (
+    input.royaltyKind === 'fixed'
+    && input.fixedRoyaltyBasis !== 'burdened_branch'
+    && input.fixedRoyaltyBasis !== 'whole_tract'
+  ) {
+    return 'Fixed NPRI basis must be explicit: burdened_branch or whole_tract.';
+  }
+  return null;
+}
+
 function summariseMutationProposal(toolName: string, input: unknown): string {
   const data = (input && typeof input === 'object' ? input : {}) as Record<string, unknown>;
   const text = (value: unknown): string => {
@@ -294,7 +311,7 @@ function summariseMutationProposal(toolName: string, input: unknown): string {
     case 'convey':
       return `Convey ${text(data.share)} from ${text(data.parentNodeId)}`;
     case 'createNpri':
-      return `Create ${text(data.royaltyKind) || 'fixed'} NPRI ${text(data.share)} on ${text(data.parentNodeId)}`;
+      return `Create ${text(data.royaltyKind) || 'unclassified'} NPRI ${text(data.share)} on ${text(data.parentNodeId)}`;
     case 'precede':
       return `Insert predecessor above ${text(data.nodeId)} (${text(data.newInitialFraction)})`;
     case 'graftToParent':
@@ -411,11 +428,11 @@ export const landroidTools = {
       royaltyKind: z
         .enum(['fixed', 'floating'])
         .optional()
-        .describe('Only used when kind="npri". Defaults to "fixed".'),
+        .describe('Required when kind="npri"; ask whether the NPRI is fixed or floating if unclear.'),
       fixedRoyaltyBasis: z
         .enum(['burdened_branch', 'whole_tract'])
         .optional()
-        .describe('For a fixed NPRI: whose share the fraction is taken of.'),
+        .describe('Required for fixed NPRI: whose share the fraction is taken of.'),
       deskMapId: z
         .string()
         .optional()
@@ -427,6 +444,19 @@ export const landroidTools = {
       form: nodeFormSchema.optional(),
     }),
     execute: async ({ kind, initialFraction, royaltyKind, fixedRoyaltyBasis, deskMapId, linkedOwnerId, form }) => {
+      if (kind === 'npri') {
+        const characterizationError = missingNpriCharacterizationMessage({
+          royaltyKind,
+          fixedRoyaltyBasis,
+        });
+        if (characterizationError) {
+          return {
+            ok: false,
+            error: characterizationError,
+            validation: summariseValidation(),
+          };
+        }
+      }
       const id = newNodeId('node');
       const store = useWorkspaceStore.getState();
       const okFlag = store.createRootNode(
@@ -435,10 +465,10 @@ export const landroidTools = {
         {
           ...formToPartialNode(form),
           interestClass: kind,
-          royaltyKind: kind === 'npri' ? royaltyKind ?? 'fixed' : null,
+          royaltyKind: kind === 'npri' ? royaltyKind : null,
           fixedRoyaltyBasis:
-            kind === 'npri' && (royaltyKind ?? 'fixed') === 'fixed'
-              ? fixedRoyaltyBasis ?? 'burdened_branch'
+            kind === 'npri' && royaltyKind === 'fixed'
+              ? fixedRoyaltyBasis
               : null,
           linkedOwnerId: linkedOwnerId ?? null,
         },
@@ -484,23 +514,35 @@ export const landroidTools = {
 
   createNpri: tool({
     description:
-      'Create a non-participating royalty interest (NPRI) branch off a mineral node. Always ask the user whether the NPRI is fixed or floating if unclear — the distinction is a core title rule. A fixed NPRI needs a basis: "burdened_branch" (default) vs "whole_tract".',
+      'Create a non-participating royalty interest (NPRI) branch off a mineral node. Always ask the user whether the NPRI is fixed or floating if unclear — the distinction is a core title rule. A fixed NPRI needs an explicit basis: "burdened_branch" vs "whole_tract".',
     inputSchema: z.object({
       parentNodeId: z.string().min(1).describe('The mineral node being burdened.'),
       share: z.string().min(1),
-      royaltyKind: z.enum(['fixed', 'floating']).default('fixed'),
+      royaltyKind: z.enum(['fixed', 'floating']),
       fixedRoyaltyBasis: z
         .enum(['burdened_branch', 'whole_tract'])
+        .describe('Required when royaltyKind="fixed".')
         .optional(),
       form: nodeFormSchema.optional(),
     }),
     execute: async ({ parentNodeId, share, royaltyKind, fixedRoyaltyBasis, form }) => {
+      const characterizationError = missingNpriCharacterizationMessage({
+        royaltyKind,
+        fixedRoyaltyBasis,
+      });
+      if (characterizationError) {
+        return {
+          ok: false,
+          error: characterizationError,
+          validation: summariseValidation(),
+        };
+      }
       const id = newNodeId('node');
       const okFlag = useWorkspaceStore.getState().createNpri(parentNodeId, id, share, {
         ...formToPartialNode(form),
         royaltyKind,
         fixedRoyaltyBasis:
-          royaltyKind === 'fixed' ? fixedRoyaltyBasis ?? 'burdened_branch' : null,
+          royaltyKind === 'fixed' ? fixedRoyaltyBasis : null,
       });
       if (!okFlag) {
         return {
