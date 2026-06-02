@@ -1,6 +1,7 @@
 /**
  * Provider & model settings surface. Rendered inline at the top of the AI panel.
- * Keys live in localStorage only — we warn the user about browser exposure.
+ * Persisted preferences are provider/model/base URL only; cloud API keys stay
+ * in session memory.
  */
 import { useAISettingsStore, MODEL_SUGGESTIONS, type AIProvider } from './settings-store';
 import { isHostedMode } from '../utils/deploy-env';
