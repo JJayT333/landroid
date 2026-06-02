@@ -14,6 +14,7 @@ import {
   createBlankLease,
   createBlankOwner,
   isLeaseStatusOption,
+  isTexasMathLease,
   normalizeLease,
   type Lease,
 } from '../../types/owner';
@@ -42,6 +43,15 @@ function createLeaseDraft(workspaceId: string, ownerId: string, parentNode: Owne
     leasedInterest: parentNode.fraction,
     status: DEFAULT_LEASE_STATUS,
   });
+}
+
+const NON_TEXAS_LEASE_ATTACHMENT_MESSAGE =
+  'Only Texas fee/state leases can attach to Desk Map math. Keep federal/private/tribal leases in Research or Federal Leasing as reference records.';
+
+export function getAttachLeaseModalTexasMathError(
+  lease: Pick<Lease, 'jurisdiction'>
+): string | null {
+  return isTexasMathLease(lease) ? null : NON_TEXAS_LEASE_ATTACHMENT_MESSAGE;
 }
 
 export default function AttachLeaseModal({
@@ -180,6 +190,11 @@ export default function AttachLeaseModal({
       setSaveError(
         'Leases can only be attached to mineral owners. Open this from a mineral-class card.'
       );
+      return;
+    }
+    const jurisdictionError = getAttachLeaseModalTexasMathError(draft);
+    if (jurisdictionError) {
+      setSaveError(jurisdictionError);
       return;
     }
     // Strict-parse both interest fields BEFORE any persistence. A blank value is a

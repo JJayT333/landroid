@@ -5,8 +5,14 @@ on:
   push:
     branches:
       - main
-      - "claude/**"
-      - "codex/**"
+      - "feat/**"
+      - "fix/**"
+      - "docs/**"
+      - "chore/**"
+      - "refactor/**"
+      - "test/**"
+      - "perf/**"
+      - "ci/**"
 
 jobs:
   root-app:

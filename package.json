@@ -17,6 +17,8 @@
     "test:watch": "vitest",
     "test:engine": "vitest run src/engine",
     "lint": "tsc --noEmit",
+    "validate": "npm run lint && npm test && npm run build && npm run test:e2e && npm run validate:backend",
+    "validate:backend": "npm --prefix backend/spine audit --omit=dev && npm test -- --config backend/spine/vitest.config.ts && tsc -p backend/spine/tsconfig.json --noEmit && npm --prefix backend/ai-proxy audit --omit=dev && npm --prefix backend/ai-proxy test && npm --prefix backend/ai-proxy run build",
     "deploy:check": "bash scripts/predeploy-check.sh"
   },
   "dependencies": {
