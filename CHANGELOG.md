@@ -5,6 +5,12 @@ stay short.
 
 ## 2026-06-02
 
+- Added `.landroid` v9 action-ledger durability. Manual save can embed the
+  current title `action_record` and `audit_event` rows as a validated
+  `actionLedger` bundle, while the existing snapshot remains authoritative on
+  import. v8 files stay readable, v10+ files are rejected, and corrupt embedded
+  ledgers are dropped with a warning instead of blocking the snapshot.
+
 - Closed the main-line audit-cleanup batch for the 2026-05-31 line-by-line
   audit. AI NPRI creation now requires explicit royalty characterization,
   document attachment ordering is workspace-scoped, strict import hydration

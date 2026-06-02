@@ -9,6 +9,7 @@ import { useResearchStore } from '../../store/research-store';
 import { useCurativeStore } from '../../store/curative-store';
 import { useWorkspaceStore } from '../../store/workspace-store';
 import { useCanvasStore } from '../../store/canvas-store';
+import { useTitleActionLog } from '../../store/title-action-log';
 import {
   downloadLandroidFile,
   exportDocumentWorkspaceData,
@@ -170,40 +171,47 @@ export default function Navbar() {
     setFileMenuOpen(false);
     const state = useWorkspaceStore.getState();
     const canvasState = useCanvasStore.getState();
-    await downloadLandroidFile({
-      workspaceId: state.workspaceId,
-      projectName: state.projectName,
-      nodes: state.nodes,
-      deskMaps: state.deskMaps,
-      leaseholdUnit,
-      leaseholdAssignments,
-      leaseholdOrris,
-      leaseholdTransferOrderEntries,
-      activeDeskMapId: state.activeDeskMapId,
-      activeUnitCode: state.activeUnitCode,
-      instrumentTypes: state.instrumentTypes,
-      ownerData: await useOwnerStore.getState().exportWorkspaceData(),
-      documentData: await exportDocumentWorkspaceData(
-        state.workspaceId,
-        state.nodes
-      ),
-      mapData: await useMapStore.getState().exportWorkspaceData(),
-      researchData: await useResearchStore.getState().exportWorkspaceData(),
-      curativeData: await useCurativeStore.getState().exportWorkspaceData(),
-      canvas: {
-        nodes: canvasState.nodes,
-        edges: canvasState.edges,
-        viewport: canvasState.viewport,
-        gridCols: canvasState.gridCols,
-        gridRows: canvasState.gridRows,
-        orientation: canvasState.orientation,
-        pageSize: canvasState.pageSize,
-        horizontalSpacingFactor: canvasState.horizontalSpacingFactor,
-        verticalSpacingFactor: canvasState.verticalSpacingFactor,
-        snapToGrid: canvasState.snapToGrid,
-        gridSize: canvasState.gridSize,
+    const titleActionLog = useTitleActionLog.getState();
+    await downloadLandroidFile(
+      {
+        workspaceId: state.workspaceId,
+        projectName: state.projectName,
+        nodes: state.nodes,
+        deskMaps: state.deskMaps,
+        leaseholdUnit,
+        leaseholdAssignments,
+        leaseholdOrris,
+        leaseholdTransferOrderEntries,
+        activeDeskMapId: state.activeDeskMapId,
+        activeUnitCode: state.activeUnitCode,
+        instrumentTypes: state.instrumentTypes,
+        ownerData: await useOwnerStore.getState().exportWorkspaceData(),
+        documentData: await exportDocumentWorkspaceData(
+          state.workspaceId,
+          state.nodes
+        ),
+        mapData: await useMapStore.getState().exportWorkspaceData(),
+        researchData: await useResearchStore.getState().exportWorkspaceData(),
+        curativeData: await useCurativeStore.getState().exportWorkspaceData(),
+        canvas: {
+          nodes: canvasState.nodes,
+          edges: canvasState.edges,
+          viewport: canvasState.viewport,
+          gridCols: canvasState.gridCols,
+          gridRows: canvasState.gridRows,
+          orientation: canvasState.orientation,
+          pageSize: canvasState.pageSize,
+          horizontalSpacingFactor: canvasState.horizontalSpacingFactor,
+          verticalSpacingFactor: canvasState.verticalSpacingFactor,
+          snapToGrid: canvasState.snapToGrid,
+          gridSize: canvasState.gridSize,
+        },
       },
-    });
+      {
+        actionRecords: titleActionLog.actionRecords,
+        auditEvents: titleActionLog.auditEvents,
+      }
+    );
   };
 
   const handleLoad = () => {

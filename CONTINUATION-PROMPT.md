@@ -4,76 +4,78 @@ Use this file to resume the active workstream in a new chat. Read it with
 `AGENTS.md`, `PROJECT_CONTEXT.md`, and `docs/README.md` before touching code.
 Keep long history in `CHANGELOG.md`.
 
-## Current Audit-Cleanup Handoff - 2026-06-02
+## Current V9 Durable Format Handoff - 2026-06-02
 
-Branch: `fix/title-action-cleanup`
+Branch: `feat/v9-landroid-durable-format`
 
-Workstream: audit-cleanup Branch A, based on local
-`feat/phase-4-title-cutover`.
+Workstream: v9 `.landroid` action-ledger durability, based on `origin/main` in
+the isolated worktree `/private/tmp/landroid-v9-landroid`.
 
 Completed in this branch:
 
-- ACT-H02: malformed active title action rows now fail closed with
-  `InvalidTitleActionReplayError`, including invalid record IDs; replay and
-  node reconstruction propagate the failure.
-- ACT-H04: `loadWorkspace` is the reset choke point for title action logs.
-  Workspace replacement now clears action records, audit events, and head hash,
-  and invalidates in-flight old-workspace recordings.
-- ACT-M03: default title command IDs now use a `crypto.randomUUID()` suffix with
-  the existing `title:<mutation>:` prefix; explicit command IDs remain honored.
-- ACT-L01: action-log and nearby title-cutover comments now reflect that
-  projected field edits record as `title.update`.
-- `docs/audit-backlog.md` rows for those four IDs are marked
-  `Fixed (audit-cleanup batch)` with one-line status notes.
+- `LANDROID_FILE_VERSION` is now 9.
+- Manual `.landroid` save can embed a validated `actionLedger` bundle containing
+  only title `action_record` and `audit_event` rows from `useTitleActionLog`.
+- `ACTION_LAYER_EXPORT_GATE` uses the explicit
+  `RECORD_BEARING_LANDROID_VERSION = 9`, so v8 still rejects records and v9
+  allows them.
+- `.landroid` import keeps the snapshot authoritative. Valid ledgers are
+  attached to returned `LandroidFileData`; schema-invalid or chain-broken
+  ledgers are dropped with `console.warn` and the snapshot still loads.
+- Autosave/backup callers keep using the optional export parameter and write v9
+  snapshots without an embedded ledger.
+- Docs/backlog now mark DEF-ACT-04 fixed by the v9 file format and ACT-H03 only
+  partially fixed because runtime Dexie ledger persistence remains deferred.
+- Added `scripts/title-soak.ts` as a synthetic-only soak harness for replay and
+  math parity.
 
 Latest validation:
 
-- `npm test -- src/project-records/__tests__/title-replay.test.ts`
-  - passed, 1 file / 4 tests.
-- `npm test -- src/project-records/__tests__/title-divergence.test.ts`
-  - passed, 1 file / 4 tests.
-- `npm test -- src/store/__tests__/title-action-log.test.ts`
-  - passed, 1 file / 6 tests. Existing intentional title-divergence stderr
-    appeared.
-- `npm test -- src/store/__tests__/workspace-store.test.ts`
-  - passed, 1 file / 14 tests. Existing simulated Dexie failure stderr
-    appeared.
-- `npm run lint`
-  - passed.
-- `npm run test`
-  - passed, 116 files / 818 tests. Existing intentional stderr coverage for
-    title divergence, simulated Dexie failures, and post-v8 backup failure
-    appeared.
+- `npm ci` - passed in the isolated worktree, with an engine warning because the
+  local shell reports Node 26 while the repo declares Node 22-25, plus the
+  pre-existing npm audit finding.
+- `npm run lint` - passed.
+- `npm test -- src/project-records/__tests__/action-persistence.test.ts src/storage/__tests__/workspace-persistence.test.ts src/phase0/__tests__/vulcan-mesa-fixtures.test.ts`
+  - passed, 3 files / 36 tests.
+- `npm test` - passed, 121 files / 844 tests. Existing intentional stderr
+  appeared for simulated Dexie failures, title divergence, and post-v8 backup
+  failure paths.
+- `npx tsx scripts/title-soak.ts` - passed with `RESULT: PASS` after an
+  escalated rerun because the sandbox blocked tsx's local IPC pipe.
+- `npm run build` - passed with existing Vite warnings for missing TORS PDF
+  runtime URLs, dynamic/static import chunking, the Node `module.register()`
+  deprecation warning, and large chunks.
+- `git diff --check` - passed.
 
 Open risks / deliberately deferred:
 
-- ACT-H01, ACT-H03, and ACT-H05 remain open and are outside this cleanup batch.
-  Do not claim title-ledger read-cutover readiness while those blockers remain.
-- Branch B (`chore/audit-cleanup` from `main`) is still pending: LLA-H04,
-  LLA-M02, LLA-M03, LLA-M05, LLA-M13, LLA-M14, LLA-L01, LLA-L04, and LLA-L05.
-- Existing untracked local artifacts remain intentionally uncommitted unless
-  the user asks otherwise:
-  `docs/.audit-backlog.md.swp`,
-  `docs/archive/audits/LINE_BY_LINE_AUDIT_2026-05-31.md`, and
-  `scripts/springhill/`.
+- This is file-format work only. No Dexie tables, runtime ledger hydration,
+  autosave ledger persistence, read-path flip, divergence UX, snapshot
+  compaction, or full projected-bundle embedding is included.
+- v9 files are forward-incompatible with older v8-only builds by design.
+- The Navbar reads `useTitleActionLog.getState()` only inside `handleSave`.
+  Review should confirm no render-time subscription or autosave wiring was
+  introduced.
+- The original checkout at `/Users/abstractmapping/projects/landroid` still has
+  unrelated local noise from the prior branch; this worktree did not touch it.
 
 Likely next steps:
 
-1. Push `fix/title-action-cleanup` and open its PR against
-   `feat/phase-4-title-cutover`.
-2. Start Branch B from `main` as `chore/audit-cleanup` after preserving or
-   committing any current handoff changes.
-3. Keep Branch B independent from title-stack-only files.
+1. Review the v9 file-format diff, especially `workspace-persistence.ts`,
+   `Navbar.tsx`, and the storage/action tests.
+2. Push `feat/v9-landroid-durable-format`.
+3. Open a PR to `main` with the required review-risk callouts.
 
 Paste-ready next chat prompt:
 
 > Read `/Users/abstractmapping/projects/landroid/AGENTS.md`,
 > `/Users/abstractmapping/projects/landroid/PROJECT_CONTEXT.md`, and
-> `/Users/abstractmapping/projects/landroid/CONTINUATION-PROMPT.md`. Continue
-> the audit-cleanup batch. Branch A is `fix/title-action-cleanup` based on
-> `feat/phase-4-title-cutover`; it fixed ACT-H02, ACT-H04, ACT-M03, and
-> ACT-L01 and passed `npm run lint` plus `npm run test`. Branch B from `main`
-> is still pending as `chore/audit-cleanup`.
+> `/private/tmp/landroid-v9-landroid/CONTINUATION-PROMPT.md`. Continue the v9
+> `.landroid` durable-format branch `feat/v9-landroid-durable-format` from the
+> isolated worktree `/private/tmp/landroid-v9-landroid`. The branch implements
+> v9 `actionLedger` export/import while keeping the snapshot authoritative;
+> validation passed with `npm run lint`, targeted tests, `npm test`,
+> `npx tsx scripts/title-soak.ts`, `npm run build`, and `git diff --check`.
 
 ## Historical Branch Notes
 

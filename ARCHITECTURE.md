@@ -238,10 +238,11 @@ later expansion may make the app unusable offline for core workflows, and
 neither may make LANDroid unable to produce a complete local project package.
 
 The project-record `.landroid` migration strategy is documented in
-`docs/project-record-migration-strategy.md`. Phase 1 does not change the v8 file
-format; any future record-bearing package must use explicit version dispatch
-and validate both the snapshot and the project-record bundle before store
-replacement.
+`docs/project-record-migration-strategy.md`. v9 is the first record-bearing
+package format: manual save can include a validated title action/audit ledger
+under `actionLedger`, while the snapshot remains authoritative on import. Bad
+or corrupt embedded ledgers are dropped with a warning instead of blocking the
+snapshot.
 
 Phase 0.5 planning treats the current storage surface as follows:
 

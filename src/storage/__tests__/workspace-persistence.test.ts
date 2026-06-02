@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { CanvasSaveData } from '../../store/canvas-store';
 import {
   createBlankMapAsset,
@@ -23,8 +23,22 @@ import {
   type LandroidFileData,
 } from '../workspace-persistence';
 import { parsePersistedCanvasData } from '../canvas-persistence';
+import { recordTitleMutation } from '../../project-records/action-layer/title-command-sourcing';
+import { verifyAuditChain } from '../../project-records/action-layer/audit-chain';
+import {
+  emptyTitleWorkspace,
+  TITLE_NOW,
+  titleContext,
+  titleOwnerData,
+  titleWorkspace,
+} from '../../project-records/__tests__/title-cutover-fixtures';
+import type { AuditEventRecord } from '../../backend-spine/contracts';
 
 const TEST_PDF_BODY = '%PDF-1.7\n% LANDroid test PDF\n';
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 function buildCanvas(): CanvasSaveData {
   return {
@@ -336,6 +350,50 @@ function buildWorkspace(canvas: CanvasSaveData | null): LandroidFileData {
   };
 }
 
+function titleImportSafeWorkspace() {
+  const workspace = titleWorkspace();
+  const nodes = workspace.nodes.filter((node) => node.type !== 'related');
+  return {
+    ...workspace,
+    nodes,
+    deskMaps: workspace.deskMaps.map((deskMap) => ({
+      ...deskMap,
+      nodeIds: deskMap.nodeIds.filter((nodeId) =>
+        nodes.some((node) => node.id === nodeId)
+      ),
+    })),
+  };
+}
+
+async function buildSyntheticTitleLedger() {
+  const result = await recordTitleMutation({
+    mutation: 'createRootNode',
+    origin: 'system',
+    approvedBy: 'system',
+    context: titleContext(),
+    appliedAt: TITLE_NOW,
+    beforeWorkspace: emptyTitleWorkspace(),
+    afterWorkspace: titleImportSafeWorkspace(),
+    ownerData: titleOwnerData(),
+  });
+  return {
+    actionRecords: [result.actionRecord],
+    auditEvents: [result.auditEvent],
+  };
+}
+
+function titleLandroidData(): LandroidFileData {
+  const ownerData = titleOwnerData();
+  return {
+    ...titleImportSafeWorkspace(),
+    ownerData: {
+      ...ownerData,
+      contacts: [],
+      docs: [],
+    },
+  };
+}
+
 describe('workspace-persistence', () => {
   it('round-trips canvas state through .landroid export/import', async () => {
     const original = buildWorkspace(buildCanvas());
@@ -432,6 +490,122 @@ describe('workspace-persistence', () => {
     );
     expect(await imported.researchData?.imports[0]?.blob.text()).toBe('api,data');
     expect(await imported.mapData?.mapAssets[0]?.blob.text()).toContain('FeatureCollection');
+  });
+
+  it('round-trips a v9 action ledger without making it authoritative', async () => {
+    const original = titleLandroidData();
+    const ledger = await buildSyntheticTitleLedger();
+    const snapshotOnlyKeys = Object.keys(
+      JSON.parse(await (await exportLandroidFile(original)).text())
+    );
+    const blob = await exportLandroidFile(original, ledger);
+    const text = await blob.text();
+    const parsed = JSON.parse(text);
+    const file = new File([text], 'title-ledger.landroid', {
+      type: 'application/json',
+    });
+
+    expect(parsed.version).toBe(9);
+    expect(Object.keys(parsed).filter((key) => !snapshotOnlyKeys.includes(key))).toEqual([
+      'actionLedger',
+    ]);
+    expect(parsed.actionLedger).toBeDefined();
+    expect(parsed.actionLedger.workspaceId).toBe(original.workspaceId);
+    expect(parsed.actionLedger.projectId).toBe(original.workspaceId);
+    expect(parsed.actionLedger.generatedAt).toBe(parsed.exportedAt);
+    expect(
+      parsed.actionLedger.records.map((record: { recordType: string }) => record.recordType)
+    ).toEqual(['action_record', 'audit_event']);
+
+    const imported = await importLandroidFile(file);
+    const importedAuditEvents =
+      imported.actionLedger?.records.filter(
+        (record): record is AuditEventRecord => record.recordType === 'audit_event'
+      ) ?? [];
+
+    expect(imported.nodes).toEqual(original.nodes);
+    expect(imported.actionLedger?.records).toEqual([
+      ...ledger.actionRecords,
+      ...ledger.auditEvents,
+    ]);
+    expect((await verifyAuditChain(importedAuditEvents)).valid).toBe(true);
+  });
+
+  it('imports a v8 payload without an action ledger', async () => {
+    const payload = {
+      version: 8,
+      workspaceId: 'ws-v8',
+      projectName: 'v8 Read Compatibility',
+      nodes: [createBlankNode('node-v8')],
+      deskMaps: [],
+      activeDeskMapId: null,
+      instrumentTypes: ['Deed'],
+      documentData: { documents: [], attachments: [] },
+    };
+    const file = new File([JSON.stringify(payload)], 'v8.landroid', {
+      type: 'application/json',
+    });
+
+    const imported = await importLandroidFile(file);
+
+    expect(imported.projectName).toBe('v8 Read Compatibility');
+    expect(imported.actionLedger).toBeUndefined();
+  });
+
+  it('drops a schema-invalid v9 action ledger and still returns the snapshot', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const payload = {
+      version: 9,
+      workspaceId: 'ws-invalid-ledger',
+      projectName: 'Invalid Ledger',
+      nodes: [createBlankNode('node-invalid-ledger')],
+      deskMaps: [],
+      activeDeskMapId: null,
+      instrumentTypes: ['Deed'],
+      documentData: { documents: [], attachments: [] },
+      actionLedger: {
+        workspaceId: 'ws-invalid-ledger',
+        projectId: 'ws-invalid-ledger',
+        generatedAt: '2026-06-02T00:00:00.000Z',
+        records: [],
+      },
+    };
+    const file = new File([JSON.stringify(payload)], 'bad-ledger.landroid', {
+      type: 'application/json',
+    });
+
+    const imported = await importLandroidFile(file);
+
+    expect(imported.projectName).toBe('Invalid Ledger');
+    expect(imported.nodes).toHaveLength(1);
+    expect(imported.actionLedger).toBeUndefined();
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining('Dropping invalid actionLedger')
+    );
+  });
+
+  it('drops a chain-broken v9 action ledger and still returns the snapshot', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const ledger = await buildSyntheticTitleLedger();
+    const blob = await exportLandroidFile(titleLandroidData(), ledger);
+    const payload = JSON.parse(await blob.text());
+    const auditIndex = payload.actionLedger.records.findIndex(
+      (record: { recordType: string }) => record.recordType === 'audit_event'
+    );
+    payload.actionLedger.records[auditIndex] = {
+      ...payload.actionLedger.records[auditIndex],
+      eventKind: 'tampered',
+    };
+    const file = new File([JSON.stringify(payload)], 'broken-ledger.landroid', {
+      type: 'application/json',
+    });
+
+    const imported = await importLandroidFile(file);
+
+    expect(imported.projectName).toBe(titleImportSafeWorkspace().projectName);
+    expect(imported.nodes).toEqual(titleImportSafeWorkspace().nodes);
+    expect(imported.actionLedger).toBeUndefined();
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('audit chain failed'));
   });
 
   it('keeps backward compatibility when older files omit canvas state', async () => {
@@ -602,22 +776,23 @@ describe('workspace-persistence', () => {
     await expect(importLandroidFile(file)).rejects.toThrow(/valid PDF file/i);
   });
 
-  it('writes version 8 in the export payload', async () => {
+  it('writes version 9 in the export payload without an empty action ledger', async () => {
     const original = buildWorkspace(buildCanvas());
     const blob = await exportLandroidFile(original);
     const parsed = JSON.parse(await blob.text());
-    expect(parsed.version).toBe(8);
+    expect(parsed.version).toBe(9);
     // The legacy v7 `pdfData` slot is gone in v8.
     expect(parsed.pdfData).toBeUndefined();
     expect(parsed.documentData).toBeDefined();
+    expect(parsed.actionLedger).toBeUndefined();
   });
 
-  it('rejects .landroid files from a newer schema version', async () => {
+  it('rejects .landroid files from a newer schema version before normalization', async () => {
     const payload = {
-      version: LANDROID_FILE_VERSION + 1,
+      version: 10,
       workspaceId: 'ws-future',
       projectName: 'Future Workspace',
-      nodes: [],
+      nodes: 'not-normalizable',
       deskMaps: [],
       activeDeskMapId: null,
       instrumentTypes: [],

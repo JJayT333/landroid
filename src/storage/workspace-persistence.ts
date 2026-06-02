@@ -82,6 +82,20 @@ import { normalizeTitleIssues, type TitleIssue } from '../types/title-issue';
 import { resolveActiveUnitCode } from '../utils/desk-map-units';
 import { getWorkspaceDbKey } from './active-workspace-key';
 import { LANDROID_FILE_VERSION } from './landroid-file-version';
+import {
+  type ActionRecord,
+  type AuditEventRecord,
+} from '../backend-spine/contracts';
+import {
+  appendActionLayerToRecordBundle,
+  assertActionLayerExportAllowed,
+} from '../project-records/action-layer/persistence';
+import { verifyAuditChain } from '../project-records/action-layer/audit-chain';
+import {
+  buildProjectRecordBundle,
+  ProjectRecordBundleSchema,
+  type ProjectRecordBundle,
+} from '../project-records/record-validation';
 import { readWorkspaceFromShardRows } from './workspace-shard-reader';
 import {
   buildWorkspaceShards,
@@ -109,17 +123,22 @@ export interface WorkspaceData {
 
 export interface LandroidFileData extends WorkspaceData {
   canvas?: CanvasSaveData | null;
+  actionLedger?: ProjectRecordBundle;
   /**
-   * v8 document payload (Phase 5 / ADR 0004). v7 imports are migrated
-   * inline by {@link importLandroidFile} so callers never see a
-   * `pdfData`-only file — by the time the import resolves, the v8 shape
-   * is what the rest of the app consumes.
+   * Document payload introduced in v8 (Phase 5 / ADR 0004). v7 imports are
+   * migrated inline by {@link importLandroidFile} so callers never see a
+   * `pdfData`-only file.
    */
   documentData?: DocumentWorkspaceData;
   ownerData?: OwnerWorkspaceData;
   mapData?: MapWorkspaceData;
   researchData?: ResearchWorkspaceData;
   curativeData?: CurativeWorkspaceData;
+}
+
+export interface LandroidFileExportOptions {
+  actionRecords?: readonly ActionRecord[];
+  auditEvents?: readonly AuditEventRecord[];
 }
 
 export interface DocumentWorkspaceData {
@@ -1107,28 +1126,100 @@ async function serializeResearchData(
   };
 }
 
+function ledgerWarningReason(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+async function validateImportedActionLedger(
+  raw: unknown
+): Promise<ProjectRecordBundle | undefined> {
+  const parsed = ProjectRecordBundleSchema.safeParse(raw);
+  if (!parsed.success) {
+    console.warn(
+      `[landroid] Dropping invalid actionLedger: ${parsed.error.message}`
+    );
+    return undefined;
+  }
+
+  const nonLedgerRecord = parsed.data.records.find(
+    (record) => record.recordType !== 'action_record' && record.recordType !== 'audit_event'
+  );
+  if (nonLedgerRecord) {
+    console.warn(
+      `[landroid] Dropping invalid actionLedger: record ${nonLedgerRecord.recordId} ` +
+        `has non-ledger type ${nonLedgerRecord.recordType}.`
+    );
+    return undefined;
+  }
+
+  const auditEvents = parsed.data.records.filter(
+    (record): record is AuditEventRecord => record.recordType === 'audit_event'
+  );
+  try {
+    const verification = await verifyAuditChain(auditEvents);
+    if (!verification.valid) {
+      console.warn(
+        `[landroid] Dropping invalid actionLedger: audit chain failed at index ` +
+          `${verification.brokenAtIndex} (${verification.reason}).`
+      );
+      return undefined;
+    }
+  } catch (error) {
+    console.warn(
+      `[landroid] Dropping invalid actionLedger: ${ledgerWarningReason(error)}`
+    );
+    return undefined;
+  }
+
+  return parsed.data;
+}
+
 /**
- * Current `.landroid` schema version. Bumped to 8 in Phase 5
- * (multi-doc-per-entity); see ADR 0004. v8 emits `documentData` and
- * omits the legacy `pdfData` field. Imports of v7 (or earlier) files
- * are migrated inline by {@link importLandroidFile}.
+ * Current `.landroid` schema version. v9 keeps the v8 snapshot authoritative
+ * and may add an optional validated action/audit ledger. Imports of v7 (or
+ * earlier) files are migrated inline by {@link importLandroidFile}.
  */
-export async function exportLandroidFile(data: LandroidFileData): Promise<Blob> {
-  const payload = {
+export async function exportLandroidFile(
+  data: LandroidFileData,
+  options: LandroidFileExportOptions = {}
+): Promise<Blob> {
+  const exportedAt = new Date().toISOString();
+  const snapshotData = { ...data };
+  delete snapshotData.actionLedger;
+  const payload: Record<string, unknown> & { actionLedger?: ProjectRecordBundle } = {
     version: LANDROID_FILE_VERSION,
-    exportedAt: new Date().toISOString(),
-    ...data,
+    exportedAt,
+    ...snapshotData,
     documentData: await serializeDocumentData(data.documentData),
     ownerData: await serializeOwnerData(data.ownerData),
     mapData: await serializeMapData(data.mapData),
     researchData: await serializeResearchData(data.researchData),
   };
+  const actionRecords = options.actionRecords ?? [];
+  const auditEvents = options.auditEvents ?? [];
+  if (actionRecords.length > 0 || auditEvents.length > 0) {
+    assertActionLayerExportAllowed(LANDROID_FILE_VERSION);
+    const emptyBundle = buildProjectRecordBundle({
+      workspaceId: data.workspaceId,
+      projectId: data.workspaceId,
+      generatedAt: exportedAt,
+      records: [],
+    });
+    payload.actionLedger = await appendActionLayerToRecordBundle({
+      bundle: emptyBundle,
+      actionRecords,
+      auditEvents,
+    });
+  }
   const json = JSON.stringify(payload, null, 2);
   return new Blob([json], { type: 'application/json' });
 }
 
-export async function downloadLandroidFile(data: LandroidFileData) {
-  const blob = await exportLandroidFile(data);
+export async function downloadLandroidFile(
+  data: LandroidFileData,
+  options?: LandroidFileExportOptions
+) {
+  const blob = await exportLandroidFile(data, options);
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -1230,7 +1321,8 @@ export async function exportDocumentWorkspaceData(
 /**
  * Replace every document + attachment for the given workspace with the
  * supplied set. Used by `.landroid` import after `importLandroidFile`
- * resolves to v8 shape (either directly or via inline v7 migration).
+ * resolves to the current documentData shape (either directly or via inline v7
+ * migration).
  *
  * Workspace scoping protects other workspaces' data when a user imports
  * a file into a fresh workspace alongside existing local data.
@@ -1531,9 +1623,8 @@ export async function importLandroidFile(file: File): Promise<LandroidFileData> 
     ...sanitizedResearchLinks,
   };
 
-  // Phase 5 / A5: dispatch on `version` so v7 files and v8 files both
-  // arrive at the canonical v8 in-memory shape (documents +
-  // document_attachments).
+  // Phase 5 / A5: dispatch on `version` so legacy files arrive at the
+  // canonical documentData shape (documents + document_attachments).
   const fileVersion =
     typeof parsed.version === 'number' && Number.isFinite(parsed.version)
       ? parsed.version
@@ -1628,6 +1719,10 @@ export async function importLandroidFile(file: File): Promise<LandroidFileData> 
           ),
         }
       : { titleIssues: [] };
+  const actionLedger =
+    parsed.actionLedger === undefined
+      ? undefined
+      : await validateImportedActionLedger(parsed.actionLedger);
   return {
     ...core,
     nodes,
@@ -1637,5 +1732,6 @@ export async function importLandroidFile(file: File): Promise<LandroidFileData> 
     mapData,
     researchData,
     curativeData,
+    actionLedger,
   };
 }
