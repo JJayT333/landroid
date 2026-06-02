@@ -3,6 +3,17 @@
 This file records meaningful project changes so `CONTINUATION-PROMPT.md` can
 stay short.
 
+## 2026-06-02
+
+- Closed the main-line audit-cleanup batch for the 2026-05-31 line-by-line
+  audit. AI NPRI creation now requires explicit royalty characterization,
+  document attachment ordering is workspace-scoped, strict import hydration
+  clears stale attachment badges, non-Texas math lease attachments are blocked,
+  CI branch filters match the branch taxonomy, aggregate local validation
+  scripts cover root and backend packages, Ollama CORS guidance uses explicit
+  local origins, stale patch-plan docs are archived, and AI settings comments
+  match the session-only cloud key policy.
+
 ## 2026-06-01
 
 - Added native attorney-packet packaging (finishes the deferred Phase 2 export
