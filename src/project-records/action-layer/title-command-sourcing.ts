@@ -73,6 +73,8 @@ export const TITLE_MUTATIONS = [
   'graftToParent',
   'deleteNode',
   'attachLease',
+  // generic node field edit (updateNode / rebalance / link clears / lease resync)
+  'update',
 ] as const;
 export type TitleMutation = (typeof TITLE_MUTATIONS)[number];
 export const TitleMutationSchema = z.enum(TITLE_MUTATIONS);
@@ -86,6 +88,7 @@ export const COMMAND_KIND_BY_TITLE_MUTATION: Record<TitleMutation, ActionCommand
   graftToParent: 'title.graft_to_parent',
   deleteNode: 'title.delete_node',
   attachLease: 'title.attach_lease',
+  update: 'title.update',
 };
 
 /**
@@ -101,6 +104,10 @@ export const AI_TOOL_NAME_BY_TITLE_MUTATION: Record<TitleMutation, string> = {
   graftToParent: 'graftToParent',
   deleteNode: 'deleteNode',
   attachLease: 'attachLease',
+  // No AI tool performs a generic field update through this path, so an
+  // ai-origin 'update' maps to a non-gated name and is correctly rejected by
+  // assertTitleCommandRoutesThroughGate. Field edits are user-origin.
+  update: 'updateNode',
 };
 
 /**

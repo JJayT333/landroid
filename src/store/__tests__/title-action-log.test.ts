@@ -17,11 +17,16 @@ const docMocks = vi.hoisted(() => ({
   saveDoc: vi.fn(),
 }));
 const otherMocks = vi.hoisted(() => ({ unlinkNode: vi.fn(), unlinkDeskMap: vi.fn() }));
-// A controllable wrapper around the real recordTitleMutation: default delegates
-// to the real implementation; individual tests can override it once. Typed `any`
-// (test-only) so the mock can stand in for the precisely-typed export.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const recordSpy = vi.hoisted(() => ({ current: null as null | ((...args: any[]) => any) }));
+// A controllable wrapper around the real recordTitleMutation: `current` is what
+// the hook calls (default delegates to `real`); tests may override `current`
+// once, and beforeEach restores it from `real`. Typed `any` (test-only) so the
+// mock can stand in for the precisely-typed export.
+/* eslint-disable @typescript-eslint/no-explicit-any */
+const recordSpy = vi.hoisted(() => ({
+  current: null as null | ((...args: any[]) => any),
+  real: null as null | ((...args: any[]) => any),
+}));
+/* eslint-enable @typescript-eslint/no-explicit-any */
 
 vi.mock('../../storage/document-store', () => docMocks);
 vi.mock('../map-store', () => ({
@@ -41,6 +46,7 @@ vi.mock('../../project-records/action-layer/title-command-sourcing', async (impo
   const actual = await importOriginal<
     typeof import('../../project-records/action-layer/title-command-sourcing')
   >();
+  recordSpy.real = actual.recordTitleMutation;
   recordSpy.current = vi.fn(actual.recordTitleMutation);
   const wrapped = (...args: Parameters<typeof actual.recordTitleMutation>) =>
     recordSpy.current!(...args);
@@ -55,6 +61,43 @@ import { useOwnerStore } from '../owner-store';
 import { useTitleActionLog, settleTitleActionLog } from '../title-action-log';
 import { verifyAuditChain } from '../../project-records/action-layer/audit-chain';
 import { ParityDivergenceError } from '../../project-records/action-layer/parity';
+import { titleRecordsFromWorkspace } from '../../project-records/action-layer/title-projection';
+import { replayTitleProjection } from '../../project-records/action-layer/title-replay';
+import { canonicalJson } from '../../project-records/action-layer/canonical-json';
+import type { BackendSpineCoreRecord } from '../../backend-spine/contracts';
+import type { WorkspaceData } from '../../storage/workspace-persistence';
+
+function sortedJson(records: readonly BackendSpineCoreRecord[]): string {
+  return canonicalJson(
+    [...records].sort((a, b) => (a.recordId < b.recordId ? -1 : a.recordId > b.recordId ? 1 : 0))
+  );
+}
+
+/**
+ * Like sortedJson but normalizes the envelope `lastModified` — the live ledger
+ * stamps each record at record time, whereas a fresh adapter run stamps "now",
+ * so completeness is about domain content, not the generation timestamp.
+ */
+function domainJson(records: readonly BackendSpineCoreRecord[]): string {
+  return sortedJson(records.map((r) => ({ ...r, lastModified: '<normalized>' })));
+}
+
+function workspaceSnapshot(): WorkspaceData {
+  const s = useWorkspaceStore.getState();
+  return {
+    workspaceId: s.workspaceId,
+    projectName: s.projectName,
+    nodes: s.nodes,
+    deskMaps: s.deskMaps,
+    leaseholdUnit: s.leaseholdUnit,
+    leaseholdAssignments: s.leaseholdAssignments,
+    leaseholdOrris: s.leaseholdOrris,
+    leaseholdTransferOrderEntries: s.leaseholdTransferOrderEntries,
+    activeDeskMapId: s.activeDeskMapId,
+    activeUnitCode: s.activeUnitCode,
+    instrumentTypes: s.instrumentTypes,
+  };
+}
 
 const WS = 'ws-live-journal';
 const LEASE: Lease = createBlankLease(WS, 'owner-1', {
@@ -106,6 +149,8 @@ function driveSevenMutations(): void {
 describe('Phase 4 LIVE title journal (real store auto-records)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Restore the real-delegating recorder (a prior test may have overridden it).
+    recordSpy.current = vi.fn(recordSpy.real!);
     reset();
   });
 
@@ -149,6 +194,44 @@ describe('Phase 4 LIVE title journal (real store auto-records)', () => {
     expect(log.actionRecords).toHaveLength(0);
     // but the canonical store committed the mutation
     expect(useWorkspaceStore.getState().nodes.some((n) => n.id === 'root')).toBe(true);
+  });
+
+  it('captures field edits (updateNode) so the ledger replays to the adapter', async () => {
+    const store = () => useWorkspaceStore.getState();
+    store().createRootNode('root', '1', { grantee: 'Root', interestClass: 'mineral', linkedOwnerId: 'owner-1' });
+    store().convey('root', 'child', '0.5', { grantee: 'Child' });
+    // a committed field edit — changes projected fields (grantee, docNo, remarks)
+    store().updateNode('child', { grantee: 'Renamed Child', docNo: 'MD-99', remarks: 'edited' });
+    await settleTitleActionLog();
+
+    const log = useTitleActionLog.getState();
+    expect(log.lastDivergence).toBeNull();
+    expect(log.recordedMutationCount).toBe(3); // create, convey, update
+    expect(log.actionRecords.map((r) => r.actionKind)).toContain('title.update');
+
+    // COMPLETENESS: replaying the durable ledger reproduces the live adapter
+    // projection exactly — including the field edit. The ledger is now a
+    // complete title-node source-of-truth, not just structural mutations.
+    const adapterTitleRecords = titleRecordsFromWorkspace({
+      workspace: workspaceSnapshot(),
+      ownerData: { owners: useOwnerStore.getState().owners, leases: useOwnerStore.getState().leases },
+      projectId: WS,
+      generatedAt: '2026-06-02T00:00:00.000Z',
+    });
+    expect(domainJson(replayTitleProjection(log.actionRecords))).toBe(domainJson(adapterTitleRecords));
+  });
+
+  it('skips a no-op update (no projected change → no ledger record)', async () => {
+    const store = () => useWorkspaceStore.getState();
+    store().createRootNode('root', '1', { grantee: 'Root' });
+    await settleTitleActionLog();
+    const countAfterCreate = useTitleActionLog.getState().recordedMutationCount;
+
+    // set a field to a value that does not change the projected records
+    store().updateNode('root', { isCollapsed: true }); // UI-only field, not projected
+    await settleTitleActionLog();
+
+    expect(useTitleActionLog.getState().recordedMutationCount).toBe(countAfterCreate);
   });
 
   it('kill switch: setEnabled(false) stops all recording', async () => {

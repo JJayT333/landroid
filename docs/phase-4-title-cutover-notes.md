@@ -1,10 +1,13 @@
 # Phase 4 — Title-Tree Cutover (Option B, command-sourcing) — Notes
 
-Status: cutover MECHANISM built and proven in shadow, **and the WRITE path is now
-wired live** (recording-only). The current Zustand store stays canonical for all
-READS and the engine stays the math authority. **No READ flip happened** —
-`title_tree` stays `shadow`, the read path defaults to the store. Hand back to the
-reviewer for the read-path flip.
+Status: cutover MECHANISM built and proven in shadow; the WRITE path is wired
+live (recording-only); the ledger now captures **all** title-node mutations
+(structural + field edits), so it is a complete title source-of-truth; and the
+READ-path flip is **wired into the one live record consumer** (evidence-vault),
+default shadow + reversible. The Zustand store stays canonical for all reads and
+the engine stays the math authority. **No live read flip is enabled** — every
+read path defaults to the store; no call site sets `cutover`. Hand back to the
+reviewer to enable the read flip after a real-data soak.
 
 Branch: `feat/phase-4-title-cutover` (off `feat/phase-4-action-layer`). Commit
 range: see `git log feat/phase-4-action-layer..HEAD`. The first four commits are
@@ -161,6 +164,33 @@ seven mutations + a delete and asserts the ledger fills with a verified chain, t
 store stays canonical, a forced divergence is surfaced without rollback, and the
 kill switch works.
 
+## Ledger completeness + read-path flip at the consumer (follow-up step)
+
+After the live write path landed, two more steps made the ledger a complete
+source-of-truth and wired the read flip at the real consumer.
+
+**Ledger completeness (`title.update`).** The seven structural mutations weren't
+enough — the app also edits node fields via `updateNode`, `rebalance`,
+`clearLinkedOwner`, `clearLinkedLease`, and `syncLeaseNodesFromRecord`, which
+change a node's projected records. A new generic `title.update` command kind now
+captures these. `updateNode` is committed (NodeEditModal holds local form state and
+only writes on Save), so journaling per call does not flood the ledger; a no-op
+edit (no projected change) produces zero effects and is skipped. The completeness
+proof: after a structural mutation **and** a field edit through the real store,
+`replayTitleProjection(ledger)` equals the live adapter projection
+(`title-action-log.test.ts`).
+
+**Read flip at evidence-vault.** Title records are read in exactly one place,
+`buildProjectRecordsWithEvidenceVault`. It now takes an optional
+`titleReadPath?: { mode, actionRecords }`: default/`shadow` sources title records
+from the adapter (unchanged); `cutover` replays the durable ledger and splices
+those title records in, leaving every other record untouched. The flip is
+reversible by `mode` alone, and `title-read-flip.test.ts` proves shadow == omitted,
+cutover is domain-faithful to shadow when the ledger is complete, and
+shadow→cutover→shadow round-trips. `buildProjectRecordsWithEvidenceVault` has no
+live caller yet, so this is the read flip *built and wired at the consumer*, still
+default-off — the reviewer enables it.
+
 ## Confirmation: NO read flip / NO cutover happened
 
 - `LIVE_CUTOVER_DISABLED = true`; `title_tree` stays `shadow`.
@@ -179,6 +209,11 @@ kill switch works.
   `set()`, and is wrapped so it can never alter the store's result or state.
 - `src/main.tsx` — one side-effect import to register the journal hook at startup.
   Behavior-preserving: recording-only; reads and all existing flows unchanged.
+- `src/project-records/action-layer/commands.ts` — added the `title.update`
+  command kind + its surface mapping. Additive; no existing kind changed.
+- `src/project-records/evidence-vault.ts` — added an optional `titleReadPath`
+  input and a guarded splice. Behavior-preserving: omitted/`shadow` is the prior
+  behavior exactly; only an explicit `cutover` opt-in changes the title source.
 
 PII rule held: `scripts/springhill/` and all real `.landroid` data were never
 touched; every fixture is synthetic.
@@ -186,23 +221,25 @@ touched; every fixture is synthetic.
 ## Commands & results
 
 - `npm run lint` (tsc --noEmit): clean.
-- `npm run test` (full vitest suite): **811 passing / 115 files**, including the
-  Phase 0 goldens, all Phase 4 action-layer suites, the 24 title-cutover tests
-  (7 files), and the 3 live-journal tests.
+- `npm run test` (full vitest suite): **816 passing / 116 files**, including the
+  Phase 0 goldens, all Phase 4 action-layer suites, the title-cutover suites, the
+  live-journal suite (incl. the completeness proof), and the read-flip suite.
 - New suites: `title-command-sourcing`, `title-replay`, `title-divergence`,
   `title-math-parity`, `title-cutover-gate`, `title-read-path`, `title-undo`,
-  `title-action-log` (live wiring).
+  `title-action-log` (live wiring + completeness), `title-read-flip` (consumer).
 
 ## Open questions for the reviewer (batched, non-blocking)
 
-1. **Read-path flip (the remaining headline call).** The write path now records
-   live (recording-only); the read path is still the store. Flipping reads to the
-   action-derived projection is the actual cutover. It is blocked until the ledger
-   is a *complete* node source-of-truth (open question 6) and a full real-data
-   parity soak is green. Also confirm the live divergence behavior is what you want
-   (currently: surface + keep the record out of the ledger, never roll back the
-   canonical store) and whether live records should distinguish AI vs UI origin
-   (currently all `'user'` at the store choke point).
+1. **Enabling the read flip (the remaining headline call).** The read flip is now
+   built and wired at the one consumer (`evidence-vault`), default shadow. To
+   ENABLE it live, a caller passes `titleReadPath: { mode: 'cutover', actionRecords }`
+   from `useTitleActionLog`. Two things to settle first: (a) the live ledger is
+   eventually-consistent (fire-and-forget), so a `cutover` read must `await
+   settleTitleActionLog()` to avoid reading a stale projection — wire that into the
+   caller; (b) a real-data parity soak (the 50–500MB import workflow) should run
+   green before flipping. Also confirm the live divergence behavior (surface +
+   keep out of ledger, never roll back) and whether live records should carry AI
+   vs UI origin (currently all `'user'` at the store choke point).
 2. **Desk-map / leasehold scope at cutover.** Math parity holds the live desk
    maps + leasehold unit/assignments/orris fixed and only swaps the title node
    set, because those are not Phase 4 title surfaces. Confirm desk_map/unit stay
@@ -218,10 +255,10 @@ touched; every fixture is synthetic.
    step (Phase 4 open question #4 names v9 but does not define it)?
 5. **PII.** No `scripts/springhill/` or real `.landroid` data was touched; all
    fixtures synthetic. Confirm that remains the rule through cutover.
-6. **Ledger completeness for the read flip.** The live journal records only the
-   seven structural mutations. Field-level edits (`updateNode`, `rebalance`,
-   `clearLinked*`, `syncLeaseNodesFromRecord`) are not in the typed command
-   catalog, so the ledger is not yet a complete node source-of-truth — the read
-   flip cannot be pulled until those are captured (either as new typed commands or
-   as a generic `title.update` command). This is the natural next step after this
-   one, and is the same boundary that motivates the eventual Option A reducer.
+6. **Ledger completeness — DONE.** Field-level edits (`updateNode`, `rebalance`,
+   `clearLinked*`, `syncLeaseNodesFromRecord`) are now captured as `title.update`
+   commands, so the ledger is a complete title-node source-of-truth (proven:
+   replay == adapter after a field edit). Remaining nuance for the reviewer: a
+   `title.update` records the full node delta as effects + snapshots; if you later
+   want field-level provenance (which field changed, by whom) that would be a
+   richer command payload, not required for cutover parity.

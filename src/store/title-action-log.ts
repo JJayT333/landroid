@@ -128,6 +128,10 @@ export const useTitleActionLog = create<TitleActionLogState>()((set, get) => ({
         aiToolName,
         priorHeadHash: get().headHash,
       });
+      // A mutation that did not change any projected title record (e.g. an edit
+      // that touched only non-projected fields, or set a field to its current
+      // value) produces no effects — keep it out of the ledger.
+      if (result.delta.effects.length === 0) return;
       set((state) => ({
         actionRecords: [...state.actionRecords, result.actionRecord],
         auditEvents: [...state.auditEvents, result.auditEvent],

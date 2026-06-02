@@ -928,15 +928,16 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
   },
 
   rebalance: (nodeId, newInitialFraction, formFields) => {
-    const { nodes } = get();
-    const parentId = findParentId(nodes, nodeId);
-    const result = executeRebalance({ allNodes: nodes, nodeId, newInitialFraction, parentId: parentId ?? undefined, formFields });
+    const state = get();
+    const parentId = findParentId(state.nodes, nodeId);
+    const result = executeRebalance({ allNodes: state.nodes, nodeId, newInitialFraction, parentId: parentId ?? undefined, formFields });
     if (result.ok) {
       set({
         nodes: result.data.map((node) => normalizeOwnershipNode(node)),
         lastAudit: result.audit,
         lastError: null,
       });
+      journalTitleMutation('update', state, get());
       return true;
     }
     set({ lastError: result.error.message });
@@ -1104,12 +1105,19 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
     return newId;
   },
 
-  addNode: (node) => set((state) => ({ nodes: [...state.nodes, node] })),
+  addNode: (node) => {
+    const before = get();
+    set((state) => ({ nodes: [...state.nodes, node] }));
+    journalTitleMutation('update', before, get());
+  },
 
-  updateNode: (id, fields) =>
+  updateNode: (id, fields) => {
+    const before = get();
     set((state) => ({
       nodes: state.nodes.map((n) => (n.id === id ? { ...n, ...fields } : n)),
-    })),
+    }));
+    journalTitleMutation('update', before, get());
+  },
 
   removeNode: (id) => {
     const state = get();
@@ -1157,7 +1165,8 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
     });
   },
 
-  clearLinkedOwner: (ownerId) =>
+  clearLinkedOwner: (ownerId) => {
+    const before = get();
     set((state) => {
       useCurativeStore.getState().unlinkOwner(ownerId);
       return {
@@ -1165,9 +1174,12 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
           node.linkedOwnerId === ownerId ? { ...node, linkedOwnerId: null } : node
         ),
       };
-    }),
+    });
+    journalTitleMutation('update', before, get());
+  },
 
-  clearLinkedLease: (leaseId) =>
+  clearLinkedLease: (leaseId) => {
+    const before = get();
     set((state) => {
       useCurativeStore.getState().unlinkLease(leaseId);
       return {
@@ -1185,9 +1197,12 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
             : node
         ),
       };
-    }),
+    });
+    journalTitleMutation('update', before, get());
+  },
 
-  syncLeaseNodesFromRecord: (lease) =>
+  syncLeaseNodesFromRecord: (lease) => {
+    const before = get();
     set((state) => {
       const nodeById = new Map(state.nodes.map((node) => [node.id, node]));
       let changed = false;
@@ -1214,7 +1229,9 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
       });
 
       return changed ? { nodes: nextNodes } : {};
-    }),
+    });
+    journalTitleMutation('update', before, get());
+  },
 
   addNodeToActiveDeskMap: (nodeId) =>
     set((state) => {
