@@ -5,7 +5,78 @@ Use this file to resume the active workstream in a new chat. Read it with
 `DEPLOYMENT_STATE.md` before touching code. Keep long history in
 `CHANGELOG.md`.
 
-## Current Branch
+## Current Audit-Cleanup Handoff - 2026-06-02
+
+Branch: `fix/title-action-cleanup`
+
+Workstream: audit-cleanup Branch A, based on local
+`feat/phase-4-title-cutover`.
+
+Completed in this branch:
+
+- ACT-H02: malformed active title action rows now fail closed with
+  `InvalidTitleActionReplayError`, including invalid record IDs; replay and
+  node reconstruction propagate the failure.
+- ACT-H04: `loadWorkspace` is the reset choke point for title action logs.
+  Workspace replacement now clears action records, audit events, and head hash,
+  and invalidates in-flight old-workspace recordings.
+- ACT-M03: default title command IDs now use a `crypto.randomUUID()` suffix with
+  the existing `title:<mutation>:` prefix; explicit command IDs remain honored.
+- ACT-L01: action-log and nearby title-cutover comments now reflect that
+  projected field edits record as `title.update`.
+- `docs/audit-backlog.md` rows for those four IDs are marked
+  `Fixed (audit-cleanup batch)` with one-line status notes.
+
+Latest validation:
+
+- `npm test -- src/project-records/__tests__/title-replay.test.ts`
+  - passed, 1 file / 4 tests.
+- `npm test -- src/project-records/__tests__/title-divergence.test.ts`
+  - passed, 1 file / 4 tests.
+- `npm test -- src/store/__tests__/title-action-log.test.ts`
+  - passed, 1 file / 6 tests. Existing intentional title-divergence stderr
+    appeared.
+- `npm test -- src/store/__tests__/workspace-store.test.ts`
+  - passed, 1 file / 14 tests. Existing simulated Dexie failure stderr
+    appeared.
+- `npm run lint`
+  - passed.
+- `npm run test`
+  - passed, 116 files / 818 tests. Existing intentional stderr coverage for
+    title divergence, simulated Dexie failures, and post-v8 backup failure
+    appeared.
+
+Open risks / deliberately deferred:
+
+- ACT-H01, ACT-H03, and ACT-H05 remain open and are outside this cleanup batch.
+  Do not claim title-ledger read-cutover readiness while those blockers remain.
+- Branch B (`chore/audit-cleanup` from `main`) is still pending: LLA-H04,
+  LLA-M02, LLA-M03, LLA-M05, LLA-M13, LLA-M14, LLA-L01, LLA-L04, and LLA-L05.
+- Existing untracked local artifacts remain intentionally uncommitted unless
+  the user asks otherwise:
+  `docs/.audit-backlog.md.swp`,
+  `docs/archive/audits/LINE_BY_LINE_AUDIT_2026-05-31.md`, and
+  `scripts/springhill/`.
+
+Likely next steps:
+
+1. Push `fix/title-action-cleanup` and open its PR against
+   `feat/phase-4-title-cutover`.
+2. Start Branch B from `main` as `chore/audit-cleanup` after preserving or
+   committing any current handoff changes.
+3. Keep Branch B independent from title-stack-only files.
+
+Paste-ready next chat prompt:
+
+> Read `/Users/abstractmapping/projects/landroid/AGENTS.md`,
+> `/Users/abstractmapping/projects/landroid/PROJECT_CONTEXT.md`, and
+> `/Users/abstractmapping/projects/landroid/CONTINUATION-PROMPT.md`. Continue
+> the audit-cleanup batch. Branch A is `fix/title-action-cleanup` based on
+> `feat/phase-4-title-cutover`; it fixed ACT-H02, ACT-H04, ACT-M03, and
+> ACT-L01 and passed `npm run lint` plus `npm run test`. Branch B from `main`
+> is still pending as `chore/audit-cleanup`.
+
+## Historical Branch Notes
 
 `feat/phase-3-import-session` — Phase 3 ImportSession / source-review /
 ActionPlan staging is ready for Claude review. Do not merge from this branch in
@@ -31,7 +102,7 @@ Merged to `main` (squash; each validated by CI = lint + test + build):
 Do not commit directly to `main` unless the user explicitly asks for a direct
 main push/deploy.
 
-## Current Workstream
+## Historical Workstream Notes
 
 Phase 3 import-session staging is active on this branch. The goal is to turn
 uploads into reviewable staged work, not blind mutation. This branch is additive
