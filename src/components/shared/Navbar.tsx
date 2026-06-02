@@ -250,7 +250,7 @@ export default function Navbar() {
         // Phase 5: refresh node.attachments[] after PDF table write.
         await useWorkspaceStore
           .getState()
-          .hydrateNodeAttachments()
+          .hydrateNodeAttachments({ strict: true })
           .catch(() => {});
       } else if (file.name.endsWith('.csv')) {
         assertFileSize(file, FILE_SIZE_LIMITS.SPREADSHEET, 'CSV file');

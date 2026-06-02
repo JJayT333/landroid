@@ -207,6 +207,16 @@ function buildDeskMapRecord(
     revision: options.revision,
     source: options.source,
     syncState: options.syncState,
+    deskMapId: deskMap.id,
+    name: deskMap.name || deskMap.code || deskMap.id,
+    code: deskMap.code,
+    tractId: deskMap.tractId,
+    grossAcres: deskMap.grossAcres,
+    pooledAcres: deskMap.pooledAcres,
+    description: deskMap.description,
+    nodeIds: deskMap.nodeIds,
+    unitName: deskMap.unitName,
+    unitCode: deskMap.unitCode,
   });
 }
 

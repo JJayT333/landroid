@@ -13,6 +13,10 @@ import { useResearchStore } from './store/research-store';
 import { useCurativeStore } from './store/curative-store';
 import { useWorkspaceStore } from './store/workspace-store';
 import { useCanvasStore } from './store/canvas-store';
+// Phase 4 (shadow): registers the title-tree write-path journal hook at startup
+// so title mutations are recorded as durable ActionRecords alongside the
+// canonical store. Recording-only; reads stay on the store. Side-effect import.
+import './store/title-action-log';
 import { saveWorkspaceShardsToDb, loadWorkspaceFromDb } from './storage/workspace-persistence';
 import { saveCanvasToDb, loadCanvasFromDb } from './storage/canvas-persistence';
 import {

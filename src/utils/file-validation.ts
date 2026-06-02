@@ -1,5 +1,12 @@
 export const FILE_SIZE_LIMITS = {
-  LANDROID: 50 * 1024 * 1024,
+  // Real title projects can carry hundreds of recorded instruments, each
+  // embedded as a base64 PDF blob, so a whole-workspace export legitimately
+  // runs to hundreds of MB. The practical ceiling is the browser itself:
+  // import reads the file into one string via `File.text()` before
+  // `JSON.parse`, and V8 caps a single string near ~512MB. 500MB stays under
+  // that while accommodating large units. Beyond this, import must move to a
+  // streaming/chunked reader rather than loading the whole file as one string.
+  LANDROID: 500 * 1024 * 1024,
   SPREADSHEET: 15 * 1024 * 1024,
   PDF: 25 * 1024 * 1024,
   IMAGE: 10 * 1024 * 1024,

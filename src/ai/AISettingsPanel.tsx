@@ -1,6 +1,7 @@
 /**
  * Provider & model settings surface. Rendered inline at the top of the AI panel.
- * Keys live in localStorage only — we warn the user about browser exposure.
+ * Persisted preferences are provider/model/base URL only; cloud API keys stay
+ * in session memory.
  */
 import { useAISettingsStore, MODEL_SUGGESTIONS, type AIProvider } from './settings-store';
 import { isHostedMode } from '../utils/deploy-env';
@@ -83,7 +84,10 @@ export default function AISettingsPanel({ onClose }: { onClose: () => void }) {
           />
           <p className="mt-1 text-[10px] text-ink-light">
             Ollama must allow browser requests. If chat fails with a CORS error,
-            restart Ollama with <code className="font-mono">OLLAMA_ORIGINS=*</code>.
+            restart Ollama with{' '}
+            <code className="font-mono">
+              OLLAMA_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
+            </code>.
           </p>
         </label>
       )}

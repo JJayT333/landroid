@@ -652,7 +652,7 @@ function toolCallSummary(call: ToolCall): { text: string; ok: boolean | null } {
       };
     case 'createNpri':
       return {
-        text: `createNpri ${peek(input.share)} (${peek(input.royaltyKind) || 'fixed'}) on ${peek(input.parentNodeId)} → ${peek(out?.nodeId) || '✗'}`,
+        text: `createNpri ${peek(input.share)} (${peek(input.royaltyKind) || 'unclassified'}) on ${peek(input.parentNodeId)} → ${peek(out?.nodeId) || '✗'}`,
         ok: okFlag,
       };
     case 'precede':
