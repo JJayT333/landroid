@@ -83,7 +83,10 @@ export default function AISettingsPanel({ onClose }: { onClose: () => void }) {
           />
           <p className="mt-1 text-[10px] text-ink-light">
             Ollama must allow browser requests. If chat fails with a CORS error,
-            restart Ollama with <code className="font-mono">OLLAMA_ORIGINS=*</code>.
+            restart Ollama with{' '}
+            <code className="font-mono">
+              OLLAMA_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
+            </code>.
           </p>
         </label>
       )}
