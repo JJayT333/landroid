@@ -3,6 +3,7 @@ import type {
   Lease,
   Owner,
   OwnerDoc,
+  OwnerDocMeta,
   OwnerPanelTab,
 } from '../../types/owner';
 import OwnerContactsTab from './OwnerContactsTab';
@@ -23,7 +24,7 @@ interface OwnerDetailPanelProps {
   owner: Owner;
   leases: Lease[];
   contacts: ContactLog[];
-  docs: OwnerDoc[];
+  docs: OwnerDocMeta[];
   tab: OwnerPanelTab;
   onChangeTab: (tab: OwnerPanelTab) => void;
   onSaveOwner: (fields: Partial<Owner>) => Promise<void>;

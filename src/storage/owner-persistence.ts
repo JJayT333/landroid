@@ -1,11 +1,31 @@
 import db from './db';
-import { normalizeLease, type ContactLog, type Lease, type Owner, type OwnerDoc } from '../types/owner';
+import {
+  normalizeLease,
+  type ContactLog,
+  type Lease,
+  type Owner,
+  type OwnerDoc,
+  type OwnerDocMeta,
+} from '../types/owner';
 
 export interface OwnerWorkspaceData {
   owners: Owner[];
   leases: Lease[];
   contacts: ContactLog[];
   docs: OwnerDoc[];
+}
+
+/** Project-open shape: owner docs carry metadata only, never the file blob. */
+export interface OwnerWorkspaceMetadata {
+  owners: Owner[];
+  leases: Lease[];
+  contacts: ContactLog[];
+  docs: OwnerDocMeta[];
+}
+
+function stripOwnerDocBlob(doc: OwnerDoc): OwnerDocMeta {
+  const { blob: _blob, ...meta } = doc;
+  return meta;
 }
 
 export async function loadOwnerWorkspaceData(
@@ -24,6 +44,46 @@ export async function loadOwnerWorkspaceData(
     contacts,
     docs,
   };
+}
+
+/**
+ * Metadata-first project-open reader. Identical to {@link loadOwnerWorkspaceData}
+ * except owner documents are returned blob-free so opening a project never
+ * holds blob bytes. Fetch bytes on demand with {@link getOwnerDocBlob}.
+ */
+export async function loadOwnerWorkspaceMetadata(
+  workspaceId: string
+): Promise<OwnerWorkspaceMetadata> {
+  const [owners, leases, contacts, docs] = await Promise.all([
+    db.owners.where('workspaceId').equals(workspaceId).sortBy('name'),
+    db.leases.where('workspaceId').equals(workspaceId).toArray(),
+    db.contactLogs.where('workspaceId').equals(workspaceId).toArray(),
+    db.ownerDocs.where('workspaceId').equals(workspaceId).toArray(),
+  ]);
+
+  return {
+    owners,
+    leases: leases.map((lease) => normalizeLease(lease, { workspaceId })),
+    contacts,
+    docs: docs.map(stripOwnerDocBlob),
+  };
+}
+
+/**
+ * Read the blob-bearing owner documents for a workspace. Used by
+ * `.landroid` export and the AI undo snapshot, which must carry the file
+ * bytes even though the in-memory store holds metadata only.
+ */
+export async function loadOwnerDocsWithBlobs(
+  workspaceId: string
+): Promise<OwnerDoc[]> {
+  return db.ownerDocs.where('workspaceId').equals(workspaceId).toArray();
+}
+
+/** Fetch a single owner document's file blob on demand (preview/download). */
+export async function getOwnerDocBlob(id: string): Promise<Blob | undefined> {
+  const doc = await db.ownerDocs.get(id);
+  return doc?.blob;
 }
 
 export async function replaceOwnerWorkspaceData(
@@ -89,6 +149,16 @@ export function saveContact(contact: ContactLog) {
 
 export function saveOwnerDoc(doc: OwnerDoc) {
   return db.ownerDocs.put(doc);
+}
+
+/**
+ * Update an owner document's editable metadata fields in place. The stored
+ * file blob is left untouched, so a metadata edit never needs the bytes in
+ * memory.
+ */
+export function updateOwnerDocFields(id: string, fields: Partial<OwnerDoc>) {
+  const { id: _id, blob: _blob, ...rest } = fields;
+  return db.ownerDocs.update(id, rest);
 }
 
 export function deleteOwner(id: string) {
