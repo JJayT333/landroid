@@ -90,11 +90,22 @@ export default function DeskMapDocumentChips({
               event.stopPropagation();
               onViewDoc(attachment.docId);
             }}
-            className={`inline-flex max-w-full items-center gap-1 rounded-md border px-2 py-1 text-[9px] font-semibold transition-colors ${chipClass}`}
-            title={`View attached PDF: ${label}`}
+            className={`group inline-flex max-w-full items-center gap-1 rounded-md border px-2 py-1 text-[9px] font-semibold transition-colors ${chipClass}`}
+            title={`View document: ${label}`}
           >
             <span className="shrink-0 uppercase tracking-wider">PDF</span>
             <span className="truncate">{label}</span>
+            <span
+              aria-hidden
+              className="shrink-0 inline-flex items-center gap-0.5 rounded-sm border border-current/40 px-1 uppercase tracking-wider opacity-80 group-hover:opacity-100"
+            >
+              {/* eye icon */}
+              <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+                <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z" />
+                <circle cx="12" cy="12" r="3" />
+              </svg>
+              View
+            </span>
           </button>
         );
       })}

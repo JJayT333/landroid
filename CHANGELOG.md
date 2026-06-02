@@ -3,6 +3,55 @@
 This file records meaningful project changes so `CONTINUATION-PROMPT.md` can
 stay short.
 
+## 2026-06-02
+
+- Closed the main-line audit-cleanup batch for the 2026-05-31 line-by-line
+  audit. AI NPRI creation now requires explicit royalty characterization,
+  document attachment ordering is workspace-scoped, strict import hydration
+  clears stale attachment badges, non-Texas math lease attachments are blocked,
+  CI branch filters match the branch taxonomy, aggregate local validation
+  scripts cover root and backend packages, Ollama CORS guidance uses explicit
+  local origins, stale patch-plan docs are archived, and AI settings comments
+  match the session-only cloud key policy.
+
+## 2026-06-01
+
+- Added Phase 3 import-session staging. Synthetic uploads can now be modeled as
+  recurring runsheet or title-opinion source packages with immutable source rows
+  and excerpts, staged candidates with confidence and blocking questions,
+  `ActionPlan` dry-run previews, side-by-side OCR/text review projections, and
+  batch approval into typed action drafts plus source citations. The phase
+  remains project-record-only and does not apply target records to live Zustand
+  stores or v8 `.landroid` packages.
+- Added the local-first OCR/text citation foundation. Backend-spine records now
+  model `extraction_run` lineage, derivative OCR/text vault objects, source
+  citation creation metadata, and page/span/polygon anchors. The pure extraction
+  builder keeps selectable-PDF text separate from scanned-PDF OCR, preserves
+  originals through `derivedFromVaultObjectId`, records failures without
+  derivatives, and leaves cloud OCR as per-document opt-in metadata only. AI
+  document-text answers remain disabled until the UI path can verify citations.
+- Added the first Evidence Vault project-record adapter. Registry documents,
+  owner documents, map assets, and research imports now project into shared
+  `document`, `document_version`, `vault_object`, and `document_link` records
+  with SHA-256 hashes and deterministic workspace-scoped links, while v8
+  `.landroid` and live Dexie side stores remain authoritative.
+- Added deterministic attorney packet export modeling: manifest checksums,
+  packet records/items/exports, source-citation sidecars, unresolved issue
+  summaries, and optional eDiscovery sidecars are produced as pure
+  project-record projections. Native ZIP/PDF packaging remains a later step.
+- Added Phase 1 project-record schema foundations beside the running app. The
+  backend-spine contract now defines full body schemas for instruments, tracts,
+  desk maps, leases, units, wellbores, interest references, curative issues,
+  lease obligations/events, and packet records instead of envelope-only stubs.
+- Added pure project-record adapters and projections under
+  `src/project-records`: current `WorkspaceData` can be validated into
+  backend-spine records without serializing blobs, and `MathInputView`,
+  `OpinionDraft`, `ObligationCalendar`, `AbstractorPackage`, packet export, AI
+  context, and structural citation-verifier contracts are defined read-side.
+- Documented the future `.landroid` project-record migration strategy. Phase 1
+  keeps the live package format at v8 and makes no UI/store/runtime source of
+  truth change.
+
 ## 2026-05-30
 
 - Requested persistent browser storage on startup via the Storage API where

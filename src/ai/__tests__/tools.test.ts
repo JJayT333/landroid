@@ -262,6 +262,49 @@ describe('AI tools — read-only project queries', () => {
     ]);
   });
 
+  it('blocks AI NPRI mutations until royalty kind and fixed basis are explicit', async () => {
+    useWorkspaceStore.setState({
+      deskMaps: [deskMap({ id: 'dm-1', nodeIds: ['root'] })],
+      activeDeskMapId: 'dm-1',
+      nodes: [
+        {
+          ...createBlankNode('root'),
+          grantee: 'Root Owner',
+          fraction: '1',
+          initialFraction: '1',
+        },
+      ],
+    });
+
+    const missingRootKind = await runTool(landroidTools.createRootNode, {
+      kind: 'npri',
+      initialFraction: '1/16',
+    });
+    await expectQueuedApprovalBlocked(missingRootKind, /NPRI royalty kind/);
+
+    const missingBranchKind = await runTool(landroidTools.createNpri, {
+      parentNodeId: 'root',
+      share: '1/16',
+    });
+    await expectQueuedApprovalBlocked(missingBranchKind, /NPRI royalty kind/);
+
+    const missingRootBasis = await runTool(landroidTools.createRootNode, {
+      kind: 'npri',
+      initialFraction: '1/16',
+      royaltyKind: 'fixed',
+    });
+    await expectQueuedApprovalBlocked(missingRootBasis, /Fixed NPRI basis/);
+
+    const missingBranchBasis = await runTool(landroidTools.createNpri, {
+      parentNodeId: 'root',
+      share: '1/16',
+      royaltyKind: 'fixed',
+    });
+    await expectQueuedApprovalBlocked(missingBranchBasis, /Fixed NPRI basis/);
+
+    expect(useWorkspaceStore.getState().nodes.map((node) => node.id)).toEqual(['root']);
+  });
+
   it('rejects malformed lease economics before AI-created leases enter active math', async () => {
     const owner = { ...createBlankOwner('ws-1'), id: 'owner-1', name: 'Owner One' };
     useOwnerStore.setState({ owners: [owner], leases: [] });

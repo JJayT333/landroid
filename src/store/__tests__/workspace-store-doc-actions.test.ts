@@ -317,6 +317,7 @@ describe('workspace-store document actions (Phase 5)', () => {
       ]);
 
       expect(docMocks.reorderAttachments).toHaveBeenCalledWith(
+        'ws-test',
         'node',
         'node-1',
         ['a3', 'a1', 'a2']
@@ -430,6 +431,23 @@ describe('workspace-store document actions (Phase 5)', () => {
       expect(useWorkspaceStore.getState().nodes[0].attachments).toEqual(
         preExisting
       );
+    });
+
+    it('clears stale badges in strict import hydration when Dexie has no backing rows', async () => {
+      const preExisting = [
+        {
+          docId: 'd1',
+          attachmentId: 'a1',
+          fileName: '1.pdf',
+          kind: 'deed' as const,
+        },
+      ];
+      seed([{ id: 'node-1', attachments: preExisting }]);
+      docMocks.listAttachmentsForNodes.mockResolvedValue(new Map());
+
+      await useWorkspaceStore.getState().hydrateNodeAttachments({ strict: true });
+
+      expect(useWorkspaceStore.getState().nodes[0].attachments).toEqual([]);
     });
   });
 });

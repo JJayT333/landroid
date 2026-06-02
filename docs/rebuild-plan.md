@@ -872,9 +872,9 @@ Implementation checkpoint, 2026-05-25:
 
 - shared contract schemas live in `src/backend-spine/contracts.ts`
 - every declared `recordType` is represented in the validation union. Record
-  types whose full body schema is not defined yet use strict envelope-only
-  stubs so Phase 0.5 can shard against a canonical envelope without accepting
-  arbitrary payloads.
+  types whose full body schema was not defined yet used strict envelope-only
+  stubs so Phase 0.5 could shard against a canonical envelope without accepting
+  arbitrary payloads. Phase 1 replaces those stubs with body schemas.
 - local-only, mock, and hosted adapter boundaries live in
   `src/backend-spine/adapter.ts`
 - the non-user-facing app startup contract check lives in
@@ -1180,6 +1180,24 @@ Exit gate:
   decimal plus fraction display, lease allocation order, warning-only states,
   and jurisdiction isolation
 
+Implementation checkpoint, 2026-06-01:
+
+- full Phase 1 record body schemas extend the existing backend-spine envelope in
+  `src/backend-spine/contracts.ts`
+- pure workspace-to-record and record-bundle validation helpers live under
+  `src/project-records`
+- projection contracts for `MathInputView`, `OpinionDraft`,
+  `ObligationCalendar`, `AbstractorPackage`, packet export, AI context, and
+  structural citation verification live in `src/project-records/projections.ts`
+- `MathInputView` is read-side only: it reuses existing Leasehold/Desk Map math
+  helpers, records dual decimal/fraction displays, carries warning-only states,
+  and enforces Texas-only math isolation as a projection precondition without
+  rewiring UI surfaces
+- the AI mutation coverage guard is behind the projection layer and audits the
+  existing approval/undo/hosted-read-only registries
+- `.landroid` file format remains v8; the future migration strategy is
+  documented in `docs/project-record-migration-strategy.md`
+
 ### Planned Product Lanes Outside Phase 0
 
 These are accepted rebuild-planning lanes, not Phase 0 blockers and not
@@ -1257,6 +1275,18 @@ Exit gate:
 - OCR failure leaves the original document usable and reviewable
 - AI document-text answers remain disabled until citations can be verified
 - cloud OCR data residency and retention risks are documented before any upload
+
+Implementation state:
+
+- The record foundation is additive: `extraction_run`, OCR/text derivative
+  vault-object kinds, and page/span/polygon citation anchors are modeled without
+  changing live stores or `.landroid` package format.
+- Local extraction remains the default. Selectable-PDF text and scanned-PDF OCR
+  are separate modes; no OCR subprocess is invoked by the app yet.
+- Cloud OCR is interface-only and requires explicit per-document opt-in risk
+  fields before any future upload path can exist.
+- AI document-text answers remain disabled; the citation verifier now rejects
+  document-text citations that lack extraction-run output and page/span anchors.
 
 ### Phase 3: ImportSession, Source Review, And ActionPlan
 

@@ -150,12 +150,17 @@ function DeskMapCard({
             </div>
           </div>
           {(node.vol || node.page || node.docNo) && (
-            <div className="text-[9px] text-ink-light/70 font-mono mt-0.5">
-              {node.vol && `Vol. ${node.vol}`}
-              {node.vol && node.page && ' / '}
-              {node.page && `Pg. ${node.page}`}
-              {(node.vol || node.page) && node.docNo && ' \u2014 '}
-              {node.docNo && `Doc# ${node.docNo}`}
+            <div className="mt-0.5 flex flex-wrap items-center gap-1 text-[9px] font-mono">
+              {(node.vol || node.page) && (
+                <span className="inline-flex items-center rounded-sm border border-leather/30 bg-leather/5 px-1 text-leather">
+                  {node.vol && `Vol. ${node.vol}`}
+                  {node.vol && node.page && ' / '}
+                  {node.page && `Pg. ${node.page}`}
+                </span>
+              )}
+              {node.docNo && (
+                <span className="text-ink-light/70">{`Doc# ${node.docNo}`}</span>
+              )}
             </div>
           )}
         </div>

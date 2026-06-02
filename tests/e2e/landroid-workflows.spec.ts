@@ -175,7 +175,7 @@ test('combinatorial demo loads with desk-map cards and PDF chips', async ({
   await expect(page.getByText(/Combinatorial Demo — /)).toBeVisible();
   await expect(page.getByText(/^\d+ cards$/).first()).toBeVisible();
   await expect(
-    page.locator('button[data-attachment-id][title^="View attached PDF:"]').first()
+    page.locator('button[data-attachment-id]').first()
   ).toBeVisible();
   await expect(page.getByRole('button', { name: 'Fit' })).toBeVisible();
   await page.getByRole('button', { name: 'Fit' }).click();
@@ -205,7 +205,7 @@ test('multi-document chips open the correct seeded PDFs by attachment id', async
 
   for (const namePattern of seededChipNames) {
     const chip = page
-      .locator('button[data-attachment-id][title^="View attached PDF:"]')
+      .locator('button[data-attachment-id]')
       .filter({ hasText: namePattern })
       .first();
     await expect(chip).toBeVisible();
@@ -216,7 +216,8 @@ test('multi-document chips open the correct seeded PDFs by attachment id', async
     );
     const chipText = (await chipByAttachment.innerText()).replace(/\s+/g, ' ');
     await chipByAttachment.click();
-    const fileName = chipText.replace(/^PDF\s+/, '');
+    const fileName = chipText.match(/[A-Z0-9-]+\.pdf/i)?.[0] ?? '';
+    expect(fileName).toBeTruthy();
     await expect(page.getByRole('dialog', { name: fileName })).toBeVisible();
     await page.getByRole('button', { name: 'Close' }).click();
     await expect(page.getByRole('dialog', { name: fileName })).toBeHidden();
@@ -298,7 +299,7 @@ test('leasehold seed keeps PDF filenames visible and owner leases branch-aware',
   await expect(page.getByText('Raven Forest Unit B').first()).toBeVisible();
   await expect(page.getByText('C10 — Kitchen Sink').first()).toBeVisible();
   await expect(
-    page.locator('[title="View attached PDF: 09-6968.pdf"]').first()
+    page.locator('button[data-attachment-id]').filter({ hasText: '09-6968.pdf' }).first()
   ).toBeVisible();
   await expect(page.getByRole('button', { name: 'PDF 09-6968.pdf' })).toBeVisible();
   await expect(page.getByText('Lessor: Charlotte Whitaker')).toBeVisible();

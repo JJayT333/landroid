@@ -55,7 +55,21 @@ session handoff lives in `CONTINUATION-PROMPT.md`.
 - Preserve `.landroid` package export permanently even after sync/backend work.
 - Promote the Evidence Vault contract: immutable originals, SHA-256 hashes,
   document versions, extraction runs, citation anchors, hash-continuity audit
-  events, and deterministic packet manifests.
+  events, and deterministic packet manifests. The first additive adapter now
+  projects registry documents, owner documents, map assets, and research
+  imports into shared project-record document/link/vault rows; live side-store
+  authority and package format migration remain deferred. OCR/text citation
+  record foundations are now local-first and additive: selectable-PDF text and
+  scanned-PDF OCR are separate extraction modes, derivatives point back to
+  originals, failed runs emit no derivatives, and document-text verifier support
+  requires extraction-run plus page/span anchors. Actual OCR engine execution,
+  searchable PDF generation, search indexes, and AI document Q&A remain
+  deferred gates.
+- Promote staged imports through `ImportSession`: uploads should become
+  immutable source rows/excerpts, reviewable candidates with confidence and
+  questions, dry-run `ActionPlan` previews, and approval-time typed action
+  drafts. Phase 3 keeps this behind the project-record boundary; applying those
+  actions to live stores or `.landroid` packages remains a later gate.
 - Validate and review the Phase 7A document registry MVP from
   `codex/document-registry-build-2026-05-16`: flat document index, saved
   views, metadata editing, duplicate surfacing, linked-node display, and packet
@@ -80,15 +94,17 @@ session handoff lives in `CONTINUATION-PROMPT.md`.
   sidecar.
 - Expand entity document links beyond Desk Map nodes: owners, leases, curative
   issues, and research records.
-- Unify document-like side stores before expanding the vault: owner documents,
-  PDF map assets, research file imports, and registry documents should converge
-  on shared document/entity-link semantics where practical.
+- Decide the live cutover path for document-like side stores: owner documents,
+  PDF map assets, research file imports, and registry documents now have shared
+  project-record semantics, but Dexie/runtime storage should only converge
+  after a separate migration gate.
 - Add import-manifest previews for large document sources such as ArcGIS
   attachment tables, Dropbox/local folders, and selected source packets.
-- Design OCR/text indexing after the document registry exists; AI document
-  query should return citations and stay read-only by default. Until OCR/text
-  anchors exist, AI may cite structured records and source attestations but not
-  unsupported document text spans.
+- Build the local OCR/text engine integration after the record foundation:
+  use local tooling first, support embedded/selectable PDF extraction separately
+  from scanned-PDF OCR, add searchable PDF generation only after a local tool
+  path is available, and keep AI document query disabled until citation
+  verification is wired through the UI path.
 - Design the hybrid retrieval contract for future AI Q&A: exact/keyword search,
   vector recall, graph/schema traversal tools, deterministic math tools, rank
   fusion, and a `CitationVerifier` gate before answers display.

@@ -86,11 +86,34 @@ Target rebuild boundaries:
   documents, instruments, leases, units, wells, source attestations, curative
   issues, import sessions, action plans, action records, packets, and audit
   events. The ownership tree is graph-shaped, but the implementation target is
-  records and projections, not a graph database.
+  records and projections, not a graph database. Phase 1 record body schemas now
+  live in `src/backend-spine/contracts.ts`; pure workspace-to-record adapters,
+  record-bundle validation, `MathInputView`, `OpinionDraft`,
+  `ObligationCalendar`, `AbstractorPackage`, evidence-vault/packet export
+  adapters, AI context, and citation-verifier contracts live under
+  `src/project-records`. These helpers are read-side/additive only and do not
+  replace the current stores.
 - Evidence Vault: immutable originals, content hashes, document versions,
   vault objects, extraction runs, citation anchors, derivative OCR/text
-  artifacts, and deterministic packet manifests. Search indexes and packet
-  exports are rebuildable derivatives.
+  artifacts, and deterministic packet manifests. The current evidence-vault
+  adapter projects registry documents, owner documents, map assets, and
+  research imports into shared `document` / `document_link` / `vault_object`
+  records without changing v8 `.landroid` or Dexie side-store authority. The
+  OCR/text citation foundation adds `extraction_run` records, separate
+  selectable-PDF text versus scanned-PDF OCR modes, derivative vault-object
+  kinds, and page/span/polygon citation anchors through pure project-record
+  helpers only. No OCR subprocess, cloud OCR upload, store migration, or
+  `.landroid` format change is wired yet. Search indexes and packet exports are
+  rebuildable derivatives.
+- Import sessions: uploads become immutable source packages, source rows,
+  source excerpts, staged candidates, and Phase 1 `ActionPlan` dry-run previews
+  before approval. Phase 3 supports recurring runsheet packages,
+  title-opinion-as-root `SourceAttestation` drafts, candidate confidence plus
+  blocking questions, side-by-side OCR/text review when Phase 2.5 text records
+  exist, and batch approval into typed action drafts. It remains
+  project-record-only: approved candidates can create source citations and
+  citation anchors, but do not apply instruments, interests, leases, tracts,
+  live Zustand writes, or `.landroid` format changes.
 - Action layer: typed `ActionPlan` previews and durable `ActionRecord`s over
   records. Meaningful approved changes should also be able to produce
   append-only audit events with hash continuity.
@@ -180,6 +203,12 @@ During rebuild work, do not make the math engine consume new domain records
 directly. Add a stable `MathInputView` projection first, then compare its
 outputs against existing golden masters before any cutover.
 
+The current `MathInputView` projection is implemented behind
+`src/project-records/projections.ts`. It reuses the existing Leasehold and Desk
+Map math helpers, records dual decimal/fraction displays, carries warning-only
+states, and makes Texas/federal/private lease isolation a projection
+precondition without changing live UI behavior.
+
 ## Persistence Boundary
 
 Persistence helpers live under `src/storage`. Import paths must treat external
@@ -207,6 +236,12 @@ explicit before Dexie sharding. Later backend expansion should make sync,
 backup, jobs, search, sharing, and AI policy more durable. Neither the spine nor
 later expansion may make the app unusable offline for core workflows, and
 neither may make LANDroid unable to produce a complete local project package.
+
+The project-record `.landroid` migration strategy is documented in
+`docs/project-record-migration-strategy.md`. Phase 1 does not change the v8 file
+format; any future record-bearing package must use explicit version dispatch
+and validate both the snapshot and the project-record bundle before store
+replacement.
 
 Phase 0.5 planning treats the current storage surface as follows:
 
@@ -274,6 +309,9 @@ Target AI evidence policy:
 - Every displayed answer should pass a `CitationVerifier` boundary. Material
   claims must trace to a source citation, record ID, deterministic math result,
   approved action record, or explicit curative issue.
+- Document-text citations with an `extractionRunId` must also have a successful
+  or partial extraction run, at least one derivative vault object, and a page
+  plus character-span anchor before the verifier treats them as supported.
 - Retrieval should be hybrid: exact/keyword search, vector recall, record
   traversal tools, deterministic math tools, and rank fusion before answer
   generation.

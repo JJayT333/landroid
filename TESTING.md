@@ -5,10 +5,19 @@ Use this file to choose the smallest useful validation set for a change.
 ## Default Commands
 
 ```bash
+npm run validate
+```
+
+`npm run validate` is the full local aggregate: root typecheck, root unit tests,
+production build, Playwright e2e, backend spine audit/test/build, and AI proxy
+audit/test/build. For targeted validation, run the narrower commands directly:
+
+```bash
 npm run lint
 npm test
 npm run build
 npm run test:e2e
+npm run validate:backend
 ```
 
 ## When To Run What
@@ -26,11 +35,13 @@ npm run test:e2e
 | Phase 0 inventory reconciliation | docs diff check, verify highest-risk inventory rows against code before marking them binding, and update `docs/rebuild-plan.md`, `docs/phase-0-inventory.md`, `ROADMAP.md`, `ARCHITECTURE.md`, `SECURITY.md`, and `CONTINUATION-PROMPT.md` together |
 | Backend-spine planning | docs diff check, threat-model/security review notes, data-flow/API boundary review, local/export contract review, backend-shaped local schema review, and explicit smallest implementation slice before backend coding |
 | Minimal backend-spine implementation | `npm run lint`, targeted shared-schema/adapter/app-contract tests, `cd backend/spine && npm ci && npm audit --omit=dev && npm test && npm run build && npm run bundle`, `npm run deploy:check`, root `npm test` if frontend contract code changes, and no hosted-deploy claim without `DEPLOYMENT_STATE.md` plus smoke evidence |
+| Project record schema foundation | `npm run lint`, `npm test -- src/backend-spine/__tests__/contracts.test.ts src/project-records/__tests__/workspace-record-adapter.test.ts src/storage/__tests__/workspace-shards.test.ts src/phase0/__tests__/vulcan-mesa-fixtures.test.ts`, then `npm test` and `npm run build` before handoff |
 | Phase 0.5 storage sharding implementation | `npm run lint`, targeted storage migration/lock/lazy-blob tests, `.landroid` round-trip tests, side-store reset tests, `npm test`, `npm run build`, relevant e2e, and Phase 0 performance-baseline comparison for project open, autosave, document registry, and `.landroid` round trip |
-| Evidence vault, OCR, packet, or AI citation implementation | `npm run lint`, relevant storage/document tests, package round-trip tests, citation-verifier tests, AI tests when answer behavior changes, and targeted browser/e2e smoke for impacted flows |
+| Evidence vault, OCR, packet, or AI citation implementation | `npm run lint`, `npm test -- src/project-records/__tests__/evidence-vault.test.ts src/project-records/__tests__/extraction-runs.test.ts src/project-records/__tests__/workspace-record-adapter.test.ts` plus relevant storage/document tests, package round-trip tests, citation-verifier tests, AI tests when answer behavior changes, and targeted browser/e2e smoke for impacted flows |
+| ImportSession / staged-import implementation | `npm run lint`, `npm test -- src/project-records/__tests__/import-sessions.test.ts`, Phase 0 golden tests, then `npm test`; add storage/UI/e2e checks only if the implementation crosses the project-record boundary |
 | AI tool/provider change | `npm run lint`, AI tests, relevant wizard/tool tests, approval-queue tests, and rollback check |
 | Hosted AI proxy/deploy change | `npm run deploy:check`, `cd backend/ai-proxy && npm test && npx tsc -p tsconfig.json --noEmit`, plus root `npm test` if frontend policy changes; run `bash scripts/smoke-test-hosted.sh` when network/AWS access is available |
-| Release/checkpoint | full default commands plus `npm run deploy:check` for hosted deploy candidates |
+| Release/checkpoint | `npm run validate` plus `npm run deploy:check` for hosted deploy candidates |
 
 For hosted persistence-key changes, include
 `npm test -- src/storage/__tests__/active-workspace-key.test.ts src/storage/__tests__/persistence-db-key.test.ts`.
@@ -154,6 +165,10 @@ For rebuild storage and evidence-vault work, tests should cover:
 - OCR/text extraction failures leave originals usable
 - extraction runs trace from document version to derivative artifacts and source
   citations
+- selectable-PDF text extraction stays separate from scanned-PDF OCR in record
+  mode, tooling expectations, and derivative object kinds
+- cloud OCR records require explicit per-document opt-in risk fields and never
+  run as an ambient fallback
 - packet manifests, checksums, unresolved-issue files, and load-file sidecars
   are deterministic
 
@@ -208,6 +223,34 @@ For AI cited-answer work, tests should cover:
 - every mutating tool that can change project state is covered by approval and
   undo policy; registry drift between tool definitions and undo/approval lists
   must fail a test
+
+For Phase 3 import-session work, tests should cover:
+
+- recurring runsheet packages preserve package series/occurrence metadata
+- source rows and excerpts are immutable and content-hashed
+- title-opinion-as-root imports produce `SourceAttestation` drafts before apply
+- every staged candidate has confidence and can carry blocking questions
+- malformed or ambiguous fraction fields become questions instead of guessed
+  values
+- dry-run `ActionPlan` previews exist before approval and explicitly mark the
+  no-live-store/no-v8 boundary
+- rejected candidates produce no target records, links, citations, action
+  drafts, or other mutation residue
+- approved candidates cite immutable source row IDs and source documents
+- OCR/text side-by-side review appears only when extraction-run and vault-object
+  evidence is available
+
+For Phase 1 project-record schema foundations, tests should cover:
+
+- every declared backend-spine `recordType` parsing through
+  `BackendSpineCoreRecordSchema`
+- serialization/round-trip validation through `ProjectRecordBundleSchema`
+- current `WorkspaceData` projection into records without serializing blobs
+- `MathInputView` preserving dual decimal/fraction display, lease allocation
+  order, warning-only states, and Texas-only math isolation
+- citation-verifier failure behavior before document text Q&A expands
+- the existing Phase 0 golden-master tests that freeze current math/display
+  outputs
 
 For rebuild-scale performance gates, record:
 

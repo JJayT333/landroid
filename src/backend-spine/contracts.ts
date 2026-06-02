@@ -10,6 +10,7 @@ export const BackendSpineRecordTypeSchema = z.enum([
   'document',
   'document_version',
   'vault_object',
+  'extraction_run',
   'document_link',
   'source_citation',
   'citation_anchor',
@@ -55,9 +56,49 @@ export type BackendSpineSyncState = z.infer<typeof BackendSpineSyncStateSchema>;
 const IsoDateTimeSchema = z.string().datetime({ offset: true });
 const IsoDateOnlySchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const NonEmptyStringSchema = z.string().trim().min(1);
+const OptionalTextSchema = z.string().trim().optional();
 const IdSchema = NonEmptyStringSchema.max(160);
 const ContentHashSchema = z.string().regex(/^[a-f0-9]{64}$/);
 const UnknownJsonObjectSchema = z.record(z.string(), z.unknown());
+const IdArraySchema = z.array(IdSchema).default([]);
+const NullableIdSchema = IdSchema.nullable().optional();
+
+export const BackendSpineJurisdictionSchema = z.enum([
+  'tx_fee',
+  'tx_state',
+  'federal',
+  'private',
+  'tribal',
+  'unknown',
+]);
+export type BackendSpineJurisdiction = z.infer<typeof BackendSpineJurisdictionSchema>;
+
+export const BackendSpineInterestClassSchema = z.enum([
+  'mineral',
+  'npri',
+  'leasehold',
+  'orri',
+  'working_interest',
+  'royalty',
+  'other',
+]);
+export type BackendSpineInterestClass = z.infer<typeof BackendSpineInterestClassSchema>;
+
+const RecordingReferenceSchema = z.object({
+  instrumentNumber: OptionalTextSchema,
+  volume: OptionalTextSchema,
+  page: OptionalTextSchema,
+  book: OptionalTextSchema,
+}).strict();
+
+const SurfaceLocationSchema = z.object({
+  latitude: z.number().finite().optional(),
+  longitude: z.number().finite().optional(),
+  abstractName: OptionalTextSchema,
+  surveyName: OptionalTextSchema,
+  county: OptionalTextSchema,
+  state: OptionalTextSchema,
+}).strict();
 
 export const RecordEnvelopeSchema = z.object({
   recordId: IdSchema,
@@ -132,13 +173,93 @@ export type DocumentVersionRecord = z.infer<typeof DocumentVersionRecordSchema>;
 export const VaultObjectRecordSchema = RecordEnvelopeSchema.extend({
   recordType: z.literal('vault_object'),
   objectId: IdSchema,
-  objectKind: z.enum(['original', 'derivative', 'text', 'packet_copy', 'index']),
+  objectKind: z.enum([
+    'original',
+    'derivative',
+    'text',
+    'searchable_pdf',
+    'hocr_json',
+    'text_json',
+    'text_file',
+    'page_image',
+    'packet_copy',
+    'index',
+  ]),
+  derivedFromVaultObjectId: IdSchema.optional(),
   contentHash: ContentHashSchema,
   byteLength: z.number().int().nonnegative(),
   storageRef: NonEmptyStringSchema,
   localOnly: z.boolean().default(false),
 }).strict();
 export type VaultObjectRecord = z.infer<typeof VaultObjectRecordSchema>;
+
+export const ExtractionModeSchema = z.enum(['selectable_pdf_text', 'scanned_pdf_ocr']);
+export type ExtractionMode = z.infer<typeof ExtractionModeSchema>;
+
+export const ExtractionRunStatusSchema = z.enum([
+  'queued',
+  'running',
+  'succeeded',
+  'partial',
+  'low_confidence',
+  'failed',
+  'canceled',
+]);
+export type ExtractionRunStatus = z.infer<typeof ExtractionRunStatusSchema>;
+
+const UnitConfidenceSchema = z.number().finite().min(0).max(1);
+
+export const ExtractionConfidenceSummarySchema = z.object({
+  mean: UnitConfidenceSchema.optional(),
+  minimum: UnitConfidenceSchema.optional(),
+  maximum: UnitConfidenceSchema.optional(),
+  pageCount: z.number().int().nonnegative().optional(),
+  lowConfidencePageCount: z.number().int().nonnegative().optional(),
+}).strict();
+export type ExtractionConfidenceSummary = z.infer<
+  typeof ExtractionConfidenceSummarySchema
+>;
+
+export const ExtractionProviderDecisionSchema = z.discriminatedUnion('providerKind', [
+  z.object({
+    providerKind: z.literal('local'),
+    providerName: NonEmptyStringSchema.optional(),
+  }).strict(),
+  z.object({
+    providerKind: z.literal('cloud'),
+    providerName: NonEmptyStringSchema,
+    optInDocumentId: IdSchema,
+    approvedAt: IsoDateTimeSchema,
+    approvedBy: z.literal('user'),
+    dataResidencyWarningAccepted: z.literal(true),
+    retentionPolicyAcknowledged: z.literal(true),
+    retentionPolicyNote: NonEmptyStringSchema,
+    dataResidencyRegion: OptionalTextSchema,
+  }).strict(),
+]);
+export type ExtractionProviderDecision = z.infer<
+  typeof ExtractionProviderDecisionSchema
+>;
+
+export const ExtractionRunRecordSchema = RecordEnvelopeSchema.extend({
+  recordType: z.literal('extraction_run'),
+  extractionRunId: IdSchema,
+  documentId: IdSchema,
+  inputDocumentVersionId: IdSchema,
+  inputVaultObjectId: IdSchema,
+  extractionMode: ExtractionModeSchema,
+  engine: NonEmptyStringSchema,
+  engineVersion: NonEmptyStringSchema,
+  parameters: UnknownJsonObjectSchema,
+  providerDecision: ExtractionProviderDecisionSchema,
+  status: ExtractionRunStatusSchema,
+  startedAt: IsoDateTimeSchema,
+  completedAt: IsoDateTimeSchema.optional(),
+  confidenceSummary: ExtractionConfidenceSummarySchema.default({}),
+  outputVaultObjectIds: IdArraySchema,
+  errorMessage: OptionalTextSchema,
+}).strict();
+export type ExtractionRunRecord = z.infer<typeof ExtractionRunRecordSchema>;
 
 export const DocumentLinkRecordSchema = RecordEnvelopeSchema.extend({
   recordType: z.literal('document_link'),
@@ -170,16 +291,20 @@ export const SourceCitationRecordSchema = RecordEnvelopeSchema.extend({
   quotedText: z.string().optional(),
   quotedTextHash: ContentHashSchema.optional(),
   confidence: z.enum(['supported', 'partial', 'conflicting', 'insufficient']),
+  createdBy: z.enum(['user', 'system', 'ai', 'import', 'extraction']).optional(),
+  createdAt: IsoDateTimeSchema.optional(),
 }).strict();
 export type SourceCitationRecord = z.infer<typeof SourceCitationRecordSchema>;
 
 export const CitationAnchorRecordSchema = RecordEnvelopeSchema.extend({
   recordType: z.literal('citation_anchor'),
   sourceCitationId: IdSchema,
+  vaultObjectId: IdSchema.optional(),
   pageNumber: z.number().int().positive().optional(),
   charStart: z.number().int().nonnegative().optional(),
   charEnd: z.number().int().nonnegative().optional(),
   bbox: z.array(z.number().finite()).length(4).optional(),
+  polygon: z.array(z.tuple([z.number().finite(), z.number().finite()])).min(3).optional(),
 }).strict();
 export type CitationAnchorRecord = z.infer<typeof CitationAnchorRecordSchema>;
 
@@ -205,51 +330,189 @@ export type SourceAttestationRecord = z.infer<typeof SourceAttestationRecordSche
 
 export const InstrumentRecordSchema = RecordEnvelopeSchema.extend({
   recordType: z.literal('instrument_record'),
+  instrumentType: NonEmptyStringSchema,
+  instrumentDate: IsoDateOnlySchema.optional(),
+  recordingDate: IsoDateOnlySchema.optional(),
+  county: OptionalTextSchema,
+  state: OptionalTextSchema,
+  recordingReference: RecordingReferenceSchema.optional(),
+  grantorPartyIds: IdArraySchema,
+  granteePartyIds: IdArraySchema,
+  documentId: IdSchema.optional(),
+  sourceCitationIds: IdArraySchema,
+  legalDescription: OptionalTextSchema,
+  summary: OptionalTextSchema,
+  notes: OptionalTextSchema,
+  supersedesInstrumentRecordId: IdSchema.optional(),
 }).strict();
 export type InstrumentRecord = z.infer<typeof InstrumentRecordSchema>;
 
 export const TractRecordSchema = RecordEnvelopeSchema.extend({
   recordType: z.literal('tract'),
+  tractId: IdSchema,
+  name: NonEmptyStringSchema,
+  code: OptionalTextSchema,
+  county: OptionalTextSchema,
+  state: OptionalTextSchema,
+  legalDescription: OptionalTextSchema,
+  grossAcres: OptionalTextSchema,
+  pooledAcres: OptionalTextSchema,
+  deskMapId: NullableIdSchema,
+  sourceCitationIds: IdArraySchema,
 }).strict();
 export type TractRecord = z.infer<typeof TractRecordSchema>;
 
 export const DeskMapRecordSchema = RecordEnvelopeSchema.extend({
   recordType: z.literal('desk_map'),
+  deskMapId: IdSchema,
+  name: NonEmptyStringSchema,
+  code: OptionalTextSchema,
+  tractId: NullableIdSchema,
+  grossAcres: OptionalTextSchema,
+  pooledAcres: OptionalTextSchema,
+  description: OptionalTextSchema,
+  nodeIds: IdArraySchema,
+  unitName: OptionalTextSchema,
+  unitCode: OptionalTextSchema,
 }).strict();
 export type DeskMapRecord = z.infer<typeof DeskMapRecordSchema>;
 
 export const LeaseRecordSchema = RecordEnvelopeSchema.extend({
   recordType: z.literal('lease'),
+  leaseId: IdSchema,
+  ownerId: IdSchema.optional(),
+  lessorPartyId: IdSchema.optional(),
+  lesseePartyId: IdSchema.optional(),
+  leaseName: OptionalTextSchema,
+  lesseeName: OptionalTextSchema,
+  royaltyRate: OptionalTextSchema,
+  leasedInterest: OptionalTextSchema,
+  effectiveDate: IsoDateOnlySchema.optional(),
+  expirationDate: IsoDateOnlySchema.optional(),
+  status: OptionalTextSchema,
+  jurisdiction: BackendSpineJurisdictionSchema,
+  docNo: OptionalTextSchema,
+  notes: OptionalTextSchema,
+  depthRange: OptionalTextSchema,
+  sourceCitationIds: IdArraySchema,
 }).strict();
 export type LeaseRecord = z.infer<typeof LeaseRecordSchema>;
 
 export const UnitRecordSchema = RecordEnvelopeSchema.extend({
   recordType: z.literal('unit'),
+  unitId: IdSchema,
+  name: NonEmptyStringSchema,
+  operatorPartyId: IdSchema.optional(),
+  operatorName: OptionalTextSchema,
+  jurisdiction: BackendSpineJurisdictionSchema,
+  effectiveDate: IsoDateOnlySchema.optional(),
+  tractIds: IdArraySchema,
+  wellboreIds: IdArraySchema,
+  sourceCitationIds: IdArraySchema,
 }).strict();
 export type UnitRecord = z.infer<typeof UnitRecordSchema>;
 
 export const WellboreRecordSchema = RecordEnvelopeSchema.extend({
   recordType: z.literal('wellbore'),
+  wellboreId: IdSchema,
+  name: NonEmptyStringSchema,
+  apiNumber: OptionalTextSchema,
+  operatorPartyId: IdSchema.optional(),
+  operatorName: OptionalTextSchema,
+  unitId: IdSchema.optional(),
+  tractIds: IdArraySchema,
+  status: OptionalTextSchema,
+  surfaceLocation: SurfaceLocationSchema.optional(),
+  sourceCitationIds: IdArraySchema,
 }).strict();
 export type WellboreRecord = z.infer<typeof WellboreRecordSchema>;
 
 export const InterestReferenceRecordSchema = RecordEnvelopeSchema.extend({
   recordType: z.literal('interest_reference'),
+  interestId: IdSchema,
+  subjectRecordId: IdSchema.optional(),
+  partyId: IdSchema.optional(),
+  parentInterestId: NullableIdSchema,
+  instrumentRecordId: IdSchema.optional(),
+  interestClass: BackendSpineInterestClassSchema,
+  fraction: NonEmptyStringSchema,
+  initialFraction: OptionalTextSchema,
+  displayDecimal: OptionalTextSchema,
+  displayFraction: OptionalTextSchema,
+  depthRange: OptionalTextSchema,
+  jurisdiction: BackendSpineJurisdictionSchema,
+  deskMapIds: IdArraySchema,
+  leaseId: IdSchema.optional(),
+  sourceCitationIds: IdArraySchema,
 }).strict();
 export type InterestReferenceRecord = z.infer<typeof InterestReferenceRecordSchema>;
 
 export const CurativeIssueRecordSchema = RecordEnvelopeSchema.extend({
   recordType: z.literal('curative_issue'),
+  issueId: IdSchema,
+  title: NonEmptyStringSchema,
+  issueType: OptionalTextSchema,
+  priority: z.enum(['critical', 'high', 'medium', 'low', 'unknown']),
+  status: z.enum([
+    'open',
+    'researching',
+    'curative_requested',
+    'waiting_on_third_party',
+    'ready_for_review',
+    'resolved',
+    'deferred',
+    'unknown',
+  ]),
+  affectedRecordIds: IdArraySchema,
+  dueDate: IsoDateOnlySchema.optional(),
+  sourceCitationIds: IdArraySchema,
+  requiredAction: OptionalTextSchema,
+  responsiblePartyId: IdSchema.optional(),
+  notes: OptionalTextSchema,
+  resolutionNotes: OptionalTextSchema,
 }).strict();
 export type CurativeIssueRecord = z.infer<typeof CurativeIssueRecordSchema>;
 
 export const LeaseObligationRecordSchema = RecordEnvelopeSchema.extend({
   recordType: z.literal('lease_obligation'),
+  obligationId: IdSchema,
+  leaseId: IdSchema,
+  obligationType: z.enum([
+    'bonus',
+    'rental',
+    'shut_in',
+    'continuous_development',
+    'extension',
+    'notice',
+    'other',
+  ]),
+  status: z.enum(['open', 'satisfied', 'waived', 'missed', 'unknown']),
+  dueDate: IsoDateOnlySchema.optional(),
+  responsiblePartyId: IdSchema.optional(),
+  amount: OptionalTextSchema,
+  description: OptionalTextSchema,
+  sourceCitationIds: IdArraySchema,
 }).strict();
 export type LeaseObligationRecord = z.infer<typeof LeaseObligationRecordSchema>;
 
 export const ObligationEventRecordSchema = RecordEnvelopeSchema.extend({
   recordType: z.literal('obligation_event'),
+  eventId: IdSchema,
+  obligationId: IdSchema,
+  eventType: z.enum([
+    'created',
+    'notice_sent',
+    'payment_made',
+    'satisfied',
+    'waived',
+    'missed',
+    'note',
+  ]),
+  occurredAt: IsoDateTimeSchema.optional(),
+  effectiveDate: IsoDateOnlySchema.optional(),
+  actorPartyId: IdSchema.optional(),
+  notes: OptionalTextSchema,
+  sourceCitationIds: IdArraySchema,
 }).strict();
 export type ObligationEventRecord = z.infer<typeof ObligationEventRecordSchema>;
 
@@ -298,16 +561,44 @@ export type AuditEventRecord = z.infer<typeof AuditEventRecordSchema>;
 
 export const PacketRecordSchema = RecordEnvelopeSchema.extend({
   recordType: z.literal('packet'),
+  packetId: IdSchema,
+  title: NonEmptyStringSchema,
+  packetType: z.enum(['attorney', 'runsheet', 'evidence_vault', 'export', 'other']),
+  status: z.enum(['draft', 'ready', 'exported', 'archived']),
+  itemCount: z.number().int().nonnegative(),
+  createdAt: IsoDateTimeSchema,
+  updatedAt: IsoDateTimeSchema,
+  sourceRecordIds: IdArraySchema,
 }).strict();
 export type PacketRecord = z.infer<typeof PacketRecordSchema>;
 
 export const PacketItemRecordSchema = RecordEnvelopeSchema.extend({
   recordType: z.literal('packet_item'),
+  packetItemId: IdSchema,
+  packetId: IdSchema,
+  position: z.number().int().nonnegative(),
+  label: NonEmptyStringSchema,
+  sourceRecordId: IdSchema.optional(),
+  documentId: IdSchema.optional(),
+  vaultObjectId: IdSchema.optional(),
+  contentHash: ContentHashSchema.optional(),
+  notes: OptionalTextSchema,
 }).strict();
 export type PacketItemRecord = z.infer<typeof PacketItemRecordSchema>;
 
 export const PacketExportRecordSchema = RecordEnvelopeSchema.extend({
   recordType: z.literal('packet_export'),
+  packetExportId: IdSchema,
+  packetId: IdSchema,
+  status: z.enum(['queued', 'generated', 'failed']),
+  format: z.enum(['zip', 'pdf', 'json', 'folder']),
+  generatedAt: IsoDateTimeSchema,
+  itemCount: z.number().int().nonnegative(),
+  manifestHash: ContentHashSchema.optional(),
+  contentHash: ContentHashSchema.optional(),
+  vaultObjectId: IdSchema.optional(),
+  byteLength: z.number().int().nonnegative().optional(),
+  errorMessage: OptionalTextSchema,
 }).strict();
 export type PacketExportRecord = z.infer<typeof PacketExportRecordSchema>;
 
@@ -319,6 +610,7 @@ export const BackendSpineCoreRecordSchema = z.discriminatedUnion('recordType', [
   BackendDocumentRecordSchema,
   DocumentVersionRecordSchema,
   VaultObjectRecordSchema,
+  ExtractionRunRecordSchema,
   DocumentLinkRecordSchema,
   SourceCitationRecordSchema,
   CitationAnchorRecordSchema,
