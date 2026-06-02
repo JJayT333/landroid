@@ -8,6 +8,7 @@ import { normalizeOwnershipNode } from '../../types/node';
 import { canonicalJson } from '../action-layer/canonical-json';
 import { recordTitleMutation } from '../action-layer/title-command-sourcing';
 import {
+  InvalidTitleActionReplayError,
   parseTitleActions,
   reconstructTitleNodes,
   replayTitleProjection,
@@ -84,5 +85,39 @@ describe('Phase 4 title replay (replay == adapter)', () => {
     const parsed = parseTitleActions([result.actionRecord, undone, importAction]);
     expect(parsed).toHaveLength(1);
     expect(parsed[0].actionRecord.recordId).toBe(result.actionRecord.recordId);
+  });
+
+  it('fails closed when an active title action is missing its full-effect payload', async () => {
+    const result = await buildLogFromEmpty();
+    const missingFullEffect = {
+      ...result.actionRecord,
+      recordId: 'bad-title-action-missing-full-effect',
+      result: {
+        ...result.actionRecord.result,
+        titleNodeSnapshots: undefined,
+      },
+    } satisfies BackendSpineCoreRecord;
+    const malformedResult = {
+      ...result.actionRecord,
+      recordId: 'bad-title-action-malformed-effect',
+      result: {
+        ...result.actionRecord.result,
+        recordEffects: 'not-an-effect-array',
+      },
+    } satisfies BackendSpineCoreRecord;
+
+    expect(() => parseTitleActions([result.actionRecord, missingFullEffect, malformedResult]))
+      .toThrow(InvalidTitleActionReplayError);
+    expect(() => parseTitleActions([result.actionRecord, missingFullEffect, malformedResult]))
+      .toThrow('bad-title-action-missing-full-effect');
+    expect(() => parseTitleActions([result.actionRecord, missingFullEffect, malformedResult]))
+      .toThrow('bad-title-action-malformed-effect');
+
+    expect(() => replayTitleProjection([missingFullEffect])).toThrow(
+      InvalidTitleActionReplayError
+    );
+    expect(() => reconstructTitleNodes([malformedResult])).toThrow(
+      InvalidTitleActionReplayError
+    );
   });
 });

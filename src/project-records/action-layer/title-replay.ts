@@ -32,6 +32,16 @@ interface ParsedTitleAction {
   result: TitleActionResult;
 }
 
+export class InvalidTitleActionReplayError extends Error {
+  readonly invalidRecordIds: string[];
+
+  constructor(invalidRecordIds: string[]) {
+    super(`Invalid title action record result(s): ${invalidRecordIds.join(', ')}`);
+    this.name = 'InvalidTitleActionReplayError';
+    this.invalidRecordIds = invalidRecordIds;
+  }
+}
+
 function isTitleActionKind(actionKind: string): actionKind is ActionCommandKind {
   return actionKind.startsWith('title.');
 }
@@ -45,13 +55,20 @@ export function parseTitleActions(
   records: readonly BackendSpineCoreRecord[]
 ): ParsedTitleAction[] {
   const parsed: ParsedTitleAction[] = [];
+  const invalidRecordIds: string[] = [];
   for (const record of records) {
     if (record.recordType !== 'action_record') continue;
     if (record.status === 'undone') continue;
     if (!isTitleActionKind(record.actionKind)) continue;
     const result = TitleActionResultSchema.safeParse(record.result);
-    if (!result.success) continue;
+    if (!result.success) {
+      invalidRecordIds.push(record.recordId);
+      continue;
+    }
     parsed.push({ actionRecord: record, result: result.data });
+  }
+  if (invalidRecordIds.length > 0) {
+    throw new InvalidTitleActionReplayError(invalidRecordIds);
   }
   return parsed;
 }
