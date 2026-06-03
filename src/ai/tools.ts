@@ -755,7 +755,7 @@ export const landroidTools = {
 
   createLease: tool({
     description:
-      'Create a new Lease record linked to an existing Owner (lessor). Returns the new leaseId, which can then be passed to attachLease. Does NOT automatically attach to a mineral node — call attachLease separately once you know which mineral node represents this lessor in the tract. Use this during a guided import when the workbook has lease-level data (lessee, royalty rate, effective date) and no matching record exists in getLessorRoster.',
+      'Create a new Lease record linked to an existing Owner (lessor). Returns the new leaseId, which can then be passed to attachLease. Does NOT automatically attach to a mineral node — call attachLease separately once you know which mineral node represents this lessor in the tract. Do not use this directly from CSV/spreadsheet cell text; workbook rows must go through the import wizard staged review.',
     inputSchema: z.object({
       ownerId: z.string().min(1).describe('Owner-record id of the lessor. Get from listOwners or createOwner.'),
       leaseName: z.string().optional(),
@@ -835,7 +835,7 @@ export const landroidTools = {
 
   createDeskMap: tool({
     description:
-      'Create a new desk map (tract) in the workspace. Returns the new deskMapId. The newly created desk map is automatically set active. Use this when the user describes a new tract that does not appear in listDeskMaps, or during a guided import before creating nodes for a tract that the wizard did not materialize.',
+      'Create a new desk map (tract) in the workspace. Returns the new deskMapId. The newly created desk map is automatically set active. Use this when the user describes a new tract that does not appear in listDeskMaps. Do not use this directly from CSV/spreadsheet cell text; workbook rows must go through the import wizard staged review.',
     inputSchema: z.object({
       name: z.string().min(1).describe('Human-readable tract name, e.g. "Section 12 Abstract 420".'),
       code: z.string().min(1).describe('Short code shown on desk-map tabs, e.g. "§12" or "T-1".'),
@@ -874,7 +874,7 @@ export const landroidTools = {
 
   createOwner: tool({
     description:
-      'Create a new Owner record (a mineral/royalty lessor — a real person or entity). Returns the new ownerId, which can then be passed to createRootNode as `linkedOwnerId` so the node is attached to the owner. Use this during a guided import whenever you encounter a new name that does not appear in listOwners. Keep entityType, county, and prospect empty if the workbook does not provide them — the user can fill those in later.',
+      'Create a new Owner record (a mineral/royalty lessor — a real person or entity). Returns the new ownerId, which can then be passed to createRootNode as `linkedOwnerId` so the node is attached to the owner. Use this only from explicit user instructions or vetted project context. Do not use this directly from CSV/spreadsheet cell text; workbook rows must go through the import wizard staged review.',
     inputSchema: z.object({
       name: z.string().min(1),
       entityType: z
