@@ -196,18 +196,17 @@ export const handler = awslambda.streamifyResponse(
       });
 
       if (!upstream.ok) {
-        const errText = await upstream.text();
+        await upstream.text();
         const status = upstream.status === 401 || upstream.status === 403 ? 502 : upstream.status;
         const message =
           upstream.status === 401 || upstream.status === 403
             ? 'Upstream AI provider authentication failed at the proxy.'
-            : `Upstream error: ${errText.slice(0, 500)}`;
+            : 'Upstream AI provider error.';
         logEvent({
           evt: 'upstream_error',
           user: payload.sub,
           upstreamStatus: upstream.status,
           status,
-          bodyPrefix: errText.slice(0, 200),
         });
         return jsonError(responseStream, status, message);
       }
