@@ -43,6 +43,10 @@ function bodyText(stream: TestResponseStream): string {
     .join('');
 }
 
+function logEvents(): Array<Record<string, unknown>> {
+  return vi.mocked(console.log).mock.calls.map(([line]) => JSON.parse(String(line)) as Record<string, unknown>);
+}
+
 function chatEvent(body: Record<string, unknown>, token = 'good-token'): LambdaUrlEvent {
   return {
     requestContext: { http: { method: 'POST', path: '/chat/completions' } },
@@ -265,5 +269,42 @@ describe('handler integration', () => {
     expect(trackUsageMock).toHaveBeenCalledTimes(1);
     expect(stream.metadata?.statusCode).toBe(502);
     expect(bodyText(stream)).toContain('Upstream AI provider authentication failed');
+    expect(bodyText(stream)).not.toContain('bad server key');
+    const upstreamLog = logEvents().find((event) => event.evt === 'upstream_error');
+    expect(upstreamLog).toMatchObject({
+      evt: 'upstream_error',
+      user: 'cognito-sub-123',
+      upstreamStatus: 401,
+      status: 502,
+    });
+    expect(upstreamLog).not.toHaveProperty('bodyPrefix');
+    expect(JSON.stringify(upstreamLog)).not.toContain('bad server key');
+  });
+
+  it('does not leak upstream OpenAI error bodies to clients or logs', async () => {
+    verifyToken.mockResolvedValue({ sub: 'cognito-sub-123' });
+    const upstreamError = 'sensitive upstream detail: policy trace id sk-live-secret';
+    const fetchMock = vi.fn(async () => new Response(upstreamError, { status: 500 }));
+    vi.stubGlobal('fetch', fetchMock);
+    const handler = await loadHandler();
+    const stream = makeStream();
+
+    await handler(chatEvent({ messages: [{ role: 'user', content: 'hello' }] }), stream, {});
+
+    expect(trackUsageMock).toHaveBeenCalledTimes(1);
+    expect(stream.metadata?.statusCode).toBe(500);
+    expect(bodyText(stream)).toContain('Upstream AI provider error.');
+    expect(bodyText(stream)).not.toContain(upstreamError);
+    expect(bodyText(stream)).not.toContain('policy trace id');
+    const upstreamLog = logEvents().find((event) => event.evt === 'upstream_error');
+    expect(upstreamLog).toMatchObject({
+      evt: 'upstream_error',
+      user: 'cognito-sub-123',
+      upstreamStatus: 500,
+      status: 500,
+    });
+    expect(upstreamLog).not.toHaveProperty('bodyPrefix');
+    expect(JSON.stringify(upstreamLog)).not.toContain(upstreamError);
+    expect(JSON.stringify(upstreamLog)).not.toContain('policy trace id');
   });
 });
