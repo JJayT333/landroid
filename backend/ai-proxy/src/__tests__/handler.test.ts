@@ -1,5 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { MAX_REQUEST_BODY_BYTES } from '../request-policy.js';
+import {
+  LANDROID_PROXY_GUARD_SYSTEM,
+  MAX_REQUEST_BODY_BYTES,
+} from '../request-policy.js';
 
 type LambdaUrlEvent = {
   requestContext: { http: { method: string; path: string } };
@@ -53,6 +56,14 @@ function chatEvent(body: Record<string, unknown>, token = 'good-token'): LambdaU
     headers: { authorization: `Bearer ${token}` },
     body: JSON.stringify(body),
     isBase64Encoded: false,
+  };
+}
+
+function validChatBody(messages = [{ role: 'user', content: 'hello' }]): Record<string, unknown> {
+  return {
+    model: 'client-choice-will-be-overwritten',
+    stream: true,
+    messages,
   };
 }
 
@@ -179,7 +190,11 @@ describe('handler integration', () => {
     expect(bodyText(stream)).toContain('Request body is too large');
   });
 
-  it('rejects client-supplied tool schemas before charging usage or calling upstream OpenAI', async () => {
+  it.each([
+    ['temperature', { temperature: 0.2 }],
+    ['tools', { tools: [{ type: 'function', function: { name: 'external_tool' } }] }],
+    ['tool_choice', { tool_choice: 'auto' }],
+  ])('rejects extra top-level field %s before charging usage or calling upstream OpenAI', async (_name, extra) => {
     verifyToken.mockResolvedValue({ sub: 'cognito-sub-123' });
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
@@ -188,9 +203,10 @@ describe('handler integration', () => {
 
     await handler(
       chatEvent({
+        model: 'client-choice-will-be-overwritten',
+        stream: true,
         messages: [{ role: 'user', content: 'hello' }],
-        tools: [{ type: 'function', function: { name: 'external_tool' } }],
-        tool_choice: 'auto',
+        ...extra,
       }),
       stream,
       {}
@@ -199,10 +215,10 @@ describe('handler integration', () => {
     expect(trackUsageMock).not.toHaveBeenCalled();
     expect(fetchMock).not.toHaveBeenCalled();
     expect(stream.metadata?.statusCode).toBe(400);
-    expect(bodyText(stream)).toContain('does not accept client-supplied tool');
+    expect(bodyText(stream)).toContain('Hosted LANDroid AI request body is invalid');
   });
 
-  it('pins the verified sub onto the OpenAI body and streams the upstream response', async () => {
+  it('accepts the real client shape, prepends the guard, and applies server-owned OpenAI fields', async () => {
     verifyToken.mockResolvedValue({ sub: 'cognito-sub-123' });
     const upstreamBody = new ReadableStream<Uint8Array>({
       start(controller) {
@@ -221,10 +237,13 @@ describe('handler integration', () => {
 
     await handler(
       chatEvent({
-        model: 'gpt-9000',
-        max_tokens: 99_999,
-        user: 'spoofed-user',
-        messages: [{ role: 'user', content: 'hello' }],
+        model: 'client-choice-will-be-overwritten',
+        stream: true,
+        messages: [
+          { role: 'system', content: 'LANDroid system prompt' },
+          { role: 'system', content: 'LANDroid project context' },
+          { role: 'user', content: 'hello' },
+        ],
       }),
       stream,
       {}
@@ -254,7 +273,15 @@ describe('handler integration', () => {
       max_tokens: 2048,
       user: 'cognito-sub-123',
     });
+    expect(outbound.stream).toBe(true);
+    expect(outbound.messages).toEqual([
+      { role: 'system', content: LANDROID_PROXY_GUARD_SYSTEM },
+      { role: 'system', content: 'LANDroid system prompt' },
+      { role: 'system', content: 'LANDroid project context' },
+      { role: 'user', content: 'hello' },
+    ]);
     expect(outbound).not.toHaveProperty('store');
+    expect(outbound).not.toHaveProperty('temperature');
   });
 
   it('maps upstream OpenAI auth failures to proxy errors instead of browser sign-out statuses', async () => {
@@ -264,7 +291,7 @@ describe('handler integration', () => {
     const handler = await loadHandler();
     const stream = makeStream();
 
-    await handler(chatEvent({ messages: [{ role: 'user', content: 'hello' }] }), stream, {});
+    await handler(chatEvent(validChatBody()), stream, {});
 
     expect(trackUsageMock).toHaveBeenCalledTimes(1);
     expect(stream.metadata?.statusCode).toBe(502);
@@ -289,7 +316,7 @@ describe('handler integration', () => {
     const handler = await loadHandler();
     const stream = makeStream();
 
-    await handler(chatEvent({ messages: [{ role: 'user', content: 'hello' }] }), stream, {});
+    await handler(chatEvent(validChatBody()), stream, {});
 
     expect(trackUsageMock).toHaveBeenCalledTimes(1);
     expect(stream.metadata?.statusCode).toBe(500);

@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
-  ALLOWED_OPENAI_CHAT_BODY_FIELDS,
   applyBodyPolicy,
   bodyByteLength,
   decodeBody,
   estimateInputTokens,
   extractBearer,
   HARDCODED_MODEL,
+  LANDROID_CHAT_REQUEST_V1,
+  LANDROID_PROXY_GUARD_SYSTEM,
   MAX_OUTPUT_TOKENS,
   MAX_REQUEST_BODY_BYTES,
   parseJsonBody,
@@ -106,18 +107,47 @@ describe('parseJsonBody', () => {
 });
 
 describe('applyBodyPolicy', () => {
-  it('forces the hardcoded model, clamps max_tokens, and sets user to the verified sub', () => {
+  it('accepts the real hosted client shape and prepends the server guard message', () => {
     const out = applyBodyPolicy(
-      { model: 'gpt-9000', max_tokens: 99_999, user: 'imposter', messages: [] },
+      {
+        model: 'client-choice-will-be-overwritten',
+        stream: true,
+        messages: [
+          { role: 'system', content: 'LANDroid browser context' },
+          { role: 'user', content: 'Summarize title status.' },
+          { role: 'assistant', content: 'Prior assistant context.' },
+        ],
+      },
       'real-sub-from-cognito'
     );
+
     expect(out.model).toBe(HARDCODED_MODEL);
     expect(out.max_tokens).toBe(MAX_OUTPUT_TOKENS);
     expect(out.user).toBe('real-sub-from-cognito');
-    expect(out.messages).toEqual([]);
+    expect(out.stream).toBe(true);
+    expect(out.messages).toEqual([
+      { role: 'system', content: LANDROID_PROXY_GUARD_SYSTEM },
+      { role: 'system', content: 'LANDroid browser context' },
+      { role: 'user', content: 'Summarize title status.' },
+      { role: 'assistant', content: 'Prior assistant context.' },
+    ]);
   });
 
-  it('accepts a smaller max_tokens (clamp is downward only)', () => {
+  it('clamps max_tokens downward when a trusted server branch supplies it', () => {
+    const out = applyBodyPolicy(
+      {
+        model: 'client-choice-will-be-overwritten',
+        stream: true,
+        max_tokens: 99_999,
+        messages: [{ role: 'user', content: 'hello' }],
+      },
+      'sub'
+    );
+
+    expect(out.max_tokens).toBe(MAX_OUTPUT_TOKENS);
+  });
+
+  it('accepts a smaller max_tokens from a trusted server branch', () => {
     const out = applyBodyPolicy({ max_tokens: 100 }, 'sub');
     expect(out.max_tokens).toBe(100);
   });
@@ -135,64 +165,58 @@ describe('applyBodyPolicy', () => {
     expect(applyBodyPolicy({ max_tokens: 0 }, 'sub').max_tokens).toBe(MAX_OUTPUT_TOKENS);
   });
 
-  it('allowlists OpenAI-compatible fields and drops arbitrary client fields', () => {
+  it('does not pass through non-contract top-level fields', () => {
     const out = applyBodyPolicy(
       {
-        messages: [],
+        messages: [{ role: 'user', content: 'hello' }],
         stream: true,
-        stream_options: { include_usage: true },
+        temperature: 0.2,
+        tools: [],
         store: true,
         metadata: { caseId: 'should-not-pass-through' },
-        max_completion_tokens: 99_999,
-        extra_body: { arbitrary: true },
       },
       'sub'
     );
 
     expect(out).toMatchObject({
-      messages: [],
       stream: true,
-      stream_options: { include_usage: true },
       model: HARDCODED_MODEL,
       max_tokens: MAX_OUTPUT_TOKENS,
       user: 'sub',
     });
+    expect(out.messages).toEqual([
+      { role: 'system', content: LANDROID_PROXY_GUARD_SYSTEM },
+      { role: 'user', content: 'hello' },
+    ]);
+    expect(out).not.toHaveProperty('temperature');
+    expect(out).not.toHaveProperty('tools');
     expect(out).not.toHaveProperty('store');
     expect(out).not.toHaveProperty('metadata');
-    expect(out).not.toHaveProperty('max_completion_tokens');
-    expect(out).not.toHaveProperty('extra_body');
   });
 
-  it('keeps the allowlist intentionally narrow', () => {
-    expect(ALLOWED_OPENAI_CHAT_BODY_FIELDS.has('messages')).toBe(true);
-    expect(ALLOWED_OPENAI_CHAT_BODY_FIELDS.has('tools')).toBe(false);
-    expect(ALLOWED_OPENAI_CHAT_BODY_FIELDS.has('tool_choice')).toBe(false);
-    expect(ALLOWED_OPENAI_CHAT_BODY_FIELDS.has('metadata')).toBe(false);
-    expect(ALLOWED_OPENAI_CHAT_BODY_FIELDS.has('store')).toBe(false);
+  it('keeps the v1 contract intentionally narrow', () => {
+    expect([...LANDROID_CHAT_REQUEST_V1.allowedTopLevelFields]).toEqual([
+      'model',
+      'stream',
+      'messages',
+    ]);
+    expect(LANDROID_CHAT_REQUEST_V1.maxMessages).toBe(50);
   });
 
   it('does not mutate the input body', () => {
-    const input = { model: 'foo' };
+    const input = {
+      model: 'foo',
+      stream: true,
+      messages: [{ role: 'user', content: 'hello' }],
+    };
     const out = applyBodyPolicy(input, 'sub');
     expect(input.model).toBe('foo');
     expect(out).not.toBe(input);
+    expect(out.messages).not.toBe(input.messages);
   });
 });
 
 describe('validateBodyPolicy', () => {
-  it('rejects client-supplied hosted tool schemas before upstream forwarding', () => {
-    expect(validateBodyPolicy({ messages: [], tools: [] })).toMatchObject({
-      ok: false,
-      status: 400,
-      reason: 'client_tools_not_allowed',
-    });
-    expect(validateBodyPolicy({ messages: [], tool_choice: 'auto' })).toMatchObject({
-      ok: false,
-      status: 400,
-      reason: 'client_tools_not_allowed',
-    });
-  });
-
   it('accepts the current hosted read-only chat body shape', () => {
     expect(
       validateBodyPolicy({
@@ -201,5 +225,78 @@ describe('validateBodyPolicy', () => {
         model: 'client-choice-will-be-overwritten',
       })
     ).toEqual({ ok: true });
+  });
+
+  it.each([
+    ['temperature', { temperature: 0.2 }],
+    ['tools', { tools: [] }],
+    ['tool_choice', { tool_choice: 'auto' }],
+    ['max_tokens', { max_tokens: 100 }],
+    ['user', { user: 'spoofed' }],
+  ])('rejects extra top-level field %s', (_name, extra) => {
+    expect(
+      validateBodyPolicy({
+        model: 'client-choice-will-be-overwritten',
+        stream: true,
+        messages: [{ role: 'user', content: 'hello' }],
+        ...extra,
+      })
+    ).toMatchObject({
+      ok: false,
+      status: 400,
+      reason: 'client_field_not_allowed',
+      message: 'Hosted LANDroid AI request body is invalid.',
+    });
+  });
+
+  it.each([
+    ['tool role', [{ role: 'tool', content: 'hello' }]],
+    ['function role', [{ role: 'function', content: 'hello' }]],
+    ['unknown role', [{ role: 'developer', content: 'hello' }]],
+    ['array content', [{ role: 'user', content: [{ type: 'text', text: 'hello' }] }]],
+    ['non-string content', [{ role: 'user', content: { text: 'hello' } }]],
+    ['missing content', [{ role: 'user' }]],
+    ['empty content', [{ role: 'user', content: '   ' }]],
+    ['extra message field', [{ role: 'user', content: 'hello', name: 'caller' }]],
+  ])('rejects invalid v1 message shape: %s', (_name, messages) => {
+    expect(
+      validateBodyPolicy({
+        model: 'client-choice-will-be-overwritten',
+        stream: true,
+        messages,
+      })
+    ).toMatchObject({
+      ok: false,
+      status: 400,
+      message: 'Hosted LANDroid AI request body is invalid.',
+    });
+  });
+
+  it('rejects an empty messages array', () => {
+    expect(
+      validateBodyPolicy({
+        model: 'client-choice-will-be-overwritten',
+        stream: true,
+        messages: [],
+      })
+    ).toMatchObject({
+      ok: false,
+      status: 400,
+      reason: 'empty_messages',
+    });
+  });
+
+  it('rejects more than 50 messages', () => {
+    expect(
+      validateBodyPolicy({
+        model: 'client-choice-will-be-overwritten',
+        stream: true,
+        messages: Array.from({ length: 51 }, () => ({ role: 'user', content: 'hello' })),
+      })
+    ).toMatchObject({
+      ok: false,
+      status: 400,
+      reason: 'too_many_messages',
+    });
   });
 });
