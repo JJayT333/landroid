@@ -5,6 +5,7 @@ import { Suspense, lazy } from 'react';
 import { useUIStore } from './store/ui-store';
 import { useWorkspaceStore } from './store/workspace-store';
 import Navbar from './components/shared/Navbar';
+import TitleLedgerStatusBanner from './components/shared/TitleLedgerStatusBanner';
 import WriteLeaseBanner from './components/shared/WriteLeaseBanner';
 import DeskMapView from './views/DeskMapView';
 
@@ -46,6 +47,7 @@ export default function App() {
     <div className="h-screen flex flex-col bg-parchment">
       <Navbar />
       <WriteLeaseBanner />
+      <TitleLedgerStatusBanner />
       {startupWarning && (
         <div className="border-b border-amber-300 bg-amber-100 px-4 py-3 text-sm text-amber-900">
           <div className="mx-auto flex max-w-6xl items-start justify-between gap-4">

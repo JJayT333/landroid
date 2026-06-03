@@ -68,6 +68,21 @@ describe('Phase 4 title cutover gate', () => {
     expect(gate.getState()).toBe('shadow'); // reversible
   });
 
+  it('refuses candidacy while a runtime title-ledger divergence is active', () => {
+    const gate = new TitleTreeCutoverGate();
+    passN(gate, MIN_PASSED_TITLE_PARITIES);
+    gate.setMathParityClean(true);
+    gate.setRuntimeDivergence(true, 'createRootNode diverged');
+
+    const readiness = gate.readiness();
+
+    expect(readiness.ready).toBe(false);
+    expect(readiness.runtimeDivergence).toBe(true);
+    expect(readiness.reason).toMatch(/Runtime title-ledger divergence is active/);
+    expect(() => gate.proposeCandidate(cleanReport)).toThrow(/Runtime title-ledger divergence/);
+    expect(gate.getState()).toBe('shadow');
+  });
+
   it('refuses to count a diverged parity toward candidacy', () => {
     const gate = new TitleTreeCutoverGate();
     expect(() => gate.recordPassedParity([dirtyReport])).toThrow(/diverged/);

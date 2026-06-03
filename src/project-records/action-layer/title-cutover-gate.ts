@@ -26,6 +26,7 @@ export interface TitleCutoverReadiness {
   passedParities: number;
   threshold: number;
   mathParityClean: boolean;
+  runtimeDivergence: boolean;
   reason: string;
 }
 
@@ -36,6 +37,7 @@ export interface TitleCutoverReadiness {
 export class TitleTreeCutoverGate {
   private passedParities = 0;
   private lastMathParityClean = false;
+  private runtimeDivergenceMessage: string | null = null;
 
   constructor(
     private readonly registry: CutoverRegistry = new CutoverRegistry(),
@@ -61,6 +63,13 @@ export class TitleTreeCutoverGate {
     this.lastMathParityClean = clean;
   }
 
+  /** Record whether the live title ledger has surfaced a runtime divergence. */
+  setRuntimeDivergence(active: boolean, message?: string | null): void {
+    this.runtimeDivergenceMessage = active
+      ? message?.trim() || 'Runtime title-ledger divergence is active.'
+      : null;
+  }
+
   getPassedParities(): number {
     return this.passedParities;
   }
@@ -71,14 +80,18 @@ export class TitleTreeCutoverGate {
 
   readiness(): TitleCutoverReadiness {
     const enough = this.passedParities >= this.threshold;
-    const ready = enough && this.lastMathParityClean;
+    const runtimeDivergence = this.runtimeDivergenceMessage !== null;
+    const ready = enough && this.lastMathParityClean && !runtimeDivergence;
     return {
       ready,
       passedParities: this.passedParities,
       threshold: this.threshold,
       mathParityClean: this.lastMathParityClean,
+      runtimeDivergence,
       reason: ready
         ? `title_tree eligible: ${this.passedParities}/${this.threshold} parities passed and math parity clean.`
+        : runtimeDivergence
+          ? `Runtime title-ledger divergence is active: ${this.runtimeDivergenceMessage}`
         : !enough
           ? `Not enough proven mutations: ${this.passedParities}/${this.threshold} passed inline parity.`
           : 'Math parity is not clean; resolve the divergence before candidacy.',
