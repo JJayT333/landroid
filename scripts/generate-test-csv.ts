@@ -12,11 +12,12 @@
  *   test-200a, test-200b  — two 200-node trees with different structures
  *   test-500a, test-500b  — two 500-node trees with different structures
  *
- * Usage: npx tsx scripts/generate-test-csv.ts
+ * Usage: npx tsx scripts/generate-test-csv.ts --out fixtures/generated-test-csv
  */
 import Decimal from 'decimal.js';
-import { writeFileSync } from 'fs';
-import { resolve } from 'path';
+import { mkdirSync, writeFileSync } from 'fs';
+import { dirname, isAbsolute, relative, resolve } from 'path';
+import { fileURLToPath } from 'url';
 
 Decimal.set({ precision: 40, rounding: Decimal.ROUND_HALF_UP });
 
@@ -24,6 +25,7 @@ const D = (v: string | number | Decimal) => new Decimal(v);
 const ZERO = D(0);
 const ONE = D(1);
 const FLOOR = D('0.001953125'); // 1/512
+const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 // ── Data pools ──────────────────────────────────────────────
 
@@ -89,6 +91,36 @@ function nextDate(): string {
 
 function pad(n: number): string { return String(n).padStart(6, '0'); }
 function ser(v: Decimal): string { return v.toFixed(9); }
+
+function usage(): string {
+  return 'Usage: npx tsx scripts/generate-test-csv.ts --out <in-repo-output-dir>';
+}
+
+function isInsideRepo(path: string): boolean {
+  const rel = relative(REPO_ROOT, path);
+  return rel === '' || (!rel.startsWith('..') && !isAbsolute(rel));
+}
+
+function parseOutputDir(args: string[]): string {
+  if (args.length !== 2 || args[0] !== '--out' || args[1].trim() === '') {
+    throw new Error(usage());
+  }
+  const outputDir = isAbsolute(args[1])
+    ? resolve(args[1])
+    : resolve(REPO_ROOT, args[1]);
+  if (!isInsideRepo(outputDir)) {
+    throw new Error(`Output path must stay inside the repo: ${outputDir}`);
+  }
+  return outputDir;
+}
+
+function outputPathFor(outputDir: string, filename: string): string {
+  const path = resolve(outputDir, filename);
+  if (!isInsideRepo(path)) {
+    throw new Error(`Generated file path must stay inside the repo: ${path}`);
+  }
+  return path;
+}
 
 // ── Node type ───────────────────────────────────────────────
 
@@ -441,6 +473,15 @@ const allConfigs = [
   { cfg: config500b, id: 'nm-500b', label: '500b — many partial conveyances' },
 ];
 
+let outputDir: string;
+try {
+  outputDir = parseOutputDir(process.argv.slice(2));
+  mkdirSync(outputDir, { recursive: true });
+} catch (error) {
+  console.error(error instanceof Error ? error.message : String(error));
+  process.exit(1);
+}
+
 for (const { cfg, id, label } of allConfigs) {
   nameIndex = 0;
   dateCounter = 0;
@@ -456,7 +497,7 @@ for (const { cfg, id, label } of allConfigs) {
 
   const csv = generateCSV(nodes, id);
   const filename = `test-${id.replace('nm-', '')}-v2.import.csv`;
-  const path = resolve(process.cwd(), '..', filename);
+  const path = outputPathFor(outputDir, filename);
   writeFileSync(path, csv, 'utf-8');
 
   // Stats
