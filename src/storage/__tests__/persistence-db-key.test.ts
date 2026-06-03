@@ -16,6 +16,7 @@ type WorkspaceRecord = {
 type ShardRow = {
   id: string;
   workspaceId: string;
+  dbKey?: string;
 };
 
 type CanvasRecord = {
@@ -81,7 +82,13 @@ function makeShardTable<Row extends ShardRow>(initial: Row[] = []) {
     where: vi.fn((field: string) => ({
       equals: vi.fn((value: unknown) =>
         collection(
-          (row) => (row as unknown as Record<string, unknown>)[field] === value
+          (row) => {
+            if (field === '[dbKey+workspaceId]' && Array.isArray(value)) {
+              const [dbKey, workspaceId] = value as [string, string];
+              return row.dbKey === dbKey && row.workspaceId === workspaceId;
+            }
+            return (row as unknown as Record<string, unknown>)[field] === value;
+          }
         )
       ),
     })),
@@ -90,15 +97,23 @@ function makeShardTable<Row extends ShardRow>(initial: Row[] = []) {
 
 function shardRowsFromWorkspace(
   workspace: WorkspaceData,
-  savedAt = '2026-04-25T00:00:00.000Z'
+  savedAt = '2026-04-25T00:00:00.000Z',
+  dbKey = 'user-alice'
 ): WorkspaceShardSet {
-  return buildWorkspaceShards(workspace, {
+  const shards = buildWorkspaceShards(workspace, {
     lastModified: savedAt,
     landroidFileVersion: LANDROID_FILE_VERSION,
     source: 'migration',
     syncState: 'local_only',
     legacyWorkspaceDataJson: JSON.stringify(workspace),
   });
+  return {
+    manifest: { ...shards.manifest, dbKey },
+    deskMaps: shards.deskMaps.map((row) => ({ ...row, dbKey })),
+    nodes: shards.nodes.map((row) => ({ ...row, dbKey })),
+    leaseholdState: { ...shards.leaseholdState, dbKey },
+    uiState: { ...shards.uiState, dbKey },
+  };
 }
 
 async function loadPersistenceWithKeys({

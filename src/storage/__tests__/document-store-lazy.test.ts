@@ -11,9 +11,17 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { DocumentAttachment, DocumentRecord } from '../../types/document';
 
-function fakeDoc(overrides: Partial<DocumentRecord> = {}): DocumentRecord {
+type StoredDocumentRecord = DocumentRecord & { dbKey?: string };
+type StoredDocumentAttachment = DocumentAttachment & { dbKey?: string };
+
+const ACTIVE_DB_KEY = 'user-alice';
+
+function fakeDoc(
+  overrides: Partial<StoredDocumentRecord> = {}
+): StoredDocumentRecord {
   return {
     docId: 'doc-1',
+    dbKey: ACTIVE_DB_KEY,
     workspaceId: 'ws-1',
     fileName: 'deed.pdf',
     mimeType: 'application/pdf',
@@ -27,9 +35,12 @@ function fakeDoc(overrides: Partial<DocumentRecord> = {}): DocumentRecord {
   };
 }
 
-function fakeAttachment(overrides: Partial<DocumentAttachment> = {}): DocumentAttachment {
+function fakeAttachment(
+  overrides: Partial<StoredDocumentAttachment> = {}
+): StoredDocumentAttachment {
   return {
     attachmentId: 'att-1',
+    dbKey: ACTIVE_DB_KEY,
     workspaceId: 'ws-1',
     docId: 'doc-1',
     entityKind: 'node',
@@ -48,6 +59,23 @@ function matchEquals(
   if (field === '[workspaceId+entityKind+entityId]' && Array.isArray(value)) {
     const [ws, kind, id] = value as [string, string, string];
     return row.workspaceId === ws && row.entityKind === kind && row.entityId === id;
+  }
+  if (field === '[dbKey+workspaceId]' && Array.isArray(value)) {
+    const [dbKey, ws] = value as [string, string];
+    return row.dbKey === dbKey && row.workspaceId === ws;
+  }
+  if (field === '[dbKey+workspaceId+docId]' && Array.isArray(value)) {
+    const [dbKey, ws, docId] = value as [string, string, string];
+    return row.dbKey === dbKey && row.workspaceId === ws && row.docId === docId;
+  }
+  if (field === '[dbKey+workspaceId+entityKind+entityId]' && Array.isArray(value)) {
+    const [dbKey, ws, kind, id] = value as [string, string, string, string];
+    return (
+      row.dbKey === dbKey
+      && row.workspaceId === ws
+      && row.entityKind === kind
+      && row.entityId === id
+    );
   }
   return row[field] === value;
 }
@@ -73,16 +101,28 @@ function makeTable<Row extends Record<string, unknown>>(
       equals: (value: unknown) =>
         collection((row) => matchEquals(row, field, value)),
       anyOf: (values: unknown[]) => {
+        if (field === '[dbKey+workspaceId+docId]') {
+          const set = new Set(values.map((value) => JSON.stringify(value)));
+          return collection((row) =>
+            set.has(JSON.stringify([row.dbKey, row.workspaceId, row.docId]))
+          );
+        }
         const set = new Set(values);
         return collection((row) => set.has(row[field]));
       },
       between: (lower: unknown[]) =>
         // The node-attachment reader scans [ws, 'node', minKey..maxKey];
         // match on the fixed prefix and let the caller's `.and(...)` filter ids.
-        collection(
-          (row) =>
-            row.workspaceId === lower[0] && row.entityKind === lower[1]
-        ),
+        collection((row) => {
+          if (lower.length === 4) {
+            return (
+              row.dbKey === lower[0]
+              && row.workspaceId === lower[1]
+              && row.entityKind === lower[2]
+            );
+          }
+          return row.workspaceId === lower[0] && row.entityKind === lower[1];
+        }),
     })),
   };
 }
@@ -91,8 +131,8 @@ async function loadStore({
   documents,
   attachments,
 }: {
-  documents: DocumentRecord[];
-  attachments: DocumentAttachment[];
+  documents: StoredDocumentRecord[];
+  attachments: StoredDocumentAttachment[];
 }) {
   vi.resetModules();
   const docTable = makeTable(
@@ -105,6 +145,9 @@ async function loadStore({
   );
   const db = { documents: docTable, document_attachments: attachmentTable };
   vi.doMock('../db', () => ({ default: db }));
+  vi.doMock('../active-workspace-key', () => ({
+    getWorkspaceDbKey: () => ACTIVE_DB_KEY,
+  }));
   const documentStore = await import('../document-store');
   return { documentStore, docTable };
 }
@@ -116,6 +159,7 @@ function hasBlob(value: unknown): boolean {
 describe('document vault lazy-load contract', () => {
   afterEach(() => {
     vi.doUnmock('../db');
+    vi.doUnmock('../active-workspace-key');
     vi.resetModules();
   });
 

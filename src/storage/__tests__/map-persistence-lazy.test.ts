@@ -12,16 +12,27 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createBlankMapAsset, type MapAsset } from '../../types/map';
 
-function fakeAsset(id: string, overrides: Partial<MapAsset> = {}): MapAsset {
-  return createBlankMapAsset(
-    'ws-1',
-    new Blob(['map-bytes'], { type: 'image/png' }),
-    {
-      fileName: `${id}.png`,
-      mimeType: 'image/png',
-      overrides: { id, ...overrides },
-    }
-  );
+type StoredMapAsset = MapAsset & { dbKey?: string };
+
+const ACTIVE_DB_KEY = 'user-alice';
+
+function fakeAsset(
+  id: string,
+  overrides: Partial<StoredMapAsset> = {}
+): StoredMapAsset {
+  return {
+    ...createBlankMapAsset(
+      'ws-1',
+      new Blob(['map-bytes'], { type: 'image/png' }),
+      {
+        fileName: `${id}.png`,
+        mimeType: 'image/png',
+        overrides: { id, ...overrides },
+      }
+    ),
+    dbKey: ACTIVE_DB_KEY,
+    ...overrides,
+  };
 }
 
 function makeTable<Row extends Record<string, unknown>>(rows: Row[], pk: keyof Row) {
@@ -32,12 +43,18 @@ function makeTable<Row extends Record<string, unknown>>(rows: Row[], pk: keyof R
   return {
     get: vi.fn(async (id: string) => byId.get(id)),
     where: vi.fn((field: string) => ({
-      equals: (value: unknown) => collection((row) => row[field] === value),
+      equals: (value: unknown) => collection((row) => {
+        if (field === '[dbKey+workspaceId]' && Array.isArray(value)) {
+          const [dbKey, workspaceId] = value as [string, string];
+          return row.dbKey === dbKey && row.workspaceId === workspaceId;
+        }
+        return row[field] === value;
+      }),
     })),
   };
 }
 
-async function loadStore(assets: MapAsset[]) {
+async function loadStore(assets: StoredMapAsset[]) {
   vi.resetModules();
   const mapAssets = makeTable(assets as unknown as Array<Record<string, unknown>>, 'id');
   const db = {
@@ -46,6 +63,9 @@ async function loadStore(assets: MapAsset[]) {
     mapExternalReferences: makeTable([], 'id'),
   };
   vi.doMock('../db', () => ({ default: db }));
+  vi.doMock('../active-workspace-key', () => ({
+    getWorkspaceDbKey: () => ACTIVE_DB_KEY,
+  }));
   const mapPersistence = await import('../map-persistence');
   return { mapPersistence };
 }
@@ -57,6 +77,7 @@ function hasBlob(value: unknown): boolean {
 describe('map-asset lazy-load contract', () => {
   afterEach(() => {
     vi.doUnmock('../db');
+    vi.doUnmock('../active-workspace-key');
     vi.resetModules();
   });
 

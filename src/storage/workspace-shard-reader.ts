@@ -67,6 +67,7 @@ function requireCompleteShardSet(rows: WorkspaceShardRows): WorkspaceShardSet {
   }
 
   const workspaceId = rows.manifest.workspaceId;
+  const dbKey = rows.manifest.dbKey;
   const deskMaps = rows.deskMaps ?? [];
   const nodes = rows.nodes ?? [];
   const allRows = [...deskMaps, ...nodes, rows.leaseholdState, rows.uiState];
@@ -74,6 +75,14 @@ function requireCompleteShardSet(rows: WorkspaceShardRows): WorkspaceShardSet {
   if (mismatched) {
     throw new Error(
       `shard ${mismatched.id} belongs to workspace ${mismatched.workspaceId}, expected ${workspaceId}`
+    );
+  }
+  const mismatchedDbKey = dbKey
+    ? allRows.find((row) => row.dbKey !== dbKey)
+    : null;
+  if (mismatchedDbKey && dbKey) {
+    throw new Error(
+      `shard ${mismatchedDbKey.id} belongs to dbKey ${mismatchedDbKey.dbKey ?? 'unscoped'}, expected ${dbKey}`
     );
   }
 

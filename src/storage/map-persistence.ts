@@ -1,5 +1,13 @@
 import db from './db';
 import {
+  activeDbKey,
+  activeStorageScopedId,
+  activeWorkspaceScope,
+  stampActiveDbKeyWithStorageId,
+  stripDbKeyAndStorageId,
+  stripStorageScopedId,
+} from './db-key-scope';
+import {
   normalizeMapAsset,
   normalizeMapExternalReference,
   normalizeMapRegion,
@@ -27,20 +35,41 @@ function stripMapAssetBlob(asset: MapAsset): MapAssetMeta {
   return meta;
 }
 
+function stripStoredId<T extends { id: string; dbKey?: string }>(
+  row: T
+): Omit<T, 'dbKey'> {
+  return stripDbKeyAndStorageId(row, 'id');
+}
+
+async function getMapAssetRow(id: string) {
+  return (await db.mapAssets.get(activeStorageScopedId(id))) ?? db.mapAssets.get(id);
+}
+
+async function getMapRegionRow(id: string) {
+  return (await db.mapRegions.get(activeStorageScopedId(id))) ?? db.mapRegions.get(id);
+}
+
+async function getMapReferenceRow(id: string) {
+  return (
+    (await db.mapExternalReferences.get(activeStorageScopedId(id)))
+    ?? db.mapExternalReferences.get(id)
+  );
+}
+
 export async function loadMapWorkspaceData(
   workspaceId: string
 ): Promise<MapWorkspaceData> {
   const [mapAssets, mapRegions, mapReferences] = await Promise.all([
-    db.mapAssets.where('workspaceId').equals(workspaceId).toArray(),
-    db.mapRegions.where('workspaceId').equals(workspaceId).toArray(),
-    db.mapExternalReferences.where('workspaceId').equals(workspaceId).toArray(),
+    db.mapAssets.where('[dbKey+workspaceId]').equals(activeWorkspaceScope(workspaceId)).toArray(),
+    db.mapRegions.where('[dbKey+workspaceId]').equals(activeWorkspaceScope(workspaceId)).toArray(),
+    db.mapExternalReferences.where('[dbKey+workspaceId]').equals(activeWorkspaceScope(workspaceId)).toArray(),
   ]);
 
   return {
-    mapAssets: mapAssets.map((asset) => normalizeMapAsset(asset)),
-    mapRegions: mapRegions.map((region) => normalizeMapRegion(region)),
+    mapAssets: mapAssets.map((asset) => normalizeMapAsset(stripStoredId(asset))),
+    mapRegions: mapRegions.map((region) => normalizeMapRegion(stripStoredId(region))),
     mapReferences: mapReferences.map((reference) =>
-      normalizeMapExternalReference(reference)
+      normalizeMapExternalReference(stripStoredId(reference))
     ),
   };
 }
@@ -54,16 +83,16 @@ export async function loadMapWorkspaceMetadata(
   workspaceId: string
 ): Promise<MapWorkspaceMetadata> {
   const [mapAssets, mapRegions, mapReferences] = await Promise.all([
-    db.mapAssets.where('workspaceId').equals(workspaceId).toArray(),
-    db.mapRegions.where('workspaceId').equals(workspaceId).toArray(),
-    db.mapExternalReferences.where('workspaceId').equals(workspaceId).toArray(),
+    db.mapAssets.where('[dbKey+workspaceId]').equals(activeWorkspaceScope(workspaceId)).toArray(),
+    db.mapRegions.where('[dbKey+workspaceId]').equals(activeWorkspaceScope(workspaceId)).toArray(),
+    db.mapExternalReferences.where('[dbKey+workspaceId]').equals(activeWorkspaceScope(workspaceId)).toArray(),
   ]);
 
   return {
-    mapAssets: mapAssets.map(stripMapAssetBlob),
-    mapRegions: mapRegions.map((region) => normalizeMapRegion(region)),
+    mapAssets: mapAssets.map((asset) => stripMapAssetBlob(stripStoredId(asset))),
+    mapRegions: mapRegions.map((region) => normalizeMapRegion(stripStoredId(region))),
     mapReferences: mapReferences.map((reference) =>
-      normalizeMapExternalReference(reference)
+      normalizeMapExternalReference(stripStoredId(reference))
     ),
   };
 }
@@ -77,15 +106,16 @@ export async function loadMapAssetsWithBlobs(
   workspaceId: string
 ): Promise<MapAsset[]> {
   const mapAssets = await db.mapAssets
-    .where('workspaceId')
-    .equals(workspaceId)
+    .where('[dbKey+workspaceId]')
+    .equals(activeWorkspaceScope(workspaceId))
     .toArray();
-  return mapAssets.map((asset) => normalizeMapAsset(asset));
+  return mapAssets.map((asset) => normalizeMapAsset(stripStoredId(asset)));
 }
 
 /** Fetch a single map asset's file blob on demand (preview/download/render). */
 export async function getMapAssetBlob(id: string): Promise<Blob | undefined> {
-  const asset = await db.mapAssets.get(id);
+  const asset = await getMapAssetRow(id);
+  if (!asset || asset.dbKey !== activeWorkspaceScope(asset.workspaceId)[0]) return undefined;
   return asset?.blob;
 }
 
@@ -100,15 +130,18 @@ export async function replaceMapWorkspaceData(
     db.mapExternalReferences,
     async () => {
       await Promise.all([
-        db.mapAssets.where('workspaceId').equals(workspaceId).delete(),
-        db.mapRegions.where('workspaceId').equals(workspaceId).delete(),
-        db.mapExternalReferences.where('workspaceId').equals(workspaceId).delete(),
+        db.mapAssets.where('[dbKey+workspaceId]').equals(activeWorkspaceScope(workspaceId)).delete(),
+        db.mapRegions.where('[dbKey+workspaceId]').equals(activeWorkspaceScope(workspaceId)).delete(),
+        db.mapExternalReferences.where('[dbKey+workspaceId]').equals(activeWorkspaceScope(workspaceId)).delete(),
       ]);
 
       if (data.mapAssets.length > 0) {
         await db.mapAssets.bulkPut(
           data.mapAssets.map((asset) =>
-            normalizeMapAsset({ ...asset, workspaceId })
+            stampActiveDbKeyWithStorageId(
+              normalizeMapAsset({ ...asset, workspaceId }),
+              'id'
+            )
           )
         );
       }
@@ -116,7 +149,10 @@ export async function replaceMapWorkspaceData(
       if (data.mapRegions.length > 0) {
         await db.mapRegions.bulkPut(
           data.mapRegions.map((region) =>
-            normalizeMapRegion({ ...region, workspaceId })
+            stampActiveDbKeyWithStorageId(
+              normalizeMapRegion({ ...region, workspaceId }),
+              'id'
+            )
           )
         );
       }
@@ -124,7 +160,10 @@ export async function replaceMapWorkspaceData(
       if (data.mapReferences.length > 0) {
         await db.mapExternalReferences.bulkPut(
           data.mapReferences.map((reference) =>
-            normalizeMapExternalReference({ ...reference, workspaceId })
+            stampActiveDbKeyWithStorageId(
+              normalizeMapExternalReference({ ...reference, workspaceId }),
+              'id'
+            )
           )
         );
       }
@@ -133,7 +172,9 @@ export async function replaceMapWorkspaceData(
 }
 
 export function saveMapAsset(asset: MapAsset) {
-  return db.mapAssets.put(normalizeMapAsset(asset));
+  return db.mapAssets.put(
+    stampActiveDbKeyWithStorageId(normalizeMapAsset(asset), 'id')
+  );
 }
 
 /**
@@ -144,15 +185,23 @@ export function saveMapAsset(asset: MapAsset) {
  */
 export function updateMapAssetFields(id: string, fields: Partial<MapAssetMeta>) {
   const { id: _id, ...rest } = fields as Partial<MapAsset>;
-  return db.mapAssets.update(id, rest);
+  return db.transaction('rw', db.mapAssets, async () => {
+    const asset = await getMapAssetRow(id);
+    if (!asset || asset.dbKey !== activeWorkspaceScope(asset.workspaceId)[0]) return;
+    await db.mapAssets.update(asset.id, rest);
+  });
 }
 
 export function saveMapRegion(region: MapRegion) {
-  return db.mapRegions.put(normalizeMapRegion(region));
+  return db.mapRegions.put(
+    stampActiveDbKeyWithStorageId(normalizeMapRegion(region), 'id')
+  );
 }
 
 export function saveMapReference(reference: MapExternalReference) {
-  return db.mapExternalReferences.put(normalizeMapExternalReference(reference));
+  return db.mapExternalReferences.put(
+    stampActiveDbKeyWithStorageId(normalizeMapExternalReference(reference), 'id')
+  );
 }
 
 export function deleteMapAsset(id: string) {
@@ -162,12 +211,29 @@ export function deleteMapAsset(id: string) {
     db.mapRegions,
     db.mapExternalReferences,
     async () => {
-      await db.mapAssets.delete(id);
-      const regionIds = await db.mapRegions.where('assetId').equals(id).primaryKeys();
-      await db.mapRegions.where('assetId').equals(id).delete();
-      await db.mapExternalReferences.where('assetId').equals(id).delete();
-      for (const regionId of regionIds) {
-        await db.mapExternalReferences.where('regionId').equals(String(regionId)).delete();
+      const asset = await getMapAssetRow(id);
+      if (!asset || asset.dbKey !== activeWorkspaceScope(asset.workspaceId)[0]) return;
+      const scope = activeWorkspaceScope(asset.workspaceId);
+      const assetId = stripStorageScopedId(asset.id, asset.dbKey);
+      await db.mapAssets.delete(asset.id);
+      const regions = await db.mapRegions
+        .where('[dbKey+workspaceId+assetId]')
+        .equals([...scope, assetId])
+        .toArray();
+      await db.mapRegions
+        .where('[dbKey+workspaceId+assetId]')
+        .equals([...scope, assetId])
+        .delete();
+      await db.mapExternalReferences
+        .where('[dbKey+workspaceId+assetId]')
+        .equals([...scope, assetId])
+        .delete();
+      for (const region of regions) {
+        const regionId = stripStorageScopedId(region.id, region.dbKey);
+        await db.mapExternalReferences
+          .where('[dbKey+workspaceId+regionId]')
+          .equals([...scope, regionId])
+          .delete();
       }
     }
   );
@@ -179,48 +245,95 @@ export function deleteMapRegion(id: string) {
     db.mapRegions,
     db.mapExternalReferences,
     async () => {
-      await db.mapRegions.delete(id);
-      await db.mapExternalReferences.where('regionId').equals(id).delete();
+      const region = await getMapRegionRow(id);
+      if (!region || region.dbKey !== activeWorkspaceScope(region.workspaceId)[0]) return;
+      const scope = activeWorkspaceScope(region.workspaceId);
+      const regionId = stripStorageScopedId(region.id, region.dbKey);
+      await db.mapRegions.delete(region.id);
+      await db.mapExternalReferences
+        .where('[dbKey+workspaceId+regionId]')
+        .equals([...scope, regionId])
+        .delete();
     }
   );
 }
 
 export function deleteMapReference(id: string) {
-  return db.mapExternalReferences.delete(id);
+  return db.transaction('rw', db.mapExternalReferences, async () => {
+    const reference = await getMapReferenceRow(id);
+    if (!reference || reference.dbKey !== activeWorkspaceScope(reference.workspaceId)[0]) return;
+    await db.mapExternalReferences.delete(reference.id);
+  });
 }
 
 export function clearDeskMapLink(id: string) {
+  const dbKey = activeDbKey();
   return db.transaction('rw', db.mapAssets, db.mapRegions, async () => {
     await Promise.all([
-      db.mapAssets.where('deskMapId').equals(id).modify({ deskMapId: null }),
-      db.mapRegions.where('deskMapId').equals(id).modify({ deskMapId: null }),
+      db.mapAssets
+        .where('deskMapId')
+        .equals(id)
+        .filter((row) => row.dbKey === dbKey)
+        .modify({ deskMapId: null }),
+      db.mapRegions
+        .where('deskMapId')
+        .equals(id)
+        .filter((row) => row.dbKey === dbKey)
+        .modify({ deskMapId: null }),
     ]);
   });
 }
 
 export function clearNodeLink(id: string) {
+  const dbKey = activeDbKey();
   return db.transaction('rw', db.mapAssets, db.mapRegions, async () => {
     await Promise.all([
-      db.mapAssets.where('nodeId').equals(id).modify({ nodeId: null }),
-      db.mapRegions.where('nodeId').equals(id).modify({ nodeId: null }),
+      db.mapAssets
+        .where('nodeId')
+        .equals(id)
+        .filter((row) => row.dbKey === dbKey)
+        .modify({ nodeId: null }),
+      db.mapRegions
+        .where('nodeId')
+        .equals(id)
+        .filter((row) => row.dbKey === dbKey)
+        .modify({ nodeId: null }),
     ]);
   });
 }
 
 export function clearOwnerLink(id: string) {
+  const dbKey = activeDbKey();
   return db.transaction('rw', db.mapAssets, db.mapRegions, async () => {
     await Promise.all([
-      db.mapAssets.where('linkedOwnerId').equals(id).modify({ linkedOwnerId: null }),
-      db.mapRegions.where('linkedOwnerId').equals(id).modify({ linkedOwnerId: null }),
+      db.mapAssets
+        .where('linkedOwnerId')
+        .equals(id)
+        .filter((row) => row.dbKey === dbKey)
+        .modify({ linkedOwnerId: null }),
+      db.mapRegions
+        .where('linkedOwnerId')
+        .equals(id)
+        .filter((row) => row.dbKey === dbKey)
+        .modify({ linkedOwnerId: null }),
     ]);
   });
 }
 
 export function clearLeaseLink(id: string) {
+  const dbKey = activeDbKey();
   return db.transaction('rw', db.mapAssets, db.mapRegions, async () => {
     await Promise.all([
-      db.mapAssets.where('leaseId').equals(id).modify({ leaseId: null }),
-      db.mapRegions.where('leaseId').equals(id).modify({ leaseId: null }),
+      db.mapAssets
+        .where('leaseId')
+        .equals(id)
+        .filter((row) => row.dbKey === dbKey)
+        .modify({ leaseId: null }),
+      db.mapRegions
+        .where('leaseId')
+        .equals(id)
+        .filter((row) => row.dbKey === dbKey)
+        .modify({ leaseId: null }),
     ]);
   });
 }

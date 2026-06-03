@@ -2,9 +2,17 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { DocumentAttachment, DocumentRecord } from '../../types/document';
 import type { OwnershipNode } from '../../types/node';
 
-function fakeDocument(overrides: Partial<DocumentRecord> = {}): DocumentRecord {
+type StoredDocumentRecord = DocumentRecord & { dbKey?: string };
+type StoredDocumentAttachment = DocumentAttachment & { dbKey?: string };
+
+const ACTIVE_DB_KEY = 'user-alice';
+
+function fakeDocument(
+  overrides: Partial<StoredDocumentRecord> = {}
+): StoredDocumentRecord {
   return {
     docId: 'doc-1',
+    dbKey: ACTIVE_DB_KEY,
     workspaceId: 'ws-1',
     fileName: 'doc.pdf',
     mimeType: 'application/pdf',
@@ -19,10 +27,11 @@ function fakeDocument(overrides: Partial<DocumentRecord> = {}): DocumentRecord {
 }
 
 function fakeAttachment(
-  overrides: Partial<DocumentAttachment> = {}
-): DocumentAttachment {
+  overrides: Partial<StoredDocumentAttachment> = {}
+): StoredDocumentAttachment {
   return {
     attachmentId: 'att-1',
+    dbKey: ACTIVE_DB_KEY,
     workspaceId: 'ws-1',
     docId: 'doc-1',
     entityKind: 'node',
@@ -37,8 +46,8 @@ async function loadWorkspacePersistenceWithRows({
   documents,
   attachments,
 }: {
-  documents: DocumentRecord[];
-  attachments: DocumentAttachment[];
+  documents: StoredDocumentRecord[];
+  attachments: StoredDocumentAttachment[];
 }) {
   vi.resetModules();
 
@@ -47,7 +56,7 @@ async function loadWorkspacePersistenceWithRows({
     document_attachments: {
       where: vi.fn((field: string) => ({
         equals: vi.fn((value: unknown) => ({
-          and: vi.fn((predicate: (row: DocumentAttachment) => boolean) => ({
+          and: vi.fn((predicate: (row: StoredDocumentAttachment) => boolean) => ({
             toArray: vi.fn(async () =>
               attachments
                 .filter((row) => row[field as keyof DocumentAttachment] === value)
@@ -65,6 +74,9 @@ async function loadWorkspacePersistenceWithRows({
   };
 
   vi.doMock('../db', () => ({ default: db }));
+  vi.doMock('../active-workspace-key', () => ({
+    getWorkspaceDbKey: () => ACTIVE_DB_KEY,
+  }));
   const workspacePersistence = await import('../workspace-persistence');
   return { workspacePersistence, db };
 }
@@ -72,6 +84,7 @@ async function loadWorkspacePersistenceWithRows({
 describe('exportDocumentWorkspaceData workspace scope', () => {
   afterEach(() => {
     vi.doUnmock('../db');
+    vi.doUnmock('../active-workspace-key');
     vi.resetModules();
   });
 

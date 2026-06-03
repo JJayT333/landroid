@@ -4,9 +4,17 @@ import type {
   DocumentRecord,
 } from '../../types/document';
 
-function fakeDocument(overrides: Partial<DocumentRecord> = {}): DocumentRecord {
+type StoredDocumentRecord = DocumentRecord & { dbKey?: string };
+type StoredDocumentAttachment = DocumentAttachment & { dbKey?: string };
+
+const ACTIVE_DB_KEY = 'user-alice';
+
+function fakeDocument(
+  overrides: Partial<StoredDocumentRecord> = {}
+): StoredDocumentRecord {
   return {
     docId: 'doc-1',
+    dbKey: ACTIVE_DB_KEY,
     workspaceId: 'ws-1',
     fileName: 'doc.pdf',
     mimeType: 'application/pdf',
@@ -21,10 +29,11 @@ function fakeDocument(overrides: Partial<DocumentRecord> = {}): DocumentRecord {
 }
 
 function fakeAttachment(
-  overrides: Partial<DocumentAttachment> = {}
-): DocumentAttachment {
+  overrides: Partial<StoredDocumentAttachment> = {}
+): StoredDocumentAttachment {
   return {
     attachmentId: 'att-1',
+    dbKey: ACTIVE_DB_KEY,
     workspaceId: 'ws-1',
     docId: 'doc-1',
     entityKind: 'node',
@@ -39,8 +48,8 @@ async function loadDocumentStoreWithRows({
   documents,
   attachments,
 }: {
-  documents: DocumentRecord[];
-  attachments: DocumentAttachment[];
+  documents: StoredDocumentRecord[];
+  attachments: StoredDocumentAttachment[];
 }) {
   vi.resetModules();
 
@@ -51,15 +60,24 @@ async function loadDocumentStoreWithRows({
   const db = {
     documents: {
       get: vi.fn(async (docId: string) => docRows.get(docId)),
+      bulkGet: vi.fn(async (docIds: string[]) =>
+        docIds.map((docId) => docRows.get(docId))
+      ),
       where: vi.fn((field: string) => ({
-        equals: vi.fn((workspaceId: string) => ({
+        equals: vi.fn((value: unknown) => ({
           toArray: vi.fn(async () => {
+            if (field === '[dbKey+workspaceId]' && Array.isArray(value)) {
+              const [dbKey, workspaceId] = value as [string, string];
+              return [...docRows.values()].filter((doc) =>
+                doc.dbKey === dbKey && doc.workspaceId === workspaceId
+              );
+            }
             if (field !== 'workspaceId') return [];
-            return [...docRows.values()].filter((doc) => doc.workspaceId === workspaceId);
+            return [...docRows.values()].filter((doc) => doc.workspaceId === value);
           }),
         })),
       })),
-      add: vi.fn(async (doc: DocumentRecord) => {
+      add: vi.fn(async (doc: StoredDocumentRecord) => {
         docRows.set(doc.docId, doc);
       }),
       bulkDelete: vi.fn(async (docIds: string[]) => {
@@ -68,7 +86,7 @@ async function loadDocumentStoreWithRows({
     },
     document_attachments: {
       get: vi.fn(async (attachmentId: string) => attachmentRows.get(attachmentId)),
-      add: vi.fn(async (attachment: DocumentAttachment) => {
+      add: vi.fn(async (attachment: StoredDocumentAttachment) => {
         attachmentRows.set(attachment.attachmentId, attachment);
       }),
       update: vi.fn(async (attachmentId: string, patch: Partial<DocumentAttachment>) => {
@@ -100,6 +118,24 @@ async function loadDocumentStoreWithRows({
                 && attachment.entityId === entityId
               );
             }
+            if (field === '[dbKey+workspaceId+entityKind+entityId]' && Array.isArray(value)) {
+              const [dbKey, workspaceId, entityKind, entityId] =
+                value as [string, string, string, string];
+              return (
+                attachment.dbKey === dbKey
+                && attachment.workspaceId === workspaceId
+                && attachment.entityKind === entityKind
+                && attachment.entityId === entityId
+              );
+            }
+            if (field === '[dbKey+workspaceId+docId]' && Array.isArray(value)) {
+              const [dbKey, workspaceId, docId] = value as [string, string, string];
+              return (
+                attachment.dbKey === dbKey
+                && attachment.workspaceId === workspaceId
+                && attachment.docId === docId
+              );
+            }
             return (attachment as unknown as Record<string, unknown>)[field] === value;
           });
           return {
@@ -112,10 +148,20 @@ async function loadDocumentStoreWithRows({
             }),
           };
         }),
-        anyOf: vi.fn((docIds: string[]) => ({
+        anyOf: vi.fn((docIds: unknown[]) => ({
           toArray: vi.fn(async () => {
+            if (field === '[dbKey+workspaceId+docId]') {
+              const keys = new Set(docIds.map((value) => JSON.stringify(value)));
+              return [...attachmentRows.values()].filter((attachment) =>
+                keys.has(JSON.stringify([
+                  attachment.dbKey,
+                  attachment.workspaceId,
+                  attachment.docId,
+                ]))
+              );
+            }
             if (field !== 'docId') return [];
-            const docIdSet = new Set(docIds);
+            const docIdSet = new Set(docIds as string[]);
             return [...attachmentRows.values()].filter((attachment) =>
               docIdSet.has(attachment.docId)
             );
@@ -133,6 +179,9 @@ async function loadDocumentStoreWithRows({
   };
 
   vi.doMock('../db', () => ({ default: db }));
+  vi.doMock('../active-workspace-key', () => ({
+    getWorkspaceDbKey: () => ACTIVE_DB_KEY,
+  }));
   const documentStore = await import('../document-store');
   return { documentStore, docRows, attachmentRows, db };
 }
@@ -140,6 +189,7 @@ async function loadDocumentStoreWithRows({
 describe('document-store', () => {
   afterEach(() => {
     vi.doUnmock('../db');
+    vi.doUnmock('../active-workspace-key');
     vi.resetModules();
   });
 
@@ -263,12 +313,12 @@ describe('document-store', () => {
     expect(attachmentRows.get('att-ws2-b')?.position).toBe(0);
     expect(attachmentRows.get('att-ws2-a')?.position).toBe(1);
     expect(attachmentRows.get('att-ws1-a')?.position).toBe(0);
-    expect(attachmentRows.get(added.attachmentId)?.position).toBe(1);
+    expect(attachmentRows.get(`${ACTIVE_DB_KEY}::${added.attachmentId}`)?.position).toBe(1);
 
     await documentStore.detachDocFromEntity('att-ws2-b');
     expect(attachmentRows.has('att-ws2-b')).toBe(false);
     expect(attachmentRows.get('att-ws2-a')?.position).toBe(0);
     expect(attachmentRows.get('att-ws1-a')?.position).toBe(0);
-    expect(attachmentRows.get(added.attachmentId)?.position).toBe(1);
+    expect(attachmentRows.get(`${ACTIVE_DB_KEY}::${added.attachmentId}`)?.position).toBe(1);
   });
 });

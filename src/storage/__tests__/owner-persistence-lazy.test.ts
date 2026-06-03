@@ -12,9 +12,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { OwnerDoc } from '../../types/owner';
 
-function fakeDoc(overrides: Partial<OwnerDoc> = {}): OwnerDoc {
+type StoredOwnerDoc = OwnerDoc & { dbKey?: string };
+
+const ACTIVE_DB_KEY = 'user-alice';
+
+function fakeDoc(overrides: Partial<StoredOwnerDoc> = {}): StoredOwnerDoc {
   return {
     id: 'doc-1',
+    dbKey: ACTIVE_DB_KEY,
     workspaceId: 'ws-1',
     ownerId: 'owner-1',
     leaseId: null,
@@ -43,12 +48,18 @@ function makeTable<Row extends Record<string, unknown>>(rows: Row[], pk: keyof R
   return {
     get: vi.fn(async (id: string) => byId.get(id)),
     where: vi.fn((field: string) => ({
-      equals: (value: unknown) => collection((row) => row[field] === value),
+      equals: (value: unknown) => collection((row) => {
+        if (field === '[dbKey+workspaceId]' && Array.isArray(value)) {
+          const [dbKey, workspaceId] = value as [string, string];
+          return row.dbKey === dbKey && row.workspaceId === workspaceId;
+        }
+        return row[field] === value;
+      }),
     })),
   };
 }
 
-async function loadStore(docs: OwnerDoc[]) {
+async function loadStore(docs: StoredOwnerDoc[]) {
   vi.resetModules();
   const ownerDocs = makeTable(docs as unknown as Array<Record<string, unknown>>, 'id');
   const db = {
@@ -58,6 +69,9 @@ async function loadStore(docs: OwnerDoc[]) {
     ownerDocs,
   };
   vi.doMock('../db', () => ({ default: db }));
+  vi.doMock('../active-workspace-key', () => ({
+    getWorkspaceDbKey: () => ACTIVE_DB_KEY,
+  }));
   const ownerPersistence = await import('../owner-persistence');
   return { ownerPersistence };
 }
@@ -69,6 +83,7 @@ function hasBlob(value: unknown): boolean {
 describe('owner-document lazy-load contract', () => {
   afterEach(() => {
     vi.doUnmock('../db');
+    vi.doUnmock('../active-workspace-key');
     vi.resetModules();
   });
 
