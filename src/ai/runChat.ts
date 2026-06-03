@@ -14,6 +14,7 @@ import { useAISettingsStore } from './settings-store';
 import { captureSnapshot, useAIUndoStore } from './undo-store';
 import { isHostedMode } from '../utils/deploy-env';
 import { getIdToken, triggerUnauthorized } from '../auth/session';
+import { useWorkspaceStore } from '../store/workspace-store';
 
 export interface ChatTurnInput {
   messages: ModelMessage[];
@@ -151,6 +152,16 @@ export async function runChatTurn(
 async function runHostedProxyChatTurn(
   input: ChatTurnInput
 ): Promise<ChatTurnResult> {
+  const settings = useAISettingsStore.getState();
+  const workspaceId = useWorkspaceStore.getState().workspaceId;
+  if (
+    settings.hostedContextMode === 'full'
+    && settings.hostedFullContextAcceptedWorkspaceId !== workspaceId
+  ) {
+    throw new Error(
+      'Hosted full context requires disclosure acceptance for this workspace before sending project details.'
+    );
+  }
   const token = await getIdToken();
   if (!token) {
     throw new Error('Hosted AI session is missing a Cognito ID token. Sign out, sign back in, and try again.');
@@ -169,7 +180,7 @@ async function runHostedProxyChatTurn(
         stream: true,
         messages: [
           { role: 'system', content: LANDROID_SYSTEM_PROMPT },
-          { role: 'system', content: buildAIAppContext() },
+          { role: 'system', content: buildAIAppContext(settings.hostedContextMode) },
           ...input.messages.map(toOpenAIMessage),
         ],
       }),

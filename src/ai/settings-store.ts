@@ -38,6 +38,7 @@ function resolvePersistStorage(): Storage {
 }
 
 export type AIProvider = 'ollama' | 'openai' | 'anthropic';
+export type HostedContextMode = 'minimal' | 'full';
 
 export interface AISettings {
   provider: AIProvider;
@@ -45,6 +46,8 @@ export interface AISettings {
   ollamaBaseURL: string;
   openaiApiKey: string;
   anthropicApiKey: string;
+  hostedContextMode: HostedContextMode;
+  hostedFullContextAcceptedWorkspaceId: string | null;
 }
 
 export interface AISettingsActions {
@@ -53,6 +56,8 @@ export interface AISettingsActions {
   setOllamaBaseURL: (url: string) => void;
   setOpenAIKey: (k: string) => void;
   setAnthropicKey: (k: string) => void;
+  setHostedContextMode: (mode: HostedContextMode) => void;
+  acceptHostedFullContextDisclosure: (workspaceId: string) => void;
 }
 
 /** Default model per provider. Local defaults to a model the user already has. */
@@ -93,12 +98,27 @@ export const useAISettingsStore = create<AISettings & AISettingsActions>()(
       ollamaBaseURL: 'http://localhost:11434/v1',
       openaiApiKey: '',
       anthropicApiKey: '',
+      hostedContextMode: 'minimal',
+      hostedFullContextAcceptedWorkspaceId: null,
       setProvider: (provider: AIProvider) =>
         set({ provider, model: DEFAULT_MODELS[provider] }),
       setModel: (model: string) => set({ model }),
       setOllamaBaseURL: (ollamaBaseURL: string) => set({ ollamaBaseURL }),
       setOpenAIKey: (openaiApiKey: string) => set({ openaiApiKey }),
       setAnthropicKey: (anthropicApiKey: string) => set({ anthropicApiKey }),
+      setHostedContextMode: (hostedContextMode: HostedContextMode) =>
+        set((state) => ({
+          hostedContextMode,
+          hostedFullContextAcceptedWorkspaceId:
+            hostedContextMode === 'full'
+              ? state.hostedFullContextAcceptedWorkspaceId
+              : null,
+        })),
+      acceptHostedFullContextDisclosure: (workspaceId: string) =>
+        set({
+          hostedContextMode: 'full',
+          hostedFullContextAcceptedWorkspaceId: workspaceId,
+        }),
     }),
     {
       name: 'landroid-ai-settings',
@@ -126,6 +146,8 @@ export const useAISettingsStore = create<AISettings & AISettingsActions>()(
               : 'http://localhost:11434/v1',
           openaiApiKey: '',
           anthropicApiKey: '',
+          hostedContextMode: 'minimal',
+          hostedFullContextAcceptedWorkspaceId: null,
         });
       },
       merge: (persisted, current) => {

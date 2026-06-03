@@ -19,6 +19,7 @@ import {
 } from '../utils/desk-map-units';
 
 const MAX_CONTEXT_NODES = 40;
+export type AIAppContextMode = 'minimal' | 'full';
 
 const VIEW_LABELS: Record<ViewMode, string> = {
   chart: 'Desk Map',
@@ -34,7 +35,11 @@ const VIEW_LABELS: Record<ViewMode, string> = {
   pitch: 'Sales Deck',
 };
 
-export function buildAIAppContext(): string {
+export function buildAIAppContext(mode: AIAppContextMode = 'full'): string {
+  if (mode === 'minimal') {
+    return buildMinimalAIAppContext();
+  }
+
   const ui = useUIStore.getState();
   const workspace = useWorkspaceStore.getState();
   const ownerState = useOwnerStore.getState();
@@ -92,6 +97,63 @@ export function buildAIAppContext(): string {
   appendVisibleDeskMapCards(contextLines, activeNodes, activeLeasesByOwnerId, unitNodes);
 
   return contextLines.join('\n');
+}
+
+function buildMinimalAIAppContext(): string {
+  const ui = useUIStore.getState();
+  const workspace = useWorkspaceStore.getState();
+  const ownerState = useOwnerStore.getState();
+  const activeDeskMap =
+    workspace.deskMaps.find((deskMap) => deskMap.id === workspace.activeDeskMapId) ??
+    workspace.deskMaps[0] ??
+    null;
+  const activeUnitCode = resolveActiveUnitCode(
+    workspace.deskMaps,
+    workspace.activeUnitCode,
+    activeDeskMap?.id ?? null
+  );
+  const activeNodes = activeDeskMap
+    ? activeDeskMap.nodeIds
+        .map((id) => workspace.nodes.find((node) => node.id === id))
+        .filter((node): node is OwnershipNode => Boolean(node))
+    : [];
+  const unitNodeIds = new Set(
+    workspace.deskMaps
+      .filter((deskMap) => !activeUnitCode || deskMap.unitCode === activeUnitCode)
+      .flatMap((deskMap) => deskMap.nodeIds)
+  );
+  const unitNodes = workspace.nodes.filter((node) => unitNodeIds.has(node.id));
+
+  const conveyanceCount = activeNodes.filter(
+    (node) => node.type !== 'related' && !isNpriNode(node)
+  ).length;
+  const npriCount = activeNodes.filter((node) => isNpriNode(node)).length;
+  const relatedLeaseCount = activeNodes.filter((node) => isLeaseNode(node)).length;
+  const relatedDocumentCount = activeNodes.filter(
+    (node) => node.type === 'related' && node.relatedKind === 'document'
+  ).length;
+  const activeLeasesByOwnerId = groupActiveLeasesByOwnerId(ownerState.leases);
+  const coverage = activeDeskMap
+    ? calculateDeskMapCoverageSummary(
+        activeNodes,
+        activeLeasesByOwnerId,
+        unitNodes.length > 0 ? unitNodes : activeNodes
+      )
+    : null;
+
+  return [
+    '# Read-only LANDroid app context (minimal)',
+    'Hosted minimal context includes counts and structure only. It intentionally omits project names, party names, fractions, lease economics, remarks, document references, and identifiers.',
+    '',
+    `Active view: ${VIEW_LABELS[ui.view]}`,
+    `Workspace counts: ${workspace.deskMaps.length} tract map${workspace.deskMaps.length === 1 ? '' : 's'}, ${workspace.nodes.length} title card${workspace.nodes.length === 1 ? '' : 's'}, ${ownerState.owners.length} owner record${ownerState.owners.length === 1 ? '' : 's'}, ${ownerState.leases.length} lease record${ownerState.leases.length === 1 ? '' : 's'}.`,
+    `Active focus loaded: ${activeDeskMap ? 'yes' : 'no'}`,
+    `Active unit selected: ${activeUnitCode ? 'yes' : 'no'}`,
+    `Visible card counts: ${activeNodes.length} total, ${conveyanceCount} conveyance, ${npriCount} NPRI, ${relatedLeaseCount} related lease, ${relatedDocumentCount} related document.`,
+    coverage
+      ? `Coverage structure: ${coverage.currentOwnerCount} current owner card${coverage.currentOwnerCount === 1 ? '' : 's'}, ${coverage.linkedOwnerCount} linked owner card${coverage.linkedOwnerCount === 1 ? '' : 's'}, ${coverage.leasedOwnerCount} leased owner card${coverage.leasedOwnerCount === 1 ? '' : 's'}, ${coverage.leaseOverlaps.length} lease coverage warning${coverage.leaseOverlaps.length === 1 ? '' : 's'}.`
+      : 'Coverage structure: no active Desk Map loaded.',
+  ].join('\n');
 }
 
 function groupActiveLeasesByOwnerId(leases: Lease[]): Map<string, Lease[]> {
