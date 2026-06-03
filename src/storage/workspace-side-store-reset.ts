@@ -62,11 +62,11 @@ interface ReplaceWorkspaceSideStoresWithRollbackOptions {
   rollbackNodes: OwnershipNode[];
 }
 
-export async function replaceWorkspaceSideStores(
+function sideStoreReplacementPromises(
   workspaceId: string,
   data: WorkspaceSideStoreData = {}
-): Promise<void> {
-  await Promise.all([
+): Array<Promise<void>> {
+  return [
     useOwnerStore
       .getState()
       .replaceWorkspaceData(workspaceId, data.ownerData ?? EMPTY_OWNER_DATA),
@@ -83,8 +83,10 @@ export async function replaceWorkspaceSideStores(
     useCurativeStore
       .getState()
       .replaceWorkspaceData(workspaceId, data.curativeData ?? EMPTY_CURATIVE_DATA),
-  ]);
+  ];
+}
 
+async function finalizeWorkspaceSideStoreReplacement(): Promise<void> {
   // Drop the prior workspace's shard rows for this DB key so the replacement
   // workspace's autosave starts from a clean set and the reader cannot resolve
   // a stale workspace under the active key.
@@ -93,6 +95,38 @@ export async function replaceWorkspaceSideStores(
   useAIApprovalStore.getState().clear();
   useAIActionJournalStore.getState().clear();
   useAIUndoStore.getState().clear();
+}
+
+export async function replaceWorkspaceSideStores(
+  workspaceId: string,
+  data: WorkspaceSideStoreData = {}
+): Promise<void> {
+  await Promise.all(sideStoreReplacementPromises(workspaceId, data));
+  await finalizeWorkspaceSideStoreReplacement();
+}
+
+function toError(value: unknown): Error {
+  return value instanceof Error ? value : new Error(String(value));
+}
+
+async function settleWorkspaceSideStoreReplacement(
+  workspaceId: string,
+  data: WorkspaceSideStoreData
+): Promise<Error[]> {
+  const results = await Promise.allSettled(
+    sideStoreReplacementPromises(workspaceId, data)
+  );
+  return results.flatMap((result) =>
+    result.status === 'rejected' ? [toError(result.reason)] : []
+  );
+}
+
+function replacementFailure(errors: Error[], fallbackMessage: string): Error {
+  if (errors.length === 1) return errors[0];
+  if (errors.length === 0) return new Error(fallbackMessage);
+  return new Error(
+    `${fallbackMessage}: ${errors.map((error) => error.message).join('; ')}`
+  );
 }
 
 async function exportActiveWorkspaceSideStores(
@@ -127,10 +161,29 @@ export async function replaceWorkspaceSideStoresWithRollback({
     rollbackNodes
   );
 
-  try {
-    await replaceWorkspaceSideStores(targetWorkspaceId, targetData);
-  } catch (error) {
-    await replaceWorkspaceSideStores(rollbackWorkspaceId, rollbackData);
-    throw error;
+  const targetErrors = await settleWorkspaceSideStoreReplacement(
+    targetWorkspaceId,
+    targetData
+  );
+  if (targetErrors.length === 0) {
+    await finalizeWorkspaceSideStoreReplacement();
+    return;
   }
+
+  const rollbackErrors = await settleWorkspaceSideStoreReplacement(
+    rollbackWorkspaceId,
+    rollbackData
+  );
+  if (rollbackErrors.length === 0) {
+    await finalizeWorkspaceSideStoreReplacement();
+    throw replacementFailure(
+      targetErrors,
+      'Side-store replacement failed.'
+    );
+  }
+
+  throw replacementFailure(
+    [...targetErrors, ...rollbackErrors],
+    'Side-store replacement failed and rollback also failed.'
+  );
 }

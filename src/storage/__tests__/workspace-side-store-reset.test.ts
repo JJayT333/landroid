@@ -1,11 +1,21 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
-  replaceOwnerWorkspaceData: vi.fn(async () => undefined),
-  replaceDocumentWorkspaceData: vi.fn(async () => undefined),
-  replaceMapWorkspaceData: vi.fn(async () => undefined),
-  replaceResearchWorkspaceData: vi.fn(async () => undefined),
-  replaceCurativeWorkspaceData: vi.fn(async () => undefined),
+  replaceOwnerWorkspaceData: vi.fn(
+    async (_workspaceId: string, _data: unknown) => undefined
+  ),
+  replaceDocumentWorkspaceData: vi.fn(
+    async (_data: unknown, _workspaceId: string) => undefined
+  ),
+  replaceMapWorkspaceData: vi.fn(
+    async (_workspaceId: string, _data: unknown) => undefined
+  ),
+  replaceResearchWorkspaceData: vi.fn(
+    async (_workspaceId: string, _data: unknown) => undefined
+  ),
+  replaceCurativeWorkspaceData: vi.fn(
+    async (_workspaceId: string, _data: unknown) => undefined
+  ),
   exportOwnerWorkspaceData: vi.fn(),
   exportDocumentWorkspaceData: vi.fn(),
   exportMapWorkspaceData: vi.fn(),
@@ -88,6 +98,95 @@ import {
   replaceWorkspaceSideStoresWithRollback,
 } from '../workspace-side-store-reset';
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((promiseResolve, promiseReject) => {
+    resolve = promiseResolve;
+    reject = promiseReject;
+  });
+  return { promise, resolve, reject };
+}
+
+function emptyOwnerData() {
+  return { owners: [], leases: [], contacts: [], docs: [] };
+}
+
+function emptyDocumentData() {
+  return { documents: [], attachments: [] };
+}
+
+function emptyMapData() {
+  return { mapAssets: [], mapRegions: [], mapReferences: [] };
+}
+
+function emptyResearchData() {
+  return {
+    imports: [],
+    sources: [],
+    formulas: [],
+    projectRecords: [],
+    questions: [],
+  };
+}
+
+function emptyCurativeData() {
+  return { titleIssues: [] };
+}
+
+function emptySideStoreData() {
+  return {
+    ownerData: emptyOwnerData(),
+    documentData: emptyDocumentData(),
+    mapData: emptyMapData(),
+    researchData: emptyResearchData(),
+    curativeData: emptyCurativeData(),
+  };
+}
+
+type SideStoreDataFixture = ReturnType<typeof emptySideStoreData>;
+
+function mockExportedSideStores(data: SideStoreDataFixture) {
+  mocks.exportOwnerWorkspaceData.mockResolvedValue(data.ownerData);
+  mocks.exportDocumentWorkspaceData.mockResolvedValue(data.documentData);
+  mocks.exportMapWorkspaceData.mockResolvedValue(data.mapData);
+  mocks.exportResearchWorkspaceData.mockResolvedValue(data.researchData);
+  mocks.exportCurativeWorkspaceData.mockResolvedValue(data.curativeData);
+}
+
+function expectSideStoreWrites(
+  workspaceId: string,
+  data: SideStoreDataFixture
+) {
+  expect(mocks.replaceOwnerWorkspaceData).toHaveBeenCalledWith(
+    workspaceId,
+    data.ownerData
+  );
+  expect(mocks.replaceDocumentWorkspaceData).toHaveBeenCalledWith(
+    data.documentData,
+    workspaceId
+  );
+  expect(mocks.replaceMapWorkspaceData).toHaveBeenCalledWith(
+    workspaceId,
+    data.mapData
+  );
+  expect(mocks.replaceResearchWorkspaceData).toHaveBeenCalledWith(
+    workspaceId,
+    data.researchData
+  );
+  expect(mocks.replaceCurativeWorkspaceData).toHaveBeenCalledWith(
+    workspaceId,
+    data.curativeData
+  );
+}
+
+function expectFinalStoresCleared() {
+  expect(mocks.clearWorkspaceShardsForActiveKey).toHaveBeenCalledOnce();
+  expect(mocks.clearApprovals).toHaveBeenCalledOnce();
+  expect(mocks.clearActionJournal).toHaveBeenCalledOnce();
+  expect(mocks.clearUndo).toHaveBeenCalledOnce();
+}
+
 describe('replaceWorkspaceSideStores', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -101,75 +200,45 @@ describe('replaceWorkspaceSideStores', () => {
   it('clears every side store when no side data is supplied', async () => {
     await replaceWorkspaceSideStores('ws-reset');
 
-    expect(mocks.replaceOwnerWorkspaceData).toHaveBeenCalledWith('ws-reset', {
-      owners: [],
-      leases: [],
-      contacts: [],
-      docs: [],
-    });
+    expect(mocks.replaceOwnerWorkspaceData).toHaveBeenCalledWith(
+      'ws-reset',
+      emptyOwnerData()
+    );
     expect(mocks.replaceDocumentWorkspaceData).toHaveBeenCalledWith(
-      { documents: [], attachments: [] },
+      emptyDocumentData(),
       'ws-reset'
     );
-    expect(mocks.replaceMapWorkspaceData).toHaveBeenCalledWith('ws-reset', {
-      mapAssets: [],
-      mapRegions: [],
-      mapReferences: [],
-    });
-    expect(mocks.replaceResearchWorkspaceData).toHaveBeenCalledWith('ws-reset', {
-      imports: [],
-      sources: [],
-      formulas: [],
-      projectRecords: [],
-      questions: [],
-    });
-    expect(mocks.replaceCurativeWorkspaceData).toHaveBeenCalledWith('ws-reset', {
-      titleIssues: [],
-    });
-    expect(mocks.clearWorkspaceShardsForActiveKey).toHaveBeenCalledOnce();
-    expect(mocks.clearApprovals).toHaveBeenCalledOnce();
-    expect(mocks.clearActionJournal).toHaveBeenCalledOnce();
-    expect(mocks.clearUndo).toHaveBeenCalledOnce();
+    expect(mocks.replaceMapWorkspaceData).toHaveBeenCalledWith(
+      'ws-reset',
+      emptyMapData()
+    );
+    expect(mocks.replaceResearchWorkspaceData).toHaveBeenCalledWith(
+      'ws-reset',
+      emptyResearchData()
+    );
+    expect(mocks.replaceCurativeWorkspaceData).toHaveBeenCalledWith(
+      'ws-reset',
+      emptyCurativeData()
+    );
+    expectFinalStoresCleared();
+  });
+
+  it('replaces every side store with target data and resolves on success', async () => {
+    const targetData = emptySideStoreData();
+
+    await expect(
+      replaceWorkspaceSideStores('ws-target', targetData)
+    ).resolves.toBeUndefined();
+
+    expectSideStoreWrites('ws-target', targetData);
+    expectFinalStoresCleared();
   });
 
   it('restores the previous active side stores when target replacement fails', async () => {
-    const previousOwnerData = {
-      owners: [],
-      leases: [],
-      contacts: [],
-      docs: [],
-    };
-    const previousDocumentData = {
-      documents: [],
-      attachments: [],
-    };
-    const previousMapData = {
-      mapAssets: [],
-      mapRegions: [],
-      mapReferences: [],
-    };
-    const previousResearchData = {
-      imports: [],
-      sources: [],
-      formulas: [],
-      projectRecords: [],
-      questions: [],
-    };
-    const previousCurativeData = {
-      titleIssues: [],
-    };
-    const targetOwnerData = {
-      owners: [],
-      leases: [],
-      contacts: [],
-      docs: [],
-    };
+    const previousData = emptySideStoreData();
+    const targetOwnerData = emptyOwnerData();
 
-    mocks.exportOwnerWorkspaceData.mockResolvedValue(previousOwnerData);
-    mocks.exportDocumentWorkspaceData.mockResolvedValue(previousDocumentData);
-    mocks.exportMapWorkspaceData.mockResolvedValue(previousMapData);
-    mocks.exportResearchWorkspaceData.mockResolvedValue(previousResearchData);
-    mocks.exportCurativeWorkspaceData.mockResolvedValue(previousCurativeData);
+    mockExportedSideStores(previousData);
     mocks.replaceDocumentWorkspaceData
       .mockRejectedValueOnce(new Error('document replace failed'))
       .mockResolvedValueOnce(undefined);
@@ -190,27 +259,129 @@ describe('replaceWorkspaceSideStores', () => {
     );
     expect(mocks.replaceOwnerWorkspaceData).toHaveBeenCalledWith(
       'ws-old',
-      previousOwnerData
+      previousData.ownerData
     );
     expect(mocks.replaceDocumentWorkspaceData).toHaveBeenCalledWith(
-      previousDocumentData,
+      previousData.documentData,
       'ws-old'
     );
     expect(mocks.replaceMapWorkspaceData).toHaveBeenCalledWith(
       'ws-old',
-      previousMapData
+      previousData.mapData
     );
     expect(mocks.replaceResearchWorkspaceData).toHaveBeenCalledWith(
       'ws-old',
-      previousResearchData
+      previousData.researchData
     );
     expect(mocks.replaceCurativeWorkspaceData).toHaveBeenCalledWith(
       'ws-old',
-      previousCurativeData
+      previousData.curativeData
     );
-    expect(mocks.clearWorkspaceShardsForActiveKey).toHaveBeenCalledOnce();
-    expect(mocks.clearApprovals).toHaveBeenCalledOnce();
-    expect(mocks.clearActionJournal).toHaveBeenCalledOnce();
-    expect(mocks.clearUndo).toHaveBeenCalledOnce();
+    expectFinalStoresCleared();
+  });
+
+  it('replaces every target side store through the rollback wrapper on success', async () => {
+    const previousData = emptySideStoreData();
+    const targetData = emptySideStoreData();
+
+    mockExportedSideStores(previousData);
+
+    await expect(
+      replaceWorkspaceSideStoresWithRollback({
+        targetWorkspaceId: 'ws-new',
+        targetData,
+        rollbackWorkspaceId: 'ws-old',
+        rollbackNodes: [],
+      })
+    ).resolves.toBeUndefined();
+
+    expectSideStoreWrites('ws-new', targetData);
+    expect(mocks.replaceOwnerWorkspaceData).not.toHaveBeenCalledWith(
+      'ws-old',
+      previousData.ownerData
+    );
+    expectFinalStoresCleared();
+  });
+
+  it('waits for delayed target writes before rolling back failed imports', async () => {
+    const previousData = emptySideStoreData();
+    const targetData = emptySideStoreData();
+    const storeState: {
+      ownerData: unknown;
+      documentData: unknown;
+      mapData: unknown;
+      researchData: unknown;
+      curativeData: unknown;
+    } = {
+      ownerData: previousData.ownerData,
+      documentData: previousData.documentData,
+      mapData: previousData.mapData,
+      researchData: previousData.researchData,
+      curativeData: previousData.curativeData,
+    };
+    const events: string[] = [];
+    const delayedResearchTarget = deferred<void>();
+
+    mockExportedSideStores(previousData);
+
+    mocks.replaceOwnerWorkspaceData.mockImplementation(async (workspaceId, data) => {
+      events.push(`${workspaceId}:owner`);
+      storeState.ownerData = data;
+    });
+    mocks.replaceDocumentWorkspaceData.mockImplementation(async (data, workspaceId) => {
+      events.push(`${workspaceId}:document`);
+      storeState.documentData = data;
+    });
+    mocks.replaceMapWorkspaceData.mockImplementation(async (workspaceId, data) => {
+      events.push(`${workspaceId}:map`);
+      if (workspaceId === 'ws-new') {
+        throw new Error('map replace failed');
+      }
+      storeState.mapData = data;
+    });
+    mocks.replaceResearchWorkspaceData.mockImplementation(async (workspaceId, data) => {
+      events.push(`${workspaceId}:research:start`);
+      if (workspaceId === 'ws-new') {
+        await delayedResearchTarget.promise;
+      }
+      storeState.researchData = data;
+      events.push(`${workspaceId}:research:end`);
+    });
+    mocks.replaceCurativeWorkspaceData.mockImplementation(async (workspaceId, data) => {
+      events.push(`${workspaceId}:curative`);
+      storeState.curativeData = data;
+    });
+
+    const replace = replaceWorkspaceSideStoresWithRollback({
+      targetWorkspaceId: 'ws-new',
+      targetData,
+      rollbackWorkspaceId: 'ws-old',
+      rollbackNodes: [],
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(events).toContain('ws-new:research:start');
+    expect(events).not.toContain('ws-old:owner');
+
+    delayedResearchTarget.resolve();
+    await expect(replace).rejects.toThrow('map replace failed');
+
+    expect(storeState).toEqual({
+      ownerData: previousData.ownerData,
+      documentData: previousData.documentData,
+      mapData: previousData.mapData,
+      researchData: previousData.researchData,
+      curativeData: previousData.curativeData,
+    });
+    expect(storeState.ownerData).toBe(previousData.ownerData);
+    expect(storeState.documentData).toBe(previousData.documentData);
+    expect(storeState.mapData).toBe(previousData.mapData);
+    expect(storeState.researchData).toBe(previousData.researchData);
+    expect(storeState.curativeData).toBe(previousData.curativeData);
+    expect(events.indexOf('ws-new:research:end')).toBeLessThan(
+      events.indexOf('ws-old:owner')
+    );
+    expectFinalStoresCleared();
   });
 });

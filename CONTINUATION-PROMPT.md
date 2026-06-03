@@ -4,76 +4,70 @@ Use this file to resume the active workstream in a new chat. Read it with
 `AGENTS.md`, `PROJECT_CONTEXT.md`, and `docs/README.md` before touching code.
 Keep long history in `CHANGELOG.md`.
 
-## Current Audit-Cleanup Handoff - 2026-06-02
+## Current LLA-M01 Handoff - 2026-06-03
 
-Branch: `fix/title-action-cleanup`
+Branch: `fix/lla-m01-rollback-determinism`
 
-Workstream: audit-cleanup Branch A, based on local
-`feat/phase-4-title-cutover`.
+Workstream: storage/import rollback determinism, based on `main`.
 
 Completed in this branch:
 
-- ACT-H02: malformed active title action rows now fail closed with
-  `InvalidTitleActionReplayError`, including invalid record IDs; replay and
-  node reconstruction propagate the failure.
-- ACT-H04: `loadWorkspace` is the reset choke point for title action logs.
-  Workspace replacement now clears action records, audit events, and head hash,
-  and invalidates in-flight old-workspace recordings.
-- ACT-M03: default title command IDs now use a `crypto.randomUUID()` suffix with
-  the existing `title:<mutation>:` prefix; explicit command IDs remain honored.
-- ACT-L01: action-log and nearby title-cutover comments now reflect that
-  projected field edits record as `title.update`.
-- `docs/audit-backlog.md` rows for those four IDs are marked
-  `Fixed (audit-cleanup batch)` with one-line status notes.
+- LLA-M01: `.landroid` side-store rollback now waits for all target
+  side-store replacements to settle before rollback begins.
+- Rollback replacement also uses a settled barrier, so no late target write can
+  land after rollback and leave a mixed old/new side-store state.
+- `replaceWorkspaceSideStores` keeps its public signature and success behavior:
+  successful replacement still writes owner, document, map, research, and
+  curative side stores, then clears workspace shards plus AI approval, journal,
+  and undo state.
+- Added side-store reset tests for direct success, rollback-wrapper success,
+  failed replacement rollback, and the delayed-target-write regression.
+- `docs/audit-backlog.md` marks LLA-M01 fixed with a note that broader
+  storage isolation/write-fence work remains LLA-H01/H02.
 
 Latest validation:
 
-- `npm test -- src/project-records/__tests__/title-replay.test.ts`
-  - passed, 1 file / 4 tests.
-- `npm test -- src/project-records/__tests__/title-divergence.test.ts`
-  - passed, 1 file / 4 tests.
-- `npm test -- src/store/__tests__/title-action-log.test.ts`
-  - passed, 1 file / 6 tests. Existing intentional title-divergence stderr
-    appeared.
-- `npm test -- src/store/__tests__/workspace-store.test.ts`
-  - passed, 1 file / 14 tests. Existing simulated Dexie failure stderr
-    appeared.
 - `npm run lint`
   - passed.
-- `npm run test`
-  - passed, 116 files / 818 tests. Existing intentional stderr coverage for
-    title divergence, simulated Dexie failures, and post-v8 backup failure
-    appeared.
+- `npm test -- src/storage/__tests__/workspace-side-store-reset.test.ts`
+  - passed, 1 file / 5 tests.
+- `npm test -- src/storage/__tests__/workspace-persistence.test.ts`
+  - passed, 1 file / 19 tests.
+- `npm test`
+  - passed, 121 files / 843 tests. Existing intentional stderr appeared for
+    simulated Dexie failures, title divergence, and post-v8 backup failure.
+  - first full run in the fresh worktree failed because `elkjs` resolved from
+    the original checkout's `node_modules`; after `npm ci` installed
+    worktree-local dependencies, the full suite passed.
+- `npm run build`
+  - passed with existing Vite warnings for missing `TORS_Documents` runtime
+    PDFs, dynamic/static import chunking, large chunks, and Node
+    `module.register()` deprecation.
 
 Open risks / deliberately deferred:
 
-- ACT-H01, ACT-H03, and ACT-H05 remain open and are outside this cleanup batch.
-  Do not claim title-ledger read-cutover readiness while those blockers remain.
-- Branch B (`chore/audit-cleanup` from `main`) is still pending: LLA-H04,
-  LLA-M02, LLA-M03, LLA-M05, LLA-M13, LLA-M14, LLA-L01, LLA-L04, and LLA-L05.
-- Existing untracked local artifacts remain intentionally uncommitted unless
-  the user asks otherwise:
-  `docs/.audit-backlog.md.swp`,
-  `docs/archive/audits/LINE_BY_LINE_AUDIT_2026-05-31.md`, and
-  `scripts/springhill/`.
+- LLA-H01/H02, LLA-M06, and all other backlog items remain out of scope.
+- This branch does not change math, title/action-layer behavior, AI mutation
+  behavior, store APIs, or `.landroid` parsing.
+- `npm ci` in the worktree reported the existing Node 26 engine warning and one
+  critical audit item; no dependency files changed.
 
 Likely next steps:
 
-1. Push `fix/title-action-cleanup` and open its PR against
-   `feat/phase-4-title-cutover`.
-2. Start Branch B from `main` as `chore/audit-cleanup` after preserving or
-   committing any current handoff changes.
-3. Keep Branch B independent from title-stack-only files.
+1. Commit the LLA-M01 storage/test/docs changes.
+2. Push `fix/lla-m01-rollback-determinism`.
+3. Open a PR to `main` titled
+   `fix(storage): deterministic side-store rollback on failed import (LLA-M01)`.
 
 Paste-ready next chat prompt:
 
 > Read `/Users/abstractmapping/projects/landroid/AGENTS.md`,
 > `/Users/abstractmapping/projects/landroid/PROJECT_CONTEXT.md`, and
 > `/Users/abstractmapping/projects/landroid/CONTINUATION-PROMPT.md`. Continue
-> the audit-cleanup batch. Branch A is `fix/title-action-cleanup` based on
-> `feat/phase-4-title-cutover`; it fixed ACT-H02, ACT-H04, ACT-M03, and
-> ACT-L01 and passed `npm run lint` plus `npm run test`. Branch B from `main`
-> is still pending as `chore/audit-cleanup`.
+> LLA-M01 on branch `fix/lla-m01-rollback-determinism`. The branch makes
+> `.landroid` side-store rollback deterministic by waiting for target
+> replacement branches to settle before rollback and passed lint, targeted
+> storage tests, full `npm test`, and build.
 
 ## Historical Branch Notes
 
