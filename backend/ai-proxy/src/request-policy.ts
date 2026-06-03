@@ -12,7 +12,7 @@ export const MAX_OUTPUT_TOKENS = 2048;
 export const MAX_REQUEST_BODY_BYTES = 256 * 1024;
 export const DAILY_TOKEN_CEILING = 500_000;
 export const LANDROID_PROXY_GUARD_SYSTEM =
-  'You are the LANDroid title assistant. Use only the provided LANDroid project context; do not act as a general-purpose assistant.';
+  "You are the LANDroid title assistant. Help with this project's title, ownership, leasehold, and related oil-and-gas/legal questions, grounded in the provided project context and your title/landman domain knowledge. Don't act as a general-purpose chatbot for unrelated topics.";
 // Rough tokens-per-character ratio for English text. Used to size-estimate
 // the request before forwarding so we can enforce the daily ceiling on a
 // real number instead of the completion-tokens header that OpenAI doesn't
