@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { calculateDeskMapCoverageSummary } from '../../components/deskmap/deskmap-coverage';
+import { hasDeskMapWarningDot } from '../../components/deskmap/deskmap-warning-dots';
 import {
   buildLeaseholdDecimalRows,
   buildLeaseholdTransferOrderReview,
@@ -171,6 +172,31 @@ describe('Phase 0 Vulcan Mesa fixture goldens', () => {
         };
       }),
     });
+  });
+
+  it('freezes Desk Map warning dots from shared validation and coverage state', () => {
+    const fixture = readJson<SerializedLandroidFixture>('demo.landroid');
+    const leasesByOwner = activeLeasesByOwnerId(fixture.ownerData.leases);
+    const warningDotCodes = fixture.deskMaps
+      .filter((deskMap) => {
+        const tractNodes = fixture.nodes.filter((node) => deskMap.nodeIds.includes(node.id));
+        const coverageSummary = calculateDeskMapCoverageSummary(
+          tractNodes,
+          leasesByOwner,
+          fixture.nodes
+        );
+        return hasDeskMapWarningDot({
+          deskMap,
+          nodes: tractNodes,
+          coverageSummary,
+        });
+      })
+      .map((deskMap) => deskMap.code);
+
+    // LLA-L02 intentional behavior change: VM2 keeps its graph-validation dot,
+    // and VM3/VM7 now dot because shared coverage state reports real clipped
+    // lease-overlap warnings. The old description parser only surfaced VM2.
+    expect(warningDotCodes).toEqual(['VM2', 'VM3', 'VM7']);
   });
 
   it('freezes the v7 orphaned-PDF migration fixture behavior', async () => {
