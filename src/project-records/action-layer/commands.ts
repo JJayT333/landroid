@@ -43,6 +43,7 @@ export const ActionCommandKindSchema = z.enum([
   'title.graft_to_parent',
   'title.delete_node',
   'title.attach_lease',
+  'title.baseline',
   // generic title-node field edit (updateNode / rebalance / link clears /
   // lease-node resync) — not a structural tree op, but it changes a node's
   // projected records, so the ledger must capture it to stay a complete source.
@@ -76,6 +77,7 @@ export const SURFACE_BY_COMMAND_KIND: Record<ActionCommandKind, ActionSurface> =
   'title.graft_to_parent': 'title_tree',
   'title.delete_node': 'title_tree',
   'title.attach_lease': 'title_tree',
+  'title.baseline': 'title_tree',
   'title.update': 'title_tree',
   'document.link': 'document',
   'document.unlink': 'document',

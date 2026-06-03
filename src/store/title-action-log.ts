@@ -66,18 +66,49 @@ interface TitleActionLogState {
   lastError: string | null;
   setEnabled: (enabled: boolean) => void;
   reset: () => void;
+  /**
+   * Seed the ledger from a durable bundle (e.g. an imported v9 `.landroid`
+   * `actionLedger`) so a later save preserves the chain rather than dropping it.
+   * Replaces current state and bumps the generation guard like `reset`; the next
+   * recorded mutation continues the chain from the hydrated head hash (and the
+   * baseline-if-needed check is skipped because records already exist).
+   */
+  hydrate: (input: {
+    actionRecords: ActionRecord[];
+    auditEvents: AuditEventRecord[];
+  }) => void;
   record: (input: {
     mutation: string;
     beforeWorkspace: WorkspaceData;
     afterWorkspace: WorkspaceData;
     ownerData?: OwnerSlice;
     origin?: 'user' | 'ai' | 'import' | 'system';
+    approvedBy?: ActionRecord['approvedBy'];
     aiToolName?: string;
   }) => Promise<void>;
 }
 
 function isTitleMutation(value: string): value is TitleMutation {
   return (TITLE_MUTATIONS as readonly string[]).includes(value);
+}
+
+function cloneWorkspaceForLedger(workspace: WorkspaceData): WorkspaceData {
+  return {
+    ...workspace,
+    nodes: workspace.nodes.map((node) => ({ ...node })),
+    deskMaps: workspace.deskMaps.map((deskMap) => ({
+      ...deskMap,
+      nodeIds: [...deskMap.nodeIds],
+    })),
+  };
+}
+
+function emptyTitleBaselineWorkspace(workspace: WorkspaceData): WorkspaceData {
+  return {
+    ...workspace,
+    nodes: [],
+    deskMaps: workspace.deskMaps.map((deskMap) => ({ ...deskMap, nodeIds: [] })),
+  };
 }
 
 // Incremented on reset so in-flight recordings from a replaced workspace cannot append late.
@@ -109,7 +140,28 @@ export const useTitleActionLog = create<TitleActionLogState>()((set, get) => ({
     });
   },
 
-  record: async ({ mutation, beforeWorkspace, afterWorkspace, ownerData, origin = 'user', aiToolName }) => {
+  hydrate: ({ actionRecords, auditEvents }) => {
+    ledgerGeneration += 1;
+    recordingChain = Promise.resolve();
+    set({
+      actionRecords: [...actionRecords],
+      auditEvents: [...auditEvents],
+      headHash: auditEvents.at(-1)?.eventHash,
+      recordedMutationCount: actionRecords.length,
+      lastDivergence: null,
+      lastError: null,
+    });
+  },
+
+  record: async ({
+    mutation,
+    beforeWorkspace,
+    afterWorkspace,
+    ownerData,
+    origin = 'user',
+    approvedBy = 'user',
+    aiToolName,
+  }) => {
     const generationAtStart = ledgerGeneration;
     // Only mutations in the typed title catalog are representable as commands.
     if (!isTitleMutation(mutation)) return;
@@ -128,7 +180,7 @@ export const useTitleActionLog = create<TitleActionLogState>()((set, get) => ({
       const result = await recordTitleMutation({
         mutation,
         origin,
-        approvedBy: 'user',
+        approvedBy,
         context,
         appliedAt: generatedAt,
         beforeWorkspace,
@@ -174,6 +226,27 @@ function readOwnerData(): OwnerSlice {
   return { owners: owner.owners, leases: owner.leases };
 }
 
+async function recordBaselineIfNeeded(input: {
+  workspace: WorkspaceData;
+  ownerData?: OwnerSlice;
+  generationAtEnqueue: number;
+}): Promise<void> {
+  if (input.generationAtEnqueue !== ledgerGeneration) return;
+  const state = useTitleActionLog.getState();
+  if (state.actionRecords.length > 0 || state.recordedMutationCount > 0) return;
+  if (input.workspace.nodes.length === 0) return;
+
+  const afterWorkspace = cloneWorkspaceForLedger(input.workspace);
+  await useTitleActionLog.getState().record({
+    mutation: 'baseline',
+    origin: 'system',
+    approvedBy: 'system',
+    beforeWorkspace: emptyTitleBaselineWorkspace(afterWorkspace),
+    afterWorkspace,
+    ownerData: input.ownerData,
+  });
+}
+
 // Queue recordings so the audit chain threads head hashes in mutation order.
 // Generation checks drop any queued work from a replaced workspace.
 function track(promise: Promise<unknown>): void {
@@ -188,11 +261,42 @@ export async function settleTitleActionLog(): Promise<void> {
   }
 }
 
+/**
+ * Prepare a loaded workspace for any future title-ledger read cutover. A caller
+ * that wants to read from `actionRecords` must call this with the current
+ * workspace and loaded owner data, then await `settleTitleActionLog()` before
+ * reading the ledger. This only records the lazy baseline; it does not flip any
+ * live read path.
+ */
+export function ensureTitleBaseline(
+  workspace: WorkspaceData,
+  ownerData?: OwnerSlice
+): Promise<void> {
+  if (!useTitleActionLog.getState().enabled) return Promise.resolve();
+  const generationAtEnqueue = ledgerGeneration;
+  const workspaceAtEnqueue = cloneWorkspaceForLedger(workspace);
+  recordingChain = recordingChain.then(() =>
+    recordBaselineIfNeeded({
+      workspace: workspaceAtEnqueue,
+      ownerData,
+      generationAtEnqueue,
+    })
+  );
+  track(recordingChain);
+  return recordingChain;
+}
+
 setTitleJournalHook((mutation, beforeWorkspace, afterWorkspace) => {
   if (!useTitleActionLog.getState().enabled) return;
   const generationAtEnqueue = ledgerGeneration;
   const ownerData = readOwnerData();
-  recordingChain = recordingChain.then(() => {
+  recordingChain = recordingChain.then(async () => {
+    if (generationAtEnqueue !== ledgerGeneration) return;
+    await recordBaselineIfNeeded({
+      workspace: beforeWorkspace,
+      ownerData,
+      generationAtEnqueue,
+    });
     if (generationAtEnqueue !== ledgerGeneration) return;
     return useTitleActionLog.getState().record({
       mutation,

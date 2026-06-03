@@ -9,6 +9,8 @@ import { useResearchStore } from '../../store/research-store';
 import { useCurativeStore } from '../../store/curative-store';
 import { useWorkspaceStore } from '../../store/workspace-store';
 import { useCanvasStore } from '../../store/canvas-store';
+import { useTitleActionLog } from '../../store/title-action-log';
+import type { ActionRecord, AuditEventRecord } from '../../backend-spine/contracts';
 import {
   downloadLandroidFile,
   exportDocumentWorkspaceData,
@@ -170,40 +172,47 @@ export default function Navbar() {
     setFileMenuOpen(false);
     const state = useWorkspaceStore.getState();
     const canvasState = useCanvasStore.getState();
-    await downloadLandroidFile({
-      workspaceId: state.workspaceId,
-      projectName: state.projectName,
-      nodes: state.nodes,
-      deskMaps: state.deskMaps,
-      leaseholdUnit,
-      leaseholdAssignments,
-      leaseholdOrris,
-      leaseholdTransferOrderEntries,
-      activeDeskMapId: state.activeDeskMapId,
-      activeUnitCode: state.activeUnitCode,
-      instrumentTypes: state.instrumentTypes,
-      ownerData: await useOwnerStore.getState().exportWorkspaceData(),
-      documentData: await exportDocumentWorkspaceData(
-        state.workspaceId,
-        state.nodes
-      ),
-      mapData: await useMapStore.getState().exportWorkspaceData(),
-      researchData: await useResearchStore.getState().exportWorkspaceData(),
-      curativeData: await useCurativeStore.getState().exportWorkspaceData(),
-      canvas: {
-        nodes: canvasState.nodes,
-        edges: canvasState.edges,
-        viewport: canvasState.viewport,
-        gridCols: canvasState.gridCols,
-        gridRows: canvasState.gridRows,
-        orientation: canvasState.orientation,
-        pageSize: canvasState.pageSize,
-        horizontalSpacingFactor: canvasState.horizontalSpacingFactor,
-        verticalSpacingFactor: canvasState.verticalSpacingFactor,
-        snapToGrid: canvasState.snapToGrid,
-        gridSize: canvasState.gridSize,
+    const titleActionLog = useTitleActionLog.getState();
+    await downloadLandroidFile(
+      {
+        workspaceId: state.workspaceId,
+        projectName: state.projectName,
+        nodes: state.nodes,
+        deskMaps: state.deskMaps,
+        leaseholdUnit,
+        leaseholdAssignments,
+        leaseholdOrris,
+        leaseholdTransferOrderEntries,
+        activeDeskMapId: state.activeDeskMapId,
+        activeUnitCode: state.activeUnitCode,
+        instrumentTypes: state.instrumentTypes,
+        ownerData: await useOwnerStore.getState().exportWorkspaceData(),
+        documentData: await exportDocumentWorkspaceData(
+          state.workspaceId,
+          state.nodes
+        ),
+        mapData: await useMapStore.getState().exportWorkspaceData(),
+        researchData: await useResearchStore.getState().exportWorkspaceData(),
+        curativeData: await useCurativeStore.getState().exportWorkspaceData(),
+        canvas: {
+          nodes: canvasState.nodes,
+          edges: canvasState.edges,
+          viewport: canvasState.viewport,
+          gridCols: canvasState.gridCols,
+          gridRows: canvasState.gridRows,
+          orientation: canvasState.orientation,
+          pageSize: canvasState.pageSize,
+          horizontalSpacingFactor: canvasState.horizontalSpacingFactor,
+          verticalSpacingFactor: canvasState.verticalSpacingFactor,
+          snapToGrid: canvasState.snapToGrid,
+          gridSize: canvasState.gridSize,
+        },
       },
-    });
+      {
+        actionRecords: titleActionLog.actionRecords,
+        auditEvents: titleActionLog.auditEvents,
+      }
+    );
   };
 
   const handleLoad = () => {
@@ -246,6 +255,20 @@ export default function Navbar() {
           rollbackNodes: currentWorkspace.nodes,
         });
         loadWorkspace(data);
+        if (data.actionLedger) {
+          // Seed the title ledger from the imported v9 bundle so a later save
+          // preserves the audit chain instead of dropping it — loadWorkspace
+          // just reset the live ledger (ACT-H04), and nothing else rehydrates it.
+          const ledgerRecords = data.actionLedger.records;
+          useTitleActionLog.getState().hydrate({
+            actionRecords: ledgerRecords.filter(
+              (record): record is ActionRecord => record.recordType === 'action_record'
+            ),
+            auditEvents: ledgerRecords.filter(
+              (record): record is AuditEventRecord => record.recordType === 'audit_event'
+            ),
+          });
+        }
         useCanvasStore.getState().loadCanvas(data.canvas ?? { nodes: [], edges: [] });
         // Phase 5: refresh node.attachments[] after PDF table write.
         await useWorkspaceStore

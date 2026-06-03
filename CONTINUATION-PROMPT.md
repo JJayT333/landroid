@@ -4,70 +4,78 @@ Use this file to resume the active workstream in a new chat. Read it with
 `AGENTS.md`, `PROJECT_CONTEXT.md`, and `docs/README.md` before touching code.
 Keep long history in `CHANGELOG.md`.
 
-## Current LLA-M01 Handoff - 2026-06-03
+## Current V9 Durable Format Handoff - 2026-06-02
 
-Branch: `fix/lla-m01-rollback-determinism`
+Branch: `feat/v9-landroid-durable-format`
 
-Workstream: storage/import rollback determinism, based on `main`.
+Workstream: v9 `.landroid` action-ledger durability, based on `origin/main` in
+the isolated worktree `/private/tmp/landroid-v9-landroid`.
 
 Completed in this branch:
 
-- LLA-M01: `.landroid` side-store rollback now waits for all target
-  side-store replacements to settle before rollback begins.
-- Rollback replacement also uses a settled barrier, so no late target write can
-  land after rollback and leave a mixed old/new side-store state.
-- `replaceWorkspaceSideStores` keeps its public signature and success behavior:
-  successful replacement still writes owner, document, map, research, and
-  curative side stores, then clears workspace shards plus AI approval, journal,
-  and undo state.
-- Added side-store reset tests for direct success, rollback-wrapper success,
-  failed replacement rollback, and the delayed-target-write regression.
-- `docs/audit-backlog.md` marks LLA-M01 fixed with a note that broader
-  storage isolation/write-fence work remains LLA-H01/H02.
+- `LANDROID_FILE_VERSION` is now 9.
+- Manual `.landroid` save can embed a validated `actionLedger` bundle containing
+  only title `action_record` and `audit_event` rows from `useTitleActionLog`.
+- `ACTION_LAYER_EXPORT_GATE` uses the explicit
+  `RECORD_BEARING_LANDROID_VERSION = 9`, so v8 still rejects records and v9
+  allows them.
+- `.landroid` import keeps the snapshot authoritative. Valid ledgers are
+  attached to returned `LandroidFileData`; schema-invalid or chain-broken
+  ledgers are dropped with `console.warn` and the snapshot still loads.
+- Autosave/backup callers keep using the optional export parameter and write v9
+  snapshots without an embedded ledger.
+- Docs/backlog now mark DEF-ACT-04 fixed by the v9 file format and ACT-H03 only
+  partially fixed because runtime Dexie ledger persistence remains deferred.
+- Added `scripts/title-soak.ts` as a synthetic-only soak harness for replay and
+  math parity.
 
 Latest validation:
 
-- `npm run lint`
-  - passed.
-- `npm test -- src/storage/__tests__/workspace-side-store-reset.test.ts`
-  - passed, 1 file / 5 tests.
-- `npm test -- src/storage/__tests__/workspace-persistence.test.ts`
-  - passed, 1 file / 19 tests.
-- `npm test`
-  - passed, 121 files / 843 tests. Existing intentional stderr appeared for
-    simulated Dexie failures, title divergence, and post-v8 backup failure.
-  - first full run in the fresh worktree failed because `elkjs` resolved from
-    the original checkout's `node_modules`; after `npm ci` installed
-    worktree-local dependencies, the full suite passed.
-- `npm run build`
-  - passed with existing Vite warnings for missing `TORS_Documents` runtime
-    PDFs, dynamic/static import chunking, large chunks, and Node
-    `module.register()` deprecation.
+- `npm ci` - passed in the isolated worktree, with an engine warning because the
+  local shell reports Node 26 while the repo declares Node 22-25, plus the
+  pre-existing npm audit finding.
+- `npm run lint` - passed.
+- `npm test -- src/project-records/__tests__/action-persistence.test.ts src/storage/__tests__/workspace-persistence.test.ts src/phase0/__tests__/vulcan-mesa-fixtures.test.ts`
+  - passed, 3 files / 36 tests.
+- `npm test` - passed, 121 files / 844 tests. Existing intentional stderr
+  appeared for simulated Dexie failures, title divergence, and post-v8 backup
+  failure paths.
+- `npx tsx scripts/title-soak.ts` - passed with `RESULT: PASS` after an
+  escalated rerun because the sandbox blocked tsx's local IPC pipe.
+- `npm run build` - passed with existing Vite warnings for missing TORS PDF
+  runtime URLs, dynamic/static import chunking, the Node `module.register()`
+  deprecation warning, and large chunks.
+- `git diff --check` - passed.
 
 Open risks / deliberately deferred:
 
-- LLA-H01/H02, LLA-M06, and all other backlog items remain out of scope.
-- This branch does not change math, title/action-layer behavior, AI mutation
-  behavior, store APIs, or `.landroid` parsing.
-- `npm ci` in the worktree reported the existing Node 26 engine warning and one
-  critical audit item; no dependency files changed.
+- This is file-format work only. No Dexie tables, runtime ledger hydration,
+  autosave ledger persistence, read-path flip, divergence UX, snapshot
+  compaction, or full projected-bundle embedding is included.
+- v9 files are forward-incompatible with older v8-only builds by design.
+- The Navbar reads `useTitleActionLog.getState()` only inside `handleSave`.
+  Review should confirm no render-time subscription or autosave wiring was
+  introduced.
+- The original checkout at `/Users/abstractmapping/projects/landroid` still has
+  unrelated local noise from the prior branch; this worktree did not touch it.
 
 Likely next steps:
 
-1. Commit the LLA-M01 storage/test/docs changes.
-2. Push `fix/lla-m01-rollback-determinism`.
-3. Open a PR to `main` titled
-   `fix(storage): deterministic side-store rollback on failed import (LLA-M01)`.
+1. Review the v9 file-format diff, especially `workspace-persistence.ts`,
+   `Navbar.tsx`, and the storage/action tests.
+2. Push `feat/v9-landroid-durable-format`.
+3. Open a PR to `main` with the required review-risk callouts.
 
 Paste-ready next chat prompt:
 
 > Read `/Users/abstractmapping/projects/landroid/AGENTS.md`,
 > `/Users/abstractmapping/projects/landroid/PROJECT_CONTEXT.md`, and
-> `/Users/abstractmapping/projects/landroid/CONTINUATION-PROMPT.md`. Continue
-> LLA-M01 on branch `fix/lla-m01-rollback-determinism`. The branch makes
-> `.landroid` side-store rollback deterministic by waiting for target
-> replacement branches to settle before rollback and passed lint, targeted
-> storage tests, full `npm test`, and build.
+> `/private/tmp/landroid-v9-landroid/CONTINUATION-PROMPT.md`. Continue the v9
+> `.landroid` durable-format branch `feat/v9-landroid-durable-format` from the
+> isolated worktree `/private/tmp/landroid-v9-landroid`. The branch implements
+> v9 `actionLedger` export/import while keeping the snapshot authoritative;
+> validation passed with `npm run lint`, targeted tests, `npm test`,
+> `npx tsx scripts/title-soak.ts`, `npm run build`, and `git diff --check`.
 
 ## Historical Branch Notes
 
