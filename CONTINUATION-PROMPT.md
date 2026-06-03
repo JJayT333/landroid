@@ -4,72 +4,78 @@ Use this file to resume the active workstream in a new chat. Read it with
 `AGENTS.md`, `PROJECT_CONTEXT.md`, and `docs/README.md` before touching code.
 Keep long history in `CHANGELOG.md`.
 
-## Current Title-Ledger Baseline Handoff - 2026-06-02
+## Current V9 Durable Format Handoff - 2026-06-02
 
-Branch: `fix/act-h01-title-baseline`
+Branch: `feat/v9-landroid-durable-format`
 
-Workstream: title-ledger lazy baseline, based on `main`.
+Workstream: v9 `.landroid` action-ledger durability, based on `origin/main` in
+the isolated worktree `/private/tmp/landroid-v9-landroid`.
 
 Completed in this branch:
 
-- ACT-H01: added a lazy, idempotent `title.baseline` command kind for loaded
-  workspaces whose live title store already has nodes but whose action ledger is
-  empty.
-- `ensureTitleBaseline(workspace, ownerData)` is exported from
-  `src/store/title-action-log.ts`. Future title-ledger read callers must call it
-  with the current workspace snapshot and loaded owner data, then await
-  `settleTitleActionLog()` before reading `actionRecords`.
-- The live journal hook now baselines the mutation's `beforeWorkspace` before
-  recording the first mutation, serialized on the existing recording chain and
-  guarded by the existing workspace-generation reset behavior.
-- Baselines use the same `recordTitleMutation` path, parity handling, audit
-  chain append, and divergence surfacing as normal title mutations.
-- Added focused acceptance coverage for first-mutation baseline, direct
-  baseline/replay, idempotence, empty workspaces, loaded-owner party IDs, and
-  workspace-switch reset behavior.
+- `LANDROID_FILE_VERSION` is now 9.
+- Manual `.landroid` save can embed a validated `actionLedger` bundle containing
+  only title `action_record` and `audit_event` rows from `useTitleActionLog`.
+- `ACTION_LAYER_EXPORT_GATE` uses the explicit
+  `RECORD_BEARING_LANDROID_VERSION = 9`, so v8 still rejects records and v9
+  allows them.
+- `.landroid` import keeps the snapshot authoritative. Valid ledgers are
+  attached to returned `LandroidFileData`; schema-invalid or chain-broken
+  ledgers are dropped with `console.warn` and the snapshot still loads.
+- Autosave/backup callers keep using the optional export parameter and write v9
+  snapshots without an embedded ledger.
+- Docs/backlog now mark DEF-ACT-04 fixed by the v9 file format and ACT-H03 only
+  partially fixed because runtime Dexie ledger persistence remains deferred.
+- Added `scripts/title-soak.ts` as a synthetic-only soak harness for replay and
+  math parity.
 
 Latest validation:
 
-- `npm test -- src/store/__tests__/title-action-log.test.ts`
-  - passed, 1 file / 12 tests. Existing intentional title-divergence stderr
-    appeared.
-- `npm run lint`
-  - passed.
-- `npm run test`
-  - passed, 121 files / 846 tests. Existing intentional stderr coverage for
-    title divergence, simulated Dexie failures, and post-v8 backup failure
-    appeared.
-- `git diff --check`
-  - passed.
+- `npm ci` - passed in the isolated worktree, with an engine warning because the
+  local shell reports Node 26 while the repo declares Node 22-25, plus the
+  pre-existing npm audit finding.
+- `npm run lint` - passed.
+- `npm test -- src/project-records/__tests__/action-persistence.test.ts src/storage/__tests__/workspace-persistence.test.ts src/phase0/__tests__/vulcan-mesa-fixtures.test.ts`
+  - passed, 3 files / 36 tests.
+- `npm test` - passed, 121 files / 844 tests. Existing intentional stderr
+  appeared for simulated Dexie failures, title divergence, and post-v8 backup
+  failure paths.
+- `npx tsx scripts/title-soak.ts` - passed with `RESULT: PASS` after an
+  escalated rerun because the sandbox blocked tsx's local IPC pipe.
+- `npm run build` - passed with existing Vite warnings for missing TORS PDF
+  runtime URLs, dynamic/static import chunking, the Node `module.register()`
+  deprecation warning, and large chunks.
+- `git diff --check` - passed.
 
 Open risks / deliberately deferred:
 
-- No read-flip enablement, live read caller, `.landroid` persistence work,
-  divergence UX, load-flow wiring, math-engine work, `scripts/springhill/`
-  changes, or real-data changes were made.
-- ACT-H03 and ACT-H05 remain separate work. Do not claim title-ledger cutover
-  readiness until their gates are complete.
-- Existing untracked local artifacts remain intentionally uncommitted unless
-  the user asks otherwise:
-  `docs/.audit-backlog.md.swp`,
-  `docs/archive/audits/LINE_BY_LINE_AUDIT_2026-05-31.md`, and
-  `scripts/springhill/`.
+- This is file-format work only. No Dexie tables, runtime ledger hydration,
+  autosave ledger persistence, read-path flip, divergence UX, snapshot
+  compaction, or full projected-bundle embedding is included.
+- v9 files are forward-incompatible with older v8-only builds by design.
+- The Navbar reads `useTitleActionLog.getState()` only inside `handleSave`.
+  Review should confirm no render-time subscription or autosave wiring was
+  introduced.
+- The original checkout at `/Users/abstractmapping/projects/landroid` still has
+  unrelated local noise from the prior branch; this worktree did not touch it.
 
 Likely next steps:
 
-1. Commit `fix(act): add lazy title baseline`.
-2. Push `fix/act-h01-title-baseline`.
-3. Open a PR against `main` and keep it unmerged pending review.
+1. Review the v9 file-format diff, especially `workspace-persistence.ts`,
+   `Navbar.tsx`, and the storage/action tests.
+2. Push `feat/v9-landroid-durable-format`.
+3. Open a PR to `main` with the required review-risk callouts.
 
 Paste-ready next chat prompt:
 
 > Read `/Users/abstractmapping/projects/landroid/AGENTS.md`,
 > `/Users/abstractmapping/projects/landroid/PROJECT_CONTEXT.md`, and
-> `/Users/abstractmapping/projects/landroid/CONTINUATION-PROMPT.md`. Continue
-> the title-ledger baseline work on `fix/act-h01-title-baseline`. ACT-H01 adds
-> lazy `title.baseline` recording and passed `npm test --
-> src/store/__tests__/title-action-log.test.ts`, `npm run lint`, `npm run test`,
-> and `git diff --check`. ACT-H03 and ACT-H05 remain deferred.
+> `/private/tmp/landroid-v9-landroid/CONTINUATION-PROMPT.md`. Continue the v9
+> `.landroid` durable-format branch `feat/v9-landroid-durable-format` from the
+> isolated worktree `/private/tmp/landroid-v9-landroid`. The branch implements
+> v9 `actionLedger` export/import while keeping the snapshot authoritative;
+> validation passed with `npm run lint`, targeted tests, `npm test`,
+> `npx tsx scripts/title-soak.ts`, `npm run build`, and `git diff --check`.
 
 ## Historical Branch Notes
 

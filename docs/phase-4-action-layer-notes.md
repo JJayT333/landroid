@@ -122,9 +122,9 @@ above remain reviewer-gated.
 additively in a `ProjectRecordBundle` and survive a serialize/reload round trip
 (verified, including the hash chain). `appendActionLayerToRecordBundle` returns a
 NEW validated bundle and refuses a broken chain. `ACTION_LAYER_EXPORT_GATE` keeps
-`LANDROID_FILE_VERSION = 8` authoritative and gates record inclusion to an
-explicit `v9+` format (`assertActionLayerExportAllowed` throws for v8). No v8
-writer was modified; no lossy/one-way format change.
+the snapshot authoritative and gates record inclusion to explicit `v9+`
+packages (`assertActionLayerExportAllowed` throws for v8). v9 writes only the
+optional `actionLedger` bundle; no lossy/one-way format change.
 
 ## Existing files modified (behavior-preserving, shadow-only)
 
@@ -154,8 +154,8 @@ uses — but does not modify them.)
    reload can replay without the store. Want that added now or at cutover time?
 3. **Audit chain scope.** One chain per project is assumed. Do you want a
    per-workspace or per-surface chain instead before any cutover?
-4. **`v9` format.** The export gate names `v8 + 1` as the first record-bearing
-   version but does not define a v9 writer (out of Phase 4 scope). Confirm v9
-   format design is a later phase.
+4. **Runtime ledger persistence.** `.landroid` v9 can now carry a validated
+   `actionLedger`, but refresh-time Dexie persistence and hydration are still a
+   separate storage workstream.
 5. **PII.** No `scripts/springhill/` or real `.landroid` data was touched;
    all fixtures are synthetic. Confirm that remains the rule through cutover.

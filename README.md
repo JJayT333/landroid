@@ -131,7 +131,9 @@ Older stress and 8-tract leasehold demos have been retired.
 ## Persistence Notes
 
 - Browser autosave keeps the active workspace and flowchart canvas locally.
-- `.landroid` files are the main named backup/export format.
+- `.landroid` files are the main named backup/export format. The current v9
+  format keeps the workspace snapshot authoritative and can carry a validated
+  title action/audit ledger for durability.
 - Phase 5 stores document blobs, content hashes, and attachments in the local
   workspace database. Phase 7A adds the `Documents` registry so LANDroid can
   edit document metadata, group documents by saved view/area, surface duplicate
@@ -139,7 +141,9 @@ Older stress and 8-tract leasehold demos have been retired.
   later object storage remain optional raw-file vaults rather than the only
   database. Removing a document from a card detaches that link; shared document
   blobs remain until no entity links reference them.
-- `.landroid` imports validate the top-level workspace graph before loading.
+- `.landroid` imports validate the top-level workspace graph before loading;
+  corrupt embedded action ledgers are dropped with a warning so the snapshot can
+  still open.
 - CSV imports create a fresh workspace and intentionally start with empty owner,
   document, curative, map, research, and transient AI side state.
 - `.landroid` and CSV loads require the typed phrase `LOAD WORKSPACE` because

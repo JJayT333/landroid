@@ -627,6 +627,8 @@ These are the main workspace snapshot files. They now include:
 - flowchart viewport
 - page/grid/orientation settings
 - flowchart spacing settings
+- validated title action/audit ledger rows when present; the saved workspace
+  snapshot remains the source loaded by the app
 
 ### `.csv` import
 CSV import loads workspace data, resets the flowchart canvas, and starts a fresh empty owner/document/curative/maps/research side workspace so you can re-import and relink cleanly. It also clears pending AI approvals, the AI action/result journal, and the last AI undo snapshot. `.landroid` export/import carries node document attachments and registry metadata, including multiple PDFs on the same title card. Older v7 `.landroid` files are migrated into the current multi-document attachment shape during import.

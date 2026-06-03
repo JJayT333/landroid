@@ -362,6 +362,29 @@ describe('Phase 4 LIVE title journal (real store auto-records)', () => {
     );
   });
 
+  it('hydrate restores a ledger after a workspace reset so a later save preserves it (ACT-M05)', async () => {
+    seedPreExistingWorkspace();
+    await ensureTitleBaseline(workspaceSnapshot(), ownerDataSnapshot());
+    await settleTitleActionLog();
+    const seeded = useTitleActionLog.getState();
+    const actionRecords = [...seeded.actionRecords];
+    const auditEvents = [...seeded.auditEvents];
+    expect(actionRecords.length).toBeGreaterThan(0);
+
+    // loadWorkspace wipes the live ledger (ACT-H04); a v9 import then hydrates it.
+    useTitleActionLog.getState().reset();
+    expect(useTitleActionLog.getState().actionRecords).toHaveLength(0);
+
+    useTitleActionLog.getState().hydrate({ actionRecords, auditEvents });
+
+    const after = useTitleActionLog.getState();
+    expect(after.actionRecords).toEqual(actionRecords);
+    expect(after.auditEvents).toEqual(auditEvents);
+    expect(after.headHash).toBe(auditEvents.at(-1)?.eventHash);
+    expect(after.recordedMutationCount).toBe(actionRecords.length);
+    expect((await verifyAuditChain(after.auditEvents)).valid).toBe(true);
+  });
+
   it('keeps lazy baseline idempotent when requested more than once', async () => {
     seedPreExistingWorkspace();
 

@@ -7,6 +7,7 @@ import {
 } from '../record-validation';
 import {
   ACTION_LAYER_EXPORT_GATE,
+  RECORD_BEARING_LANDROID_VERSION,
   actionLayerExportInclusion,
   appendActionLayerToRecordBundle,
   assertActionLayerExportAllowed,
@@ -102,17 +103,20 @@ describe('Phase 4 action-layer persistence (additive + version-gated)', () => {
     ).rejects.toThrow(/broken audit chain/);
   });
 
-  it('keeps v8 authoritative and gates record inclusion to a future version', () => {
-    expect(ACTION_LAYER_EXPORT_GATE.authoritativeLandroidVersion).toBe(LANDROID_FILE_VERSION);
-    expect(ACTION_LAYER_EXPORT_GATE.includedInV8Export).toBe(false);
-    expect(ACTION_LAYER_EXPORT_GATE.v8StaysAuthoritative).toBe(true);
-
-    expect(actionLayerExportInclusion(LANDROID_FILE_VERSION)).toBe(false);
-    expect(actionLayerExportInclusion(LANDROID_FILE_VERSION + 1)).toBe(true);
-
-    expect(() => assertActionLayerExportAllowed(LANDROID_FILE_VERSION)).toThrow(
-      /stays authoritative/
+  it('keeps the snapshot authoritative and gates record inclusion to v9+', () => {
+    expect(ACTION_LAYER_EXPORT_GATE.currentLandroidVersion).toBe(LANDROID_FILE_VERSION);
+    expect(ACTION_LAYER_EXPORT_GATE.recordsIncludedInV8Export).toBe(false);
+    expect(ACTION_LAYER_EXPORT_GATE.snapshotRemainsAuthoritative).toBe(true);
+    expect(ACTION_LAYER_EXPORT_GATE.firstRecordBearingVersionAtLeast).toBe(
+      RECORD_BEARING_LANDROID_VERSION
     );
-    expect(() => assertActionLayerExportAllowed(LANDROID_FILE_VERSION + 1)).not.toThrow();
+
+    expect(actionLayerExportInclusion(8)).toBe(false);
+    expect(actionLayerExportInclusion(9)).toBe(true);
+
+    expect(() => assertActionLayerExportAllowed(8)).toThrow(
+      /record inclusion requires v9/
+    );
+    expect(() => assertActionLayerExportAllowed(9)).not.toThrow();
   });
 });
