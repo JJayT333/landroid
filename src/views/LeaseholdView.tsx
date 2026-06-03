@@ -25,6 +25,7 @@ import { useOwnerStore } from '../store/owner-store';
 import { useWorkspaceStore } from '../store/workspace-store';
 import { parseStrictInterestString } from '../utils/interest-string';
 import {
+  buildLeaseholdTransferOrderHoldReasons,
   buildLeaseholdTransferOrderReview,
   buildLeaseholdUnitSummary,
   type LeaseholdAssignmentSummary,
@@ -36,6 +37,7 @@ import {
   type LeaseholdOwnerSummary,
   type LeaseholdTractSummary,
   type LeaseholdTransferOrderReview,
+  type LeaseholdUnitAssignmentWarning,
   type LeaseholdUnitSummary,
 } from '../components/leasehold/leasehold-summary';
 import type { LeaseCoverageOverlap } from '../components/deskmap/deskmap-coverage';
@@ -162,6 +164,18 @@ function unitScopedSummaryMatchesTract(
   tract: Pick<LeaseholdTractSummary, 'unitCode'>
 ) {
   return tract.unitCode ? recordUnitCode === tract.unitCode : !recordUnitCode;
+}
+
+function normalizeVisibleUnitCode(value: string | null | undefined) {
+  const trimmed = value?.trim() ?? '';
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function needsActiveUnitAssignment(
+  summary: { needsUnitAssignment: boolean } | null,
+  activeUnitCode: string | null
+) {
+  return Boolean(summary?.needsUnitAssignment && activeUnitCode);
 }
 
 function sortLeaseholdGraphLeaseSlices(leaseSlices: LeaseholdOwnerLeaseSummary[]) {
@@ -374,6 +388,40 @@ function LeaseholdInputWarningPanel({
   );
 }
 
+function LeaseholdUnitAssignmentWarningPanel({
+  warnings,
+}: {
+  warnings: LeaseholdUnitAssignmentWarning[];
+}) {
+  if (warnings.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="rounded-2xl border border-gold/40 bg-gold/10 px-4 py-3 text-sm text-gold-950">
+      <div className="font-semibold">
+        {warnings.length} unit-scoped ORRI/WI record
+        {warnings.length === 1 ? '' : 's'} excluded - needs unit assignment
+      </div>
+      <ul className="mt-2 space-y-1 text-xs leading-5">
+        {warnings.slice(0, 4).map((warning) => (
+          <li key={warning.id}>
+            <span className="font-semibold">{warning.sourceLabel}</span>
+            {' '}
+            ({warning.sourceType === 'orri' ? 'ORRI' : 'WI assignment'}): {warning.message}
+          </li>
+        ))}
+      </ul>
+      {warnings.length > 4 && (
+        <div className="mt-2 text-xs">
+          Plus {warnings.length - 4} more record
+          {warnings.length - 4 === 1 ? '' : 's'} missing unit assignment.
+        </div>
+      )}
+    </div>
+  );
+}
+
 function LeaseholdOverrideOverview({
   summary,
 }: {
@@ -388,6 +436,12 @@ function LeaseholdOverrideOverview({
     return null;
   }
 
+  const orriUnitAssignmentWarningCount = summary.unitAssignmentWarnings.filter(
+    (warning) => warning.sourceType === 'orri'
+  ).length;
+  const wiUnitAssignmentWarningCount = summary.unitAssignmentWarnings.filter(
+    (warning) => warning.sourceType === 'assignment'
+  ).length;
   const rows = [
     {
       label: 'NPRI branches',
@@ -399,14 +453,20 @@ function LeaseholdOverrideOverview({
     {
       label: 'ORRI overrides',
       value: formatPercent(summary.totalOrriDecimal),
-      count: `${summary.includedOrriCount}/${summary.trackedOrriCount} in payout math`,
+      count:
+        orriUnitAssignmentWarningCount > 0
+          ? `${summary.includedOrriCount}/${summary.trackedOrriCount} in payout math; ${orriUnitAssignmentWarningCount} need unit`
+          : `${summary.includedOrriCount}/${summary.trackedOrriCount} in payout math`,
       detail: 'Leasehold-side burdens carved before retained working interest.',
       tone: 'border-seal/30 bg-seal/10 text-seal',
     },
     {
       label: 'WI assignments',
       value: formatPercent(summary.totalAssignedWorkingInterestDecimal),
-      count: `${summary.includedAssignmentCount}/${summary.trackedAssignmentCount} in payout math`,
+      count:
+        wiUnitAssignmentWarningCount > 0
+          ? `${summary.includedAssignmentCount}/${summary.trackedAssignmentCount} in payout math; ${wiUnitAssignmentWarningCount} need unit`
+          : `${summary.includedAssignmentCount}/${summary.trackedAssignmentCount} in payout math`,
       detail: 'Working-interest splits after royalty, NPRI, and ORRI burdens.',
       tone: 'border-leather/30 bg-leather/10 text-leather',
     },
@@ -2273,12 +2333,14 @@ function LeaseholdOrriDeckCard({
   orri,
   summary,
   deskMaps,
+  activeUnitCode,
   onUpdate,
   onRemove,
 }: {
   orri: LeaseholdOrri;
   summary: LeaseholdOrriSummary | null;
   deskMaps: Array<Pick<LeaseholdTractSummary, 'deskMapId' | 'name' | 'code'>>;
+  activeUnitCode: string | null;
   onUpdate: (id: string, fields: Partial<LeaseholdOrri>) => void;
   onRemove: (id: string) => void;
 }) {
@@ -2305,6 +2367,8 @@ function LeaseholdOrriDeckCard({
     setNotesDraft(orri.notes);
   }, [orri.notes]);
 
+  const needsUnitAssignment = needsActiveUnitAssignment(summary, activeUnitCode);
+
   return (
     <div className="w-80 rounded-lg border-2 border-amber-200 bg-amber-50 text-ink shadow-[0_8px_18px_rgba(217,119,6,0.14)]">
       <div className="rounded-t-lg border-b border-amber-200 bg-amber-100/80 px-3 py-1.5">
@@ -2329,6 +2393,21 @@ function LeaseholdOrriDeckCard({
       </div>
 
       <div className="space-y-3 px-3 py-3">
+        {needsUnitAssignment && (
+          <div className="rounded-xl border border-gold/40 bg-gold/10 px-3 py-2 text-[11px] leading-5 text-gold-950">
+            <div className="font-semibold">Excluded - needs unit assignment</div>
+            <div className="mt-1">
+              This unit-scoped ORRI is not in payout math until it is assigned to a unit.
+            </div>
+            <button
+              type="button"
+              onClick={() => onUpdate(orri.id, { unitCode: activeUnitCode })}
+              className="mt-2 rounded-lg border border-gold/40 bg-white/80 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-gold-950 transition-colors hover:bg-gold/15"
+            >
+              Assign to {activeUnitCode}
+            </button>
+          </div>
+        )}
         <label className="block">
           <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-900/75">
             Payee
@@ -2525,7 +2604,11 @@ function LeaseholdOrriDeckCard({
           <span className="rounded-full border border-amber-300 bg-white/80 px-2 py-0.5 text-amber-900">
             {orri.scope === 'unit' ? 'Unit-wide burden' : summary?.tractName ?? 'Single tract burden'}
           </span>
-          {summary?.includedInMath ? (
+          {needsUnitAssignment ? (
+            <span className="rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-gold-900">
+              Excluded - needs unit assignment
+            </span>
+          ) : summary?.includedInMath ? (
             <span className="rounded-full border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-emerald-800">
               Unit decimal{' '}
               <FormulaTooltip content={orriUnitDecimalFormula(summary)}>
@@ -2637,6 +2720,7 @@ function LeaseholdAssignmentDeckCard({
   summary,
   deskMaps,
   focusDetail,
+  activeUnitCode,
   onUpdate,
   onRemove,
 }: {
@@ -2644,6 +2728,7 @@ function LeaseholdAssignmentDeckCard({
   summary: LeaseholdAssignmentSummary | null;
   deskMaps: Array<Pick<LeaseholdTractSummary, 'deskMapId' | 'name' | 'code'>>;
   focusDetail: { label: string; decimal: string } | null;
+  activeUnitCode: string | null;
   onUpdate: (id: string, fields: Partial<LeaseholdAssignment>) => void;
   onRemove: (id: string) => void;
 }) {
@@ -2677,6 +2762,8 @@ function LeaseholdAssignmentDeckCard({
     setNotesDraft(assignment.notes);
   }, [assignment.notes]);
 
+  const needsUnitAssignment = needsActiveUnitAssignment(summary, activeUnitCode);
+
   return (
     <div className="w-80 rounded-lg border-2 border-leather/25 bg-leather/5 text-ink shadow-[0_8px_18px_rgba(120,53,15,0.14)]">
       <div className="rounded-t-lg border-b border-leather/20 bg-leather/10 px-3 py-1.5">
@@ -2704,6 +2791,21 @@ function LeaseholdAssignmentDeckCard({
       </div>
 
       <div className="space-y-3 px-3 py-3">
+        {needsUnitAssignment && (
+          <div className="rounded-xl border border-gold/40 bg-gold/10 px-3 py-2 text-[11px] leading-5 text-gold-950">
+            <div className="font-semibold">Excluded - needs unit assignment</div>
+            <div className="mt-1">
+              This unit-scoped WI assignment is not in payout math until it is assigned to a unit.
+            </div>
+            <button
+              type="button"
+              onClick={() => onUpdate(assignment.id, { unitCode: activeUnitCode })}
+              className="mt-2 rounded-lg border border-gold/40 bg-white/80 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-gold-950 transition-colors hover:bg-gold/15"
+            >
+              Assign to {activeUnitCode}
+            </button>
+          </div>
+        )}
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="block">
             <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-leather">
@@ -2897,7 +2999,11 @@ function LeaseholdAssignmentDeckCard({
               ? 'Unit-wide split'
               : summary?.tractName ?? 'Single tract split'}
           </span>
-          {summary?.includedInMath ? (
+          {needsUnitAssignment ? (
+            <span className="rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-gold-900">
+              Excluded - needs unit assignment
+            </span>
+          ) : summary?.includedInMath ? (
             <>
               <span className="rounded-full border border-leather/30 bg-white/80 px-2 py-0.5 text-leather">
                 Unit decimal{' '}
@@ -3049,6 +3155,7 @@ function LeaseholdTransferOrderEntryEditor({
   entry,
   editable,
   payoutHold,
+  payoutHoldReason,
   onUpsert,
   onRemove,
 }: {
@@ -3056,6 +3163,7 @@ function LeaseholdTransferOrderEntryEditor({
   entry: LeaseholdTransferOrderEntry | null;
   editable: boolean;
   payoutHold: boolean;
+  payoutHoldReason: string;
   onUpsert: (
     entry: Pick<LeaseholdTransferOrderEntry, 'sourceRowId'>
       & Partial<Omit<LeaseholdTransferOrderEntry, 'sourceRowId'>>
@@ -3149,8 +3257,7 @@ function LeaseholdTransferOrderEntryEditor({
       </div>
       {payoutHold && (
         <div className="rounded-lg border border-seal/20 bg-seal/5 px-2.5 py-2 text-[11px] leading-5 text-seal">
-          Floating NPRI over-carve keeps payout readiness on hold. Owner numbers and notes can
-          still be saved, but Ready stays unavailable until the royalty burden is corrected.
+          {payoutHoldReason}
         </div>
       )}
       <textarea
@@ -3173,6 +3280,7 @@ function LeaseholdDecimalLedger({
   overBurdenedFocus,
   overFloatingNpriBurdenedFocus,
   leaseOverlapsFocus,
+  transferOrderHoldReasons,
   editable,
   entriesBySourceRowId,
   onUpsertEntry,
@@ -3185,6 +3293,7 @@ function LeaseholdDecimalLedger({
   overBurdenedFocus: boolean;
   overFloatingNpriBurdenedFocus: boolean;
   leaseOverlapsFocus: LeaseCoverageOverlap[];
+  transferOrderHoldReasons: string[];
   editable: boolean;
   entriesBySourceRowId: Map<string, LeaseholdTransferOrderEntry>;
   onUpsertEntry: (
@@ -3201,7 +3310,15 @@ function LeaseholdDecimalLedger({
     && review.rowsWithCompleteSource === review.reviewableRowCount
       ? 'success'
       : 'default';
-  const payoutHold = editable && overFloatingNpriBurdenedFocus;
+  const payoutHoldReasons = [
+    overFloatingNpriBurdenedFocus
+      ? 'Floating NPRI over-carve keeps payout readiness on hold until the royalty burden is corrected.'
+      : null,
+    ...transferOrderHoldReasons,
+  ].filter((reason): reason is string => Boolean(reason));
+  const payoutHold = editable && payoutHoldReasons.length > 0;
+  const payoutHoldReason =
+    `${payoutHoldReasons.join(' ')} Owner numbers and notes can still be saved, but Ready stays unavailable until the hold is resolved.`;
   const visibleEntries = editable
     ? review.rows.flatMap((row) => {
         const entry = entriesBySourceRowId.get(row.id);
@@ -3347,6 +3464,17 @@ function LeaseholdDecimalLedger({
         </div>
       )}
 
+      {transferOrderHoldReasons.length > 0 && (
+        <div className="mt-4 rounded-2xl border border-gold/40 bg-gold/10 px-4 py-3 text-sm text-gold-950">
+          <div className="font-semibold">Transfer-order readiness on hold</div>
+          <ul className="mt-1 space-y-1">
+            {transferOrderHoldReasons.map((reason) => (
+              <li key={reason}>{reason}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {leaseOverlapsFocus.length > 0 && (
         <div className="mt-4 rounded-2xl border border-seal/25 bg-seal/5 px-4 py-3 text-sm text-seal">
           <div className="font-semibold">
@@ -3466,6 +3594,7 @@ function LeaseholdDecimalLedger({
                         entry={editable ? entriesBySourceRowId.get(row.id) ?? null : null}
                         editable={editable}
                         payoutHold={payoutHold}
+                        payoutHoldReason={payoutHoldReason}
                         onUpsert={onUpsertEntry}
                         onRemove={onRemoveEntry}
                       />
@@ -3493,6 +3622,7 @@ function LeaseholdDecimalLedger({
 function LeaseholdDeck({
   deskMaps,
   unit,
+  activeUnitCode,
   unitSummary,
   unitUniqueLessees,
   assignments,
@@ -3521,6 +3651,7 @@ function LeaseholdDeck({
 }: {
   deskMaps: LeaseholdTractSummary[];
   unit: LeaseholdUnit;
+  activeUnitCode: string | null;
   unitSummary: ReturnType<typeof buildLeaseholdUnitSummary>;
   unitUniqueLessees: string[];
   assignments: LeaseholdAssignment[];
@@ -3559,6 +3690,10 @@ function LeaseholdDeck({
         focusedDeskMapId,
       }),
     [focusedDeskMapId, unit, unitSummary]
+  );
+  const transferOrderHoldReasons = useMemo(
+    () => buildLeaseholdTransferOrderHoldReasons(unitSummary),
+    [unitSummary]
   );
 
   useEffect(() => {
@@ -3633,6 +3768,7 @@ function LeaseholdDeck({
   const activeInputWarnings = focusedTract
     ? focusedTract.inputWarnings
     : unitSummary.inputWarnings;
+  const activeUnitAssignmentWarnings = unitSummary.unitAssignmentWarnings;
   const activeRetainedHolder = activeLessees[0] || unit.operator;
   const focusCoverageDetail = focusedTract
     ? `${formatPercent(focusedTract.unitParticipation)} participation x ${formatPercent(focusedTract.leasedOwnership)} leased ownership for ${focusedTract.code}.`
@@ -3760,6 +3896,11 @@ function LeaseholdDeck({
             <LeaseholdInputWarningPanel warnings={activeInputWarnings} />
           </div>
         )}
+        {activeUnitAssignmentWarnings.length > 0 && (
+          <div className="mt-4">
+            <LeaseholdUnitAssignmentWarningPanel warnings={activeUnitAssignmentWarnings} />
+          </div>
+        )}
       </section>
 
       <section className="rounded-3xl border border-ledger-line bg-parchment/95 p-5 shadow-md">
@@ -3843,6 +3984,7 @@ function LeaseholdDeck({
                 orri={orri}
                 summary={summaryById.get(orri.id) ?? null}
                 deskMaps={deskMaps}
+                activeUnitCode={activeUnitCode}
                 onUpdate={onUpdateOrri}
                 onRemove={onRemoveOrri}
               />
@@ -3926,6 +4068,7 @@ function LeaseholdDeck({
                         }
                       : null
                   }
+                  activeUnitCode={activeUnitCode}
                   onUpdate={onUpdateAssignment}
                   onRemove={onRemoveAssignment}
                 />
@@ -3949,6 +4092,7 @@ function LeaseholdDeck({
         overBurdenedFocus={activeOverBurdened}
         overFloatingNpriBurdenedFocus={activeOverFloatingNpriBurdened}
         leaseOverlapsFocus={activeLeaseOverlaps}
+        transferOrderHoldReasons={transferOrderHoldReasons}
         editable={focusedDeskMapId === null}
         entriesBySourceRowId={transferOrderEntriesBySourceRowId}
         onUpsertEntry={onUpsertTransferOrderEntry}
@@ -4161,6 +4305,13 @@ export default function LeaseholdView() {
                 />
               </div>
               <LeaseholdOverrideOverview summary={summary} />
+              {summary.unitAssignmentWarningCount > 0 && (
+                <div className="mt-4">
+                  <LeaseholdUnitAssignmentWarningPanel
+                    warnings={summary.unitAssignmentWarnings}
+                  />
+                </div>
+              )}
               {npriSummary.total > 0 && (
                 <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
                   <div className="font-semibold">NPRI payout layer active</div>
@@ -4200,19 +4351,28 @@ export default function LeaseholdView() {
           <LeaseholdDeck
             deskMaps={summary.tracts}
             unit={leaseholdUnit}
+            activeUnitCode={effectiveUnitCode}
             unitSummary={summary}
             unitUniqueLessees={summary.uniqueLessees}
             assignments={leaseholdAssignments.filter((assignment) =>
               assignment.scope === 'tract'
                 ? focusedDeskMaps.some((deskMap) => deskMap.id === assignment.deskMapId)
-                : (assignment.unitCode ?? null) === effectiveUnitCode
+                : normalizeVisibleUnitCode(assignment.unitCode) === effectiveUnitCode
+                  || (
+                    effectiveUnitCode !== null
+                    && normalizeVisibleUnitCode(assignment.unitCode) === null
+                  )
             )}
             assignmentSummaries={summary.assignments}
             npriSummaries={summary.npris}
             orris={leaseholdOrris.filter((orri) =>
               orri.scope === 'tract'
                 ? focusedDeskMaps.some((deskMap) => deskMap.id === orri.deskMapId)
-                : (orri.unitCode ?? null) === effectiveUnitCode
+                : normalizeVisibleUnitCode(orri.unitCode) === effectiveUnitCode
+                  || (
+                    effectiveUnitCode !== null
+                    && normalizeVisibleUnitCode(orri.unitCode) === null
+                  )
             )}
             orriSummaries={summary.orris}
             totalRoyaltyDecimal={summary.totalRoyaltyDecimal}

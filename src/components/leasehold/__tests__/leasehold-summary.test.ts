@@ -4,6 +4,7 @@ import { createBlankNode, type OwnershipNode } from '../../../types/node';
 import { createBlankLease, createBlankOwner } from '../../../types/owner';
 import {
   buildLeaseholdDecimalRows,
+  buildLeaseholdTransferOrderHoldReasons,
   buildLeaseholdTransferOrderReview,
   buildLeaseholdUnitSummary,
 } from '../leasehold-summary';
@@ -2169,6 +2170,175 @@ describe('leasehold-summary', () => {
         unitCode: 'A',
         tractName: 'Raven Forest Unit A',
       })
+    );
+  });
+
+  it('surfaces null-unit ORRI/WI exclusions without changing payout math', () => {
+    const summary = buildLeaseholdUnitSummary({
+      deskMaps: [
+        {
+          id: 'dm-a',
+          name: 'A Tract',
+          code: 'A1',
+          tractId: 'A1',
+          grossAcres: '100',
+          pooledAcres: '100',
+          description: '',
+          nodeIds: ['owner-a', 'lease-a-node'],
+          unitName: 'Raven Forest Unit A',
+          unitCode: 'A',
+        },
+      ],
+      nodes: [
+        {
+          ...createBlankNode('owner-a', null),
+          grantee: 'A Owner',
+          linkedOwnerId: 'owner-a-record',
+          fraction: '1',
+          initialFraction: '1',
+        },
+        {
+          ...createBlankNode('lease-a-node', 'owner-a'),
+          type: 'related' as const,
+          relatedKind: 'lease' as const,
+          linkedLeaseId: 'lease-a',
+        },
+      ],
+      owners: [createBlankOwner('ws-1', { id: 'owner-a-record', name: 'A Owner' })],
+      leases: [
+        createBlankLease('ws-1', 'owner-a-record', {
+          id: 'lease-a',
+          lessee: 'Operator A',
+          royaltyRate: '1/8',
+          leasedInterest: '1',
+          effectiveDate: '2024-01-01',
+          docNo: 'LEASE-A',
+        }),
+      ],
+      leaseholdAssignments: [
+        {
+          id: 'assignment-null-unit',
+          assignor: 'Operator A',
+          assignee: 'Unassigned WI Partner',
+          scope: 'unit',
+          unitCode: null,
+          deskMapId: null,
+          workingInterestFraction: '1/2',
+          effectiveDate: '2024-02-01',
+          sourceDocNo: 'ASG-NULL',
+          notes: '',
+          depthRange: 'all_depths',
+        },
+        {
+          id: 'assignment-a',
+          assignor: 'Operator A',
+          assignee: 'A WI Partner',
+          scope: 'unit',
+          unitCode: 'A',
+          deskMapId: null,
+          workingInterestFraction: '1/4',
+          effectiveDate: '2024-02-02',
+          sourceDocNo: 'ASG-A',
+          notes: '',
+          depthRange: 'all_depths',
+        },
+      ],
+      leaseholdOrris: [
+        {
+          id: 'orri-null-unit',
+          payee: 'Unassigned Override',
+          scope: 'unit',
+          unitCode: null,
+          deskMapId: null,
+          burdenFraction: '1/16',
+          burdenBasis: 'gross_8_8',
+          effectiveDate: '2024-01-02',
+          sourceDocNo: 'ORRI-NULL',
+          notes: '',
+          depthRange: 'all_depths',
+        },
+        {
+          id: 'orri-a',
+          payee: 'A Override',
+          scope: 'unit',
+          unitCode: 'A',
+          deskMapId: null,
+          burdenFraction: '1/32',
+          burdenBasis: 'gross_8_8',
+          effectiveDate: '2024-01-03',
+          sourceDocNo: 'ORRI-A',
+          notes: '',
+          depthRange: 'all_depths',
+        },
+      ],
+    });
+
+    const nullAssignment = summary.assignments.find(
+      (assignment) => assignment.id === 'assignment-null-unit'
+    );
+    const taggedAssignment = summary.assignments.find(
+      (assignment) => assignment.id === 'assignment-a'
+    );
+    const nullOrri = summary.orris.find((orri) => orri.id === 'orri-null-unit');
+    const taggedOrri = summary.orris.find((orri) => orri.id === 'orri-a');
+
+    expect(summary.unitAssignmentWarningCount).toBe(2);
+    expect(summary.unitAssignmentWarnings.map((warning) => warning.id)).toEqual([
+      'assignment:assignment-null-unit:unitCode',
+      'orri:orri-null-unit:unitCode',
+    ]);
+    expect(summary.unitAssignmentWarnings.every((warning) =>
+      warning.message.includes('excluded - needs unit assignment')
+    )).toBe(true);
+    expect(nullAssignment).toEqual(
+      expect.objectContaining({
+        includedInMath: false,
+        needsUnitAssignment: true,
+        unitDecimal: '0',
+      })
+    );
+    expect(nullOrri).toEqual(
+      expect.objectContaining({
+        includedInMath: false,
+        needsUnitAssignment: true,
+        unitDecimal: '0',
+      })
+    );
+    expect(taggedAssignment).toEqual(
+      expect.objectContaining({
+        includedInMath: true,
+        needsUnitAssignment: false,
+      })
+    );
+    expect(taggedOrri).toEqual(
+      expect.objectContaining({
+        includedInMath: true,
+        needsUnitAssignment: false,
+      })
+    );
+    expect(summary.totalOrriDecimal).toBe('0.03125');
+    expect(summary.totalAssignedWorkingInterestDecimal).toBe('0.2109375');
+
+    const review = buildLeaseholdTransferOrderReview({
+      unit: {
+        name: 'Raven Forest Unit A',
+        description: '',
+        operator: 'Operator A',
+        effectiveDate: '2024-01-01',
+        jurisdiction: 'tx_fee',
+      },
+      unitSummary: summary,
+      focusedDeskMapId: null,
+    });
+
+    expect(buildLeaseholdTransferOrderHoldReasons(summary)).toEqual([
+      '2 unit-scoped ORRI/WI records excluded - needs unit assignment.',
+    ]);
+    expect(review.rows.map((row) => row.id)).toContain('orri-orri-a');
+    expect(review.rows.map((row) => row.id)).toContain('assignment-assignment-a');
+    expect(review.rows.map((row) => row.id)).not.toContain('orri-orri-null-unit');
+    expect(review.rows.map((row) => row.id)).not.toContain(
+      'assignment-assignment-null-unit'
     );
   });
 });
