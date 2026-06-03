@@ -168,6 +168,67 @@ export default function Navbar() {
     setSeedLoading(false);
   };
 
+  // Dr. Elmore #1 Unit sample: a de-identified, bundled `.landroid` (fake
+  // addresses, every embedded PDF replaced with a blank Producers 88). Loaded
+  // from a static asset, then through the same import path as a picked file.
+  const handleSpringhill = async () => {
+    setDemoMenuOpen(false);
+    const confirmed = await requestConfirmation({
+      title: 'Load Dr. Elmore #1 Unit Sample?',
+      message:
+        'This replaces the current workspace with the Dr. Elmore #1 Unit sample (a de-identified 7-tract title example). Save first if you need to keep the current workspace.',
+      confirmLabel: 'Load Demo Data',
+      tone: 'danger',
+      requiredConfirmationText: LOAD_DEMO_CONFIRMATION_TEXT,
+      typedConfirmationHelp:
+        'The demo loader overwrites the active local workspace in this browser session.',
+    });
+    if (!confirmed) return;
+
+    setSeedLoading(true);
+    try {
+      const url = `${import.meta.env.BASE_URL}samples/springhill-dr-elmore.landroid`;
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`Sample fetch failed (${response.status})`);
+      }
+      const blob = await response.blob();
+      const file = new File([blob], 'springhill-dr-elmore.landroid', {
+        type: 'application/json',
+      });
+      assertFileSize(file, FILE_SIZE_LIMITS.LANDROID, '.landroid file');
+
+      const data = await importLandroidFile(file);
+      const currentWorkspace = useWorkspaceStore.getState();
+      await replaceWorkspaceSideStoresWithRollback({
+        targetWorkspaceId: data.workspaceId,
+        targetData: {
+          ownerData: data.ownerData,
+          documentData: data.documentData,
+          mapData: data.mapData,
+          researchData: data.researchData,
+          curativeData: data.curativeData,
+        },
+        rollbackWorkspaceId: currentWorkspace.workspaceId,
+        rollbackNodes: currentWorkspace.nodes,
+      });
+      loadWorkspace(data);
+      useCanvasStore.getState().loadCanvas(data.canvas ?? { nodes: [], edges: [] });
+      await useWorkspaceStore
+        .getState()
+        .hydrateNodeAttachments({ strict: true })
+        .catch(() => {});
+      console.log(`[springhill-sample] Loaded ${data.nodes.length} nodes`);
+    } catch (err) {
+      console.error('[springhill-sample] Failed:', err);
+      await showAlert({
+        title: 'Sample Load Failed',
+        message: `Sample load failed: ${err instanceof Error ? err.message : 'Unknown error'}`,
+      });
+    }
+    setSeedLoading(false);
+  };
+
   const handleSave = async () => {
     setFileMenuOpen(false);
     const state = useWorkspaceStore.getState();
@@ -464,6 +525,15 @@ export default function Navbar() {
                     className="block w-full px-3 py-2 text-left text-xs text-parchment/80 hover:bg-ink-light/40 hover:text-parchment disabled:opacity-50"
                   >
                     Vulcan Mesa — Demo
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={handleSpringhill}
+                    disabled={seedLoading}
+                    className="block w-full px-3 py-2 text-left text-xs text-parchment/80 hover:bg-ink-light/40 hover:text-parchment disabled:opacity-50"
+                  >
+                    Dr. Elmore #1 Unit — Sample
                   </button>
                 </div>
               )}
