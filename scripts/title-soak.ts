@@ -1,16 +1,17 @@
 /**
  * Title-ledger soak harness (SHADOW verification - read-only).
  *
- * Purpose: exercise the lazy title baseline (`ensureTitleBaseline`) against a
- * whole workspace, then prove the durable title ActionRecords are self-sufficient
- * at that workspace's real scale:
+ * Synthesizes one whole-workspace `createRootNode` title mutation via
+ * `recordTitleMutation` (empty -> full), then proves the durable title
+ * ActionRecord it produces is self-sufficient:
  *   1. replay == adapter - `replayTitleProjection(records)` must equal the
  *      adapter's title slice (`titleRecordsFromWorkspace`).
  *   2. math parity - the node set reconstructed from the record snapshots must
  *      drive the identical `MathInputView` as the live workspace.
- * Any divergence, or any `lastDivergence`/`lastError` surfaced by the live
- * recording path, fails the soak (non-zero exit). This is prerequisite evidence
- * for any future read-path flip.
+ * The soak fails (non-zero exit) if either check diverges. It exercises the
+ * record/replay/projection primitives, NOT the live `useTitleActionLog` store or
+ * `ensureTitleBaseline` - it is replay/math evidence, not live-recording-path or
+ * whole-workspace-baseline coverage.
  *
  * GUARDRAILS:
  * - This NEVER flips a live read path. It only records the shadow ledger and
@@ -116,10 +117,7 @@ interface SoakReport {
   workspaceId: string;
   nodeCount: number;
   adapterTitleRecordCount: number;
-  baselineActionCount: number;
-  recordedMutationCount: number;
-  lastDivergence: string | null;
-  lastError: string | null;
+  recordCount: number;
   replayClean: boolean;
   replayedRecordCount: number;
   replayFirstDivergence: string | null;
@@ -183,10 +181,7 @@ async function runSoak(input: SoakInput): Promise<SoakReport> {
     workspaceId: input.workspace.workspaceId,
     nodeCount: input.workspace.nodes.length,
     adapterTitleRecordCount: adapter.length,
-    baselineActionCount: 1,
-    recordedMutationCount: 1,
-    lastDivergence: null,
-    lastError: null,
+    recordCount: records.length,
     replayClean,
     replayedRecordCount: replayed.length,
     replayFirstDivergence,
@@ -206,7 +201,7 @@ function printHuman(report: SoakReport): void {
     `  workspace             : ${report.workspaceId}`,
     `  nodes                 : ${report.nodeCount}`,
     `  adapter title records : ${report.adapterTitleRecordCount}`,
-    `  baseline actions      : ${report.baselineActionCount} (recordedMutationCount=${report.recordedMutationCount})`,
+    `  synthesized records   : ${report.recordCount}`,
     `  [replay == adapter]   : ${ok(report.replayClean)} (replayed ${report.replayedRecordCount} vs adapter ${report.adapterTitleRecordCount})`,
     ...(report.replayFirstDivergence
       ? [`      first divergence  : ${report.replayFirstDivergence}`]
@@ -216,8 +211,6 @@ function printHuman(report: SoakReport): void {
         ? ` (divergent keys: ${report.mathDivergentKeys.join(', ')})`
         : ''
     }`,
-    `  lastDivergence        : ${report.lastDivergence ?? '(none)'}`,
-    `  lastError             : ${report.lastError ?? '(none)'}`,
     `  elapsed               : ${(report.elapsedMs / 1000).toFixed(2)}s   peak rss: ${report.peakRssMb} MB`,
     `  RESULT                : ${ok(report.pass)}`,
   ];

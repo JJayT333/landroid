@@ -10,6 +10,7 @@ import { useCurativeStore } from '../../store/curative-store';
 import { useWorkspaceStore } from '../../store/workspace-store';
 import { useCanvasStore } from '../../store/canvas-store';
 import { useTitleActionLog } from '../../store/title-action-log';
+import type { ActionRecord, AuditEventRecord } from '../../backend-spine/contracts';
 import {
   downloadLandroidFile,
   exportDocumentWorkspaceData,
@@ -254,6 +255,20 @@ export default function Navbar() {
           rollbackNodes: currentWorkspace.nodes,
         });
         loadWorkspace(data);
+        if (data.actionLedger) {
+          // Seed the title ledger from the imported v9 bundle so a later save
+          // preserves the audit chain instead of dropping it — loadWorkspace
+          // just reset the live ledger (ACT-H04), and nothing else rehydrates it.
+          const ledgerRecords = data.actionLedger.records;
+          useTitleActionLog.getState().hydrate({
+            actionRecords: ledgerRecords.filter(
+              (record): record is ActionRecord => record.recordType === 'action_record'
+            ),
+            auditEvents: ledgerRecords.filter(
+              (record): record is AuditEventRecord => record.recordType === 'audit_event'
+            ),
+          });
+        }
         useCanvasStore.getState().loadCanvas(data.canvas ?? { nodes: [], edges: [] });
         // Phase 5: refresh node.attachments[] after PDF table write.
         await useWorkspaceStore

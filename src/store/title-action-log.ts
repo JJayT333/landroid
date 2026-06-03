@@ -66,6 +66,17 @@ interface TitleActionLogState {
   lastError: string | null;
   setEnabled: (enabled: boolean) => void;
   reset: () => void;
+  /**
+   * Seed the ledger from a durable bundle (e.g. an imported v9 `.landroid`
+   * `actionLedger`) so a later save preserves the chain rather than dropping it.
+   * Replaces current state and bumps the generation guard like `reset`; the next
+   * recorded mutation continues the chain from the hydrated head hash (and the
+   * baseline-if-needed check is skipped because records already exist).
+   */
+  hydrate: (input: {
+    actionRecords: ActionRecord[];
+    auditEvents: AuditEventRecord[];
+  }) => void;
   record: (input: {
     mutation: string;
     beforeWorkspace: WorkspaceData;
@@ -124,6 +135,19 @@ export const useTitleActionLog = create<TitleActionLogState>()((set, get) => ({
       auditEvents: [],
       headHash: undefined,
       recordedMutationCount: 0,
+      lastDivergence: null,
+      lastError: null,
+    });
+  },
+
+  hydrate: ({ actionRecords, auditEvents }) => {
+    ledgerGeneration += 1;
+    recordingChain = Promise.resolve();
+    set({
+      actionRecords: [...actionRecords],
+      auditEvents: [...auditEvents],
+      headHash: auditEvents.at(-1)?.eventHash,
+      recordedMutationCount: actionRecords.length,
       lastDivergence: null,
       lastError: null,
     });
