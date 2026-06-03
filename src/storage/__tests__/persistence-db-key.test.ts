@@ -25,6 +25,14 @@ type CanvasRecord = {
   savedAt: string;
 };
 
+type WorkspaceWriteLeaseRecord = {
+  workspaceId: string;
+  ownerTabId: string;
+  heartbeatAt: number;
+  expiresAt: number;
+  fencingToken: number;
+};
+
 function workspaceData(projectName = 'Namespaced Workspace'): WorkspaceData {
   return {
     workspaceId: 'ws-1',
@@ -149,10 +157,23 @@ async function loadPersistenceWithKeys({
     }),
     get: vi.fn(async (id: string) => canvasRecords.get(id)),
   };
+  const workspaceWriteLeaseRows = new Map<string, WorkspaceWriteLeaseRecord>();
+  const workspaceWriteLeases = {
+    get: vi.fn(async (workspaceId: string) =>
+      workspaceWriteLeaseRows.get(workspaceId)
+    ),
+    put: vi.fn(async (lease: WorkspaceWriteLeaseRecord) => {
+      workspaceWriteLeaseRows.set(lease.workspaceId, lease);
+    }),
+    delete: vi.fn(async (workspaceId: string) => {
+      workspaceWriteLeaseRows.delete(workspaceId);
+    }),
+  };
 
   const db = {
     workspaces,
     canvases,
+    workspaceWriteLeases,
     workspaceManifestShards: makeShardTable(
       shards?.manifest ? [shards.manifest] : []
     ),
@@ -204,7 +225,7 @@ describe('persistence db keys (audit M-1)', () => {
       workspaceData(),
       ALWAYS_WRITABLE
     );
-    await canvasPersistence.saveCanvasToDb(canvasData());
+    await canvasPersistence.saveCanvasToDb(canvasData(), 'ws-1');
 
     expect(result.status).toBe('written');
     const manifests = await db.workspaceManifestShards.toArray();

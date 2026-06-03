@@ -6,6 +6,10 @@ import {
   stripDbKeyAndStorageId,
 } from './db-key-scope';
 import {
+  assertWorkspaceWriteFence,
+  ensureWorkspaceWriteFence,
+} from './workspace-write-lease';
+import {
   normalizeResearchFormula,
   normalizeResearchImport,
   normalizeResearchProjectRecord,
@@ -128,9 +132,11 @@ export async function replaceResearchWorkspaceData(
 ): Promise<void> {
   const normalized = normalizeResearchWorkspaceData(workspaceId, data);
 
+  await ensureWorkspaceWriteFence(workspaceId);
   await db.transaction(
     'rw',
     [
+      db.workspaceWriteLeases,
       db.researchImports,
       db.researchSources,
       db.researchFormulas,
@@ -138,6 +144,7 @@ export async function replaceResearchWorkspaceData(
       db.researchQuestions,
     ],
     async () => {
+      await assertWorkspaceWriteFence(workspaceId);
       await Promise.all([
         db.researchImports.where('[dbKey+workspaceId]').equals(activeWorkspaceScope(workspaceId)).delete(),
         db.researchSources.where('[dbKey+workspaceId]').equals(activeWorkspaceScope(workspaceId)).delete(),
@@ -177,72 +184,117 @@ export async function replaceResearchWorkspaceData(
   );
 }
 
-export function saveResearchImport(researchImport: ResearchImport) {
-  return db.researchImports.put(
-    stampActiveDbKeyWithStorageId(normalizeResearchImport(researchImport), 'id')
-  );
+export async function saveResearchImport(researchImport: ResearchImport) {
+  const normalized = normalizeResearchImport(researchImport);
+  await ensureWorkspaceWriteFence(normalized.workspaceId);
+  return db.transaction('rw', db.workspaceWriteLeases, db.researchImports, async () => {
+    await assertWorkspaceWriteFence(normalized.workspaceId);
+    return db.researchImports.put(
+      stampActiveDbKeyWithStorageId(normalized, 'id')
+    );
+  });
 }
 
-export function deleteResearchImport(id: string) {
-  return db.transaction('rw', db.researchImports, async () => {
-    const row = await getResearchImportRow(id);
-    if (!row || row.dbKey !== activeWorkspaceScope(row.workspaceId)[0]) return;
+export async function deleteResearchImport(id: string) {
+  const row = await getResearchImportRow(id);
+  if (!row || row.dbKey !== activeWorkspaceScope(row.workspaceId)[0]) return;
+  await ensureWorkspaceWriteFence(row.workspaceId);
+  return db.transaction('rw', db.workspaceWriteLeases, db.researchImports, async () => {
+    await assertWorkspaceWriteFence(row.workspaceId);
     await db.researchImports.delete(row.id);
   });
 }
 
-export function saveResearchSource(source: ResearchSource) {
-  return db.researchSources.put(
-    stampActiveDbKeyWithStorageId(normalizeResearchSource(source), 'id')
-  );
+export async function saveResearchSource(source: ResearchSource) {
+  const normalized = normalizeResearchSource(source);
+  await ensureWorkspaceWriteFence(normalized.workspaceId);
+  return db.transaction('rw', db.workspaceWriteLeases, db.researchSources, async () => {
+    await assertWorkspaceWriteFence(normalized.workspaceId);
+    return db.researchSources.put(
+      stampActiveDbKeyWithStorageId(normalized, 'id')
+    );
+  });
 }
 
-export function deleteResearchSource(id: string) {
-  return db.transaction('rw', db.researchSources, async () => {
-    const row = await getResearchSourceRow(id);
-    if (!row || row.dbKey !== activeWorkspaceScope(row.workspaceId)[0]) return;
+export async function deleteResearchSource(id: string) {
+  const row = await getResearchSourceRow(id);
+  if (!row || row.dbKey !== activeWorkspaceScope(row.workspaceId)[0]) return;
+  await ensureWorkspaceWriteFence(row.workspaceId);
+  return db.transaction('rw', db.workspaceWriteLeases, db.researchSources, async () => {
+    await assertWorkspaceWriteFence(row.workspaceId);
     await db.researchSources.delete(row.id);
   });
 }
 
-export function saveResearchFormula(formula: ResearchFormula) {
-  return db.researchFormulas.put(
-    stampActiveDbKeyWithStorageId(normalizeResearchFormula(formula), 'id')
-  );
+export async function saveResearchFormula(formula: ResearchFormula) {
+  const normalized = normalizeResearchFormula(formula);
+  await ensureWorkspaceWriteFence(normalized.workspaceId);
+  return db.transaction('rw', db.workspaceWriteLeases, db.researchFormulas, async () => {
+    await assertWorkspaceWriteFence(normalized.workspaceId);
+    return db.researchFormulas.put(
+      stampActiveDbKeyWithStorageId(normalized, 'id')
+    );
+  });
 }
 
-export function deleteResearchFormula(id: string) {
-  return db.transaction('rw', db.researchFormulas, async () => {
-    const row = await getResearchFormulaRow(id);
-    if (!row || row.dbKey !== activeWorkspaceScope(row.workspaceId)[0]) return;
+export async function deleteResearchFormula(id: string) {
+  const row = await getResearchFormulaRow(id);
+  if (!row || row.dbKey !== activeWorkspaceScope(row.workspaceId)[0]) return;
+  await ensureWorkspaceWriteFence(row.workspaceId);
+  return db.transaction('rw', db.workspaceWriteLeases, db.researchFormulas, async () => {
+    await assertWorkspaceWriteFence(row.workspaceId);
     await db.researchFormulas.delete(row.id);
   });
 }
 
-export function saveResearchProjectRecord(projectRecord: ResearchProjectRecord) {
-  return db.researchProjectRecords.put(
-    stampActiveDbKeyWithStorageId(normalizeResearchProjectRecord(projectRecord), 'id')
+export async function saveResearchProjectRecord(projectRecord: ResearchProjectRecord) {
+  const normalized = normalizeResearchProjectRecord(projectRecord);
+  await ensureWorkspaceWriteFence(normalized.workspaceId);
+  return db.transaction(
+    'rw',
+    db.workspaceWriteLeases,
+    db.researchProjectRecords,
+    async () => {
+      await assertWorkspaceWriteFence(normalized.workspaceId);
+      return db.researchProjectRecords.put(
+        stampActiveDbKeyWithStorageId(normalized, 'id')
+      );
+    }
   );
 }
 
-export function deleteResearchProjectRecord(id: string) {
-  return db.transaction('rw', db.researchProjectRecords, async () => {
-    const row = await getResearchProjectRecordRow(id);
-    if (!row || row.dbKey !== activeWorkspaceScope(row.workspaceId)[0]) return;
-    await db.researchProjectRecords.delete(row.id);
+export async function deleteResearchProjectRecord(id: string) {
+  const row = await getResearchProjectRecordRow(id);
+  if (!row || row.dbKey !== activeWorkspaceScope(row.workspaceId)[0]) return;
+  await ensureWorkspaceWriteFence(row.workspaceId);
+  return db.transaction(
+    'rw',
+    db.workspaceWriteLeases,
+    db.researchProjectRecords,
+    async () => {
+      await assertWorkspaceWriteFence(row.workspaceId);
+      await db.researchProjectRecords.delete(row.id);
+    }
+  );
+}
+
+export async function saveResearchQuestion(question: ResearchQuestion) {
+  const normalized = normalizeResearchQuestion(question);
+  await ensureWorkspaceWriteFence(normalized.workspaceId);
+  return db.transaction('rw', db.workspaceWriteLeases, db.researchQuestions, async () => {
+    await assertWorkspaceWriteFence(normalized.workspaceId);
+    return db.researchQuestions.put(
+      stampActiveDbKeyWithStorageId(normalized, 'id')
+    );
   });
 }
 
-export function saveResearchQuestion(question: ResearchQuestion) {
-  return db.researchQuestions.put(
-    stampActiveDbKeyWithStorageId(normalizeResearchQuestion(question), 'id')
-  );
-}
-
-export function deleteResearchQuestion(id: string) {
-  return db.transaction('rw', db.researchQuestions, async () => {
-    const row = await getResearchQuestionRow(id);
-    if (!row || row.dbKey !== activeWorkspaceScope(row.workspaceId)[0]) return;
+export async function deleteResearchQuestion(id: string) {
+  const row = await getResearchQuestionRow(id);
+  if (!row || row.dbKey !== activeWorkspaceScope(row.workspaceId)[0]) return;
+  await ensureWorkspaceWriteFence(row.workspaceId);
+  return db.transaction('rw', db.workspaceWriteLeases, db.researchQuestions, async () => {
+    await assertWorkspaceWriteFence(row.workspaceId);
     await db.researchQuestions.delete(row.id);
   });
 }

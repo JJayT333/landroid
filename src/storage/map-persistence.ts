@@ -7,6 +7,10 @@ import {
   stripStorageScopedId,
 } from './db-key-scope';
 import {
+  assertWorkspaceWriteFence,
+  ensureWorkspaceWriteFence,
+} from './workspace-write-lease';
+import {
   normalizeMapAsset,
   normalizeMapExternalReference,
   normalizeMapRegion,
@@ -122,12 +126,15 @@ export async function replaceMapWorkspaceData(
   workspaceId: string,
   data: MapWorkspaceData
 ): Promise<void> {
+  await ensureWorkspaceWriteFence(workspaceId);
   await db.transaction(
     'rw',
+    db.workspaceWriteLeases,
     db.mapAssets,
     db.mapRegions,
     db.mapExternalReferences,
     async () => {
+      await assertWorkspaceWriteFence(workspaceId);
       await Promise.all([
         db.mapAssets.where('[dbKey+workspaceId]').equals(activeWorkspaceScope(workspaceId)).delete(),
         db.mapRegions.where('[dbKey+workspaceId]').equals(activeWorkspaceScope(workspaceId)).delete(),
@@ -170,10 +177,14 @@ export async function replaceMapWorkspaceData(
   );
 }
 
-export function saveMapAsset(asset: MapAsset) {
-  return db.mapAssets.put(
-    stampActiveDbKeyWithStorageId(normalizeMapAsset(asset), 'id')
-  );
+export async function saveMapAsset(asset: MapAsset) {
+  await ensureWorkspaceWriteFence(asset.workspaceId);
+  return db.transaction('rw', db.workspaceWriteLeases, db.mapAssets, async () => {
+    await assertWorkspaceWriteFence(asset.workspaceId);
+    return db.mapAssets.put(
+      stampActiveDbKeyWithStorageId(normalizeMapAsset(asset), 'id')
+    );
+  });
 }
 
 /**
@@ -182,36 +193,57 @@ export function saveMapAsset(asset: MapAsset) {
  * never need (and never overwrite) the bytes. Used by the metadata-first
  * store, which holds blob-free assets.
  */
-export function updateMapAssetFields(id: string, fields: Partial<MapAssetMeta>) {
+export async function updateMapAssetFields(id: string, fields: Partial<MapAssetMeta>) {
   const { id: _id, ...rest } = fields as Partial<MapAsset>;
-  return db.transaction('rw', db.mapAssets, async () => {
-    const asset = await getMapAssetRow(id);
-    if (!asset || asset.dbKey !== activeWorkspaceScope(asset.workspaceId)[0]) return;
+  const asset = await getMapAssetRow(id);
+  if (!asset || asset.dbKey !== activeWorkspaceScope(asset.workspaceId)[0]) return;
+  await ensureWorkspaceWriteFence(asset.workspaceId);
+  return db.transaction('rw', db.workspaceWriteLeases, db.mapAssets, async () => {
+    await assertWorkspaceWriteFence(asset.workspaceId);
     await db.mapAssets.update(asset.id, rest);
   });
 }
 
-export function saveMapRegion(region: MapRegion) {
-  return db.mapRegions.put(
-    stampActiveDbKeyWithStorageId(normalizeMapRegion(region), 'id')
-  );
+export async function saveMapRegion(region: MapRegion) {
+  await ensureWorkspaceWriteFence(region.workspaceId);
+  return db.transaction('rw', db.workspaceWriteLeases, db.mapRegions, async () => {
+    await assertWorkspaceWriteFence(region.workspaceId);
+    return db.mapRegions.put(
+      stampActiveDbKeyWithStorageId(normalizeMapRegion(region), 'id')
+    );
+  });
 }
 
-export function saveMapReference(reference: MapExternalReference) {
-  return db.mapExternalReferences.put(
-    stampActiveDbKeyWithStorageId(normalizeMapExternalReference(reference), 'id')
-  );
-}
-
-export function deleteMapAsset(id: string) {
+export async function saveMapReference(reference: MapExternalReference) {
+  await ensureWorkspaceWriteFence(reference.workspaceId);
   return db.transaction(
     'rw',
+    db.workspaceWriteLeases,
+    db.mapExternalReferences,
+    async () => {
+      await assertWorkspaceWriteFence(reference.workspaceId);
+      return db.mapExternalReferences.put(
+        stampActiveDbKeyWithStorageId(
+          normalizeMapExternalReference(reference),
+          'id'
+        )
+      );
+    }
+  );
+}
+
+export async function deleteMapAsset(id: string) {
+  const asset = await getMapAssetRow(id);
+  if (!asset || asset.dbKey !== activeWorkspaceScope(asset.workspaceId)[0]) return;
+  await ensureWorkspaceWriteFence(asset.workspaceId);
+  return db.transaction(
+    'rw',
+    db.workspaceWriteLeases,
     db.mapAssets,
     db.mapRegions,
     db.mapExternalReferences,
     async () => {
-      const asset = await getMapAssetRow(id);
-      if (!asset || asset.dbKey !== activeWorkspaceScope(asset.workspaceId)[0]) return;
+      await assertWorkspaceWriteFence(asset.workspaceId);
       const scope = activeWorkspaceScope(asset.workspaceId);
       const assetId = stripStorageScopedId(asset.id, asset.dbKey);
       await db.mapAssets.delete(asset.id);
@@ -238,14 +270,17 @@ export function deleteMapAsset(id: string) {
   );
 }
 
-export function deleteMapRegion(id: string) {
+export async function deleteMapRegion(id: string) {
+  const region = await getMapRegionRow(id);
+  if (!region || region.dbKey !== activeWorkspaceScope(region.workspaceId)[0]) return;
+  await ensureWorkspaceWriteFence(region.workspaceId);
   return db.transaction(
     'rw',
+    db.workspaceWriteLeases,
     db.mapRegions,
     db.mapExternalReferences,
     async () => {
-      const region = await getMapRegionRow(id);
-      if (!region || region.dbKey !== activeWorkspaceScope(region.workspaceId)[0]) return;
+      await assertWorkspaceWriteFence(region.workspaceId);
       const scope = activeWorkspaceScope(region.workspaceId);
       const regionId = stripStorageScopedId(region.id, region.dbKey);
       await db.mapRegions.delete(region.id);
@@ -257,17 +292,26 @@ export function deleteMapRegion(id: string) {
   );
 }
 
-export function deleteMapReference(id: string) {
-  return db.transaction('rw', db.mapExternalReferences, async () => {
-    const reference = await getMapReferenceRow(id);
-    if (!reference || reference.dbKey !== activeWorkspaceScope(reference.workspaceId)[0]) return;
-    await db.mapExternalReferences.delete(reference.id);
-  });
+export async function deleteMapReference(id: string) {
+  const reference = await getMapReferenceRow(id);
+  if (!reference || reference.dbKey !== activeWorkspaceScope(reference.workspaceId)[0]) return;
+  await ensureWorkspaceWriteFence(reference.workspaceId);
+  return db.transaction(
+    'rw',
+    db.workspaceWriteLeases,
+    db.mapExternalReferences,
+    async () => {
+      await assertWorkspaceWriteFence(reference.workspaceId);
+      await db.mapExternalReferences.delete(reference.id);
+    }
+  );
 }
 
-export function clearDeskMapLink(workspaceId: string, id: string) {
+export async function clearDeskMapLink(workspaceId: string, id: string) {
   const scope = activeWorkspaceScope(workspaceId);
-  return db.transaction('rw', db.mapAssets, db.mapRegions, async () => {
+  await ensureWorkspaceWriteFence(workspaceId);
+  return db.transaction('rw', db.workspaceWriteLeases, db.mapAssets, db.mapRegions, async () => {
+    await assertWorkspaceWriteFence(workspaceId);
     await Promise.all([
       db.mapAssets
         .where('[dbKey+workspaceId+deskMapId]')
@@ -281,9 +325,11 @@ export function clearDeskMapLink(workspaceId: string, id: string) {
   });
 }
 
-export function clearNodeLink(workspaceId: string, id: string) {
+export async function clearNodeLink(workspaceId: string, id: string) {
   const scope = activeWorkspaceScope(workspaceId);
-  return db.transaction('rw', db.mapAssets, db.mapRegions, async () => {
+  await ensureWorkspaceWriteFence(workspaceId);
+  return db.transaction('rw', db.workspaceWriteLeases, db.mapAssets, db.mapRegions, async () => {
+    await assertWorkspaceWriteFence(workspaceId);
     await Promise.all([
       db.mapAssets
         .where('[dbKey+workspaceId+nodeId]')
@@ -297,9 +343,11 @@ export function clearNodeLink(workspaceId: string, id: string) {
   });
 }
 
-export function clearOwnerLink(workspaceId: string, id: string) {
+export async function clearOwnerLink(workspaceId: string, id: string) {
   const scope = activeWorkspaceScope(workspaceId);
-  return db.transaction('rw', db.mapAssets, db.mapRegions, async () => {
+  await ensureWorkspaceWriteFence(workspaceId);
+  return db.transaction('rw', db.workspaceWriteLeases, db.mapAssets, db.mapRegions, async () => {
+    await assertWorkspaceWriteFence(workspaceId);
     await Promise.all([
       db.mapAssets
         .where('[dbKey+workspaceId+linkedOwnerId]')
@@ -313,9 +361,11 @@ export function clearOwnerLink(workspaceId: string, id: string) {
   });
 }
 
-export function clearLeaseLink(workspaceId: string, id: string) {
+export async function clearLeaseLink(workspaceId: string, id: string) {
   const scope = activeWorkspaceScope(workspaceId);
-  return db.transaction('rw', db.mapAssets, db.mapRegions, async () => {
+  await ensureWorkspaceWriteFence(workspaceId);
+  return db.transaction('rw', db.workspaceWriteLeases, db.mapAssets, db.mapRegions, async () => {
+    await assertWorkspaceWriteFence(workspaceId);
     await Promise.all([
       db.mapAssets
         .where('[dbKey+workspaceId+leaseId]')

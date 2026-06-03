@@ -106,7 +106,10 @@ import {
 } from '../project-records/record-validation';
 import { readWorkspaceFromShardRows } from './workspace-shard-reader';
 import { buildWorkspaceShards } from './workspace-shards';
-import { ensureWorkspaceWritable } from './workspace-write-lease';
+import {
+  assertWorkspaceWriteFence,
+  ensureWorkspaceWritable,
+} from './workspace-write-lease';
 export { LANDROID_FILE_VERSION } from './landroid-file-version';
 const PAGE_SIZE_ID_SET = new Set<PageSizeId>(
   PAGE_SIZE_DEFINITIONS.map((definition) => definition.id)
@@ -726,6 +729,8 @@ export interface SaveWorkspaceShardsDeps {
   now?: () => string;
   /** Override the single-writer lease gate (tests). */
   ensureWritable?: (workspaceId: string) => Promise<boolean>;
+  /** Override the in-transaction fencing assertion (tests). */
+  assertWritable?: (workspaceId: string) => Promise<void>;
 }
 
 function defaultShardTimestamp(): string {
@@ -761,6 +766,8 @@ export async function saveWorkspaceShardsToDb(
   deps: SaveWorkspaceShardsDeps = {}
 ): Promise<SaveWorkspaceShardsResult> {
   const ensureWritable = deps.ensureWritable ?? ensureWorkspaceWritable;
+  const assertWritable = deps.assertWritable
+    ?? (deps.ensureWritable ? async () => undefined : assertWorkspaceWriteFence);
   if (!(await ensureWritable(data.workspaceId))) {
     return { status: 'blocked' };
   }
@@ -791,6 +798,7 @@ export async function saveWorkspaceShardsToDb(
     'rw',
     [
       db.workspaces,
+      db.workspaceWriteLeases,
       db.workspaceManifestShards,
       db.deskMapShards,
       db.ownershipNodeCompatShards,
@@ -798,6 +806,7 @@ export async function saveWorkspaceShardsToDb(
       db.workspaceUiStateShards,
     ],
     async () => {
+      await assertWritable(workspaceId);
       // Replace the per-workspace child rows wholesale so removed desk maps or
       // nodes cannot linger as orphans, then write the fresh complete set. A
       // throw anywhere here rolls the whole transaction back, leaving the prior
@@ -1420,7 +1429,12 @@ export async function replaceDocumentWorkspaceData(
     .filter((a) => docIdSet.has(a.docId))
     .map((a) => ({ ...a, workspaceId }));
 
-  await db.transaction('rw', db.documents, db.document_attachments, async () => {
+  const writable = await ensureWorkspaceWritable(workspaceId);
+  if (!writable) {
+    throw new Error('Workspace is read-only because another tab holds the write lease.');
+  }
+  await db.transaction('rw', db.workspaceWriteLeases, db.documents, db.document_attachments, async () => {
+    await assertWorkspaceWriteFence(workspaceId);
     // Drop every document scoped to this workspace.
     const existingDocs = await db.documents
       .where('[dbKey+workspaceId]')
@@ -1457,14 +1471,20 @@ export async function replaceDocumentWorkspaceData(
 
 export async function replacePdfWorkspaceData(
   data: PdfWorkspaceData,
-  nodes: OwnershipNode[]
+  nodes: OwnershipNode[],
+  workspaceId: string
 ): Promise<void> {
   const validNodeIds = new Set(nodes.map((node) => node.id));
   const pdfs = data.pdfs.filter(
     (pdf) => validNodeIds.has(pdf.nodeId) && pdf.blob.size > 0
   );
 
-  await db.transaction('rw', db.pdfs, async () => {
+  const writable = await ensureWorkspaceWritable(workspaceId);
+  if (!writable) {
+    throw new Error('Workspace is read-only because another tab holds the write lease.');
+  }
+  await db.transaction('rw', db.workspaceWriteLeases, db.pdfs, async () => {
+    await assertWorkspaceWriteFence(workspaceId);
     await db.pdfs.bulkDelete([...validNodeIds]);
     if (pdfs.length > 0) {
       await db.pdfs.bulkPut(pdfs);

@@ -14,6 +14,8 @@ import db from './db';
 import { useWriteLeaseStore } from '../store/write-lease-store';
 import {
   evaluateWorkspaceWriteLease,
+  type WorkspaceWriteLeaseDecision,
+  type WorkspaceWriteLeaseRequest,
   type WorkspaceWriteLease,
 } from './workspace-write-lock';
 
@@ -30,6 +32,9 @@ export interface LeaseBroadcastChannel {
 export interface WorkspaceWriteLeaseEnv {
   tabId: string;
   now: () => number;
+  claimLease?: (
+    request: WorkspaceWriteLeaseRequest
+  ) => Promise<WorkspaceWriteLeaseDecision>;
   loadLease: (workspaceId: string) => Promise<WorkspaceWriteLease | null>;
   saveLease: (lease: WorkspaceWriteLease) => Promise<void>;
   deleteLease: (workspaceId: string) => Promise<void>;
@@ -49,6 +54,12 @@ interface LeasePeerMessage {
   fencingToken: number;
 }
 
+interface ActiveWriteFence {
+  workspaceId: string;
+  ownerTabId: string;
+  fencingToken: number;
+}
+
 function isLeasePeerMessage(value: unknown): value is LeasePeerMessage {
   return (
     typeof value === 'object'
@@ -63,6 +74,7 @@ function isLeasePeerMessage(value: unknown): value is LeasePeerMessage {
 export class WorkspaceWriteLeaseController {
   private role: WorkspaceWriteRole = 'idle';
   private engagedWorkspaceId: string | null = null;
+  private activeFence: ActiveWriteFence | null = null;
   private channel: LeaseBroadcastChannel | null = null;
   private channelName: string | null = null;
 
@@ -82,21 +94,28 @@ export class WorkspaceWriteLeaseController {
     // hears the writer's claim/release broadcasts.
     this.ensureChannel(workspaceId);
 
-    const existing = await this.env.loadLease(workspaceId);
-    const decision = evaluateWorkspaceWriteLease(existing, {
+    const request: WorkspaceWriteLeaseRequest = {
       workspaceId,
       ownerTabId: this.env.tabId,
       now: this.env.now(),
       forceTakeover: options.force,
-    });
+    };
+    const decision = this.env.claimLease
+      ? await this.env.claimLease(request)
+      : await this.claimLeaseWithLoadThenSave(request);
 
     if (decision.status === 'blocked') {
+      this.activeFence = null;
       this.setRole('reader', workspaceId);
       return false;
     }
 
     const wasWriter = this.role === 'writer' && this.engagedWorkspaceId === workspaceId;
-    await this.env.saveLease(decision.lease);
+    this.activeFence = {
+      workspaceId,
+      ownerTabId: this.env.tabId,
+      fencingToken: decision.lease.fencingToken,
+    };
     this.setRole('writer', workspaceId);
     if (!wasWriter) {
       // Only announce on a genuine transition to writer, so per-autosave
@@ -113,7 +132,34 @@ export class WorkspaceWriteLeaseController {
 
   /** True when this tab currently holds the write lease for the workspace. */
   canWrite(workspaceId: string): boolean {
-    return this.role === 'writer' && this.engagedWorkspaceId === workspaceId;
+    return (
+      this.role === 'writer'
+      && this.engagedWorkspaceId === workspaceId
+      && this.activeFence?.workspaceId === workspaceId
+    );
+  }
+
+  getActiveFence(workspaceId: string): ActiveWriteFence | null {
+    if (!this.canWrite(workspaceId)) return null;
+    return this.activeFence;
+  }
+
+  async assertFence(workspaceId: string): Promise<void> {
+    const fence = this.getActiveFence(workspaceId);
+    if (!fence) {
+      throw new Error('Workspace is read-only because this tab does not hold the write lease.');
+    }
+    const current = await this.env.loadLease(workspaceId);
+    if (
+      !current
+      || current.ownerTabId !== fence.ownerTabId
+      || current.fencingToken !== fence.fencingToken
+      || current.expiresAt <= this.env.now()
+    ) {
+      this.activeFence = null;
+      this.setRole('reader', workspaceId);
+      throw new Error('Workspace write lease is stale; reload or take over before saving.');
+    }
   }
 
   /** Release the lease if this tab owns it, so a peer can take over at once. */
@@ -129,8 +175,20 @@ export class WorkspaceWriteLeaseController {
       });
     }
     if (this.engagedWorkspaceId === workspaceId) {
+      this.activeFence = null;
       this.setRole('idle', null);
     }
+  }
+
+  private async claimLeaseWithLoadThenSave(
+    request: WorkspaceWriteLeaseRequest
+  ): Promise<WorkspaceWriteLeaseDecision> {
+    const existing = await this.env.loadLease(request.workspaceId);
+    const decision = evaluateWorkspaceWriteLease(existing, request);
+    if (decision.status !== 'blocked') {
+      await this.env.saveLease(decision.lease);
+    }
+    return decision;
   }
 
   private setRole(role: WorkspaceWriteRole, workspaceId: string | null): void {
@@ -162,6 +220,7 @@ export class WorkspaceWriteLeaseController {
     if (data.type === 'claim' && this.role === 'writer') {
       // A peer claimed the lease we held; step down to read-only. The next
       // write re-evaluates against Dexie.
+      this.activeFence = null;
       this.setRole('reader', this.engagedWorkspaceId);
     } else if (data.type === 'release' && this.role === 'reader') {
       // The writer released; try to promote this read-only tab without making
@@ -186,6 +245,16 @@ function defaultEnv(): WorkspaceWriteLeaseEnv {
   return {
     tabId: randomTabId(),
     now: () => Date.now(),
+    claimLease: async (request) =>
+      db.transaction('rw', db.workspaceWriteLeases, async () => {
+        const existing =
+          (await db.workspaceWriteLeases.get(request.workspaceId)) ?? null;
+        const decision = evaluateWorkspaceWriteLease(existing, request);
+        if (decision.status !== 'blocked') {
+          await db.workspaceWriteLeases.put(decision.lease);
+        }
+        return decision;
+      }),
     loadLease: async (workspaceId) =>
       (await db.workspaceWriteLeases.get(workspaceId)) ?? null,
     saveLease: async (lease) => {
@@ -220,6 +289,17 @@ function getController(): WorkspaceWriteLeaseController {
  */
 export async function ensureWorkspaceWritable(workspaceId: string): Promise<boolean> {
   return getController().ensureWritable(workspaceId);
+}
+
+export async function ensureWorkspaceWriteFence(workspaceId: string): Promise<void> {
+  const writable = await getController().ensureWritable(workspaceId);
+  if (!writable) {
+    throw new Error('Workspace is read-only because another tab holds the write lease.');
+  }
+}
+
+export async function assertWorkspaceWriteFence(workspaceId: string): Promise<void> {
+  await getController().assertFence(workspaceId);
 }
 
 /**

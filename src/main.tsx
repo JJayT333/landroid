@@ -165,7 +165,7 @@ useCanvasStore.subscribe((state) => {
     // read-only tab cannot overwrite the active writer's viewport/layout.
     const workspaceId = useWorkspaceStore.getState().workspaceId;
     void ensureWorkspaceWritable(workspaceId).then((writable) => {
-      if (writable) saveCanvasToDb(buildCanvasAutosavePayload(state));
+      if (writable) saveCanvasToDb(buildCanvasAutosavePayload(state), workspaceId);
     });
   }, AUTOSAVE_DEBOUNCE_MS);
 });

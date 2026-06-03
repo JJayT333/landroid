@@ -7,6 +7,10 @@ import db from './db';
 import type { CanvasSaveData } from '../store/canvas-store';
 import { normalizeCanvasSaveData } from './workspace-persistence';
 import { getCanvasDbKey } from './active-workspace-key';
+import {
+  assertWorkspaceWriteFence,
+  ensureWorkspaceWriteFence,
+} from './workspace-write-lease';
 
 export interface CanvasLoadResult {
   status: 'missing' | 'loaded' | 'corrupt';
@@ -31,11 +35,18 @@ export function parsePersistedCanvasData(raw: string): CanvasSaveData {
   return normalized;
 }
 
-export async function saveCanvasToDb(data: CanvasSaveData): Promise<void> {
-  await db.canvases.put({
-    id: getCanvasDbKey(),
-    data: JSON.stringify(data),
-    savedAt: new Date().toISOString(),
+export async function saveCanvasToDb(
+  data: CanvasSaveData,
+  workspaceId: string
+): Promise<void> {
+  await ensureWorkspaceWriteFence(workspaceId);
+  await db.transaction('rw', db.workspaceWriteLeases, db.canvases, async () => {
+    await assertWorkspaceWriteFence(workspaceId);
+    await db.canvases.put({
+      id: getCanvasDbKey(),
+      data: JSON.stringify(data),
+      savedAt: new Date().toISOString(),
+    });
   });
 }
 
