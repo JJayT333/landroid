@@ -8,6 +8,7 @@ import {
   buildLeaseholdTransferOrderReview,
   buildLeaseholdUnitSummary,
 } from '../leasehold-summary';
+import { getTransferOrderEntryDisplayStatus } from '../../../views/LeaseholdView';
 
 describe('leasehold-summary', () => {
   it('derives tract participation, owner acres, and weighted unit royalty', () => {
@@ -2317,7 +2318,11 @@ describe('leasehold-summary', () => {
       })
     );
     expect(summary.totalOrriDecimal).toBe('0.03125');
+    expect(summary.tracts[0]?.nriBeforeOrriRate).toBe('0.875');
+    expect(summary.tracts[0]?.netRevenueInterestBaseRate).toBe('0.84375');
+    expect(summary.preWorkingInterestDecimal).toBe('0.84375');
     expect(summary.totalAssignedWorkingInterestDecimal).toBe('0.2109375');
+    expect(summary.retainedWorkingInterestDecimal).toBe('0.6328125');
 
     const review = buildLeaseholdTransferOrderReview({
       unit: {
@@ -2330,10 +2335,14 @@ describe('leasehold-summary', () => {
       unitSummary: summary,
       focusedDeskMapId: null,
     });
+    const holdReasons = buildLeaseholdTransferOrderHoldReasons(summary);
 
-    expect(buildLeaseholdTransferOrderHoldReasons(summary)).toEqual([
+    expect(holdReasons).toEqual([
       '2 unit-scoped ORRI/WI records excluded - needs unit assignment.',
     ]);
+    expect(getTransferOrderEntryDisplayStatus('ready', holdReasons.length > 0)).toBe(
+      'hold'
+    );
     expect(review.rows.map((row) => row.id)).toContain('orri-orri-a');
     expect(review.rows.map((row) => row.id)).toContain('assignment-assignment-a');
     expect(review.rows.map((row) => row.id)).not.toContain('orri-orri-null-unit');

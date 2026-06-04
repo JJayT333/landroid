@@ -1652,6 +1652,8 @@ export function buildLeaseholdDecimalRows({
 export function buildLeaseholdTransferOrderHoldReasons(
   unitSummary: Pick<LeaseholdUnitSummary, 'unitAssignmentWarningCount'>
 ): string[] {
+  // Deliberate readiness gate: a null-unit ORRI/WI record is not transfer-order
+  // reliable until it is assigned to the coded unit it affects.
   return unitSummary.unitAssignmentWarningCount > 0
     ? [
         `${unitSummary.unitAssignmentWarningCount} unit-scoped ORRI/WI record${
