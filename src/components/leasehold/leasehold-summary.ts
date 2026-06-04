@@ -41,6 +41,16 @@ export interface LeaseholdInputWarning {
   message: string;
 }
 
+export type LeaseholdUnitAssignmentWarningSourceType = 'orri' | 'assignment';
+
+export interface LeaseholdUnitAssignmentWarning {
+  id: string;
+  sourceType: LeaseholdUnitAssignmentWarningSourceType;
+  sourceId: string;
+  sourceLabel: string;
+  message: string;
+}
+
 interface LeaseholdInputWarningContext {
   sourceType: LeaseholdInputWarningSourceType;
   sourceId: string;
@@ -180,6 +190,7 @@ export interface LeaseholdOrriSummary {
   sourceDocNo: string;
   notes: string;
   includedInMath: boolean;
+  needsUnitAssignment: boolean;
   unitDecimal: string;
 }
 
@@ -215,6 +226,7 @@ export interface LeaseholdAssignmentSummary {
   sourceDocNo: string;
   notes: string;
   includedInMath: boolean;
+  needsUnitAssignment: boolean;
   unitDecimal: string;
 }
 
@@ -251,6 +263,13 @@ export interface LeaseholdUnitSummary {
   /** Total count of malformed economic inputs that were excluded as 0. */
   inputWarningCount: number;
   inputWarnings: LeaseholdInputWarning[];
+  /**
+   * Unit-scoped ORRI/WI records with blank unit assignment in a coded-unit
+   * workspace. They stay excluded by the existing math, but are surfaced here
+   * so transfer-order review can hold until the user assigns a unit.
+   */
+  unitAssignmentWarningCount: number;
+  unitAssignmentWarnings: LeaseholdUnitAssignmentWarning[];
   trackedOrriCount: number;
   includedOrriCount: number;
   excludedOrriCount: number;
@@ -624,6 +643,18 @@ function unitRecordAppliesToDeskMap(
     : normalizedRecordUnitCode === null;
 }
 
+function normalizeUnitCode(value: string | null | undefined): string | null {
+  const trimmed = value?.trim() ?? '';
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function unitRecordNeedsAssignment(
+  record: Pick<LeaseholdOrri | LeaseholdAssignment, 'scope' | 'unitCode'>,
+  hasCodedUnitFocus: boolean
+): boolean {
+  return hasCodedUnitFocus && record.scope === 'unit' && normalizeUnitCode(record.unitCode) === null;
+}
+
 function orriAppliesToDeskMap(orri: LeaseholdOrri, deskMap: DeskMap): boolean {
   return orri.scope === 'tract'
     ? orri.deskMapId === deskMap.id
@@ -704,6 +735,7 @@ export function buildLeaseholdUnitSummary({
 }): LeaseholdUnitSummary {
   const ownerById = new Map(owners.map((owner) => [owner.id, owner]));
   const deskMapById = new Map(deskMaps.map((deskMap) => [deskMap.id, deskMap]));
+  const hasCodedUnitFocus = deskMaps.some((deskMap) => normalizeUnitCode(deskMap.unitCode) !== null);
   const leaseScopeIndex = buildLeaseScopeIndex(nodes);
   const activeLeasesByOwnerId = new Map<string, Lease[]>();
 
@@ -739,6 +771,18 @@ export function buildLeaseholdUnitSummary({
   const inputWarningById = new Map<string, LeaseholdInputWarning>();
   const inputWarningsByTractId = new Map<string, LeaseholdInputWarning[]>();
   const inputWarningIdsByTractId = new Map<string, Set<string>>();
+  const unitAssignmentWarnings = new Map<string, LeaseholdUnitAssignmentWarning>();
+  const addUnitAssignmentWarning = (
+    warning: Omit<LeaseholdUnitAssignmentWarning, 'message'>
+  ) => {
+    if (unitAssignmentWarnings.has(warning.id)) {
+      return;
+    }
+    unitAssignmentWarnings.set(warning.id, {
+      ...warning,
+      message: `${warning.sourceLabel} is excluded - needs unit assignment.`,
+    });
+  };
   const addInputWarning: AddLeaseholdInputWarning = (context) => {
     const id = leaseholdInputWarningId(context);
     const rawValue = context.value === undefined || context.value === null
@@ -1175,6 +1219,15 @@ export function buildLeaseholdUnitSummary({
     const tract = assignment.deskMapId
       ? tractSummaryById.get(assignment.deskMapId) ?? null
       : null;
+    const needsUnitAssignment = unitRecordNeedsAssignment(assignment, hasCodedUnitFocus);
+    if (needsUnitAssignment) {
+      addUnitAssignmentWarning({
+        id: `assignment:${assignment.id}:unitCode`,
+        sourceType: 'assignment',
+        sourceId: assignment.id,
+        sourceLabel: assignmentSourceLabel(assignment),
+      });
+    }
     const scopedTracts = unitScopedTracts(assignment, tracts, deskMapById);
     const unitPreWorkingInterestDecimal = scopedTracts.reduce(
       (sum, candidate) => sum.plus(d(candidate.preWorkingInterestDecimal)),
@@ -1223,6 +1276,7 @@ export function buildLeaseholdUnitSummary({
       sourceDocNo: assignment.sourceDocNo,
       notes: assignment.notes,
       includedInMath,
+      needsUnitAssignment,
       unitDecimal: unitDecimal.toString(),
     };
   });
@@ -1231,6 +1285,15 @@ export function buildLeaseholdUnitSummary({
   );
   const orris = leaseholdOrris.map((orri) => {
     const tract = orri.deskMapId ? tractSummaryById.get(orri.deskMapId) ?? null : null;
+    const needsUnitAssignment = unitRecordNeedsAssignment(orri, hasCodedUnitFocus);
+    if (needsUnitAssignment) {
+      addUnitAssignmentWarning({
+        id: `orri:${orri.id}:unitCode`,
+        sourceType: 'orri',
+        sourceId: orri.id,
+        sourceLabel: orriSourceLabel(orri),
+      });
+    }
     const scopedTracts = unitScopedTracts(orri, tracts, deskMapById);
     const includedInMath =
       (
@@ -1270,9 +1333,11 @@ export function buildLeaseholdUnitSummary({
       sourceDocNo: orri.sourceDocNo,
       notes: orri.notes,
       includedInMath,
+      needsUnitAssignment,
       unitDecimal: unitDecimal.toString(),
     };
   });
+  const unitAssignmentWarningList = [...unitAssignmentWarnings.values()];
 
   return {
     tractCount: tracts.length,
@@ -1323,6 +1388,8 @@ export function buildLeaseholdUnitSummary({
     ),
     inputWarningCount: inputWarnings.length,
     inputWarnings,
+    unitAssignmentWarningCount: unitAssignmentWarningList.length,
+    unitAssignmentWarnings: unitAssignmentWarningList,
     trackedOrriCount: orris.length,
     includedOrriCount: orris.filter((orri) => orri.includedInMath).length,
     excludedOrriCount: orris.filter((orri) => !orri.includedInMath).length,
@@ -1580,6 +1647,20 @@ export function buildLeaseholdDecimalRows({
     }
     return left.payee.localeCompare(right.payee);
   });
+}
+
+export function buildLeaseholdTransferOrderHoldReasons(
+  unitSummary: Pick<LeaseholdUnitSummary, 'unitAssignmentWarningCount'>
+): string[] {
+  // Deliberate readiness gate: a null-unit ORRI/WI record is not transfer-order
+  // reliable until it is assigned to the coded unit it affects.
+  return unitSummary.unitAssignmentWarningCount > 0
+    ? [
+        `${unitSummary.unitAssignmentWarningCount} unit-scoped ORRI/WI record${
+          unitSummary.unitAssignmentWarningCount === 1 ? '' : 's'
+        } excluded - needs unit assignment.`,
+      ]
+    : [];
 }
 
 function leaseholdCoverageDecimal(tract: Pick<LeaseholdTractSummary, 'unitParticipation' | 'leasedOwnership'>) {
