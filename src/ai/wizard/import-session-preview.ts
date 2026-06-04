@@ -54,7 +54,7 @@ export async function buildStagedImportActionPlanPreview(
       packageKind: 'runsheet',
       packageId: packageId(input.fileName),
       title: `${input.projectName || 'Workspace'} CSV import preview`,
-      documentIds: [],
+      documentIds: [packageId(input.fileName)],
     },
     sourceRows,
     candidates,

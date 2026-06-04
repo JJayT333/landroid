@@ -1,9 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import {
-  buildApplyPlan,
-  executeApplyPlan,
-  type WorkspaceApplyActions,
-} from '../apply-proposal';
+import * as applyProposal from '../apply-proposal';
+import { buildApplyPlan } from '../apply-proposal';
 import type { WorkspaceImportProposal } from '../schemas';
 import type { DeskMap } from '../../../types/node';
 
@@ -117,69 +114,9 @@ describe('buildApplyPlan', () => {
   });
 });
 
-describe('executeApplyPlan', () => {
-  function makeActions(): WorkspaceApplyActions & {
-    calls: { setProjectName: string[]; createDeskMap: Array<[string, string]>; updateDeskMapDetails: Array<[string, unknown]> };
-  } {
-    const calls = {
-      setProjectName: [] as string[],
-      createDeskMap: [] as Array<[string, string]>,
-      updateDeskMapDetails: [] as Array<[string, unknown]>,
-    };
-    let counter = 0;
-    return {
-      calls,
-      setProjectName: (n) => calls.setProjectName.push(n),
-      createDeskMap: (name, code) => {
-        const id = `dm-${++counter}`;
-        calls.createDeskMap.push([name, code]);
-        return id;
-      },
-      updateDeskMapDetails: (id, fields) => {
-        calls.updateDeskMapDetails.push([id, fields]);
-      },
-    };
-  }
-
-  it('calls setProjectName then createDeskMap per planned tract', () => {
-    const plan = buildApplyPlan(
-      proposal({
-        project: { unitName: 'Elmore #1 Unit' },
-        tracts: [{ code: 'T1', grossAcres: '40' }],
-      }),
-      { projectName: 'Untitled', deskMaps: [], nodes: [] }
-    );
-    const actions = makeActions();
-    const result = executeApplyPlan(plan, actions);
-
-    expect(actions.calls.setProjectName).toEqual(['Elmore #1 Unit']);
-    expect(actions.calls.createDeskMap).toEqual([['Tract T1', 'T1']]);
-    expect(actions.calls.updateDeskMapDetails[0][1]).toMatchObject({
-      grossAcres: '40',
-    });
-    expect(result.projectRenamed).toBe(true);
-    expect(result.createdDeskMapIds).toHaveLength(1);
-  });
-
-  it('throws when blockers are present', () => {
-    const plan = buildApplyPlan(proposal(), {
-      projectName: 'P',
-      deskMaps: [],
-      nodes: [],
-    });
-    const actions = makeActions();
-    expect(() => executeApplyPlan(plan, actions)).toThrow(/blockers/);
-    expect(actions.calls.setProjectName).toHaveLength(0);
-  });
-
-  it('skips updateDeskMapDetails when no extra fields to set', () => {
-    const plan = buildApplyPlan(
-      proposal({ tracts: [{ code: 'T9' }] }),
-      { projectName: 'P', deskMaps: [], nodes: [] }
-    );
-    const actions = makeActions();
-    executeApplyPlan(plan, actions);
-    expect(actions.calls.updateDeskMapDetails).toHaveLength(0);
+describe('AI proposal mutation boundary', () => {
+  it('does not export a direct workspace mutation executor', () => {
+    expect((applyProposal as Record<string, unknown>).executeApplyPlan).toBeUndefined();
   });
 });
 

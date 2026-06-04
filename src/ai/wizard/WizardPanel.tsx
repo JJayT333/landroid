@@ -1,24 +1,17 @@
 /**
- * Spreadsheet-to-Deskmap wizard — upload → preview → AI analyze → review →
- * validated apply.
+ * Spreadsheet-to-Deskmap wizard — upload → preview → AI analyze or row review
+ * → staged ActionPlan → explicit approval.
  *
- * The apply step builds a deterministic plan, runs `validateOwnershipGraph`
- * on the existing nodes, surfaces collisions, then commits via the workspace
- * store. AI never writes to the store directly.
+ * AI workbook analysis is preview-only. Workbook-driven workspace mutation
+ * runs only after the user approves a staged ImportSession ActionPlan.
  */
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import {
   parseWorkbookInWorker,
   type ParsedWorkbook,
 } from './parse-workbook';
 import { analyzeWorkbook } from './analyze-workbook';
 import type { WorkspaceImportProposal, SheetRole } from './schemas';
-import {
-  buildApplyPlan,
-  executeApplyPlan,
-  type ApplyPlan,
-  type ApplyResult,
-} from './apply-proposal';
 import { useWorkspaceStore } from '../../store/workspace-store';
 import type {
   FixedRoyaltyBasis,
@@ -40,6 +33,10 @@ import {
   MAX_STAGED_IMPORT_PROPOSALS,
   type StagedImportActionPlanPreview,
 } from './import-session-preview';
+import {
+  applyApprovedStagedImportActionPlan,
+  type ApprovedStagedImportApplyResult,
+} from './staged-apply';
 
 type Status = 'idle' | 'parsing' | 'parsed' | 'staged' | 'analyzing' | 'analyzed' | 'error';
 
@@ -164,13 +161,12 @@ export default function WizardPanel() {
             </button>
           </div>
           <p className="text-[10px] italic text-ink-light">
-            <strong>Review rows</strong> — stage spreadsheet lines as editable node drafts and attach them one at a time.
+            <strong>Review rows</strong> — stage spreadsheet lines as editable node drafts and approve selected rows.
             <br />
-            <strong>Analyze with AI</strong> — deterministic apply plan (creates desk maps only).
+            <strong>Analyze with AI</strong> — classification and proposal preview only.
             <br />
             <strong>Review rows</strong> now builds a project-record ActionPlan
-            preview from selected rows; spreadsheet cells remain untrusted source
-            data until review.
+            preview from selected rows; apply requires explicit approval.
           </p>
         </div>
       )}
@@ -190,117 +186,6 @@ export default function WizardPanel() {
   );
 }
 
-function ApplySection({ proposal }: { proposal: WorkspaceImportProposal }) {
-  const projectName = useWorkspaceStore((s) => s.projectName);
-  const deskMaps = useWorkspaceStore((s) => s.deskMaps);
-  const nodes = useWorkspaceStore((s) => s.nodes);
-  const setProjectName = useWorkspaceStore((s) => s.setProjectName);
-  const createDeskMap = useWorkspaceStore((s) => s.createDeskMap);
-  const updateDeskMapDetails = useWorkspaceStore((s) => s.updateDeskMapDetails);
-
-  const [applied, setApplied] = useState<ApplyResult | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  const plan: ApplyPlan = useMemo(
-    () => buildApplyPlan(proposal, { projectName, deskMaps, nodes }),
-    [proposal, projectName, deskMaps, nodes]
-  );
-
-  const onApply = () => {
-    setError(null);
-    try {
-      const result = executeApplyPlan(plan, {
-        setProjectName,
-        createDeskMap,
-        updateDeskMapDetails,
-      });
-      setApplied(result);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    }
-  };
-
-  if (applied) {
-    return (
-      <section className="rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-xs text-emerald-900">
-        <div className="font-semibold">Applied to workspace.</div>
-        <ul className="mt-1 list-disc space-y-0.5 pl-4">
-          {applied.projectRenamed && (
-            <li>Project renamed to "{plan.projectNameChange}"</li>
-          )}
-          {applied.createdDeskMapIds.length > 0 && (
-            <li>{applied.createdDeskMapIds.length} desk map(s) created</li>
-          )}
-        </ul>
-      </section>
-    );
-  }
-
-  return (
-    <section className="space-y-2 rounded-lg border-2 border-gold/50 bg-parchment p-3 text-xs">
-      <h4 className="font-semibold uppercase tracking-wide text-ink">
-        Apply plan
-      </h4>
-
-      <ul className="space-y-1 text-[11px] text-ink">
-        {plan.projectNameChange && (
-          <li>
-            <strong>Rename project</strong> →{' '}
-            <span className="font-mono">{plan.projectNameChange}</span>
-          </li>
-        )}
-        <li>
-          <strong>Create desk maps:</strong> {plan.deskMapsToCreate.length}
-          {plan.deskMapsToCreate.length > 0 && (
-            <span className="ml-1 font-mono text-ink-light">
-              ({plan.deskMapsToCreate.map((d) => d.code).join(', ')})
-            </span>
-          )}
-        </li>
-        {plan.collisions.length > 0 && (
-          <li className="text-amber-800">
-            <strong>Skip (already exist):</strong> {plan.collisions.length}{' '}
-            <span className="font-mono">
-              ({plan.collisions.map((c) => c.code).join(', ')})
-            </span>
-          </li>
-        )}
-      </ul>
-
-      {plan.existingGraphIssues.length > 0 && (
-        <div className="rounded border border-amber-300 bg-amber-50 p-2 text-[10px] text-amber-900">
-          <strong>{plan.existingGraphIssues.length} pre-existing graph issue(s)</strong>{' '}
-          in the current workspace. Apply is allowed but you should fix these
-          first.
-        </div>
-      )}
-
-      {plan.blockers.length > 0 && (
-        <div className="rounded border border-rose-300 bg-rose-50 p-2 text-[10px] text-rose-900">
-          {plan.blockers.map((b, i) => (
-            <div key={i}>{b}</div>
-          ))}
-        </div>
-      )}
-
-      {error && (
-        <div className="rounded border border-rose-400 bg-rose-50 p-2 text-[10px] text-rose-900">
-          {error}
-        </div>
-      )}
-
-      <button
-        type="button"
-        onClick={onApply}
-        disabled={plan.blockers.length > 0}
-        className="rounded bg-ink px-3 py-1.5 text-xs font-semibold text-parchment hover:bg-ink-light disabled:opacity-40"
-      >
-        Apply to workspace
-      </button>
-    </section>
-  );
-}
-
 function StagedImportReview({
   result,
   onRowsChange,
@@ -312,11 +197,15 @@ function StagedImportReview({
 }) {
   const workspaceId = useWorkspaceStore((s) => s.workspaceId);
   const projectName = useWorkspaceStore((s) => s.projectName);
+  const nodes = useWorkspaceStore((s) => s.nodes);
+  const createRootNode = useWorkspaceStore((s) => s.createRootNode);
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [selectedRowIds, setSelectedRowIds] = useState<Set<string>>(() => new Set());
   const [preview, setPreview] = useState<StagedImportActionPlanPreview | null>(null);
   const [previewBusy, setPreviewBusy] = useState(false);
+  const [applyBusy, setApplyBusy] = useState(false);
+  const [applyResult, setApplyResult] = useState<ApprovedStagedImportApplyResult | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
   const rows = result.rows;
@@ -331,6 +220,7 @@ function StagedImportReview({
 
   const updateRows = (updater: (rows: StagedImportRow[]) => StagedImportRow[]) => {
     setPreview(null);
+    setApplyResult(null);
     onRowsChange(updater(rows));
   };
 
@@ -376,6 +266,7 @@ function StagedImportReview({
       row.id === rowId ? { ...row, status, createdNodeId } : row
     );
     setPreview(null);
+    setApplyResult(null);
     setSelectedRowIds((current) => {
       const next = new Set(current);
       next.delete(rowId);
@@ -419,6 +310,7 @@ function StagedImportReview({
   const buildActionPlanPreview = async () => {
     setActionError(null);
     setPreview(null);
+    setApplyResult(null);
     setPreviewBusy(true);
     try {
       const nextPreview = await buildStagedImportActionPlanPreview({
@@ -434,6 +326,44 @@ function StagedImportReview({
       setActionError(err instanceof Error ? err.message : String(err));
     } finally {
       setPreviewBusy(false);
+    }
+  };
+
+  const approveAndApplyPreview = async () => {
+    if (!preview) return;
+    setActionError(null);
+    setApplyBusy(true);
+    try {
+      const result = await applyApprovedStagedImportActionPlan({
+        preview,
+        approvedAt: new Date().toISOString(),
+        approvedBy: 'user',
+        existingNodeIds: nodes.map((node) => node.id),
+        actions: {
+          createRootNode,
+          getLastError: () => useWorkspaceStore.getState().lastError,
+        },
+      });
+      setApplyResult(result);
+      const appliedByRowId = new Map(
+        result.appliedRows.map((row) => [row.rowId, row])
+      );
+      const nextRows = rows.map((row) => {
+        const applied = appliedByRowId.get(row.id);
+        return applied
+          ? { ...row, status: 'created_root' as const, createdNodeId: applied.nodeId }
+          : row;
+      });
+      onRowsChange(nextRows);
+      setSelectedRowIds((current) => {
+        const next = new Set(current);
+        for (const applied of result.appliedRows) next.delete(applied.rowId);
+        return next;
+      });
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setApplyBusy(false);
     }
   };
 
@@ -509,7 +439,7 @@ function StagedImportReview({
           <div>
             <div className="font-semibold text-ink">ActionPlan selection</div>
             <div className="text-[10px] text-ink-light">
-              {selectedCount} selected · cap {MAX_STAGED_IMPORT_PROPOSALS} rows per preview · live workspace mutation disabled
+              {selectedCount} selected · cap {MAX_STAGED_IMPORT_PROPOSALS} rows per preview · apply locked until approval
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -699,7 +629,14 @@ function StagedImportReview({
           </div>
         )}
 
-        {preview && <ImportActionPlanPreviewSummary preview={preview} />}
+        {preview && (
+          <ImportActionPlanPreviewSummary
+            preview={preview}
+            applyBusy={applyBusy}
+            applyResult={applyResult}
+            onApproveAndApply={approveAndApplyPreview}
+          />
+        )}
 
         {actionError && (
           <div className="mt-3 rounded border border-rose-300 bg-rose-50 p-2 text-[10px] text-rose-900">
@@ -746,12 +683,19 @@ function StagedImportReview({
 
 function ImportActionPlanPreviewSummary({
   preview,
+  applyBusy,
+  applyResult,
+  onApproveAndApply,
 }: {
   preview: StagedImportActionPlanPreview;
+  applyBusy: boolean;
+  applyResult: ApprovedStagedImportApplyResult | null;
+  onApproveAndApply: () => void;
 }) {
   const blockedCount = preview.session.candidates.filter(
     (candidate) => candidate.questions.length > 0
   ).length;
+  const canApply = blockedCount === 0 && !applyBusy && applyResult === null;
   return (
     <div className="mt-3 rounded border border-emerald-300 bg-emerald-50 p-3 text-[10px] text-emerald-950">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -762,7 +706,7 @@ function ImportActionPlanPreviewSummary({
           </div>
         </div>
         <div className="rounded border border-emerald-400/70 px-2 py-1 font-mono text-[10px]">
-          project_records_only_no_live_store
+          staged_apply_requires_approval
         </div>
       </div>
       <ul className="mt-2 space-y-1">
@@ -787,8 +731,22 @@ function ImportActionPlanPreviewSummary({
         ))}
       </ul>
       <div className="mt-2 text-emerald-900">
-        Dry-run only: no live graph, Desk Map, AI tool, or .landroid write occurs from this preview.
+        Dry-run preview: no live graph, AI tool, or .landroid write occurs before explicit approval.
       </div>
+      {applyResult ? (
+        <div className="mt-2 rounded border border-emerald-400 bg-white/70 p-2 font-semibold text-emerald-950">
+          Applied {applyResult.appliedRows.length} approved row(s) from this ActionPlan.
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={onApproveAndApply}
+          disabled={!canApply}
+          className="mt-2 rounded bg-ink px-3 py-1.5 text-xs font-semibold text-parchment hover:bg-ink-light disabled:opacity-40"
+        >
+          {applyBusy ? 'Applying...' : 'Approve staged ActionPlan'}
+        </button>
+      )}
     </div>
   );
 }
@@ -991,7 +949,10 @@ function ProposalView({
         </section>
       )}
 
-      <ApplySection proposal={proposal} />
+      <section className="rounded-lg border border-leather/30 bg-parchment p-3 text-xs text-ink-light">
+        AI proposal is preview-only. Use row review to build and approve a
+        staged ImportSession ActionPlan before any workspace mutation.
+      </section>
     </div>
   );
 }
