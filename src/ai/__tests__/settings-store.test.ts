@@ -14,6 +14,8 @@ describe('AI settings store', () => {
       ollamaBaseURL: 'http://localhost:11434/v1',
       openaiApiKey: '',
       anthropicApiKey: '',
+      hostedContextMode: 'minimal',
+      hostedFullContextAcceptedWorkspaceId: null,
     });
   });
 
@@ -58,6 +60,8 @@ describe('AI settings store', () => {
       ollamaBaseURL: 'http://localhost:11434/v1',
       openaiApiKey: 'sk-test',
       anthropicApiKey: 'sk-ant-test',
+      hostedContextMode: 'full',
+      hostedFullContextAcceptedWorkspaceId: 'ws-1',
     });
 
     expect(persisted).toEqual({
@@ -72,6 +76,8 @@ describe('AI settings store', () => {
     ]);
     expect(persisted).not.toHaveProperty('openaiApiKey');
     expect(persisted).not.toHaveProperty('anthropicApiKey');
+    expect(persisted).not.toHaveProperty('hostedContextMode');
+    expect(persisted).not.toHaveProperty('hostedFullContextAcceptedWorkspaceId');
   });
 
   it('never writes cloud API keys through the persisted partial (audit L2)', () => {
@@ -87,5 +93,22 @@ describe('AI settings store', () => {
     expect(persisted).not.toContain('sk-ant-should-not-persist');
     expect(persisted).not.toContain('openaiApiKey');
     expect(persisted).not.toContain('anthropicApiKey');
+  });
+
+  it('defaults hosted context to minimal and scopes full-context acceptance by workspace', () => {
+    expect(useAISettingsStore.getState().hostedContextMode).toBe('minimal');
+    expect(useAISettingsStore.getState().hostedFullContextAcceptedWorkspaceId).toBeNull();
+
+    useAISettingsStore.getState().setHostedContextMode('full');
+    expect(useAISettingsStore.getState().hostedContextMode).toBe('full');
+    expect(useAISettingsStore.getState().hostedFullContextAcceptedWorkspaceId).toBeNull();
+
+    useAISettingsStore.getState().acceptHostedFullContextDisclosure('ws-full');
+    expect(useAISettingsStore.getState().hostedContextMode).toBe('full');
+    expect(useAISettingsStore.getState().hostedFullContextAcceptedWorkspaceId).toBe('ws-full');
+
+    useAISettingsStore.getState().setHostedContextMode('minimal');
+    expect(useAISettingsStore.getState().hostedContextMode).toBe('minimal');
+    expect(useAISettingsStore.getState().hostedFullContextAcceptedWorkspaceId).toBeNull();
   });
 });

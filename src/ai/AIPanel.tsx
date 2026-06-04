@@ -7,7 +7,11 @@
  */
 import { useRef, useState } from 'react';
 import { runChatTurn, type ChatTurnResult } from './runChat';
-import { useAISettingsStore, isConfigured } from './settings-store';
+import {
+  useAISettingsStore,
+  isConfigured,
+  type HostedContextMode,
+} from './settings-store';
 import { useAIUndoStore, restoreSnapshot } from './undo-store';
 import {
   approveAIProposal,
@@ -28,6 +32,7 @@ import AISettingsPanel from './AISettingsPanel';
 import WizardPanel from './wizard/WizardPanel';
 import { HOSTED_MODEL_ID } from './client';
 import { isHostedMode } from '../utils/deploy-env';
+import { useWorkspaceStore } from '../store/workspace-store';
 
 interface ChatEntry {
   role: 'user' | 'assistant';
@@ -42,6 +47,11 @@ export default function AIPanel({ onClose }: { onClose: () => void }) {
   const settings = useAISettingsStore();
   const hostedMode = isHostedMode();
   const configured = hostedMode || isConfigured(settings);
+  const workspaceId = useWorkspaceStore((state) => state.workspaceId);
+  const hostedFullContextBlocked =
+    hostedMode
+    && settings.hostedContextMode === 'full'
+    && settings.hostedFullContextAcceptedWorkspaceId !== workspaceId;
 
   const [mode, setMode] = useState<Mode>('chat');
   const [entries, setEntries] = useState<ChatEntry[]>([]);
@@ -120,6 +130,18 @@ export default function AIPanel({ onClose }: { onClose: () => void }) {
   const sendText = async (text: string) => {
     const trimmed = text.trim();
     if (!trimmed || busy) return;
+    if (hostedFullContextBlocked) {
+      setEntries((prev) => [
+        ...prev,
+        {
+          role: 'assistant',
+          text: '',
+          error:
+            'Hosted full context requires disclosure acceptance for this workspace before sending project details.',
+        },
+      ]);
+      return;
+    }
 
     const baseEntries: ChatEntry[] = [...entries, { role: 'user', text: trimmed }];
     const streamingIndex = baseEntries.length; // index of the assistant entry we'll stream into
@@ -287,6 +309,16 @@ export default function AIPanel({ onClose }: { onClose: () => void }) {
           <AISettingsPanel onClose={() => setShowSettings(false)} />
         )}
 
+        {hostedMode && (
+          <HostedContextControl
+            mode={settings.hostedContextMode}
+            fullAccepted={!hostedFullContextBlocked}
+            workspaceId={workspaceId}
+            onModeChange={settings.setHostedContextMode}
+            onAcceptFull={settings.acceptHostedFullContextDisclosure}
+          />
+        )}
+
         {mode === 'wizard' && !showSettings && (
           <WizardPanel onStartGuided={startGuidedImport} />
         )}
@@ -356,9 +388,9 @@ export default function AIPanel({ onClose }: { onClose: () => void }) {
               Cancel
             </button>
           ) : (
-            <button
+          <button
               type="submit"
-              disabled={!input.trim()}
+              disabled={!input.trim() || hostedFullContextBlocked}
               className="self-end rounded bg-ink px-3 py-1 text-xs font-semibold text-parchment hover:bg-ink-light disabled:opacity-40"
             >
               Send
@@ -416,6 +448,67 @@ function TabButton({
     >
       {children}
     </button>
+  );
+}
+
+function HostedContextControl({
+  mode,
+  fullAccepted,
+  workspaceId,
+  onModeChange,
+  onAcceptFull,
+}: {
+  mode: HostedContextMode;
+  fullAccepted: boolean;
+  workspaceId: string;
+  onModeChange: (mode: HostedContextMode) => void;
+  onAcceptFull: (workspaceId: string) => void;
+}) {
+  return (
+    <div className="space-y-2 rounded-lg border border-leather/30 bg-parchment p-3 text-xs text-ink">
+      <div className="flex items-center justify-between gap-2">
+        <span className="font-semibold uppercase tracking-wide text-ink-light">
+          Hosted Context
+        </span>
+        <div className="inline-flex rounded border border-leather/30 bg-parchment-dark p-0.5">
+          {(['minimal', 'full'] as const).map((option) => (
+            <button
+              key={option}
+              type="button"
+              onClick={() => onModeChange(option)}
+              className={`rounded px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                mode === option
+                  ? 'bg-ink text-parchment'
+                  : 'text-ink-light hover:bg-parchment hover:text-ink'
+              }`}
+            >
+              {option}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="leading-5 text-ink-light">
+        {mode === 'minimal'
+          ? 'Minimal sends counts and structure only. It omits project names, party names, fractions, lease economics, remarks, document refs, and identifiers.'
+          : 'Full sends current project details to the hosted AI proxy, including names, fractions, lease economics, remarks, document refs, and identifiers.'}
+      </div>
+      {mode === 'full' && !fullAccepted && (
+        <div className="rounded border border-gold/40 bg-gold/10 p-2 text-gold-950">
+          <div className="font-semibold">Disclosure required for this workspace</div>
+          <div className="mt-1 leading-5">
+            Accept to send full current workspace context for this browser session. Switching
+            workspaces requires accepting again.
+          </div>
+          <button
+            type="button"
+            onClick={() => onAcceptFull(workspaceId)}
+            className="mt-2 rounded border border-gold/50 bg-parchment px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-gold-950 hover:bg-gold/10"
+          >
+            Accept full context
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
 

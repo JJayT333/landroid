@@ -72,11 +72,11 @@ describe('runChatTurn hosted proxy path', () => {
     expect(body.messages?.[0]?.content).toContain(
       'Hosted read-only context counts as project context'
     );
-    expect(body.messages?.[1]?.content).toContain('Read-only LANDroid app context');
+    expect(body.messages?.[1]?.content).toContain('Read-only LANDroid app context (minimal)');
     expect(body.messages?.at(-1)).toEqual({ role: 'user', content: 'hello' });
   });
 
-  it('includes current Desk Map state as read-only hosted context', async () => {
+  it('defaults hosted requests to minimal context without project details', async () => {
     const { runChatTurn, session } = await loadHostedChat();
     const [{ useWorkspaceStore }, { useUIStore }, { useOwnerStore }] = await Promise.all([
       import('../../store/workspace-store'),
@@ -148,6 +148,97 @@ describe('runChatTurn hosted proxy path', () => {
     const context = body.messages?.find((message) =>
       message.content.startsWith('# Read-only LANDroid app context')
     )?.content;
+    expect(context).toContain('Read-only LANDroid app context (minimal)');
+    expect(context).toContain('Workspace counts: 1 tract map, 2 title cards');
+    expect(context).toContain('Visible card counts: 2 total');
+    expect(context).not.toContain('Vulcan Mesa - Demo');
+    expect(context).not.toContain('P. T. Broncus');
+    expect(context).not.toContain('Vulcan Mesa Petroleum');
+    expect(context).not.toContain('Apollo Draw Lease');
+    expect(context).not.toContain('1/1');
+  });
+
+  it('includes full current Desk Map state only after workspace disclosure acceptance', async () => {
+    const { runChatTurn, session } = await loadHostedChat();
+    const [
+      { useWorkspaceStore },
+      { useUIStore },
+      { useOwnerStore },
+      { useAISettingsStore },
+    ] = await Promise.all([
+      import('../../store/workspace-store'),
+      import('../../store/ui-store'),
+      import('../../store/owner-store'),
+      import('../settings-store'),
+    ]);
+    session.setIdToken('id.jwt.token');
+    useUIStore.setState({ view: 'chart' });
+    useWorkspaceStore.setState({
+      workspaceId: 'ws-hosted-full',
+      projectName: 'Vulcan Mesa - Demo',
+      activeDeskMapId: 'dm-vm1',
+      activeUnitCode: 'JFU',
+      deskMaps: [
+        {
+          id: 'dm-vm1',
+          name: 'Apollo Draw',
+          code: 'VM1',
+          tractId: 'tract-vm1',
+          grossAcres: '160',
+          pooledAcres: '160',
+          description: '',
+          unitName: 'Jupiter Flats Unit',
+          unitCode: 'JFU',
+          nodeIds: ['root-1', 'lease-node-1'],
+        },
+      ],
+      nodes: [
+        makeNode({
+          id: 'root-1',
+          grantor: 'Front State of Texas',
+          grantee: 'P. T. Broncus',
+          instrument: 'Patent',
+          docNo: '1473-01-15',
+          linkedOwnerId: 'owner-1',
+        }),
+        makeNode({
+          id: 'lease-node-1',
+          type: 'related',
+          grantor: 'P. T. Broncus',
+          grantee: 'Vulcan Mesa Petroleum, LLC',
+          instrument: 'Oil & Gas Lease',
+          parentId: 'root-1',
+          fraction: '0',
+          initialFraction: '0',
+          linkedLeaseId: 'lease-1',
+          relatedKind: 'lease',
+        }),
+      ],
+    });
+    useOwnerStore.setState({
+      leases: [
+        makeLease({
+          id: 'lease-1',
+          ownerId: 'owner-1',
+          leaseName: 'Apollo Draw Lease',
+          lessee: 'Vulcan Mesa Petroleum, LLC',
+        }),
+      ],
+    });
+    useAISettingsStore.getState().setHostedContextMode('full');
+    useAISettingsStore.getState().acceptHostedFullContextDisclosure('ws-hosted-full');
+    const fetchMock = vi.fn(async () => streamResponse(['data: [DONE]\n\n']));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await runChatTurn({ messages: [{ role: 'user', content: 'Can you see the Desk Map?' }] });
+
+    const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    const body = JSON.parse(String(init.body)) as {
+      messages?: Array<{ role: string; content: string }>;
+    };
+    const context = body.messages?.find((message) =>
+      message.content.startsWith('# Read-only LANDroid app context')
+    )?.content;
     expect(context).toContain('Active view: Desk Map');
     expect(context).toContain('Project: Vulcan Mesa - Demo');
     expect(context).toContain('Active unit: Jupiter Flats Unit (JFU) (1 tract)');
@@ -156,6 +247,24 @@ describe('runChatTurn hosted proxy path', () => {
     expect(context).toContain('Found in chain: 1/1 (100.00%)');
     expect(context).toContain('Front State of Texas -> P. T. Broncus');
     expect(context).toContain('Apollo Draw Lease to Vulcan Mesa Petroleum, LLC');
+  });
+
+  it('blocks hosted full context until the active workspace disclosure is accepted', async () => {
+    const { runChatTurn, session } = await loadHostedChat();
+    const [{ useWorkspaceStore }, { useAISettingsStore }] = await Promise.all([
+      import('../../store/workspace-store'),
+      import('../settings-store'),
+    ]);
+    session.setIdToken('id.jwt.token');
+    useWorkspaceStore.setState({ workspaceId: 'ws-needs-acceptance' });
+    useAISettingsStore.getState().setHostedContextMode('full');
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(
+      runChatTurn({ messages: [{ role: 'user', content: 'hello' }] })
+    ).rejects.toThrow(/requires disclosure acceptance/);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('throws before fetch when hosted auth has no ID token', async () => {
