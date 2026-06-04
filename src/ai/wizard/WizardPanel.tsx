@@ -1,47 +1,42 @@
 /**
- * Spreadsheet-to-Deskmap wizard — upload → preview → AI analyze → review →
- * validated apply.
+ * Spreadsheet-to-Deskmap wizard — upload → preview → AI analyze or row review
+ * → staged ActionPlan → explicit approval.
  *
- * The apply step builds a deterministic plan, runs `validateOwnershipGraph`
- * on the existing nodes, surfaces collisions, then commits via the workspace
- * store. AI never writes to the store directly.
+ * AI workbook analysis is preview-only. Workbook-driven workspace mutation
+ * runs only after the user approves a staged ImportSession ActionPlan.
  */
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import {
   parseWorkbookInWorker,
-  renderWorkbookForPrompt,
   type ParsedWorkbook,
 } from './parse-workbook';
 import { analyzeWorkbook } from './analyze-workbook';
 import type { WorkspaceImportProposal, SheetRole } from './schemas';
-import {
-  buildApplyPlan,
-  executeApplyPlan,
-  type ApplyPlan,
-  type ApplyResult,
-} from './apply-proposal';
 import { useWorkspaceStore } from '../../store/workspace-store';
 import type {
   FixedRoyaltyBasis,
   InterestClass,
-  OwnershipNode,
   RoyaltyKind,
 } from '../../types/node';
 import InstrumentSelect from '../../components/shared/InstrumentSelect';
 import { assertFileSize, FILE_SIZE_LIMITS } from '../../utils/file-validation';
 import {
-  buildImportNodeId,
   buildStagedImportRows,
-  parseImportFraction,
-  stagedRowToNodeForm,
   stagedImportRowNeedsQuestion,
-  suggestParentForRow,
   validateStagedImportRow,
   type StagedImportBuildResult,
   type StagedImportRow,
   type StagedImportRowStatus,
-  type StagedImportSheetSummary,
 } from './row-staging';
+import {
+  buildStagedImportActionPlanPreview,
+  MAX_STAGED_IMPORT_PROPOSALS,
+  type StagedImportActionPlanPreview,
+} from './import-session-preview';
+import {
+  applyApprovedStagedImportActionPlan,
+  type ApprovedStagedImportApplyResult,
+} from './staged-apply';
 
 type Status = 'idle' | 'parsing' | 'parsed' | 'staged' | 'analyzing' | 'analyzed' | 'error';
 
@@ -56,11 +51,7 @@ const ROLE_LABELS: Record<SheetRole, { label: string; tone: string }> = {
   unknown: { label: 'Unknown', tone: 'rose' },
 };
 
-export default function WizardPanel({
-  onStartGuided,
-}: {
-  onStartGuided?: (spreadsheetText: string) => void;
-}) {
+export default function WizardPanel() {
   const [status, setStatus] = useState<Status>('idle');
   const [error, setError] = useState<string | null>(null);
   const [parsed, setParsed] = useState<ParsedWorkbook | null>(null);
@@ -161,16 +152,6 @@ export default function WizardPanel({
             >
               Analyze with AI
             </button>
-            {onStartGuided && parsed && (
-              <button
-                type="button"
-                onClick={() => onStartGuided(renderWorkbookForPrompt(parsed))}
-                className="rounded border-2 border-gold bg-gold/10 px-3 py-1.5 text-xs font-semibold text-ink hover:bg-gold/20"
-                title="Switch to chat and walk through the import row-by-row with the AI, using mutating tools."
-              >
-                Walk me through it ↗
-              </button>
-            )}
             <button
               type="button"
               onClick={handleReset}
@@ -180,12 +161,12 @@ export default function WizardPanel({
             </button>
           </div>
           <p className="text-[10px] italic text-ink-light">
-            <strong>Review rows</strong> — stage spreadsheet lines as editable node drafts and attach them one at a time.
+            <strong>Review rows</strong> — stage spreadsheet lines as editable node drafts and approve selected rows.
             <br />
-            <strong>Analyze with AI</strong> — deterministic apply plan (creates desk maps only).
+            <strong>Analyze with AI</strong> — classification and proposal preview only.
             <br />
-            <strong>Walk me through it</strong> — conversational import: AI proposes, asks clarifying
-            questions, creates owners as standalone trees you can graft later.
+            <strong>Review rows</strong> now builds a project-record ActionPlan
+            preview from selected rows; apply requires explicit approval.
           </p>
         </div>
       )}
@@ -205,117 +186,6 @@ export default function WizardPanel({
   );
 }
 
-function ApplySection({ proposal }: { proposal: WorkspaceImportProposal }) {
-  const projectName = useWorkspaceStore((s) => s.projectName);
-  const deskMaps = useWorkspaceStore((s) => s.deskMaps);
-  const nodes = useWorkspaceStore((s) => s.nodes);
-  const setProjectName = useWorkspaceStore((s) => s.setProjectName);
-  const createDeskMap = useWorkspaceStore((s) => s.createDeskMap);
-  const updateDeskMapDetails = useWorkspaceStore((s) => s.updateDeskMapDetails);
-
-  const [applied, setApplied] = useState<ApplyResult | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  const plan: ApplyPlan = useMemo(
-    () => buildApplyPlan(proposal, { projectName, deskMaps, nodes }),
-    [proposal, projectName, deskMaps, nodes]
-  );
-
-  const onApply = () => {
-    setError(null);
-    try {
-      const result = executeApplyPlan(plan, {
-        setProjectName,
-        createDeskMap,
-        updateDeskMapDetails,
-      });
-      setApplied(result);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    }
-  };
-
-  if (applied) {
-    return (
-      <section className="rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-xs text-emerald-900">
-        <div className="font-semibold">Applied to workspace.</div>
-        <ul className="mt-1 list-disc space-y-0.5 pl-4">
-          {applied.projectRenamed && (
-            <li>Project renamed to "{plan.projectNameChange}"</li>
-          )}
-          {applied.createdDeskMapIds.length > 0 && (
-            <li>{applied.createdDeskMapIds.length} desk map(s) created</li>
-          )}
-        </ul>
-      </section>
-    );
-  }
-
-  return (
-    <section className="space-y-2 rounded-lg border-2 border-gold/50 bg-parchment p-3 text-xs">
-      <h4 className="font-semibold uppercase tracking-wide text-ink">
-        Apply plan
-      </h4>
-
-      <ul className="space-y-1 text-[11px] text-ink">
-        {plan.projectNameChange && (
-          <li>
-            <strong>Rename project</strong> →{' '}
-            <span className="font-mono">{plan.projectNameChange}</span>
-          </li>
-        )}
-        <li>
-          <strong>Create desk maps:</strong> {plan.deskMapsToCreate.length}
-          {plan.deskMapsToCreate.length > 0 && (
-            <span className="ml-1 font-mono text-ink-light">
-              ({plan.deskMapsToCreate.map((d) => d.code).join(', ')})
-            </span>
-          )}
-        </li>
-        {plan.collisions.length > 0 && (
-          <li className="text-amber-800">
-            <strong>Skip (already exist):</strong> {plan.collisions.length}{' '}
-            <span className="font-mono">
-              ({plan.collisions.map((c) => c.code).join(', ')})
-            </span>
-          </li>
-        )}
-      </ul>
-
-      {plan.existingGraphIssues.length > 0 && (
-        <div className="rounded border border-amber-300 bg-amber-50 p-2 text-[10px] text-amber-900">
-          <strong>{plan.existingGraphIssues.length} pre-existing graph issue(s)</strong>{' '}
-          in the current workspace. Apply is allowed but you should fix these
-          first.
-        </div>
-      )}
-
-      {plan.blockers.length > 0 && (
-        <div className="rounded border border-rose-300 bg-rose-50 p-2 text-[10px] text-rose-900">
-          {plan.blockers.map((b, i) => (
-            <div key={i}>{b}</div>
-          ))}
-        </div>
-      )}
-
-      {error && (
-        <div className="rounded border border-rose-400 bg-rose-50 p-2 text-[10px] text-rose-900">
-          {error}
-        </div>
-      )}
-
-      <button
-        type="button"
-        onClick={onApply}
-        disabled={plan.blockers.length > 0}
-        className="rounded bg-ink px-3 py-1.5 text-xs font-semibold text-parchment hover:bg-ink-light disabled:opacity-40"
-      >
-        Apply to workspace
-      </button>
-    </section>
-  );
-}
-
 function StagedImportReview({
   result,
   onRowsChange,
@@ -325,68 +195,32 @@ function StagedImportReview({
   onRowsChange: (rows: StagedImportRow[]) => void;
   onReset: () => void;
 }) {
+  const workspaceId = useWorkspaceStore((s) => s.workspaceId);
+  const projectName = useWorkspaceStore((s) => s.projectName);
   const nodes = useWorkspaceStore((s) => s.nodes);
-  const deskMaps = useWorkspaceStore((s) => s.deskMaps);
-  const activeDeskMapId = useWorkspaceStore((s) => s.activeDeskMapId);
   const createRootNode = useWorkspaceStore((s) => s.createRootNode);
-  const convey = useWorkspaceStore((s) => s.convey);
-  const createNpri = useWorkspaceStore((s) => s.createNpri);
-  const createDeskMap = useWorkspaceStore((s) => s.createDeskMap);
-  const updateDeskMapDetails = useWorkspaceStore((s) => s.updateDeskMapDetails);
-  const addInstrumentType = useWorkspaceStore((s) => s.addInstrumentType);
 
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [targetDeskMapId, setTargetDeskMapId] = useState(
-    activeDeskMapId ?? deskMaps[0]?.id ?? ''
-  );
-  const [sheetDeskMapIds, setSheetDeskMapIds] = useState<Record<string, string>>(
-    () => buildInitialSheetDeskMapIds(result.sheetSummaries, deskMaps)
-  );
-  const [parentSelections, setParentSelections] = useState<Record<string, string>>({});
+  const [selectedRowIds, setSelectedRowIds] = useState<Set<string>>(() => new Set());
+  const [preview, setPreview] = useState<StagedImportActionPlanPreview | null>(null);
+  const [previewBusy, setPreviewBusy] = useState(false);
+  const [applyBusy, setApplyBusy] = useState(false);
+  const [applyResult, setApplyResult] = useState<ApprovedStagedImportApplyResult | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
   const rows = result.rows;
   const currentRow = rows[currentIndex] ?? rows[0] ?? null;
-  const selectedDeskMapId = currentRow
-    ? sheetDeskMapIds[currentRow.sheetName] ?? targetDeskMapId
-    : targetDeskMapId;
-  const suggestion = useMemo(
-    () => currentRow ? suggestParentForRow(currentRow, nodes) : null,
-    [currentRow, nodes]
-  );
-  const selectedParentId = currentRow
-    ? parentSelections[currentRow.id] ?? suggestion?.nodeId ?? ''
-    : '';
   const currentWarnings = currentRow ? validateStagedImportRow(currentRow) : [];
   const currentRowEditable = currentRow ? isEditableRowStatus(currentRow.status) : false;
-  const currentRowCanApply = currentRow
-    ? currentRow.status === 'pending' && !stagedImportRowNeedsQuestion(currentRow)
-    : false;
+  const selectedCount = selectedRowIds.size;
+  const selectedOverLimit = selectedCount > MAX_STAGED_IMPORT_PROPOSALS;
   const pendingCount = rows.filter((row) => row.status === 'pending').length;
   const needsQuestionCount = rows.filter((row) => row.status === 'needs_question').length;
   const completedCount = rows.filter((row) => !isEditableRowStatus(row.status)).length;
-  const parentOptions = useMemo(
-    () => {
-      const selectedDeskMap = deskMaps.find((deskMap) => deskMap.id === selectedDeskMapId);
-      const selectedNodeIds = selectedDeskMap
-        ? new Set(selectedDeskMap.nodeIds)
-        : null;
-      return nodes.filter((node) => {
-        if (!currentRow || node.type === 'related') return false;
-        if (selectedNodeIds && !selectedNodeIds.has(node.id)) return false;
-        if (currentRow.interestClass === 'mineral') {
-          return node.interestClass === 'mineral';
-        }
-        return node.interestClass === 'mineral' || node.interestClass === 'npri';
-      })
-      .sort((a, b) =>
-        (a.grantee || a.grantor || a.id).localeCompare(b.grantee || b.grantor || b.id)
-      );
-    },
-    [currentRow, deskMaps, nodes, selectedDeskMapId]
-  );
 
   const updateRows = (updater: (rows: StagedImportRow[]) => StagedImportRow[]) => {
+    setPreview(null);
+    setApplyResult(null);
     onRowsChange(updater(rows));
   };
 
@@ -431,111 +265,105 @@ function StagedImportReview({
     const nextRows = rows.map((row) =>
       row.id === rowId ? { ...row, status, createdNodeId } : row
     );
+    setPreview(null);
+    setApplyResult(null);
+    setSelectedRowIds((current) => {
+      const next = new Set(current);
+      next.delete(rowId);
+      return next;
+    });
     onRowsChange(nextRows);
     advanceAfter(rowId, nextRows);
   };
 
-  const setSelectedParent = (rowId: string, nodeId: string) => {
-    setParentSelections((current) => ({ ...current, [rowId]: nodeId }));
-  };
-
-  const setSelectedDeskMapForCurrentSheet = (deskMapId: string) => {
-    if (!currentRow) return;
-    setTargetDeskMapId(deskMapId);
-    setSheetDeskMapIds((current) => ({
-      ...current,
-      [currentRow.sheetName]: deskMapId,
-    }));
-  };
-
-  const createMissingTracts = () => {
-    const next: Record<string, string> = {};
-    for (const summary of result.sheetSummaries) {
-      const existingId = sheetDeskMapIds[summary.sheetName];
-      if (existingId && deskMaps.some((deskMap) => deskMap.id === existingId)) {
-        next[summary.sheetName] = existingId;
-        continue;
-      }
-      const existingDeskMap = findDeskMapForSheet(summary, deskMaps);
-      const deskMapId = existingDeskMap?.id
-        ?? createDeskMap(summary.tractName, summary.tractCode);
-      if (summary.grossAcres) {
-        updateDeskMapDetails(deskMapId, {
-          grossAcres: summary.grossAcres,
-          description: summary.tractName,
-        });
-      }
-      next[summary.sheetName] = deskMapId;
-    }
-    setSheetDeskMapIds((current) => ({ ...current, ...next }));
-  };
-
-  const createFromCurrentRow = (mode: 'root' | 'attach') => {
-    if (!currentRow) return;
+  const toggleSelectedRow = (rowId: string) => {
     setActionError(null);
-
-    const parsedFraction = parseImportFraction(currentRow.fractionInput);
-    if (!parsedFraction.ok) {
-      setActionError(parsedFraction.error);
-      return;
-    }
-    if (!currentRow.grantee.trim()) {
-      setActionError('Grantee is required before creating a node.');
-      return;
-    }
-    if (stagedImportRowNeedsQuestion(currentRow)) {
-      setActionError(
-        'Answer the NPRI fixed/floating and burden-basis question before creating title nodes.'
-      );
-      return;
-    }
-
-    const store = useWorkspaceStore.getState();
-    const nodeId = buildImportNodeId(
-      currentRow,
-      new Set(store.nodes.map((node) => node.id))
-    );
-    const form = stagedRowToNodeForm(currentRow, parsedFraction.value);
-    let ok = false;
-    if (currentRow.instrument.trim()) {
-      addInstrumentType(currentRow.instrument.trim());
-    }
-
-    if (mode === 'root') {
-      if (!selectedDeskMapId) {
-        setActionError('Choose or create a tract before creating this root node.');
-        return;
-      }
-      ok = createRootNode(
-        nodeId,
-        parsedFraction.value,
-        form,
-        selectedDeskMapId
-      );
-      if (ok) {
-        markRow(currentRow.id, 'created_root', nodeId);
-      }
-    } else {
-      const parent = store.nodes.find((node) => node.id === selectedParentId);
-      if (!parent) {
-        setActionError('Choose a parent before attaching this row.');
-        return;
-      }
-      if (currentRow.interestClass === 'npri' && parent.interestClass === 'mineral') {
-        ok = createNpri(parent.id, nodeId, parsedFraction.value, form);
-      } else if (parent.interestClass === currentRow.interestClass) {
-        ok = convey(parent.id, nodeId, parsedFraction.value, form);
+    setPreview(null);
+    setSelectedRowIds((current) => {
+      const next = new Set(current);
+      if (next.has(rowId)) {
+        next.delete(rowId);
       } else {
-        setActionError('Mineral rows can only attach to mineral parents. NPRI rows can attach to mineral or NPRI parents.');
-        return;
+        next.add(rowId);
       }
-      if (ok) {
-        markRow(currentRow.id, 'attached', nodeId);
-      }
-    }
+      return next;
+    });
+  };
 
-    if (!ok) {
-      setActionError(useWorkspaceStore.getState().lastError ?? 'Node creation failed.');
+  const selectReviewableRows = () => {
+    setActionError(null);
+    setPreview(null);
+    setSelectedRowIds(new Set(
+      rows
+        .filter((row) => isEditableRowStatus(row.status))
+        .slice(0, MAX_STAGED_IMPORT_PROPOSALS)
+        .map((row) => row.id)
+    ));
+  };
+
+  const clearSelectedRows = () => {
+    setActionError(null);
+    setPreview(null);
+    setSelectedRowIds(new Set());
+  };
+
+  const buildActionPlanPreview = async () => {
+    setActionError(null);
+    setPreview(null);
+    setApplyResult(null);
+    setPreviewBusy(true);
+    try {
+      const nextPreview = await buildStagedImportActionPlanPreview({
+        rows,
+        selectedRowIds: [...selectedRowIds],
+        workspaceId,
+        projectId: workspaceId,
+        projectName,
+        fileName: 'guided-csv-import',
+      });
+      setPreview(nextPreview);
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setPreviewBusy(false);
+    }
+  };
+
+  const approveAndApplyPreview = async () => {
+    if (!preview) return;
+    setActionError(null);
+    setApplyBusy(true);
+    try {
+      const result = await applyApprovedStagedImportActionPlan({
+        preview,
+        approvedAt: new Date().toISOString(),
+        approvedBy: 'user',
+        existingNodeIds: nodes.map((node) => node.id),
+        actions: {
+          createRootNode,
+          getLastError: () => useWorkspaceStore.getState().lastError,
+        },
+      });
+      setApplyResult(result);
+      const appliedByRowId = new Map(
+        result.appliedRows.map((row) => [row.rowId, row])
+      );
+      const nextRows = rows.map((row) => {
+        const applied = appliedByRowId.get(row.id);
+        return applied
+          ? { ...row, status: 'created_root' as const, createdNodeId: applied.nodeId }
+          : row;
+      });
+      onRowsChange(nextRows);
+      setSelectedRowIds((current) => {
+        const next = new Set(current);
+        for (const applied of result.appliedRows) next.delete(applied.rowId);
+        return next;
+      });
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setApplyBusy(false);
     }
   };
 
@@ -609,55 +437,69 @@ function StagedImportReview({
       <div className="rounded-lg border border-leather/30 bg-parchment p-3 text-xs">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
-            <div className="font-semibold text-ink">Detected tracts</div>
+            <div className="font-semibold text-ink">ActionPlan selection</div>
             <div className="text-[10px] text-ink-light">
-              The CSV can map to a Desk Map before you create roots.
+              {selectedCount} selected · cap {MAX_STAGED_IMPORT_PROPOSALS} rows per preview · apply locked until approval
             </div>
           </div>
-          <button
-            type="button"
-            onClick={createMissingTracts}
-            className="rounded bg-ink px-3 py-1.5 text-xs font-semibold text-parchment hover:bg-ink-light"
-          >
-            Create missing tracts
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={selectReviewableRows}
+              className="rounded border border-leather/40 px-3 py-1.5 text-xs font-semibold text-ink hover:bg-leather/10"
+            >
+              Select first {MAX_STAGED_IMPORT_PROPOSALS}
+            </button>
+            <button
+              type="button"
+              onClick={clearSelectedRows}
+              className="rounded border border-leather/40 px-3 py-1.5 text-xs text-ink-light hover:bg-leather/10"
+            >
+              Clear
+            </button>
+            <button
+              type="button"
+              onClick={buildActionPlanPreview}
+              disabled={previewBusy || selectedCount === 0 || selectedOverLimit}
+              className="rounded bg-ink px-3 py-1.5 text-xs font-semibold text-parchment hover:bg-ink-light disabled:opacity-40"
+            >
+              {previewBusy ? 'Building...' : 'Build ActionPlan preview'}
+            </button>
+          </div>
         </div>
-        <ul className="mt-2 grid gap-1 text-[10px] text-ink-light md:grid-cols-2">
-          {result.sheetSummaries.map((summary) => {
-            const mappedId = sheetDeskMapIds[summary.sheetName];
-            const mapped = deskMaps.find((deskMap) => deskMap.id === mappedId);
-            return (
-              <li key={summary.sheetName} className="rounded border border-leather/20 bg-white/60 px-2 py-1">
-                <span className="font-mono text-ink">{summary.sheetName}</span>
-                <span> → {mapped ? mapped.name : 'not created yet'}</span>
-              </li>
-            );
-          })}
-        </ul>
+        {selectedOverLimit && (
+          <div className="mt-2 rounded border border-rose-300 bg-rose-50 p-2 text-[10px] text-rose-900">
+            Remove {selectedCount - MAX_STAGED_IMPORT_PROPOSALS} selected row(s) before building a preview.
+          </div>
+        )}
       </div>
 
       <div className="flex flex-wrap items-center gap-2 text-[10px]">
-        {rows.map((row, index) => (
-          <button
-            key={row.id}
-            type="button"
-            onClick={() => {
-              setActionError(null);
-              setCurrentIndex(index);
-            }}
-            className={`rounded border px-2 py-1 font-mono ${
-              index === currentIndex
-                ? 'border-ink bg-ink text-parchment'
-                : row.status === 'pending'
-                  ? 'border-leather/30 bg-parchment text-ink'
-                  : row.status === 'needs_question'
-                    ? 'border-amber-300 bg-amber-50 text-amber-900'
-                  : 'border-emerald-300 bg-emerald-50 text-emerald-900'
-            }`}
-          >
-            {row.rowNumber} · {rowStatusLabel(row.status)}
-          </button>
-        ))}
+        {rows.map((row, index) => {
+          const selected = selectedRowIds.has(row.id);
+          return (
+            <button
+              key={row.id}
+              type="button"
+              onClick={() => {
+                setActionError(null);
+                setCurrentIndex(index);
+              }}
+              className={`rounded border px-2 py-1 font-mono ${
+                index === currentIndex
+                  ? 'border-ink bg-ink text-parchment'
+                  : row.status === 'pending'
+                    ? 'border-leather/30 bg-parchment text-ink'
+                    : row.status === 'needs_question'
+                      ? 'border-amber-300 bg-amber-50 text-amber-900'
+                    : 'border-emerald-300 bg-emerald-50 text-emerald-900'
+              } ${selected && index !== currentIndex ? 'ring-2 ring-gold/70' : ''}`}
+            >
+              {selected ? '[selected] ' : ''}
+              {row.rowNumber} · {rowStatusLabel(row.status)}
+            </button>
+          );
+        })}
       </div>
 
       <div className="rounded-lg border-2 border-gold/50 bg-parchment p-3 text-xs">
@@ -668,12 +510,24 @@ function StagedImportReview({
             </div>
             <div className="text-[10px] text-ink-light">
               {currentRowEditable
-                ? 'Review, edit, then create or attach.'
+                ? 'Review, edit, then include in the ActionPlan preview.'
                 : `Handled as ${rowStatusLabel(currentRow.status)}${currentRow.createdNodeId ? ` (${currentRow.createdNodeId})` : ''}.`}
             </div>
           </div>
-          <div className="rounded border border-leather/30 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-ink-light">
-            {currentRow.tractCode} · {currentRow.interestClass}
+          <div className="flex flex-wrap items-center gap-2">
+            {currentRowEditable && (
+              <label className="flex items-center gap-1 rounded border border-leather/30 bg-white/60 px-2 py-1 text-[10px] font-semibold text-ink">
+                <input
+                  type="checkbox"
+                  checked={selectedRowIds.has(currentRow.id)}
+                  onChange={() => toggleSelectedRow(currentRow.id)}
+                />
+                Include in preview
+              </label>
+            )}
+            <div className="rounded border border-leather/30 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-ink-light">
+              {currentRow.tractCode} · {currentRow.interestClass}
+            </div>
           </div>
         </div>
 
@@ -775,46 +629,13 @@ function StagedImportReview({
           </div>
         )}
 
-        {suggestion && currentRowEditable && (
-          <div className="mt-3 rounded border border-emerald-300 bg-emerald-50 p-2 text-[10px] text-emerald-900">
-            Suggested parent: <span className="font-semibold">{suggestion.label}</span>{' '}
-            ({suggestion.confidence}, {suggestion.reason})
-          </div>
-        )}
-
-        {currentRowEditable && (
-          <div className="mt-3 grid gap-2 md:grid-cols-[1fr_1fr]">
-            <label className="block text-[10px] font-semibold uppercase tracking-wide text-ink-light">
-              Tract / Desk Map
-              <select
-                value={selectedDeskMapId}
-                onChange={(event) => setSelectedDeskMapForCurrentSheet(event.target.value)}
-                className="mt-1 w-full rounded border border-leather/30 bg-white px-2 py-1 text-xs normal-case tracking-normal text-ink"
-              >
-                <option value="">Choose tract...</option>
-                {deskMaps.map((deskMap) => (
-                  <option key={deskMap.id} value={deskMap.id}>
-                    {deskMap.name} {deskMap.code ? `(${deskMap.code})` : ''}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="block text-[10px] font-semibold uppercase tracking-wide text-ink-light">
-              Parent
-              <select
-                value={selectedParentId}
-                onChange={(event) => setSelectedParent(currentRow.id, event.target.value)}
-                className="mt-1 w-full rounded border border-leather/30 bg-white px-2 py-1 text-xs normal-case tracking-normal text-ink"
-              >
-                <option value="">Choose parent...</option>
-                {parentOptions.map((node) => (
-                  <option key={node.id} value={node.id}>
-                    {nodeLabel(node)}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
+        {preview && (
+          <ImportActionPlanPreviewSummary
+            preview={preview}
+            applyBusy={applyBusy}
+            applyResult={applyResult}
+            onApproveAndApply={approveAndApplyPreview}
+          />
         )}
 
         {actionError && (
@@ -824,22 +645,6 @@ function StagedImportReview({
         )}
 
         <div className="mt-3 flex flex-wrap gap-2">
-          <button
-            type="button"
-            disabled={!currentRowCanApply}
-            onClick={() => createFromCurrentRow('attach')}
-            className="rounded bg-ink px-3 py-1.5 text-xs font-semibold text-parchment hover:bg-ink-light disabled:opacity-40"
-          >
-            Attach to parent
-          </button>
-          <button
-            type="button"
-            disabled={!currentRowCanApply}
-            onClick={() => createFromCurrentRow('root')}
-            className="rounded border border-leather/40 px-3 py-1.5 text-xs font-semibold text-ink hover:bg-leather/10 disabled:opacity-40"
-          >
-            Create root
-          </button>
           <button
             type="button"
             disabled={!currentRowEditable}
@@ -862,9 +667,87 @@ function StagedImportReview({
           >
             Next
           </button>
+          <button
+            type="button"
+            onClick={buildActionPlanPreview}
+            disabled={previewBusy || selectedCount === 0 || selectedOverLimit}
+            className="rounded bg-ink px-3 py-1.5 text-xs font-semibold text-parchment hover:bg-ink-light disabled:opacity-40"
+          >
+            {previewBusy ? 'Building...' : 'Build ActionPlan preview'}
+          </button>
         </div>
       </div>
     </section>
+  );
+}
+
+function ImportActionPlanPreviewSummary({
+  preview,
+  applyBusy,
+  applyResult,
+  onApproveAndApply,
+}: {
+  preview: StagedImportActionPlanPreview;
+  applyBusy: boolean;
+  applyResult: ApprovedStagedImportApplyResult | null;
+  onApproveAndApply: () => void;
+}) {
+  const blockedCount = preview.session.candidates.filter(
+    (candidate) => candidate.questions.length > 0
+  ).length;
+  const canApply = blockedCount === 0 && !applyBusy && applyResult === null;
+  return (
+    <div className="mt-3 rounded border border-emerald-300 bg-emerald-50 p-3 text-[10px] text-emerald-950">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <div className="font-semibold text-emerald-950">ActionPlan dry-run ready</div>
+          <div className="text-emerald-900">
+            {preview.session.candidates.length} candidate(s) · {blockedCount} blocked by questions
+          </div>
+        </div>
+        <div className="rounded border border-emerald-400/70 px-2 py-1 font-mono text-[10px]">
+          staged_apply_requires_approval
+        </div>
+      </div>
+      <ul className="mt-2 space-y-1">
+        {preview.session.candidates.map((candidate) => (
+          <li key={candidate.candidateId} className="rounded border border-emerald-300/70 bg-white/60 px-2 py-1">
+            <div className="font-semibold text-emerald-950">
+              {candidate.proposedAction.summary}
+            </div>
+            <div className="font-mono text-[10px] text-emerald-900">
+              {candidate.proposedAction.actionKind} · {candidate.proposedAction.targetRecordType}
+            </div>
+            {candidate.questions.length > 0 && (
+              <ul className="mt-1 space-y-0.5 text-amber-900">
+                {candidate.questions.map((question) => (
+                  <li key={question.questionId}>
+                    {question.field ?? 'review'}: {question.prompt}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </li>
+        ))}
+      </ul>
+      <div className="mt-2 text-emerald-900">
+        Dry-run preview: no live graph, AI tool, or .landroid write occurs before explicit approval.
+      </div>
+      {applyResult ? (
+        <div className="mt-2 rounded border border-emerald-400 bg-white/70 p-2 font-semibold text-emerald-950">
+          Applied {applyResult.appliedRows.length} approved row(s) from this ActionPlan.
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={onApproveAndApply}
+          disabled={!canApply}
+          className="mt-2 rounded bg-ink px-3 py-1.5 text-xs font-semibold text-parchment hover:bg-ink-light disabled:opacity-40"
+        >
+          {applyBusy ? 'Applying...' : 'Approve staged ActionPlan'}
+        </button>
+      )}
+    </div>
   );
 }
 
@@ -927,48 +810,6 @@ function rowStatusLabel(status: StagedImportRowStatus): string {
 
 function isEditableRowStatus(status: StagedImportRowStatus): boolean {
   return status === 'pending' || status === 'needs_question';
-}
-
-function buildInitialSheetDeskMapIds(
-  summaries: StagedImportSheetSummary[],
-  deskMaps: { id: string; name: string; code: string }[]
-): Record<string, string> {
-  const ids: Record<string, string> = {};
-  for (const summary of summaries) {
-    const match = findDeskMapForSheet(summary, deskMaps);
-    if (match) {
-      ids[summary.sheetName] = match.id;
-    }
-  }
-  return ids;
-}
-
-function findDeskMapForSheet(
-  summary: StagedImportSheetSummary,
-  deskMaps: { id: string; name: string; code: string }[]
-): { id: string; name: string; code: string } | null {
-  const summaryCode = normalizeDeskMapLookup(summary.tractCode);
-  const summaryName = normalizeDeskMapLookup(summary.tractName);
-  const sheetName = normalizeDeskMapLookup(summary.sheetName);
-  return deskMaps.find((deskMap) => {
-    const code = normalizeDeskMapLookup(deskMap.code);
-    const name = normalizeDeskMapLookup(deskMap.name);
-    return Boolean(
-      (summaryCode && code === summaryCode)
-        || (summaryName && name === summaryName)
-        || (sheetName && name === sheetName)
-    );
-  }) ?? null;
-}
-
-function normalizeDeskMapLookup(value: string): string {
-  return value.toLowerCase().replace(/[^a-z0-9]+/g, '');
-}
-
-function nodeLabel(node: OwnershipNode): string {
-  const name = node.grantee || node.grantor || node.id;
-  const doc = node.docNo ? ` · Doc ${node.docNo}` : '';
-  return `${name}${doc} · ${node.interestClass} · ${node.fraction}`;
 }
 
 function UploadZone({ onFile }: { onFile: (f: File) => void }) {
@@ -1108,7 +949,10 @@ function ProposalView({
         </section>
       )}
 
-      <ApplySection proposal={proposal} />
+      <section className="rounded-lg border border-leather/30 bg-parchment p-3 text-xs text-ink-light">
+        AI proposal is preview-only. Use row review to build and approve a
+        staged ImportSession ActionPlan before any workspace mutation.
+      </section>
     </div>
   );
 }

@@ -1,12 +1,8 @@
 /**
- * Turn an AI `WorkspaceImportProposal` into a concrete, validated apply plan.
+ * Turn an AI `WorkspaceImportProposal` into a concrete, validated preview plan.
  *
- * The wizard never mutates workspace state directly. It builds an
- * `ApplyPlan` describing exactly what will change (project rename,
- * desk maps to create), runs it through `validateOwnershipGraph` to make
- * sure the starting node graph is sound, and reports collisions with
- * existing desk-map codes. The user reviews the plan, then a single
- * `executeApplyPlan` call commits via the workspace-store actions.
+ * AI workbook analysis is preview-only. Workbook-driven workspace mutations
+ * must use the staged ImportSession ActionPlan path in `staged-apply.ts`.
  */
 import {
   validateOwnershipGraph,
@@ -115,57 +111,6 @@ export function buildApplyPlan(
     collisions,
     existingGraphIssues,
     blockers,
-  };
-}
-
-export interface WorkspaceApplyActions {
-  setProjectName: (name: string) => void;
-  createDeskMap: (name: string, code: string) => string;
-  updateDeskMapDetails: (
-    id: string,
-    fields: { grossAcres?: string; pooledAcres?: string; description?: string }
-  ) => void;
-}
-
-export interface ApplyResult {
-  projectRenamed: boolean;
-  createdDeskMapIds: string[];
-}
-
-/**
- * Commit the plan through workspace-store actions. Caller must have
- * already inspected `plan.blockers` — this throws if blockers exist so
- * we never silently mutate a workspace the user didn't approve.
- */
-export function executeApplyPlan(
-  plan: ApplyPlan,
-  actions: WorkspaceApplyActions
-): ApplyResult {
-  if (plan.blockers.length > 0) {
-    throw new Error(
-      `Cannot apply plan with blockers: ${plan.blockers.join('; ')}`
-    );
-  }
-
-  if (plan.projectNameChange !== null) {
-    actions.setProjectName(plan.projectNameChange);
-  }
-
-  const createdDeskMapIds: string[] = [];
-  for (const dm of plan.deskMapsToCreate) {
-    const id = actions.createDeskMap(dm.name, dm.code);
-    if (dm.grossAcres || dm.description) {
-      actions.updateDeskMapDetails(id, {
-        grossAcres: dm.grossAcres,
-        description: dm.description,
-      });
-    }
-    createdDeskMapIds.push(id);
-  }
-
-  return {
-    projectRenamed: plan.projectNameChange !== null,
-    createdDeskMapIds,
   };
 }
 

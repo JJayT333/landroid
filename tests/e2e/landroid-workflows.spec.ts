@@ -51,6 +51,59 @@ async function loadCombinatorialDemo(page: Page) {
   });
 }
 
+async function waitForPersistedProject(page: Page, projectName: RegExp) {
+  await expect
+    .poll(
+      async () =>
+        page.evaluate(async ({ source, flags }) => {
+          const pattern = new RegExp(source, flags);
+          const requestToPromise = <T,>(request: IDBRequest<T>) =>
+            new Promise<T>((resolve, reject) => {
+              request.onsuccess = () => resolve(request.result);
+              request.onerror = () => reject(request.error);
+            });
+
+          const db = await requestToPromise(indexedDB.open('landroid-v2'));
+          try {
+            if (!db.objectStoreNames.contains('workspaceManifestShards')) {
+              return false;
+            }
+            const tx = db.transaction('workspaceManifestShards', 'readonly');
+            const rows = await requestToPromise<unknown[]>(
+              tx.objectStore('workspaceManifestShards').getAll()
+            );
+            return rows.some((row) => {
+              const manifest = row as {
+                backendRecord?: {
+                  projectName?: unknown;
+                  recordCounts?: { desk_map?: unknown };
+                };
+                nodeCount?: unknown;
+              };
+              const savedProjectName = manifest.backendRecord?.projectName;
+              const deskMapCount = manifest.backendRecord?.recordCounts?.desk_map;
+              const nodeCount = manifest.nodeCount;
+              return (
+                typeof savedProjectName === 'string' &&
+                pattern.test(savedProjectName) &&
+                typeof deskMapCount === 'number' &&
+                deskMapCount > 0 &&
+                typeof nodeCount === 'number' &&
+                nodeCount > 0
+              );
+            });
+          } finally {
+            db.close();
+          }
+        }, { source: projectName.source, flags: projectName.flags }),
+      {
+        message: 'wait for the writer tab to persist the sharded workspace',
+        timeout: 45_000,
+      }
+    )
+    .toBe(true);
+}
+
 async function selectDeskMapTab(page: Page, name: string | RegExp) {
   const tab = page.getByRole('tab', { name }).first();
   await tab.click();
@@ -651,11 +704,10 @@ test('a second tab opens read-only and can take over the single-writer lease', a
   // The first tab holds the lease, so it shows no read-only banner.
   await expect(writerBanner).toBeHidden();
 
-  // Let the debounced autosave persist the sharded workspace so the second tab
-  // loads the same workspace id and contends for the same lease (rather than
-  // booting a fresh empty workspace with its own id). The 1476-node shard write
-  // runs ~2s after load; wait comfortably past it but well under the lease TTL.
-  await writerPage.waitForTimeout(5000);
+  // Wait for the debounced autosave to persist the sharded workspace so the
+  // second tab loads the same workspace id and contends for the same lease
+  // rather than booting a fresh empty workspace with its own id.
+  await waitForPersistedProject(writerPage, /Combinatorial Demo — /);
 
   const readerPage = await context.newPage();
   const readerErrors = collectBrowserErrors(readerPage);
