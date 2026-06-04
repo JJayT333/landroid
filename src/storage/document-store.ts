@@ -17,6 +17,13 @@ import db from './db';
 import Dexie from 'dexie';
 import { sha256HexOfBlob } from './blob-hash';
 import {
+  activeStorageScopedId,
+  activeWorkspaceScope,
+  stampActiveDbKeyWithStorageId,
+  stripDbKeyAndStorageId,
+  stripStorageScopedId,
+} from './db-key-scope';
+import {
   PDF_MIME_TYPE,
   normalizePdfBlob,
 } from '../utils/pdf-validation';
@@ -39,6 +46,70 @@ export type {
   DocumentKind,
   DocumentRecord,
 } from '../types/document';
+
+type StoredDocumentRecord = DocumentRecord & { dbKey?: string };
+type StoredDocumentAttachment = DocumentAttachment & { dbKey?: string };
+
+function stripStoredDocId<T extends { docId: string; dbKey?: string }>(
+  row: T
+): Omit<T, 'dbKey'> {
+  return stripDbKeyAndStorageId(row, 'docId');
+}
+
+function stripStoredAttachmentId<
+  T extends { attachmentId: string; dbKey?: string },
+>(row: T): Omit<T, 'dbKey'> {
+  return stripDbKeyAndStorageId(row, 'attachmentId');
+}
+
+function logicalDocId(doc: { docId: string; dbKey?: string }): string {
+  return stripStorageScopedId(doc.docId, doc.dbKey);
+}
+
+function logicalAttachmentId(
+  attachment: { attachmentId: string; dbKey?: string }
+): string {
+  return stripStorageScopedId(attachment.attachmentId, attachment.dbKey);
+}
+
+async function getDocumentRow(docId: string) {
+  return (
+    (await db.documents.get(activeStorageScopedId(docId)))
+    ?? db.documents.get(docId)
+  );
+}
+
+async function getAttachmentRows(
+  attachmentIds: ReadonlyArray<string>
+): Promise<StoredDocumentAttachment[]> {
+  const requested = [...new Set(attachmentIds)].filter(Boolean);
+  if (requested.length === 0) return [];
+  const scopedIds = requested.map(activeStorageScopedId);
+  const rows = await db.document_attachments.bulkGet(scopedIds);
+  const missingIds = requested.filter((_, index) => !rows[index]);
+  const fallbackRows = missingIds.length > 0
+    ? await db.document_attachments.bulkGet(missingIds)
+    : [];
+  return [...rows, ...fallbackRows].filter(
+    (row): row is StoredDocumentAttachment => Boolean(row)
+  );
+}
+
+async function getDocumentRows(
+  docIds: ReadonlyArray<string>
+): Promise<StoredDocumentRecord[]> {
+  const requested = [...new Set(docIds)].filter(Boolean);
+  if (requested.length === 0) return [];
+  const scopedIds = requested.map(activeStorageScopedId);
+  const rows = await db.documents.bulkGet(scopedIds);
+  const missingIds = requested.filter((_, index) => !rows[index]);
+  const fallbackRows = missingIds.length > 0
+    ? await db.documents.bulkGet(missingIds)
+    : [];
+  return [...rows, ...fallbackRows].filter(
+    (row): row is StoredDocumentRecord => Boolean(row)
+  );
+}
 
 export type DocumentMetadataPatch = Partial<
   Pick<
@@ -197,8 +268,8 @@ export async function saveDoc(
     db.document_attachments,
     async (): Promise<SaveDocumentResult> => {
       const existingCount = await db.document_attachments
-        .where('[workspaceId+entityKind+entityId]')
-        .equals([input.workspaceId, input.entityKind, input.entityId])
+        .where('[dbKey+workspaceId+entityKind+entityId]')
+        .equals([...activeWorkspaceScope(input.workspaceId), input.entityKind, input.entityId])
         .count();
       const attachment: DocumentAttachment = {
         attachmentId,
@@ -209,8 +280,10 @@ export async function saveDoc(
         position: existingCount,
         createdAt,
       };
-      await db.documents.add(document);
-      await db.document_attachments.add(attachment);
+      await db.documents.add(stampActiveDbKeyWithStorageId(document, 'docId'));
+      await db.document_attachments.add(
+        stampActiveDbKeyWithStorageId(attachment, 'attachmentId')
+      );
       return { document, attachment };
     }
   );
@@ -227,24 +300,29 @@ export async function attachDocToEntity(
   entityId: string
 ): Promise<DocumentAttachment> {
   return db.transaction('rw', db.documents, db.document_attachments, async () => {
-    const doc = await db.documents.get(docId);
+    const doc = await getDocumentRow(docId);
     if (!doc) {
       throw new Error(`attachDocToEntity: document ${docId} not found`);
     }
+    if (doc.dbKey !== activeWorkspaceScope(doc.workspaceId)[0]) {
+      throw new Error(`attachDocToEntity: document ${docId} not found`);
+    }
     const existingCount = await db.document_attachments
-      .where('[workspaceId+entityKind+entityId]')
-      .equals([doc.workspaceId, entityKind, entityId])
+      .where('[dbKey+workspaceId+entityKind+entityId]')
+      .equals([...activeWorkspaceScope(doc.workspaceId), entityKind, entityId])
       .count();
     const attachment: DocumentAttachment = {
       attachmentId: newId(),
       workspaceId: doc.workspaceId,
-      docId,
+      docId: logicalDocId(doc),
       entityKind,
       entityId,
       position: existingCount,
       createdAt: nowIso(),
     };
-    await db.document_attachments.add(attachment);
+    await db.document_attachments.add(
+      stampActiveDbKeyWithStorageId(attachment, 'attachmentId')
+    );
     return attachment;
   });
 }
@@ -258,9 +336,11 @@ export async function detachDocFromEntity(
   attachmentId: string
 ): Promise<void> {
   await db.transaction('rw', db.document_attachments, async () => {
-    const existing = await db.document_attachments.get(attachmentId);
+    const existingRows = await getAttachmentRows([attachmentId]);
+    const existing = existingRows[0];
     if (!existing) return;
-    await db.document_attachments.delete(attachmentId);
+    if (existing.dbKey !== activeWorkspaceScope(existing.workspaceId)[0]) return;
+    await db.document_attachments.delete(existing.attachmentId);
     await compactAttachmentPositions(
       existing.workspaceId,
       existing.entityKind,
@@ -278,9 +358,13 @@ export async function renameDoc(docId: string, newFileName: string): Promise<voi
   if (!trimmed) {
     throw new Error('renameDoc: fileName cannot be empty');
   }
-  await db.documents.update(docId, {
-    fileName: trimmed,
-    updatedAt: nowIso(),
+  await db.transaction('rw', db.documents, async () => {
+    const doc = await getDocumentRow(docId);
+    if (!doc || doc.dbKey !== activeWorkspaceScope(doc.workspaceId)[0]) return;
+    await db.documents.update(doc.docId, {
+      fileName: trimmed,
+      updatedAt: nowIso(),
+    });
   });
 }
 
@@ -290,9 +374,13 @@ export async function renameDoc(docId: string, newFileName: string): Promise<voi
  * after the v8 upgrade lands.
  */
 export async function setDocKind(docId: string, kind: DocumentKind): Promise<void> {
-  await db.documents.update(docId, {
-    kind: normalizeDocumentKind(kind),
-    updatedAt: nowIso(),
+  await db.transaction('rw', db.documents, async () => {
+    const doc = await getDocumentRow(docId);
+    if (!doc || doc.dbKey !== activeWorkspaceScope(doc.workspaceId)[0]) return;
+    await db.documents.update(doc.docId, {
+      kind: normalizeDocumentKind(kind),
+      updatedAt: nowIso(),
+    });
   });
 }
 
@@ -306,9 +394,13 @@ export async function updateDocMetadata(
 ): Promise<void> {
   const updates = normalizeMetadataPatch(patch);
   if (Object.keys(updates).length === 0) return;
-  await db.documents.update(docId, {
-    ...updates,
-    updatedAt: nowIso(),
+  await db.transaction('rw', db.documents, async () => {
+    const doc = await getDocumentRow(docId);
+    if (!doc || doc.dbKey !== activeWorkspaceScope(doc.workspaceId)[0]) return;
+    await db.documents.update(doc.docId, {
+      ...updates,
+      updatedAt: nowIso(),
+    });
   });
 }
 
@@ -322,9 +414,12 @@ export async function listDocumentRegistryData(
   documents: Array<Omit<DocumentRecord, 'blob'>>;
   attachments: DocumentAttachment[];
 }> {
-  const docs = await db.documents.where('workspaceId').equals(workspaceId).toArray();
+  const docs = await db.documents
+    .where('[dbKey+workspaceId]')
+    .equals(activeWorkspaceScope(workspaceId))
+    .toArray();
   const documents = docs.map((doc) => {
-    const { blob: _blob, ...meta } = doc;
+    const { blob: _blob, ...meta } = stripStoredDocId(doc);
     return meta;
   });
   if (documents.length === 0) {
@@ -333,13 +428,13 @@ export async function listDocumentRegistryData(
 
   const docIds = documents.map((doc) => doc.docId);
   const attachments = await db.document_attachments
-    .where('docId')
-    .anyOf(docIds)
+    .where('[dbKey+workspaceId+docId]')
+    .anyOf(docIds.map((docId) => [...activeWorkspaceScope(workspaceId), docId]))
     .toArray();
 
   return {
     documents,
-    attachments,
+    attachments: attachments.map(stripStoredAttachmentId),
   };
 }
 
@@ -350,8 +445,14 @@ export async function listDocumentRegistryData(
  */
 export async function deleteDoc(docId: string): Promise<void> {
   await db.transaction('rw', db.documents, db.document_attachments, async () => {
-    await db.document_attachments.where('docId').equals(docId).delete();
-    await db.documents.delete(docId);
+    const doc = await getDocumentRow(docId);
+    if (!doc || doc.dbKey !== activeWorkspaceScope(doc.workspaceId)[0]) return;
+    const logicalId = logicalDocId(doc);
+    await db.document_attachments
+      .where('[dbKey+workspaceId+docId]')
+      .equals([...activeWorkspaceScope(doc.workspaceId), logicalId])
+      .delete();
+    await db.documents.delete(doc.docId);
   });
 }
 
@@ -363,14 +464,27 @@ export async function deleteDocs(docIds: ReadonlyArray<string>): Promise<void> {
   const uniqueDocIds = [...new Set(docIds)].filter(Boolean);
   if (uniqueDocIds.length === 0) return;
   await db.transaction('rw', db.documents, db.document_attachments, async () => {
+    const docs = (await getDocumentRows(uniqueDocIds))
+      .filter((doc): doc is StoredDocumentRecord =>
+        Boolean(doc && doc.dbKey === activeWorkspaceScope(doc.workspaceId)[0])
+      );
+    const scopedDocIds = docs.map((doc) => doc.docId);
+    if (scopedDocIds.length === 0) return;
+    const scopedAttachmentKeys = docs.map((doc) =>
+      [...activeWorkspaceScope(doc.workspaceId), logicalDocId(doc)] as [
+        string,
+        string,
+        string,
+      ]
+    );
     const attachmentIds = await db.document_attachments
-      .where('docId')
-      .anyOf(uniqueDocIds)
+      .where('[dbKey+workspaceId+docId]')
+      .anyOf(scopedAttachmentKeys)
       .primaryKeys();
     if (attachmentIds.length > 0) {
       await db.document_attachments.bulkDelete(attachmentIds);
     }
-    await db.documents.bulkDelete(uniqueDocIds);
+    await db.documents.bulkDelete(scopedDocIds);
   });
 }
 
@@ -386,16 +500,23 @@ export async function deleteDocsForAttachments(
   if (uniqueAttachmentIds.length === 0) return;
 
   await db.transaction('rw', db.documents, db.document_attachments, async () => {
-    const removedAttachmentSet = new Set(uniqueAttachmentIds);
-    const removedAttachments = (await db.document_attachments.bulkGet(
-      uniqueAttachmentIds
-    )).filter((attachment): attachment is DocumentAttachment => Boolean(attachment));
+    const removedAttachments = (await getAttachmentRows(uniqueAttachmentIds)).filter(
+      (attachment): attachment is StoredDocumentAttachment =>
+        Boolean(
+          attachment
+          && attachment.dbKey === activeWorkspaceScope(attachment.workspaceId)[0]
+        )
+    );
     if (removedAttachments.length === 0) return;
 
+    const removedAttachmentSet = new Set(
+      removedAttachments.map((attachment) => attachment.attachmentId)
+    );
     const docIds = [...new Set(removedAttachments.map((attachment) => attachment.docId))];
+    const workspaceId = removedAttachments[0].workspaceId;
     const allAttachmentsForDocs = await db.document_attachments
-      .where('docId')
-      .anyOf(docIds)
+      .where('[dbKey+workspaceId+docId]')
+      .anyOf(docIds.map((docId) => [...activeWorkspaceScope(workspaceId), docId]))
       .toArray();
     const attachmentsByDoc = new Map<string, DocumentAttachment[]>();
     for (const attachment of allAttachmentsForDocs) {
@@ -414,24 +535,33 @@ export async function deleteDocsForAttachments(
       );
     });
 
-    await db.document_attachments.bulkDelete(uniqueAttachmentIds);
+    await db.document_attachments.bulkDelete(
+      removedAttachments.map((attachment) => attachment.attachmentId)
+    );
     if (docIdsToDelete.length > 0) {
-      await db.documents.bulkDelete(docIdsToDelete);
+      const docsToDelete = await getDocumentRows(docIdsToDelete);
+      await db.documents.bulkDelete(
+        docsToDelete
+          .filter((doc) => doc.dbKey === activeWorkspaceScope(doc.workspaceId)[0])
+          .map((doc) => doc.docId)
+      );
     }
   });
 }
 
 export async function getDocBlob(docId: string): Promise<Blob | undefined> {
-  const doc = await db.documents.get(docId);
+  const doc = await getDocumentRow(docId);
+  if (!doc || doc.dbKey !== activeWorkspaceScope(doc.workspaceId)[0]) return undefined;
   return doc?.blob;
 }
 
 export async function getDocMeta(
   docId: string
 ): Promise<Omit<DocumentRecord, 'blob'> | undefined> {
-  const doc = await db.documents.get(docId);
+  const doc = await getDocumentRow(docId);
   if (!doc) return undefined;
-  const { blob: _blob, ...meta } = doc;
+  if (doc.dbKey !== activeWorkspaceScope(doc.workspaceId)[0]) return undefined;
+  const { blob: _blob, ...meta } = stripStoredDocId(doc);
   return meta;
 }
 
@@ -450,22 +580,24 @@ export async function listDocsForEntity(
   }>
 > {
   const attachments = await db.document_attachments
-    .where('[workspaceId+entityKind+entityId]')
-    .equals([workspaceId, entityKind, entityId])
+    .where('[dbKey+workspaceId+entityKind+entityId]')
+    .equals([...activeWorkspaceScope(workspaceId), entityKind, entityId])
     .toArray();
   attachments.sort((a, b) => a.position - b.position);
   if (attachments.length === 0) return [];
   const docIds = [...new Set(attachments.map((a) => a.docId))];
-  const docs = await db.documents.bulkGet(docIds);
+  const docs = await getDocumentRows(docIds);
   const docById = new Map<string, DocumentRecord>();
   for (const doc of docs) {
-    if (doc) docById.set(doc.docId, doc);
+    if (doc && doc.dbKey === activeWorkspaceScope(doc.workspaceId)[0]) {
+      docById.set(logicalDocId(doc), stripStoredDocId(doc));
+    }
   }
   return attachments.flatMap((attachment) => {
     const doc = docById.get(attachment.docId);
     if (!doc) return [];
     const { blob: _blob, ...meta } = doc;
-    return [{ attachment, document: meta }];
+    return [{ attachment: stripStoredAttachmentId(attachment), document: meta }];
   });
 }
 
@@ -509,18 +641,25 @@ export async function listAttachmentsForNodes(
 
   // Dexie equalsAnyOf lets us bulk-fetch attachments without N round-trips.
   const attachments = await db.document_attachments
-    .where('[workspaceId+entityKind+entityId]')
-    .between([workspaceId, 'node', Dexie.minKey], [workspaceId, 'node', Dexie.maxKey])
+    .where('[dbKey+workspaceId+entityKind+entityId]')
+    .between(
+      [...activeWorkspaceScope(workspaceId), 'node', Dexie.minKey],
+      [...activeWorkspaceScope(workspaceId), 'node', Dexie.maxKey]
+    )
     .and((a) => nodeIds.includes(a.entityId))
     .toArray();
   if (attachments.length === 0) return result;
 
   const docIds = [...new Set(attachments.map((a) => a.docId))];
-  const docs = await db.documents.bulkGet(docIds);
+  const docs = await getDocumentRows(docIds);
   const docById = new Map<string, DocumentRecord>();
   for (const doc of docs) {
-    if (doc && doc.workspaceId === workspaceId) {
-      docById.set(doc.docId, doc);
+    if (
+      doc
+      && doc.workspaceId === workspaceId
+      && doc.dbKey === activeWorkspaceScope(workspaceId)[0]
+    ) {
+      docById.set(logicalDocId(doc), stripStoredDocId(doc));
     }
   }
 
@@ -529,7 +668,7 @@ export async function listAttachmentsForNodes(
     if (!doc) continue;
     const list = result.get(a.entityId) ?? [];
     list.push({
-      attachmentId: a.attachmentId,
+      attachmentId: logicalAttachmentId(a),
       docId: a.docId,
       position: a.position,
       fileName: doc.fileName,
@@ -557,10 +696,10 @@ export async function reorderAttachments(
 ): Promise<void> {
   await db.transaction('rw', db.document_attachments, async () => {
     const existing = await db.document_attachments
-      .where('[workspaceId+entityKind+entityId]')
-      .equals([workspaceId, entityKind, entityId])
-      .toArray();
-    const byId = new Map(existing.map((a) => [a.attachmentId, a] as const));
+      .where('[dbKey+workspaceId+entityKind+entityId]')
+    .equals([...activeWorkspaceScope(workspaceId), entityKind, entityId])
+    .toArray();
+    const byId = new Map(existing.map((a) => [logicalAttachmentId(a), a] as const));
     const seen = new Set<string>();
     const ordered: DocumentAttachment[] = [];
 
@@ -574,7 +713,7 @@ export async function reorderAttachments(
     // Anything that wasn't named in the order list keeps its relative
     // position from `existing` and trails behind.
     for (const a of existing) {
-      if (!seen.has(a.attachmentId)) {
+      if (!seen.has(logicalAttachmentId(a))) {
         ordered.push(a);
       }
     }
@@ -601,8 +740,8 @@ async function compactAttachmentPositions(
   entityId: string
 ): Promise<void> {
   const remaining = await db.document_attachments
-    .where('[workspaceId+entityKind+entityId]')
-    .equals([workspaceId, entityKind, entityId])
+    .where('[dbKey+workspaceId+entityKind+entityId]')
+    .equals([...activeWorkspaceScope(workspaceId), entityKind, entityId])
     .toArray();
   remaining.sort((a, b) => a.position - b.position);
   for (let i = 0; i < remaining.length; i += 1) {

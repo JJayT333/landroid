@@ -81,6 +81,14 @@ import type { CurativeWorkspaceData } from './curative-persistence';
 import { normalizeTitleIssues, type TitleIssue } from '../types/title-issue';
 import { resolveActiveUnitCode } from '../utils/desk-map-units';
 import { getWorkspaceDbKey } from './active-workspace-key';
+import {
+  activeStorageScopedId,
+  activeWorkspaceScope,
+  stampActiveDbKeyWithStorageId,
+  stampDbKeyWithStorageId,
+  stripDbKeyAndStorageId,
+  stripStorageScopedId,
+} from './db-key-scope';
 import { LANDROID_FILE_VERSION } from './landroid-file-version';
 import {
   type ActionRecord,
@@ -97,10 +105,7 @@ import {
   type ProjectRecordBundle,
 } from '../project-records/record-validation';
 import { readWorkspaceFromShardRows } from './workspace-shard-reader';
-import {
-  buildWorkspaceShards,
-  type WorkspaceManifestShard,
-} from './workspace-shards';
+import { buildWorkspaceShards } from './workspace-shards';
 import { ensureWorkspaceWritable } from './workspace-write-lease';
 export { LANDROID_FILE_VERSION } from './landroid-file-version';
 const PAGE_SIZE_ID_SET = new Set<PageSizeId>(
@@ -626,6 +631,38 @@ const EMPTY_SHARD_ROWS: LoadedWorkspaceShardRows = {
   uiState: null,
 };
 
+function stripStoredDocId<T extends { docId: string; dbKey?: string }>(
+  row: T
+): Omit<T, 'dbKey'> {
+  return stripDbKeyAndStorageId(row, 'docId');
+}
+
+function stripStoredAttachmentId<
+  T extends { attachmentId: string; dbKey?: string },
+>(row: T): Omit<T, 'dbKey'> {
+  return stripDbKeyAndStorageId(row, 'attachmentId');
+}
+
+function logicalDocId(doc: { docId: string; dbKey?: string }): string {
+  return stripStorageScopedId(doc.docId, doc.dbKey);
+}
+
+async function getDocumentRows(
+  docIds: ReadonlyArray<string>
+): Promise<Array<DocumentRecord & { dbKey?: string }>> {
+  const requested = [...new Set(docIds)].filter(Boolean);
+  if (requested.length === 0) return [];
+  const scopedIds = requested.map(activeStorageScopedId);
+  const rows = await db.documents.bulkGet(scopedIds);
+  const missingIds = requested.filter((_, index) => !rows[index]);
+  const fallbackRows = missingIds.length > 0
+    ? await db.documents.bulkGet(missingIds)
+    : [];
+  return [...rows, ...fallbackRows].filter(
+    (row): row is DocumentRecord & { dbKey?: string } => Boolean(row)
+  );
+}
+
 async function loadWorkspaceShardRows(args: {
   dbKey: string;
   monolithWorkspaceId: string | null;
@@ -652,19 +689,20 @@ async function loadWorkspaceShardRows(args: {
   }
 
   const resolvedWorkspaceId = manifest.workspaceId;
+  const scope = [args.dbKey, resolvedWorkspaceId] as [string, string];
   const [deskMaps, nodes, leaseholdStates, uiStates] = await Promise.all([
-    db.deskMapShards.where('workspaceId').equals(resolvedWorkspaceId).toArray(),
+    db.deskMapShards.where('[dbKey+workspaceId]').equals(scope).toArray(),
     db.ownershipNodeCompatShards
-      .where('workspaceId')
-      .equals(resolvedWorkspaceId)
+      .where('[dbKey+workspaceId]')
+      .equals(scope)
       .toArray(),
     db.leaseholdStateShards
-      .where('workspaceId')
-      .equals(resolvedWorkspaceId)
+      .where('[dbKey+workspaceId]')
+      .equals(scope)
       .toArray(),
     db.workspaceUiStateShards
-      .where('workspaceId')
-      .equals(resolvedWorkspaceId)
+      .where('[dbKey+workspaceId]')
+      .equals(scope)
       .toArray(),
   ]);
 
@@ -735,7 +773,15 @@ export async function saveWorkspaceShardsToDb(
     source: 'local',
     syncState: 'local_only',
   });
-  const manifest: WorkspaceManifestShard = { ...shards.manifest, dbKey };
+  const manifest = stampDbKeyWithStorageId(shards.manifest, 'id', dbKey);
+  const deskMapShards = shards.deskMaps.map((row) =>
+    stampDbKeyWithStorageId(row, 'id', dbKey)
+  );
+  const nodeShards = shards.nodes.map((row) =>
+    stampDbKeyWithStorageId(row, 'id', dbKey)
+  );
+  const leaseholdState = stampDbKeyWithStorageId(shards.leaseholdState, 'id', dbKey);
+  const uiState = stampDbKeyWithStorageId(shards.uiState, 'id', dbKey);
   const { workspaceId } = data;
   // Re-anchor the monolithic backup only when it does not already describe this
   // workspace (a fresh install, or an import/CSV that swapped the workspace).
@@ -756,20 +802,35 @@ export async function saveWorkspaceShardsToDb(
       // nodes cannot linger as orphans, then write the fresh complete set. A
       // throw anywhere here rolls the whole transaction back, leaving the prior
       // complete shard set intact.
-      await db.deskMapShards.where('workspaceId').equals(workspaceId).delete();
+      await db.deskMapShards
+        .where('[dbKey+workspaceId]')
+        .equals(activeWorkspaceScope(workspaceId))
+        .delete();
       await db.ownershipNodeCompatShards
-        .where('workspaceId')
-        .equals(workspaceId)
+        .where('[dbKey+workspaceId]')
+        .equals(activeWorkspaceScope(workspaceId))
+        .delete();
+      await db.workspaceManifestShards
+        .where('[dbKey+workspaceId]')
+        .equals(activeWorkspaceScope(workspaceId))
+        .delete();
+      await db.leaseholdStateShards
+        .where('[dbKey+workspaceId]')
+        .equals(activeWorkspaceScope(workspaceId))
+        .delete();
+      await db.workspaceUiStateShards
+        .where('[dbKey+workspaceId]')
+        .equals(activeWorkspaceScope(workspaceId))
         .delete();
       await db.workspaceManifestShards.put(manifest);
-      if (shards.deskMaps.length > 0) {
-        await db.deskMapShards.bulkPut(shards.deskMaps);
+      if (deskMapShards.length > 0) {
+        await db.deskMapShards.bulkPut(deskMapShards);
       }
-      if (shards.nodes.length > 0) {
-        await db.ownershipNodeCompatShards.bulkPut(shards.nodes);
+      if (nodeShards.length > 0) {
+        await db.ownershipNodeCompatShards.bulkPut(nodeShards);
       }
-      await db.leaseholdStateShards.put(shards.leaseholdState);
-      await db.workspaceUiStateShards.put(shards.uiState);
+      await db.leaseholdStateShards.put(leaseholdState);
+      await db.workspaceUiStateShards.put(uiState);
       if (shouldAnchorMonolith) {
         await db.workspaces.put({
           id: dbKey,
@@ -815,22 +876,26 @@ export async function clearWorkspaceShardsForActiveKey(): Promise<void> {
     ],
     async () => {
       for (const workspaceId of workspaceIds) {
+        const scope = [dbKey, workspaceId] as [string, string];
         await db.workspaceManifestShards
-          .where('workspaceId')
-          .equals(workspaceId)
+          .where('[dbKey+workspaceId]')
+          .equals(scope)
           .delete();
-        await db.deskMapShards.where('workspaceId').equals(workspaceId).delete();
+        await db.deskMapShards
+          .where('[dbKey+workspaceId]')
+          .equals(scope)
+          .delete();
         await db.ownershipNodeCompatShards
-          .where('workspaceId')
-          .equals(workspaceId)
+          .where('[dbKey+workspaceId]')
+          .equals(scope)
           .delete();
         await db.leaseholdStateShards
-          .where('workspaceId')
-          .equals(workspaceId)
+          .where('[dbKey+workspaceId]')
+          .equals(scope)
           .delete();
         await db.workspaceUiStateShards
-          .where('workspaceId')
-          .equals(workspaceId)
+          .where('[dbKey+workspaceId]')
+          .equals(scope)
           .delete();
       }
     }
@@ -1229,6 +1294,7 @@ export async function downloadLandroidFile(
 }
 
 export async function exportPdfWorkspaceData(
+  workspaceId: string,
   nodes: OwnershipNode[]
 ): Promise<PdfWorkspaceData> {
   // Phase 5: read from the v8 `documents` + `document_attachments`
@@ -1242,9 +1308,9 @@ export async function exportPdfWorkspaceData(
   if (nodeIds.length === 0) return { pdfs: [] };
 
   const attachments = await db.document_attachments
-    .where('entityKind')
-    .equals('node')
-    .and((row) => nodeIds.includes(row.entityId))
+    .where('[dbKey+workspaceId]')
+    .equals(activeWorkspaceScope(workspaceId))
+    .and((row) => row.entityKind === 'node' && nodeIds.includes(row.entityId))
     .toArray();
   if (attachments.length === 0) return { pdfs: [] };
 
@@ -1258,10 +1324,17 @@ export async function exportPdfWorkspaceData(
   }
 
   const docIds = [...new Set([...firstByNode.values()].map((a) => a.docId))];
-  const docs = await db.documents.bulkGet(docIds);
+  const docs = await getDocumentRows(docIds);
   const docById = new Map<string, NonNullable<typeof docs[number]>>();
   for (const doc of docs) {
-    if (doc && doc.blob.size > 0) docById.set(doc.docId, doc);
+    if (
+      doc
+      && doc.workspaceId === workspaceId
+      && doc.dbKey === activeWorkspaceScope(workspaceId)[0]
+      && doc.blob.size > 0
+    ) {
+      docById.set(logicalDocId(doc), doc);
+    }
   }
 
   const pdfs: PdfAttachment[] = [];
@@ -1295,21 +1368,29 @@ export async function exportDocumentWorkspaceData(
   const attachments = await db.document_attachments
     .where('entityKind')
     .equals('node')
-    .and((row) => nodeIds.includes(row.entityId))
+    .and((row) =>
+      row.dbKey === activeWorkspaceScope(workspaceId)[0]
+      && row.workspaceId === workspaceId
+      && nodeIds.includes(row.entityId)
+    )
     .toArray();
-  const scopedAttachments = attachments.filter(
-    (row) => row.workspaceId === workspaceId
-  );
+  const scopedAttachments = attachments.map(stripStoredAttachmentId);
   if (scopedAttachments.length === 0) return { documents: [], attachments: [] };
 
   const docIds = [...new Set(scopedAttachments.map((a) => a.docId))];
-  const docs = await db.documents.bulkGet(docIds);
+  const docs = await getDocumentRows(docIds);
   const documents: DocumentRecord[] = [];
   const docIdSeen = new Set<string>();
   for (const doc of docs) {
-    if (doc && doc.workspaceId === workspaceId && doc.blob.size > 0) {
-      documents.push(doc);
-      docIdSeen.add(doc.docId);
+    if (
+      doc
+      && doc.dbKey === activeWorkspaceScope(workspaceId)[0]
+      && doc.workspaceId === workspaceId
+      && doc.blob.size > 0
+    ) {
+      const cleanDoc = stripStoredDocId(doc);
+      documents.push(cleanDoc);
+      docIdSeen.add(cleanDoc.docId);
     }
   }
   return {
@@ -1342,24 +1423,34 @@ export async function replaceDocumentWorkspaceData(
   await db.transaction('rw', db.documents, db.document_attachments, async () => {
     // Drop every document scoped to this workspace.
     const existingDocs = await db.documents
-      .where('workspaceId')
-      .equals(workspaceId)
+      .where('[dbKey+workspaceId]')
+      .equals(activeWorkspaceScope(workspaceId))
       .toArray();
-    const existingDocIds = existingDocs.map((d) => d.docId);
-    if (existingDocIds.length > 0) {
-      await db.documents.bulkDelete(existingDocIds);
+    const existingStoredDocIds = existingDocs.map((d) => d.docId);
+    const existingLogicalDocIds = existingDocs.map(logicalDocId);
+    if (existingStoredDocIds.length > 0) {
+      await db.documents.bulkDelete(existingStoredDocIds);
       // Cascade-delete attachments pointing at those docs.
       const existingAttachmentIds = await db.document_attachments
-        .where('docId')
-        .anyOf(existingDocIds)
+        .where('[dbKey+workspaceId+docId]')
+        .anyOf(existingLogicalDocIds.map((docId) => [
+          ...activeWorkspaceScope(workspaceId),
+          docId,
+        ]))
         .primaryKeys();
       if (existingAttachmentIds.length > 0) {
         await db.document_attachments.bulkDelete(existingAttachmentIds);
       }
     }
     if (documents.length > 0) {
-      await db.documents.bulkAdd(documents);
-      await db.document_attachments.bulkAdd(attachments);
+      await db.documents.bulkAdd(
+        documents.map((doc) => stampActiveDbKeyWithStorageId(doc, 'docId'))
+      );
+      await db.document_attachments.bulkAdd(
+        attachments.map((attachment) =>
+          stampActiveDbKeyWithStorageId(attachment, 'attachmentId')
+        )
+      );
     }
   });
 }

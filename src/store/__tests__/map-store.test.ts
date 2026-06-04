@@ -186,8 +186,8 @@ describe('map-store', () => {
     await useMapStore.getState().unlinkNode('node-1');
     await useMapStore.getState().unlinkLease('lease-1');
 
-    expect(mocks.clearNodeLink).toHaveBeenCalledWith('node-1');
-    expect(mocks.clearLeaseLink).toHaveBeenCalledWith('lease-1');
+    expect(mocks.clearNodeLink).toHaveBeenCalledWith('ws-a', 'node-1');
+    expect(mocks.clearLeaseLink).toHaveBeenCalledWith('ws-a', 'lease-1');
     expect(useMapStore.getState().mapAssets[0]?.nodeId).toBeNull();
     expect(useMapStore.getState().mapAssets[0]?.leaseId).toBeNull();
     expect(useMapStore.getState().mapRegions[0]?.nodeId).toBeNull();

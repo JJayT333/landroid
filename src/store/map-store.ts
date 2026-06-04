@@ -300,7 +300,9 @@ export const useMapStore = create<MapState>()((set, get) => ({
   },
 
   unlinkDeskMap: async (id) => {
-    await clearDeskMapLink(id);
+    const workspaceId = get().workspaceId;
+    if (!workspaceId) return;
+    await clearDeskMapLink(workspaceId, id);
     set((state) => ({
       mapAssets: state.mapAssets.map((asset) =>
         asset.deskMapId === id ? { ...asset, deskMapId: null } : asset
@@ -312,7 +314,9 @@ export const useMapStore = create<MapState>()((set, get) => ({
   },
 
   unlinkNode: async (id) => {
-    await clearNodeLink(id);
+    const workspaceId = get().workspaceId;
+    if (!workspaceId) return;
+    await clearNodeLink(workspaceId, id);
     set((state) => ({
       mapAssets: state.mapAssets.map((asset) =>
         asset.nodeId === id ? { ...asset, nodeId: null } : asset
@@ -324,7 +328,9 @@ export const useMapStore = create<MapState>()((set, get) => ({
   },
 
   unlinkOwner: async (id) => {
-    await clearOwnerLink(id);
+    const workspaceId = get().workspaceId;
+    if (!workspaceId) return;
+    await clearOwnerLink(workspaceId, id);
     set((state) => ({
       mapAssets: state.mapAssets.map((asset) =>
         asset.linkedOwnerId === id ? { ...asset, linkedOwnerId: null } : asset
@@ -336,7 +342,9 @@ export const useMapStore = create<MapState>()((set, get) => ({
   },
 
   unlinkLease: async (id) => {
-    await clearLeaseLink(id);
+    const workspaceId = get().workspaceId;
+    if (!workspaceId) return;
+    await clearLeaseLink(workspaceId, id);
     set((state) => ({
       mapAssets: state.mapAssets.map((asset) =>
         asset.leaseId === id ? { ...asset, leaseId: null } : asset

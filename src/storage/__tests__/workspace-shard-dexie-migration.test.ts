@@ -3,6 +3,7 @@ import type { Transaction } from 'dexie';
 import { createBlankNode, type DeskMap } from '../../types/node';
 import { LANDROID_FILE_VERSION, type WorkspaceData } from '../workspace-persistence';
 import {
+  runV10ToV11DbKeyBackfill,
   runV9ToV10WorkspaceShardMigration,
   type WorkspaceRecord,
 } from '../db';
@@ -33,6 +34,16 @@ class FakeTable<Row extends object> {
     for (const row of rows) {
       await this.put(row);
     }
+  }
+
+  async update(key: string, patch: Partial<Row>): Promise<void> {
+    const existing = this.rows.get(key);
+    if (!existing) return;
+    this.rows.set(key, { ...existing, ...patch });
+  }
+
+  async delete(key: string): Promise<void> {
+    this.rows.delete(key);
   }
 }
 
@@ -97,6 +108,21 @@ function buildTx(records: WorkspaceRecord[]) {
     ownershipNodeCompatShards: new FakeTable<Record<string, unknown>>('id'),
     leaseholdStateShards: new FakeTable<Record<string, unknown>>('id'),
     workspaceUiStateShards: new FakeTable<Record<string, unknown>>('id'),
+    owners: new FakeTable<Record<string, unknown>>('id'),
+    leases: new FakeTable<Record<string, unknown>>('id'),
+    contactLogs: new FakeTable<Record<string, unknown>>('id'),
+    ownerDocs: new FakeTable<Record<string, unknown>>('id'),
+    mapAssets: new FakeTable<Record<string, unknown>>('id'),
+    mapRegions: new FakeTable<Record<string, unknown>>('id'),
+    mapExternalReferences: new FakeTable<Record<string, unknown>>('id'),
+    researchImports: new FakeTable<Record<string, unknown>>('id'),
+    researchSources: new FakeTable<Record<string, unknown>>('id'),
+    researchFormulas: new FakeTable<Record<string, unknown>>('id'),
+    researchProjectRecords: new FakeTable<Record<string, unknown>>('id'),
+    researchQuestions: new FakeTable<Record<string, unknown>>('id'),
+    titleIssues: new FakeTable<Record<string, unknown>>('id'),
+    documents: new FakeTable<Record<string, unknown>>('docId'),
+    document_attachments: new FakeTable<Record<string, unknown>>('attachmentId'),
   };
   const tx = {
     table: vi.fn((name: keyof typeof tables) => tables[name]),
@@ -113,9 +139,12 @@ describe('v9 to v10 workspace shard Dexie migration', () => {
     await runV9ToV10WorkspaceShardMigration(tx);
 
     expect(tables.workspaces.rows.get('user-alice')).toEqual(record);
-    expect(tables.workspaceManifestShards.rows.get('ws-1:workspace-manifest')).toEqual(
+    expect(
+      tables.workspaceManifestShards.rows.get('user-alice::ws-1:workspace-manifest')
+    ).toEqual(
       expect.objectContaining({
-        id: 'ws-1:workspace-manifest',
+        id: 'user-alice::ws-1:workspace-manifest',
+        dbKey: 'user-alice',
         shardKind: 'workspace_manifest',
         workspaceId: 'ws-1',
         legacyWorkspaceDataJson: record.data,
@@ -127,22 +156,23 @@ describe('v9 to v10 workspace shard Dexie migration', () => {
         }),
       })
     );
-    expect(tables.deskMapShards.rows.get('ws-1:desk-map:dm-1')).toEqual(
+    expect(tables.deskMapShards.rows.get('user-alice::ws-1:desk-map:dm-1')).toEqual(
       expect.objectContaining({
+        dbKey: 'user-alice',
         shardKind: 'desk_map',
         position: 0,
       })
     );
     expect(
       tables.ownershipNodeCompatShards.rows.get(
-        'ws-1:ownership-node-compat:node-root'
+        'user-alice::ws-1:ownership-node-compat:node-root'
       )
-    ).toEqual(expect.objectContaining({ localOnly: true, position: 0 }));
-    expect(tables.leaseholdStateShards.rows.get('ws-1:leasehold-state')).toEqual(
-      expect.objectContaining({ localOnly: true })
+    ).toEqual(expect.objectContaining({ dbKey: 'user-alice', localOnly: true, position: 0 }));
+    expect(tables.leaseholdStateShards.rows.get('user-alice::ws-1:leasehold-state')).toEqual(
+      expect.objectContaining({ dbKey: 'user-alice', localOnly: true })
     );
-    expect(tables.workspaceUiStateShards.rows.get('ws-1:workspace-ui-state')).toEqual(
-      expect.objectContaining({ activeDeskMapId: 'dm-1' })
+    expect(tables.workspaceUiStateShards.rows.get('user-alice::ws-1:workspace-ui-state')).toEqual(
+      expect.objectContaining({ dbKey: 'user-alice', activeDeskMapId: 'dm-1' })
     );
   });
 
@@ -176,5 +206,52 @@ describe('v9 to v10 workspace shard Dexie migration', () => {
       expect.stringContaining('Workspace row corrupt-row could not be sharded')
     );
     warnSpy.mockRestore();
+  });
+
+  it('backfills dbKey onto v10 shard and side-store rows', async () => {
+    const { tx, tables } = buildTx([]);
+    await tables.workspaceManifestShards.put({
+      id: 'ws-1:workspace-manifest',
+      workspaceId: 'ws-1',
+      dbKey: 'user-alice',
+    });
+    await tables.deskMapShards.put({
+      id: 'ws-1:desk-map:dm-1',
+      workspaceId: 'ws-1',
+    });
+    await tables.owners.put({
+      id: 'owner-1',
+      workspaceId: 'ws-1',
+      name: 'Alice Owner',
+    });
+    await tables.documents.put({
+      docId: 'doc-1',
+      workspaceId: 'ws-1',
+    });
+    await tables.document_attachments.put({
+      attachmentId: 'att-1',
+      workspaceId: 'ws-1',
+    });
+
+    await runV10ToV11DbKeyBackfill(tx);
+
+    expect(tables.deskMapShards.rows.get('user-alice::ws-1:desk-map:dm-1')).toEqual(
+      expect.objectContaining({
+        id: 'user-alice::ws-1:desk-map:dm-1',
+        dbKey: 'user-alice',
+      })
+    );
+    expect(tables.owners.rows.get('user-alice::owner-1')).toEqual(
+      expect.objectContaining({ id: 'user-alice::owner-1', dbKey: 'user-alice' })
+    );
+    expect(tables.documents.rows.get('user-alice::doc-1')).toEqual(
+      expect.objectContaining({ docId: 'user-alice::doc-1', dbKey: 'user-alice' })
+    );
+    expect(tables.document_attachments.rows.get('user-alice::att-1')).toEqual(
+      expect.objectContaining({
+        attachmentId: 'user-alice::att-1',
+        dbKey: 'user-alice',
+      })
+    );
   });
 });

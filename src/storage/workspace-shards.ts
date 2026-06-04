@@ -66,6 +66,7 @@ export interface DeskMapShard {
   id: string;
   shardKind: 'desk_map';
   workspaceId: string;
+  dbKey?: string;
   projectId: string;
   position: number;
   backendRecord: DeskMapRecord;
@@ -76,6 +77,7 @@ export interface OwnershipNodeCompatShard {
   id: string;
   shardKind: 'ownership_node_compat';
   workspaceId: string;
+  dbKey?: string;
   projectId: string;
   position: number;
   localOnly: true;
@@ -86,6 +88,7 @@ export interface LeaseholdStateShard {
   id: string;
   shardKind: 'leasehold_state';
   workspaceId: string;
+  dbKey?: string;
   projectId: string;
   localOnly: true;
   leaseholdUnit?: LeaseholdUnit;
@@ -98,6 +101,7 @@ export interface WorkspaceUiStateShard {
   id: string;
   shardKind: 'workspace_ui_state';
   workspaceId: string;
+  dbKey?: string;
   projectId: string;
   localOnly: true;
   activeDeskMapId: string | null;
@@ -114,13 +118,16 @@ export interface WorkspaceShardSet {
 }
 
 export const WORKSPACE_SHARD_STORE_DEFINITIONS = {
-  workspaceManifestShards: 'id, workspaceId, projectId, [workspaceId+projectId]',
+  workspaceManifestShards:
+    'id, dbKey, workspaceId, projectId, [dbKey+workspaceId], [dbKey+workspaceId+projectId], [workspaceId+projectId]',
   deskMapShards:
-    'id, workspaceId, projectId, [workspaceId+position], [workspaceId+projectId]',
+    'id, dbKey, workspaceId, projectId, [dbKey+workspaceId], [dbKey+workspaceId+position], [dbKey+workspaceId+projectId], [workspaceId+position], [workspaceId+projectId]',
   ownershipNodeCompatShards:
-    'id, workspaceId, projectId, [workspaceId+position], [workspaceId+projectId]',
-  leaseholdStateShards: 'id, workspaceId, projectId, [workspaceId+projectId]',
-  workspaceUiStateShards: 'id, workspaceId, projectId, [workspaceId+projectId]',
+    'id, dbKey, workspaceId, projectId, [dbKey+workspaceId], [dbKey+workspaceId+position], [dbKey+workspaceId+projectId], [workspaceId+position], [workspaceId+projectId]',
+  leaseholdStateShards:
+    'id, dbKey, workspaceId, projectId, [dbKey+workspaceId], [dbKey+workspaceId+projectId], [workspaceId+projectId]',
+  workspaceUiStateShards:
+    'id, dbKey, workspaceId, projectId, [dbKey+workspaceId], [dbKey+workspaceId+projectId], [workspaceId+projectId]',
   workspaceWriteLeases: 'workspaceId, ownerTabId, expiresAt',
 } as const;
 

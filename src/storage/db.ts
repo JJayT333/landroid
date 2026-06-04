@@ -48,6 +48,9 @@ import {
   type WorkspaceUiStateShard,
 } from './workspace-shards';
 import type { WorkspaceWriteLease } from './workspace-write-lock';
+import { stampDbKeyWithStorageId, storageScopedId } from './db-key-scope';
+
+type DbScoped<T extends { workspaceId: string }> = T & { dbKey?: string };
 
 export interface PdfAttachment {
   nodeId: string;
@@ -72,23 +75,23 @@ export interface CanvasRecord {
 
 const db = new Dexie('landroid-v2') as Dexie & {
   pdfs: EntityTable<PdfAttachment, 'nodeId'>;
-  documents: EntityTable<DocumentRecord, 'docId'>;
-  document_attachments: EntityTable<DocumentAttachment, 'attachmentId'>;
+  documents: EntityTable<DbScoped<DocumentRecord>, 'docId'>;
+  document_attachments: EntityTable<DbScoped<DocumentAttachment>, 'attachmentId'>;
   workspaces: EntityTable<WorkspaceRecord, 'id'>;
   canvases: EntityTable<CanvasRecord, 'id'>;
-  owners: EntityTable<Owner, 'id'>;
-  leases: EntityTable<Lease, 'id'>;
-  contactLogs: EntityTable<ContactLog, 'id'>;
-  ownerDocs: EntityTable<OwnerDoc, 'id'>;
-  mapAssets: EntityTable<MapAsset, 'id'>;
-  mapRegions: EntityTable<MapRegion, 'id'>;
-  mapExternalReferences: EntityTable<MapExternalReference, 'id'>;
-  researchImports: EntityTable<ResearchImport, 'id'>;
-  researchSources: EntityTable<ResearchSource, 'id'>;
-  researchFormulas: EntityTable<ResearchFormula, 'id'>;
-  researchProjectRecords: EntityTable<ResearchProjectRecord, 'id'>;
-  researchQuestions: EntityTable<ResearchQuestion, 'id'>;
-  titleIssues: EntityTable<TitleIssue, 'id'>;
+  owners: EntityTable<DbScoped<Owner>, 'id'>;
+  leases: EntityTable<DbScoped<Lease>, 'id'>;
+  contactLogs: EntityTable<DbScoped<ContactLog>, 'id'>;
+  ownerDocs: EntityTable<DbScoped<OwnerDoc>, 'id'>;
+  mapAssets: EntityTable<DbScoped<MapAsset>, 'id'>;
+  mapRegions: EntityTable<DbScoped<MapRegion>, 'id'>;
+  mapExternalReferences: EntityTable<DbScoped<MapExternalReference>, 'id'>;
+  researchImports: EntityTable<DbScoped<ResearchImport>, 'id'>;
+  researchSources: EntityTable<DbScoped<ResearchSource>, 'id'>;
+  researchFormulas: EntityTable<DbScoped<ResearchFormula>, 'id'>;
+  researchProjectRecords: EntityTable<DbScoped<ResearchProjectRecord>, 'id'>;
+  researchQuestions: EntityTable<DbScoped<ResearchQuestion>, 'id'>;
+  titleIssues: EntityTable<DbScoped<TitleIssue>, 'id'>;
   workspaceManifestShards: EntityTable<WorkspaceManifestShard, 'id'>;
   deskMapShards: EntityTable<DeskMapShard, 'id'>;
   ownershipNodeCompatShards: EntityTable<OwnershipNodeCompatShard, 'id'>;
@@ -368,6 +371,55 @@ db.version(10)
   });
 
 /**
+ * v11 (LLA-H01 — per-user workspace row isolation).
+ *
+ * The v10 manifest was keyed by `dbKey`, but workspace child shards and
+ * side-store tables still queried by `workspaceId` alone. v11 adds `dbKey`
+ * to every workspace-scoped row plus `[dbKey+workspaceId]` indexes so hosted
+ * users sharing one browser profile cannot read or delete one another's rows
+ * when a `.landroid` import carries the same workspace id.
+ */
+db.version(11)
+  .stores({
+    pdfs: 'nodeId',
+    workspaces: 'id',
+    canvases: 'id',
+    owners: 'id, dbKey, workspaceId, name, [dbKey+workspaceId], [dbKey+workspaceId+name]',
+    leases:
+      'id, dbKey, workspaceId, ownerId, [dbKey+workspaceId], [dbKey+workspaceId+ownerId], [workspaceId+ownerId]',
+    contactLogs:
+      'id, dbKey, workspaceId, ownerId, [dbKey+workspaceId], [dbKey+workspaceId+ownerId], [workspaceId+ownerId]',
+    ownerDocs:
+      'id, dbKey, workspaceId, ownerId, leaseId, [dbKey+workspaceId], [dbKey+workspaceId+ownerId], [dbKey+workspaceId+leaseId], [workspaceId+ownerId], [workspaceId+leaseId]',
+    mapAssets:
+      'id, dbKey, workspaceId, isFeatured, deskMapId, nodeId, linkedOwnerId, leaseId, researchSourceId, researchProjectRecordId, [dbKey+workspaceId], [dbKey+workspaceId+isFeatured], [dbKey+workspaceId+deskMapId], [dbKey+workspaceId+nodeId], [dbKey+workspaceId+linkedOwnerId], [dbKey+workspaceId+leaseId], [workspaceId+isFeatured], [workspaceId+deskMapId], [workspaceId+nodeId], [workspaceId+linkedOwnerId], [workspaceId+leaseId], [workspaceId+researchSourceId], [workspaceId+researchProjectRecordId]',
+    mapRegions:
+      'id, dbKey, workspaceId, assetId, deskMapId, nodeId, linkedOwnerId, leaseId, researchSourceId, researchProjectRecordId, [dbKey+workspaceId], [dbKey+workspaceId+assetId], [dbKey+workspaceId+deskMapId], [dbKey+workspaceId+nodeId], [dbKey+workspaceId+linkedOwnerId], [dbKey+workspaceId+leaseId], [workspaceId+assetId], [workspaceId+deskMapId], [workspaceId+nodeId], [workspaceId+linkedOwnerId], [workspaceId+leaseId], [workspaceId+researchSourceId], [workspaceId+researchProjectRecordId]',
+    mapExternalReferences:
+      'id, dbKey, workspaceId, assetId, regionId, source, [dbKey+workspaceId], [dbKey+workspaceId+assetId], [dbKey+workspaceId+regionId], [workspaceId+assetId], [workspaceId+regionId]',
+    researchImports:
+      'id, dbKey, workspaceId, datasetId, detectedFormat, [dbKey+workspaceId], [dbKey+workspaceId+datasetId], [dbKey+workspaceId+detectedFormat], [workspaceId+datasetId], [workspaceId+detectedFormat]',
+    researchSources:
+      'id, dbKey, workspaceId, sourceType, context, [dbKey+workspaceId], [dbKey+workspaceId+sourceType], [dbKey+workspaceId+context], [workspaceId+sourceType], [workspaceId+context]',
+    researchFormulas:
+      'id, dbKey, workspaceId, category, status, [dbKey+workspaceId], [dbKey+workspaceId+category], [dbKey+workspaceId+status], [workspaceId+category], [workspaceId+status]',
+    researchProjectRecords:
+      'id, dbKey, workspaceId, recordType, jurisdiction, status, [dbKey+workspaceId], [dbKey+workspaceId+recordType], [dbKey+workspaceId+jurisdiction], [dbKey+workspaceId+status], [workspaceId+recordType], [workspaceId+jurisdiction], [workspaceId+status]',
+    researchQuestions:
+      'id, dbKey, workspaceId, status, [dbKey+workspaceId], [dbKey+workspaceId+status], [workspaceId+status]',
+    titleIssues:
+      'id, dbKey, workspaceId, status, priority, issueType, affectedDeskMapId, affectedNodeId, affectedOwnerId, affectedLeaseId, [dbKey+workspaceId], [dbKey+workspaceId+status], [dbKey+workspaceId+priority], [workspaceId+status], [workspaceId+priority]',
+    documents:
+      'docId, dbKey, workspaceId, contentHash, [dbKey+workspaceId], [dbKey+workspaceId+kind], [dbKey+workspaceId+createdAt], [workspaceId+kind], [workspaceId+createdAt]',
+    document_attachments:
+      'attachmentId, dbKey, workspaceId, docId, [dbKey+workspaceId], [dbKey+workspaceId+entityKind+entityId], [dbKey+workspaceId+docId], [workspaceId+entityKind+entityId], [entityKind+entityId], [docId+entityKind+entityId]',
+    ...WORKSPACE_SHARD_STORE_DEFINITIONS,
+  })
+  .upgrade(async (tx) => {
+    await runV10ToV11DbKeyBackfill(tx);
+  });
+
+/**
  * Real-implementation deps for the migration. The pure helper accepts
  * everything as injection so tests can run with deterministic stubs.
  */
@@ -457,28 +509,123 @@ export async function runV9ToV10WorkspaceShardMigration(
     // Stamp the per-user DB key (the monolithic row's primary key) on the
     // manifest so the runtime reader can resolve this workspace by key without
     // adopting another user's shards (Bug 001).
+    const dbKey = record.id;
     await tx
       .table<WorkspaceManifestShard, 'id'>('workspaceManifestShards')
-      .put({ ...migration.shards.manifest, dbKey: record.id });
+      .put(stampDbKeyWithStorageId(migration.shards.manifest, 'id', dbKey));
 
     if (migration.shards.deskMaps.length > 0) {
       await tx
         .table<DeskMapShard, 'id'>('deskMapShards')
-        .bulkPut(migration.shards.deskMaps);
+        .bulkPut(
+          migration.shards.deskMaps.map((row) =>
+            stampDbKeyWithStorageId(row, 'id', dbKey)
+          )
+        );
     }
     if (migration.shards.nodes.length > 0) {
       await tx
         .table<OwnershipNodeCompatShard, 'id'>('ownershipNodeCompatShards')
-        .bulkPut(migration.shards.nodes);
+        .bulkPut(
+          migration.shards.nodes.map((row) =>
+            stampDbKeyWithStorageId(row, 'id', dbKey)
+          )
+        );
     }
 
     await tx
       .table<LeaseholdStateShard, 'id'>('leaseholdStateShards')
-      .put(migration.shards.leaseholdState);
+      .put(stampDbKeyWithStorageId(migration.shards.leaseholdState, 'id', dbKey));
     await tx
       .table<WorkspaceUiStateShard, 'id'>('workspaceUiStateShards')
-      .put(migration.shards.uiState);
+      .put(stampDbKeyWithStorageId(migration.shards.uiState, 'id', dbKey));
   }
+}
+
+type WorkspaceScopedBackfillRow = { id?: string; docId?: string; attachmentId?: string; workspaceId?: string; dbKey?: string };
+
+async function backfillDbKeyForTable(
+  tx: Transaction,
+  tableName: string,
+  dbKeyForWorkspace: Map<string, string>
+): Promise<void> {
+  const table = tx.table<WorkspaceScopedBackfillRow, string>(tableName);
+  const rows = await table.toArray();
+  await Promise.all(
+    rows.map(async (row) => {
+      if (!row.workspaceId) return;
+      const key = row.dbKey ?? dbKeyForWorkspace.get(row.workspaceId) ?? 'default';
+      const primaryField = row.id !== undefined
+        ? 'id'
+        : row.docId !== undefined
+          ? 'docId'
+          : row.attachmentId !== undefined
+            ? 'attachmentId'
+            : null;
+      if (!primaryField) return;
+      const primaryKey = row[primaryField];
+      if (!primaryKey) return undefined;
+      const nextPrimaryKey = storageScopedId(primaryKey, key);
+      const nextRow = {
+        ...row,
+        dbKey: key,
+        [primaryField]: nextPrimaryKey,
+      };
+      if (nextPrimaryKey === primaryKey) {
+        if (!row.dbKey) await table.update(primaryKey, { dbKey: key });
+        return;
+      }
+      await table.put(nextRow);
+      await table.delete(primaryKey);
+    })
+  );
+}
+
+export async function runV10ToV11DbKeyBackfill(
+  tx: Transaction
+): Promise<void> {
+  const manifests = await tx
+    .table<WorkspaceManifestShard, 'id'>('workspaceManifestShards')
+    .toArray();
+  const dbKeysByWorkspace = new Map<string, Set<string>>();
+  for (const manifest of manifests) {
+    const dbKey = manifest.dbKey ?? 'default';
+    const keys = dbKeysByWorkspace.get(manifest.workspaceId) ?? new Set<string>();
+    keys.add(dbKey);
+    dbKeysByWorkspace.set(manifest.workspaceId, keys);
+  }
+  const dbKeyForWorkspace = new Map<string, string>();
+  for (const [workspaceId, keys] of dbKeysByWorkspace) {
+    dbKeyForWorkspace.set(
+      workspaceId,
+      keys.size === 1 ? [...keys][0] : 'default'
+    );
+  }
+
+  await Promise.all(
+    [
+      'workspaceManifestShards',
+      'deskMapShards',
+      'ownershipNodeCompatShards',
+      'leaseholdStateShards',
+      'workspaceUiStateShards',
+      'owners',
+      'leases',
+      'contactLogs',
+      'ownerDocs',
+      'mapAssets',
+      'mapRegions',
+      'mapExternalReferences',
+      'researchImports',
+      'researchSources',
+      'researchFormulas',
+      'researchProjectRecords',
+      'researchQuestions',
+      'titleIssues',
+      'documents',
+      'document_attachments',
+    ].map((tableName) => backfillDbKeyForTable(tx, tableName, dbKeyForWorkspace))
+  );
 }
 
 export default db;

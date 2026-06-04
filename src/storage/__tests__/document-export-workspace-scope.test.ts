@@ -2,9 +2,17 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { DocumentAttachment, DocumentRecord } from '../../types/document';
 import type { OwnershipNode } from '../../types/node';
 
-function fakeDocument(overrides: Partial<DocumentRecord> = {}): DocumentRecord {
+type StoredDocumentRecord = DocumentRecord & { dbKey?: string };
+type StoredDocumentAttachment = DocumentAttachment & { dbKey?: string };
+
+const ACTIVE_DB_KEY = 'user-alice';
+
+function fakeDocument(
+  overrides: Partial<StoredDocumentRecord> = {}
+): StoredDocumentRecord {
   return {
     docId: 'doc-1',
+    dbKey: ACTIVE_DB_KEY,
     workspaceId: 'ws-1',
     fileName: 'doc.pdf',
     mimeType: 'application/pdf',
@@ -19,10 +27,11 @@ function fakeDocument(overrides: Partial<DocumentRecord> = {}): DocumentRecord {
 }
 
 function fakeAttachment(
-  overrides: Partial<DocumentAttachment> = {}
-): DocumentAttachment {
+  overrides: Partial<StoredDocumentAttachment> = {}
+): StoredDocumentAttachment {
   return {
     attachmentId: 'att-1',
+    dbKey: ACTIVE_DB_KEY,
     workspaceId: 'ws-1',
     docId: 'doc-1',
     entityKind: 'node',
@@ -37,8 +46,8 @@ async function loadWorkspacePersistenceWithRows({
   documents,
   attachments,
 }: {
-  documents: DocumentRecord[];
-  attachments: DocumentAttachment[];
+  documents: StoredDocumentRecord[];
+  attachments: StoredDocumentAttachment[];
 }) {
   vi.resetModules();
 
@@ -47,10 +56,16 @@ async function loadWorkspacePersistenceWithRows({
     document_attachments: {
       where: vi.fn((field: string) => ({
         equals: vi.fn((value: unknown) => ({
-          and: vi.fn((predicate: (row: DocumentAttachment) => boolean) => ({
+          and: vi.fn((predicate: (row: StoredDocumentAttachment) => boolean) => ({
             toArray: vi.fn(async () =>
               attachments
-                .filter((row) => row[field as keyof DocumentAttachment] === value)
+                .filter((row) => {
+                  if (field === '[dbKey+workspaceId]' && Array.isArray(value)) {
+                    const [dbKey, workspaceId] = value as [string, string];
+                    return row.dbKey === dbKey && row.workspaceId === workspaceId;
+                  }
+                  return row[field as keyof DocumentAttachment] === value;
+                })
                 .filter(predicate)
             ),
           })),
@@ -65,6 +80,9 @@ async function loadWorkspacePersistenceWithRows({
   };
 
   vi.doMock('../db', () => ({ default: db }));
+  vi.doMock('../active-workspace-key', () => ({
+    getWorkspaceDbKey: () => ACTIVE_DB_KEY,
+  }));
   const workspacePersistence = await import('../workspace-persistence');
   return { workspacePersistence, db };
 }
@@ -72,6 +90,7 @@ async function loadWorkspacePersistenceWithRows({
 describe('exportDocumentWorkspaceData workspace scope', () => {
   afterEach(() => {
     vi.doUnmock('../db');
+    vi.doUnmock('../active-workspace-key');
     vi.resetModules();
   });
 
@@ -102,5 +121,55 @@ describe('exportDocumentWorkspaceData workspace scope', () => {
     expect(exported.attachments.map((attachment) => attachment.attachmentId)).toEqual([
       'att-good',
     ]);
+  });
+
+  it('exports legacy PDF data only from the requested workspace when logical node IDs collide', async () => {
+    const { workspacePersistence, db } = await loadWorkspacePersistenceWithRows({
+      documents: [
+        fakeDocument({
+          docId: `${ACTIVE_DB_KEY}::doc-ws-1`,
+          workspaceId: 'ws-1',
+          fileName: 'target.pdf',
+          blob: new Blob(['target-pdf'], { type: 'application/pdf' }),
+        }),
+        fakeDocument({
+          docId: `${ACTIVE_DB_KEY}::doc-ws-2`,
+          workspaceId: 'ws-2',
+          fileName: 'stale.pdf',
+          blob: new Blob(['stale-pdf'], { type: 'application/pdf' }),
+        }),
+      ],
+      attachments: [
+        fakeAttachment({
+          attachmentId: `${ACTIVE_DB_KEY}::att-ws-2`,
+          workspaceId: 'ws-2',
+          docId: 'doc-ws-2',
+          entityId: 'node-collide',
+          position: 0,
+        }),
+        fakeAttachment({
+          attachmentId: `${ACTIVE_DB_KEY}::att-ws-1`,
+          workspaceId: 'ws-1',
+          docId: 'doc-ws-1',
+          entityId: 'node-collide',
+          position: 1,
+        }),
+      ],
+    });
+
+    const exported = await workspacePersistence.exportPdfWorkspaceData(
+      'ws-1',
+      [{ id: 'node-collide' } as OwnershipNode]
+    );
+
+    expect(db.documents.bulkGet).toHaveBeenCalledWith([
+      `${ACTIVE_DB_KEY}::doc-ws-1`,
+    ]);
+    expect(exported.pdfs).toHaveLength(1);
+    expect(exported.pdfs[0]).toMatchObject({
+      nodeId: 'node-collide',
+      fileName: 'target.pdf',
+    });
+    expect(await exported.pdfs[0]?.blob.text()).toBe('target-pdf');
   });
 });

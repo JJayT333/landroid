@@ -10,44 +10,94 @@
  * project open. Mirrors `document-store-lazy.test.ts`.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createBlankMapAsset, type MapAsset } from '../../types/map';
+import {
+  createBlankMapAsset,
+  createBlankMapRegion,
+  type MapAsset,
+  type MapRegion,
+} from '../../types/map';
 
-function fakeAsset(id: string, overrides: Partial<MapAsset> = {}): MapAsset {
-  return createBlankMapAsset(
-    'ws-1',
-    new Blob(['map-bytes'], { type: 'image/png' }),
-    {
-      fileName: `${id}.png`,
-      mimeType: 'image/png',
-      overrides: { id, ...overrides },
-    }
-  );
+type StoredMapAsset = MapAsset & { dbKey?: string };
+type StoredMapRegion = MapRegion & { dbKey?: string };
+
+const ACTIVE_DB_KEY = 'user-alice';
+
+function fakeAsset(
+  id: string,
+  overrides: Partial<StoredMapAsset> = {}
+): StoredMapAsset {
+  return {
+    ...createBlankMapAsset(
+      'ws-1',
+      new Blob(['map-bytes'], { type: 'image/png' }),
+      {
+        fileName: `${id}.png`,
+        mimeType: 'image/png',
+        overrides: { id, ...overrides },
+      }
+    ),
+    dbKey: ACTIVE_DB_KEY,
+    ...overrides,
+  };
 }
 
 function makeTable<Row extends Record<string, unknown>>(rows: Row[], pk: keyof Row) {
   const byId = new Map(rows.map((row) => [String(row[pk]), row]));
   const collection = (predicate: (row: Row) => boolean) => ({
     toArray: vi.fn(async () => rows.filter(predicate)),
+    modify: vi.fn(async (patch: Partial<Row>) => {
+      rows.filter(predicate).forEach((row) => Object.assign(row, patch));
+    }),
   });
   return {
     get: vi.fn(async (id: string) => byId.get(id)),
     where: vi.fn((field: string) => ({
-      equals: (value: unknown) => collection((row) => row[field] === value),
+      equals: (value: unknown) => collection((row) => {
+        if (field === '[dbKey+workspaceId]' && Array.isArray(value)) {
+          const [dbKey, workspaceId] = value as [string, string];
+          return row.dbKey === dbKey && row.workspaceId === workspaceId;
+        }
+        const compoundPrefix = '[dbKey+workspaceId+';
+        if (field.startsWith(compoundPrefix) && field.endsWith(']') && Array.isArray(value)) {
+          const linkField = field.slice(compoundPrefix.length, -1);
+          const [dbKey, workspaceId, linkId] = value as [string, string, string];
+          return (
+            row.dbKey === dbKey
+            && row.workspaceId === workspaceId
+            && row[linkField] === linkId
+          );
+        }
+        return row[field] === value;
+      }),
     })),
   };
 }
 
-async function loadStore(assets: MapAsset[]) {
+async function loadStore(
+  assets: StoredMapAsset[],
+  regions: StoredMapRegion[] = []
+) {
   vi.resetModules();
   const mapAssets = makeTable(assets as unknown as Array<Record<string, unknown>>, 'id');
+  const mapRegions = makeTable(regions as unknown as Array<Record<string, unknown>>, 'id');
   const db = {
     mapAssets,
-    mapRegions: makeTable([], 'id'),
+    mapRegions,
     mapExternalReferences: makeTable([], 'id'),
+    transaction: vi.fn(async (_mode: string, ...args: unknown[]) => {
+      const callback = args.at(-1);
+      if (typeof callback !== 'function') {
+        throw new Error('transaction callback missing');
+      }
+      return callback();
+    }),
   };
   vi.doMock('../db', () => ({ default: db }));
+  vi.doMock('../active-workspace-key', () => ({
+    getWorkspaceDbKey: () => ACTIVE_DB_KEY,
+  }));
   const mapPersistence = await import('../map-persistence');
-  return { mapPersistence };
+  return { mapPersistence, assets, regions };
 }
 
 function hasBlob(value: unknown): boolean {
@@ -57,6 +107,7 @@ function hasBlob(value: unknown): boolean {
 describe('map-asset lazy-load contract', () => {
   afterEach(() => {
     vi.doUnmock('../db');
+    vi.doUnmock('../active-workspace-key');
     vi.resetModules();
   });
 
@@ -103,5 +154,76 @@ describe('map-asset lazy-load contract', () => {
       expect(asset).not.toBeInstanceOf(Blob);
       expect(hasBlob(asset)).toBe(false);
     }
+  });
+
+  it('clears map links only inside the requested workspace for the active db key', async () => {
+    const ws1Asset = fakeAsset('map-ws-1', {
+      workspaceId: 'ws-1',
+      deskMapId: 'desk-shared',
+      nodeId: 'node-shared',
+      linkedOwnerId: 'owner-shared',
+      leaseId: 'lease-shared',
+    });
+    const ws2Asset = fakeAsset('map-ws-2', {
+      workspaceId: 'ws-2',
+      deskMapId: 'desk-shared',
+      nodeId: 'node-shared',
+      linkedOwnerId: 'owner-shared',
+      leaseId: 'lease-shared',
+    });
+    const ws1Region = {
+      ...createBlankMapRegion('ws-1', ws1Asset.id, {
+        id: 'region-ws-1',
+        deskMapId: 'desk-shared',
+        nodeId: 'node-shared',
+        linkedOwnerId: 'owner-shared',
+        leaseId: 'lease-shared',
+      }),
+      dbKey: ACTIVE_DB_KEY,
+    };
+    const ws2Region = {
+      ...createBlankMapRegion('ws-2', ws2Asset.id, {
+        id: 'region-ws-2',
+        deskMapId: 'desk-shared',
+        nodeId: 'node-shared',
+        linkedOwnerId: 'owner-shared',
+        leaseId: 'lease-shared',
+      }),
+      dbKey: ACTIVE_DB_KEY,
+    };
+    const { mapPersistence } = await loadStore(
+      [ws1Asset, ws2Asset],
+      [ws1Region, ws2Region]
+    );
+
+    await mapPersistence.clearDeskMapLink('ws-1', 'desk-shared');
+    await mapPersistence.clearNodeLink('ws-1', 'node-shared');
+    await mapPersistence.clearOwnerLink('ws-1', 'owner-shared');
+    await mapPersistence.clearLeaseLink('ws-1', 'lease-shared');
+
+    expect(ws1Asset).toMatchObject({
+      deskMapId: null,
+      nodeId: null,
+      linkedOwnerId: null,
+      leaseId: null,
+    });
+    expect(ws1Region).toMatchObject({
+      deskMapId: null,
+      nodeId: null,
+      linkedOwnerId: null,
+      leaseId: null,
+    });
+    expect(ws2Asset).toMatchObject({
+      deskMapId: 'desk-shared',
+      nodeId: 'node-shared',
+      linkedOwnerId: 'owner-shared',
+      leaseId: 'lease-shared',
+    });
+    expect(ws2Region).toMatchObject({
+      deskMapId: 'desk-shared',
+      nodeId: 'node-shared',
+      linkedOwnerId: 'owner-shared',
+      leaseId: 'lease-shared',
+    });
   });
 });
