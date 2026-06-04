@@ -35,6 +35,7 @@ import type {
 import type { OwnerWorkspaceData } from '../storage/owner-persistence';
 import type { WorkspaceData } from '../storage/workspace-persistence';
 import { ParityDivergenceError } from '../project-records/action-layer/parity';
+import { setTitleCutoverRuntimeStateReader } from '../project-records/action-layer/title-cutover-gate';
 import {
   recordTitleMutation,
   TITLE_MUTATIONS,
@@ -220,6 +221,14 @@ export const useTitleActionLog = create<TitleActionLogState>()((set, get) => ({
     }
   },
 }));
+
+setTitleCutoverRuntimeStateReader(() => {
+  const state = useTitleActionLog.getState();
+  return {
+    divergenceMessage: state.lastDivergence?.message ?? null,
+    errorMessage: state.lastError,
+  };
+});
 
 function readOwnerData(): OwnerSlice {
   const owner = useOwnerStore.getState();
