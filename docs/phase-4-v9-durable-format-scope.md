@@ -1,10 +1,12 @@
 # Phase 4 — Record-Bearing `.landroid` v9 Durable Format — Scope
 
-Status: **DESIGN-FIRST, scoped 2026-06-02 (pair).** No code written yet. This
-captures the decisions so the build can be split into tickets. Tracks audit
-backlog **ACT-H03** (live ledger not durable) and **DEF-ACT-04** (define the v9
-package format); incorporates **DEF-ACT-03** (audit-chain scope) and flags
-**ACT-M04** (snapshot growth).
+Status: **DESIGN-FIRST, scoped 2026-06-02 (pair); updated 2026-06-04.** The v9
+file format and the T2a runtime storage half are implemented; runtime
+flush/hydrate remains the T2b lifecycle slice. This captures the decisions so
+the remaining build can stay split into reviewable tickets. Tracks audit backlog
+**ACT-H03** (live ledger not durable) and **DEF-ACT-04** (define the v9 package
+format); incorporates **DEF-ACT-03** (audit-chain scope) and flags **ACT-M04**
+(snapshot growth).
 
 Supersession note, 2026-06-04: this file records the v9 design decision made
 under the earlier additive/snapshot-first posture. LANDroid now uses the
@@ -51,7 +53,7 @@ the title ActionRecords are self-sufficient; v9 makes them survive a round-trip.
 | D1 | Records authoritative on import? | **No** — snapshot authoritative; records ride along as validated shadow. |
 | D2 | Scope depth | **File format + runtime durability** (both halves of ACT-H03). |
 | D3 | Audit-chain scope (DEF-ACT-03) | **Project-wide** (one chain per project, as built today). |
-| D4 | Sequencing vs storage blockers | **File format now; runtime deferred behind LLA-H01 (isolation) + LLA-H02 (write fence).** |
+| D4 | Sequencing vs storage blockers | **LLA-H01/LLA-H02 landed; runtime is split into storage (T2a) and lifecycle (T2b).** |
 | D5 | Snapshot growth (ACT-M04) | **Ship full-snapshot v9; measure; add compaction/checkpointing later.** Not pre-optimized. |
 
 ## A. v9 file format (build now — does NOT touch the Dexie storage layer)
@@ -92,35 +94,57 @@ the file.
 **Forward compat:** v≤8 → load as today (no `actionLedger`); v9 → full path;
 v>9 → reject.
 
-## B. Runtime durability (DEFERRED behind LLA-H01 + LLA-H02 — see D4)
+## B. Runtime durability (T2a storage built; T2b lifecycle next)
 
-Models on the curative/owner side-store pattern (Dexie, `workspaceId`-keyed, 2s
-autosave debounce). Recorded here so it isn't re-derived later:
+Models on the curative/owner side-store pattern. LLA-H01 and LLA-H02 have
+landed, so runtime durability is no longer blocked; it is intentionally split
+into storage and lifecycle slices so the hydrate/precedence boundary gets its
+own review.
 
-- **Storage:** new Dexie tables `action_records` + `audit_events` (one
-  `db.version()` bump), keyed by `workspaceId` — same scoping as existing
-  side-stores, so it inherits (does not worsen) the LLA-H01 isolation posture.
-- **Write:** flush the live `useTitleActionLog` to Dexie on the existing
+- **Storage (T2a):** Dexie v12 adds `titleActionRecords` and
+  `titleAuditEvents`, storing backend-spine `action_record` and `audit_event`
+  rows. Rows are scoped by `[dbKey+workspaceId]` using the LLA-H01 db-key helper
+  contract. The stored `id`, `dbKey`, and `position` fields are Dexie metadata
+  only; canonical `recordId`, `previousHash`, and `eventHash` values stay
+  unchanged so T2b can hydrate and verify the same audit chain.
+- **Reset (T2a):** workspace replacement clears the active db-key's title ledger
+  rows through `workspace-side-store-reset.ts`. This matches shard reset
+  behavior and prevents an imported or demo-loaded workspace from inheriting a
+  stale ledger under the same browser profile. The in-memory
+  `setTitleActionLogResetHook` remains the live-store reset boundary.
+- **Write (T2b):** flush the live `useTitleActionLog` to Dexie on the existing
   `AUTOSAVE_DEBOUNCE_MS` (2s). Snapshot authoritative ⇒ ≤2s of shadow-ledger
   loss on a hard crash is harmless. (Preferred over write-per-append.)
-- **Hydrate on load:** Dexie has a ledger for the workspace → hydrate it and
+- **Hydrate on load (T2b):** Dexie has a ledger for the workspace → hydrate it and
   **continue the same audit chain from the persisted head hash** (tamper-evidence
   spans sessions). No ledger → fall back to lazy `ensureTitleBaseline`. Baseline
   = cold-start path; hydration = warm path.
-- **Reset:** extend `setTitleActionLogResetHook` to also delete the workspace's
-  ledger rows + bump the generation guard, so a workspace swap can't leak a
-  stale chain.
-- **File ↔ Dexie coherence:** opening a `.landroid` is a workspace load → reset,
+- **File ↔ Dexie coherence (T2b):** opening a `.landroid` is a workspace load → reset,
   then hydrate from the file's `actionLedger` (v9) or lazy-baseline (v8). The
   Dexie table always mirrors the live ledger. No merge/conflict logic — coherent
   by construction.
+
+**T2a rollback / revert recipe:**
+
+1. Before any destructive migration, export a `.landroid` backup and note the
+   branch/commit being tested.
+2. To revert the T2a code, revert the T2a commit or deploy the previous build.
+   T2a is additive storage only: no runtime read path, flush path, or hydrate
+   path depends on the new tables.
+3. If a browser profile has opened Dexie v12 and a reverted v11 build cannot
+   open `landroid-v2` because the IndexedDB version is newer, recover from the
+   `.landroid` backup: delete the `landroid-v2` IndexedDB database for that
+   browser profile, open the reverted build, and import the backup.
+4. If staying on the v12 build and only ledger rows need to be purged, clear the
+   `titleActionRecords` and `titleAuditEvents` object stores. No title/math data
+   lives only in those stores until T2b ships flush/hydrate.
 
 ## Build sequence (tickets)
 
 1. **v9 file format** (A). Codex-able: synthetic fixtures, pure round-trip +
    rollback + version-dispatch tests. **Buildable now.**
-2. *(after LLA-H01/H02)* **Dexie ledger tables + reset wiring** (B storage half).
-   Codex-able with a clear spec.
+2. **Dexie ledger tables + reset wiring** (B storage half / T2a). Codex-able
+   with a clear spec.
 3. *(after 2)* **Autosave flush + hydrate/continue-chain** (B lifecycle half).
    Pair — touches live store lifecycle.
 
@@ -134,14 +158,18 @@ From the migration strategy + v9-specific cases:
 - MathInputView parity vs Phase 0 goldens after a v9 round trip.
 - **`scripts/title-soak.ts` becomes a regression check**: after a v9 round-trip,
   `replay == adapter` + math parity must still hold.
-- *(runtime, deferred)* persist→refresh→hydrate equals pre-refresh ledger; next
-  mutation continues the chain; workspace swap clears rows.
+- *(runtime storage / T2a)* Dexie schema/index tests; Alice/Bob db-key isolation;
+  active-workspace reset clears only active-key ledger rows.
+- *(runtime lifecycle / T2b)* persist→refresh→hydrate equals pre-refresh ledger;
+  next mutation continues the chain; workspace swap clears rows; v9 file import
+  hydrates from file ledger instead of stale Dexie rows.
 
 ## Open follow-ons (not blocking v9 file format)
 
 - **ACT-M04** — snapshot growth/compaction; measure at W2 scale, decide
   full-snapshot vs math-relevant-field snapshot + checkpointing.
-- **LLA-H01 / LLA-H02** — prerequisites for runtime durability (D4).
+- **T2b runtime lifecycle** — autosave flush, hydrate, continue-chain, and
+  file-vs-Dexie precedence after the T2a storage tables.
 - **ACT-H05** — visible divergence UX; independent gate, still required before a
   read-flip is proposable.
 - **Rebuild-first read-flip governance** — after runtime ledger persistence,

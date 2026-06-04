@@ -27,6 +27,14 @@ summarizes how the app is put together and where changes should live.
   defines the pure single-writer lease decision contract for the later
   multi-tab write gate. `src/storage/workspace-shard-migration.ts` defines the
   pure monolith-to-shards and shards-to-monolith rollback helpers.
+- Title ledger runtime storage: Dexie v12 adds `titleActionRecords` and
+  `titleAuditEvents` through `src/storage/title-ledger-stores.ts` and
+  `src/storage/title-ledger-persistence.ts`. These tables store backend-spine
+  `action_record` and `audit_event` rows scoped by `dbKey + workspaceId`.
+  Stored row `id`, `dbKey`, and `position` are Dexie metadata; canonical
+  `recordId` and audit hashes are unchanged for later chain hydration. This is
+  storage plus reset wiring only; autosave flush, hydrate, continue-chain, and
+  file-vs-Dexie precedence remain the next lifecycle slice.
 - Runtime target: hosted web app first, with PWA/iPad support as a product
   target. Native iOS and desktop installers are deferred unless a later
   decision gate proves they are needed.
@@ -193,8 +201,9 @@ engine helper, or typed utility already owns the behavior.
 Workspace-replacing flows use `src/storage/workspace-side-store-reset.ts` to
 replace every side store in one pass. Demo loads and CSV imports pass empty
 side-store data, while `.landroid` imports pass the file payload and default
-missing sections to empty. That reset also clears transient AI approval and undo
-state so stale proposals cannot apply against a replaced workspace.
+missing sections to empty. That reset also clears the active db-key's workspace
+shards and title-ledger runtime rows, plus transient AI approval and undo state,
+so stale storage and proposals cannot apply against a replaced workspace.
 
 Tract-level Desk Map clearing remains scoped to the active Desk Map. It removes
 deleted node artifacts from document, map, and curative stores, then removes
@@ -267,6 +276,15 @@ under `actionLedger`. The v9 snapshot-authoritative import rule remains the
 current file-format behavior, but rebuild-first supersedes treating that as a
 permanent architecture rule. A future read-flip may make action-derived records
 canonical after runtime persistence, parity, round-trip, and revert gates pass.
+
+The T2a runtime storage slice adds Dexie v12 ledger tables only. Rollback is
+revertible by code because no runtime path reads or writes the tables yet. If a
+browser profile has already opened v12 and a reverted v11 build cannot open the
+newer IndexedDB version, recover by exporting a `.landroid` backup first,
+deleting the `landroid-v2` IndexedDB database for that profile, then importing
+the backup into the reverted build. If staying on v12, clearing
+`titleActionRecords` and `titleAuditEvents` is enough to purge the additive
+ledger rows.
 
 Phase 0.5 planning treats the current storage surface as follows:
 

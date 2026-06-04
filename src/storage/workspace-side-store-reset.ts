@@ -10,6 +10,7 @@ import type { CurativeWorkspaceData } from './curative-persistence';
 import type { MapWorkspaceData } from './map-persistence';
 import type { OwnerWorkspaceData } from './owner-persistence';
 import type { ResearchWorkspaceData } from './research-persistence';
+import { clearTitleLedgerRowsForActiveKey } from './title-ledger-persistence';
 import {
   clearWorkspaceShardsForActiveKey,
   exportDocumentWorkspaceData,
@@ -90,7 +91,10 @@ async function finalizeWorkspaceSideStoreReplacement(): Promise<void> {
   // Drop the prior workspace's shard rows for this DB key so the replacement
   // workspace's autosave starts from a clean set and the reader cannot resolve
   // a stale workspace under the active key.
-  await clearWorkspaceShardsForActiveKey();
+  await Promise.all([
+    clearWorkspaceShardsForActiveKey(),
+    clearTitleLedgerRowsForActiveKey(),
+  ]);
 
   useAIApprovalStore.getState().clear();
   useAIActionJournalStore.getState().clear();
