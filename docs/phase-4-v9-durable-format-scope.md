@@ -6,6 +6,14 @@ backlog **ACT-H03** (live ledger not durable) and **DEF-ACT-04** (define the v9
 package format); incorporates **DEF-ACT-03** (audit-chain scope) and flags
 **ACT-M04** (snapshot growth).
 
+Supersession note, 2026-06-04: this file records the v9 design decision made
+under the earlier additive/snapshot-first posture. LANDroid now uses the
+rebuild-first posture in `AGENTS.md` and `docs/rebuild-plan.md`: temporary branch
+breakage is acceptable when changes are reversible and validated, and the title
+read-flip is a near-term governed gate. The v9 file-format behavior below still
+describes current import/export semantics, but "snapshot stays authoritative" and
+"v9 does not read-flip" are no longer permanent architecture constraints.
+
 Authority: `docs/project-record-migration-strategy.md` (write/import strategy +
 required tests) and `docs/phase-4-action-layer-notes.md` (export gate already
 built). Read those first; this doc only records the v9-specific decisions.
@@ -136,3 +144,7 @@ From the migration strategy + v9-specific cases:
 - **LLA-H01 / LLA-H02** — prerequisites for runtime durability (D4).
 - **ACT-H05** — visible divergence UX; independent gate, still required before a
   read-flip is proposable.
+- **Rebuild-first read-flip governance** — after runtime ledger persistence,
+  `MathInputView` parity, `.landroid` round-trip, divergence, and revert gates
+  are green, the existing read-flip machinery may become governed/default-off
+  rather than permanently deferred.

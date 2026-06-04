@@ -35,6 +35,24 @@ summarizes how the app is put together and where changes should live.
 - AI: Vercel AI SDK adapters in `src/ai`; Ollama is the default provider.
 - Tests: Vitest and Playwright.
 
+## Operating posture - Rebuild-first
+
+As of 2026-06-04, LANDroid is in active rebuild with a single operator and no
+production users. Priority is correct architecture, not continuous runnability;
+temporary breakage during a rebuild step is acceptable. Safety comes from
+reversibility and validation, not from preserving live behavior at every step.
+Required of every change: branch isolation with revertible commits; `.landroid`
+export/import is the escape hatch and no destructive migration ships without a
+backup plus documented recovery; no math/precision change without the Phase 0
+golden masters; `MathInputView` parity and `.landroid` round-trip stay green or
+are updated deliberately and reviewably; no real-data or `scripts/springhill/`
+leakage; no hidden behavior changes; name behavior changes and update the
+relevant source-of-truth doc; no speculative features added just because
+breakage is cheap. The action/record layer becoming the canonical read source,
+the read-flip, is now a near-term designed gate, not deferred. This supersedes
+prior additive, snapshot-first, or keep-live-behavior guidance where they
+conflict.
+
 ## Entrypoints
 
 - `src/main.tsx`: app bootstrap, IndexedDB hydration, autosave subscriptions,
@@ -77,8 +95,10 @@ summarizes how the app is put together and where changes should live.
 
 ## Target Rebuild Boundaries
 
-The current app remains the behavioral reference until Phase 0 inventory,
-golden masters, and parity checks prove otherwise.
+The current app remains the behavioral reference for invariants, goldens, and
+reviewable comparisons; it is no longer a continuity constraint for every
+intermediate rebuild branch. A workflow may move to the action/record layer when
+its parity, round-trip recovery, and revert gates are proven.
 
 Target rebuild boundaries:
 
@@ -91,8 +111,9 @@ Target rebuild boundaries:
   record-bundle validation, `MathInputView`, `OpinionDraft`,
   `ObligationCalendar`, `AbstractorPackage`, evidence-vault/packet export
   adapters, AI context, and citation-verifier contracts live under
-  `src/project-records`. These helpers are read-side/additive only and do not
-  replace the current stores.
+  `src/project-records`. Earlier slices built these helpers as read-side and
+  additive. Under rebuild-first, later governed cutovers may make specific
+  projections canonical after parity, recovery, and revert gates pass.
 - Evidence Vault: immutable originals, content hashes, document versions,
   vault objects, extraction runs, citation anchors, derivative OCR/text
   artifacts, and deterministic packet manifests. The current evidence-vault
@@ -200,8 +221,10 @@ UI components should display and collect inputs; they should not duplicate the
 calculation rules.
 
 During rebuild work, do not make the math engine consume new domain records
-directly. Add a stable `MathInputView` projection first, then compare its
-outputs against existing golden masters before any cutover.
+directly. Add or preserve a stable `MathInputView` projection first, then
+compare its outputs against existing golden masters before any cutover. If a
+math behavior change is intentional, update the goldens deliberately and name
+the domain decision in the relevant docs.
 
 The current `MathInputView` projection is implemented behind
 `src/project-records/projections.ts`. It reuses the existing Leasehold and Desk
@@ -240,9 +263,10 @@ neither may make LANDroid unable to produce a complete local project package.
 The project-record `.landroid` migration strategy is documented in
 `docs/project-record-migration-strategy.md`. v9 is the first record-bearing
 package format: manual save can include a validated title action/audit ledger
-under `actionLedger`, while the snapshot remains authoritative on import. Bad
-or corrupt embedded ledgers are dropped with a warning instead of blocking the
-snapshot.
+under `actionLedger`. The v9 snapshot-authoritative import rule remains the
+current file-format behavior, but rebuild-first supersedes treating that as a
+permanent architecture rule. A future read-flip may make action-derived records
+canonical after runtime persistence, parity, round-trip, and revert gates pass.
 
 Phase 0.5 planning treats the current storage surface as follows:
 

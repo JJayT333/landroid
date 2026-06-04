@@ -4,6 +4,18 @@ Status: cutover MECHANISM built and proven in shadow; the WRITE path is wired
 live (recording-only); and the READ-path flip is wired into the one live record
 consumer (evidence-vault), default shadow + reversible.
 
+**Supersession note (2026-06-04).** This file was written under the earlier
+additive/snapshot-first posture. LANDroid now uses the rebuild-first posture in
+`AGENTS.md` and `docs/rebuild-plan.md`: temporary branch breakage is acceptable
+when changes are reversible and validated, and the title read-flip is a
+near-term governed gate. The "no live read flip," "never flipped," and
+`LIVE_CUTOVER_DISABLED = true` statements below remain accurate historical
+status for this Phase 4 shadow branch, but they are no longer permanent
+constraints for new work. T3 converts the existing machinery into a
+governed/default-off flip path; production enablement remains a separate
+reviewed decision after persistence, parity, round-trip, divergence, and revert
+gates are green.
+
 **Scope / accuracy note (post 2026-06-02 Codex audit).** The live ledger is
 **in-memory shadow instrumentation** held in a Zustand store. The ActionRecords
 are durable-*class* (schema-valid) but are **not yet persisted** to Dexie,

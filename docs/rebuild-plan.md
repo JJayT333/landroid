@@ -1,13 +1,31 @@
-# LANDroid Incremental Rebuild Plan
+# LANDroid Rebuild-First Plan
 
 Status: planning source of truth.
-Last updated: 2026-05-26.
+Last updated: 2026-06-04.
 
-This document consolidates the current rebuild direction. It is not approval to
-rewrite the app in one pass. It is the working plan for rebuilding LANDroid
-professionally, incrementally, and without breaking existing Desk Map,
-Runsheet, Leasehold, Flowchart, Documents, Curative, Maps, Research, Federal
-Leasing, AI approval, import/export, or print workflows.
+This document consolidates the current rebuild direction. It is not approval for
+reckless or irreversible changes. It is the working plan for rebuilding LANDroid
+professionally with correct architecture first, accepting temporary branch
+breakage when that produces a cleaner system and the change remains reversible,
+validated, and documented.
+
+## Operating posture - Rebuild-first
+
+As of 2026-06-04, LANDroid is in active rebuild with a single operator and no
+production users. Priority is correct architecture, not continuous runnability;
+temporary breakage during a rebuild step is acceptable. Safety comes from
+reversibility and validation, not from preserving live behavior at every step.
+Required of every change: branch isolation with revertible commits; `.landroid`
+export/import is the escape hatch and no destructive migration ships without a
+backup plus documented recovery; no math/precision change without the Phase 0
+golden masters; `MathInputView` parity and `.landroid` round-trip stay green or
+are updated deliberately and reviewably; no real-data or `scripts/springhill/`
+leakage; no hidden behavior changes; name behavior changes and update the
+relevant source-of-truth doc; no speculative features added just because
+breakage is cheap. The action/record layer becoming the canonical read source,
+the read-flip, is now a near-term designed gate, not deferred. This supersedes
+prior additive, snapshot-first, or keep-live-behavior guidance where they
+conflict.
 
 ## Reconciled Plan Summary
 
@@ -18,8 +36,9 @@ Accepted from the outside proposal:
 
 - one source of truth is the correct direction
 - mutation history, provenance, and approval records matter
-- migration must be incremental, with the old app running while new foundations
-  are added beside it
+- migration can be staged through reversible branches, documented backups, and
+  explicit recovery rather than requiring the old app to keep running at every
+  intermediate step
 - parity checks and golden-master tests come before cutover
 - the math engine must be preserved until a specific math phase is approved
 - the title-opinion starting workflow is a real product requirement
@@ -142,7 +161,10 @@ or to collapse the domain into generic nodes and edges.
 
 ## Non-Negotiable Contract
 
-The rebuild must preserve the full observable product, not only the arithmetic.
+The rebuild must preserve or deliberately replace the full observable product,
+not only the arithmetic. Temporary branch breakage is allowed, but no workflow
+replacement may land without naming the behavior change, preserving a revert
+path, and protecting the load-bearing invariants.
 
 Before replacing any existing workflow, LANDroid must inventory and protect:
 
@@ -996,7 +1018,10 @@ Migration and rollback strategy:
 
 Local-first and offline plan:
 
-- Dexie remains the active source of truth for core workflows during Phase 0.5.
+- Dexie remains the active local runtime store until a governed action/record
+  cutover replaces a specific workflow. Under rebuild-first, that cutover can be
+  near-term when the ledger is durable, parity is green, `.landroid` round-trip
+  recovery is proven, and the revert recipe is documented.
   The Phase 0.75 backend spine is a contract check, not storage, sync, or an
   online dependency for editing.
 - Sharded load, edit, autosave, document preview, `.landroid` import/export,

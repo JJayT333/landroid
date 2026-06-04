@@ -5,14 +5,30 @@ session handoff lives in `CONTINUATION-PROMPT.md`.
 
 ## Now
 
+- Operating posture - rebuild-first: as of 2026-06-04, LANDroid is in active
+  rebuild with a single operator and no production users. Priority is correct
+  architecture, not continuous runnability; temporary breakage during a rebuild
+  step is acceptable. Safety comes from reversibility and validation, not from
+  preserving live behavior at every step. Required of every change: branch
+  isolation with revertible commits; `.landroid` export/import is the escape
+  hatch and no destructive migration ships without a backup plus documented
+  recovery; no math/precision change without the Phase 0 golden masters;
+  `MathInputView` parity and `.landroid` round-trip stay green or are updated
+  deliberately and reviewably; no real-data or `scripts/springhill/` leakage;
+  no hidden behavior changes; name behavior changes and update the relevant
+  source-of-truth doc; no speculative features added just because breakage is
+  cheap. The action/record layer becoming the canonical read source, the
+  read-flip, is now a near-term designed gate, not deferred. This supersedes
+  prior additive, snapshot-first, or keep-live-behavior guidance where they
+  conflict.
 - Treat `docs/rebuild-plan.md` as the planning source of truth for any rebuild
   work: Phase 0 current-behavior inventory is closed, Phase 0.75 minimal
   backend spine is implemented and deployed, Phase 0.5 workspace sharding
   scaffolding has started, then project record schema, evidence-grade document
-  vault, source attestations, import/action
-  layers, and only then workflow cutovers. Preserve dual decimal plus fraction
-  display, print fidelity, in-flight migration safety, and citation
-  verification as rebuild contracts.
+  vault, source attestations, import/action layers, and governed workflow
+  cutovers. Preserve dual decimal plus fraction display, print fidelity,
+  in-flight migration safety, MathInputView parity, `.landroid` round-trip
+  recovery, and citation verification as rebuild contracts.
 - Keep `docs/phase-0-inventory.md` as the closed Phase 0 behavior catalog.
   Future-contract goldens remain parked for the implementation phase that
   creates each behavior, and lane rows should be re-verified before that lane is
@@ -27,8 +43,8 @@ session handoff lives in `CONTINUATION-PROMPT.md`.
   gates.
 - Phase 0.5 active implementation: shard the monolithic `workspaces.data` JSON
   inside Dexie against the Phase 0.75 record envelope before broad
-  record-schema work, while preserving current user-visible behavior. The first
-  code slices are still behavior-preserving: backend-spine manifest and Desk
+  record-schema work. The first code slices were behavior-preserving:
+  backend-spine manifest and Desk
   Map shard builders, local-only compatibility rows, autosave debounce naming,
   write-lease decision logic, lazy document-registry guard tests, and the Dexie
   v10 shard table upgrade. Runtime workspace load is shard-first with monolith
@@ -49,9 +65,10 @@ session handoff lives in `CONTINUATION-PROMPT.md`.
   was re-measured at 1476-node scale (2276 ms persist vs a 2062 ms monolith
   baseline — ~210 ms slower, off the interaction path). Persistent browser
   storage is now requested on startup (Storage API, recorded, non-blocking).
-  Remaining Phase 0.5 work is deferred and evidence-gated: a metadata-first
-  conversion of the blob-bearing side stores (owner docs, map assets, research
-  imports) and per-view edit-control disabling for read-only tabs.
+  Remaining shard-runtime work is evidence-gated: title-ledger runtime
+  persistence comes before any governed read-flip, metadata-first conversion of
+  blob-bearing side stores remains later, and per-view edit-control disabling
+  is optional unless storage integrity needs it.
 - Preserve `.landroid` package export permanently even after sync/backend work.
 - Promote the Evidence Vault contract: immutable originals, SHA-256 hashes,
   document versions, extraction runs, citation anchors, hash-continuity audit

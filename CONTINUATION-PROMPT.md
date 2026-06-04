@@ -4,6 +4,42 @@ Use this file to resume the active workstream in a new chat. Read it with
 `AGENTS.md`, `PROJECT_CONTEXT.md`, and `docs/README.md` before touching code.
 Keep long history in `CHANGELOG.md`.
 
+## Current Rebuild-First Posture Handoff - 2026-06-04
+
+Branch: `docs/rebuild-first-posture`
+
+Workstream: T0 rebuild-first posture update.
+
+LANDroid is now governed by this posture: as of 2026-06-04, LANDroid is in
+active rebuild with a single operator and no production users. Priority is
+correct architecture, not continuous runnability; temporary breakage during a
+rebuild step is acceptable. Safety comes from reversibility and validation, not
+from preserving live behavior at every step. Required of every change: branch
+isolation with revertible commits; `.landroid` export/import is the escape hatch
+and no destructive migration ships without a backup plus documented recovery; no
+math/precision change without the Phase 0 golden masters; `MathInputView` parity
+and `.landroid` round-trip stay green or are updated deliberately and
+reviewably; no real-data or `scripts/springhill/` leakage; no hidden behavior
+changes; name behavior changes and update the relevant source-of-truth doc; no
+speculative features added just because breakage is cheap. The action/record
+layer becoming the canonical read source, the read-flip, is now a near-term
+designed gate, not deferred. This supersedes prior additive, snapshot-first, or
+keep-live-behavior guidance where they conflict.
+
+Current implementation order:
+
+1. Finish this docs posture branch and merge it through PR.
+2. Complete the open remediation merge train (#111-#117) without broadening it.
+3. Build title-ledger runtime storage, then flush/hydrate lifecycle.
+4. Convert the existing title read-flip machinery from hard-disabled to
+   governed/default-off; production enablement remains a separate reviewed
+   decision after the gates are green.
+5. Add AI whole-project summary context with hosted minimal privacy preserved.
+
+Do not touch real `.landroid` files or `scripts/springhill/` in Codex tickets.
+The load-bearing invariants through the read-flip work are `MathInputView`
+goldens and `.landroid` export/import round-trip.
+
 ## Current V9 Durable Format Handoff - 2026-06-02
 
 Branch: `feat/v9-landroid-durable-format`
