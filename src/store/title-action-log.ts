@@ -35,16 +35,31 @@ import type {
 import type { OwnerWorkspaceData } from '../storage/owner-persistence';
 import type { WorkspaceData } from '../storage/workspace-persistence';
 import { ParityDivergenceError } from '../project-records/action-layer/parity';
+import { verifyAuditChain } from '../project-records/action-layer/audit-chain';
 import { setTitleCutoverRuntimeStateReader } from '../project-records/action-layer/title-cutover-gate';
 import {
   recordTitleMutation,
   TITLE_MUTATIONS,
   type TitleMutation,
 } from '../project-records/action-layer/title-command-sourcing';
+import type { ProjectRecordBundle } from '../project-records/record-validation';
+import {
+  listTitleLedgerWorkspaceRows,
+  replaceTitleLedgerWorkspaceRows,
+} from '../storage/title-ledger-persistence';
+import type { TitleLedgerWorkspaceRows } from '../storage/title-ledger-stores';
 import { useOwnerStore } from './owner-store';
 import { setTitleActionLogResetHook, setTitleJournalHook } from './workspace-store';
 
 type OwnerSlice = Pick<OwnerWorkspaceData, 'owners' | 'leases'>;
+
+export type TitleLedgerHydrationSource = 'storage' | 'file' | 'baseline';
+
+export interface TitleLedgerLifecycleResult {
+  source: TitleLedgerHydrationSource;
+  actionRecordCount: number;
+  auditEventCount: number;
+}
 
 export interface TitleLedgerDivergence {
   mutation: string;
@@ -268,6 +283,144 @@ export async function settleTitleActionLog(): Promise<void> {
   while (pending.size > 0) {
     await Promise.allSettled([...pending]);
   }
+}
+
+function cloneLedgerRows(rows: TitleLedgerWorkspaceRows): TitleLedgerWorkspaceRows {
+  return {
+    actionRecords: [...rows.actionRecords],
+    auditEvents: [...rows.auditEvents],
+  };
+}
+
+function ledgerRowsFromBundle(
+  bundle: ProjectRecordBundle
+): TitleLedgerWorkspaceRows {
+  return {
+    actionRecords: bundle.records.filter(
+      (record): record is ActionRecord => record.recordType === 'action_record'
+    ),
+    auditEvents: bundle.records.filter(
+      (record): record is AuditEventRecord => record.recordType === 'audit_event'
+    ),
+  };
+}
+
+function ledgerRowsBelongToWorkspace(
+  rows: TitleLedgerWorkspaceRows,
+  workspaceId: string
+): boolean {
+  return [...rows.actionRecords, ...rows.auditEvents].every(
+    (record) => record.workspaceId === workspaceId
+  );
+}
+
+async function verifyTitleLedgerRows(
+  rows: TitleLedgerWorkspaceRows,
+  workspaceId: string,
+  label: string
+): Promise<boolean> {
+  if (!ledgerRowsBelongToWorkspace(rows, workspaceId)) {
+    console.warn(
+      `[title-action-log] Ignoring ${label} ledger for workspace ${workspaceId}: ` +
+        'one or more records belong to another workspace.'
+    );
+    return false;
+  }
+  if (rows.auditEvents.length === 0) {
+    return rows.actionRecords.length === 0;
+  }
+  if (rows.actionRecords.length !== rows.auditEvents.length) {
+    console.warn(
+      `[title-action-log] Ignoring ${label} ledger for workspace ${workspaceId}: ` +
+        `action/audit count mismatch (${rows.actionRecords.length} actions, ` +
+        `${rows.auditEvents.length} audit events).`
+    );
+    return false;
+  }
+  const verification = await verifyAuditChain(rows.auditEvents);
+  if (!verification.valid) {
+    console.warn(
+      `[title-action-log] Ignoring ${label} ledger for workspace ${workspaceId}: ` +
+        `audit chain failed at index ${verification.brokenAtIndex} ` +
+        `(${verification.reason}).`
+    );
+    return false;
+  }
+  return true;
+}
+
+async function baselineAndFlushTitleLedger(
+  workspace: WorkspaceData,
+  ownerData?: OwnerSlice
+): Promise<TitleLedgerLifecycleResult> {
+  useTitleActionLog.getState().reset();
+  await ensureTitleBaseline(workspace, ownerData);
+  await flushTitleActionLogToStorage(workspace.workspaceId);
+  const state = useTitleActionLog.getState();
+  return {
+    source: 'baseline',
+    actionRecordCount: state.actionRecords.length,
+    auditEventCount: state.auditEvents.length,
+  };
+}
+
+export async function flushTitleActionLogToStorage(
+  workspaceId: string
+): Promise<void> {
+  await settleTitleActionLog();
+  const state = useTitleActionLog.getState();
+  const rows: TitleLedgerWorkspaceRows = {
+    actionRecords: [...state.actionRecords],
+    auditEvents: [...state.auditEvents],
+  };
+  if (!(await verifyTitleLedgerRows(rows, workspaceId, 'live'))) {
+    throw new Error(`Refusing to flush invalid title ledger for workspace ${workspaceId}.`);
+  }
+  await replaceTitleLedgerWorkspaceRows(workspaceId, rows);
+}
+
+export async function hydrateTitleActionLogFromStorageOrBaseline(
+  workspace: WorkspaceData,
+  ownerData?: OwnerSlice
+): Promise<TitleLedgerLifecycleResult> {
+  const storedRows = await listTitleLedgerWorkspaceRows(workspace.workspaceId);
+  if (
+    storedRows.actionRecords.length > 0
+    || storedRows.auditEvents.length > 0
+  ) {
+    if (
+      await verifyTitleLedgerRows(storedRows, workspace.workspaceId, 'stored')
+    ) {
+      const rows = cloneLedgerRows(storedRows);
+      useTitleActionLog.getState().hydrate(rows);
+      return {
+        source: 'storage',
+        actionRecordCount: rows.actionRecords.length,
+        auditEventCount: rows.auditEvents.length,
+      };
+    }
+  }
+  return baselineAndFlushTitleLedger(workspace, ownerData);
+}
+
+export async function hydrateTitleActionLogFromImportedLedger(
+  workspace: WorkspaceData,
+  actionLedger: ProjectRecordBundle | undefined,
+  ownerData?: OwnerSlice
+): Promise<TitleLedgerLifecycleResult> {
+  if (actionLedger) {
+    const rows = ledgerRowsFromBundle(actionLedger);
+    if (await verifyTitleLedgerRows(rows, workspace.workspaceId, 'imported file')) {
+      useTitleActionLog.getState().hydrate(cloneLedgerRows(rows));
+      await flushTitleActionLogToStorage(workspace.workspaceId);
+      return {
+        source: 'file',
+        actionRecordCount: rows.actionRecords.length,
+        auditEventCount: rows.auditEvents.length,
+      };
+    }
+  }
+  return baselineAndFlushTitleLedger(workspace, ownerData);
 }
 
 /**

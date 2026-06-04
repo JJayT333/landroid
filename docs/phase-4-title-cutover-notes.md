@@ -16,18 +16,19 @@ governed/default-off flip path; production enablement remains a separate
 reviewed decision after persistence, parity, round-trip, divergence, and revert
 gates are green.
 
-**Scope / accuracy note (post 2026-06-02 Codex audit).** The live ledger is
-**in-memory shadow instrumentation** held in a Zustand store. The ActionRecords
-are durable-*class* (schema-valid) but are **not yet persisted** to Dexie,
-`.landroid`, or a record bundle (ACT-H03). It captures title mutations made
-**in-session from an empty baseline**; it does **not** yet snapshot a
-loaded/imported workspace's pre-existing nodes (ACT-H01) and is **not** reset on
-workspace switch (ACT-H04). So it is a faithful *in-session* shadow — **not** yet
-a durable or complete read source. Treat any "durable" / "complete
-source-of-truth" wording elsewhere in this doc as aspirational until ACT-H01/H03/
-H04 land. Full gap list + ownership is in `docs/audit-backlog.md` (ACT-H01…ACT-L01):
-the Codex cleanup batch takes ACT-H02/H04/M03/L01; ACT-H01/H03/H05/M01/M02/M04 are
-paired (baseline, durable persistence/v9, divergence UX, provenance, ordering).
+**Scope / accuracy note (updated 2026-06-04).** The live ledger is still shadow
+instrumentation held in `useTitleActionLog`, but ACT-H01/H03/H04 are no longer
+accurate as open runtime gaps: loaded/imported workspaces can baseline or
+hydrate the ledger, the ledger is persisted to Dexie v12 and v9 `.landroid`
+packages, and workspace replacement resets the in-memory log plus the active
+db-key ledger rows. The ledger is now durable shadow evidence, not just
+in-session memory.
+
+It is still **not** the canonical read source. The Zustand store and snapshot
+path stay authoritative until the separate governed/default-off read-flip gate
+passes parity, `.landroid` round-trip, divergence, and revert checks. Treat any
+"complete source-of-truth" wording elsewhere in this historical note as
+conditional on that later read-flip decision.
 
 The Zustand store stays canonical for all reads and the engine stays the math
 authority. **No live read flip is enabled** — every read path defaults to the
