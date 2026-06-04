@@ -1,6 +1,5 @@
 import db from './db';
 import {
-  activeDbKey,
   activeStorageScopedId,
   activeWorkspaceScope,
   stampActiveDbKeyWithStorageId,
@@ -266,73 +265,65 @@ export function deleteMapReference(id: string) {
   });
 }
 
-export function clearDeskMapLink(id: string) {
-  const dbKey = activeDbKey();
+export function clearDeskMapLink(workspaceId: string, id: string) {
+  const scope = activeWorkspaceScope(workspaceId);
   return db.transaction('rw', db.mapAssets, db.mapRegions, async () => {
     await Promise.all([
       db.mapAssets
-        .where('deskMapId')
-        .equals(id)
-        .filter((row) => row.dbKey === dbKey)
+        .where('[dbKey+workspaceId+deskMapId]')
+        .equals([...scope, id])
         .modify({ deskMapId: null }),
       db.mapRegions
-        .where('deskMapId')
-        .equals(id)
-        .filter((row) => row.dbKey === dbKey)
+        .where('[dbKey+workspaceId+deskMapId]')
+        .equals([...scope, id])
         .modify({ deskMapId: null }),
     ]);
   });
 }
 
-export function clearNodeLink(id: string) {
-  const dbKey = activeDbKey();
+export function clearNodeLink(workspaceId: string, id: string) {
+  const scope = activeWorkspaceScope(workspaceId);
   return db.transaction('rw', db.mapAssets, db.mapRegions, async () => {
     await Promise.all([
       db.mapAssets
-        .where('nodeId')
-        .equals(id)
-        .filter((row) => row.dbKey === dbKey)
+        .where('[dbKey+workspaceId+nodeId]')
+        .equals([...scope, id])
         .modify({ nodeId: null }),
       db.mapRegions
-        .where('nodeId')
-        .equals(id)
-        .filter((row) => row.dbKey === dbKey)
+        .where('[dbKey+workspaceId+nodeId]')
+        .equals([...scope, id])
         .modify({ nodeId: null }),
     ]);
   });
 }
 
-export function clearOwnerLink(id: string) {
-  const dbKey = activeDbKey();
+export function clearOwnerLink(workspaceId: string, id: string) {
+  const scope = activeWorkspaceScope(workspaceId);
   return db.transaction('rw', db.mapAssets, db.mapRegions, async () => {
     await Promise.all([
       db.mapAssets
-        .where('linkedOwnerId')
-        .equals(id)
-        .filter((row) => row.dbKey === dbKey)
+        .where('[dbKey+workspaceId+linkedOwnerId]')
+        .equals([...scope, id])
         .modify({ linkedOwnerId: null }),
       db.mapRegions
-        .where('linkedOwnerId')
-        .equals(id)
-        .filter((row) => row.dbKey === dbKey)
+        .where('[dbKey+workspaceId+linkedOwnerId]')
+        .equals([...scope, id])
         .modify({ linkedOwnerId: null }),
     ]);
   });
 }
 
-export function clearLeaseLink(id: string) {
-  const dbKey = activeDbKey();
+export function clearLeaseLink(workspaceId: string, id: string) {
+  const scope = activeWorkspaceScope(workspaceId);
   return db.transaction('rw', db.mapAssets, db.mapRegions, async () => {
     await Promise.all([
       db.mapAssets
-        .where('leaseId')
-        .equals(id)
-        .filter((row) => row.dbKey === dbKey)
+        .where('[dbKey+workspaceId+leaseId]')
+        .equals([...scope, id])
         .modify({ leaseId: null }),
       db.mapRegions
-        .where('leaseId')
-        .equals(id)
-        .filter((row) => row.dbKey === dbKey)
+        .where('[dbKey+workspaceId+leaseId]')
+        .equals([...scope, id])
         .modify({ leaseId: null }),
     ]);
   });

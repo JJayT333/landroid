@@ -713,7 +713,7 @@ export async function reorderAttachments(
     // Anything that wasn't named in the order list keeps its relative
     // position from `existing` and trails behind.
     for (const a of existing) {
-      if (!seen.has(a.attachmentId)) {
+      if (!seen.has(logicalAttachmentId(a))) {
         ordered.push(a);
       }
     }

@@ -59,7 +59,13 @@ async function loadWorkspacePersistenceWithRows({
           and: vi.fn((predicate: (row: StoredDocumentAttachment) => boolean) => ({
             toArray: vi.fn(async () =>
               attachments
-                .filter((row) => row[field as keyof DocumentAttachment] === value)
+                .filter((row) => {
+                  if (field === '[dbKey+workspaceId]' && Array.isArray(value)) {
+                    const [dbKey, workspaceId] = value as [string, string];
+                    return row.dbKey === dbKey && row.workspaceId === workspaceId;
+                  }
+                  return row[field as keyof DocumentAttachment] === value;
+                })
                 .filter(predicate)
             ),
           })),
@@ -115,5 +121,55 @@ describe('exportDocumentWorkspaceData workspace scope', () => {
     expect(exported.attachments.map((attachment) => attachment.attachmentId)).toEqual([
       'att-good',
     ]);
+  });
+
+  it('exports legacy PDF data only from the requested workspace when logical node IDs collide', async () => {
+    const { workspacePersistence, db } = await loadWorkspacePersistenceWithRows({
+      documents: [
+        fakeDocument({
+          docId: `${ACTIVE_DB_KEY}::doc-ws-1`,
+          workspaceId: 'ws-1',
+          fileName: 'target.pdf',
+          blob: new Blob(['target-pdf'], { type: 'application/pdf' }),
+        }),
+        fakeDocument({
+          docId: `${ACTIVE_DB_KEY}::doc-ws-2`,
+          workspaceId: 'ws-2',
+          fileName: 'stale.pdf',
+          blob: new Blob(['stale-pdf'], { type: 'application/pdf' }),
+        }),
+      ],
+      attachments: [
+        fakeAttachment({
+          attachmentId: `${ACTIVE_DB_KEY}::att-ws-2`,
+          workspaceId: 'ws-2',
+          docId: 'doc-ws-2',
+          entityId: 'node-collide',
+          position: 0,
+        }),
+        fakeAttachment({
+          attachmentId: `${ACTIVE_DB_KEY}::att-ws-1`,
+          workspaceId: 'ws-1',
+          docId: 'doc-ws-1',
+          entityId: 'node-collide',
+          position: 1,
+        }),
+      ],
+    });
+
+    const exported = await workspacePersistence.exportPdfWorkspaceData(
+      'ws-1',
+      [{ id: 'node-collide' } as OwnershipNode]
+    );
+
+    expect(db.documents.bulkGet).toHaveBeenCalledWith([
+      `${ACTIVE_DB_KEY}::doc-ws-1`,
+    ]);
+    expect(exported.pdfs).toHaveLength(1);
+    expect(exported.pdfs[0]).toMatchObject({
+      nodeId: 'node-collide',
+      fileName: 'target.pdf',
+    });
+    expect(await exported.pdfs[0]?.blob.text()).toBe('target-pdf');
   });
 });

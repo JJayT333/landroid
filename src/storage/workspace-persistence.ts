@@ -82,7 +82,6 @@ import { normalizeTitleIssues, type TitleIssue } from '../types/title-issue';
 import { resolveActiveUnitCode } from '../utils/desk-map-units';
 import { getWorkspaceDbKey } from './active-workspace-key';
 import {
-  activeDbKey,
   activeStorageScopedId,
   activeWorkspaceScope,
   stampActiveDbKeyWithStorageId,
@@ -1295,6 +1294,7 @@ export async function downloadLandroidFile(
 }
 
 export async function exportPdfWorkspaceData(
+  workspaceId: string,
   nodes: OwnershipNode[]
 ): Promise<PdfWorkspaceData> {
   // Phase 5: read from the v8 `documents` + `document_attachments`
@@ -1308,9 +1308,9 @@ export async function exportPdfWorkspaceData(
   if (nodeIds.length === 0) return { pdfs: [] };
 
   const attachments = await db.document_attachments
-    .where('entityKind')
-    .equals('node')
-    .and((row) => row.dbKey === activeDbKey() && nodeIds.includes(row.entityId))
+    .where('[dbKey+workspaceId]')
+    .equals(activeWorkspaceScope(workspaceId))
+    .and((row) => row.entityKind === 'node' && nodeIds.includes(row.entityId))
     .toArray();
   if (attachments.length === 0) return { pdfs: [] };
 
@@ -1327,7 +1327,12 @@ export async function exportPdfWorkspaceData(
   const docs = await getDocumentRows(docIds);
   const docById = new Map<string, NonNullable<typeof docs[number]>>();
   for (const doc of docs) {
-    if (doc && doc.dbKey === activeDbKey() && doc.blob.size > 0) {
+    if (
+      doc
+      && doc.workspaceId === workspaceId
+      && doc.dbKey === activeWorkspaceScope(workspaceId)[0]
+      && doc.blob.size > 0
+    ) {
       docById.set(logicalDocId(doc), doc);
     }
   }

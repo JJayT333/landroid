@@ -321,4 +321,46 @@ describe('document-store', () => {
     expect(attachmentRows.get('att-ws1-a')?.position).toBe(0);
     expect(attachmentRows.get(`${ACTIVE_DB_KEY}::${added.attachmentId}`)?.position).toBe(1);
   });
+
+  it('reorders storage-scoped attachment IDs by their logical IDs without appending duplicates', async () => {
+    const { documentStore, attachmentRows } = await loadDocumentStoreWithRows({
+      documents: [
+        fakeDocument({ docId: 'doc-a', workspaceId: 'ws-1' }),
+        fakeDocument({ docId: 'doc-b', workspaceId: 'ws-1' }),
+        fakeDocument({ docId: 'doc-other', workspaceId: 'ws-2' }),
+      ],
+      attachments: [
+        fakeAttachment({
+          attachmentId: `${ACTIVE_DB_KEY}::att-a`,
+          workspaceId: 'ws-1',
+          docId: 'doc-a',
+          entityId: 'node-shared',
+          position: 0,
+        }),
+        fakeAttachment({
+          attachmentId: `${ACTIVE_DB_KEY}::att-b`,
+          workspaceId: 'ws-1',
+          docId: 'doc-b',
+          entityId: 'node-shared',
+          position: 1,
+        }),
+        fakeAttachment({
+          attachmentId: `${ACTIVE_DB_KEY}::att-other`,
+          workspaceId: 'ws-2',
+          docId: 'doc-other',
+          entityId: 'node-shared',
+          position: 0,
+        }),
+      ],
+    });
+
+    await documentStore.reorderAttachments('ws-1', 'node', 'node-shared', [
+      'att-b',
+      'att-a',
+    ]);
+
+    expect(attachmentRows.get(`${ACTIVE_DB_KEY}::att-b`)?.position).toBe(0);
+    expect(attachmentRows.get(`${ACTIVE_DB_KEY}::att-a`)?.position).toBe(1);
+    expect(attachmentRows.get(`${ACTIVE_DB_KEY}::att-other`)?.position).toBe(0);
+  });
 });
