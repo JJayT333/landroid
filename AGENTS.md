@@ -19,10 +19,29 @@ The active application surface is the repository root (`/`).
 - Prefer simple, predictable UX with a low learning curve for non-technical users.
 - Prefer extending existing patterns over introducing new paradigms.
 
+## Operating posture - Rebuild-first
+
+As of 2026-06-04, LANDroid is in active rebuild with a single operator and no
+production users. Priority is correct architecture, not continuous runnability;
+temporary breakage during a rebuild step is acceptable. Safety comes from
+reversibility and validation, not from preserving live behavior at every step.
+Required of every change: branch isolation with revertible commits; `.landroid`
+export/import is the escape hatch and no destructive migration ships without a
+backup plus documented recovery; no math/precision change without the Phase 0
+golden masters; `MathInputView` parity and `.landroid` round-trip stay green or
+are updated deliberately and reviewably; no real-data or `scripts/springhill/`
+leakage; no hidden behavior changes; name behavior changes and update the
+relevant source-of-truth doc; no speculative features added just because
+breakage is cheap. The action/record layer becoming the canonical read source,
+the read-flip, is now a near-term designed gate, not deferred. This supersedes
+prior additive, snapshot-first, or keep-live-behavior guidance where they
+conflict.
+
 ## Repository safety rules
 - Never commit directly to main.
 - Prefer small, reversible change sets.
-- Do not remove or rewrite working behavior unless required for the task.
+- Do not remove or rewrite working behavior unless required for the active
+  rebuild task; when doing so, make the behavior change explicit and reversible.
 - Do not add dependencies unless clearly justified.
 - Never hardcode secrets, tokens, credentials, or sensitive data.
 - Do not expose or move sensitive data outside the repository unless explicitly requested.
@@ -101,6 +120,9 @@ For app code, persistence, math, AI mutation, security, deployment, data-shape, 
 - Use the full delivery process.
 - Run the relevant automated checks and broaden validation when practical.
 - Update the matching source-of-truth docs when behavior, architecture, validation, security, or roadmap changes.
+- Under rebuild-first, do not treat temporary branch breakage as failure by
+  itself; treat hidden, irreversible, unvalidated, or undocumented behavior
+  change as the failure.
 
 The user is building LANDroid for the first time and benefits from brief orientation each turn. Provide a concise explanation of where the work is, what is next, and what is being deliberately deferred. If the user introduces new ideas mid-phase, capture them as deferred scope unless they explicitly redirect the current phase.
 
@@ -198,7 +220,7 @@ When applicable, keep stress coverage for large graphs or similar scale-sensitiv
 ## Default roadmap order
 Unless I override, prioritize work in this order:
 1. Correctness and invariants
-2. Safety and preview UX for math-changing actions
+2. Reversibility, backup/recovery, and reviewable migration paths
 3. Audit visibility and explainability
 4. Optimization and hardening
 5. Additional features only if clearly needed

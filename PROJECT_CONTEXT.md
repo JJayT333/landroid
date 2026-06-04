@@ -28,6 +28,24 @@ collaboration, sharing, and multi-user permissions remain later gates. The
 backend must not become the immediate source of truth for core workflows until
 an explicit future phase approves that cutover.
 
+## Operating posture - Rebuild-first
+
+As of 2026-06-04, LANDroid is in active rebuild with a single operator and no
+production users. Priority is correct architecture, not continuous runnability;
+temporary breakage during a rebuild step is acceptable. Safety comes from
+reversibility and validation, not from preserving live behavior at every step.
+Required of every change: branch isolation with revertible commits; `.landroid`
+export/import is the escape hatch and no destructive migration ships without a
+backup plus documented recovery; no math/precision change without the Phase 0
+golden masters; `MathInputView` parity and `.landroid` round-trip stay green or
+are updated deliberately and reviewably; no real-data or `scripts/springhill/`
+leakage; no hidden behavior changes; name behavior changes and update the
+relevant source-of-truth doc; no speculative features added just because
+breakage is cheap. The action/record layer becoming the canonical read source,
+the read-flip, is now a near-term designed gate, not deferred. This supersedes
+prior additive, snapshot-first, or keep-live-behavior guidance where they
+conflict.
+
 ## Jurisdictional scope
 LANDroid is **Texas-only for math today**. Texas fee and Texas state leases are the only jurisdictions modeled in calculation logic, leasehold review, and title-math UI today.
 
@@ -165,7 +183,7 @@ Avoid unnecessarily bloating test runtime.
 Unless explicitly overridden, prioritize work in this order:
 
 1. correctness and invariants
-2. safe preview UX for calculation changes
+2. reversibility, backup/recovery, and reviewable migration paths
 3. audit visibility and explainability
 4. performance and hardening
 5. additional features only when clearly needed
