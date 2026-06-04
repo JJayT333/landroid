@@ -85,6 +85,10 @@ async function loadOwnerPersistence(initialOwners: StoredOwner[]) {
   vi.doMock('../active-workspace-key', () => ({
     getWorkspaceDbKey: () => ACTIVE_DB_KEY,
   }));
+  vi.doMock('../workspace-write-lease', () => ({
+    assertWorkspaceWriteFence: vi.fn(async () => undefined),
+    ensureWorkspaceWriteFence: vi.fn(async () => undefined),
+  }));
   vi.doMock('../db', () => ({ default: db }));
 
   const persistence = await import('../owner-persistence');
@@ -94,6 +98,7 @@ async function loadOwnerPersistence(initialOwners: StoredOwner[]) {
 describe('side-store dbKey isolation', () => {
   afterEach(() => {
     vi.doUnmock('../active-workspace-key');
+    vi.doUnmock('../workspace-write-lease');
     vi.doUnmock('../db');
     vi.resetModules();
   });

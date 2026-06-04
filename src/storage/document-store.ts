@@ -24,6 +24,10 @@ import {
   stripStorageScopedId,
 } from './db-key-scope';
 import {
+  assertWorkspaceWriteFence,
+  ensureWorkspaceWriteFence,
+} from './workspace-write-lease';
+import {
   PDF_MIME_TYPE,
   normalizePdfBlob,
 } from '../utils/pdf-validation';
@@ -147,6 +151,18 @@ export interface SaveDocumentResult {
   attachment: DocumentAttachment;
 }
 
+async function ensureWorkspacesWritable(workspaceIds: Iterable<string>) {
+  for (const workspaceId of new Set(workspaceIds)) {
+    await ensureWorkspaceWriteFence(workspaceId);
+  }
+}
+
+async function assertWorkspacesWritable(workspaceIds: Iterable<string>) {
+  for (const workspaceId of new Set(workspaceIds)) {
+    await assertWorkspaceWriteFence(workspaceId);
+  }
+}
+
 function newId(): string {
   return crypto.randomUUID();
 }
@@ -262,11 +278,14 @@ export async function saveDoc(
     updatedAt: createdAt,
   };
 
+  await ensureWorkspaceWriteFence(input.workspaceId);
   return db.transaction(
     'rw',
+    db.workspaceWriteLeases,
     db.documents,
     db.document_attachments,
     async (): Promise<SaveDocumentResult> => {
+      await assertWorkspaceWriteFence(input.workspaceId);
       const existingCount = await db.document_attachments
         .where('[dbKey+workspaceId+entityKind+entityId]')
         .equals([...activeWorkspaceScope(input.workspaceId), input.entityKind, input.entityId])
@@ -299,14 +318,16 @@ export async function attachDocToEntity(
   entityKind: DocumentEntityKind,
   entityId: string
 ): Promise<DocumentAttachment> {
-  return db.transaction('rw', db.documents, db.document_attachments, async () => {
-    const doc = await getDocumentRow(docId);
-    if (!doc) {
-      throw new Error(`attachDocToEntity: document ${docId} not found`);
-    }
-    if (doc.dbKey !== activeWorkspaceScope(doc.workspaceId)[0]) {
-      throw new Error(`attachDocToEntity: document ${docId} not found`);
-    }
+  const doc = await getDocumentRow(docId);
+  if (!doc) {
+    throw new Error(`attachDocToEntity: document ${docId} not found`);
+  }
+  if (doc.dbKey !== activeWorkspaceScope(doc.workspaceId)[0]) {
+    throw new Error(`attachDocToEntity: document ${docId} not found`);
+  }
+  await ensureWorkspaceWriteFence(doc.workspaceId);
+  return db.transaction('rw', db.workspaceWriteLeases, db.documents, db.document_attachments, async () => {
+    await assertWorkspaceWriteFence(doc.workspaceId);
     const existingCount = await db.document_attachments
       .where('[dbKey+workspaceId+entityKind+entityId]')
       .equals([...activeWorkspaceScope(doc.workspaceId), entityKind, entityId])
@@ -335,11 +356,13 @@ export async function attachDocToEntity(
 export async function detachDocFromEntity(
   attachmentId: string
 ): Promise<void> {
-  await db.transaction('rw', db.document_attachments, async () => {
-    const existingRows = await getAttachmentRows([attachmentId]);
-    const existing = existingRows[0];
-    if (!existing) return;
-    if (existing.dbKey !== activeWorkspaceScope(existing.workspaceId)[0]) return;
+  const existingRows = await getAttachmentRows([attachmentId]);
+  const existing = existingRows[0];
+  if (!existing) return;
+  if (existing.dbKey !== activeWorkspaceScope(existing.workspaceId)[0]) return;
+  await ensureWorkspaceWriteFence(existing.workspaceId);
+  await db.transaction('rw', db.workspaceWriteLeases, db.document_attachments, async () => {
+    await assertWorkspaceWriteFence(existing.workspaceId);
     await db.document_attachments.delete(existing.attachmentId);
     await compactAttachmentPositions(
       existing.workspaceId,
@@ -358,9 +381,11 @@ export async function renameDoc(docId: string, newFileName: string): Promise<voi
   if (!trimmed) {
     throw new Error('renameDoc: fileName cannot be empty');
   }
-  await db.transaction('rw', db.documents, async () => {
-    const doc = await getDocumentRow(docId);
-    if (!doc || doc.dbKey !== activeWorkspaceScope(doc.workspaceId)[0]) return;
+  const doc = await getDocumentRow(docId);
+  if (!doc || doc.dbKey !== activeWorkspaceScope(doc.workspaceId)[0]) return;
+  await ensureWorkspaceWriteFence(doc.workspaceId);
+  await db.transaction('rw', db.workspaceWriteLeases, db.documents, async () => {
+    await assertWorkspaceWriteFence(doc.workspaceId);
     await db.documents.update(doc.docId, {
       fileName: trimmed,
       updatedAt: nowIso(),
@@ -374,9 +399,11 @@ export async function renameDoc(docId: string, newFileName: string): Promise<voi
  * after the v8 upgrade lands.
  */
 export async function setDocKind(docId: string, kind: DocumentKind): Promise<void> {
-  await db.transaction('rw', db.documents, async () => {
-    const doc = await getDocumentRow(docId);
-    if (!doc || doc.dbKey !== activeWorkspaceScope(doc.workspaceId)[0]) return;
+  const doc = await getDocumentRow(docId);
+  if (!doc || doc.dbKey !== activeWorkspaceScope(doc.workspaceId)[0]) return;
+  await ensureWorkspaceWriteFence(doc.workspaceId);
+  await db.transaction('rw', db.workspaceWriteLeases, db.documents, async () => {
+    await assertWorkspaceWriteFence(doc.workspaceId);
     await db.documents.update(doc.docId, {
       kind: normalizeDocumentKind(kind),
       updatedAt: nowIso(),
@@ -394,9 +421,11 @@ export async function updateDocMetadata(
 ): Promise<void> {
   const updates = normalizeMetadataPatch(patch);
   if (Object.keys(updates).length === 0) return;
-  await db.transaction('rw', db.documents, async () => {
-    const doc = await getDocumentRow(docId);
-    if (!doc || doc.dbKey !== activeWorkspaceScope(doc.workspaceId)[0]) return;
+  const doc = await getDocumentRow(docId);
+  if (!doc || doc.dbKey !== activeWorkspaceScope(doc.workspaceId)[0]) return;
+  await ensureWorkspaceWriteFence(doc.workspaceId);
+  await db.transaction('rw', db.workspaceWriteLeases, db.documents, async () => {
+    await assertWorkspaceWriteFence(doc.workspaceId);
     await db.documents.update(doc.docId, {
       ...updates,
       updatedAt: nowIso(),
@@ -444,9 +473,11 @@ export async function listDocumentRegistryData(
  * when one entity just wants to drop a reference.
  */
 export async function deleteDoc(docId: string): Promise<void> {
-  await db.transaction('rw', db.documents, db.document_attachments, async () => {
-    const doc = await getDocumentRow(docId);
-    if (!doc || doc.dbKey !== activeWorkspaceScope(doc.workspaceId)[0]) return;
+  const doc = await getDocumentRow(docId);
+  if (!doc || doc.dbKey !== activeWorkspaceScope(doc.workspaceId)[0]) return;
+  await ensureWorkspaceWriteFence(doc.workspaceId);
+  await db.transaction('rw', db.workspaceWriteLeases, db.documents, db.document_attachments, async () => {
+    await assertWorkspaceWriteFence(doc.workspaceId);
     const logicalId = logicalDocId(doc);
     await db.document_attachments
       .where('[dbKey+workspaceId+docId]')
@@ -463,20 +494,23 @@ export async function deleteDoc(docId: string): Promise<void> {
 export async function deleteDocs(docIds: ReadonlyArray<string>): Promise<void> {
   const uniqueDocIds = [...new Set(docIds)].filter(Boolean);
   if (uniqueDocIds.length === 0) return;
-  await db.transaction('rw', db.documents, db.document_attachments, async () => {
-    const docs = (await getDocumentRows(uniqueDocIds))
-      .filter((doc): doc is StoredDocumentRecord =>
-        Boolean(doc && doc.dbKey === activeWorkspaceScope(doc.workspaceId)[0])
-      );
-    const scopedDocIds = docs.map((doc) => doc.docId);
-    if (scopedDocIds.length === 0) return;
-    const scopedAttachmentKeys = docs.map((doc) =>
-      [...activeWorkspaceScope(doc.workspaceId), logicalDocId(doc)] as [
-        string,
-        string,
-        string,
-      ]
-    );
+  const docs = (await getDocumentRows(uniqueDocIds)).filter(
+    (doc): doc is StoredDocumentRecord =>
+      Boolean(doc && doc.dbKey === activeWorkspaceScope(doc.workspaceId)[0])
+  );
+  const scopedDocIds = docs.map((doc) => doc.docId);
+  if (scopedDocIds.length === 0) return;
+  const workspaceIds = docs.map((doc) => doc.workspaceId);
+  const scopedAttachmentKeys = docs.map((doc) =>
+    [...activeWorkspaceScope(doc.workspaceId), logicalDocId(doc)] as [
+      string,
+      string,
+      string,
+    ]
+  );
+  await ensureWorkspacesWritable(workspaceIds);
+  await db.transaction('rw', db.workspaceWriteLeases, db.documents, db.document_attachments, async () => {
+    await assertWorkspacesWritable(workspaceIds);
     const attachmentIds = await db.document_attachments
       .where('[dbKey+workspaceId+docId]')
       .anyOf(scopedAttachmentKeys)
@@ -499,14 +533,21 @@ export async function deleteDocsForAttachments(
   const uniqueAttachmentIds = [...new Set(attachmentIds)].filter(Boolean);
   if (uniqueAttachmentIds.length === 0) return;
 
-  await db.transaction('rw', db.documents, db.document_attachments, async () => {
-    const removedAttachments = (await getAttachmentRows(uniqueAttachmentIds)).filter(
-      (attachment): attachment is StoredDocumentAttachment =>
-        Boolean(
-          attachment
-          && attachment.dbKey === activeWorkspaceScope(attachment.workspaceId)[0]
-        )
+  const attachmentsBeforeWrite = (await getAttachmentRows(uniqueAttachmentIds)).filter(
+    (attachment): attachment is StoredDocumentAttachment =>
+      Boolean(
+        attachment
+        && attachment.dbKey === activeWorkspaceScope(attachment.workspaceId)[0]
+      )
+  );
+  await ensureWorkspacesWritable(
+    attachmentsBeforeWrite.map((attachment) => attachment.workspaceId)
+  );
+  await db.transaction('rw', db.workspaceWriteLeases, db.documents, db.document_attachments, async () => {
+    await assertWorkspacesWritable(
+      attachmentsBeforeWrite.map((attachment) => attachment.workspaceId)
     );
+    const removedAttachments = attachmentsBeforeWrite;
     if (removedAttachments.length === 0) return;
 
     const removedAttachmentSet = new Set(
@@ -694,7 +735,9 @@ export async function reorderAttachments(
   entityId: string,
   orderedAttachmentIds: ReadonlyArray<string>
 ): Promise<void> {
-  await db.transaction('rw', db.document_attachments, async () => {
+  await ensureWorkspaceWriteFence(workspaceId);
+  await db.transaction('rw', db.workspaceWriteLeases, db.document_attachments, async () => {
+    await assertWorkspaceWriteFence(workspaceId);
     const existing = await db.document_attachments
       .where('[dbKey+workspaceId+entityKind+entityId]')
     .equals([...activeWorkspaceScope(workspaceId), entityKind, entityId])

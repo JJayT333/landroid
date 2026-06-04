@@ -182,6 +182,10 @@ async function loadDocumentStoreWithRows({
   vi.doMock('../active-workspace-key', () => ({
     getWorkspaceDbKey: () => ACTIVE_DB_KEY,
   }));
+  vi.doMock('../workspace-write-lease', () => ({
+    assertWorkspaceWriteFence: vi.fn(async () => undefined),
+    ensureWorkspaceWriteFence: vi.fn(async () => undefined),
+  }));
   const documentStore = await import('../document-store');
   return { documentStore, docRows, attachmentRows, db };
 }
@@ -190,6 +194,7 @@ describe('document-store', () => {
   afterEach(() => {
     vi.doUnmock('../db');
     vi.doUnmock('../active-workspace-key');
+    vi.doUnmock('../workspace-write-lease');
     vi.resetModules();
   });
 

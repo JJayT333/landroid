@@ -189,6 +189,20 @@ describe('WorkspaceWriteLeaseController', () => {
     expect(store.leases.get('ws-1')).toMatchObject({ ownerTabId: 'tab-b' });
   });
 
+  it('rejects a stale writer fence after another tab takes over', async () => {
+    const store = makeLeaseStore();
+    const clock = { value: 1000 };
+    const tabA = new WorkspaceWriteLeaseController(makeEnv(store, 'tab-a', clock));
+    const tabB = new WorkspaceWriteLeaseController(makeEnv(store, 'tab-b', clock));
+
+    await tabA.ensureWritable('ws-1');
+    await tabB.ensureWritable('ws-1', { force: true });
+
+    await expect(tabA.assertFence('ws-1')).rejects.toThrow(/stale/i);
+    expect(tabA.canWrite('ws-1')).toBe(false);
+    expect(tabB.canWrite('ws-1')).toBe(true);
+  });
+
   it('auto-promotes a read-only tab when the writer releases', async () => {
     const store = makeLeaseStore();
     const clock = { value: 1000 };

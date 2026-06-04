@@ -96,6 +96,10 @@ async function loadStore(
   vi.doMock('../active-workspace-key', () => ({
     getWorkspaceDbKey: () => ACTIVE_DB_KEY,
   }));
+  vi.doMock('../workspace-write-lease', () => ({
+    assertWorkspaceWriteFence: vi.fn(async () => undefined),
+    ensureWorkspaceWriteFence: vi.fn(async () => undefined),
+  }));
   const mapPersistence = await import('../map-persistence');
   return { mapPersistence, assets, regions };
 }
@@ -108,6 +112,7 @@ describe('map-asset lazy-load contract', () => {
   afterEach(() => {
     vi.doUnmock('../db');
     vi.doUnmock('../active-workspace-key');
+    vi.doUnmock('../workspace-write-lease');
     vi.resetModules();
   });
 
