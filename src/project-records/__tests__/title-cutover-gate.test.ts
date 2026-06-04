@@ -3,7 +3,7 @@
  * advance shadow→candidate until >=10 real mutations have passed inline parity
  * AND math parity is clean. Reversible; live cutover stays hard-blocked.
  */
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   CutoverRegistry,
   CutoverDisabledError,
@@ -14,6 +14,7 @@ import {
   TitleTreeCutoverGate,
 } from '../action-layer/title-cutover-gate';
 import type { ParityReport } from '../action-layer/parity';
+import { useTitleActionLog } from '../../store/title-action-log';
 
 const cleanReport: ParityReport = {
   workflow: 'title_tree',
@@ -37,6 +38,14 @@ function passN(gate: TitleTreeCutoverGate, n: number): void {
 }
 
 describe('Phase 4 title cutover gate', () => {
+  beforeEach(() => {
+    useTitleActionLog.getState().reset();
+  });
+
+  afterEach(() => {
+    useTitleActionLog.getState().reset();
+  });
+
   it('refuses candidacy before the parity threshold is met', () => {
     const gate = new TitleTreeCutoverGate();
     gate.setMathParityClean(true);
@@ -81,6 +90,34 @@ describe('Phase 4 title cutover gate', () => {
     expect(readiness.reason).toMatch(/Runtime title-ledger divergence is active/);
     expect(() => gate.proposeCandidate(cleanReport)).toThrow(/Runtime title-ledger divergence/);
     expect(gate.getState()).toBe('shadow');
+  });
+
+  it('consults live title action-log divergence and recovers after reset', () => {
+    const gate = new TitleTreeCutoverGate();
+    passN(gate, MIN_PASSED_TITLE_PARITIES);
+    gate.setMathParityClean(true);
+    expect(gate.readiness().ready).toBe(true);
+
+    useTitleActionLog.setState({
+      lastDivergence: {
+        mutation: 'createRootNode',
+        message: 'createRootNode diverged',
+        at: '2026-06-04T00:00:00.000Z',
+      },
+      lastError: null,
+    });
+
+    const blocked = gate.readiness();
+    expect(blocked.ready).toBe(false);
+    expect(blocked.runtimeDivergence).toBe(true);
+    expect(blocked.reason).toMatch(/createRootNode diverged/);
+    expect(() => gate.proposeCandidate(cleanReport)).toThrow(/createRootNode diverged/);
+
+    useTitleActionLog.getState().reset();
+
+    const recovered = gate.readiness();
+    expect(recovered.ready).toBe(true);
+    expect(recovered.runtimeDivergence).toBe(false);
   });
 
   it('refuses to count a diverged parity toward candidacy', () => {
