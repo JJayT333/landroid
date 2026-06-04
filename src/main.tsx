@@ -13,10 +13,10 @@ import { useResearchStore } from './store/research-store';
 import { useCurativeStore } from './store/curative-store';
 import { useWorkspaceStore } from './store/workspace-store';
 import { useCanvasStore } from './store/canvas-store';
-// Phase 4 (shadow): registers the title-tree write-path journal hook at startup
-// so title mutations are recorded as durable ActionRecords alongside the
-// canonical store. Recording-only; reads stay on the store. Side-effect import.
-import './store/title-action-log';
+import {
+  flushTitleActionLogToStorage,
+  hydrateTitleActionLogFromStorageOrBaseline,
+} from './store/title-action-log';
 import { saveWorkspaceShardsToDb, loadWorkspaceFromDb } from './storage/workspace-persistence';
 import { saveCanvasToDb, loadCanvasFromDb } from './storage/canvas-persistence';
 import {
@@ -37,6 +37,11 @@ import {
   workspaceAutosaveStateChanged,
 } from './storage/autosave-change-detection';
 import { AUTOSAVE_DEBOUNCE_MS } from './storage/autosave-config';
+
+function readTitleOwnerData() {
+  const owner = useOwnerStore.getState();
+  return { owners: owner.owners, leases: owner.leases };
+}
 
 // ── Auto-load saved workspace and canvas on startup ─────
 async function bootstrapApp() {
@@ -88,6 +93,13 @@ async function bootstrapApp() {
     // `document_attachments` tables after the workspace state lands.
     // Safe to fail; the rest of the workspace still renders.
     await useWorkspaceStore.getState().hydrateNodeAttachments().catch(() => {});
+    await hydrateTitleActionLogFromStorageOrBaseline(
+      workspaceResult.data,
+      readTitleOwnerData()
+    ).catch((err) => {
+      const message = err instanceof Error ? err.message : String(err);
+      startupWarnings.push(`Title ledger hydration failed: ${message}`);
+    });
   } else {
     useWorkspaceStore.getState().setHydrated();
     const workspaceId = useWorkspaceStore.getState().workspaceId;
@@ -130,6 +142,7 @@ void bootstrapApp();
 // ── Auto-save workspace on changes (debounced 2s) ────────
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 let prevWorkspaceSnapshot: ReturnType<typeof captureWorkspaceAutosaveSnapshot> | null = null;
+let workspaceSaveGeneration = 0;
 
 useWorkspaceStore.subscribe((state) => {
   if (!state._hydrated) return;
@@ -139,10 +152,20 @@ useWorkspaceStore.subscribe((state) => {
   }
   if (!workspaceAutosaveStateChanged(prevWorkspaceSnapshot, state)) return;
   prevWorkspaceSnapshot = captureWorkspaceAutosaveSnapshot(state);
+  workspaceSaveGeneration += 1;
 
   if (saveTimer) clearTimeout(saveTimer);
+  const saveGeneration = workspaceSaveGeneration;
+  const payload = buildWorkspaceAutosavePayload(state);
   saveTimer = setTimeout(() => {
-    void saveWorkspaceShardsToDb(buildWorkspaceAutosavePayload(state));
+    void (async () => {
+      const result = await saveWorkspaceShardsToDb(payload);
+      if (result.status !== 'written') return;
+      if (saveGeneration !== workspaceSaveGeneration) return;
+      await flushTitleActionLogToStorage(payload.workspaceId);
+    })().catch((err) => {
+      console.warn('[landroid] title ledger autosave failed:', err);
+    });
   }, AUTOSAVE_DEBOUNCE_MS);
 });
 

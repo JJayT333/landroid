@@ -4,93 +4,108 @@ Use this file to resume the active workstream in a new chat. Read it with
 `AGENTS.md`, `PROJECT_CONTEXT.md`, and `docs/README.md` before touching code.
 Keep long history in `CHANGELOG.md`.
 
-## Current Title Ledger Runtime Storage Handoff - 2026-06-04
+## Current Title Ledger Runtime Lifecycle Handoff - 2026-06-04
 
-Branch: `feat/title-ledger-runtime-storage`
+Branch: `feat/title-ledger-runtime-lifecycle`
 
-Worktree: `/private/tmp/landroid-title-ledger-storage`
+Worktree: `/private/tmp/landroid-title-ledger-lifecycle`
 
-Workstream: T2a runtime ledger storage. T0 rebuild-first posture and the T1
-remediation merge train (#111-#117) are complete on `main`.
+Workstream: T2b runtime ledger lifecycle, branched from T2a
+`feat/title-ledger-runtime-storage`. T0 rebuild-first posture and the T1
+remediation merge train (#111-#117) are complete on `main`; T2a is open as PR
+#119.
 
 Completed in this branch:
 
-- Dexie v12 adds `titleActionRecords` and `titleAuditEvents` for backend-spine
-  `action_record` and `audit_event` rows.
-- Runtime ledger rows are scoped by `dbKey + workspaceId`; stored `id`,
-  `dbKey`, and `position` are Dexie-only metadata. Canonical `recordId`,
-  `previousHash`, and `eventHash` values stay unchanged for later chain
-  verification.
-- `src/storage/title-ledger-persistence.ts` can list, replace, clear one active
-  workspace, and clear all ledger rows for the active db key.
-- Workspace replacement now clears active-key title-ledger rows alongside shard
-  rows and transient AI approval/undo state.
-- `ARCHITECTURE.md`, `ROADMAP.md`, and
-  `docs/phase-4-v9-durable-format-scope.md` document the storage/lifecycle
-  split and the exact Dexie rollback recipe.
+- `useTitleActionLog` now has lifecycle helpers to flush the live title ledger
+  to Dexie, hydrate from Dexie, hydrate from a v9 file ledger, or baseline when
+  no ledger exists.
+- App startup hydrates the loaded workspace from Dexie and continues the audit
+  chain from the persisted head. If no stored rows exist, it baselines the
+  loaded snapshot and mirrors that baseline to Dexie.
+- Debounced workspace autosave now mirrors the title ledger after a successful
+  current-generation shard save. A generation guard skips stale flushes when a
+  newer edit arrives while an async save is in flight.
+- `.landroid` imports hydrate from the file `actionLedger` over stale Dexie rows
+  and mirror the chosen file/baseline ledger back to Dexie. CSV and demo loads
+  baseline from the loaded workspace and mirror back.
+- Lifecycle tests cover persist-refresh-hydrate equality, continued audit chain,
+  workspace swap rehydrate, and v9 file-ledger precedence over stale Dexie.
+- `ARCHITECTURE.md`, `ROADMAP.md`,
+  `docs/phase-4-v9-durable-format-scope.md`, and
+  `docs/phase-4-title-cutover-notes.md` now describe the ledger as durable
+  shadow evidence, not in-memory-only instrumentation.
 
 Explicitly not included:
 
-- No autosave flush, hydrate, continue-chain, `.landroid` file-vs-Dexie
-  precedence, read-path change, read-flip enablement, or production flip.
+- No production read flip and no change to canonical reads. Zustand/snapshot
+  reads remain authoritative until the separate T3 governed/default-off
+  read-flip readiness gate is reviewed.
 - No math/precision behavior change.
 - No real `.landroid` files or `scripts/springhill/` changes.
 
 Rollback / recovery:
 
-- Before any destructive migration, export a `.landroid` backup and note the
-  branch/commit under test.
-- T2a is additive storage only; reverting the T2a code removes the runtime use
-  of the new tables because no read/flush/hydrate path depends on them yet.
+- Before destructive migration or rollback testing, export a `.landroid` backup
+  and note the branch/commit under test.
+- To revert T2b while keeping Dexie v12, revert this lifecycle commit/PR. The
+  app returns to T2a storage-only shadow behavior; current reads still come from
+  the store/snapshot path.
 - If a browser profile has opened Dexie v12 and a reverted v11 build cannot
   open the newer IndexedDB version, delete the `landroid-v2` IndexedDB database
   for that profile only after exporting a `.landroid` backup, then import the
   backup into the reverted build.
-- If staying on v12, clearing `titleActionRecords` and `titleAuditEvents` is
-  enough to purge the additive ledger rows.
+- If staying on v12, clearing `titleActionRecords` and `titleAuditEvents` purges
+  the additive mirror rows.
 
 Latest validation:
 
-- `npm ci` - passed earlier in this worktree, with the local Node 26 engine
-  warning and the pre-existing npm audit finding.
-- `npm test -- src/storage/__tests__/title-ledger-persistence.test.ts src/storage/__tests__/workspace-side-store-reset.test.ts`
-  - passed, 2 files / 9 tests.
+- `npm ci` - passed in this worktree, with the local Node 26 engine warning and
+  the pre-existing npm audit finding.
+- `npm test -- src/store/__tests__/title-action-log-persistence.test.ts src/storage/__tests__/title-ledger-persistence.test.ts src/store/__tests__/title-action-log.test.ts`
+  - passed, 3 files / 21 tests.
 - `npm run lint` - passed.
 - `git diff --check` - passed.
-- `npm test` - passed, 128 files / 890 tests. Existing intentional stderr
+- `npm test` - passed, 129 files / 894 tests. Existing intentional stderr
   appeared for simulated Dexie failures, title divergence, and post-v8 backup
   failure paths.
 - `npm run build` - passed with existing Vite dynamic/static import warnings,
   the Node `module.register()` deprecation warning, and large-chunk warning.
+- `./node_modules/.bin/tsx scripts/title-soak.ts` - passed on the synthetic
+  Vulcan Mesa fixture: replay == adapter and math parity both PASS.
 
 Open risks / deliberately deferred:
 
-- T2b is the close-review lifecycle slice: autosave flush, hydrate,
-  continue-chain, workspace swap rehydrate, and v9 file-ledger precedence over
-  stale Dexie rows.
-- The read-flip remains default-off and is not part of T2a. Production
-  enablement remains a separate reviewed decision after persistence, parity,
-  `.landroid` round-trip, divergence, and revert gates are green.
-- No e2e run was performed for T2a because this branch changes additive storage
-  tables/reset helpers and no browser workflow surface.
+- T2b touches the subtle hydrate/precedence boundary and should get close
+  review. The file path intentionally wins over stale Dexie rows; startup
+  resident workspaces hydrate from Dexie.
+- Read-flip remains a separate reviewed decision after T3 proves the gates:
+  MathInputView parity, `.landroid` round-trip/replay, live divergence, and the
+  flip-to-shadow revert path.
+- No e2e run was performed for T2b because the behavior is covered by lifecycle
+  unit tests and no visible browser workflow changed. Run e2e if review wants a
+  full app smoke before merge.
 
 Likely next steps:
 
-1. Review and push `feat/title-ledger-runtime-storage`.
-2. Open the T2a PR with the rollback recipe in the body.
-3. Build T2b from this branch or from merged T2a: autosave flush, hydrate,
-   continue-chain, and file-vs-Dexie precedence.
+1. Review and push `feat/title-ledger-runtime-lifecycle`.
+2. Open the T2b PR against the T2a branch/PR, with close-review callouts for
+   hydrate/precedence/file-vs-Dexie behavior.
+3. After T2a/T2b merge, start T3 `feat/title-read-flip-governance`: convert the
+   existing hard-disabled read-flip machinery to governed/default-off, with no
+   production enablement.
 
 Paste-ready next chat prompt:
 
 > Read `/Users/abstractmapping/projects/landroid/AGENTS.md`,
 > `/Users/abstractmapping/projects/landroid/PROJECT_CONTEXT.md`, and
-> `/private/tmp/landroid-title-ledger-storage/CONTINUATION-PROMPT.md`. Continue
-> T2a from branch `feat/title-ledger-runtime-storage` in
-> `/private/tmp/landroid-title-ledger-storage`. The branch adds Dexie v12
-> title-ledger storage tables scoped by `dbKey + workspaceId`, active-key reset
-> wiring, tests, and rollback docs. Validation passed with targeted storage
-> tests, `npm run lint`, `git diff --check`, `npm test`, and `npm run build`.
+> `/private/tmp/landroid-title-ledger-lifecycle/CONTINUATION-PROMPT.md`.
+> Continue T2b from branch `feat/title-ledger-runtime-lifecycle` in
+> `/private/tmp/landroid-title-ledger-lifecycle`. The branch adds runtime title
+> ledger flush/hydrate/continue-chain behavior, file-ledger precedence over stale
+> Dexie rows, lifecycle tests, and source-of-truth doc updates. Validation
+> passed with targeted lifecycle tests, `npm run lint`, `git diff --check`,
+> `npm test`, `npm run build`, and `./node_modules/.bin/tsx scripts/title-soak.ts`.
 
 ## Historical Branch Notes
 

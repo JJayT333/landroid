@@ -9,12 +9,16 @@ import { useResearchStore } from '../../store/research-store';
 import { useCurativeStore } from '../../store/curative-store';
 import { useWorkspaceStore } from '../../store/workspace-store';
 import { useCanvasStore } from '../../store/canvas-store';
-import { useTitleActionLog } from '../../store/title-action-log';
-import type { ActionRecord, AuditEventRecord } from '../../backend-spine/contracts';
+import {
+  hydrateTitleActionLogFromImportedLedger,
+  useTitleActionLog,
+} from '../../store/title-action-log';
 import {
   downloadLandroidFile,
   exportDocumentWorkspaceData,
   importLandroidFile,
+  type LandroidFileData,
+  type WorkspaceData,
 } from '../../storage/workspace-persistence';
 import {
   replaceWorkspaceSideStores,
@@ -48,6 +52,23 @@ const views: { id: ViewMode; label: string }[] = [
 
 const LOAD_DEMO_CONFIRMATION_TEXT = 'LOAD DEMO';
 const LOAD_WORKSPACE_CONFIRMATION_TEXT = 'LOAD WORKSPACE';
+
+function readTitleOwnerData() {
+  const owner = useOwnerStore.getState();
+  return { owners: owner.owners, leases: owner.leases };
+}
+
+async function mirrorLoadedTitleLedger(
+  data: WorkspaceData & Pick<LandroidFileData, 'actionLedger'>
+): Promise<void> {
+  await hydrateTitleActionLogFromImportedLedger(
+    data,
+    data.actionLedger,
+    readTitleOwnerData()
+  ).catch((err) => {
+    console.warn('[landroid] title ledger import hydration failed:', err);
+  });
+}
 
 export default function Navbar() {
   const hostedMode = isHostedMode();
@@ -133,6 +154,7 @@ export default function Navbar() {
     setSeedLoading(true);
     try {
       const { nodeCount, pdfCount } = await seedCombinatorialData();
+      await mirrorLoadedTitleLedger(useWorkspaceStore.getState());
       console.log(
         `[combinatorial] Loaded ${nodeCount} nodes, attached ${pdfCount} PDFs`
       );
@@ -159,6 +181,7 @@ export default function Navbar() {
     setSeedLoading(true);
     try {
       const { nodeCount, pdfCount } = await seedVulcanMesaData();
+      await mirrorLoadedTitleLedger(useWorkspaceStore.getState());
       console.log(
         `[vulcan-mesa] Loaded ${nodeCount} nodes, attached ${pdfCount} PDFs`
       );
@@ -213,6 +236,7 @@ export default function Navbar() {
         rollbackNodes: currentWorkspace.nodes,
       });
       loadWorkspace(data);
+      await mirrorLoadedTitleLedger(data);
       useCanvasStore.getState().loadCanvas(data.canvas ?? { nodes: [], edges: [] });
       await useWorkspaceStore
         .getState()
@@ -316,20 +340,7 @@ export default function Navbar() {
           rollbackNodes: currentWorkspace.nodes,
         });
         loadWorkspace(data);
-        if (data.actionLedger) {
-          // Seed the title ledger from the imported v9 bundle so a later save
-          // preserves the audit chain instead of dropping it — loadWorkspace
-          // just reset the live ledger (ACT-H04), and nothing else rehydrates it.
-          const ledgerRecords = data.actionLedger.records;
-          useTitleActionLog.getState().hydrate({
-            actionRecords: ledgerRecords.filter(
-              (record): record is ActionRecord => record.recordType === 'action_record'
-            ),
-            auditEvents: ledgerRecords.filter(
-              (record): record is AuditEventRecord => record.recordType === 'audit_event'
-            ),
-          });
-        }
+        await mirrorLoadedTitleLedger(data);
         useCanvasStore.getState().loadCanvas(data.canvas ?? { nodes: [], edges: [] });
         // Phase 5: refresh node.attachments[] after PDF table write.
         await useWorkspaceStore
@@ -355,6 +366,7 @@ export default function Navbar() {
         loadWorkspace(result);
         useCanvasStore.getState().loadCanvas({ nodes: [], edges: [] });
         await replaceWorkspaceSideStores(result.workspaceId);
+        await mirrorLoadedTitleLedger(useWorkspaceStore.getState());
       } else {
         await showAlert({
           title: 'Unsupported File Type',
