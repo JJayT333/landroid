@@ -1,12 +1,12 @@
 # Phase 4 — Record-Bearing `.landroid` v9 Durable Format — Scope
 
 Status: **DESIGN-FIRST, scoped 2026-06-02 (pair); updated 2026-06-04.** The v9
-file format and the T2a runtime storage half are implemented; runtime
-flush/hydrate remains the T2b lifecycle slice. This captures the decisions so
-the remaining build can stay split into reviewable tickets. Tracks audit backlog
-**ACT-H03** (live ledger not durable) and **DEF-ACT-04** (define the v9 package
-format); incorporates **DEF-ACT-03** (audit-chain scope) and flags **ACT-M04**
-(snapshot growth).
+file format plus T2a/T2b runtime persistence are implemented: the live title
+ledger now has Dexie storage, autosave flush, load hydrate, continue-chain, and
+file-vs-Dexie precedence. Read-flip governance remains separate. Tracks audit
+backlog **ACT-H03** (live ledger not durable) and **DEF-ACT-04** (define the v9
+package format); incorporates **DEF-ACT-03** (audit-chain scope) and flags
+**ACT-M04** (snapshot growth).
 
 Supersession note, 2026-06-04: this file records the v9 design decision made
 under the earlier additive/snapshot-first posture. LANDroid now uses the
@@ -94,12 +94,12 @@ the file.
 **Forward compat:** v≤8 → load as today (no `actionLedger`); v9 → full path;
 v>9 → reject.
 
-## B. Runtime durability (T2a storage built; T2b lifecycle next)
+## B. Runtime durability (T2a/T2b built; read flip still separate)
 
 Models on the curative/owner side-store pattern. LLA-H01 and LLA-H02 have
-landed, so runtime durability is no longer blocked; it is intentionally split
-into storage and lifecycle slices so the hydrate/precedence boundary gets its
-own review.
+landed, so runtime durability is no longer blocked. The implementation is split
+into storage and lifecycle slices so the hydrate/precedence boundary stays
+reviewable.
 
 - **Storage (T2a):** Dexie v12 adds `titleActionRecords` and
   `titleAuditEvents`, storing backend-spine `action_record` and `audit_event`
@@ -112,32 +112,36 @@ own review.
   behavior and prevents an imported or demo-loaded workspace from inheriting a
   stale ledger under the same browser profile. The in-memory
   `setTitleActionLogResetHook` remains the live-store reset boundary.
-- **Write (T2b):** flush the live `useTitleActionLog` to Dexie on the existing
-  `AUTOSAVE_DEBOUNCE_MS` (2s). Snapshot authoritative ⇒ ≤2s of shadow-ledger
-  loss on a hard crash is harmless. (Preferred over write-per-append.)
+- **Write (T2b):** flush the live `useTitleActionLog` to Dexie after the existing
+  `AUTOSAVE_DEBOUNCE_MS` (2s) workspace shard save succeeds. A save-generation
+  guard skips the ledger flush if a newer workspace edit arrived while the
+  async save was in flight. (Preferred over write-per-append.)
 - **Hydrate on load (T2b):** Dexie has a ledger for the workspace → hydrate it and
   **continue the same audit chain from the persisted head hash** (tamper-evidence
   spans sessions). No ledger → fall back to lazy `ensureTitleBaseline`. Baseline
-  = cold-start path; hydration = warm path.
+  = cold-start path; hydration = warm path, and the baseline mirror is flushed
+  back to Dexie.
 - **File ↔ Dexie coherence (T2b):** opening a `.landroid` is a workspace load → reset,
   then hydrate from the file's `actionLedger` (v9) or lazy-baseline (v8). The
-  Dexie table always mirrors the live ledger. No merge/conflict logic — coherent
-  by construction.
+  file path does not consult stale Dexie rows; it mirrors the file/baseline
+  ledger back to Dexie. CSV/demo loads also baseline from the loaded workspace
+  and mirror back. No merge/conflict logic — coherent by construction.
 
-**T2a rollback / revert recipe:**
+**Runtime persistence rollback / revert recipe:**
 
 1. Before any destructive migration, export a `.landroid` backup and note the
    branch/commit being tested.
-2. To revert the T2a code, revert the T2a commit or deploy the previous build.
-   T2a is additive storage only: no runtime read path, flush path, or hydrate
-   path depends on the new tables.
+2. To revert the T2b lifecycle behavior while keeping the v12 schema, revert
+   the lifecycle commit/PR. The app returns to T2a storage-only behavior; current
+   workspace reads still come from the snapshot/Zustand store.
 3. If a browser profile has opened Dexie v12 and a reverted v11 build cannot
    open `landroid-v2` because the IndexedDB version is newer, recover from the
    `.landroid` backup: delete the `landroid-v2` IndexedDB database for that
    browser profile, open the reverted build, and import the backup.
 4. If staying on the v12 build and only ledger rows need to be purged, clear the
-   `titleActionRecords` and `titleAuditEvents` object stores. No title/math data
-   lives only in those stores until T2b ships flush/hydrate.
+   `titleActionRecords` and `titleAuditEvents` object stores. The canonical
+   title/math snapshot remains the recovery source until the separately
+   reviewed read-flip is enabled.
 
 ## Build sequence (tickets)
 
@@ -145,8 +149,8 @@ own review.
    rollback + version-dispatch tests. **Buildable now.**
 2. **Dexie ledger tables + reset wiring** (B storage half / T2a). Codex-able
    with a clear spec.
-3. *(after 2)* **Autosave flush + hydrate/continue-chain** (B lifecycle half).
-   Pair — touches live store lifecycle.
+3. **Autosave flush + hydrate/continue-chain** (B lifecycle half / T2b). Pair —
+   touches live store lifecycle and file-vs-Dexie precedence.
 
 ## Test plan
 
@@ -168,8 +172,6 @@ From the migration strategy + v9-specific cases:
 
 - **ACT-M04** — snapshot growth/compaction; measure at W2 scale, decide
   full-snapshot vs math-relevant-field snapshot + checkpointing.
-- **T2b runtime lifecycle** — autosave flush, hydrate, continue-chain, and
-  file-vs-Dexie precedence after the T2a storage tables.
 - **ACT-H05** — visible divergence UX; independent gate, still required before a
   read-flip is proposable.
 - **Rebuild-first read-flip governance** — after runtime ledger persistence,
