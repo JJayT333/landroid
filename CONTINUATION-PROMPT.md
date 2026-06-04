@@ -118,6 +118,34 @@ Paste-ready next chat prompt:
 > production read flip; Producers 88 is a separate pending redirect requiring
 > clarification before edits.
 
+### Audit Handoff Prompt For Claude
+
+Use this prompt for a cold audit of the current rebuild sequence:
+
+> Audit LANDroid from the rebuild-first master handoff. Start read-only. Read
+> `AGENTS.md`, `PROJECT_CONTEXT.md`, `docs/README.md`, and
+> `CONTINUATION-PROMPT.md`. Verify the actual GitHub PR state before trusting
+> branch-local notes. Expected state on 2026-06-04: T0 PR #118 is merged; T1
+> PRs #111-#117 are merged; T2a PR #119 is open from
+> `feat/title-ledger-runtime-storage` to `main`; T2b PR #120 is open from
+> `feat/title-ledger-runtime-lifecycle` to
+> `feat/title-ledger-runtime-storage`; T3 PR #121 is open from
+> `feat/title-read-flip-governance` to
+> `feat/title-ledger-runtime-lifecycle`; T4 PR #122 is open from
+> `feat/ai-project-summary-context` to `main`; docs repair PR #123 is open from
+> `docs/rebuild-handoff-repair` to `main`.
+>
+> Audit in this order: #123 handoff repair, merged train #111-#118, T2a #119,
+> T2b #120, T3 #121, and T4 #122. Confirm #120 file-vs-Dexie precedence and
+> hydrate/flush behavior especially carefully. Confirm T3 does not enable
+> production title reads. Confirm T4 hosted minimal AI context does not disclose
+> project names, party names, fractions, lease economics, remarks, document
+> references, or record IDs. Keep Producers 88 separate: determine candidate
+> file sets, then ask the user what "those files" means before edits. Do not
+> modify `scripts/springhill/`, real `.landroid` files, math/precision behavior,
+> production read-flip settings, or open PR branches unless a concrete defect is
+> found and the user authorizes the correction.
+
 ## Historical Branch Notes
 
 The following notes are historical only. The active state is the master handoff
