@@ -22,6 +22,7 @@ const mocks = vi.hoisted(() => ({
   exportResearchWorkspaceData: vi.fn(),
   exportCurativeWorkspaceData: vi.fn(),
   clearWorkspaceShardsForActiveKey: vi.fn(async () => undefined),
+  clearTitleLedgerRowsForActiveKey: vi.fn(async () => undefined),
   clearApprovals: vi.fn(),
   clearActionJournal: vi.fn(),
   clearUndo: vi.fn(),
@@ -91,6 +92,10 @@ vi.mock('../workspace-persistence', () => ({
   exportDocumentWorkspaceData: mocks.exportDocumentWorkspaceData,
   replaceDocumentWorkspaceData: mocks.replaceDocumentWorkspaceData,
   clearWorkspaceShardsForActiveKey: mocks.clearWorkspaceShardsForActiveKey,
+}));
+
+vi.mock('../title-ledger-persistence', () => ({
+  clearTitleLedgerRowsForActiveKey: mocks.clearTitleLedgerRowsForActiveKey,
 }));
 
 import {
@@ -182,6 +187,7 @@ function expectSideStoreWrites(
 
 function expectFinalStoresCleared() {
   expect(mocks.clearWorkspaceShardsForActiveKey).toHaveBeenCalledOnce();
+  expect(mocks.clearTitleLedgerRowsForActiveKey).toHaveBeenCalledOnce();
   expect(mocks.clearApprovals).toHaveBeenCalledOnce();
   expect(mocks.clearActionJournal).toHaveBeenCalledOnce();
   expect(mocks.clearUndo).toHaveBeenCalledOnce();

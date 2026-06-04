@@ -37,6 +37,11 @@ import type {
   ResearchQuestion,
   ResearchSource,
 } from '../types/research';
+import type {
+  StoredTitleActionRecord,
+  StoredTitleAuditEvent,
+} from './title-ledger-stores';
+import { TITLE_LEDGER_STORE_DEFINITIONS } from './title-ledger-stores';
 import type { TitleIssue } from '../types/title-issue';
 import { LANDROID_FILE_VERSION } from './landroid-file-version';
 import {
@@ -97,6 +102,8 @@ const db = new Dexie('landroid-v2') as Dexie & {
   ownershipNodeCompatShards: EntityTable<OwnershipNodeCompatShard, 'id'>;
   leaseholdStateShards: EntityTable<LeaseholdStateShard, 'id'>;
   workspaceUiStateShards: EntityTable<WorkspaceUiStateShard, 'id'>;
+  titleActionRecords: EntityTable<StoredTitleActionRecord, 'id'>;
+  titleAuditEvents: EntityTable<StoredTitleAuditEvent, 'id'>;
   workspaceWriteLeases: EntityTable<WorkspaceWriteLease, 'workspaceId'>;
 };
 
@@ -418,6 +425,52 @@ db.version(11)
   .upgrade(async (tx) => {
     await runV10ToV11DbKeyBackfill(tx);
   });
+
+/**
+ * v12 (ACT-H03 runtime storage half).
+ *
+ * Adds title-runtime ledger stores for backend-spine `action_record` and
+ * `audit_event` rows. The stored `id`, `dbKey`, and `position` fields are
+ * Dexie-only metadata; `recordId` and audit hashes stay untouched so the
+ * persisted chain can still be verified after hydration. Runtime flush/hydrate
+ * is intentionally left to the lifecycle slice.
+ */
+db.version(12).stores({
+  pdfs: 'nodeId',
+  workspaces: 'id',
+  canvases: 'id',
+  owners: 'id, dbKey, workspaceId, name, [dbKey+workspaceId], [dbKey+workspaceId+name]',
+  leases:
+    'id, dbKey, workspaceId, ownerId, [dbKey+workspaceId], [dbKey+workspaceId+ownerId], [workspaceId+ownerId]',
+  contactLogs:
+    'id, dbKey, workspaceId, ownerId, [dbKey+workspaceId], [dbKey+workspaceId+ownerId], [workspaceId+ownerId]',
+  ownerDocs:
+    'id, dbKey, workspaceId, ownerId, leaseId, [dbKey+workspaceId], [dbKey+workspaceId+ownerId], [dbKey+workspaceId+leaseId], [workspaceId+ownerId], [workspaceId+leaseId]',
+  mapAssets:
+    'id, dbKey, workspaceId, isFeatured, deskMapId, nodeId, linkedOwnerId, leaseId, researchSourceId, researchProjectRecordId, [dbKey+workspaceId], [dbKey+workspaceId+isFeatured], [dbKey+workspaceId+deskMapId], [dbKey+workspaceId+nodeId], [dbKey+workspaceId+linkedOwnerId], [dbKey+workspaceId+leaseId], [workspaceId+isFeatured], [workspaceId+deskMapId], [workspaceId+nodeId], [workspaceId+linkedOwnerId], [workspaceId+leaseId], [workspaceId+researchSourceId], [workspaceId+researchProjectRecordId]',
+  mapRegions:
+    'id, dbKey, workspaceId, assetId, deskMapId, nodeId, linkedOwnerId, leaseId, researchSourceId, researchProjectRecordId, [dbKey+workspaceId], [dbKey+workspaceId+assetId], [dbKey+workspaceId+deskMapId], [dbKey+workspaceId+nodeId], [dbKey+workspaceId+linkedOwnerId], [dbKey+workspaceId+leaseId], [workspaceId+assetId], [workspaceId+deskMapId], [workspaceId+nodeId], [workspaceId+linkedOwnerId], [workspaceId+leaseId], [workspaceId+researchSourceId], [workspaceId+researchProjectRecordId]',
+  mapExternalReferences:
+    'id, dbKey, workspaceId, assetId, regionId, source, [dbKey+workspaceId], [dbKey+workspaceId+assetId], [dbKey+workspaceId+regionId], [workspaceId+assetId], [workspaceId+regionId]',
+  researchImports:
+    'id, dbKey, workspaceId, datasetId, detectedFormat, [dbKey+workspaceId], [dbKey+workspaceId+datasetId], [dbKey+workspaceId+detectedFormat], [workspaceId+datasetId], [workspaceId+detectedFormat]',
+  researchSources:
+    'id, dbKey, workspaceId, sourceType, context, [dbKey+workspaceId], [dbKey+workspaceId+sourceType], [dbKey+workspaceId+context], [workspaceId+sourceType], [workspaceId+context]',
+  researchFormulas:
+    'id, dbKey, workspaceId, category, status, [dbKey+workspaceId], [dbKey+workspaceId+category], [dbKey+workspaceId+status], [workspaceId+category], [workspaceId+status]',
+  researchProjectRecords:
+    'id, dbKey, workspaceId, recordType, jurisdiction, status, [dbKey+workspaceId], [dbKey+workspaceId+recordType], [dbKey+workspaceId+jurisdiction], [dbKey+workspaceId+status], [workspaceId+recordType], [workspaceId+jurisdiction], [workspaceId+status]',
+  researchQuestions:
+    'id, dbKey, workspaceId, status, [dbKey+workspaceId], [dbKey+workspaceId+status], [workspaceId+status]',
+  titleIssues:
+    'id, dbKey, workspaceId, status, priority, issueType, affectedDeskMapId, affectedNodeId, affectedOwnerId, affectedLeaseId, [dbKey+workspaceId], [dbKey+workspaceId+status], [dbKey+workspaceId+priority], [workspaceId+status], [workspaceId+priority]',
+  documents:
+    'docId, dbKey, workspaceId, contentHash, [dbKey+workspaceId], [dbKey+workspaceId+kind], [dbKey+workspaceId+createdAt], [workspaceId+kind], [workspaceId+createdAt]',
+  document_attachments:
+    'attachmentId, dbKey, workspaceId, docId, [dbKey+workspaceId], [dbKey+workspaceId+entityKind+entityId], [dbKey+workspaceId+docId], [workspaceId+entityKind+entityId], [entityKind+entityId], [docId+entityKind+entityId]',
+  ...WORKSPACE_SHARD_STORE_DEFINITIONS,
+  ...TITLE_LEDGER_STORE_DEFINITIONS,
+});
 
 /**
  * Real-implementation deps for the migration. The pure helper accepts

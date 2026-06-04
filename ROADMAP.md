@@ -65,10 +65,12 @@ session handoff lives in `CONTINUATION-PROMPT.md`.
   was re-measured at 1476-node scale (2276 ms persist vs a 2062 ms monolith
   baseline — ~210 ms slower, off the interaction path). Persistent browser
   storage is now requested on startup (Storage API, recorded, non-blocking).
-  Remaining shard-runtime work is evidence-gated: title-ledger runtime
-  persistence comes before any governed read-flip, metadata-first conversion of
-  blob-bearing side stores remains later, and per-view edit-control disabling
-  is optional unless storage integrity needs it.
+  Remaining shard-runtime work is evidence-gated: title-ledger runtime storage
+  now has Dexie v12 tables and active-key reset wiring, but autosave flush,
+  hydrate/continue-chain, and `.landroid` file-vs-Dexie precedence remain the
+  next lifecycle slice before any governed read-flip. Metadata-first conversion
+  of blob-bearing side stores remains later, and per-view edit-control
+  disabling is optional unless storage integrity needs it.
 - Preserve `.landroid` package export permanently even after sync/backend work.
 - Promote the Evidence Vault contract: immutable originals, SHA-256 hashes,
   document versions, extraction runs, citation anchors, hash-continuity audit
