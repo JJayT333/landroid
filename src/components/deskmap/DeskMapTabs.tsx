@@ -9,19 +9,16 @@
  * Deleting the last desk map is allowed — auto-create will make a fresh one.
  */
 import { useMemo, useState } from 'react';
+import { useOwnerStore } from '../../store/owner-store';
 import { useWorkspaceStore } from '../../store/workspace-store';
 import type { DeskMap, DeskMapUnitCode } from '../../types/node';
+import type { Lease } from '../../types/owner';
 import { useConfirmation } from '../shared/ConfirmationProvider';
-
-/** Tracts that belong to error-scenario flavors show a small dot indicator. */
-function hasWarning(dm: DeskMap): boolean {
-  // C3 (NPRI discrepancy), C7 (over-conveyance), C9 (orphan node) each carry
-  // a recognizable substring in their description so we can show the dot
-  // without importing the full validation engine into the tab bar.
-  return (
-    /NPRI.discrepancy|over-conveyance|orphan/i.test(dm.description)
-  );
-}
+import {
+  calculateDeskMapCoverageSummary,
+  getActiveLeases,
+} from './deskmap-coverage';
+import { hasDeskMapWarningDot } from './deskmap-warning-dots';
 
 interface UnitGroup {
   unitCode: DeskMapUnitCode | null;
@@ -30,6 +27,7 @@ interface UnitGroup {
 }
 
 export default function DeskMapTabs() {
+  const nodes = useWorkspaceStore((s) => s.nodes);
   const deskMaps = useWorkspaceStore((s) => s.deskMaps);
   const activeDeskMapId = useWorkspaceStore((s) => s.activeDeskMapId);
   const activeUnitCode = useWorkspaceStore((s) => s.activeUnitCode);
@@ -37,6 +35,7 @@ export default function DeskMapTabs() {
   const setActiveDeskMap = useWorkspaceStore((s) => s.setActiveDeskMap);
   const renameDeskMap = useWorkspaceStore((s) => s.renameDeskMap);
   const deleteDeskMap = useWorkspaceStore((s) => s.deleteDeskMap);
+  const leases = useOwnerStore((s) => s.leases);
   const { confirm: requestConfirmation } = useConfirmation();
 
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -63,6 +62,34 @@ export default function DeskMapTabs() {
   }, [deskMaps]);
 
   const hasMultipleGroups = groups.length > 1 || (groups.length === 1 && groups[0].unitCode !== null);
+  const warningDotByDeskMapId = useMemo(() => {
+    const activeLeasesByOwnerId = new Map<string, Lease[]>();
+    for (const lease of getActiveLeases(leases)) {
+      const current = activeLeasesByOwnerId.get(lease.ownerId) ?? [];
+      current.push(lease);
+      activeLeasesByOwnerId.set(lease.ownerId, current);
+    }
+
+    return new Map(
+      deskMaps.map((deskMap) => {
+        const nodeIds = new Set(deskMap.nodeIds);
+        const deskMapNodes = nodes.filter((node) => nodeIds.has(node.id));
+        const coverageSummary = calculateDeskMapCoverageSummary(
+          deskMapNodes,
+          activeLeasesByOwnerId,
+          nodes
+        );
+        return [
+          deskMap.id,
+          hasDeskMapWarningDot({
+            deskMap,
+            nodes: deskMapNodes,
+            coverageSummary,
+          }),
+        ] as const;
+      })
+    );
+  }, [deskMaps, leases, nodes]);
 
   const handleCreate = () => {
     const activeDeskMap = activeDeskMapId
@@ -165,7 +192,7 @@ export default function DeskMapTabs() {
                 </span>
               )}
               {/* Error-dot indicator for tracts with active validation warnings */}
-              {hasWarning(dm) && (
+              {warningDotByDeskMapId.get(dm.id) && (
                 <span
                   className={`inline-block w-2 h-2 rounded-full flex-shrink-0 ${
                     activeDeskMapId === dm.id ? 'bg-seal/80' : 'bg-seal'

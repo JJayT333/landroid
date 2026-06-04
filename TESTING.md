@@ -54,6 +54,10 @@ For hosted persistence-key changes, include
 - GitHub Actions CI runs on Node.js 22 and covers root `npm ci`,
   `npm audit --omit=dev`, `npm run lint`, `npm test`, `npm run build`, plus
   backend AI proxy install, production audit, tests, and build.
+- LLA-L02: Desk Map warning dots now derive from shared coverage/validation
+  state instead of description text. Vulcan Mesa dots `VM2`, `VM3`, and `VM7`
+  (previously `VM2` only) because `VM3` and `VM7` carry real lease-overlap
+  coverage warnings.
 
 ## E2E Status
 
