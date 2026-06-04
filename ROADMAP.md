@@ -67,11 +67,13 @@ session handoff lives in `CONTINUATION-PROMPT.md`.
   storage is now requested on startup (Storage API, recorded, non-blocking).
   Remaining shard-runtime work is evidence-gated: title-ledger runtime
   persistence now has Dexie v12 tables, active-key reset wiring, autosave flush,
-  load hydrate, continue-chain, and `.landroid` file-vs-Dexie precedence. The
-  next title gate is governed/default-off read-flip readiness, not production
-  enablement. Metadata-first conversion of blob-bearing side stores remains
-  later, and per-view edit-control disabling is optional unless storage
-  integrity needs it.
+  load hydrate, continue-chain, and `.landroid` file-vs-Dexie precedence. T3 now
+  converts the existing title read-flip machinery to governed/default-off:
+  MathInputView parity, `.landroid` round-trip, live-divergence, and
+  flip-to-shadow revert gates must stay green, and production enablement remains
+  a separate reviewed decision. Metadata-first conversion of blob-bearing side
+  stores remains later, and per-view edit-control disabling is optional unless
+  storage integrity needs it.
 - Preserve `.landroid` package export permanently even after sync/backend work.
 - Promote the Evidence Vault contract: immutable originals, SHA-256 hashes,
   document versions, extraction runs, citation anchors, hash-continuity audit

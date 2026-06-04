@@ -1,5 +1,5 @@
 /**
- * Phase 4 — cutover mechanism (BUILT, NEVER FLIPPED).
+ * Phase 4 / T3 — governed cutover mechanism (DEFAULT OFF).
  *
  * Cutting a workflow's source of truth over to the action layer is
  * irreversible-class, so this run builds the mechanism and the parity proof but
@@ -9,21 +9,32 @@
  * The mechanism is reversible and flag-gated:
  * - `shadow` → `candidate` is allowed ONLY when parity is clean.
  * - `candidate` → `shadow` is always allowed (reversible).
- * - `candidate` → `cutover` requires a reviewer approval token AND is hard-
- *   guarded by `LIVE_CUTOVER_DISABLED`, which is `true` for this entire run, so
- *   no code path here can flip a workflow live.
+ * - `candidate` → `cutover` requires a reviewer approval token AND an explicit
+ *   governance object with live cutover enabled. The default governance leaves
+ *   production cutover off; enabling it remains a separate reviewed decision.
  */
 import type { ActionSurface } from './commands';
 import type { ParityReport } from './parity';
 
 export type CutoverState = 'shadow' | 'candidate' | 'cutover';
 
+/** Default posture: production cutover remains disabled. */
+export const DEFAULT_LIVE_CUTOVER_ENABLED = false;
+
 /**
- * Hard gate for this run. While true, `CutoverRegistry.cutOver` always throws —
- * the action layer cannot become the canonical mutation path for any live
- * workflow in this run. Only a reviewer may change this.
+ * Compatibility status flag for older docs/tests. The registry now consults
+ * per-instance governance, but the default runtime posture is still disabled.
  */
-export const LIVE_CUTOVER_DISABLED: boolean = true;
+export const LIVE_CUTOVER_DISABLED = !DEFAULT_LIVE_CUTOVER_ENABLED;
+
+export interface CutoverGovernance {
+  /** False by default; true only in tests or a future reviewed enablement PR. */
+  liveCutoverEnabled: boolean;
+}
+
+export const DEFAULT_CUTOVER_GOVERNANCE: CutoverGovernance = {
+  liveCutoverEnabled: DEFAULT_LIVE_CUTOVER_ENABLED,
+};
 
 export interface CutoverEvaluation {
   workflow: ActionSurface;
@@ -78,8 +89,8 @@ export function reportCutoverCandidates(
 export class CutoverDisabledError extends Error {
   constructor(workflow: ActionSurface) {
     super(
-      `Live cutover of "${workflow}" is disabled in this run (LIVE_CUTOVER_DISABLED). ` +
-        'Build the mechanism and report candidates; the reviewer performs the flip.'
+      `Live cutover of "${workflow}" is disabled by default governance. ` +
+        'A separate reviewed decision must enable the flip.'
     );
     this.name = 'CutoverDisabledError';
   }
@@ -88,10 +99,14 @@ export class CutoverDisabledError extends Error {
 /**
  * Reversible, flag-gated registry of per-workflow cutover state. Defaults every
  * workflow to `shadow`. The current store stays canonical in every state except
- * `cutover`, which this run can never reach.
+ * `cutover`, and default governance prevents reaching `cutover` in production.
  */
 export class CutoverRegistry {
   private readonly states = new Map<ActionSurface, CutoverState>();
+
+  constructor(
+    private readonly governance: CutoverGovernance = DEFAULT_CUTOVER_GOVERNANCE
+  ) {}
 
   getState(workflow: ActionSurface): CutoverState {
     return this.states.get(workflow) ?? 'shadow';
@@ -113,18 +128,18 @@ export class CutoverRegistry {
   }
 
   /**
-   * Move candidate → cutover. Guarded by LIVE_CUTOVER_DISABLED (always throws in
-   * this run) and additionally requires a reviewer approval token. No call site
-   * in this run supplies a real flip.
+   * Move candidate → cutover. Default governance throws; tests may pass explicit
+   * enabled governance, and production enablement must happen in a later
+   * reviewed PR.
    */
   cutOver(
     workflow: ActionSurface,
     options: { reviewerApprovalToken: string }
   ): void {
-    if (LIVE_CUTOVER_DISABLED) {
+    if (!this.governance.liveCutoverEnabled) {
       throw new CutoverDisabledError(workflow);
     }
-    if (!options.reviewerApprovalToken) {
+    if (!options.reviewerApprovalToken.trim()) {
       throw new Error(`Cutover of "${workflow}" requires a reviewer approval token.`);
     }
     if (this.getState(workflow) !== 'candidate') {

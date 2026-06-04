@@ -3,7 +3,8 @@
 Status: **DESIGN-FIRST, scoped 2026-06-02 (pair); updated 2026-06-04.** The v9
 file format plus T2a/T2b runtime persistence are implemented: the live title
 ledger now has Dexie storage, autosave flush, load hydrate, continue-chain, and
-file-vs-Dexie precedence. Read-flip governance remains separate. Tracks audit
+file-vs-Dexie precedence. T3 adds governed/default-off read-flip readiness, but
+production enablement remains a separate reviewed decision. Tracks audit
 backlog **ACT-H03** (live ledger not durable) and **DEF-ACT-04** (define the v9
 package format); incorporates **DEF-ACT-03** (audit-chain scope) and flags
 **ACT-M04** (snapshot growth).
@@ -24,10 +25,11 @@ built). Read those first; this doc only records the v9-specific decisions.
 
 **v9 makes the title ledger _durable_, not _authoritative_.** It persists the
 action/audit records alongside the existing v8 snapshot; the snapshot stays the
-source of truth on import. This decouples v9 from the read-flip — durable
-persistence can ship now while the read-flip stays gated behind ACT-H05 and an
-explicit later decision. **v9 ≠ read-flip.** Honors the no-read-flip guardrail
-(the Zustand store / v8 snapshot remains canonical).
+current source of truth on import. This decouples v9 from the read-flip: durable
+persistence can ship, T3 can prove governed/default-off readiness, and production
+enablement can still remain a separate reviewed decision. **v9 does not itself
+flip reads.** The Zustand store / v8 snapshot remains canonical until that later
+enablement PR explicitly changes it.
 
 Evidence the ledger round-trips on real data: `scripts/title-soak.ts` ran
 `ensureTitleBaseline` → `replay == adapter` (714/714) + math parity clean on the
@@ -151,6 +153,9 @@ reviewable.
    with a clear spec.
 3. **Autosave flush + hydrate/continue-chain** (B lifecycle half / T2b). Pair —
    touches live store lifecycle and file-vs-Dexie precedence.
+4. **Governed read-flip readiness** (T3). Convert the existing hard-disabled
+   read-path/cutover machinery to governed/default-off, prove test-only cutover
+   and flip-to-shadow revert, and keep production enablement out of scope.
 
 ## Test plan
 
@@ -167,14 +172,17 @@ From the migration strategy + v9-specific cases:
 - *(runtime lifecycle / T2b)* persist→refresh→hydrate equals pre-refresh ledger;
   next mutation continues the chain; workspace swap clears rows; v9 file import
   hydrates from file ledger instead of stale Dexie rows.
+- *(read-flip governance / T3)* MathInputView parity goldens; `.landroid`
+  export-import-replay round trip; flag-ON synthetic equivalence between
+  action-derived reads and store reads; divergence/parity/round-trip failures
+  block eligibility; explicit flip-to-shadow revert proof.
 
 ## Open follow-ons (not blocking v9 file format)
 
 - **ACT-M04** — snapshot growth/compaction; measure at W2 scale, decide
   full-snapshot vs math-relevant-field snapshot + checkpointing.
-- **ACT-H05** — visible divergence UX; independent gate, still required before a
-  read-flip is proposable.
-- **Rebuild-first read-flip governance** — after runtime ledger persistence,
-  `MathInputView` parity, `.landroid` round-trip, divergence, and revert gates
-  are green, the existing read-flip machinery may become governed/default-off
-  rather than permanently deferred.
+- **Production read-flip enablement** — T3 proves the governed/default-off path,
+  but the actual production flip is still a separate reviewed decision. That PR
+  must explicitly enable governance, keep `MathInputView` parity and `.landroid`
+  round-trip green, show no live divergence/error, preserve audit-chain
+  continuity, and document the exact flip-to-shadow revert.

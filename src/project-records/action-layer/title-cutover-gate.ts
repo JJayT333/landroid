@@ -3,11 +3,11 @@
  *
  * The title tree is the highest-risk surface, so advancing it from `shadow` to
  * `candidate` requires MORE than one clean parity run: at least
- * {@link MIN_PASSED_TITLE_PARITIES} REAL mutations must have passed inline parity
- * AND the MathInputView parity gate must be clean. The mechanism is reversible
- * (`candidate → shadow` is always allowed) and the `candidate → cutover` flip
- * stays hard-blocked by `LIVE_CUTOVER_DISABLED` for this entire run (guardrail
- * 2). No call site advances title_tree past `candidate`.
+ * {@link MIN_PASSED_TITLE_PARITIES} REAL mutations must have passed inline parity,
+ * the MathInputView parity gate must be clean, the `.landroid`
+ * export-import-replay round trip must be clean, and runtime divergence must be
+ * absent. The mechanism is reversible (`candidate → shadow` is always allowed)
+ * and production `candidate → cutover` remains default-off through governance.
  *
  * This composes the Phase 4 {@link CutoverRegistry} rather than modifying it, so
  * the other surfaces' behavior is unchanged.
@@ -26,6 +26,7 @@ export interface TitleCutoverReadiness {
   passedParities: number;
   threshold: number;
   mathParityClean: boolean;
+  landroidRoundTripClean: boolean;
   runtimeDivergence: boolean;
   reason: string;
 }
@@ -57,6 +58,7 @@ export function setTitleCutoverRuntimeStateReader(
 export class TitleTreeCutoverGate {
   private passedParities = 0;
   private lastMathParityClean = false;
+  private lastLandroidRoundTripClean = false;
   private runtimeDivergenceMessage: string | null = null;
 
   constructor(
@@ -83,6 +85,11 @@ export class TitleTreeCutoverGate {
   /** Record the latest math-parity outcome (gate input, not a counter). */
   setMathParityClean(clean: boolean): void {
     this.lastMathParityClean = clean;
+  }
+
+  /** Record the latest `.landroid` export-import-replay round-trip outcome. */
+  setLandroidRoundTripClean(clean: boolean): void {
+    this.lastLandroidRoundTripClean = clean;
   }
 
   /** Record whether the live title ledger has surfaced a runtime divergence. */
@@ -120,20 +127,29 @@ export class TitleTreeCutoverGate {
     const enough = this.passedParities >= this.threshold;
     const runtimeDivergenceReason = this.runtimeDivergenceReason();
     const runtimeDivergence = runtimeDivergenceReason !== null;
-    const ready = enough && this.lastMathParityClean && !runtimeDivergence;
+    const ready =
+      enough
+      && this.lastMathParityClean
+      && this.lastLandroidRoundTripClean
+      && !runtimeDivergence;
     return {
       ready,
       passedParities: this.passedParities,
       threshold: this.threshold,
       mathParityClean: this.lastMathParityClean,
+      landroidRoundTripClean: this.lastLandroidRoundTripClean,
       runtimeDivergence,
       reason: ready
-        ? `title_tree eligible: ${this.passedParities}/${this.threshold} parities passed and math parity clean.`
+        ? `title_tree eligible: ${this.passedParities}/${this.threshold} parities passed, math parity clean, and .landroid round-trip clean.`
         : runtimeDivergence
           ? runtimeDivergenceReason
         : !enough
           ? `Not enough proven mutations: ${this.passedParities}/${this.threshold} passed inline parity.`
-          : 'Math parity is not clean; resolve the divergence before candidacy.',
+          : !this.lastMathParityClean
+            ? 'Math parity is not clean; resolve the divergence before candidacy.'
+          : !this.lastLandroidRoundTripClean
+            ? '.landroid export-import-replay round trip is not clean; resolve before candidacy.'
+          : 'Title read-flip readiness is blocked by an unknown gate state.',
     };
   }
 
@@ -161,5 +177,17 @@ export class TitleTreeCutoverGate {
   /** candidate → shadow. Always allowed (reversible). */
   revertToShadow(): void {
     this.registry.revertToShadow('title_tree');
+  }
+
+  /** candidate → cutover. Default registry governance keeps production off. */
+  cutOver(options: { reviewerApprovalToken: string }): TitleCutoverReadiness {
+    const readiness = this.readiness();
+    if (!readiness.ready) {
+      throw new Error(
+        `Cannot cut over title_tree: ${readiness.reason}`
+      );
+    }
+    this.registry.cutOver('title_tree', options);
+    return readiness;
   }
 }
