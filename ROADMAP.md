@@ -127,9 +127,12 @@ session handoff lives in `CONTINUATION-PROMPT.md`.
   from scanned-PDF OCR, add searchable PDF generation only after a local tool
   path is available, and keep AI document query disabled until citation
   verification is wired through the UI path.
-- Design the hybrid retrieval contract for future AI Q&A: exact/keyword search,
-  vector recall, graph/schema traversal tools, deterministic math tools, rank
-  fusion, and a `CitationVerifier` gate before answers display.
+- Extend AI context in two steps: first, keep the bounded whole-project summary
+  active for cross-tract structure and rollups while preserving hosted minimal
+  privacy; later, design the hybrid retrieval contract for future AI Q&A with
+  exact/keyword search, vector recall, graph/schema traversal tools,
+  deterministic math tools, rank fusion, and a `CitationVerifier` gate before
+  answers display.
 - Keep LANDroid hosted-web/PWA first. Native iOS and desktop installers remain
   deferred; Capacitor is a future option only if app-store distribution becomes
   a product requirement.

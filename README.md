@@ -112,7 +112,9 @@ See `docs/README.md` for the full documentation map.
   Ollama as the local default provider, hosted proxy mode for the POC site, and
   approval-gated AI edits. Hosted chat posts directly to the Lambda-backed
   `/api/ai/chat/completions` proxy with the signed-in Cognito session and a
-  compact read-only packet of the current app/Desk Map context.
+  compact read-only packet. Minimal hosted context is all-tract counts and
+  structure only; richer bounded project rollups require the full-context
+  disclosure gate.
 
 Leasehold math strictly validates legacy/imported lease royalty, ORRI burden, and
 WI assignment fractions; malformed non-blank values are treated as 0 and surfaced

@@ -7,11 +7,20 @@ import {
   getLeasesForOwnerNode,
 } from '../components/deskmap/deskmap-coverage';
 import { isLeaseNode } from '../components/deskmap/deskmap-lease-node';
+import {
+  buildLeaseholdUnitSummary,
+  type LeaseholdUnitSummary,
+} from '../components/leasehold/leasehold-summary';
 import { useOwnerStore } from '../store/owner-store';
 import { useUIStore, type ViewMode } from '../store/ui-store';
 import { useWorkspaceStore } from '../store/workspace-store';
-import { isNpriNode, type OwnershipNode } from '../types/node';
-import type { Lease } from '../types/owner';
+import type {
+  LeaseholdAssignment,
+  LeaseholdOrri,
+  LeaseholdTransferOrderEntry,
+} from '../types/leasehold';
+import { isNpriNode, type DeskMap, type OwnershipNode } from '../types/node';
+import type { Lease, Owner } from '../types/owner';
 import {
   findUnitOption,
   makeUnitOptionLabel,
@@ -72,6 +81,18 @@ export function buildAIAppContext(mode: AIAppContextMode = 'full'): string {
     `Active view: ${VIEW_LABELS[ui.view]}`,
     `Project: ${cleanText(workspace.projectName) || 'Untitled project'}`,
   ];
+
+  appendWholeProjectSummary(contextLines, {
+    mode: 'full',
+    deskMaps: workspace.deskMaps,
+    nodes: workspace.nodes,
+    owners: ownerState.owners,
+    leases: ownerState.leases,
+    leaseholdAssignments: workspace.leaseholdAssignments,
+    leaseholdOrris: workspace.leaseholdOrris,
+    leaseholdTransferOrderEntries: workspace.leaseholdTransferOrderEntries,
+    activeLeasesByOwnerId,
+  });
 
   if (activeUnit) {
     contextLines.push(
@@ -141,7 +162,7 @@ function buildMinimalAIAppContext(): string {
       )
     : null;
 
-  return [
+  const contextLines = [
     '# Read-only LANDroid app context (minimal)',
     'Hosted minimal context includes counts and structure only. It intentionally omits project names, party names, fractions, lease economics, remarks, document references, and identifiers.',
     '',
@@ -153,7 +174,221 @@ function buildMinimalAIAppContext(): string {
     coverage
       ? `Coverage structure: ${coverage.currentOwnerCount} current owner card${coverage.currentOwnerCount === 1 ? '' : 's'}, ${coverage.linkedOwnerCount} linked owner card${coverage.linkedOwnerCount === 1 ? '' : 's'}, ${coverage.leasedOwnerCount} leased owner card${coverage.leasedOwnerCount === 1 ? '' : 's'}, ${coverage.leaseOverlaps.length} lease coverage warning${coverage.leaseOverlaps.length === 1 ? '' : 's'}.`
       : 'Coverage structure: no active Desk Map loaded.',
-  ].join('\n');
+  ];
+
+  appendWholeProjectSummary(contextLines, {
+    mode: 'minimal',
+    deskMaps: workspace.deskMaps,
+    nodes: workspace.nodes,
+    owners: ownerState.owners,
+    leases: ownerState.leases,
+    leaseholdAssignments: workspace.leaseholdAssignments,
+    leaseholdOrris: workspace.leaseholdOrris,
+    leaseholdTransferOrderEntries: workspace.leaseholdTransferOrderEntries,
+    activeLeasesByOwnerId,
+  });
+
+  return contextLines.join('\n');
+}
+
+type ProjectSummaryMode = AIAppContextMode;
+
+interface WholeProjectSummaryInput {
+  mode: ProjectSummaryMode;
+  deskMaps: DeskMap[];
+  nodes: OwnershipNode[];
+  owners: Owner[];
+  leases: Lease[];
+  leaseholdAssignments: LeaseholdAssignment[];
+  leaseholdOrris: LeaseholdOrri[];
+  leaseholdTransferOrderEntries: LeaseholdTransferOrderEntry[];
+  activeLeasesByOwnerId: Map<string, Lease[]>;
+}
+
+interface NodeKindCounts {
+  conveyanceCount: number;
+  npriCount: number;
+  relatedLeaseCount: number;
+  relatedDocumentCount: number;
+}
+
+function appendWholeProjectSummary(
+  lines: string[],
+  input: WholeProjectSummaryInput
+): void {
+  const activeLeaseCount = getActiveLeases(input.leases).length;
+  const codedUnitCodes = new Set(
+    input.deskMaps
+      .map((deskMap) => cleanText(deskMap.unitCode ?? ''))
+      .filter(Boolean)
+  );
+  const uncodedTractCount = input.deskMaps.filter(
+    (deskMap) => !cleanText(deskMap.unitCode ?? '')
+  ).length;
+
+  lines.push(
+    '',
+    input.mode === 'minimal'
+      ? 'Whole-project structure (counts only):'
+      : 'Whole-project structured summary:',
+    `- Tract maps: ${input.deskMaps.length}; title cards: ${input.nodes.length}; owner records: ${input.owners.length}; lease records: ${input.leases.length}; active Texas leases: ${activeLeaseCount}.`,
+    `- Unit structure: ${codedUnitCodes.size} coded unit group${codedUnitCodes.size === 1 ? '' : 's'}, ${uncodedTractCount} tract${uncodedTractCount === 1 ? '' : 's'} outside coded units.`,
+    `- Leasehold records: ${input.leaseholdAssignments.length} WI assignment${input.leaseholdAssignments.length === 1 ? '' : 's'}, ${input.leaseholdOrris.length} ORRI burden${input.leaseholdOrris.length === 1 ? '' : 's'}, ${input.leaseholdTransferOrderEntries.length} transfer-order row${input.leaseholdTransferOrderEntries.length === 1 ? '' : 's'}.`
+  );
+
+  if (input.mode === 'full') {
+    const unitSummary = buildProjectLeaseholdUnitSummary(input);
+    appendFullLeaseholdTotals(lines, unitSummary);
+    appendFullTractRollups(lines, input, unitSummary);
+    return;
+  }
+
+  appendMinimalTractStructure(lines, input);
+}
+
+function appendFullLeaseholdTotals(
+  lines: string[],
+  unitSummary: LeaseholdUnitSummary
+): void {
+  lines.push(
+    `- Unit totals: gross acres ${unitSummary.totalGrossAcres}; pooled acres ${unitSummary.totalPooledAcres}; royalty decimal ${unitSummary.totalRoyaltyDecimal}; NPRI decimal ${unitSummary.totalNpriDecimal}; ORRI decimal ${unitSummary.totalOrriDecimal}; retained WI ${unitSummary.retainedWorkingInterestDecimal}.`,
+    `- Unit warnings: ${unitSummary.overAssignedTractCount} over-assigned tract${unitSummary.overAssignedTractCount === 1 ? '' : 's'}, ${unitSummary.overBurdenedTractCount} over-burdened tract${unitSummary.overBurdenedTractCount === 1 ? '' : 's'}, ${unitSummary.leaseOverlapWarningCount} lease-overlap warning${unitSummary.leaseOverlapWarningCount === 1 ? '' : 's'}, ${unitSummary.inputWarningCount} input warning${unitSummary.inputWarningCount === 1 ? '' : 's'}, ${unitSummary.unitAssignmentWarningCount} unit-assignment warning${unitSummary.unitAssignmentWarningCount === 1 ? '' : 's'}.`
+  );
+}
+
+function appendFullTractRollups(
+  lines: string[],
+  input: WholeProjectSummaryInput,
+  unitSummary: LeaseholdUnitSummary
+): void {
+  const nodeById = new Map(input.nodes.map((node) => [node.id, node]));
+  const leaseholdTractByDeskMapId = new Map(
+    unitSummary.tracts.map((tract) => [tract.deskMapId, tract])
+  );
+
+  lines.push('', 'All-tract rollups:');
+  if (input.deskMaps.length === 0) {
+    lines.push('- No tract maps loaded.');
+    return;
+  }
+
+  input.deskMaps.forEach((deskMap) => {
+    const tractNodes = nodesForDeskMap(deskMap, nodeById);
+    const leaseScopeNodes = leaseScopeNodesForDeskMap(deskMap, input.deskMaps, nodeById);
+    const counts = countNodeKinds(tractNodes);
+    const coverage = calculateDeskMapCoverageSummary(
+      tractNodes,
+      input.activeLeasesByOwnerId,
+      leaseScopeNodes
+    );
+    const leaseholdTract = leaseholdTractByDeskMapId.get(deskMap.id);
+    const unitLabel = cleanText(deskMap.unitName ?? deskMap.unitCode ?? '');
+    const parts = [
+      `${cleanText(deskMap.code) || 'Uncoded'} - ${cleanText(deskMap.name) || 'Unnamed tract'}`,
+      `${tractNodes.length} card${tractNodes.length === 1 ? '' : 's'}`,
+      `${counts.conveyanceCount} conveyance`,
+      `${counts.npriCount} NPRI`,
+      `${counts.relatedLeaseCount} lease link`,
+      `${counts.relatedDocumentCount} document link`,
+      `owners current/linked/leased ${coverage.currentOwnerCount}/${coverage.linkedOwnerCount}/${coverage.leasedOwnerCount}`,
+      `coverage found ${formatFractionPercent(coverage.currentOwnership)}, linked ${formatFractionPercent(coverage.linkedOwnership)}, leased ${formatFractionPercent(coverage.leasedOwnership)}`,
+      `lease warnings ${coverage.leaseOverlaps.length}`,
+    ];
+    if (unitLabel) parts.push(`unit ${unitLabel}`);
+    if (leaseholdTract) {
+      parts.push(
+        `unit royalty ${leaseholdTract.unitRoyaltyDecimal}`,
+        `NRI before ORRI ${leaseholdTract.nriBeforeOrriRate}`,
+        `ORRI burden ${leaseholdTract.totalOrriBurdenRate}`,
+        `retained WI ${leaseholdTract.retainedWorkingInterestDecimal}`,
+        `lessees ${formatNameList(leaseholdTract.uniqueLessees)}`
+      );
+    }
+    lines.push(`- ${parts.join('; ')}`);
+  });
+}
+
+function buildProjectLeaseholdUnitSummary(
+  input: WholeProjectSummaryInput
+): LeaseholdUnitSummary {
+  return buildLeaseholdUnitSummary({
+    deskMaps: input.deskMaps,
+    nodes: input.nodes,
+    owners: input.owners,
+    leases: input.leases,
+    leaseholdAssignments: input.leaseholdAssignments,
+    leaseholdOrris: input.leaseholdOrris,
+  });
+}
+
+function appendMinimalTractStructure(
+  lines: string[],
+  input: WholeProjectSummaryInput
+): void {
+  const nodeById = new Map(input.nodes.map((node) => [node.id, node]));
+  lines.push('', 'All-tract structure (counts only):');
+  if (input.deskMaps.length === 0) {
+    lines.push('- No tract maps loaded.');
+    return;
+  }
+
+  input.deskMaps.forEach((deskMap, index) => {
+    const tractNodes = nodesForDeskMap(deskMap, nodeById);
+    const leaseScopeNodes = leaseScopeNodesForDeskMap(deskMap, input.deskMaps, nodeById);
+    const counts = countNodeKinds(tractNodes);
+    const coverage = calculateDeskMapCoverageSummary(
+      tractNodes,
+      input.activeLeasesByOwnerId,
+      leaseScopeNodes
+    );
+    lines.push(
+      `- Tract ${index + 1}: ${tractNodes.length} title card${tractNodes.length === 1 ? '' : 's'}; ${counts.conveyanceCount} conveyance; ${counts.npriCount} NPRI; ${counts.relatedLeaseCount} related lease; ${counts.relatedDocumentCount} related document; ${coverage.currentOwnerCount} current owner card${coverage.currentOwnerCount === 1 ? '' : 's'}; ${coverage.linkedOwnerCount} linked owner card${coverage.linkedOwnerCount === 1 ? '' : 's'}; ${coverage.leasedOwnerCount} leased owner card${coverage.leasedOwnerCount === 1 ? '' : 's'}; ${coverage.leaseOverlaps.length} lease coverage warning${coverage.leaseOverlaps.length === 1 ? '' : 's'}; coded unit: ${cleanText(deskMap.unitCode ?? '') ? 'yes' : 'no'}.`
+    );
+  });
+}
+
+function nodesForDeskMap(
+  deskMap: DeskMap,
+  nodeById: Map<string, OwnershipNode>
+): OwnershipNode[] {
+  return deskMap.nodeIds
+    .map((id) => nodeById.get(id))
+    .filter((node): node is OwnershipNode => Boolean(node));
+}
+
+function leaseScopeNodesForDeskMap(
+  deskMap: DeskMap,
+  deskMaps: DeskMap[],
+  nodeById: Map<string, OwnershipNode>
+): OwnershipNode[] {
+  const unitCode = cleanText(deskMap.unitCode ?? '');
+  if (!unitCode) return nodesForDeskMap(deskMap, nodeById);
+  return deskMaps
+    .filter((candidate) => cleanText(candidate.unitCode ?? '') === unitCode)
+    .flatMap((candidate) => nodesForDeskMap(candidate, nodeById));
+}
+
+function countNodeKinds(nodes: OwnershipNode[]): NodeKindCounts {
+  return {
+    conveyanceCount: nodes.filter(
+      (node) => node.type !== 'related' && !isNpriNode(node)
+    ).length,
+    npriCount: nodes.filter((node) => isNpriNode(node)).length,
+    relatedLeaseCount: nodes.filter((node) => isLeaseNode(node)).length,
+    relatedDocumentCount: nodes.filter(
+      (node) => node.type === 'related' && node.relatedKind === 'document'
+    ).length,
+  };
+}
+
+function formatNameList(values: string[]): string {
+  const cleaned = [...new Set(values.map(cleanText).filter(Boolean))];
+  if (cleaned.length === 0) return 'none';
+  const visible = cleaned.slice(0, 6);
+  const hiddenCount = cleaned.length - visible.length;
+  return hiddenCount > 0
+    ? `${visible.join(', ')} (+${hiddenCount} more)`
+    : visible.join(', ');
 }
 
 function groupActiveLeasesByOwnerId(leases: Lease[]): Map<string, Lease[]> {

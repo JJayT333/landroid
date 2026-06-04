@@ -124,6 +124,12 @@ jobs, search indexes, sharing links, audit events, and collaboration.
   storage.
 - Cloud provider use can send prompt context and project data to third parties.
   Use cloud AI only when that is acceptable for the current project.
+- Hosted minimal context is counts/structure only. It may include all-tract
+  structural rollups, but must not send project names, party names, fractions,
+  lease economics, remarks, document references, or stable record IDs. Hosted
+  full-context mode requires the existing per-workspace disclosure acceptance
+  before richer bounded project rollups are sent. Local AI may receive richer
+  bounded context because it stays on the operator's machine.
 - Hosted/cloud mode uses a backend proxy with server-held keys. Keep Cognito
   JWT verification, server-side model policy, durable token-ceiling tracking,
   request body caps, body-field allowlisting, client-supplied tool-schema
