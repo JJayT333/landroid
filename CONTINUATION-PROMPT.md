@@ -4,69 +4,65 @@ Use this file to resume the active workstream in a new chat. Read it with
 `AGENTS.md`, `PROJECT_CONTEXT.md`, and `docs/README.md` before touching code.
 Keep long history in `CHANGELOG.md`.
 
-## Current Title Ledger Runtime Lifecycle Handoff - 2026-06-04
+## Current Title Read-Flip Governance Handoff - 2026-06-04
 
-Branch: `feat/title-ledger-runtime-lifecycle`
+Branch: `feat/title-read-flip-governance`
 
-Worktree: `/private/tmp/landroid-title-ledger-lifecycle`
+Worktree: `/private/tmp/landroid-title-read-flip-governance`
 
-Workstream: T2b runtime ledger lifecycle, branched from T2a
-`feat/title-ledger-runtime-storage`. T0 rebuild-first posture and the T1
-remediation merge train (#111-#117) are complete on `main`; T2a is open as PR
-#119.
+Workstream: T3 read-flip governance, branched from T2b
+`feat/title-ledger-runtime-lifecycle`. T0 rebuild-first posture and the T1
+remediation merge train (#111-#117) are complete on `main`. T2a is PR #119 and
+T2b is PR #120.
 
 Completed in this branch:
 
-- `useTitleActionLog` now has lifecycle helpers to flush the live title ledger
-  to Dexie, hydrate from Dexie, hydrate from a v9 file ledger, or baseline when
-  no ledger exists.
-- App startup hydrates the loaded workspace from Dexie and continues the audit
-  chain from the persisted head. If no stored rows exist, it baselines the
-  loaded snapshot and mirrors that baseline to Dexie.
-- Debounced workspace autosave now mirrors the title ledger after a successful
-  current-generation shard save. A generation guard skips stale flushes when a
-  newer edit arrives while an async save is in flight.
-- `.landroid` imports hydrate from the file `actionLedger` over stale Dexie rows
-  and mirror the chosen file/baseline ledger back to Dexie. CSV and demo loads
-  baseline from the loaded workspace and mirror back.
-- Lifecycle tests cover persist-refresh-hydrate equality, continued audit chain,
-  workspace swap rehydrate, and v9 file-ledger precedence over stale Dexie.
+- `CutoverRegistry` now has explicit default-off governance. Default production
+  posture still throws `CutoverDisabledError`; test-only registries can pass
+  `{ liveCutoverEnabled: true }` to prove cutover and revert behavior.
+- `TitleTreeCutoverGate` now requires the full T3 evidence set before candidacy:
+  enough clean inline parities, clean MathInputView parity, clean `.landroid`
+  export-import-replay round trip, and no active runtime ledger divergence/error.
+- `TitleReadPathFlag` now has explicit default-off governance. Default
+  `cutOver()` throws `TitleReadFlipDisabledError`; test-only flags can enable
+  cutover with a reviewer token and then return to shadow.
+- `title-read-flip-governance.test.ts` proves a synthetic `.landroid` v9
+  export/import/replay round trip, action-derived read equivalence to the store
+  projection, clean math parity, governed test-only cutover, and flip-to-shadow
+  revert.
 - `ARCHITECTURE.md`, `ROADMAP.md`,
-  `docs/phase-4-v9-durable-format-scope.md`, and
-  `docs/phase-4-title-cutover-notes.md` now describe the ledger as durable
-  shadow evidence, not in-memory-only instrumentation.
+  `docs/phase-4-v9-durable-format-scope.md`,
+  `docs/phase-4-title-cutover-notes.md`, and
+  `docs/phase-4-action-layer-notes.md` now describe T3 as governed/default-off
+  readiness, not production enablement.
 
 Explicitly not included:
 
 - No production read flip and no change to canonical reads. Zustand/snapshot
-  reads remain authoritative until the separate T3 governed/default-off
-  read-flip readiness gate is reviewed.
+  reads remain authoritative until a separate reviewed enablement decision.
 - No math/precision behavior change.
 - No real `.landroid` files or `scripts/springhill/` changes.
+- No new retrieval, AI, spreadsheet export, SourceAttestation, or lease-generator
+  work.
 
-Rollback / recovery:
+Flip-to-shadow revert recipe:
 
-- Before destructive migration or rollback testing, export a `.landroid` backup
-  and note the branch/commit under test.
-- To revert T2b while keeping Dexie v12, revert this lifecycle commit/PR. The
-  app returns to T2a storage-only shadow behavior; current reads still come from
-  the store/snapshot path.
-- If a browser profile has opened Dexie v12 and a reverted v11 build cannot
-  open the newer IndexedDB version, delete the `landroid-v2` IndexedDB database
-  for that profile only after exporting a `.landroid` backup, then import the
-  backup into the reverted build.
-- If staying on v12, clearing `titleActionRecords` and `titleAuditEvents` purges
-  the additive mirror rows.
+1. For T3 itself, revert this PR or leave default governance disabled. No data
+   migration is required because the store/snapshot path remains canonical.
+2. If a later reviewed PR enables production governance, immediately revert by
+   calling `TitleReadPathFlag.revertToShadow()` and
+   `TitleTreeCutoverGate.revertToShadow()`, with governance set back to disabled.
+3. Keep the `.landroid` backup taken before any future production enablement
+   test. If runtime ledger persistence is also being reverted, use the Dexie v12
+   rollback recipe in `docs/phase-4-v9-durable-format-scope.md`.
 
 Latest validation:
 
-- `npm ci` - passed in this worktree, with the local Node 26 engine warning and
-  the pre-existing npm audit finding.
-- `npm test -- src/store/__tests__/title-action-log-persistence.test.ts src/storage/__tests__/title-ledger-persistence.test.ts src/store/__tests__/title-action-log.test.ts`
-  - passed, 3 files / 21 tests.
+- `npm test -- src/project-records/__tests__/action-cutover.test.ts src/project-records/__tests__/title-cutover-gate.test.ts src/project-records/__tests__/title-read-path.test.ts src/project-records/__tests__/title-read-flip.test.ts src/project-records/__tests__/title-read-flip-governance.test.ts src/project-records/__tests__/title-math-parity.test.ts`
+  - passed, 6 files / 27 tests.
 - `npm run lint` - passed.
 - `git diff --check` - passed.
-- `npm test` - passed, 129 files / 894 tests. Existing intentional stderr
+- `npm test` - passed, 130 files / 899 tests. Existing intentional stderr
   appeared for simulated Dexie failures, title divergence, and post-v8 backup
   failure paths.
 - `npm run build` - passed with existing Vite dynamic/static import warnings,
@@ -76,36 +72,35 @@ Latest validation:
 
 Open risks / deliberately deferred:
 
-- T2b touches the subtle hydrate/precedence boundary and should get close
-  review. The file path intentionally wins over stale Dexie rows; startup
-  resident workspaces hydrate from Dexie.
-- Read-flip remains a separate reviewed decision after T3 proves the gates:
-  MathInputView parity, `.landroid` round-trip/replay, live divergence, and the
-  flip-to-shadow revert path.
-- No e2e run was performed for T2b because the behavior is covered by lifecycle
-  unit tests and no visible browser workflow changed. Run e2e if review wants a
-  full app smoke before merge.
+- Production read-flip enablement is still a separate reviewed decision after
+  T2a/T2b/T3 are reviewed together. This branch proves the path and gates only.
+- T2b remains the riskiest lifecycle slice in the stack because
+  hydrate/precedence/file-vs-Dexie coherence decides which ledger survives a
+  load/import.
+- No e2e run was performed for T3 because no visible browser workflow changed;
+  run e2e if review wants a full app smoke before merge.
 
 Likely next steps:
 
-1. Review and push `feat/title-ledger-runtime-lifecycle`.
-2. Open the T2b PR against the T2a branch/PR, with close-review callouts for
-   hydrate/precedence/file-vs-Dexie behavior.
-3. After T2a/T2b merge, start T3 `feat/title-read-flip-governance`: convert the
-   existing hard-disabled read-flip machinery to governed/default-off, with no
-   production enablement.
+1. Push `feat/title-read-flip-governance` and open the stacked PR against
+   `feat/title-ledger-runtime-lifecycle`.
+2. Review T2a/T2b/T3 in order, with close attention to T2b lifecycle coherence
+   and T3's non-flip guarantee.
+3. After review, decide separately whether and when a production read-flip
+   enablement PR should be written.
 
 Paste-ready next chat prompt:
 
 > Read `/Users/abstractmapping/projects/landroid/AGENTS.md`,
 > `/Users/abstractmapping/projects/landroid/PROJECT_CONTEXT.md`, and
-> `/private/tmp/landroid-title-ledger-lifecycle/CONTINUATION-PROMPT.md`.
-> Continue T2b from branch `feat/title-ledger-runtime-lifecycle` in
-> `/private/tmp/landroid-title-ledger-lifecycle`. The branch adds runtime title
-> ledger flush/hydrate/continue-chain behavior, file-ledger precedence over stale
-> Dexie rows, lifecycle tests, and source-of-truth doc updates. Validation
-> passed with targeted lifecycle tests, `npm run lint`, `git diff --check`,
-> `npm test`, `npm run build`, and `./node_modules/.bin/tsx scripts/title-soak.ts`.
+> `/private/tmp/landroid-title-read-flip-governance/CONTINUATION-PROMPT.md`.
+> Continue T3 from branch `feat/title-read-flip-governance` in
+> `/private/tmp/landroid-title-read-flip-governance`. The branch converts the
+> existing title read-flip machinery to governed/default-off, proves test-only
+> cutover plus flip-to-shadow revert, keeps production reads on the store, and
+> updates the source-of-truth docs. Validation passed with targeted T3 tests,
+> `npm run lint`, `git diff --check`, `npm test`, `npm run build`, and
+> `./node_modules/.bin/tsx scripts/title-soak.ts`.
 
 ## Historical Branch Notes
 

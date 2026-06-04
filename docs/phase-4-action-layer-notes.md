@@ -4,6 +4,14 @@ Status: shadow build complete. The current Zustand stores remain canonical and
 the reference for the entire run. NO live workflow was cut over. Hand back to
 the reviewer for the cutover decision.
 
+**Supersession note (2026-06-04).** This historical Phase 4 note describes the
+original shadow run. T3 now converts the cutover mechanism from permanently
+hard-disabled to governed/default-off: default production posture is still
+shadow, but tests and a future reviewed PR can pass explicit governance to prove
+or enable `candidate → cutover`. Runtime title-ledger persistence also landed in
+T2a/T2b, so references to non-durable/in-memory title logs are historical unless
+restated in newer docs.
+
 Branch: `feat/phase-4-action-layer` (off `main`). Additive only; one existing
 file touched (`src/project-records/index.ts`, a re-export).
 
@@ -20,7 +28,7 @@ A new shadow subsystem under `src/project-records/action-layer/`:
 | `action-records.ts` | `materializeImportApproval` (Phase 3 drafts → durable records) and `materializeCommandBatch`. |
 | `encoders.ts` | Shadow translators: current store output → typed command log, per surface. |
 | `parity.ts` | Per-workflow parity harness; `assertParityClean` throws on any divergence. |
-| `cutover.ts` | Reversible, flag-gated cutover mechanism; never flips in this run. |
+| `cutover.ts` | Reversible, governed/default-off cutover mechanism; never flips production in this run. |
 | `undo-boundary.ts` | Explicit undo/rollback boundary + AI-proposal gate guard. |
 | `persistence.ts` | Additive, version-gated bundle inclusion; v8 stays authoritative. |
 
@@ -105,11 +113,12 @@ would add divergence risk against guardrail 3). Structural/derived records
 
 ## Cutover candidates (mechanism built, NOT flipped)
 
-`LIVE_CUTOVER_DISABLED = true` for this entire run. `CutoverRegistry` defaults
-every workflow to `shadow`; `shadow → candidate` requires clean parity;
-`candidate → shadow` is reversible; `candidate → cutover` is hard-guarded
-(throws `CutoverDisabledError`) and additionally requires a reviewer token. No
-call site flips a workflow.
+`CutoverRegistry` defaults every workflow to `shadow`; `shadow → candidate`
+requires clean parity; `candidate → shadow` is reversible; `candidate → cutover`
+requires a reviewer token plus explicit governance with live cutover enabled.
+`LIVE_CUTOVER_DISABLED` remains `true` as the default runtime posture, so default
+registries still throw `CutoverDisabledError`. No application call site flips a
+workflow in production.
 
 **Candidates reported (clean parity; reviewer decides the flip):** `title_tree`,
 `document`, `owner`, `lease`, `curative`. Each has clean per-surface parity in
@@ -154,8 +163,9 @@ uses — but does not modify them.)
    reload can replay without the store. Want that added now or at cutover time?
 3. **Audit chain scope.** One chain per project is assumed. Do you want a
    per-workspace or per-surface chain instead before any cutover?
-4. **Runtime ledger persistence.** `.landroid` v9 can now carry a validated
-   `actionLedger`, but refresh-time Dexie persistence and hydration are still a
-   separate storage workstream.
+4. **Runtime ledger persistence.** `.landroid` v9 can carry a validated
+   `actionLedger`, and T2a/T2b add refresh-time Dexie persistence, hydration,
+   continue-chain, and file-vs-Dexie precedence. The ledger is durable shadow
+   evidence, not the production read source.
 5. **PII.** No `scripts/springhill/` or real `.landroid` data was touched;
    all fixtures are synthetic. Confirm that remains the rule through cutover.

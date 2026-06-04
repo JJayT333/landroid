@@ -49,6 +49,7 @@ describe('Phase 4 title cutover gate', () => {
   it('refuses candidacy before the parity threshold is met', () => {
     const gate = new TitleTreeCutoverGate();
     gate.setMathParityClean(true);
+    gate.setLandroidRoundTripClean(true);
     passN(gate, MIN_PASSED_TITLE_PARITIES - 1);
     expect(gate.readiness().ready).toBe(false);
     expect(() => gate.proposeCandidate(cleanReport)).toThrow(/Not enough proven mutations/);
@@ -58,9 +59,20 @@ describe('Phase 4 title cutover gate', () => {
   it('refuses candidacy when math parity is not clean', () => {
     const gate = new TitleTreeCutoverGate();
     passN(gate, MIN_PASSED_TITLE_PARITIES);
+    gate.setLandroidRoundTripClean(true);
     gate.setMathParityClean(false);
     expect(gate.readiness().ready).toBe(false);
     expect(() => gate.proposeCandidate(cleanReport)).toThrow(/Math parity is not clean/);
+    expect(gate.getState()).toBe('shadow');
+  });
+
+  it('refuses candidacy when the .landroid round trip is not clean', () => {
+    const gate = new TitleTreeCutoverGate();
+    passN(gate, MIN_PASSED_TITLE_PARITIES);
+    gate.setMathParityClean(true);
+    gate.setLandroidRoundTripClean(false);
+    expect(gate.readiness().ready).toBe(false);
+    expect(() => gate.proposeCandidate(cleanReport)).toThrow(/round trip is not clean/);
     expect(gate.getState()).toBe('shadow');
   });
 
@@ -68,6 +80,7 @@ describe('Phase 4 title cutover gate', () => {
     const gate = new TitleTreeCutoverGate();
     passN(gate, MIN_PASSED_TITLE_PARITIES);
     gate.setMathParityClean(true);
+    gate.setLandroidRoundTripClean(true);
     expect(gate.readiness().ready).toBe(true);
 
     gate.proposeCandidate(cleanReport);
@@ -81,6 +94,7 @@ describe('Phase 4 title cutover gate', () => {
     const gate = new TitleTreeCutoverGate();
     passN(gate, MIN_PASSED_TITLE_PARITIES);
     gate.setMathParityClean(true);
+    gate.setLandroidRoundTripClean(true);
     gate.setRuntimeDivergence(true, 'createRootNode diverged');
 
     const readiness = gate.readiness();
@@ -96,6 +110,7 @@ describe('Phase 4 title cutover gate', () => {
     const gate = new TitleTreeCutoverGate();
     passN(gate, MIN_PASSED_TITLE_PARITIES);
     gate.setMathParityClean(true);
+    gate.setLandroidRoundTripClean(true);
     expect(gate.readiness().ready).toBe(true);
 
     useTitleActionLog.setState({
@@ -133,5 +148,20 @@ describe('Phase 4 title cutover gate', () => {
     expect(() =>
       registry.cutOver('title_tree', { reviewerApprovalToken: 'reviewer-ok' })
     ).toThrow(CutoverDisabledError);
+  });
+
+  it('allows test-only governed cutover and explicit shadow revert', () => {
+    const registry = new CutoverRegistry({ liveCutoverEnabled: true });
+    const gate = new TitleTreeCutoverGate(registry);
+    passN(gate, MIN_PASSED_TITLE_PARITIES);
+    gate.setMathParityClean(true);
+    gate.setLandroidRoundTripClean(true);
+    gate.proposeCandidate(cleanReport);
+
+    gate.cutOver({ reviewerApprovalToken: 'reviewer-ok' });
+    expect(gate.getState()).toBe('cutover');
+
+    gate.revertToShadow();
+    expect(gate.getState()).toBe('shadow');
   });
 });

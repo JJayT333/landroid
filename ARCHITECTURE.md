@@ -39,6 +39,13 @@ summarizes how the app is put together and where changes should live.
   prefer the loaded file/workspace over stale Dexie rows and mirror that ledger
   back to Dexie. Reads still use the canonical Zustand/snapshot path; no
   production read flip is enabled here.
+- Title read-flip governance: `src/project-records/action-layer/title-read-path.ts`,
+  `title-cutover-gate.ts`, `title-math-parity.ts`, and `title-read-flip.ts`
+  contain the existing Phase 4 read-flip machinery. T3 converts that machinery
+  from permanently hard-disabled to governed/default-off: default app behavior
+  remains shadow/store reads, while tests can explicitly enable governance to
+  prove action-derived reads, gate failures, and flip-to-shadow reversion.
+  Production enablement is a separate reviewed decision and is not part of T3.
 - Runtime target: hosted web app first, with PWA/iPad support as a product
   target. Native iOS and desktop installers are deferred unless a later
   decision gate proves they are needed.
@@ -278,8 +285,10 @@ The project-record `.landroid` migration strategy is documented in
 package format: manual save can include a validated title action/audit ledger
 under `actionLedger`. The v9 snapshot-authoritative import rule remains the
 current file-format behavior, but rebuild-first supersedes treating that as a
-permanent architecture rule. A future read-flip may make action-derived records
-canonical after runtime persistence, parity, round-trip, and revert gates pass.
+permanent architecture rule. T3 proves a governed/default-off read-flip path from
+the existing action-derived records after runtime persistence, MathInputView
+parity, `.landroid` round-trip, divergence, and revert gates are green. It does
+not enable production cutover.
 
 Runtime title-ledger persistence is a shadow mirror, not the read source.
 Rollback is still governed by the `.landroid` escape hatch. To revert lifecycle
@@ -290,6 +299,14 @@ reverted v11 build cannot open the newer IndexedDB version, export a `.landroid`
 backup first, delete the `landroid-v2` IndexedDB database for that profile, then
 import the backup into the reverted build. If staying on v12, clearing
 `titleActionRecords` and `titleAuditEvents` purges the additive mirror rows.
+
+Read-flip governance rollback is data-free in T3 because no production read path
+is flipped: revert the T3 PR or leave the default governance disabled. If a later
+reviewed PR enables production cutover, the immediate runtime revert is
+`TitleReadPathFlag.revertToShadow()` plus `TitleTreeCutoverGate.revertToShadow()`,
+with governance set back to disabled. The store/snapshot path must remain
+available until that later enablement explicitly changes the canonical read
+source.
 
 Phase 0.5 planning treats the current storage surface as follows:
 

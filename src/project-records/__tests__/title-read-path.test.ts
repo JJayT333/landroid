@@ -11,6 +11,7 @@ import {
   DEFAULT_TITLE_READ_PATH_MODE,
   selectTitleProjection,
   TitleReadPathFlag,
+  TitleReadFlipDisabledError,
 } from '../action-layer/title-read-path';
 import {
   emptyTitleWorkspace,
@@ -66,9 +67,22 @@ describe('Phase 4 title read path', () => {
     expect(sortedJson(cutover)).toBe(sortedJson(storeTitleRecords));
   });
 
-  it('is one reversible flag: flip to cutover, then revert to shadow', async () => {
+  it('keeps cutover disabled by default', async () => {
     const { storeTitleRecords, actionRecords } = await setup();
     const flag = new TitleReadPathFlag();
+
+    expect(() =>
+      flag.cutOver({ reviewerApprovalToken: 'reviewer-ok' })
+    ).toThrow(TitleReadFlipDisabledError);
+    expect(flag.getMode()).toBe('shadow');
+    expect(sortedJson(flag.select({ storeTitleRecords, actionRecords }))).toBe(
+      sortedJson(storeTitleRecords)
+    );
+  });
+
+  it('is one reversible governed flag: flip to cutover, then revert to shadow', async () => {
+    const { storeTitleRecords, actionRecords } = await setup();
+    const flag = new TitleReadPathFlag('shadow', { cutoverEnabled: true });
 
     // shadow
     expect(sortedJson(flag.select({ storeTitleRecords, actionRecords }))).toBe(
@@ -76,7 +90,7 @@ describe('Phase 4 title read path', () => {
     );
 
     // flip → cutover (reviewer action; identical content while in parity)
-    flag.cutOver();
+    flag.cutOver({ reviewerApprovalToken: 'reviewer-ok' });
     expect(flag.isCutover()).toBe(true);
     const cutoverProjection = flag.select({ storeTitleRecords, actionRecords });
     expect(sortedJson(cutoverProjection)).toBe(sortedJson(storeTitleRecords));

@@ -1,12 +1,12 @@
 /**
- * Phase 4 title cutover — flag-gated read path (DEFAULT OFF, NEVER FLIPPED).
+ * Phase 4 / T3 title cutover — governed read path (DEFAULT OFF).
  *
  * The read path is the actual cutover switch: in `shadow` the title projection
  * comes from the current store/adapter (canonical); in `cutover` it comes from
  * the action layer (replayed from durable records). It defaults to `shadow`, the
  * store keeps shadow-running in both modes, and the flip is a single reversible
- * flag. This run builds the switch and proves it round-trips, but never flips it
- * live (guardrail 2) — no call site sets `cutover`.
+ * flag. The flag is governed/default-off: tests may enable it explicitly, while
+ * production enablement remains a separate reviewed decision.
  */
 import type { BackendSpineCoreRecord } from '../../backend-spine/contracts';
 import { replayTitleProjection } from './title-replay';
@@ -15,6 +15,24 @@ export type TitleReadPathMode = 'shadow' | 'cutover';
 
 /** The default — the current store stays the source of truth for reads. */
 export const DEFAULT_TITLE_READ_PATH_MODE: TitleReadPathMode = 'shadow';
+
+export interface TitleReadPathGovernance {
+  /** False by default; true only for tests or a future reviewed enablement PR. */
+  cutoverEnabled: boolean;
+}
+
+export const DEFAULT_TITLE_READ_PATH_GOVERNANCE: TitleReadPathGovernance = {
+  cutoverEnabled: false,
+};
+
+export class TitleReadFlipDisabledError extends Error {
+  constructor() {
+    super(
+      'Title read flip is disabled by default governance; enabling it requires a separate reviewed decision.'
+    );
+    this.name = 'TitleReadFlipDisabledError';
+  }
+}
 
 export interface SelectTitleProjectionInput {
   mode: TitleReadPathMode;
@@ -40,13 +58,16 @@ export function selectTitleProjection(
 /**
  * A reversible holder for the read-path mode. Defaults to `shadow`. The store
  * keeps shadow-running regardless of mode. Provided so a reviewer (or a test)
- * can flip and revert in one place; NO application call site constructs this in
- * `cutover` or calls {@link cutOver} in this run.
+ * can flip and revert in one place; default governance blocks `cutOver`.
  */
 export class TitleReadPathFlag {
   private mode: TitleReadPathMode;
 
-  constructor(initial: TitleReadPathMode = DEFAULT_TITLE_READ_PATH_MODE) {
+  constructor(
+    initial: TitleReadPathMode = DEFAULT_TITLE_READ_PATH_MODE,
+    private readonly governance: TitleReadPathGovernance =
+      DEFAULT_TITLE_READ_PATH_GOVERNANCE
+  ) {
     this.mode = initial;
   }
 
@@ -59,7 +80,13 @@ export class TitleReadPathFlag {
   }
 
   /** Flip to cutover (reviewer action). Reversible via {@link revertToShadow}. */
-  cutOver(): void {
+  cutOver(options: { reviewerApprovalToken: string }): void {
+    if (!this.governance.cutoverEnabled) {
+      throw new TitleReadFlipDisabledError();
+    }
+    if (!options.reviewerApprovalToken.trim()) {
+      throw new Error('Title read flip requires a reviewer approval token.');
+    }
     this.mode = 'cutover';
   }
 

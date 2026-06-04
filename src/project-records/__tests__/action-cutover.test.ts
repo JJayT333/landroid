@@ -24,8 +24,8 @@ function dirtyReport(workflow: ParityReport['workflow'] = 'lease'): ParityReport
   };
 }
 
-describe('Phase 4 cutover mechanism (built, never flipped)', () => {
-  it('keeps live cutover hard-disabled for this run', () => {
+describe('Phase 4 cutover mechanism (governed default-off)', () => {
+  it('keeps live cutover disabled by default', () => {
     expect(LIVE_CUTOVER_DISABLED).toBe(true);
   });
 
@@ -67,6 +67,16 @@ describe('Phase 4 cutover mechanism (built, never flipped)', () => {
     // state is unchanged — nothing was cut over
     expect(registry.getState('owner')).toBe('candidate');
     expect(registry.liveWorkflows()).toEqual([]);
+  });
+
+  it('requires a non-blank reviewer token even when governance is enabled', () => {
+    const registry = new CutoverRegistry({ liveCutoverEnabled: true });
+    registry.proposeCandidate('owner', cleanReport());
+
+    expect(() => registry.cutOver('owner', { reviewerApprovalToken: '   ' })).toThrow(
+      /requires a reviewer approval token/
+    );
+    expect(registry.getState('owner')).toBe('candidate');
   });
 
   it('reports clean workflows as candidates without performing any cutover', () => {
