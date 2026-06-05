@@ -10,6 +10,7 @@ import { memo } from 'react';
 import { formatAsFraction } from '../../engine/fraction-display';
 import { d, serialize } from '../../engine/decimal';
 import { useWorkspaceStore } from '../../store/workspace-store';
+import { READ_ONLY_WORKSPACE_EDIT_TITLE } from '../../store/write-lease-store';
 import type { OwnershipNode } from '../../types/node';
 import { isNpriNode } from '../../types/node';
 import type { DeskMapPrimaryLeaseSummary } from './deskmap-coverage';
@@ -35,6 +36,7 @@ interface DeskMapCardProps {
   onAttachDoc: (nodeId: string) => void;
   onDelete: (nodeId: string) => void;
   onViewDoc: (docId: string) => void;
+  readOnly?: boolean;
 }
 
 function DeskMapCard({
@@ -50,6 +52,7 @@ function DeskMapCard({
   onAttachDoc,
   onDelete,
   onViewDoc,
+  readOnly = false,
 }: DeskMapCardProps) {
   const isActive = useWorkspaceStore((state) => state.activeNodeId === node.id);
   const initial = d(node.initialFraction);
@@ -116,9 +119,14 @@ function DeskMapCard({
               ? 'border-leather/60 shadow-[0_8px_18px_rgba(92,61,46,0.12)]'
               : 'border-ledger-line'}
           ${isFullyConveyed ? 'opacity-75' : ''}
+          ${readOnly ? 'cursor-default' : 'cursor-pointer'}
           ${cardBodyTint}
         `}
-        onClick={() => onEdit(node.id)}
+        aria-disabled={readOnly}
+        title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
+        onClick={() => {
+          if (!readOnly) onEdit(node.id);
+        }}
       >
         {/* Header */}
         <div
@@ -233,6 +241,7 @@ function DeskMapCard({
                 onEdit={onEdit}
                 onDelete={onDelete}
                 onViewDoc={onViewDoc}
+                readOnly={readOnly}
               />
             ))}
           </div>
@@ -240,10 +249,10 @@ function DeskMapCard({
 
         {/* Action buttons */}
         <div className="hidden group-hover:flex px-2 py-1.5 border-t border-ledger-line bg-parchment-dark rounded-b-lg gap-1 justify-center">
-          <ActionBtn label="PRECEDE" variant="muted" onClick={() => onPrecede(node.id)} />
-          <ActionBtn label="CONVEY" variant="primary" onClick={() => onConvey(node.id)} />
-          <ActionBtn label="ATTACH" variant="accent" onClick={() => onAttachDoc(node.id)} />
-          <ActionBtn label="DELETE" variant="danger" onClick={() => onDelete(node.id)} />
+          <ActionBtn label="PRECEDE" variant="muted" disabled={readOnly} onClick={() => onPrecede(node.id)} />
+          <ActionBtn label="CONVEY" variant="primary" disabled={readOnly} onClick={() => onConvey(node.id)} />
+          <ActionBtn label="ATTACH" variant="accent" disabled={readOnly} onClick={() => onAttachDoc(node.id)} />
+          <ActionBtn label="DELETE" variant="danger" disabled={readOnly} onClick={() => onDelete(node.id)} />
         </div>
       </div>
     </div>
@@ -266,7 +275,8 @@ function deskMapCardPropsAreEqual(
     previous.onPrecede === next.onPrecede &&
     previous.onAttachDoc === next.onAttachDoc &&
     previous.onDelete === next.onDelete &&
-    previous.onViewDoc === next.onViewDoc
+    previous.onViewDoc === next.onViewDoc &&
+    previous.readOnly === next.readOnly
   );
 }
 
@@ -279,11 +289,13 @@ function RelatedDocChip({
   onEdit,
   onDelete,
   onViewDoc,
+  readOnly = false,
 }: {
   doc: OwnershipNode;
   onEdit: (id: string) => void;
   onDelete: (id: string) => void;
   onViewDoc: (id: string) => void;
+  readOnly?: boolean;
 }) {
   // Lease chips render in emerald (lessee = green) so the leased relationship
   // is visible beneath the still-blue lessor card. Other related docs keep the
@@ -296,10 +308,12 @@ function RelatedDocChip({
 
   return (
     <div
-      className={`flex items-center gap-1.5 px-2 py-1 rounded border cursor-pointer transition-colors ${chipChrome}`}
+      className={`flex items-center gap-1.5 px-2 py-1 rounded border transition-colors ${readOnly ? 'cursor-default' : 'cursor-pointer'} ${chipChrome}`}
+      aria-disabled={readOnly}
+      title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
       onClick={(e) => {
         e.stopPropagation();
-        onEdit(doc.id);
+        if (!readOnly) onEdit(doc.id);
       }}
     >
       <div className="flex-1 min-w-0">
@@ -315,12 +329,15 @@ function RelatedDocChip({
         <DeskMapDocumentChips node={doc} onViewDoc={onViewDoc} />
       </div>
       <button
+        type="button"
+        disabled={readOnly}
         onClick={(e) => {
           e.stopPropagation();
+          if (readOnly) return;
           onDelete(doc.id);
         }}
-        className="text-[10px] text-seal/50 hover:text-seal shrink-0"
-        title="Remove"
+        className="text-[10px] text-seal/50 hover:text-seal shrink-0 disabled:cursor-not-allowed disabled:opacity-40"
+        title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : 'Remove'}
       >
         &times;
       </button>
@@ -342,18 +359,24 @@ function ActionBtn({
   label,
   variant,
   onClick,
+  disabled = false,
 }: {
   label: string;
   variant: keyof typeof ACTION_VARIANTS;
   onClick: () => void;
+  disabled?: boolean;
 }) {
   return (
     <button
+      type="button"
+      disabled={disabled}
       onClick={(e) => {
         e.stopPropagation();
+        if (disabled) return;
         onClick();
       }}
-      className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider transition-colors ${ACTION_VARIANTS[variant]}`}
+      title={disabled ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
+      className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${ACTION_VARIANTS[variant]}`}
     >
       {label}
     </button>

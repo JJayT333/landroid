@@ -20,6 +20,10 @@ import {
 import { useUIStore } from '../store/ui-store';
 import { useWorkspaceStore } from '../store/workspace-store';
 import {
+  READ_ONLY_WORKSPACE_EDIT_TITLE,
+  useWorkspaceReadOnly,
+} from '../store/write-lease-store';
+import {
   DOCUMENT_AREA_OPTIONS,
   DOCUMENT_KIND_OPTIONS,
   DOCUMENT_OCR_STATUS_OPTIONS,
@@ -103,12 +107,14 @@ function SelectField<TValue extends string>({
   options,
   onChange,
   className = '',
+  disabled = false,
 }: {
   label: string;
   value: TValue;
   options: Array<{ value: TValue; label: string }>;
   onChange: (value: TValue) => void;
   className?: string;
+  disabled?: boolean;
 }) {
   return (
     <label className={`block ${className}`}>
@@ -117,8 +123,9 @@ function SelectField<TValue extends string>({
       </span>
       <select
         value={value}
+        disabled={disabled}
         onChange={(event) => onChange(event.target.value as TValue)}
-        className="w-full rounded-lg border border-ledger-line bg-parchment px-2 py-1.5 text-sm text-ink outline-none focus:border-leather focus:ring-2 focus:ring-leather"
+        className="w-full rounded-lg border border-ledger-line bg-parchment px-2 py-1.5 text-sm text-ink outline-none focus:border-leather focus:ring-2 focus:ring-leather disabled:cursor-not-allowed disabled:opacity-60"
       >
         {options.map((option) => (
           <option key={option.value} value={option.value}>
@@ -136,12 +143,14 @@ function TextField({
   onChange,
   type = 'text',
   className = '',
+  disabled = false,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   type?: 'text' | 'date';
   className?: string;
+  disabled?: boolean;
 }) {
   return (
     <label className={`block ${className}`}>
@@ -151,8 +160,9 @@ function TextField({
       <input
         type={type}
         value={value}
+        disabled={disabled}
         onChange={(event) => onChange(event.target.value)}
-        className="w-full rounded-lg border border-ledger-line bg-parchment px-2 py-1.5 text-sm text-ink outline-none focus:border-leather focus:ring-2 focus:ring-leather"
+        className="w-full rounded-lg border border-ledger-line bg-parchment px-2 py-1.5 text-sm text-ink outline-none focus:border-leather focus:ring-2 focus:ring-leather disabled:cursor-not-allowed disabled:opacity-60"
       />
     </label>
   );
@@ -162,10 +172,12 @@ function TextAreaField({
   label,
   value,
   onChange,
+  disabled = false,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
+  disabled?: boolean;
 }) {
   return (
     <label className="block">
@@ -174,15 +186,17 @@ function TextAreaField({
       </span>
       <textarea
         value={value}
+        disabled={disabled}
         onChange={(event) => onChange(event.target.value)}
         rows={3}
-        className="w-full resize-y rounded-lg border border-ledger-line bg-parchment px-2 py-1.5 text-sm text-ink outline-none focus:border-leather focus:ring-2 focus:ring-leather"
+        className="w-full resize-y rounded-lg border border-ledger-line bg-parchment px-2 py-1.5 text-sm text-ink outline-none focus:border-leather focus:ring-2 focus:ring-leather disabled:cursor-not-allowed disabled:opacity-60"
       />
     </label>
   );
 }
 
 export default function DocumentsView() {
+  const readOnly = useWorkspaceReadOnly();
   const workspaceId = useWorkspaceStore((state) => state.workspaceId);
   const projectName = useWorkspaceStore((state) => state.projectName);
   const nodes = useWorkspaceStore((state) => state.nodes);
@@ -330,6 +344,7 @@ export default function DocumentsView() {
   }, []);
 
   const handleSaveMetadata = useCallback(async () => {
+    if (readOnly) return;
     if (!activeRow || !draft) return;
     setSaving(true);
     setStatusMessage(null);
@@ -347,7 +362,7 @@ export default function DocumentsView() {
     } finally {
       setSaving(false);
     }
-  }, [activeRow, draft]);
+  }, [activeRow, draft, readOnly]);
 
   const downloadManifest = useCallback(() => {
     const manifest = buildPacketManifest(packetRows);
@@ -691,8 +706,9 @@ export default function DocumentsView() {
                 <button
                   type="button"
                   onClick={handleSaveMetadata}
-                  disabled={saving}
-                  className="rounded-lg bg-leather px-3 py-1.5 text-xs font-semibold text-parchment hover:bg-leather-light disabled:opacity-50"
+                  disabled={readOnly || saving}
+                  title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
+                  className="rounded-lg bg-leather px-3 py-1.5 text-xs font-semibold text-parchment hover:bg-leather-light disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {saving ? 'Saving...' : 'Save'}
                 </button>
@@ -702,12 +718,14 @@ export default function DocumentsView() {
                   label="Display title"
                   value={draft.displayTitle}
                   onChange={(value) => updateDraft('displayTitle', value)}
+                  disabled={readOnly}
                 />
                 <div className="grid grid-cols-2 gap-2">
                   <SelectField
                     label="Area"
                     value={draft.documentArea}
                     onChange={(value) => updateDraft('documentArea', value)}
+                    disabled={readOnly}
                     options={DOCUMENT_AREA_OPTIONS.map((area) => ({
                       value: area,
                       label: DOCUMENT_AREA_LABELS[area],
@@ -717,6 +735,7 @@ export default function DocumentsView() {
                     label="Kind"
                     value={draft.kind}
                     onChange={(value) => updateDraft('kind', value)}
+                    disabled={readOnly}
                     options={DOCUMENT_KIND_OPTIONS.map((kind) => ({
                       value: kind,
                       label: DOCUMENT_KIND_LABELS[kind],
@@ -727,17 +746,20 @@ export default function DocumentsView() {
                   label="Instrument type"
                   value={draft.instrumentType}
                   onChange={(value) => updateDraft('instrumentType', value)}
+                  disabled={readOnly}
                 />
                 <div className="grid grid-cols-2 gap-2">
                   <TextField
                     label="County"
                     value={draft.county}
                     onChange={(value) => updateDraft('county', value)}
+                    disabled={readOnly}
                   />
                   <TextField
                     label="Instrument no."
                     value={draft.instrumentNumber}
                     onChange={(value) => updateDraft('instrumentNumber', value)}
+                    disabled={readOnly}
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-2">
@@ -745,11 +767,13 @@ export default function DocumentsView() {
                     label="Volume"
                     value={draft.volume}
                     onChange={(value) => updateDraft('volume', value)}
+                    disabled={readOnly}
                   />
                   <TextField
                     label="Page"
                     value={draft.page}
                     onChange={(value) => updateDraft('page', value)}
+                    disabled={readOnly}
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-2">
@@ -758,33 +782,39 @@ export default function DocumentsView() {
                     type="date"
                     value={draft.effectiveDate}
                     onChange={(value) => updateDraft('effectiveDate', value)}
+                    disabled={readOnly}
                   />
                   <TextField
                     label="Recorded"
                     type="date"
                     value={draft.recordingDate}
                     onChange={(value) => updateDraft('recordingDate', value)}
+                    disabled={readOnly}
                   />
                 </div>
                 <TextField
                   label="Grantor"
                   value={draft.grantor}
                   onChange={(value) => updateDraft('grantor', value)}
+                  disabled={readOnly}
                 />
                 <TextField
                   label="Grantee / lessor / lessee"
                   value={draft.grantee}
                   onChange={(value) => updateDraft('grantee', value)}
+                  disabled={readOnly}
                 />
                 <TextField
                   label="Source reference"
                   value={draft.sourceReference}
                   onChange={(value) => updateDraft('sourceReference', value)}
+                  disabled={readOnly}
                 />
                 <SelectField
                   label="OCR status"
                   value={draft.ocrStatus}
                   onChange={(value) => updateDraft('ocrStatus', value)}
+                  disabled={readOnly}
                   options={DOCUMENT_OCR_STATUS_OPTIONS.map((status) => ({
                     value: status,
                     label: status.replace(/_/g, ' '),
@@ -794,6 +824,7 @@ export default function DocumentsView() {
                   label="Notes"
                   value={draft.notes}
                   onChange={(value) => updateDraft('notes', value)}
+                  disabled={readOnly}
                 />
               </div>
               {statusMessage && (

@@ -43,6 +43,7 @@ interface OwnerDetailPanelProps {
   onAddDoc: (doc: OwnerDoc) => Promise<void>;
   onUpdateDoc: (id: string, fields: Partial<OwnerDoc>) => Promise<void>;
   onRemoveDoc: (id: string) => Promise<void>;
+  readOnly?: boolean;
 }
 
 export default function OwnerDetailPanel({
@@ -66,6 +67,7 @@ export default function OwnerDetailPanel({
   onAddDoc,
   onUpdateDoc,
   onRemoveDoc,
+  readOnly = false,
 }: OwnerDetailPanelProps) {
   const tabBaseId = `owner-${owner.id}`;
   const activePanelId = `${tabBaseId}-${tab}-panel`;
@@ -114,7 +116,12 @@ export default function OwnerDetailPanel({
         className="flex-1 overflow-auto p-5"
       >
         {tab === 'info' && (
-          <OwnerInfoTab owner={owner} onSave={onSaveOwner} onDelete={onDeleteOwner} />
+          <OwnerInfoTab
+            owner={owner}
+            onSave={onSaveOwner}
+            onDelete={onDeleteOwner}
+            readOnly={readOnly}
+          />
         )}
         {tab === 'leases' && (
           <OwnerLeasesTab
@@ -126,6 +133,7 @@ export default function OwnerDetailPanel({
             onRemove={onRemoveLease}
             getDeskMapTargetsForLease={getDeskMapTargetsForLease}
             onOpenDeskMapLeaseTarget={onOpenDeskMapLeaseTarget}
+            readOnly={readOnly}
           />
         )}
         {tab === 'contacts' && (
@@ -136,6 +144,7 @@ export default function OwnerDetailPanel({
             onAdd={onAddContact}
             onUpdate={onUpdateContact}
             onRemove={onRemoveContact}
+            readOnly={readOnly}
           />
         )}
         {tab === 'docs' && (
@@ -147,6 +156,7 @@ export default function OwnerDetailPanel({
             onAdd={onAddDoc}
             onUpdate={onUpdateDoc}
             onRemove={onRemoveDoc}
+            readOnly={readOnly}
           />
         )}
       </div>

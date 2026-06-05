@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import FormField from '../shared/FormField';
 import { useConfirmation } from '../shared/ConfirmationProvider';
+import { READ_ONLY_WORKSPACE_EDIT_TITLE } from '../../store/write-lease-store';
 import {
   LEASE_STATUS_OPTIONS,
   createBlankLease,
@@ -29,6 +30,7 @@ interface OwnerLeasesTabProps {
     lease: Lease,
     target: OwnerLeaseDeskMapTarget
   ) => void;
+  readOnly?: boolean;
 }
 
 export default function OwnerLeasesTab({
@@ -40,6 +42,7 @@ export default function OwnerLeasesTab({
   onRemove,
   getDeskMapTargetsForLease,
   onOpenDeskMapLeaseTarget,
+  readOnly = false,
 }: OwnerLeasesTabProps) {
   const { confirm: requestConfirmation } = useConfirmation();
   const [draft, setDraft] = useState<Lease | null>(null);
@@ -47,11 +50,13 @@ export default function OwnerLeasesTab({
   const [saveError, setSaveError] = useState<string | null>(null);
 
   const beginAdd = () => {
+    if (readOnly) return;
     setSaveError(null);
     setDraft(createBlankLease(workspaceId, ownerId));
   };
 
   const beginEdit = (lease: Lease) => {
+    if (readOnly) return;
     setSaveError(null);
     setDraft(normalizeLease(lease, { workspaceId, ownerId }));
   };
@@ -85,33 +90,39 @@ export default function OwnerLeasesTab({
               label="Lease Name"
               value={draft.leaseName}
               onChange={(value) => set('leaseName', value)}
+              disabled={readOnly}
             />
             <FormField
               label="Lessee"
               value={draft.lessee}
               onChange={(value) => set('lessee', value)}
+              disabled={readOnly}
             />
             <FormField
               label="Royalty"
               value={draft.royaltyRate}
               onChange={(value) => set('royaltyRate', value)}
+              disabled={readOnly}
             />
             <FormField
               label="Leased Interest"
               value={draft.leasedInterest}
               onChange={(value) => set('leasedInterest', value)}
+              disabled={readOnly}
             />
             <FormField
               label="Effective Date"
               type="date"
               value={draft.effectiveDate}
               onChange={(value) => set('effectiveDate', value)}
+              disabled={readOnly}
             />
             <FormField
               label="Expiration Date"
               type="date"
               value={draft.expirationDate}
               onChange={(value) => set('expirationDate', value)}
+              disabled={readOnly}
             />
             <div>
               <label className="text-[10px] text-ink-light uppercase tracking-wider block mb-1">
@@ -119,8 +130,9 @@ export default function OwnerLeasesTab({
               </label>
               <select
                 value={draft.status}
+                disabled={readOnly}
                 onChange={(event) => set('status', event.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none"
+                className="w-full px-3 py-2 rounded-lg border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {statusOptions.map((status) => (
                   <option key={status} value={status}>
@@ -133,6 +145,7 @@ export default function OwnerLeasesTab({
               label="Doc #"
               value={draft.docNo}
               onChange={(value) => set('docNo', value)}
+              disabled={readOnly}
             />
           </div>
 
@@ -142,9 +155,10 @@ export default function OwnerLeasesTab({
             </label>
             <textarea
               value={draft.notes}
+              disabled={readOnly}
               onChange={(event) => set('notes', event.target.value)}
               rows={4}
-              className="w-full px-3 py-2 rounded-lg border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none resize-y"
+              className="w-full px-3 py-2 rounded-lg border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none resize-y disabled:cursor-not-allowed disabled:opacity-60"
             />
           </div>
 
@@ -167,8 +181,9 @@ export default function OwnerLeasesTab({
             </button>
             <button
               type="button"
-              disabled={saving}
+              disabled={readOnly || saving}
               onClick={async () => {
+                if (readOnly) return;
                 // Strict-parse both interest fields BEFORE saving. A blank value is a
                 // legal "not entered yet" state and parses as Decimal(0); a typo like
                 // "abc" or "1/0" returns null and blocks the save with an inline error.
@@ -209,7 +224,8 @@ export default function OwnerLeasesTab({
                 setSaving(false);
                 setDraft(null);
               }}
-              className="px-4 py-2 rounded-lg bg-leather text-parchment text-sm font-semibold hover:bg-leather-light transition-colors disabled:opacity-60"
+              title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
+              className="px-4 py-2 rounded-lg bg-leather text-parchment text-sm font-semibold hover:bg-leather-light transition-colors disabled:cursor-not-allowed disabled:opacity-60"
             >
               {saving ? 'Saving...' : 'Save Lease'}
             </button>
@@ -218,8 +234,10 @@ export default function OwnerLeasesTab({
       ) : (
         <button
           type="button"
+          disabled={readOnly}
           onClick={beginAdd}
-          className="px-3 py-2 rounded-lg text-sm font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors"
+          title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
+          className="px-3 py-2 rounded-lg text-sm font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
         >
           + Add Lease
         </button>
@@ -280,14 +298,18 @@ export default function OwnerLeasesTab({
               <div className="flex gap-2">
                 <button
                   type="button"
+                  disabled={readOnly}
                   onClick={() => beginEdit(lease)}
-                  className="px-3 py-1.5 rounded-lg text-xs font-semibold text-leather hover:bg-leather/10 transition-colors"
+                  title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold text-leather hover:bg-leather/10 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Edit
                 </button>
                 <button
                   type="button"
+                  disabled={readOnly}
                   onClick={async () => {
+                    if (readOnly) return;
                     const confirmed = await requestConfirmation({
                       title: 'Delete Lease?',
                       message: 'Delete this lease? Linked map/doc references will be cleared.',
@@ -297,7 +319,8 @@ export default function OwnerLeasesTab({
                     if (!confirmed) return;
                     await onRemove(lease.id);
                   }}
-                  className="px-3 py-1.5 rounded-lg text-xs font-semibold text-seal hover:bg-seal/10 transition-colors"
+                  title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold text-seal hover:bg-seal/10 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Delete
                 </button>
@@ -313,8 +336,14 @@ export default function OwnerLeasesTab({
                           <button
                             key={`${lease.id}-${target.parentNodeId}`}
                             type="button"
+                            disabled={readOnly && !target.leaseNodeId}
                             onClick={() => onOpenDeskMapLeaseTarget(lease, target)}
-                            className="px-3 py-1.5 rounded-lg text-xs font-semibold text-emerald-900 hover:bg-emerald-100 border border-emerald-300 transition-colors"
+                            title={
+                              readOnly && !target.leaseNodeId
+                                ? READ_ONLY_WORKSPACE_EDIT_TITLE
+                                : undefined
+                            }
+                            className="px-3 py-1.5 rounded-lg text-xs font-semibold text-emerald-900 hover:bg-emerald-100 border border-emerald-300 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                           >
                             {target.leaseNodeId ? 'Open' : 'Create'} {target.deskMapName}
                           </button>

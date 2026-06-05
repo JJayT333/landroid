@@ -8,9 +8,13 @@
  * Double-click a tab to rename. Click × to delete.
  * Deleting the last desk map is allowed — auto-create will make a fresh one.
  */
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useOwnerStore } from '../../store/owner-store';
 import { useWorkspaceStore } from '../../store/workspace-store';
+import {
+  READ_ONLY_WORKSPACE_EDIT_TITLE,
+  useWorkspaceReadOnly,
+} from '../../store/write-lease-store';
 import type { DeskMap, DeskMapUnitCode } from '../../types/node';
 import type { Lease } from '../../types/owner';
 import { useConfirmation } from '../shared/ConfirmationProvider';
@@ -27,6 +31,7 @@ interface UnitGroup {
 }
 
 export default function DeskMapTabs() {
+  const readOnly = useWorkspaceReadOnly();
   const nodes = useWorkspaceStore((s) => s.nodes);
   const deskMaps = useWorkspaceStore((s) => s.deskMaps);
   const activeDeskMapId = useWorkspaceStore((s) => s.activeDeskMapId);
@@ -40,6 +45,12 @@ export default function DeskMapTabs() {
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
+
+  useEffect(() => {
+    if (readOnly) {
+      setEditingId(null);
+    }
+  }, [readOnly]);
 
   // Group desk maps by unitCode, preserving original order within each group.
   const groups = useMemo<UnitGroup[]>(() => {
@@ -92,6 +103,7 @@ export default function DeskMapTabs() {
   }, [deskMaps, leases, nodes]);
 
   const handleCreate = () => {
+    if (readOnly) return;
     const activeDeskMap = activeDeskMapId
       ? deskMaps.find((deskMap) => deskMap.id === activeDeskMapId) ?? null
       : null;
@@ -108,6 +120,7 @@ export default function DeskMapTabs() {
   };
 
   const handleStartRename = (id: string, name: string) => {
+    if (readOnly) return;
     setEditingId(id);
     setEditName(name);
   };
@@ -121,6 +134,7 @@ export default function DeskMapTabs() {
 
   const handleDelete = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
+    if (readOnly) return;
     const confirmed = await requestConfirmation({
       title: 'Delete Desk Map?',
       message: 'Delete this desk map? Nodes will remain in the workspace.',
@@ -176,6 +190,7 @@ export default function DeskMapTabs() {
                 <input
                   autoFocus
                   value={editName}
+                  disabled={readOnly}
                   onChange={(e) => setEditName(e.target.value)}
                   onBlur={handleFinishRename}
                   onKeyDown={(e) => {
@@ -184,10 +199,14 @@ export default function DeskMapTabs() {
                   }}
                   onClick={(e) => e.stopPropagation()}
                   aria-label={`Rename ${dm.name}`}
-                  className="w-36 px-2 py-1 rounded-lg text-sm bg-parchment text-ink border border-ledger-line outline-none"
+                  title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
+                  className="w-36 px-2 py-1 rounded-lg text-sm bg-parchment text-ink border border-ledger-line outline-none disabled:cursor-not-allowed disabled:opacity-60"
                 />
               ) : (
-                <span onDoubleClick={() => handleStartRename(dm.id, dm.name)}>
+                <span
+                  onDoubleClick={() => handleStartRename(dm.id, dm.name)}
+                  title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
+                >
                   {dm.name}
                 </span>
               )}
@@ -203,9 +222,11 @@ export default function DeskMapTabs() {
               {activeDeskMapId === dm.id && editingId !== dm.id && (
                 <button
                   type="button"
+                  disabled={readOnly}
                   onClick={(e) => handleDelete(dm.id, e)}
                   aria-label={`Delete ${dm.name}`}
-                  className="opacity-0 group-hover:opacity-100 text-parchment/60 hover:text-parchment text-xs transition-opacity"
+                  title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
+                  className="opacity-0 group-hover:opacity-100 text-parchment/60 hover:text-parchment text-xs transition-opacity disabled:cursor-not-allowed disabled:opacity-30"
                 >
                   ×
                 </button>
@@ -221,9 +242,10 @@ export default function DeskMapTabs() {
       ))}
       <button
         type="button"
+        disabled={readOnly}
         onClick={handleCreate}
-        className="px-5 py-2.5 rounded-2xl text-sm font-semibold whitespace-nowrap text-leather hover:bg-leather/10 border border-dashed border-leather/40 transition-colors"
-        title="Add new desk map"
+        className="px-5 py-2.5 rounded-2xl text-sm font-semibold whitespace-nowrap text-leather hover:bg-leather/10 border border-dashed border-leather/40 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+        title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : 'Add new desk map'}
       >
         + Add Tract
       </button>

@@ -7,6 +7,10 @@ import { useOwnerStore } from '../store/owner-store';
 import { useUIStore } from '../store/ui-store';
 import { useWorkspaceStore } from '../store/workspace-store';
 import {
+  READ_ONLY_WORKSPACE_EDIT_TITLE,
+  useWorkspaceReadOnly,
+} from '../store/write-lease-store';
+import {
   TITLE_ISSUE_PRIORITY_OPTIONS,
   TITLE_ISSUE_STATUS_OPTIONS,
   TITLE_ISSUE_TYPE_OPTIONS,
@@ -245,11 +249,13 @@ function SelectField<T extends string>({
   value,
   onChange,
   options,
+  disabled = false,
 }: {
   label: string;
   value: T;
   onChange: (value: T) => void;
   options: readonly T[];
+  disabled?: boolean;
 }) {
   return (
     <label className="block">
@@ -258,8 +264,9 @@ function SelectField<T extends string>({
       </span>
       <select
         value={value}
+        disabled={disabled}
         onChange={(event) => onChange(event.target.value as T)}
-        className="w-full rounded-lg border border-ledger-line bg-parchment px-3 py-1.5 text-sm text-ink outline-none focus:border-leather focus:ring-2 focus:ring-leather"
+        className="w-full rounded-lg border border-ledger-line bg-parchment px-3 py-1.5 text-sm text-ink outline-none focus:border-leather focus:ring-2 focus:ring-leather disabled:cursor-not-allowed disabled:opacity-60"
       >
         {options.map((option) => (
           <option key={option} value={option}>
@@ -276,11 +283,13 @@ function LinkedSelect({
   value,
   onChange,
   options,
+  disabled = false,
 }: {
   label: string;
   value: string | null;
   onChange: (value: string | null) => void;
   options: Array<{ id: string; label: string }>;
+  disabled?: boolean;
 }) {
   return (
     <label className="block">
@@ -289,8 +298,9 @@ function LinkedSelect({
       </span>
       <select
         value={value ?? ''}
+        disabled={disabled}
         onChange={(event) => onChange(event.target.value || null)}
-        className="w-full rounded-lg border border-ledger-line bg-parchment px-3 py-1.5 text-sm text-ink outline-none focus:border-leather focus:ring-2 focus:ring-leather"
+        className="w-full rounded-lg border border-ledger-line bg-parchment px-3 py-1.5 text-sm text-ink outline-none focus:border-leather focus:ring-2 focus:ring-leather disabled:cursor-not-allowed disabled:opacity-60"
       >
         <option value="">None linked</option>
         {options.map((option) => (
@@ -304,6 +314,7 @@ function LinkedSelect({
 }
 
 export default function CurativeView() {
+  const readOnly = useWorkspaceReadOnly();
   const workspaceId = useCurativeStore((state) => state.workspaceId);
   const titleIssues = useCurativeStore((state) => state.titleIssues);
   const selectedIssueId = useCurativeStore((state) => state.selectedIssueId);
@@ -423,6 +434,7 @@ export default function CurativeView() {
     field: K,
     value: TitleIssueForm[K]
   ) => {
+    if (readOnly) return;
     setForm((current) => (current ? { ...current, [field]: value } : current));
   };
 
@@ -450,9 +462,9 @@ export default function CurativeView() {
             </div>
             <button
               type="button"
-              disabled={!workspaceId}
+              disabled={readOnly || !workspaceId}
               onClick={async () => {
-                if (!workspaceId) return;
+                if (readOnly || !workspaceId) return;
                 await addIssue(
                   createBlankTitleIssue(workspaceId, {
                     title: 'New title issue',
@@ -461,7 +473,8 @@ export default function CurativeView() {
                   })
                 );
               }}
-              className="rounded-lg border border-leather/30 px-3 py-2 text-xs font-semibold text-leather transition-colors hover:bg-leather/10 disabled:opacity-50"
+              title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
+              className="rounded-lg border border-leather/30 px-3 py-2 text-xs font-semibold text-leather transition-colors hover:bg-leather/10 disabled:cursor-not-allowed disabled:opacity-50"
             >
               + New Issue
             </button>
@@ -636,7 +649,9 @@ export default function CurativeView() {
                   </button>
                   <button
                     type="button"
+                    disabled={readOnly}
                     onClick={async () => {
+                      if (readOnly) return;
                       const confirmed = await requestConfirmation({
                         title: 'Delete Curative Issue?',
                         message: 'Delete this curative issue?',
@@ -646,7 +661,8 @@ export default function CurativeView() {
                       if (!confirmed) return;
                       await removeIssue(issueForPanel.id);
                     }}
-                    className="rounded-lg px-3 py-2 text-xs font-semibold text-seal transition-colors hover:bg-seal/10"
+                    title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
+                    className="rounded-lg px-3 py-2 text-xs font-semibold text-seal transition-colors hover:bg-seal/10 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Delete
                   </button>
@@ -662,41 +678,48 @@ export default function CurativeView() {
                       label="Issue Title"
                       value={form.title}
                       onChange={(value) => setFormField('title', value)}
+                      disabled={readOnly}
                     />
                     <SelectField<TitleIssueType>
                       label="Issue Type"
                       value={form.issueType}
                       onChange={(value) => setFormField('issueType', value)}
                       options={TITLE_ISSUE_TYPE_OPTIONS}
+                      disabled={readOnly}
                     />
                     <SelectField<TitleIssuePriority>
                       label="Priority"
                       value={form.priority}
                       onChange={(value) => setFormField('priority', value)}
                       options={TITLE_ISSUE_PRIORITY_OPTIONS}
+                      disabled={readOnly}
                     />
                     <SelectField<TitleIssueStatus>
                       label="Status"
                       value={form.status}
                       onChange={(value) => setFormField('status', value)}
                       options={TITLE_ISSUE_STATUS_OPTIONS}
+                      disabled={readOnly}
                     />
                     <FormField
                       label="Source Doc No."
                       value={form.sourceDocNo}
                       onChange={(value) => setFormField('sourceDocNo', value)}
+                      disabled={readOnly}
                     />
                     <FormField
                       label="Due Date"
                       type="date"
                       value={form.dueDate}
                       onChange={(value) => setFormField('dueDate', value)}
+                      disabled={readOnly}
                     />
                     <FormField
                       label="Responsible Party"
                       value={form.responsibleParty}
                       onChange={(value) => setFormField('responsibleParty', value)}
                       className="md:col-span-2"
+                      disabled={readOnly}
                     />
                   </div>
 
@@ -706,11 +729,12 @@ export default function CurativeView() {
                     </label>
                     <textarea
                       value={form.requiredCurativeAction}
+                      disabled={readOnly}
                       onChange={(event) =>
                         setFormField('requiredCurativeAction', event.target.value)
                       }
                       rows={4}
-                      className="w-full resize-y rounded-lg border border-ledger-line bg-parchment px-3 py-2 text-sm text-ink outline-none focus:border-leather focus:ring-2 focus:ring-leather"
+                      className="w-full resize-y rounded-lg border border-ledger-line bg-parchment px-3 py-2 text-sm text-ink outline-none focus:border-leather focus:ring-2 focus:ring-leather disabled:cursor-not-allowed disabled:opacity-60"
                       placeholder="Example: obtain affidavit of heirship, probate order, release, ratification, correction deed, or title-opinion waiver."
                     />
                   </div>
@@ -721,9 +745,10 @@ export default function CurativeView() {
                     </label>
                     <textarea
                       value={form.notes}
+                      disabled={readOnly}
                       onChange={(event) => setFormField('notes', event.target.value)}
                       rows={5}
-                      className="w-full resize-y rounded-lg border border-ledger-line bg-parchment px-3 py-2 text-sm text-ink outline-none focus:border-leather focus:ring-2 focus:ring-leather"
+                      className="w-full resize-y rounded-lg border border-ledger-line bg-parchment px-3 py-2 text-sm text-ink outline-none focus:border-leather focus:ring-2 focus:ring-leather disabled:cursor-not-allowed disabled:opacity-60"
                     />
                   </div>
 
@@ -733,11 +758,12 @@ export default function CurativeView() {
                     </label>
                     <textarea
                       value={form.resolutionNotes}
+                      disabled={readOnly}
                       onChange={(event) =>
                         setFormField('resolutionNotes', event.target.value)
                       }
                       rows={3}
-                      className="w-full resize-y rounded-lg border border-ledger-line bg-parchment px-3 py-2 text-sm text-ink outline-none focus:border-leather focus:ring-2 focus:ring-leather"
+                      className="w-full resize-y rounded-lg border border-ledger-line bg-parchment px-3 py-2 text-sm text-ink outline-none focus:border-leather focus:ring-2 focus:ring-leather disabled:cursor-not-allowed disabled:opacity-60"
                       placeholder="Who approved it, what document cured it, or why it was deferred."
                     />
                   </div>
@@ -772,6 +798,7 @@ export default function CurativeView() {
                           );
                         }}
                         options={deskMapOptions}
+                        disabled={readOnly}
                       />
                       <LinkedSelect
                         label="Branch / Owner Card"
@@ -802,6 +829,7 @@ export default function CurativeView() {
                           });
                         }}
                         options={nodeOptions}
+                        disabled={readOnly}
                       />
                       <LinkedSelect
                         label="Owner Record"
@@ -825,12 +853,14 @@ export default function CurativeView() {
                           );
                         }}
                         options={ownerOptions}
+                        disabled={readOnly}
                       />
                       <LinkedSelect
                         label="Lease Record"
                         value={form.affectedLeaseId}
                         onChange={(value) => setFormField('affectedLeaseId', value)}
                         options={leaseOptions}
+                        disabled={readOnly}
                       />
                     </div>
                   </div>
@@ -894,13 +924,15 @@ export default function CurativeView() {
               </div>
               <button
                 type="button"
-                disabled={saving}
+                disabled={readOnly || saving}
                 onClick={async () => {
+                  if (readOnly) return;
                   setSaving(true);
                   await updateIssue(issueForPanel.id, form);
                   setSaving(false);
                 }}
-                className="rounded-lg bg-leather px-4 py-2 text-sm font-semibold text-parchment transition-colors hover:bg-leather-light disabled:opacity-60"
+                title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
+                className="rounded-lg bg-leather px-4 py-2 text-sm font-semibold text-parchment transition-colors hover:bg-leather-light disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {saving ? 'Saving...' : 'Save Issue'}
               </button>

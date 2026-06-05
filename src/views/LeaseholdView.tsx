@@ -23,6 +23,10 @@ import {
 } from '../types/leasehold';
 import { useOwnerStore } from '../store/owner-store';
 import { useWorkspaceStore } from '../store/workspace-store';
+import {
+  READ_ONLY_WORKSPACE_EDIT_TITLE,
+  useWorkspaceReadOnly,
+} from '../store/write-lease-store';
 import { parseStrictInterestString } from '../utils/interest-string';
 import {
   buildLeaseholdTransferOrderHoldReasons,
@@ -521,12 +525,14 @@ type LeaseholdMode = 'overview' | 'map' | 'deck';
 function LeaseholdTractCard({
   tract,
   onUpdate,
+  readOnly = false,
 }: {
   tract: LeaseholdTractSummary;
   onUpdate: (
     id: string,
     fields: { grossAcres?: string; pooledAcres?: string; description?: string }
   ) => void;
+  readOnly?: boolean;
 }) {
   const [grossAcresDraft, setGrossAcresDraft] = useState(tract.grossAcres);
   const [pooledAcresDraft, setPooledAcresDraft] = useState(tract.pooledAcres);
@@ -545,6 +551,7 @@ function LeaseholdTractCard({
   }, [tract.description]);
 
   const commitGrossAcres = () => {
+    if (readOnly) return;
     const next = normalizeGrossAcreInput(grossAcresDraft);
     setGrossAcresDraft(next);
     if (next !== tract.grossAcres) {
@@ -553,6 +560,7 @@ function LeaseholdTractCard({
   };
 
   const commitPooledAcres = () => {
+    if (readOnly) return;
     const next = normalizeGrossAcreInput(pooledAcresDraft);
     setPooledAcresDraft(next);
     if (next !== tract.pooledAcres) {
@@ -561,6 +569,7 @@ function LeaseholdTractCard({
   };
 
   const commitDescription = () => {
+    if (readOnly) return;
     const next = descriptionDraft.trim();
     setDescriptionDraft(next);
     if (next !== tract.description) {
@@ -649,12 +658,13 @@ function LeaseholdTractCard({
           </div>
           <input
             value={grossAcresDraft}
+            disabled={readOnly}
             onChange={(event) => setGrossAcresDraft(event.target.value)}
             onBlur={commitGrossAcres}
             onKeyDown={handleGrossAcresKeyDown}
             placeholder="100"
             inputMode="decimal"
-            className="w-full rounded-xl border border-ledger-line bg-white px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-leather"
+            className="w-full rounded-xl border border-ledger-line bg-white px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-leather disabled:cursor-not-allowed disabled:opacity-60"
           />
           <div className="mt-1 text-[11px] text-ink-light">
             Title acreage for the full tract.
@@ -667,12 +677,13 @@ function LeaseholdTractCard({
           </div>
           <input
             value={pooledAcresDraft}
+            disabled={readOnly}
             onChange={(event) => setPooledAcresDraft(event.target.value)}
             onBlur={commitPooledAcres}
             onKeyDown={handlePooledAcresKeyDown}
             placeholder="100"
             inputMode="decimal"
-            className="w-full rounded-xl border border-ledger-line bg-white px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-leather"
+            className="w-full rounded-xl border border-ledger-line bg-white px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-leather disabled:cursor-not-allowed disabled:opacity-60"
           />
           <div className="mt-1 text-[11px] text-ink-light">
             Drives unit participation and payout decimals.
@@ -685,12 +696,13 @@ function LeaseholdTractCard({
           </div>
           <textarea
             value={descriptionDraft}
+            disabled={readOnly}
             onChange={(event) => setDescriptionDraft(event.target.value)}
             onBlur={commitDescription}
             onKeyDown={handleDescriptionKeyDown}
             rows={3}
             placeholder="Brief tract description"
-            className="w-full rounded-xl border border-ledger-line bg-white px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-leather"
+            className="w-full rounded-xl border border-ledger-line bg-white px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-leather disabled:cursor-not-allowed disabled:opacity-60"
           />
           <div className="mt-1 text-[11px] text-ink-light">
             Short unit-facing note for this tract. Use Cmd/Ctrl + Enter to save from the keyboard.
@@ -858,9 +870,11 @@ function LeaseholdTractCard({
 function LeaseholdUnitEditor({
   unit,
   onUpdate,
+  readOnly = false,
 }: {
   unit: LeaseholdUnit;
   onUpdate: (fields: Partial<LeaseholdUnit>) => void;
+  readOnly?: boolean;
 }) {
   const [nameDraft, setNameDraft] = useState(unit.name);
   const [descriptionDraft, setDescriptionDraft] = useState(unit.description);
@@ -884,6 +898,7 @@ function LeaseholdUnitEditor({
   }, [unit.effectiveDate]);
 
   const commitField = <K extends keyof LeaseholdUnit>(key: K, value: LeaseholdUnit[K]) => {
+    if (readOnly) return;
     if (value !== unit[key]) {
       onUpdate({ [key]: value } as Pick<LeaseholdUnit, K>);
     }
@@ -915,13 +930,14 @@ function LeaseholdUnitEditor({
           </div>
           <input
             value={nameDraft}
+            disabled={readOnly}
             onChange={(event) => setNameDraft(event.target.value)}
             onBlur={() => {
               const next = nameDraft.trim();
               setNameDraft(next);
               commitField('name', next);
             }}
-            className="w-full rounded-xl border border-ledger-line bg-white px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-leather"
+            className="w-full rounded-xl border border-ledger-line bg-white px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-leather disabled:cursor-not-allowed disabled:opacity-60"
           />
         </label>
 
@@ -931,13 +947,14 @@ function LeaseholdUnitEditor({
           </div>
           <input
             value={operatorDraft}
+            disabled={readOnly}
             onChange={(event) => setOperatorDraft(event.target.value)}
             onBlur={() => {
               const next = operatorDraft.trim();
               setOperatorDraft(next);
               commitField('operator', next);
             }}
-            className="w-full rounded-xl border border-ledger-line bg-white px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-leather"
+            className="w-full rounded-xl border border-ledger-line bg-white px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-leather disabled:cursor-not-allowed disabled:opacity-60"
           />
         </label>
 
@@ -948,9 +965,10 @@ function LeaseholdUnitEditor({
           <input
             type="date"
             value={effectiveDateDraft}
+            disabled={readOnly}
             onChange={(event) => setEffectiveDateDraft(event.target.value)}
             onBlur={() => commitField('effectiveDate', effectiveDateDraft)}
-            className="w-full rounded-xl border border-ledger-line bg-white px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-leather"
+            className="w-full rounded-xl border border-ledger-line bg-white px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-leather disabled:cursor-not-allowed disabled:opacity-60"
           />
         </label>
 
@@ -960,6 +978,7 @@ function LeaseholdUnitEditor({
           </div>
           <textarea
             value={descriptionDraft}
+            disabled={readOnly}
             onChange={(event) => setDescriptionDraft(event.target.value)}
             onBlur={() => {
               const next = descriptionDraft.trim();
@@ -967,7 +986,7 @@ function LeaseholdUnitEditor({
               commitField('description', next);
             }}
             rows={3}
-            className="w-full rounded-xl border border-ledger-line bg-white px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-leather"
+            className="w-full rounded-xl border border-ledger-line bg-white px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-leather disabled:cursor-not-allowed disabled:opacity-60"
           />
         </label>
       </div>
@@ -2336,6 +2355,7 @@ function LeaseholdOrriDeckCard({
   activeUnitCode,
   onUpdate,
   onRemove,
+  readOnly = false,
 }: {
   orri: LeaseholdOrri;
   summary: LeaseholdOrriSummary | null;
@@ -2343,6 +2363,7 @@ function LeaseholdOrriDeckCard({
   activeUnitCode: string | null;
   onUpdate: (id: string, fields: Partial<LeaseholdOrri>) => void;
   onRemove: (id: string) => void;
+  readOnly?: boolean;
 }) {
   const [payeeDraft, setPayeeDraft] = useState(orri.payee);
   const [burdenFractionDraft, setBurdenFractionDraft] = useState(orri.burdenFraction);
@@ -2392,7 +2413,10 @@ function LeaseholdOrriDeckCard({
         </div>
       </div>
 
-      <div className="space-y-3 px-3 py-3">
+      <fieldset
+        disabled={readOnly}
+        className="m-0 min-w-0 space-y-3 border-0 px-3 py-3"
+      >
         {needsUnitAssignment && (
           <div className="rounded-xl border border-gold/40 bg-gold/10 px-3 py-2 text-[11px] leading-5 text-gold-950">
             <div className="font-semibold">Excluded - needs unit assignment</div>
@@ -2597,7 +2621,7 @@ function LeaseholdOrriDeckCard({
             className="w-full rounded-xl border border-amber-200 bg-white/90 px-3 py-2 text-sm text-amber-950 outline-none transition-colors focus:border-amber-400"
           />
         </label>
-      </div>
+      </fieldset>
 
       <div className="rounded-b-lg border-t border-amber-200 bg-amber-100/40 px-3 py-2">
         <div className="flex flex-wrap items-center gap-2 text-xs">
@@ -2622,8 +2646,10 @@ function LeaseholdOrriDeckCard({
           )}
           <button
             type="button"
+            disabled={readOnly}
             onClick={() => onRemove(orri.id)}
-            className="ml-auto rounded px-2 py-1 text-[10px] font-semibold text-seal transition-colors hover:bg-seal/10"
+            title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
+            className="ml-auto rounded px-2 py-1 text-[10px] font-semibold text-seal transition-colors hover:bg-seal/10 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Remove
           </button>
@@ -2723,6 +2749,7 @@ function LeaseholdAssignmentDeckCard({
   activeUnitCode,
   onUpdate,
   onRemove,
+  readOnly = false,
 }: {
   assignment: LeaseholdAssignment;
   summary: LeaseholdAssignmentSummary | null;
@@ -2731,6 +2758,7 @@ function LeaseholdAssignmentDeckCard({
   activeUnitCode: string | null;
   onUpdate: (id: string, fields: Partial<LeaseholdAssignment>) => void;
   onRemove: (id: string) => void;
+  readOnly?: boolean;
 }) {
   const [assignorDraft, setAssignorDraft] = useState(assignment.assignor);
   const [assigneeDraft, setAssigneeDraft] = useState(assignment.assignee);
@@ -2790,7 +2818,10 @@ function LeaseholdAssignmentDeckCard({
         </div>
       </div>
 
-      <div className="space-y-3 px-3 py-3">
+      <fieldset
+        disabled={readOnly}
+        className="m-0 min-w-0 space-y-3 border-0 px-3 py-3"
+      >
         {needsUnitAssignment && (
           <div className="rounded-xl border border-gold/40 bg-gold/10 px-3 py-2 text-[11px] leading-5 text-gold-950">
             <div className="font-semibold">Excluded - needs unit assignment</div>
@@ -2990,7 +3021,7 @@ function LeaseholdAssignmentDeckCard({
             className="w-full rounded-xl border border-leather/20 bg-white/90 px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-leather"
           />
         </label>
-      </div>
+      </fieldset>
 
       <div className="rounded-b-lg border-t border-leather/20 bg-leather/5 px-3 py-2">
         <div className="flex flex-wrap items-center gap-2 text-xs">
@@ -3024,8 +3055,10 @@ function LeaseholdAssignmentDeckCard({
           )}
           <button
             type="button"
+            disabled={readOnly}
             onClick={() => onRemove(assignment.id)}
-            className="ml-auto rounded px-2 py-1 text-[10px] font-semibold text-seal transition-colors hover:bg-seal/10"
+            title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
+            className="ml-auto rounded px-2 py-1 text-[10px] font-semibold text-seal transition-colors hover:bg-seal/10 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Remove
           </button>
@@ -3156,6 +3189,7 @@ function LeaseholdTransferOrderEntryEditor({
   editable,
   payoutHold,
   payoutHoldReason,
+  readOnly = false,
   onUpsert,
   onRemove,
 }: {
@@ -3164,6 +3198,7 @@ function LeaseholdTransferOrderEntryEditor({
   editable: boolean;
   payoutHold: boolean;
   payoutHoldReason: string;
+  readOnly?: boolean;
   onUpsert: (
     entry: Pick<LeaseholdTransferOrderEntry, 'sourceRowId'>
       & Partial<Omit<LeaseholdTransferOrderEntry, 'sourceRowId'>>
@@ -3197,6 +3232,7 @@ function LeaseholdTransferOrderEntryEditor({
   }
 
   const commit = (overrides: Partial<Omit<LeaseholdTransferOrderEntry, 'id' | 'sourceRowId'>>) => {
+    if (readOnly) return;
     const nextOwnerNumber = (overrides.ownerNumber ?? ownerNumberDraft).trim();
     const nextNotes = (overrides.notes ?? notesDraft).trim();
     const nextStatus = getTransferOrderEntryPersistedStatus(
@@ -3219,18 +3255,20 @@ function LeaseholdTransferOrderEntryEditor({
     <div className="min-w-[15rem] space-y-2">
       <input
         value={ownerNumberDraft}
+        disabled={readOnly}
         onChange={(event) => setOwnerNumberDraft(event.target.value)}
         onBlur={() => commit({ ownerNumber: ownerNumberDraft })}
         placeholder="Owner no. / pay code"
-        className="w-full rounded-lg border border-ledger-line bg-white px-2.5 py-1.5 text-xs text-ink outline-none transition-colors focus:border-leather"
+        className="w-full rounded-lg border border-ledger-line bg-white px-2.5 py-1.5 text-xs text-ink outline-none transition-colors focus:border-leather disabled:cursor-not-allowed disabled:opacity-60"
       />
       <div className="flex items-center gap-2">
         <select
           value={statusDraft}
+          disabled={readOnly}
           onChange={(event) =>
             commit({ status: event.target.value as LeaseholdTransferOrderStatus })
           }
-          className="min-w-0 flex-1 rounded-lg border border-ledger-line bg-white px-2.5 py-1.5 text-xs text-ink outline-none transition-colors focus:border-leather"
+          className="min-w-0 flex-1 rounded-lg border border-ledger-line bg-white px-2.5 py-1.5 text-xs text-ink outline-none transition-colors focus:border-leather disabled:cursor-not-allowed disabled:opacity-60"
         >
           {LEASEHOLD_TRANSFER_ORDER_STATUS_OPTIONS.filter(
             (status) => !payoutHold || status !== 'ready'
@@ -3243,13 +3281,16 @@ function LeaseholdTransferOrderEntryEditor({
         {entry && (
           <button
             type="button"
+            disabled={readOnly}
             onClick={() => {
+              if (readOnly) return;
               setOwnerNumberDraft('');
               setStatusDraft('draft');
               setNotesDraft('');
               onRemove(row.id);
             }}
-            className="rounded px-2 py-1 text-[10px] font-semibold text-seal transition-colors hover:bg-seal/10"
+            title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
+            className="rounded px-2 py-1 text-[10px] font-semibold text-seal transition-colors hover:bg-seal/10 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Clear
           </button>
@@ -3262,11 +3303,12 @@ function LeaseholdTransferOrderEntryEditor({
       )}
       <textarea
         value={notesDraft}
+        disabled={readOnly}
         onChange={(event) => setNotesDraft(event.target.value)}
         onBlur={() => commit({ notes: notesDraft })}
         rows={2}
         placeholder="Transfer-order note"
-        className="w-full rounded-lg border border-ledger-line bg-white px-2.5 py-1.5 text-xs text-ink outline-none transition-colors focus:border-leather resize-y"
+        className="w-full rounded-lg border border-ledger-line bg-white px-2.5 py-1.5 text-xs text-ink outline-none transition-colors focus:border-leather resize-y disabled:cursor-not-allowed disabled:opacity-60"
       />
     </div>
   );
@@ -3282,6 +3324,7 @@ function LeaseholdDecimalLedger({
   leaseOverlapsFocus,
   transferOrderHoldReasons,
   editable,
+  readOnly = false,
   entriesBySourceRowId,
   onUpsertEntry,
   onRemoveEntry,
@@ -3295,6 +3338,7 @@ function LeaseholdDecimalLedger({
   leaseOverlapsFocus: LeaseCoverageOverlap[];
   transferOrderHoldReasons: string[];
   editable: boolean;
+  readOnly?: boolean;
   entriesBySourceRowId: Map<string, LeaseholdTransferOrderEntry>;
   onUpsertEntry: (
     entry: Pick<LeaseholdTransferOrderEntry, 'sourceRowId'>
@@ -3595,6 +3639,7 @@ function LeaseholdDecimalLedger({
                         editable={editable}
                         payoutHold={payoutHold}
                         payoutHoldReason={payoutHoldReason}
+                        readOnly={readOnly}
                         onUpsert={onUpsertEntry}
                         onRemove={onRemoveEntry}
                       />
@@ -3640,6 +3685,7 @@ function LeaseholdDeck({
   overBurdenedTractCount,
   overFloatingNpriBurdenedTractCount,
   transferOrderEntries,
+  readOnly,
   onAddAssignment,
   onUpdateAssignment,
   onRemoveAssignment,
@@ -3669,6 +3715,7 @@ function LeaseholdDeck({
   overBurdenedTractCount: number;
   overFloatingNpriBurdenedTractCount: number;
   transferOrderEntries: LeaseholdTransferOrderEntry[];
+  readOnly: boolean;
   onAddAssignment: (assignment?: Partial<LeaseholdAssignment>) => void;
   onUpdateAssignment: (id: string, fields: Partial<LeaseholdAssignment>) => void;
   onRemoveAssignment: (id: string) => void;
@@ -3969,8 +4016,10 @@ function LeaseholdDeck({
           </div>
           <button
             type="button"
+            disabled={readOnly}
             onClick={() => onAddOrri(focusedDeskMapId)}
-            className="rounded-xl border border-amber-300 bg-amber-100 px-4 py-2 text-sm font-semibold text-amber-950 transition-colors hover:bg-amber-200/80"
+            title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
+            className="rounded-xl border border-amber-300 bg-amber-100 px-4 py-2 text-sm font-semibold text-amber-950 transition-colors hover:bg-amber-200/80 disabled:cursor-not-allowed disabled:opacity-50"
           >
             + Add ORRI
           </button>
@@ -3987,6 +4036,7 @@ function LeaseholdDeck({
                 activeUnitCode={activeUnitCode}
                 onUpdate={onUpdateOrri}
                 onRemove={onRemoveOrri}
+                readOnly={readOnly}
               />
             ))
           ) : (
@@ -4013,6 +4063,7 @@ function LeaseholdDeck({
           </div>
           <button
             type="button"
+            disabled={readOnly}
             onClick={() =>
               onAddAssignment({
                 scope: focusedDeskMapId ? 'tract' : 'unit',
@@ -4020,7 +4071,8 @@ function LeaseholdDeck({
                 assignor: activeRetainedHolder,
               })
             }
-            className="rounded-xl border border-leather/30 bg-leather/10 px-4 py-2 text-sm font-semibold text-leather transition-colors hover:bg-leather/15"
+            title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
+            className="rounded-xl border border-leather/30 bg-leather/10 px-4 py-2 text-sm font-semibold text-leather transition-colors hover:bg-leather/15 disabled:cursor-not-allowed disabled:opacity-50"
           >
             + Add Assignment
           </button>
@@ -4071,6 +4123,7 @@ function LeaseholdDeck({
                   activeUnitCode={activeUnitCode}
                   onUpdate={onUpdateAssignment}
                   onRemove={onRemoveAssignment}
+                  readOnly={readOnly}
                 />
               );
             })
@@ -4094,6 +4147,7 @@ function LeaseholdDeck({
         leaseOverlapsFocus={activeLeaseOverlaps}
         transferOrderHoldReasons={transferOrderHoldReasons}
         editable={focusedDeskMapId === null}
+        readOnly={readOnly}
         entriesBySourceRowId={transferOrderEntriesBySourceRowId}
         onUpsertEntry={onUpsertTransferOrderEntry}
         onRemoveEntry={onRemoveTransferOrderEntry}
@@ -4103,6 +4157,7 @@ function LeaseholdDeck({
 }
 
 export default function LeaseholdView() {
+  const readOnly = useWorkspaceReadOnly();
   const deskMaps = useWorkspaceStore((state) => state.deskMaps);
   const activeDeskMapId = useWorkspaceStore((state) => state.activeDeskMapId);
   const activeUnitCode = useWorkspaceStore((state) => state.activeUnitCode);
@@ -4113,29 +4168,60 @@ export default function LeaseholdView() {
     (state) => state.leaseholdTransferOrderEntries
   );
   const nodes = useWorkspaceStore((state) => state.nodes);
-  const updateLeaseholdUnit = useWorkspaceStore((state) => state.updateLeaseholdUnit);
-  const addLeaseholdAssignment = useWorkspaceStore(
+  const updateLeaseholdUnitToStore = useWorkspaceStore((state) => state.updateLeaseholdUnit);
+  const addLeaseholdAssignmentToStore = useWorkspaceStore(
     (state) => state.addLeaseholdAssignment
   );
-  const updateLeaseholdAssignment = useWorkspaceStore(
+  const updateLeaseholdAssignmentToStore = useWorkspaceStore(
     (state) => state.updateLeaseholdAssignment
   );
-  const removeLeaseholdAssignment = useWorkspaceStore(
+  const removeLeaseholdAssignmentToStore = useWorkspaceStore(
     (state) => state.removeLeaseholdAssignment
   );
-  const addLeaseholdOrri = useWorkspaceStore((state) => state.addLeaseholdOrri);
-  const updateLeaseholdOrri = useWorkspaceStore((state) => state.updateLeaseholdOrri);
-  const removeLeaseholdOrri = useWorkspaceStore((state) => state.removeLeaseholdOrri);
-  const upsertLeaseholdTransferOrderEntry = useWorkspaceStore(
+  const addLeaseholdOrriToStore = useWorkspaceStore((state) => state.addLeaseholdOrri);
+  const updateLeaseholdOrriToStore = useWorkspaceStore((state) => state.updateLeaseholdOrri);
+  const removeLeaseholdOrriToStore = useWorkspaceStore((state) => state.removeLeaseholdOrri);
+  const upsertLeaseholdTransferOrderEntryToStore = useWorkspaceStore(
     (state) => state.upsertLeaseholdTransferOrderEntry
   );
-  const removeLeaseholdTransferOrderEntry = useWorkspaceStore(
+  const removeLeaseholdTransferOrderEntryToStore = useWorkspaceStore(
     (state) => state.removeLeaseholdTransferOrderEntry
   );
-  const updateDeskMapDetails = useWorkspaceStore((state) => state.updateDeskMapDetails);
+  const updateDeskMapDetailsToStore = useWorkspaceStore((state) => state.updateDeskMapDetails);
   const owners = useOwnerStore((state) => state.owners);
   const leases = useOwnerStore((state) => state.leases);
   const [mode, setMode] = useState<LeaseholdMode>('overview');
+
+  const updateLeaseholdUnit = (...args: Parameters<typeof updateLeaseholdUnitToStore>) => {
+    if (!readOnly) updateLeaseholdUnitToStore(...args);
+  };
+  const addLeaseholdAssignment = (...args: Parameters<typeof addLeaseholdAssignmentToStore>) => {
+    if (!readOnly) addLeaseholdAssignmentToStore(...args);
+  };
+  const updateLeaseholdAssignment = (...args: Parameters<typeof updateLeaseholdAssignmentToStore>) => {
+    if (!readOnly) updateLeaseholdAssignmentToStore(...args);
+  };
+  const removeLeaseholdAssignment = (...args: Parameters<typeof removeLeaseholdAssignmentToStore>) => {
+    if (!readOnly) removeLeaseholdAssignmentToStore(...args);
+  };
+  const addLeaseholdOrri = (...args: Parameters<typeof addLeaseholdOrriToStore>) => {
+    if (!readOnly) addLeaseholdOrriToStore(...args);
+  };
+  const updateLeaseholdOrri = (...args: Parameters<typeof updateLeaseholdOrriToStore>) => {
+    if (!readOnly) updateLeaseholdOrriToStore(...args);
+  };
+  const removeLeaseholdOrri = (...args: Parameters<typeof removeLeaseholdOrriToStore>) => {
+    if (!readOnly) removeLeaseholdOrriToStore(...args);
+  };
+  const upsertLeaseholdTransferOrderEntry = (...args: Parameters<typeof upsertLeaseholdTransferOrderEntryToStore>) => {
+    if (!readOnly) upsertLeaseholdTransferOrderEntryToStore(...args);
+  };
+  const removeLeaseholdTransferOrderEntry = (...args: Parameters<typeof removeLeaseholdTransferOrderEntryToStore>) => {
+    if (!readOnly) removeLeaseholdTransferOrderEntryToStore(...args);
+  };
+  const updateDeskMapDetails = (...args: Parameters<typeof updateDeskMapDetailsToStore>) => {
+    if (!readOnly) updateDeskMapDetailsToStore(...args);
+  };
   const effectiveUnitCode = useMemo(
     () => resolveActiveUnitCode(deskMaps, activeUnitCode, activeDeskMapId),
     [activeDeskMapId, activeUnitCode, deskMaps]
@@ -4331,7 +4417,11 @@ export default function LeaseholdView() {
 
         {mode === 'overview' ? (
           <>
-            <LeaseholdUnitEditor unit={leaseholdUnit} onUpdate={updateLeaseholdUnit} />
+            <LeaseholdUnitEditor
+              unit={leaseholdUnit}
+              onUpdate={updateLeaseholdUnit}
+              readOnly={readOnly}
+            />
 
             <div className="space-y-4">
               {summary.tracts.map((tract) => (
@@ -4339,6 +4429,7 @@ export default function LeaseholdView() {
                   key={tract.deskMapId}
                   tract={tract}
                   onUpdate={updateDeskMapDetails}
+                  readOnly={readOnly}
                 />
               ))}
             </div>
@@ -4385,6 +4476,7 @@ export default function LeaseholdView() {
             overBurdenedTractCount={summary.overBurdenedTractCount}
             overFloatingNpriBurdenedTractCount={summary.overFloatingNpriBurdenedTractCount}
             transferOrderEntries={leaseholdTransferOrderEntries}
+            readOnly={readOnly}
             onAddAssignment={(assignment) =>
               addLeaseholdAssignment(
                 assignment?.scope === 'tract'

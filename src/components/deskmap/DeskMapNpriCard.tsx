@@ -2,6 +2,7 @@ import { memo } from 'react';
 import { formatAsFraction } from '../../engine/fraction-display';
 import { d } from '../../engine/decimal';
 import { useWorkspaceStore } from '../../store/workspace-store';
+import { READ_ONLY_WORKSPACE_EDIT_TITLE } from '../../store/write-lease-store';
 import type { OwnershipNode } from '../../types/node';
 import type { NpriBranchDiscrepancy } from '../../engine/math-engine';
 import DeskMapDocumentChips from './DeskMapDocumentChips';
@@ -22,6 +23,7 @@ interface DeskMapNpriCardProps {
   onAttachDoc: (nodeId: string) => void;
   onDelete: (nodeId: string) => void;
   onViewDoc: (docId: string) => void;
+  readOnly?: boolean;
 }
 
 function DeskMapNpriCard({
@@ -34,6 +36,7 @@ function DeskMapNpriCard({
   onAttachDoc,
   onDelete,
   onViewDoc,
+  readOnly = false,
 }: DeskMapNpriCardProps) {
   const isActive = useWorkspaceStore((state) => state.activeNodeId === node.id);
   const remaining = d(node.fraction);
@@ -62,8 +65,13 @@ function DeskMapNpriCard({
               : 'border-amber-200 shadow-[0_8px_18px_rgba(217,119,6,0.14)]'
           }
           ${hasDiscrepancy ? 'bg-seal/5 text-ink' : 'bg-amber-50 text-ink'}
+          ${readOnly ? 'cursor-default' : 'cursor-pointer'}
         `}
-        onClick={() => onEdit(node.id)}
+        aria-disabled={readOnly}
+        title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
+        onClick={() => {
+          if (!readOnly) onEdit(node.id);
+        }}
       >
         <div className={`px-3 py-1.5 border-b rounded-t-lg ${
           hasDiscrepancy
@@ -172,9 +180,11 @@ function DeskMapNpriCard({
               <div
                 key={doc.id}
                 className="flex items-center gap-1.5 px-2 py-1 rounded border cursor-pointer transition-colors border-amber-300/60 bg-white/70 hover:bg-white"
+                aria-disabled={readOnly}
+                title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
                 onClick={(event) => {
                   event.stopPropagation();
-                  onEdit(doc.id);
+                  if (!readOnly) onEdit(doc.id);
                 }}
               >
                 <div className="flex-1 min-w-0">
@@ -197,10 +207,10 @@ function DeskMapNpriCard({
         )}
 
         <div className="hidden group-hover:flex px-2 py-1.5 border-t border-amber-200 bg-amber-100/70 rounded-b-lg gap-1 justify-center">
-          <ActionBtn label="PRECEDE" onClick={() => onPrecede(node.id)} />
-          <ActionBtn label="CONVEY" onClick={() => onConvey(node.id)} />
-          <ActionBtn label="ATTACH" onClick={() => onAttachDoc(node.id)} />
-          <ActionBtn label="DELETE" danger onClick={() => onDelete(node.id)} />
+          <ActionBtn label="PRECEDE" disabled={readOnly} onClick={() => onPrecede(node.id)} />
+          <ActionBtn label="CONVEY" disabled={readOnly} onClick={() => onConvey(node.id)} />
+          <ActionBtn label="ATTACH" disabled={readOnly} onClick={() => onAttachDoc(node.id)} />
+          <ActionBtn label="DELETE" danger disabled={readOnly} onClick={() => onDelete(node.id)} />
         </div>
       </div>
     </div>
@@ -211,19 +221,24 @@ function ActionBtn({
   label,
   onClick,
   danger = false,
+  disabled = false,
 }: {
   label: string;
   onClick: () => void;
   danger?: boolean;
+  disabled?: boolean;
 }) {
   return (
     <button
       type="button"
+      disabled={disabled}
       onClick={(event) => {
         event.stopPropagation();
+        if (disabled) return;
         onClick();
       }}
-      className={`px-2 py-1 rounded text-[9px] font-semibold transition-colors ${
+      title={disabled ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
+      className={`px-2 py-1 rounded text-[9px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
         danger
           ? 'text-seal hover:bg-seal/10'
           : 'text-amber-900 hover:bg-amber-200/60'
@@ -247,7 +262,8 @@ function deskMapNpriCardPropsAreEqual(
     previous.onPrecede === next.onPrecede &&
     previous.onAttachDoc === next.onAttachDoc &&
     previous.onDelete === next.onDelete &&
-    previous.onViewDoc === next.onViewDoc
+    previous.onViewDoc === next.onViewDoc &&
+    previous.readOnly === next.readOnly
   );
 }
 

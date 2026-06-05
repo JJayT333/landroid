@@ -10,6 +10,7 @@ interface FormFieldProps {
   type?: 'text' | 'date';
   className?: string;
   id?: string;
+  disabled?: boolean;
 }
 
 export default function FormField({
@@ -19,6 +20,7 @@ export default function FormField({
   type = 'text',
   className = '',
   id,
+  disabled = false,
 }: FormFieldProps) {
   const generatedId = useId();
   const inputId = id ?? generatedId;
@@ -35,8 +37,9 @@ export default function FormField({
         id={inputId}
         type={type}
         value={value}
+        disabled={disabled}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full px-3 py-1.5 rounded-lg border border-ledger-line bg-parchment text-ink text-sm focus:ring-2 focus:ring-leather focus:border-leather outline-none"
+        className="w-full px-3 py-1.5 rounded-lg border border-ledger-line bg-parchment text-ink text-sm focus:ring-2 focus:ring-leather focus:border-leather outline-none disabled:cursor-not-allowed disabled:opacity-60"
       />
     </div>
   );

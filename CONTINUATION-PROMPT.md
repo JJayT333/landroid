@@ -4,6 +4,73 @@ Use this file to resume the active workstream in a new chat. Read it with
 `AGENTS.md`, `PROJECT_CONTEXT.md`, and `docs/README.md` before touching code.
 Keep long history in `CHANGELOG.md`.
 
+## Current Read-Only Lease Tab Handoff - 2026-06-05
+
+Active branch: `feat/readonly-tab-edit-disable`
+
+Worktree for this branch:
+`/private/tmp/landroid-readonly-tab-edit-disable`
+
+### Phase Goal
+
+Disable add/edit/delete affordances while a tab is in the non-holder
+read-only write-lease state, without changing lease semantics, persistence, or
+math behavior.
+
+### Current Implementation State
+
+- Read-only state is exposed through `useWorkspaceReadOnly()` and a shared
+  disabled-control title in `src/store/write-lease-store.ts`.
+- Workspace-mutating controls across the main views are disabled in read-only
+  tabs while navigation, preview, download, sort, filter, export, and takeover
+  flows remain available.
+- Desk map, owner database/detail tabs, runsheet, documents, curative, maps,
+  federal leasing, research, leasehold, and navbar mutation handlers now guard
+  against read-only lease tabs.
+- The existing two-tab e2e workflow asserts that the second tab disables
+  mutation controls, the holder tab stays editable, and takeover re-enables the
+  new holder while disabling the former holder.
+
+### Latest Validation
+
+Local validation passed in the isolated worktree:
+
+- `npm run lint`
+- `npm run test:e2e -- tests/e2e/landroid-workflows.spec.ts`
+- `npm run build`
+- `git diff --check`
+
+Known local setup warnings remained unchanged: `npm ci` reported the Node 26
+engine warning for a repo that expects `>=22 <26`, and npm audit reported one
+pre-existing critical finding. No dependency or lockfile changes were made.
+
+### Open Risks / Deliberately Deferred
+
+- This branch does not change write-lease acquisition, heartbeat, fencing,
+  takeover, persistence, or math behavior.
+- This branch does not add new dependencies.
+- The remaining review focus is UI coverage breadth: confirm that every
+  mutating affordance a reviewer expects to be blocked is disabled while read
+  workflows remain available.
+
+### Likely Next Steps
+
+1. Review PR diff for accidental lease-semantic or persistence changes.
+2. Let Claude review the branch before merge.
+3. After merge, keep future write-lease work in a separate branch.
+
+Paste-ready next chat prompt:
+
+> Read `/Users/abstractmapping/projects/landroid/AGENTS.md`,
+> `/Users/abstractmapping/projects/landroid/PROJECT_CONTEXT.md`,
+> `/Users/abstractmapping/projects/landroid/docs/README.md`, and
+> `/Users/abstractmapping/projects/landroid/CONTINUATION-PROMPT.md`. Continue
+> from branch `feat/readonly-tab-edit-disable` in worktree
+> `/private/tmp/landroid-readonly-tab-edit-disable`. The task is to disable
+> mutating UI controls in non-holder read-only write-lease tabs without changing
+> lease semantics, persistence, or math. Local lint, the targeted two-tab e2e,
+> build, and `git diff --check` were green before PR creation.
+
 ## Current Post-Stack Master Handoff - 2026-06-05
 
 Current docs handoff branch: `docs/post-stack-handoff`

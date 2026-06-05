@@ -10,6 +10,10 @@ import { useCurativeStore } from '../../store/curative-store';
 import { useWorkspaceStore } from '../../store/workspace-store';
 import { useCanvasStore } from '../../store/canvas-store';
 import {
+  READ_ONLY_WORKSPACE_EDIT_TITLE,
+  useWorkspaceReadOnly,
+} from '../../store/write-lease-store';
+import {
   hydrateTitleActionLogFromImportedLedger,
   useTitleActionLog,
 } from '../../store/title-action-log';
@@ -71,6 +75,7 @@ async function mirrorLoadedTitleLedger(
 }
 
 export default function Navbar() {
+  const readOnly = useWorkspaceReadOnly();
   const hostedMode = isHostedMode();
   const showDemoDataMenu = shouldShowDemoDataMenu();
   const { alert: showAlert, confirm: requestConfirmation } = useConfirmation();
@@ -117,12 +122,25 @@ export default function Navbar() {
     if (!isEditingName) setNameDraft(projectName);
   }, [projectName, isEditingName]);
 
+  useEffect(() => {
+    if (readOnly && isEditingName) {
+      setNameDraft(projectName);
+      setIsEditingName(false);
+    }
+  }, [isEditingName, projectName, readOnly]);
+
   const beginEditingName = () => {
+    if (readOnly) return;
     setNameDraft(projectName);
     setIsEditingName(true);
   };
 
   const commitName = () => {
+    if (readOnly) {
+      setNameDraft(projectName);
+      setIsEditingName(false);
+      return;
+    }
     const trimmed = nameDraft.trim();
     if (trimmed && trimmed !== projectName) {
       setProjectName(trimmed);
@@ -139,6 +157,7 @@ export default function Navbar() {
 
   const handleCombinatorial = async () => {
     setDemoMenuOpen(false);
+    if (readOnly) return;
     const confirmed = await requestConfirmation({
       title: 'Load Combinatorial Demo?',
       message:
@@ -166,6 +185,7 @@ export default function Navbar() {
 
   const handleVulcanMesa = async () => {
     setDemoMenuOpen(false);
+    if (readOnly) return;
     const confirmed = await requestConfirmation({
       title: 'Load Vulcan Mesa Demo?',
       message:
@@ -196,6 +216,7 @@ export default function Navbar() {
   // from a static asset, then through the same import path as a picked file.
   const handleSpringhill = async () => {
     setDemoMenuOpen(false);
+    if (readOnly) return;
     const confirmed = await requestConfirmation({
       title: 'Load Dr. Elmore #1 Unit Sample?',
       message:
@@ -302,11 +323,16 @@ export default function Navbar() {
 
   const handleLoad = () => {
     setFileMenuOpen(false);
+    if (readOnly) return;
     fileInputRef.current?.click();
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const input = e.currentTarget;
+    if (readOnly) {
+      input.value = '';
+      return;
+    }
     const file = input.files?.[0];
     if (!file) return;
 
@@ -419,10 +445,11 @@ export default function Navbar() {
           ) : (
             <button
               type="button"
+              disabled={readOnly}
               onClick={beginEditingName}
-              title="Click to rename project"
+              title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : 'Click to rename project'}
               aria-label={`Project name: ${projectName}. Click to rename.`}
-              className="block max-w-[12rem] truncate rounded px-0.5 text-left text-xs text-parchment/60 font-mono hover:text-parchment hover:bg-ink-light/30"
+              className="block max-w-[12rem] truncate rounded px-0.5 text-left text-xs text-parchment/60 font-mono hover:text-parchment hover:bg-ink-light/30 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {projectName}
             </button>
@@ -489,8 +516,10 @@ export default function Navbar() {
                 <button
                   type="button"
                   role="menuitem"
+                  disabled={readOnly}
                   onClick={handleLoad}
-                  className="block w-full px-3 py-2 text-left text-xs text-parchment/80 hover:bg-ink-light/40 hover:text-parchment"
+                  title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
+                  className="block w-full px-3 py-2 text-left text-xs text-parchment/80 hover:bg-ink-light/40 hover:text-parchment disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Load workspace
                 </button>
@@ -505,10 +534,12 @@ export default function Navbar() {
               <button
                 type="button"
                 onClick={() => {
+                  if (readOnly) return;
                   setDemoMenuOpen((open) => !open);
                   setFileMenuOpen(false);
                 }}
-                disabled={seedLoading}
+                disabled={readOnly || seedLoading}
+                title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
                 aria-haspopup="menu"
                 aria-expanded={demoMenuOpen}
                 className="px-3 py-1.5 rounded-lg text-xs font-medium text-gold/80 hover:text-gold hover:bg-gold/10 transition-colors disabled:opacity-50"
@@ -524,8 +555,9 @@ export default function Navbar() {
                     type="button"
                     role="menuitem"
                     onClick={handleCombinatorial}
-                    disabled={seedLoading}
-                    className="block w-full px-3 py-2 text-left text-xs text-parchment/80 hover:bg-ink-light/40 hover:text-parchment disabled:opacity-50"
+                    disabled={readOnly || seedLoading}
+                    title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
+                    className="block w-full px-3 py-2 text-left text-xs text-parchment/80 hover:bg-ink-light/40 hover:text-parchment disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Combinatorial — Raven Forest
                   </button>
@@ -533,8 +565,9 @@ export default function Navbar() {
                     type="button"
                     role="menuitem"
                     onClick={handleVulcanMesa}
-                    disabled={seedLoading}
-                    className="block w-full px-3 py-2 text-left text-xs text-parchment/80 hover:bg-ink-light/40 hover:text-parchment disabled:opacity-50"
+                    disabled={readOnly || seedLoading}
+                    title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
+                    className="block w-full px-3 py-2 text-left text-xs text-parchment/80 hover:bg-ink-light/40 hover:text-parchment disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Vulcan Mesa — Demo
                   </button>
@@ -542,8 +575,9 @@ export default function Navbar() {
                     type="button"
                     role="menuitem"
                     onClick={handleSpringhill}
-                    disabled={seedLoading}
-                    className="block w-full px-3 py-2 text-left text-xs text-parchment/80 hover:bg-ink-light/40 hover:text-parchment disabled:opacity-50"
+                    disabled={readOnly || seedLoading}
+                    title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
+                    className="block w-full px-3 py-2 text-left text-xs text-parchment/80 hover:bg-ink-light/40 hover:text-parchment disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Dr. Elmore #1 Unit — Sample
                   </button>
@@ -558,6 +592,7 @@ export default function Navbar() {
         ref={fileInputRef}
         type="file"
         accept=".landroid,.csv"
+        disabled={readOnly}
         className="hidden"
         onChange={handleFileChange}
       />

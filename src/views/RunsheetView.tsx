@@ -8,6 +8,10 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { isLeaseNode } from '../components/deskmap/deskmap-lease-node';
 import OwnershipNodeEditorModals from '../components/shared/OwnershipNodeEditorModals';
 import { useWorkspaceStore } from '../store/workspace-store';
+import {
+  READ_ONLY_WORKSPACE_EDIT_TITLE,
+  useWorkspaceReadOnly,
+} from '../store/write-lease-store';
 import { formatAsFraction } from '../engine/fraction-display';
 import { d } from '../engine/decimal';
 import { downloadRunsheetCsv } from '../storage/runsheet-export';
@@ -43,6 +47,7 @@ function formatVolPage(node: OwnershipNode) {
 }
 
 export default function RunsheetView() {
+  const readOnly = useWorkspaceReadOnly();
   const nodes = useWorkspaceStore((s) => s.nodes);
   const deskMaps = useWorkspaceStore((s) => s.deskMaps);
   const projectName = useWorkspaceStore((s) => s.projectName);
@@ -72,6 +77,12 @@ export default function RunsheetView() {
       setTractFilter('all');
     }
   }, [tractFilter, tractOptions]);
+
+  useEffect(() => {
+    if (readOnly) {
+      setEditorRoute(null);
+    }
+  }, [readOnly]);
 
   const filteredNodes = useMemo(() => {
     if (tractFilter === 'all') return nodes;
@@ -111,6 +122,7 @@ export default function RunsheetView() {
 
   const handleOpenEditor = useCallback(
     (node: OwnershipNode) => {
+      if (readOnly) return;
       const route = resolveNodeEditorRoute(node);
       if (!route) {
         return;
@@ -119,7 +131,7 @@ export default function RunsheetView() {
       setActiveNode(node.id);
       setEditorRoute(route);
     },
-    [setActiveNode]
+    [readOnly, setActiveNode]
   );
 
   if (nodes.length === 0) {
@@ -225,8 +237,10 @@ export default function RunsheetView() {
                 <td className="px-3 py-2 text-right">
                   <button
                     type="button"
+                    disabled={readOnly}
                     onClick={() => handleOpenEditor(node)}
-                    className="px-3 py-1.5 rounded-lg text-[11px] font-semibold text-leather hover:bg-leather/10 border border-ledger-line transition-colors"
+                    title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
+                    className="px-3 py-1.5 rounded-lg text-[11px] font-semibold text-leather hover:bg-leather/10 border border-ledger-line transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {isLeaseNode(node) ? 'Edit Lease' : 'Edit'}
                   </button>
