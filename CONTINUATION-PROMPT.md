@@ -4,7 +4,87 @@ Use this file to resume the active workstream in a new chat. Read it with
 `AGENTS.md`, `PROJECT_CONTEXT.md`, and `docs/README.md` before touching code.
 Keep long history in `CHANGELOG.md`.
 
-## Current Post-Stack Master Handoff - 2026-06-05
+## Current Title Readiness Panel Handoff - 2026-06-05
+
+Current feature branch: `feat/title-readiness-panel`
+
+Worktree for this branch: `/private/tmp/landroid-title-readiness-panel`
+
+### Current Phase
+
+- Goal: surface the title read-flip gate readiness in the UI without changing
+  any title math, persistence, or read-path defaults.
+- In scope: `TitleLedgerStatusBanner` now renders the cutover readiness fields,
+  the human gate reason, and a reviewer-only `Flip to cutover` control that is
+  visibly disabled and only surfaces the existing default-off error classes.
+- Out of scope: no production reads were enabled, no governance default was
+  changed, no math path was touched, and no real `.landroid` or
+  `scripts/springhill/` data was touched.
+
+### Implementation State
+
+- `src/components/shared/TitleLedgerStatusBanner.tsx` derives a read-only
+  readiness snapshot from `TitleTreeCutoverGate.readiness()` using the live title
+  action-log mutation count and surfaced runtime divergence/error state.
+- The panel displays `passedParities/threshold`, `mathParityClean`,
+  `landroidRoundTripClean`, `runtimeDivergence`, the human `reason`, and
+  `Default mode: shadow`.
+- The reviewer control uses `aria-disabled="true"` and does not call
+  `.cutOver()` from the production component. Pressing it surfaces
+  `TitleReadFlipDisabledError` while not ready and `CutoverDisabledError` when a
+  test-injected readiness state is otherwise eligible.
+- `src/components/shared/__tests__/TitleLedgerStatusBanner.test.tsx` covers
+  `not-enough-parities`, runtime divergence, recording error, and
+  `ready-but-disabled`, plus the default shadow mode and default-off error
+  classes.
+
+### Latest Validation
+
+Local validation passed in the isolated worktree:
+
+- `npm test -- src/components/shared/__tests__/TitleLedgerStatusBanner.test.tsx`
+- `npm run lint`
+- `./node_modules/.bin/tsx scripts/title-soak.ts`
+- `npm run build`
+- `git diff --check`
+
+Notes: `npm ci` was required in this isolated worktree. It completed with the
+existing Node 26 engine warning and existing critical npm audit finding. The
+title soak used synthetic Vulcan Mesa data and reported replay parity and math
+parity PASS. The production build completed with the existing Vite
+dynamic/static import and large-chunk warnings.
+
+### Open Risks / Deliberately Deferred
+
+- There is still no production read-flip enablement. `DEFAULT_LIVE_CUTOVER_ENABLED`
+  and `DEFAULT_TITLE_READ_PATH_GOVERNANCE.cutoverEnabled` remain false.
+- The live UI can only derive runtime divergence/error and inline parity count
+  from the current action-log store. Broader MathInputView and `.landroid`
+  round-trip cleanliness remain explicit gate inputs and were not wired to a new
+  persistent live source in this UI-only slice.
+- The visible root checkout at `/Users/abstractmapping/projects/landroid`
+  remains separate from this worktree and should not be used for this branch.
+
+### Likely Next Steps
+
+1. Push `feat/title-readiness-panel` and open a PR titled
+   `feat(title): surface read-flip readiness as a read-only panel`.
+2. Stop for Claude review.
+3. Keep any production read-flip enablement as a separate reviewed decision.
+
+Paste-ready next chat prompt:
+
+> Read `/Users/abstractmapping/projects/landroid/AGENTS.md`,
+> `/Users/abstractmapping/projects/landroid/PROJECT_CONTEXT.md`,
+> `/Users/abstractmapping/projects/landroid/docs/README.md`, and
+> `/Users/abstractmapping/projects/landroid/CONTINUATION-PROMPT.md`. Continue
+> from branch `feat/title-readiness-panel` in worktree
+> `/private/tmp/landroid-title-readiness-panel`. The branch adds a read-only
+> title read-flip readiness panel and disabled reviewer control without changing
+> title math, read defaults, or governance defaults. Reconfirm validation before
+> modifying anything further.
+
+## Previous Post-Stack Master Handoff - 2026-06-05
 
 Current docs handoff branch: `docs/post-stack-handoff`
 
