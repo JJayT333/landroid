@@ -346,6 +346,10 @@ The AI layer lives under `src/ai`.
 - Typed approval previews: `src/ai/approval-preview.ts`.
 - Action/result journal and model-context formatter:
   `src/ai/action-journal.ts`, `src/ai/chat-context.ts`.
+- App-context packet builder: `src/ai/app-context.ts`. It includes the active
+  view and active Desk Map detail, plus a bounded whole-project structured
+  summary so AI can answer cross-tract questions without receiving a raw dump
+  of every title node.
 - Undo snapshots: `src/ai/undo-store.ts`.
 - Settings: `src/ai/settings-store.ts`.
 - Workbook staging: `src/ai/wizard`.
@@ -354,6 +358,12 @@ Current policy:
 
 - Ollama is the preferred default.
 - OpenAI/Anthropic keys are session-only in browser memory.
+- Hosted minimal mode sends counts and structure only, including all-tract
+  structure counts. It must not include project names, party names, fractions,
+  lease economics, remarks, document references, or stable record IDs. Hosted
+  full-context mode remains behind the per-workspace disclosure gate before it
+  receives richer bounded project rollups. Local AI may receive the richer
+  bounded summary by default.
 - AI mutating tools create pending approval proposals. The AI panel is the
   human approval gate; approving a proposal applies that batch and captures one
   rollback snapshot. Proposal cards include typed before/after previews and

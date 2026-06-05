@@ -3,6 +3,15 @@
 This file records meaningful project changes so `CONTINUATION-PROMPT.md` can
 stay short.
 
+## 2026-06-04
+
+- Added bounded whole-project AI context. Local/full context now includes
+  all-tract project rollups and unit totals so the assistant can answer
+  cross-tract questions without prompt-dumping every title node. Hosted minimal
+  mode remains counts/structure only and excludes project names, party names,
+  fractions, lease economics, remarks, document references, and record IDs;
+  richer hosted rollups still require the full-context disclosure gate.
+
 ## 2026-06-02
 
 - Added `.landroid` v9 action-ledger durability. Manual save can embed the

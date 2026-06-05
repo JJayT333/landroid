@@ -520,9 +520,11 @@ when they need to display inline.
 - On the hosted POC site, chat runs through the signed-in Cognito session and
   the LANDroid Lambda AI proxy; no provider key is entered in the browser.
 - Hosted chat sends a compact read-only app context packet with each request,
-  including the active view, project, unit/tract, visible Desk Map cards, and
-  deterministic mineral coverage totals. This lets the hosted assistant answer
-  questions about what is visible without receiving edit tools.
+  including the active view and deterministic mineral coverage totals. Minimal
+  hosted context may describe all tracts by counts and structure only; project
+  names, party names, fractions, lease economics, remarks, document references,
+  and record IDs stay out of the minimal path. Richer bounded project rollups
+  are sent only after full-context disclosure is accepted for the workspace.
 
 ### Live edits and rollback
 - AI can propose Desk Map and owner/lease edits in the current local workflow.

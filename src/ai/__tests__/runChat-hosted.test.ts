@@ -102,6 +102,18 @@ describe('runChatTurn hosted proxy path', () => {
           unitCode: 'JFU',
           nodeIds: ['root-1', 'lease-node-1'],
         },
+        {
+          id: 'dm-vm2',
+          name: 'Zeus Ridge',
+          code: 'VM2',
+          tractId: 'tract-vm2',
+          grossAcres: '320',
+          pooledAcres: '160',
+          description: '',
+          unitName: 'Jupiter Flats Unit',
+          unitCode: 'JFU',
+          nodeIds: ['root-2', 'lease-node-2'],
+        },
       ],
       nodes: [
         makeNode({
@@ -124,6 +136,28 @@ describe('runChatTurn hosted proxy path', () => {
           linkedLeaseId: 'lease-1',
           relatedKind: 'lease',
         }),
+        makeNode({
+          id: 'root-2',
+          grantor: 'Second State of Texas',
+          grantee: 'Zeus Hidden Owner',
+          instrument: 'Patent',
+          docNo: '2026-02-02',
+          linkedOwnerId: 'owner-2',
+          fraction: '0.5',
+          initialFraction: '0.5',
+        }),
+        makeNode({
+          id: 'lease-node-2',
+          type: 'related',
+          grantor: 'Zeus Hidden Owner',
+          grantee: 'Zeus Ridge Energy LLC',
+          instrument: 'Oil & Gas Lease',
+          parentId: 'root-2',
+          fraction: '0',
+          initialFraction: '0',
+          linkedLeaseId: 'lease-2',
+          relatedKind: 'lease',
+        }),
       ],
     });
     useOwnerStore.setState({
@@ -133,6 +167,14 @@ describe('runChatTurn hosted proxy path', () => {
           ownerId: 'owner-1',
           leaseName: 'Apollo Draw Lease',
           lessee: 'Vulcan Mesa Petroleum, LLC',
+        }),
+        makeLease({
+          id: 'lease-2',
+          ownerId: 'owner-2',
+          leaseName: 'Zeus Ridge Lease',
+          lessee: 'Zeus Ridge Energy LLC',
+          royaltyRate: '1/5',
+          leasedInterest: '1/2',
         }),
       ],
     });
@@ -149,13 +191,23 @@ describe('runChatTurn hosted proxy path', () => {
       message.content.startsWith('# Read-only LANDroid app context')
     )?.content;
     expect(context).toContain('Read-only LANDroid app context (minimal)');
-    expect(context).toContain('Workspace counts: 1 tract map, 2 title cards');
+    expect(context).toContain('Workspace counts: 2 tract maps, 4 title cards');
     expect(context).toContain('Visible card counts: 2 total');
+    expect(context).toContain('All-tract structure (counts only):');
+    expect(context).toContain(
+      '- Tract 2: 2 title cards; 1 conveyance; 0 NPRI; 1 related lease'
+    );
     expect(context).not.toContain('Vulcan Mesa - Demo');
     expect(context).not.toContain('P. T. Broncus');
     expect(context).not.toContain('Vulcan Mesa Petroleum');
     expect(context).not.toContain('Apollo Draw Lease');
+    expect(context).not.toContain('Zeus Ridge');
+    expect(context).not.toContain('Zeus Hidden Owner');
+    expect(context).not.toContain('Zeus Ridge Energy');
+    expect(context).not.toContain('Zeus Ridge Lease');
     expect(context).not.toContain('1/1');
+    expect(context).not.toContain('1/2');
+    expect(context).not.toContain('1/5');
   });
 
   it('includes full current Desk Map state only after workspace disclosure acceptance', async () => {
@@ -191,6 +243,18 @@ describe('runChatTurn hosted proxy path', () => {
           unitCode: 'JFU',
           nodeIds: ['root-1', 'lease-node-1'],
         },
+        {
+          id: 'dm-vm2',
+          name: 'Zeus Ridge',
+          code: 'VM2',
+          tractId: 'tract-vm2',
+          grossAcres: '320',
+          pooledAcres: '160',
+          description: '',
+          unitName: 'Jupiter Flats Unit',
+          unitCode: 'JFU',
+          nodeIds: ['root-2', 'lease-node-2'],
+        },
       ],
       nodes: [
         makeNode({
@@ -213,6 +277,28 @@ describe('runChatTurn hosted proxy path', () => {
           linkedLeaseId: 'lease-1',
           relatedKind: 'lease',
         }),
+        makeNode({
+          id: 'root-2',
+          grantor: 'Second State of Texas',
+          grantee: 'Zeus Hidden Owner',
+          instrument: 'Patent',
+          docNo: '2026-02-02',
+          linkedOwnerId: 'owner-2',
+          fraction: '0.5',
+          initialFraction: '0.5',
+        }),
+        makeNode({
+          id: 'lease-node-2',
+          type: 'related',
+          grantor: 'Zeus Hidden Owner',
+          grantee: 'Zeus Ridge Energy LLC',
+          instrument: 'Oil & Gas Lease',
+          parentId: 'root-2',
+          fraction: '0',
+          initialFraction: '0',
+          linkedLeaseId: 'lease-2',
+          relatedKind: 'lease',
+        }),
       ],
     });
     useOwnerStore.setState({
@@ -222,6 +308,14 @@ describe('runChatTurn hosted proxy path', () => {
           ownerId: 'owner-1',
           leaseName: 'Apollo Draw Lease',
           lessee: 'Vulcan Mesa Petroleum, LLC',
+        }),
+        makeLease({
+          id: 'lease-2',
+          ownerId: 'owner-2',
+          leaseName: 'Zeus Ridge Lease',
+          lessee: 'Zeus Ridge Energy LLC',
+          royaltyRate: '1/5',
+          leasedInterest: '1/2',
         }),
       ],
     });
@@ -241,8 +335,11 @@ describe('runChatTurn hosted proxy path', () => {
     )?.content;
     expect(context).toContain('Active view: Desk Map');
     expect(context).toContain('Project: Vulcan Mesa - Demo');
-    expect(context).toContain('Active unit: Jupiter Flats Unit (JFU) (1 tract)');
+    expect(context).toContain('Active unit: Jupiter Flats Unit (JFU) (2 tracts)');
     expect(context).toContain('Active tract: VM1 - Apollo Draw');
+    expect(context).toContain('Whole-project structured summary:');
+    expect(context).toContain('VM2 - Zeus Ridge');
+    expect(context).toContain('lessees Zeus Ridge Energy LLC');
     expect(context).toContain('Visible Desk Map cards: 2');
     expect(context).toContain('Found in chain: 1/1 (100.00%)');
     expect(context).toContain('Front State of Texas -> P. T. Broncus');
