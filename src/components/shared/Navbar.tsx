@@ -3,24 +3,24 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import { useUIStore, type ViewMode } from '../../store/ui-store';
-import { useMapStore } from '../../store/map-store';
 import { useOwnerStore } from '../../store/owner-store';
-import { useResearchStore } from '../../store/research-store';
-import { useCurativeStore } from '../../store/curative-store';
 import { useWorkspaceStore } from '../../store/workspace-store';
 import { useCanvasStore } from '../../store/canvas-store';
 import { useStorageHealthStore } from '../../store/storage-health-store';
 import {
   hydrateTitleActionLogFromImportedLedger,
-  useTitleActionLog,
 } from '../../store/title-action-log';
+import { buildCurrentLandroidExport } from '../../app/current-landroid-export';
 import {
   downloadLandroidFile,
-  exportDocumentWorkspaceData,
   importLandroidFile,
   type LandroidFileData,
   type WorkspaceData,
 } from '../../storage/workspace-persistence';
+import {
+  chooseRollingAutoExportDirectory,
+  disableRollingAutoExport,
+} from '../../storage/rolling-auto-export-runtime';
 import {
   replaceWorkspaceSideStores,
   replaceWorkspaceSideStoresWithRollback,
@@ -249,55 +249,9 @@ export default function Navbar() {
     setSeedLoading(false);
   };
 
-  const buildCurrentLandroidData = async (): Promise<LandroidFileData> => {
-    const state = useWorkspaceStore.getState();
-    const canvasState = useCanvasStore.getState();
-
-    return {
-      workspaceId: state.workspaceId,
-      projectName: state.projectName,
-      nodes: state.nodes,
-      deskMaps: state.deskMaps,
-      leaseholdUnit: state.leaseholdUnit,
-      leaseholdAssignments: state.leaseholdAssignments,
-      leaseholdOrris: state.leaseholdOrris,
-      leaseholdTransferOrderEntries: state.leaseholdTransferOrderEntries,
-      activeDeskMapId: state.activeDeskMapId,
-      activeUnitCode: state.activeUnitCode,
-      instrumentTypes: state.instrumentTypes,
-      ownerData: await useOwnerStore.getState().exportWorkspaceData(),
-      documentData: await exportDocumentWorkspaceData(
-        state.workspaceId,
-        state.nodes
-      ),
-      mapData: await useMapStore.getState().exportWorkspaceData(),
-      researchData: await useResearchStore.getState().exportWorkspaceData(),
-      curativeData: await useCurativeStore.getState().exportWorkspaceData(),
-      canvas: {
-        nodes: canvasState.nodes,
-        edges: canvasState.edges,
-        viewport: canvasState.viewport,
-        gridCols: canvasState.gridCols,
-        gridRows: canvasState.gridRows,
-        orientation: canvasState.orientation,
-        pageSize: canvasState.pageSize,
-        horizontalSpacingFactor: canvasState.horizontalSpacingFactor,
-        verticalSpacingFactor: canvasState.verticalSpacingFactor,
-        snapToGrid: canvasState.snapToGrid,
-        gridSize: canvasState.gridSize,
-      },
-    };
-  };
-
   const exportCurrentWorkspace = async () => {
-    const titleActionLog = useTitleActionLog.getState();
-    await downloadLandroidFile(
-      await buildCurrentLandroidData(),
-      {
-        actionRecords: titleActionLog.actionRecords,
-        auditEvents: titleActionLog.auditEvents,
-      }
-    );
+    const currentExport = await buildCurrentLandroidExport();
+    await downloadLandroidFile(currentExport.data, currentExport.options);
     useStorageHealthStore.getState().recordWorkspaceExported();
   };
 
@@ -310,6 +264,32 @@ export default function Navbar() {
     setFileMenuOpen(false);
     setDemoMenuOpen(false);
     await exportCurrentWorkspace();
+  };
+
+  const handleConfigureAutoExport = async () => {
+    setFileMenuOpen(false);
+    setDemoMenuOpen(false);
+    try {
+      const status = await chooseRollingAutoExportDirectory();
+      if (status === 'unsupported') {
+        await showAlert({
+          title: 'Auto Export Unsupported',
+          message:
+            'This browser does not support choosing a local folder for rolling exports. Use Backup Now for manual .landroid backups.',
+        });
+      }
+    } catch (err) {
+      await showAlert({
+        title: 'Auto Export Failed',
+        message: `Auto export setup failed: ${err instanceof Error ? err.message : 'Unknown error'}`,
+      });
+    }
+  };
+
+  const handleDisableAutoExport = async () => {
+    setFileMenuOpen(false);
+    setDemoMenuOpen(false);
+    await disableRollingAutoExport();
   };
 
   const handleLoad = () => {
@@ -472,7 +452,11 @@ export default function Navbar() {
         </div>
 
         <div className="flex gap-1 border-l border-parchment/20 pl-3">
-          <StorageHealthIndicator onBackupNow={handleBackupNow} />
+          <StorageHealthIndicator
+            onBackupNow={handleBackupNow}
+            onConfigureAutoExport={handleConfigureAutoExport}
+            onDisableAutoExport={handleDisableAutoExport}
+          />
 
           <div ref={fileMenuRef} className="relative">
             <button

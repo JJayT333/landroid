@@ -5,6 +5,12 @@ stay short.
 
 ## 2026-06-05
 
+- Added opt-in rolling local auto-export for browsers that support choosing a
+  folder through the File System Access API. Snapshots are timestamped
+  `.landroid` files written through the same serializer as manual export, with
+  manual `Backup Now` fallback warnings when the API is unavailable or folder
+  permission is revoked.
+
 - Added a top-bar storage health panel that shows the latest successful
   browser autosave, latest `.landroid` backup/export, and browser Storage API
   persistence/usage status. Added `Backup Now` as a visible full `.landroid`

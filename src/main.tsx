@@ -30,6 +30,10 @@ import {
   estimateBrowserStorage,
   requestPersistentStorage,
 } from './storage/persistent-storage';
+import {
+  initializeRollingAutoExport,
+  scheduleRollingAutoExport,
+} from './storage/rolling-auto-export-runtime';
 import { runPostV8BackupIfNeeded } from './storage/post-v8-backup';
 import { runBackendSpineContractCheck } from './backend-spine/app-contract-check';
 import {
@@ -140,6 +144,10 @@ async function bootstrapApp() {
     startupWarnings.length > 0 ? startupWarnings.join(' ') : null
   );
 
+  await initializeRollingAutoExport().catch((err) => {
+    console.warn('[landroid] rolling auto-export initialization failed:', err);
+  });
+
   if (!isHostedMode()) {
     void runBackendSpineContractCheck({ logger: console });
   }
@@ -170,8 +178,10 @@ useWorkspaceStore.subscribe((state) => {
       const result = await saveWorkspaceShardsToDb(payload);
       if (result.status !== 'written') return;
       if (saveGeneration !== workspaceSaveGeneration) return;
-      useStorageHealthStore.getState().recordWorkspaceSaved();
       await flushTitleActionLogToStorage(payload.workspaceId);
+      if (saveGeneration !== workspaceSaveGeneration) return;
+      useStorageHealthStore.getState().recordWorkspaceSaved();
+      scheduleRollingAutoExport();
     })().catch((err) => {
       console.warn('[landroid] title ledger autosave failed:', err);
     });
@@ -196,8 +206,10 @@ useCanvasStore.subscribe((state) => {
     // Canvas autosave shares the workspace's single-writer lease, so a
     // read-only tab cannot overwrite the active writer's viewport/layout.
     const workspaceId = useWorkspaceStore.getState().workspaceId;
-    void ensureWorkspaceWritable(workspaceId).then((writable) => {
-      if (writable) saveCanvasToDb(buildCanvasAutosavePayload(state), workspaceId);
+    void ensureWorkspaceWritable(workspaceId).then(async (writable) => {
+      if (!writable) return;
+      await saveCanvasToDb(buildCanvasAutosavePayload(state), workspaceId);
+      scheduleRollingAutoExport();
     });
   }, AUTOSAVE_DEBOUNCE_MS);
 });

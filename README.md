@@ -140,6 +140,10 @@ Older stress and 8-tract leasehold demos have been retired.
   title action/audit ledger for durability.
 - `Backup Now` triggers the same full `.landroid` export path as manual
   workspace save so the downloaded file remains the named escape hatch.
+- In browsers with local folder access support, `Auto Export` can opt in to
+  rolling timestamped `.landroid` snapshots in a user-selected folder. If the
+  browser lacks that API or folder permission is revoked, LANDroid falls back to
+  manual `Backup Now` with a warning.
 - Phase 5 stores document blobs, content hashes, and attachments in the local
   workspace database. Phase 7A adds the `Documents` registry so LANDroid can
   edit document metadata, group documents by saved view/area, surface duplicate

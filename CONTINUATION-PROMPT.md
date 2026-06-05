@@ -4,32 +4,43 @@ Use this file to resume the active workstream in a new chat. Read it with
 `AGENTS.md`, `PROJECT_CONTEXT.md`, and `docs/README.md` before touching code.
 Keep long history in `CHANGELOG.md`.
 
-## Current Storage Health And Backup Handoff - 2026-06-05
+## Current Rolling Auto-Export Handoff - 2026-06-05
 
-Active branch: `feat/storage-health-and-backup-now`
+Active branch: `feat/rolling-auto-export`
 
 Worktree for this branch:
-`/private/tmp/landroid-storage-health-and-backup-now`
+`/private/tmp/landroid-rolling-auto-export`
+
+Base branch: stacked on open PR #129 (`feat/storage-health-and-backup-now`) so
+the `Backup Now` / storage-health surface is available. PRs #128 and #129 had
+green CI and clean merge state when checked, but `gh auth status` reported an
+invalid local token and neither PR showed recorded `latestReviews`, so this
+chat did not remote-merge them.
 
 ### Phase Goal
 
-Add a visible storage status surface plus a manual full `.landroid` backup
-action without changing serializers, autosave authority, storage authority, or
-math behavior.
+Add opt-in rolling `.landroid` auto-export to a local user-selected folder where
+the browser File System Access API supports it, while preserving manual
+`Backup Now` fallback and avoiding any cloud sync, alternate export format, or
+math behavior change.
 
 ### Current Implementation State
 
-- `Backup Now` is visible in the navbar storage surface and calls the existing
-  `downloadLandroidFile` export path.
-- The storage health UI shows the latest successful workspace autosave, latest
-  `.landroid` backup/export, and browser Storage API persistence/usage status.
-- Startup still requests persistent storage through the existing Storage API
-  helper; the branch records that result plus `navigator.storage.estimate()`
-  for display only.
-- Workspace autosave records `lastSavedAt` only after the existing shard write
-  and title-ledger flush complete successfully.
-- `Save workspace` and `Backup Now` both record `lastExportedAt` after the
-  existing `.landroid` download helper resolves.
+- `src/app/current-landroid-export.ts` centralizes the current `.landroid`
+  payload/options builder so manual save, `Backup Now`, and rolling
+  auto-export use the same serializer inputs.
+- `src/storage/rolling-auto-export.ts` isolates File System Access folder
+  handles, IndexedDB handle persistence, permission checks, timestamped
+  filename generation, and `.landroid` blob writes through `exportLandroidFile`.
+- `src/storage/rolling-auto-export-runtime.ts` loads the stored handle on
+  startup, writes an immediate snapshot after folder selection, schedules
+  debounced snapshots after successful workspace/canvas autosaves, and warns
+  when export is overdue or folder permission is unavailable.
+- The storage health panel now shows rolling auto-export status (`off`, queued,
+  writing, manual-only, overdue) plus `Auto Export` / `Change Folder` and `Off`
+  controls.
+- Unsupported browsers or revoked folder permission degrade to the existing
+  manual `Backup Now` path with a visible warning.
 
 ### Latest Validation
 
@@ -37,46 +48,57 @@ Validation passed in the isolated worktree:
 
 - `npm ci` passed with the known Node 26 engine warning and one pre-existing
   critical npm audit finding.
-- `npm run lint`
-- `npm test -- src/storage/__tests__/persistent-storage.test.ts src/store/__tests__/storage-health-store.test.ts src/components/shared/__tests__/StorageHealthIndicator.test.tsx`
-- `npm run build`
-- Manual browser smoke against `http://127.0.0.1:5175/`: loaded the
-  Combinatorial demo, edited the project name to trigger autosave, confirmed
-  the storage indicator moved from `Saved none` to a timestamp, clicked
-  `Backup Now`, confirmed `Backup` updated to a timestamp, and captured
-  `/private/tmp/landroid-storage-health-smoke.landroid`.
-- Round-trip import of `/private/tmp/landroid-storage-health-smoke.landroid`
-  through `importLandroidFile` passed with 1,476 nodes and 10 desk maps.
+- `npm test -- src/storage/__tests__/rolling-auto-export.test.ts src/store/__tests__/storage-health-store.test.ts src/components/shared/__tests__/StorageHealthIndicator.test.tsx`
+  passed, 3 files / 13 tests.
+- `npm run lint` passed.
+- `npm run build` passed with the existing Node `module.register()`
+  deprecation warning, Vite dynamic/static import chunking warnings, and
+  large-chunk warning.
+- In-app Browser smoke against `http://127.0.0.1:5176/` confirmed the storage
+  panel renders `Auto off` plus `Backup Now` and `Auto Export`.
+- Playwright smoke with an injected File System Access test folder handle
+  captured one immediate `.landroid` snapshot and one debounced post-edit
+  snapshot in `/private/tmp/landroid-rolling-auto-export-smoke`, then simulated
+  revoked permission and confirmed no third file was written while the panel
+  showed manual fallback with the warning title
+  `Auto-export folder permission is unavailable. Use Backup Now or choose the folder again.`
+- Round-trip import of
+  `/private/tmp/landroid-rolling-auto-export-smoke/Rolling Smoke Workspace-2026-06-05T23-56-37-539Z.landroid`
+  through `importLandroidFile` passed with project name
+  `Rolling Smoke Workspace`, 0 nodes, and 1 desk map.
 
-Remaining before PR: `git diff --check`.
+Remaining before PR: `git diff --check`, commit, push, and PR creation.
 
 ### Open Risks / Deliberately Deferred
 
-- Rolling or automatic exports remain a separate ticket.
-- No new serializer, storage authority, persistence model, dependency, or math
-  behavior is included.
-- The timestamps are session-scoped UI diagnostics; they are not a new durable
-  storage ledger.
+- This branch is stacked on #129. If #129 merges before PR creation, rebase this
+  branch onto updated `origin/main` before opening the PR.
+- Folder-handle persistence depends on browser File System Access and IndexedDB
+  structured-clone support. Unsupported browsers remain manual-only.
+- Auto-export writes only `.landroid` snapshots to a user-selected local
+  folder. No cloud/Dropbox sync, non-`.landroid` format, dependency, math
+  behavior, title read-flip enablement, real `.landroid` data, or
+  `scripts/springhill/` work is included.
 
 ### Likely Next Steps
 
-1. Rerun the requested validation set after this handoff edit.
-2. Manually smoke the browser flow: load demo data, wait for autosave status,
-   click `Backup Now`, confirm a `.landroid` download, and round-trip the file.
-3. Push `feat/storage-health-and-backup-now`, open the PR, and stop for Claude
-   review.
+1. Run `git diff --check`.
+2. Review the final diff for scope and no generated-artifact changes.
+3. Commit, push `feat/rolling-auto-export`, open the PR, and stop for Claude
+   review. If GitHub auth is still invalid, re-authenticate before push/PR.
 
 Paste-ready next chat prompt:
 
 > Read `/Users/abstractmapping/projects/landroid/AGENTS.md`,
 > `/Users/abstractmapping/projects/landroid/PROJECT_CONTEXT.md`,
 > `/Users/abstractmapping/projects/landroid/docs/README.md`, and
-> `/Users/abstractmapping/projects/landroid/CONTINUATION-PROMPT.md`. Continue
-> branch `feat/storage-health-and-backup-now` in worktree
-> `/private/tmp/landroid-storage-health-and-backup-now`. The task is a visible
-> storage health panel plus a manual full `.landroid` `Backup Now` action. Do
-> not add rolling/auto export, a new serializer, a new storage authority, or
-> math changes. Finish validation, open the PR, and stop for Claude review.
+> `/private/tmp/landroid-rolling-auto-export/CONTINUATION-PROMPT.md`. Continue
+> branch `feat/rolling-auto-export` in worktree
+> `/private/tmp/landroid-rolling-auto-export`. The task is opt-in rolling local
+> `.landroid` auto-export where File System Access API supports it, stacked on
+> PR #129's storage-health/Backup Now surface. Preserve Texas-only math, do not
+> touch real `.landroid` data or `scripts/springhill/`, do not add cloud sync or
+> alternate formats, finish validation, open the PR, and stop for Claude review.
 
 ## Current Post-Stack Master Handoff - 2026-06-05
 
