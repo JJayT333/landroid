@@ -4,11 +4,11 @@ Use this file to resume the active workstream in a new chat. Read it with
 `AGENTS.md`, `PROJECT_CONTEXT.md`, and `docs/README.md` before touching code.
 Keep long history in `CHANGELOG.md`.
 
-## Current Rebuild-First Master Handoff - 2026-06-04
+## Current Post-Stack Master Handoff - 2026-06-05
 
-Current docs repair branch: `docs/rebuild-handoff-repair`
+Current docs handoff branch: `docs/post-stack-handoff`
 
-Worktree for this repair: `/private/tmp/landroid-rebuild-handoff-repair`
+Worktree for this handoff refresh: `/private/tmp/landroid-stack-119-rebase`
 
 ### Current Posture
 
@@ -26,6 +26,79 @@ mandatory guardrails are:
 - The title read-flip is a near-term governed gate, but production enablement is
   still a separate reviewed decision.
 
+### Landed Stack
+
+The title-ledger rebuild stack and AI project-summary context have landed on
+`main` through squash merges:
+
+- PR #123, `docs: repair rebuild handoff`, landed at
+  `f9b300726b257d7067b8cdc902f7b1b3857fe8ad`.
+- PR #119, `feat(storage): add title ledger runtime tables`, landed at
+  `1f6e7d4ef9eb124f121a7b699036af4e05eb7076`.
+- PR #120, `feat(storage): persist title ledger lifecycle`, landed at
+  `9ea1e60a41e09cd214cc065b4f450874a77a324f`.
+- PR #124, `feat(records): govern title read flip`, replaced closed unmerged
+  PR #121 and landed at `f210227d12420e829fccffd97b64caf7aa062068`.
+- PR #122, `feat(ai): add project summary context`, landed at
+  `fa73aefe1705e091d6ef629607b18faae84a10ac`.
+
+The original stacked bases captured before branch deletion were:
+
+- `SHA_119=a393f9bcf2620b38c7b43779dfa4d40caa38d6e9`
+- `SHA_120=b8fd448c39c3e9db5e51c63bda3ff43466de9f54`
+
+### Current Implementation State
+
+- Dexie v12 now has runtime title-ledger storage tables for `action_record` and
+  `audit_event` rows scoped by `dbKey + workspaceId`.
+- Runtime title-ledger lifecycle now flushes, hydrates, continues the audit
+  chain, prefers valid v9 file ledgers over stale Dexie rows on import, and
+  mirrors selected file/baseline ledgers back to Dexie.
+- Title read-flip governance is implemented but remains default-off:
+  `DEFAULT_LIVE_CUTOVER_ENABLED === false` and
+  `DEFAULT_TITLE_READ_PATH_GOVERNANCE.cutoverEnabled === false`.
+- The only production read source remains the existing store/snapshot path.
+  Test-only governance proves cutover and flip-to-shadow revert behavior.
+- Full/local AI context now includes a bounded whole-project summary for
+  cross-tract questions. Hosted minimal AI context remains counts/structure only
+  and must not disclose project names, party names, fractions, lease economics,
+  remarks, document references, or record IDs.
+
+### Latest Validation
+
+Before each rebased PR was pushed, local validation passed in the isolated clone:
+
+- #119 T2a: `npm ci`, `npm run lint`, `npm test`, `npm run build`,
+  `./node_modules/.bin/tsx scripts/title-soak.ts`, and `git diff --check`
+  passed. The title soak replay and math parity both passed.
+- #120 T2b: `npm run lint`, `npm test`, `npm run build`,
+  `./node_modules/.bin/tsx scripts/title-soak.ts`, and `git diff --check`
+  passed. The title soak replay and math parity both passed.
+- #124 T3 replacement for #121: `npm run lint`, `npm test`, `npm run build`,
+  `./node_modules/.bin/tsx scripts/title-soak.ts`, `git diff --check`, and
+  default-off/call-site scans passed.
+- #122 T4: targeted hosted-minimal privacy/context tests, `npm run lint`,
+  `npm test`, `npm run build`, and `git diff --check` passed.
+
+GitHub checks were green before each merge. Existing local warnings remained the
+known Node 26 engine warning, the pre-existing npm audit finding, intentional
+test stderr for simulated Dexie/title divergence/post-v8 backup paths, Vite
+dynamic/static import warnings, the Node `module.register()` deprecation
+warning, and large-chunk warnings.
+
+### Open Risks / Deliberately Deferred
+
+- Production title read-flip enablement is not landed. Any enablement remains a
+  separate reviewed decision after review of the landed storage/lifecycle/gate
+  behavior.
+- No federal/private math, lease-generator, Producers 88 replacement,
+  retrieval/vector-search, SourceAttestation, real `.landroid`, or
+  `scripts/springhill/` work was included in the stack.
+- If rollback testing touches a browser profile that opened Dexie v12, export a
+  `.landroid` backup first. If a reverted v11 build cannot open the newer
+  IndexedDB version, delete that profile's `landroid-v2` database only after the
+  backup, then import the backup into the reverted build.
+
 ### Checkout Warning
 
 The visible root checkout at `/Users/abstractmapping/projects/landroid` is not a
@@ -37,53 +110,6 @@ untracked local paths:
 - `scripts/springhill/`
 
 Do not stage or edit those paths unless the user explicitly asks for that work.
-
-### Current PR Stack
-
-- T0: PR #118, `docs: adopt rebuild-first posture`, merged.
-- T1: PRs #111-#117, remediation merge train, merged.
-- T2a: PR #119, `feat(storage): add title ledger runtime tables`, open from
-  `feat/title-ledger-runtime-storage` to `main`.
-- T2b: PR #120, `feat(storage): persist title ledger lifecycle`, open from
-  `feat/title-ledger-runtime-lifecycle` to
-  `feat/title-ledger-runtime-storage`; stacked on T2a.
-- T3: PR #121, `feat(records): govern title read flip`, open from
-  `feat/title-read-flip-governance` to
-  `feat/title-ledger-runtime-lifecycle`; stacked on T2b. This must not enable
-  production reads.
-- T4: PR #122, `feat(ai): add project summary context`, open from
-  `feat/ai-project-summary-context` to `main`; independent from the T2/T3 stack.
-- T5: optional and deferred.
-
-### Audit Status
-
-- Handoff integrity was the defect: branch-local handoffs were current, but the
-  root handoff had been overwritten by branch-specific state. This branch exists
-  only to repair the root handoff.
-- No amendment is currently required for PRs #119-#122 based on the latest
-  audit. PR #120 remains the highest-risk open review item because it owns title
-  ledger hydrate, precedence, and file-vs-Dexie behavior.
-- Producers 88/template replacement is a pending user redirect, not part of
-  PR #122 and not part of this docs repair.
-
-### Validation Status By Open PR
-
-- #119 T2a validation: targeted title-ledger/reset tests passed; `npm run lint`
-  passed; `git diff --check` passed; `npm test` passed; `npm run build` passed.
-  It adds Dexie v12 tables and reset wiring only. No flush, hydrate, read-path
-  change, or production flip is included.
-- #120 T2b validation: targeted lifecycle/storage/title-action tests passed;
-  `npm run lint` passed; `git diff --check` passed; `npm test` passed;
-  `npm run build` passed; `./node_modules/.bin/tsx scripts/title-soak.ts`
-  passed. Review file-ledger precedence over stale Dexie rows closely.
-- #121 T3 validation: targeted cutover/read-path/read-flip/math-parity tests
-  passed; `npm run lint` passed; `git diff --check` passed; `npm test` passed;
-  `npm run build` passed; `./node_modules/.bin/tsx scripts/title-soak.ts`
-  passed. Production read-flip is not enabled.
-- #122 T4 validation: targeted AI context tests passed; `npm run lint` passed;
-  `npm test` passed; `npm run build` passed; `git diff --check` passed. Hosted
-  minimal context remains counts/structure only; richer rollups remain behind
-  the full-context disclosure gate.
 
 ### Producers 88 Pending Redirect
 
@@ -102,21 +128,27 @@ authorized.
 
 ### Likely Next Steps
 
-1. Review and merge this tiny docs branch so future chats see the master rebuild
-   state first.
-2. Review the open T2/T3/T4 PRs in dependency order: #119, #120, #121, and #122.
-3. Keep Producers 88 separate until the user chooses the target file set.
+1. Review and merge `docs/post-stack-handoff` so future chats see the landed
+   stack state first.
+2. Run final `main` validation after the docs handoff lands if the ticket needs
+   a final post-merge closeout: `npm run lint`, `npm test`, `npm run build`,
+   `./node_modules/.bin/tsx scripts/title-soak.ts`, and `git diff --check`.
+3. Review the landed T2/T3 behavior together before any production read-flip
+   enablement work.
+4. Keep Producers 88 separate until the user chooses the target file set.
 
 Paste-ready next chat prompt:
 
 > Read `/Users/abstractmapping/projects/landroid/AGENTS.md`,
 > `/Users/abstractmapping/projects/landroid/PROJECT_CONTEXT.md`,
-> `/Users/abstractmapping/projects/landroid/docs/README.md`, and the repaired
+> `/Users/abstractmapping/projects/landroid/docs/README.md`, and
 > `/Users/abstractmapping/projects/landroid/CONTINUATION-PROMPT.md`. Continue
-> from the rebuild-first master handoff. T0 #118 and T1 #111-#117 are merged;
-> T2a #119, T2b #120, T3 #121, and T4 #122 are open; T3 does not include a
-> production read flip; Producers 88 is a separate pending redirect requiring
-> clarification before edits.
+> from the post-stack master handoff. The title-ledger storage/lifecycle stack,
+> governed default-off read-flip readiness, and AI project-summary context have
+> landed through PRs #119, #120, #124, and #122 after #123 repaired the master
+> handoff. Production title reads remain on the store/snapshot path; do not
+> enable the read flip without a separate reviewed decision. Producers 88 is a
+> separate pending redirect requiring clarification before edits.
 
 ### Audit Handoff Prompt For Claude
 
@@ -125,26 +157,22 @@ Use this prompt for a cold audit of the current rebuild sequence:
 > Audit LANDroid from the rebuild-first master handoff. Start read-only. Read
 > `AGENTS.md`, `PROJECT_CONTEXT.md`, `docs/README.md`, and
 > `CONTINUATION-PROMPT.md`. Verify the actual GitHub PR state before trusting
-> branch-local notes. Expected state on 2026-06-04: T0 PR #118 is merged; T1
-> PRs #111-#117 are merged; T2a PR #119 is open from
-> `feat/title-ledger-runtime-storage` to `main`; T2b PR #120 is open from
-> `feat/title-ledger-runtime-lifecycle` to
-> `feat/title-ledger-runtime-storage`; T3 PR #121 is open from
-> `feat/title-read-flip-governance` to
-> `feat/title-ledger-runtime-lifecycle`; T4 PR #122 is open from
-> `feat/ai-project-summary-context` to `main`; docs repair PR #123 is open from
-> `docs/rebuild-handoff-repair` to `main`.
+> branch-local notes. Expected state on 2026-06-05: PRs #119, #120, #124, and
+> #122 are merged on `main`; original PR #121 is closed unmerged and was
+> replaced by #124; this docs handoff branch is `docs/post-stack-handoff`.
 >
-> Audit in this order: #123 handoff repair, merged train #111-#118, T2a #119,
-> T2b #120, T3 #121, and T4 #122. Confirm #120 file-vs-Dexie precedence and
-> hydrate/flush behavior especially carefully. Confirm T3 does not enable
-> production title reads. Confirm T4 hosted minimal AI context does not disclose
-> project names, party names, fractions, lease economics, remarks, document
-> references, or record IDs. Keep Producers 88 separate: determine candidate
-> file sets, then ask the user what "those files" means before edits. Do not
-> modify `scripts/springhill/`, real `.landroid` files, math/precision behavior,
-> production read-flip settings, or open PR branches unless a concrete defect is
-> found and the user authorizes the correction.
+> Audit the landed stack in this order: #123 handoff repair, #119 T2a runtime
+> ledger storage, #120 T2b lifecycle persistence and file-vs-Dexie precedence,
+> #124 T3 default-off read-flip governance, and #122 hosted/full AI context
+> behavior. Confirm #120 file-ledger precedence over stale Dexie rows and
+> hydrate/flush behavior especially carefully. Confirm #124 does not enable
+> production title reads. Confirm #122 hosted minimal AI context does not
+> disclose project names, party names, fractions, lease economics, remarks,
+> document references, or record IDs. Keep Producers 88 separate: determine
+> candidate file sets, then ask the user what "those files" means before edits.
+> Do not modify `scripts/springhill/`, real `.landroid` files, math/precision
+> behavior, or production read-flip settings unless a concrete defect is found
+> and the user authorizes the correction.
 
 ## Historical Branch Notes
 
