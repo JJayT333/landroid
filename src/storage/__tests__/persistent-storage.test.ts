@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import { requestPersistentStorage } from '../persistent-storage';
+import {
+  estimateBrowserStorage,
+  requestPersistentStorage,
+} from '../persistent-storage';
 
 describe('requestPersistentStorage', () => {
   it('reports unsupported when the Storage API is absent', async () => {
@@ -62,6 +65,53 @@ describe('requestPersistentStorage', () => {
       status: 'error',
       alreadyPersisted: false,
       error: 'quota probe failed',
+    });
+  });
+});
+
+describe('estimateBrowserStorage', () => {
+  it('reports unsupported when estimate() is absent', async () => {
+    await expect(estimateBrowserStorage({ storage: undefined })).resolves.toEqual({
+      supported: false,
+      usage: null,
+      quota: null,
+    });
+
+    await expect(estimateBrowserStorage({ storage: {} })).resolves.toEqual({
+      supported: false,
+      usage: null,
+      quota: null,
+    });
+  });
+
+  it('normalizes browser storage usage and quota', async () => {
+    await expect(
+      estimateBrowserStorage({
+        storage: {
+          estimate: async () => ({ usage: 1024, quota: 2048 }),
+        },
+      })
+    ).resolves.toEqual({
+      supported: true,
+      usage: 1024,
+      quota: 2048,
+    });
+  });
+
+  it('keeps estimate failures diagnostic-only', async () => {
+    await expect(
+      estimateBrowserStorage({
+        storage: {
+          estimate: async () => {
+            throw new Error('estimate failed');
+          },
+        },
+      })
+    ).resolves.toEqual({
+      supported: true,
+      usage: null,
+      quota: null,
+      error: 'estimate failed',
     });
   });
 });

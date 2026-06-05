@@ -13,6 +13,7 @@ import { useResearchStore } from './store/research-store';
 import { useCurativeStore } from './store/curative-store';
 import { useWorkspaceStore } from './store/workspace-store';
 import { useCanvasStore } from './store/canvas-store';
+import { useStorageHealthStore } from './store/storage-health-store';
 import {
   flushTitleActionLogToStorage,
   hydrateTitleActionLogFromStorageOrBaseline,
@@ -25,7 +26,10 @@ import {
   releaseWorkspaceWriteLease,
 } from './storage/workspace-write-lease';
 import { awaitWorkspaceKeyReady } from './storage/active-workspace-key';
-import { requestPersistentStorage } from './storage/persistent-storage';
+import {
+  estimateBrowserStorage,
+  requestPersistentStorage,
+} from './storage/persistent-storage';
 import { runPostV8BackupIfNeeded } from './storage/post-v8-backup';
 import { runBackendSpineContractCheck } from './backend-spine/app-contract-check';
 import {
@@ -54,7 +58,11 @@ async function bootstrapApp() {
   // Phase 0.5: ask the browser to keep this origin's IndexedDB persistent so
   // it is not evicted under storage pressure (PWA / iPad durability). Fire and
   // forget — a refusal is recorded, never a reason to block local-first work.
-  void requestPersistentStorage().then((result) => {
+  void requestPersistentStorage().then(async (result) => {
+    useStorageHealthStore.getState().setPersistentStorageResult(result);
+    const estimate = await estimateBrowserStorage();
+    useStorageHealthStore.getState().setBrowserStorageEstimate(estimate);
+
     if (result.status === 'denied') {
       console.warn(
         '[landroid] Persistent storage was not granted; the browser may evict '
@@ -162,6 +170,7 @@ useWorkspaceStore.subscribe((state) => {
       const result = await saveWorkspaceShardsToDb(payload);
       if (result.status !== 'written') return;
       if (saveGeneration !== workspaceSaveGeneration) return;
+      useStorageHealthStore.getState().recordWorkspaceSaved();
       await flushTitleActionLogToStorage(payload.workspaceId);
     })().catch((err) => {
       console.warn('[landroid] title ledger autosave failed:', err);
