@@ -4,7 +4,94 @@ Use this file to resume the active workstream in a new chat. Read it with
 `AGENTS.md`, `PROJECT_CONTEXT.md`, and `docs/README.md` before touching code.
 Keep long history in `CHANGELOG.md`.
 
-## Current Post-Stack Master Handoff - 2026-06-05
+## Current Title Round-Trip Gate Feeder Handoff - 2026-06-05
+
+Current feature branch: `feat/landroid-roundtrip-gate-feeder`
+
+Worktree for this branch: `/private/tmp/landroid-roundtrip-gate-feeder`
+
+### Current Phase
+
+- Goal: feed a real `.landroid` export/import/replay result into
+  `TitleTreeCutoverGate.setLandroidRoundTripClean(...)` in a diagnostic path.
+- In scope: `scripts/title-soak.ts` now exports the synthetic ledger to an
+  in-memory `.landroid` bundle, imports it, replays the imported ledger,
+  compares replay/math output, reports clean/dirty details, and surfaces the
+  resulting readiness field.
+- Out of scope: no autosave/runtime invocation, no read-path enablement, no
+  governance default change, no math behavior change, no real `.landroid`, and
+  no `scripts/springhill/` access.
+
+### Implementation State
+
+- The title soak keeps its existing replay-vs-adapter and MathInputView parity
+  checks.
+- The same synthesized ledger is now passed through `exportLandroidFile(...)`
+  and `importLandroidFile(...)` entirely in memory.
+- The imported `action_record` rows are replayed and compared to the adapter
+  title projection; imported ledger rows are also compared to the original
+  synthesized ledger rows.
+- The imported action records are used for a second MathInputView parity check.
+- A diagnostic-only `TitleTreeCutoverGate` records the clean inline parity,
+  calls `setMathParityClean(math.clean)`, calls
+  `setLandroidRoundTripClean(roundTrip.clean)`, and reports `readiness()`.
+  Synthetic Vulcan Mesa has one synthesized ledger mutation, so readiness shows
+  `.landroid` clean while still blocked by `1/10` parity threshold.
+
+### Latest Validation
+
+Initial local harness checks passed in this isolated worktree:
+
+- `./node_modules/.bin/tsx scripts/title-soak.ts` passed on synthetic Vulcan
+  Mesa with replay, MathInputView parity, `.landroid` round trip, imported
+  ledger replay, imported ledger equality, imported math parity, and diagnostic
+  readiness `.landroid` PASS.
+- `./node_modules/.bin/tsx scripts/title-soak.ts --json` passed and reported
+  `readiness.landroidRoundTripClean: true`,
+  `readiness.mathParityClean: true`, `readiness.ready: false`, and
+  `passedParities/threshold: 1/10`.
+
+Remaining required validation before PR:
+
+- `npm run lint`
+- `./node_modules/.bin/tsx scripts/title-soak.ts`
+- `npm run build`
+- `git diff --check`
+
+Notes: `npm ci` was required in this isolated worktree and completed with the
+existing Node 26 engine warning plus existing critical npm audit finding.
+
+### Open Risks / Deliberately Deferred
+
+- The harness intentionally does not claim production cutover readiness because
+  the synthetic run proves one ledger mutation, not the default threshold of ten
+  real passed parities.
+- This branch does not wire the round-trip check into autosave, load, UI, or any
+  production readiness source.
+- Production title reads remain on the existing store/snapshot path.
+
+### Likely Next Steps
+
+1. Finish the required validation block.
+2. Commit and push `feat/landroid-roundtrip-gate-feeder`.
+3. Open a PR titled
+   `feat(title): feed landroid round-trip result into cutover readiness`.
+4. Stop for Claude review.
+
+Paste-ready next chat prompt:
+
+> Read `/Users/abstractmapping/projects/landroid/AGENTS.md`,
+> `/Users/abstractmapping/projects/landroid/PROJECT_CONTEXT.md`,
+> `/Users/abstractmapping/projects/landroid/docs/README.md`, and
+> `/Users/abstractmapping/projects/landroid/CONTINUATION-PROMPT.md`. Continue
+> branch `feat/landroid-roundtrip-gate-feeder` in worktree
+> `/private/tmp/landroid-roundtrip-gate-feeder`. The branch extends
+> `scripts/title-soak.ts` so diagnostic readiness receives a real in-memory
+> `.landroid` export/import/replay result. Do not wire this into autosave or
+> production reads; finish validation, then open the PR and stop for Claude
+> review.
+
+## Previous Post-Stack Master Handoff - 2026-06-05
 
 Current docs handoff branch: `docs/post-stack-handoff`
 
