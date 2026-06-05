@@ -1,8 +1,9 @@
 # Phase 4 — Title-Tree Cutover (Option B, command-sourcing) — Notes
 
 Status: cutover MECHANISM built and proven in shadow; the WRITE path is wired
-live (recording-only); and the READ-path flip is wired into the one live record
-consumer (evidence-vault), default shadow + reversible.
+live (recording-only); the READ-path flip is wired into the one live record
+consumer (evidence-vault), default shadow + reversible; and T3 converts the
+former hard-disabled flip into governed/default-off machinery.
 
 **Supersession note (2026-06-04).** This file was written under the earlier
 additive/snapshot-first posture. LANDroid now uses the rebuild-first posture in
@@ -30,10 +31,10 @@ passes parity, `.landroid` round-trip, divergence, and revert checks. Treat any
 "complete source-of-truth" wording elsewhere in this historical note as
 conditional on that later read-flip decision.
 
-The Zustand store stays canonical for all reads and the engine stays the math
-authority. **No live read flip is enabled** — every read path defaults to the
-store; no call site sets `cutover`. Hand back for the durability/baseline/reset
-fixes + a real-data soak before enabling the read flip.
+The Zustand store stays canonical for all production reads and the engine stays
+the math authority. **No production read flip is enabled**: every live read path
+defaults to the store, no application call site enables cutover governance, and
+enabling the flip remains a separate reviewed decision.
 
 Branch: `feat/phase-4-title-cutover` (off `feat/phase-4-action-layer`). Commit
 range: see `git log feat/phase-4-action-layer..HEAD`. The first four commits are
@@ -126,19 +127,32 @@ warning-only states intact. A tampered-live test proves the comparison has teeth
 switch: `shadow` returns the store projection, `cutover` returns
 `replayTitleProjection(actionRecords)`. `DEFAULT_TITLE_READ_PATH_MODE = 'shadow'`,
 the store keeps shadow-running in both modes, and the flip/revert is one flag
-(`TitleReadPathFlag.cutOver()` / `.revertToShadow()`). `title-read-path.test.ts`
-proves default-shadow, that the two modes return identical content while parity
-holds, and that flip-then-revert is lossless. **No application call site
-constructs `cutover` or calls `cutOver` in this run.**
+(`TitleReadPathFlag.cutOver()` / `.revertToShadow()`).
+
+T3 adds explicit default-off governance: `TitleReadPathFlag.cutOver()` throws
+`TitleReadFlipDisabledError` unless the flag is constructed with
+`{ cutoverEnabled: true }`, and even then it requires a reviewer approval token.
+Tests may pass enabled governance to prove the path; production enablement must
+happen in a later reviewed PR. `title-read-path.test.ts` proves default-shadow,
+default-disabled cutover, explicit test-only cutover, and lossless
+flip-to-shadow reversion. **No application call site constructs `cutover`, passes
+enabled governance, or calls `cutOver` in production.**
 
 ## Continuous parity gate
 
 `TitleTreeCutoverGate` (composes the Phase 4 `CutoverRegistry`, leaving the other
 surfaces unchanged): `title_tree` cannot advance `shadow → candidate` until
-`MIN_PASSED_TITLE_PARITIES = 10` real mutations have passed inline parity **and**
-the math-parity gate is clean. `candidate → shadow` is always allowed
-(reversible). `candidate → cutover` stays hard-blocked by
-`LIVE_CUTOVER_DISABLED = true` (guardrail 2) — verified in the test.
+`MIN_PASSED_TITLE_PARITIES = 10` real mutations have passed inline parity, the
+MathInputView parity gate is clean, the `.landroid` export-import-replay
+round-trip gate is clean, and no runtime ledger divergence/error is active.
+`candidate → shadow` is always allowed (reversible).
+
+T3 changes `candidate → cutover` from a permanently hard-coded disabled path to a
+governed/default-off path. `LIVE_CUTOVER_DISABLED` remains `true` as the default
+runtime posture, and default `CutoverRegistry` instances still throw
+`CutoverDisabledError`. Test-only registries may pass
+`{ liveCutoverEnabled: true }` to prove cutover and revert behavior. Production
+enablement is not part of T3.
 
 ## Undo / rollback boundary for title commands
 
@@ -219,13 +233,29 @@ shadow→cutover→shadow round-trips. `buildProjectRecordsWithEvidenceVault` ha
 live caller yet, so this is the read flip *built and wired at the consumer*, still
 default-off — the reviewer enables it.
 
-## Confirmation: NO read flip / NO cutover happened
+## Confirmation: NO production read flip / NO production cutover happened
 
-- `LIVE_CUTOVER_DISABLED = true`; `title_tree` stays `shadow`.
-- `DEFAULT_TITLE_READ_PATH_MODE = 'shadow'`; no call site sets `cutover`; reads
-  still come from the store.
+- `LIVE_CUTOVER_DISABLED = true` remains the default runtime posture.
+- `DEFAULT_TITLE_READ_PATH_MODE = 'shadow'`; no application call site enables
+  read-flip governance, sets `cutover`, or reads title records from the action
+  projection in production.
+- T3 tests prove an explicitly enabled test registry/flag can cut over and then
+  return to shadow. That is evidence for the separate future decision, not a live
+  enablement.
 - The write-path journal is **recording-only** and reversible (kill switch /
   remove the startup import). The engine, adapter, and contracts are unmodified.
+
+## Flip-to-shadow revert recipe
+
+1. For T3 itself, revert the T3 PR or leave the default governance disabled. No
+   data migration is required because the Zustand store/snapshot path stays
+   canonical and the title ledger is still shadow evidence.
+2. If a future reviewed PR enables production governance, the immediate runtime
+   revert is `TitleReadPathFlag.revertToShadow()` plus
+   `TitleTreeCutoverGate.revertToShadow()`, with governance set back to disabled.
+3. Keep or restore the `.landroid` backup taken before any enablement test. If
+   later persistence work is also being reverted, follow the Dexie v12 rollback
+   recipe in `docs/phase-4-v9-durable-format-scope.md`.
 
 ## Existing files modified
 
@@ -259,15 +289,14 @@ touched; every fixture is synthetic.
 ## Open questions for the reviewer (batched, non-blocking)
 
 1. **Enabling the read flip (the remaining headline call).** The read flip is now
-   built and wired at the one consumer (`evidence-vault`), default shadow. To
-   ENABLE it live, a caller passes `titleReadPath: { mode: 'cutover', actionRecords }`
-   from `useTitleActionLog`. Two things to settle first: (a) the live ledger is
-   eventually-consistent (fire-and-forget), so a `cutover` read must `await
-   settleTitleActionLog()` to avoid reading a stale projection — wire that into the
-   caller; (b) a real-data parity soak (the 50–500MB import workflow) should run
-   green before flipping. Also confirm the live divergence behavior (surface +
-   keep out of ledger, never roll back) and whether live records should carry AI
-   vs UI origin (currently all `'user'` at the store choke point).
+   built, governed, default-off, and tested at the one consumer (`evidence-vault`).
+   To ENABLE it live, a separate reviewed PR must explicitly enable governance,
+   pass the reviewer token path, wire the caller to pass
+   `titleReadPath: { mode: 'cutover', actionRecords }`, and keep the five gates
+   green: MathInputView parity, `.landroid` export-import-replay, no live
+   divergence/error, audit-chain continuity, and the flip-to-shadow revert recipe.
+   Also confirm whether live records should carry AI vs UI origin (currently all
+   `'user'` at the store choke point).
 2. **Desk-map / leasehold scope at cutover.** Math parity holds the live desk
    maps + leasehold unit/assignments/orris fixed and only swaps the title node
    set, because those are not Phase 4 title surfaces. Confirm desk_map/unit stay
@@ -283,13 +312,13 @@ touched; every fixture is synthetic.
    step (Phase 4 open question #4 names v9 but does not define it)?
 5. **PII.** No `scripts/springhill/` or real `.landroid` data was touched; all
    fixtures synthetic. Confirm that remains the rule through cutover.
-6. **Ledger completeness — PARTIAL (not DONE).** Field-level edits (`updateNode`,
-   `rebalance`, `clearLinked*`, `syncLeaseNodesFromRecord`) are now captured as
-   `title.update` commands, so *in-session* mutations replay faithfully (replay ==
-   adapter after a field edit). But the 2026-06-02 audit correctly flags that full
-   completeness is not reached: a loaded/imported workspace's pre-existing nodes
-   are not captured (ACT-H01), the log is not reset on workspace switch (ACT-H04),
-   and it is in-memory only (ACT-H03). Those three (plus replay failing closed,
-   ACT-H02) must land before the ledger is a complete or durable read source.
-   Separately, if you later want field-level provenance (which field changed, by
-   whom) that is a richer `title.update` payload — not required for cutover parity.
+6. **Ledger durability — closed as a read-flip prerequisite, still shadow.**
+   T2a/T2b added Dexie v12 storage, reset wiring, autosave flush,
+   load/import hydrate, continue-chain, and file-vs-Dexie precedence. Field-level
+   edits (`updateNode`, `rebalance`, `clearLinked*`, `syncLeaseNodesFromRecord`)
+   are captured as `title.update` commands, so mutations replay faithfully when
+   the ledger is complete. This closes the runtime persistence prerequisite for
+   governance, but it does not make records canonical; production reads still
+   require the separate enablement decision. If later field-level provenance is
+   needed (which field changed, by whom), that is a richer `title.update` payload,
+   not required for parity.
