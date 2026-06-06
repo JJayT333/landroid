@@ -50,6 +50,12 @@ export default function ProjectPickerLanding({
   const { alert: showAlert, confirm: requestConfirmation } = useConfirmation();
   const activeWorkspaceId = useWorkspaceStore((state) => state.workspaceId);
   const activeProjectName = useWorkspaceStore((state) => state.projectName);
+  const activeWorkspaceHasContent = useWorkspaceStore((state) =>
+    state.nodes.length > 0
+    || state.leaseholdAssignments.length > 0
+    || state.leaseholdOrris.length > 0
+    || state.leaseholdTransferOrderEntries.length > 0
+  );
   const workspaceHydrated = useWorkspaceStore((state) => state._hydrated);
   const [projects, setProjects] = useState<SavedProjectSummary[]>([]);
   const [newProjectName, setNewProjectName] = useState('New LANDroid Project');
@@ -86,7 +92,12 @@ export default function ProjectPickerLanding({
 
   const handleCreate = async () => {
     await runAction('create', async () => {
-      await createAndOpenSavedProject(newProjectName);
+      const activeProjectSaved = projects.some(
+        (project) => project.workspaceId === activeWorkspaceId
+      );
+      await createAndOpenSavedProject(newProjectName, {
+        flushCurrent: activeProjectSaved || activeWorkspaceHasContent,
+      });
       await refresh();
       onClose();
     });

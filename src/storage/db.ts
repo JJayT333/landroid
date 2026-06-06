@@ -550,9 +550,40 @@ function inferProjectIndexDbKey(workspaceDbKey: string, workspaceId: string): st
     : workspaceDbKey;
 }
 
+function arrayLength(value: unknown): number {
+  return Array.isArray(value) ? value.length : 0;
+}
+
+function isBlankProjectName(value: string): boolean {
+  const trimmed = value.trim();
+  return trimmed.length === 0 || trimmed === 'Untitled Workspace';
+}
+
+function shouldSkipBlankDefaultProjectIndexRecord(args: {
+  workspaceDbKey: string;
+  projectName: string;
+  hasProjectContent: boolean;
+}): boolean {
+  return (
+    args.workspaceDbKey === 'default'
+    && !args.hasProjectContent
+    && isBlankProjectName(args.projectName)
+  );
+}
+
+function manifestHasProjectContent(manifest: WorkspaceManifestShard): boolean {
+  const recordCounts = manifest.backendRecord.recordCounts;
+  const deskMapCount = recordCounts?.desk_map;
+  return (
+    (manifest.nodeCount ?? 0) > 0
+    || (typeof deskMapCount === 'number' && deskMapCount > 0)
+  );
+}
+
 function parseWorkspaceRecordData(record: WorkspaceRecord): {
   workspaceId: string;
   projectName: string;
+  hasProjectContent: boolean;
 } | null {
   try {
     const parsed = JSON.parse(record.data) as unknown;
@@ -567,6 +598,12 @@ function parseWorkspaceRecordData(record: WorkspaceRecord): {
           typeof (parsed as { projectName?: unknown }).projectName === 'string'
             ? (parsed as { projectName: string }).projectName
             : record.projectName,
+        hasProjectContent:
+          arrayLength((parsed as { nodes?: unknown }).nodes) > 0
+          || arrayLength((parsed as { deskMaps?: unknown }).deskMaps) > 0
+          || arrayLength((parsed as { leaseholdAssignments?: unknown }).leaseholdAssignments) > 0
+          || arrayLength((parsed as { leaseholdOrris?: unknown }).leaseholdOrris) > 0
+          || arrayLength((parsed as { leaseholdTransferOrderEntries?: unknown }).leaseholdTransferOrderEntries) > 0,
       };
     }
   } catch {
@@ -593,6 +630,16 @@ async function runV12ToV13SavedProjectIndexMigration(tx: Transaction): Promise<v
 
   for (const manifest of manifests) {
     const workspaceDbKey = manifest.dbKey ?? 'default';
+    const projectName = manifest.backendRecord.projectName || 'Untitled Workspace';
+    if (
+      shouldSkipBlankDefaultProjectIndexRecord({
+        workspaceDbKey,
+        projectName,
+        hasProjectContent: manifestHasProjectContent(manifest),
+      })
+    ) {
+      continue;
+    }
     const indexDbKey = inferProjectIndexDbKey(workspaceDbKey, manifest.workspaceId);
     const timestamp = manifest.backendRecord.lastModified || manifest.backendRecord.generatedAt;
     mergeSavedProjectRecord(records, {
@@ -600,7 +647,7 @@ async function runV12ToV13SavedProjectIndexMigration(tx: Transaction): Promise<v
       indexDbKey,
       workspaceId: manifest.workspaceId,
       workspaceDbKey,
-      projectName: manifest.backendRecord.projectName || 'Untitled Workspace',
+      projectName,
       createdAt: timestamp,
       updatedAt: timestamp,
       lastOpenedAt: timestamp,
@@ -612,6 +659,15 @@ async function runV12ToV13SavedProjectIndexMigration(tx: Transaction): Promise<v
     const parsed = parseWorkspaceRecordData(row);
     if (!parsed) continue;
     const workspaceDbKey = row.id || 'default';
+    if (
+      shouldSkipBlankDefaultProjectIndexRecord({
+        workspaceDbKey,
+        projectName: parsed.projectName,
+        hasProjectContent: parsed.hasProjectContent,
+      })
+    ) {
+      continue;
+    }
     const indexDbKey = inferProjectIndexDbKey(workspaceDbKey, parsed.workspaceId);
     const timestamp = row.savedAt || new Date(0).toISOString();
     mergeSavedProjectRecord(records, {

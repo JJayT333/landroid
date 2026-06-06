@@ -140,6 +140,31 @@ async function waitForSavedProjectIndex(page: Page, projectName: string) {
     .toBe(true);
 }
 
+async function readSavedProjectIndexNames(page: Page): Promise<string[]> {
+  return page.evaluate(async () => {
+    const requestToPromise = <T,>(request: IDBRequest<T>) =>
+      new Promise<T>((resolve, reject) => {
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+
+    const db = await requestToPromise(indexedDB.open('landroid-v2'));
+    try {
+      if (!db.objectStoreNames.contains('savedProjects')) return [];
+      const tx = db.transaction('savedProjects', 'readonly');
+      const rows = await requestToPromise<unknown[]>(
+        tx.objectStore('savedProjects').getAll()
+      );
+      return rows
+        .map((row) => (row as { projectName?: unknown }).projectName)
+        .filter((name): name is string => typeof name === 'string')
+        .sort((left, right) => left.localeCompare(right));
+    } finally {
+      db.close();
+    }
+  });
+}
+
 async function selectDeskMapTab(page: Page, name: string | RegExp) {
   const tab = page.getByRole('tab', { name }).first();
   await tab.click();
@@ -392,6 +417,7 @@ test('project picker creates, switches, duplicates, and deletes saved projects',
     page.getByRole('button', { name: /Project name: Picker Alpha/ })
   ).toBeVisible();
   await waitForSavedProjectIndex(page, 'Picker Alpha');
+  await expect.poll(() => readSavedProjectIndexNames(page)).toEqual(['Picker Alpha']);
 
   await page.getByRole('button', { name: '+ Add Root Node' }).click();
   await page.getByLabel('Grantee').fill('Alpha Root Owner');
