@@ -133,6 +133,10 @@ Older stress and 8-tract leasehold demos have been retired.
 
 ## Persistence Notes
 
+- The project picker indexes saved browser-local projects and stores each
+  project under its own workspace storage key, so opening, creating, renaming,
+  duplicating, or deleting one project does not reuse another project's
+  autosave rows.
 - Browser autosave keeps the active workspace and flowchart canvas locally.
 - The top bar shows a storage health panel with last autosave, last
   `.landroid` backup/export, and browser Storage API persistence/usage status.

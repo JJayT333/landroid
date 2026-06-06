@@ -72,7 +72,11 @@ async function mirrorLoadedTitleLedger(
   });
 }
 
-export default function Navbar() {
+interface NavbarProps {
+  onOpenProjectPicker?: () => void;
+}
+
+export default function Navbar({ onOpenProjectPicker }: NavbarProps) {
   const hostedMode = isHostedMode();
   const showDemoDataMenu = shouldShowDemoDataMenu();
   const { alert: showAlert, confirm: requestConfirmation } = useConfirmation();
@@ -458,6 +462,19 @@ export default function Navbar() {
             onDisableAutoExport={handleDisableAutoExport}
           />
 
+          {onOpenProjectPicker && (
+            <button
+              type="button"
+              onClick={() => {
+                setFileMenuOpen(false);
+                setDemoMenuOpen(false);
+                onOpenProjectPicker();
+              }}
+              className="px-3 py-1.5 rounded-lg text-xs font-medium text-parchment/70 hover:text-parchment hover:bg-ink-light/30 transition-colors"
+            >
+              Projects
+            </button>
+          )}
           <div ref={fileMenuRef} className="relative">
             <button
               type="button"

@@ -90,6 +90,7 @@ import {
   stripStorageScopedId,
 } from './db-key-scope';
 import { LANDROID_FILE_VERSION } from './landroid-file-version';
+import { upsertSavedProjectFromWorkspace } from './saved-project-index';
 import {
   type ActionRecord,
   type AuditEventRecord,
@@ -854,6 +855,12 @@ export async function saveWorkspaceShardsToDb(
   if (shouldAnchorMonolith) {
     anchoredMonolithWorkspaceId = workspaceId;
   }
+  await upsertSavedProjectFromWorkspace({
+    workspaceId,
+    projectName: data.projectName,
+    workspaceDbKey: dbKey,
+    updatedAt: lastModified,
+  });
   return { status: 'written' };
 }
 

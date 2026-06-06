@@ -37,6 +37,11 @@ stay short.
   export action that records the latest backup time without changing the
   serializer, autosave authority, or storage model.
 
+- Added the browser-local project picker landing surface. Saved projects are
+  indexed in Dexie, each project gets its own workspace storage key, and the
+  picker can create, open, rename, duplicate, or typed-confirm-delete projects
+  without changing the `.landroid` export/import format or title read path.
+
 ## 2026-06-04
 
 - Added bounded whole-project AI context. Local/full context now includes

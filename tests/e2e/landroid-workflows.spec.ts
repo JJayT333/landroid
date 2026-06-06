@@ -26,6 +26,11 @@ function collectBrowserErrors(page: Page) {
 async function openApp(page: Page) {
   await page.goto('/');
   await expect(page.getByRole('button', { name: 'Desk Map' })).toBeVisible();
+  const pickerHeading = page.getByRole('heading', { name: 'LANDroid Projects' });
+  if (await pickerHeading.isVisible().catch(() => false)) {
+    await page.getByRole('button', { name: /Return to / }).click();
+    await expect(pickerHeading).toBeHidden();
+  }
 }
 
 /**
@@ -100,6 +105,37 @@ async function waitForPersistedProject(page: Page, projectName: RegExp) {
         message: 'wait for the writer tab to persist the sharded workspace',
         timeout: 45_000,
       }
+    )
+    .toBe(true);
+}
+
+async function waitForSavedProjectIndex(page: Page, projectName: string) {
+  await expect
+    .poll(
+      async () =>
+        page.evaluate(async (name) => {
+          const requestToPromise = <T,>(request: IDBRequest<T>) =>
+            new Promise<T>((resolve, reject) => {
+              request.onsuccess = () => resolve(request.result);
+              request.onerror = () => reject(request.error);
+            });
+
+          const db = await requestToPromise(indexedDB.open('landroid-v2'));
+          try {
+            if (!db.objectStoreNames.contains('savedProjects')) return false;
+            const tx = db.transaction('savedProjects', 'readonly');
+            const rows = await requestToPromise<unknown[]>(
+              tx.objectStore('savedProjects').getAll()
+            );
+            return rows.some((row) => {
+              const project = row as { projectName?: unknown };
+              return project.projectName === name;
+            });
+          } finally {
+            db.close();
+          }
+        }, projectName),
+      { timeout: 45_000 }
     )
     .toBe(true);
 }
@@ -339,6 +375,87 @@ test('project name is inline-editable from the Navbar', async ({ page }) => {
   ).toBeVisible();
 
   expect(browserErrors).toEqual([]);
+});
+
+test('project picker creates, switches, duplicates, and deletes saved projects', async ({
+  page,
+}) => {
+  const browserErrors = collectBrowserErrors(page);
+
+  await page.goto('/');
+  const pickerHeading = page.getByRole('heading', { name: 'LANDroid Projects' });
+  await expect(pickerHeading).toBeVisible();
+
+  await page.getByLabel('New Project Name').fill('Picker Alpha');
+  await page.getByRole('button', { name: 'Create Project' }).click();
+  await expect(
+    page.getByRole('button', { name: /Project name: Picker Alpha/ })
+  ).toBeVisible();
+  await waitForSavedProjectIndex(page, 'Picker Alpha');
+
+  await page.getByRole('button', { name: '+ Add Root Node' }).click();
+  await page.getByLabel('Grantee').fill('Alpha Root Owner');
+  await page.getByRole('button', { name: 'Save' }).click();
+  await expect(page.getByText('Alpha Root Owner')).toBeVisible();
+
+  await page.getByRole('button', { name: /Project name: Picker Alpha/ }).click();
+  const projectNameInput = page.getByRole('textbox', { name: 'Project name' });
+  await projectNameInput.fill('Picker Alpha Edited');
+  await projectNameInput.press('Enter');
+  await waitForSavedProjectIndex(page, 'Picker Alpha Edited');
+
+  await page.getByRole('button', { name: 'Projects' }).click();
+  await page.getByLabel('New Project Name').fill('Picker Beta');
+  await page.getByRole('button', { name: 'Create Project' }).click();
+  await expect(
+    page.getByRole('button', { name: /Project name: Picker Beta/ })
+  ).toBeVisible();
+  await waitForSavedProjectIndex(page, 'Picker Beta');
+
+  await page.getByRole('button', { name: 'Projects' }).click();
+  const alphaCard = page.locator('article').filter({ hasText: 'Picker Alpha Edited' });
+  await alphaCard.getByRole('button', { name: 'Open' }).click();
+  await expect(
+    page.getByRole('button', { name: /Project name: Picker Alpha Edited/ })
+  ).toBeVisible();
+  await expect(page.getByText('Alpha Root Owner')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Projects' }).click();
+  await page
+    .locator('article')
+    .filter({ hasText: 'Picker Alpha Edited' })
+    .getByRole('button', { name: 'Duplicate' })
+    .click();
+  const duplicateDialog = page.getByRole('heading', { name: 'Duplicate Project' }).locator('xpath=..');
+  await expect(page.getByRole('heading', { name: 'Duplicate Project' })).toBeVisible();
+  await duplicateDialog
+    .getByRole('textbox', { name: 'Project Name', exact: true })
+    .fill('Picker Alpha Copy');
+  await duplicateDialog.getByRole('button', { name: 'Duplicate' }).click();
+  await waitForSavedProjectIndex(page, 'Picker Alpha Copy');
+  await expect(page.locator('article').filter({ hasText: 'Picker Alpha Copy' })).toBeVisible();
+
+  const betaCard = page.locator('article').filter({ hasText: 'Picker Beta' });
+  await betaCard.getByRole('button', { name: 'Open' }).click();
+  await expect(
+    page.getByRole('button', { name: /Project name: Picker Beta/ })
+  ).toBeVisible();
+  await expect(page.getByText('No title chain yet')).toBeVisible();
+  await expect(page.getByText('Alpha Root Owner')).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'Projects' }).click();
+  const copyCard = page.locator('article').filter({ hasText: 'Picker Alpha Copy' });
+  await copyCard.getByRole('button', { name: 'Delete' }).click();
+  await expect(
+    page.getByRole('dialog', { name: 'Delete Picker Alpha Copy?' })
+  ).toBeVisible();
+  await page
+    .getByLabel('Type Picker Alpha Copy to confirm')
+    .fill('Picker Alpha Copy');
+  await page.getByRole('button', { name: 'Delete Project' }).click();
+  await expect(copyCard).toHaveCount(0);
+
+  expect(browserErrors, browserErrors.join('\n')).toEqual([]);
 });
 
 test('leasehold seed keeps PDF filenames visible and owner leases branch-aware', async ({

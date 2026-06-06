@@ -13,6 +13,7 @@ import { useResearchStore } from './store/research-store';
 import { useCurativeStore } from './store/curative-store';
 import { useWorkspaceStore } from './store/workspace-store';
 import { useCanvasStore } from './store/canvas-store';
+import { openMostRecentSavedProject } from './app/project-workspace-lifecycle';
 import { useStorageHealthStore } from './store/storage-health-store';
 import {
   flushTitleActionLogToStorage,
@@ -87,62 +88,77 @@ async function bootstrapApp() {
     console.warn('[landroid] post-v8 backup hook failed:', err);
   });
 
-  const [workspaceResult, canvasResult] = await Promise.all([
-    loadWorkspaceFromDb(),
-    loadCanvasFromDb(),
-  ]);
   const startupWarnings: string[] = [];
+  const savedProjectOpenResult = await openMostRecentSavedProject().catch((err) => {
+    const message = err instanceof Error ? err.message : String(err);
+    startupWarnings.push(`Saved project restore failed: ${message}`);
+    return null;
+  });
 
-  if (workspaceResult.status === 'loaded' && workspaceResult.data) {
-    useWorkspaceStore.getState().loadWorkspace(workspaceResult.data);
-    await Promise.all([
-      useOwnerStore.getState().setWorkspace(workspaceResult.data.workspaceId),
-      useMapStore.getState().setWorkspace(workspaceResult.data.workspaceId),
-      useResearchStore.getState().setWorkspace(workspaceResult.data.workspaceId),
-      useCurativeStore.getState().setWorkspace(workspaceResult.data.workspaceId),
-    ]);
-    // Phase 5: pull `node.attachments[]` from Dexie's `documents` +
-    // `document_attachments` tables after the workspace state lands.
-    // Safe to fail; the rest of the workspace still renders.
-    await useWorkspaceStore.getState().hydrateNodeAttachments().catch(() => {});
-    await hydrateTitleActionLogFromStorageOrBaseline(
-      workspaceResult.data,
-      readTitleOwnerData()
-    ).catch((err) => {
-      const message = err instanceof Error ? err.message : String(err);
-      startupWarnings.push(`Title ledger hydration failed: ${message}`);
-    });
+  if (savedProjectOpenResult) {
+    if (savedProjectOpenResult.warning) {
+      startupWarnings.push(savedProjectOpenResult.warning);
+    }
+    useWorkspaceStore.getState().setStartupWarning(
+      startupWarnings.length > 0 ? startupWarnings.join(' ') : null
+    );
   } else {
-    useWorkspaceStore.getState().setHydrated();
-    const workspaceId = useWorkspaceStore.getState().workspaceId;
-    await Promise.all([
-      useOwnerStore.getState().setWorkspace(workspaceId),
-      useMapStore.getState().setWorkspace(workspaceId),
-      useResearchStore.getState().setWorkspace(workspaceId),
-      useCurativeStore.getState().setWorkspace(workspaceId),
+    const [workspaceResult, canvasResult] = await Promise.all([
+      loadWorkspaceFromDb(),
+      loadCanvasFromDb(),
     ]);
-  }
 
-  if (workspaceResult.status === 'corrupt' && workspaceResult.error) {
-    startupWarnings.push(workspaceResult.error);
-  }
-  if (workspaceResult.warning) {
-    startupWarnings.push(workspaceResult.warning);
-  }
+    if (workspaceResult.status === 'loaded' && workspaceResult.data) {
+      useWorkspaceStore.getState().loadWorkspace(workspaceResult.data);
+      await Promise.all([
+        useOwnerStore.getState().setWorkspace(workspaceResult.data.workspaceId),
+        useMapStore.getState().setWorkspace(workspaceResult.data.workspaceId),
+        useResearchStore.getState().setWorkspace(workspaceResult.data.workspaceId),
+        useCurativeStore.getState().setWorkspace(workspaceResult.data.workspaceId),
+      ]);
+      // Phase 5: pull `node.attachments[]` from Dexie's `documents` +
+      // `document_attachments` tables after the workspace state lands.
+      // Safe to fail; the rest of the workspace still renders.
+      await useWorkspaceStore.getState().hydrateNodeAttachments().catch(() => {});
+      await hydrateTitleActionLogFromStorageOrBaseline(
+        workspaceResult.data,
+        readTitleOwnerData()
+      ).catch((err) => {
+        const message = err instanceof Error ? err.message : String(err);
+        startupWarnings.push(`Title ledger hydration failed: ${message}`);
+      });
+    } else {
+      useWorkspaceStore.getState().setHydrated();
+      const workspaceId = useWorkspaceStore.getState().workspaceId;
+      await Promise.all([
+        useOwnerStore.getState().setWorkspace(workspaceId),
+        useMapStore.getState().setWorkspace(workspaceId),
+        useResearchStore.getState().setWorkspace(workspaceId),
+        useCurativeStore.getState().setWorkspace(workspaceId),
+      ]);
+    }
 
-  if (canvasResult.status === 'loaded' && canvasResult.data) {
-    useCanvasStore.getState().loadCanvas(canvasResult.data);
-  } else {
-    useCanvasStore.getState().setHydrated();
-  }
+    if (workspaceResult.status === 'corrupt' && workspaceResult.error) {
+      startupWarnings.push(workspaceResult.error);
+    }
+    if (workspaceResult.warning) {
+      startupWarnings.push(workspaceResult.warning);
+    }
 
-  if (canvasResult.status === 'corrupt' && canvasResult.error) {
-    startupWarnings.push(canvasResult.error);
-  }
+    if (canvasResult.status === 'loaded' && canvasResult.data) {
+      useCanvasStore.getState().loadCanvas(canvasResult.data);
+    } else {
+      useCanvasStore.getState().setHydrated();
+    }
 
-  useWorkspaceStore.getState().setStartupWarning(
-    startupWarnings.length > 0 ? startupWarnings.join(' ') : null
-  );
+    if (canvasResult.status === 'corrupt' && canvasResult.error) {
+      startupWarnings.push(canvasResult.error);
+    }
+
+    useWorkspaceStore.getState().setStartupWarning(
+      startupWarnings.length > 0 ? startupWarnings.join(' ') : null
+    );
+  }
 
   await initializeRollingAutoExport().catch((err) => {
     console.warn('[landroid] rolling auto-export initialization failed:', err);
