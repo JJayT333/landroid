@@ -122,12 +122,13 @@ as input warnings in the leasehold focus that they affect.
 
 ## Demo Data
 
-Use `Demo Data -> Vulcan Mesa` or the Raven Forest sample to load the
-current sample workspaces. The hosted POC site keeps Demo Data visible for
-signed-in fixture review. Demo loading replaces the active browser workspace,
-so it requires the typed phrase `LOAD DEMO` before it runs. Demo loading resets
-owner, document, curative, map, research, and transient AI approval/undo state
-before seeding the selected fixture.
+Use `Demo Data -> Vulcan Mesa`, `Demo Data -> Combinatorial - Raven Forest`, or
+`Demo Data -> Dr. Elmore #1 Unit - Sample` to load the current sample
+workspaces. The hosted POC site keeps Demo Data visible for signed-in fixture
+review. Demo loading replaces the active browser workspace, so it requires the
+typed phrase `LOAD DEMO` before it runs. Demo loading resets owner, document,
+curative, map, research, and transient AI approval/undo state before seeding or
+importing the selected fixture.
 Older stress and 8-tract leasehold demos have been retired.
 
 ## Persistence Notes
