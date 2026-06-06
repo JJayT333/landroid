@@ -3,6 +3,14 @@
 This file records meaningful project changes so `CONTINUATION-PROMPT.md` can
 stay short.
 
+## 2026-06-05
+
+- Added a top-bar storage health panel that shows the latest successful
+  browser autosave, latest `.landroid` backup/export, and browser Storage API
+  persistence/usage status. Added `Backup Now` as a visible full `.landroid`
+  export action that records the latest backup time without changing the
+  serializer, autosave authority, or storage model.
+
 ## 2026-06-04
 
 - Added bounded whole-project AI context. Local/full context now includes

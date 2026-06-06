@@ -38,11 +38,15 @@ The top bar has view buttons for the active work surfaces:
 - `Research`
 
 The top bar also has:
+- a storage health panel showing the latest browser autosave time, latest
+  `.landroid` backup/export time, and browser storage persistence/usage status
+- `Backup Now`, which immediately exports the current workspace as a
+  `.landroid` backup file
 - `File ▾` with `Save workspace` (exports a `.landroid` snapshot) and `Load workspace` (imports a `.landroid` or `.csv` file)
 - `Demo Data ▾` with the Vulcan Mesa and Raven Forest sample fixtures for exercising Desk Map, Leasehold, and Federal Leasing surfaces without real project data. The hosted POC site keeps this menu visible for signed-in fixture review.
 - Loading demo data requires typing `LOAD DEMO`; loading a `.landroid` or `.csv` file requires typing `LOAD WORKSPACE`, because each action replaces the active browser workspace.
 
-The current project name appears in the top bar and is editable inline — click the name, type a new one, and press `Enter` to commit or `Esc` to cancel. Local autosave still uses browser storage, but `Save` now captures workspace data, flowchart canvas state, owner records, owner documents, curative title issues, map assets, and Research sources, formulas, project records, saved questions, and imports in the exported `.landroid` file.
+The current project name appears in the top bar and is editable inline — click the name, type a new one, and press `Enter` to commit or `Esc` to cancel. Local autosave still uses browser storage, but `Save workspace` and `Backup Now` both capture workspace data, flowchart canvas state, owner records, owner documents, curative title issues, map assets, and Research sources, formulas, project records, saved questions, and imports in the exported `.landroid` file.
 The top-left brand area can also carry a custom logo for demo or prospect-specific presentation.
 If LANDroid detects corrupt autosaved workspace or canvas data during startup, it now opens a safe fresh state and shows a warning banner instead of silently pretending there was no saved data.
 If a render or lazy-load failure occurs, LANDroid now shows a reload screen with the error details instead of dropping to a blank page.

@@ -9,6 +9,7 @@ import { useResearchStore } from '../../store/research-store';
 import { useCurativeStore } from '../../store/curative-store';
 import { useWorkspaceStore } from '../../store/workspace-store';
 import { useCanvasStore } from '../../store/canvas-store';
+import { useStorageHealthStore } from '../../store/storage-health-store';
 import {
   hydrateTitleActionLogFromImportedLedger,
   useTitleActionLog,
@@ -32,6 +33,7 @@ import { isHostedMode } from '../../utils/deploy-env';
 import HostedUserMenu from '../../auth/HostedUserMenu';
 import { useConfirmation } from './ConfirmationProvider';
 import { shouldShowDemoDataMenu } from './navbar-policy';
+import { StorageHealthIndicator } from './StorageHealthIndicator';
 
 const landroidLogoUrl = new URL('../../assets/branding/landroid-logo.png', import.meta.url).href;
 const ravenForestBackdropUrl = new URL('../../assets/branding/raven-forest-backdrop.png', import.meta.url).href;
@@ -78,12 +80,6 @@ export default function Navbar() {
   const setView = useUIStore((s) => s.setView);
   const projectName = useWorkspaceStore((s) => s.projectName);
   const setProjectName = useWorkspaceStore((s) => s.setProjectName);
-  const leaseholdUnit = useWorkspaceStore((s) => s.leaseholdUnit);
-  const leaseholdAssignments = useWorkspaceStore((s) => s.leaseholdAssignments);
-  const leaseholdOrris = useWorkspaceStore((s) => s.leaseholdOrris);
-  const leaseholdTransferOrderEntries = useWorkspaceStore(
-    (s) => s.leaseholdTransferOrderEntries
-  );
   const loadWorkspace = useWorkspaceStore((s) => s.loadWorkspace);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -253,51 +249,67 @@ export default function Navbar() {
     setSeedLoading(false);
   };
 
-  const handleSave = async () => {
-    setFileMenuOpen(false);
+  const buildCurrentLandroidData = async (): Promise<LandroidFileData> => {
     const state = useWorkspaceStore.getState();
     const canvasState = useCanvasStore.getState();
+
+    return {
+      workspaceId: state.workspaceId,
+      projectName: state.projectName,
+      nodes: state.nodes,
+      deskMaps: state.deskMaps,
+      leaseholdUnit: state.leaseholdUnit,
+      leaseholdAssignments: state.leaseholdAssignments,
+      leaseholdOrris: state.leaseholdOrris,
+      leaseholdTransferOrderEntries: state.leaseholdTransferOrderEntries,
+      activeDeskMapId: state.activeDeskMapId,
+      activeUnitCode: state.activeUnitCode,
+      instrumentTypes: state.instrumentTypes,
+      ownerData: await useOwnerStore.getState().exportWorkspaceData(),
+      documentData: await exportDocumentWorkspaceData(
+        state.workspaceId,
+        state.nodes
+      ),
+      mapData: await useMapStore.getState().exportWorkspaceData(),
+      researchData: await useResearchStore.getState().exportWorkspaceData(),
+      curativeData: await useCurativeStore.getState().exportWorkspaceData(),
+      canvas: {
+        nodes: canvasState.nodes,
+        edges: canvasState.edges,
+        viewport: canvasState.viewport,
+        gridCols: canvasState.gridCols,
+        gridRows: canvasState.gridRows,
+        orientation: canvasState.orientation,
+        pageSize: canvasState.pageSize,
+        horizontalSpacingFactor: canvasState.horizontalSpacingFactor,
+        verticalSpacingFactor: canvasState.verticalSpacingFactor,
+        snapToGrid: canvasState.snapToGrid,
+        gridSize: canvasState.gridSize,
+      },
+    };
+  };
+
+  const exportCurrentWorkspace = async () => {
     const titleActionLog = useTitleActionLog.getState();
     await downloadLandroidFile(
-      {
-        workspaceId: state.workspaceId,
-        projectName: state.projectName,
-        nodes: state.nodes,
-        deskMaps: state.deskMaps,
-        leaseholdUnit,
-        leaseholdAssignments,
-        leaseholdOrris,
-        leaseholdTransferOrderEntries,
-        activeDeskMapId: state.activeDeskMapId,
-        activeUnitCode: state.activeUnitCode,
-        instrumentTypes: state.instrumentTypes,
-        ownerData: await useOwnerStore.getState().exportWorkspaceData(),
-        documentData: await exportDocumentWorkspaceData(
-          state.workspaceId,
-          state.nodes
-        ),
-        mapData: await useMapStore.getState().exportWorkspaceData(),
-        researchData: await useResearchStore.getState().exportWorkspaceData(),
-        curativeData: await useCurativeStore.getState().exportWorkspaceData(),
-        canvas: {
-          nodes: canvasState.nodes,
-          edges: canvasState.edges,
-          viewport: canvasState.viewport,
-          gridCols: canvasState.gridCols,
-          gridRows: canvasState.gridRows,
-          orientation: canvasState.orientation,
-          pageSize: canvasState.pageSize,
-          horizontalSpacingFactor: canvasState.horizontalSpacingFactor,
-          verticalSpacingFactor: canvasState.verticalSpacingFactor,
-          snapToGrid: canvasState.snapToGrid,
-          gridSize: canvasState.gridSize,
-        },
-      },
+      await buildCurrentLandroidData(),
       {
         actionRecords: titleActionLog.actionRecords,
         auditEvents: titleActionLog.auditEvents,
       }
     );
+    useStorageHealthStore.getState().recordWorkspaceExported();
+  };
+
+  const handleSave = async () => {
+    setFileMenuOpen(false);
+    await exportCurrentWorkspace();
+  };
+
+  const handleBackupNow = async () => {
+    setFileMenuOpen(false);
+    setDemoMenuOpen(false);
+    await exportCurrentWorkspace();
   };
 
   const handleLoad = () => {
@@ -460,6 +472,8 @@ export default function Navbar() {
         </div>
 
         <div className="flex gap-1 border-l border-parchment/20 pl-3">
+          <StorageHealthIndicator onBackupNow={handleBackupNow} />
+
           <div ref={fileMenuRef} className="relative">
             <button
               type="button"
