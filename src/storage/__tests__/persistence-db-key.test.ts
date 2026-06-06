@@ -173,6 +173,7 @@ async function loadPersistenceWithKeys({
   const db = {
     workspaces,
     canvases,
+    savedProjects: makeShardTable(),
     workspaceWriteLeases,
     workspaceManifestShards: makeShardTable(
       shards?.manifest ? [shards.manifest] : []
@@ -195,6 +196,7 @@ async function loadPersistenceWithKeys({
   };
 
   vi.doMock('../active-workspace-key', () => ({
+    getProjectIndexDbKey: () => workspaceKey,
     getWorkspaceDbKey: () => workspaceKey,
     getCanvasDbKey: () => canvasKey,
   }));
