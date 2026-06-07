@@ -4,6 +4,128 @@ Use this file to resume the active workstream in a new chat. Read it with
 `AGENTS.md`, `PROJECT_CONTEXT.md`, and `docs/README.md` before touching code.
 Keep long history in `CHANGELOG.md`.
 
+## Current Springhill/LCT Correctness Handoff - 2026-06-07
+
+Active branch: `fix/springhill-lct-lease`
+
+Worktree for this branch:
+`/Users/abstractmapping/projects/landroid/.worktrees/springhill-lct-local`
+
+Base state: remote post-#130 `main`. PR #129 was squash-merged to `main` as
+`feat(storage): add storage health indicator and Backup Now`. PR #130 was
+force-with-lease updated to the locally rebased `83af1aa`, passed GitHub CI,
+and was squash-merged to `main` as
+`02e9e9b feat(storage): add rolling auto-export`. This branch was then rebased
+cleanly onto `github/main`; the current local commit should be checked with
+`git log --oneline -1` because the branch was amended after PR #132 opened.
+
+PR state: PR #132 is the Springhill/LCT branch. Keep it held/draft until the
+new source-proven update is pushed and GitHub CI passes; then mark it ready for
+review/merge.
+
+### Phase Goal
+
+Make Springhill/LCT correctness the launch gate before any Springhill live work.
+Feature work T8-T19, demo polish, branch pruning, federal/private math, and the
+future drill-site tract designation remain deferred.
+
+### Current Implementation State
+
+- `public/samples/springhill-dr-elmore.landroid` now includes the LCT Revocable
+  Trust / Charlyn K. Tyra owner lease row for `OGML-LCT-Trust`, with 1/4
+  royalty, active Texas jurisdiction, a Tract 1 related lease node under the
+  existing LCT owner node, and a scrubbed document registry entry.
+- `scripts/springhill/build_landroid.py` is now tracked on this branch and has
+  configurable private input/output/report paths, raw-output guards that refuse
+  repository writes, a named LCT OGML source override, and a source-to-output
+  reconciliation report section. Normal rows still follow the NRI status sheet;
+  `OGML-LCT-Trust` is allowed from verified OGML packet evidence because the
+  NRI/leasehold spreadsheet is working evidence, not permanent source
+  authority.
+- `src/phase0/__tests__/springhill-sample.test.ts` guards the LCT owner, lease
+  row, lease node, Tract 1 leased/unleased coverage, Tract 1 royalty/NRI
+  constants, and `.landroid` import/export preservation.
+- `docs/springhill-sample-workflow.md`, `TESTING.md`, `CHANGELOG.md`,
+  `README.md`, and `USER_MANUAL.md` document the stricter Springhill sample
+  workflow: private raw generation -> scrub -> public `.landroid` sample ->
+  validation.
+
+### Evidence / Source Boundary
+
+- Repo-local OCR of `TORS_Documents/OGML-LCT-Trust.pdf` showed LCT Revocable
+  Trust / Charlyn K. Tyra, Trustee as lessor, Magnolia Petroleum Company, LLC as
+  lessee, November 19, 2025 lease date, one-year primary term, and one-fourth
+  royalty.
+- The user provided readable original NRI and DOTO runsheet workbook copies from
+  the Springhill Dropbox folder. The raw generator ran from those originals plus
+  repo-local `TORS_Documents`, wrote private raw output under `/private/tmp`,
+  and reported `source-to-output executed rows missing generated lease: 0`.
+- The scrubber regenerated `public/samples/springhill-dr-elmore.landroid` from
+  the private raw output. It faked 100 owner addresses, replaced 122 embedded
+  PDF blobs, and left no non-PDF blobs.
+- The raw generator initially surfaced a bad LCT workbook remark (`3 years`);
+  OCR of `OGML-LCT-Trust.pdf` confirmed the lease has a one-year primary term.
+  `scripts/springhill/build_landroid.py` now overrides the LCT notes from the
+  OGML packet, and `src/phase0/__tests__/springhill-sample.test.ts` asserts the
+  one-year primary term and rejects the bad three-year note.
+
+### Latest Validation
+
+Passed in this worktree after rebasing onto post-#130 `github/main`:
+
+- `/Users/abstractmapping/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 scripts/springhill/build_landroid.py --help`
+  passed.
+- `/Users/abstractmapping/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 -m py_compile scripts/springhill/build_landroid.py`
+  passed.
+- Unsafe generator output paths inside the repo are refused for both raw
+  `.landroid` output and reconciliation reports.
+- Raw generator run from the user-provided original workbook copies passed:
+  358 nodes, 100 owners, 7 desk maps, 122 documents, 630 attachments, 60 leases,
+  all tract mineral sums OK, 0 missing executed lease rows, LCT assertion PASS.
+- `NODE_OPTIONS=--max-old-space-size=8192 npx tsx scripts/springhill-scrub.ts`
+  regenerated the public sample from private raw output; output size was 36.2
+  MB.
+- `npm test -- src/phase0/__tests__/springhill-sample.test.ts src/components/deskmap/__tests__/deskmap-coverage.test.ts src/components/leasehold/__tests__/leasehold-summary.test.ts src/storage/__tests__/workspace-persistence.test.ts`
+  passed, 4 files / 67 tests.
+- `npm run lint` passed.
+- `npm test` passed, 134 files / 919 tests. Existing intentional stderr
+  appeared for simulated Dexie/title divergence failure paths.
+- `npm run build` passed with existing Vite dynamic/static import warnings,
+  chunk-size warnings, and Node `module.register()` deprecation warning.
+- `git diff --check` passed.
+
+Earlier validation on the same logical branch also passed `npm ci --offline`,
+the Springhill sample target, adjacent Desk Map / Leasehold / storage
+persistence targets, the #130 multi-tab read-only e2e smoke, and Python syntax
+parse for `scripts/springhill/build_landroid.py`.
+
+Source-to-public-sample regeneration is now completed for this branch.
+
+### Likely Next Steps
+
+1. Push the source-proven update to PR #132.
+2. Wait for GitHub CI.
+3. If CI stays green, mark PR #132 ready for review/merge.
+4. Keep #131 held until its project-index import bug is addressed separately.
+5. Do not start T8-T19, demo polish, branch pruning, federal/private math, or
+   drill-site tract designation in this branch.
+
+Paste-ready next chat prompt:
+
+> Read `/Users/abstractmapping/projects/landroid/AGENTS.md`,
+> `/Users/abstractmapping/projects/landroid/PROJECT_CONTEXT.md`,
+> `/Users/abstractmapping/projects/landroid/docs/README.md`, and
+> `/Users/abstractmapping/projects/landroid/.worktrees/springhill-lct-local/CONTINUATION-PROMPT.md`.
+> Continue branch `fix/springhill-lct-lease` in
+> `/Users/abstractmapping/projects/landroid/.worktrees/springhill-lct-local`.
+> First audit the live Springhill PR and remote `main` state. #129 and #130 are
+> both merged; this branch is rebased onto post-#130 `main`. The user-provided
+> original Springhill workbooks were readable and the source generator -> scrub
+> -> public sample workflow completed. Preserve the LCT `OGML-LCT-Trust` gate
+> and the one-year primary term assertion, keep the NRI/leasehold spreadsheet as
+> evidence rather than permanent authority, keep #131 held, and do not start
+> drill-site tract designation unless explicitly redirected.
+
 ## Current Rolling Auto-Export Handoff - 2026-06-05
 
 Active branch: `feat/rolling-auto-export`

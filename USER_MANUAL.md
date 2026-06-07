@@ -48,7 +48,7 @@ The top bar also has:
   permission is revoked, the panel warns and `Backup Now` remains the manual
   fallback.
 - `File ▾` with `Save workspace` (exports a `.landroid` snapshot) and `Load workspace` (imports a `.landroid` or `.csv` file)
-- `Demo Data ▾` with the Vulcan Mesa and Raven Forest sample fixtures for exercising Desk Map, Leasehold, and Federal Leasing surfaces without real project data. The hosted POC site keeps this menu visible for signed-in fixture review.
+- `Demo Data ▾` with Vulcan Mesa, Raven Forest, and the Dr. Elmore #1 Unit Springhill sample for exercising Desk Map, Leasehold, and Federal Leasing surfaces without real project data. The hosted POC site keeps this menu visible for signed-in fixture review.
 - Loading demo data requires typing `LOAD DEMO`; loading a `.landroid` or `.csv` file requires typing `LOAD WORKSPACE`, because each action replaces the active browser workspace.
 
 The current project name appears in the top bar and is editable inline — click the name, type a new one, and press `Enter` to commit or `Esc` to cancel. Local autosave still uses browser storage, but `Save workspace`, `Backup Now`, and rolling auto-export all capture workspace data, flowchart canvas state, owner records, owner documents, curative title issues, map assets, and Research sources, formulas, project records, saved questions, and imports through the same `.landroid` serializer.
@@ -205,6 +205,7 @@ It now has three internal modes:
 
 ### Demo workspace
 - `Demo Data ▾` loads the sample fixtures after the typed confirmation phrase.
+- Dr. Elmore #1 Unit is a bundled, scrubbed `.landroid` sample. It loads through the same import path as a saved workspace package.
 - 10 tracts in two pooled units — Raven Forest Unit A (C1–C5, Walker County) and Unit B (C6–C10, Walker/Montgomery line), reflecting the Sam Houston National Forest prospect
 - Unit A tracts are leased to Texas Energy Acquisitions LP at 1/8 royalty; Unit B tracts to Lone Star Minerals LLC at 3/16 royalty
 - Leasehold and Owners open with a unit selector so you can switch between Raven Forest Unit A and Unit B instead of reviewing the whole combinatorial sample as one combined unit

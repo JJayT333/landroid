@@ -3,6 +3,26 @@
 This file records meaningful project changes so `CONTINUATION-PROMPT.md` can
 stay short.
 
+## 2026-06-06
+
+- Fixed the Dr. Elmore Springhill public sample so the LCT Revocable Trust /
+  Charlyn K. Tyra Tract 1 owner carries the verified `OGML-LCT-Trust` lease,
+  1/4 royalty, a related Desk Map lease node, and leasehold math showing Tract
+  1 as fully leased. Added a deterministic sample regression test for the LCT
+  owner, lease row, lease node, coverage, NRI constants, and `.landroid`
+  import/export preservation.
+- Hardened the Springhill sample source workflow: the raw private generator now
+  takes configurable source/output paths, refuses to write raw private output or
+  reports inside the repository, and has a documented generator -> scrubber ->
+  public sample merge gate. README and the user manual now describe Dr. Elmore
+  #1 Unit as a bundled scrubbed `.landroid` sample.
+- Regenerated the Springhill public sample from the original NRI and DOTO
+  runsheet workbooks, then scrubbed the private raw output back into
+  `public/samples/springhill-dr-elmore.landroid`. The reconciliation report
+  shows zero missing executed lease rows, and the LCT override now preserves the
+  OGML-confirmed one-year primary term instead of the bad three-year workbook
+  remark.
+
 ## 2026-06-05
 
 - Added opt-in rolling local auto-export for browsers that support choosing a
