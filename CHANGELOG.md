@@ -5,6 +5,11 @@ stay short.
 
 ## 2026-06-07
 
+- Fixed the hosted Amplify rewrite template so `.landroid`, `.pdf`, and
+  `.pptx` static assets bypass the SPA fallback instead of being rewritten to
+  `index.html`. Added predeploy and hosted-smoke coverage for the Springhill
+  `.landroid` sample URL so the Dr. Elmore demo loader can be verified online.
+
 - Stabilized the project picker branch after Springhill/LCT merged. `.landroid`
   and CSV imports now create or reconcile a saved-project identity, switch the
   active project storage key before side-store and snapshot writes, and avoid

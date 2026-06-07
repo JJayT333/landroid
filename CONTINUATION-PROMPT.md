@@ -6,86 +6,85 @@ Keep long history in `CHANGELOG.md`.
 
 ## Active Ticket Handoff - 2026-06-07
 
-Current workstream: project picker import/index correctness.
+Current workstream: hosted Springhill sample visibility.
 
-Branch: `feat/project-picker-landing`
+Branch: `fix/hosted-landroid-static`
 
-Worktree: `/private/tmp/landroid-project-picker-landing`
+Worktree: `/private/tmp/landroid-hosted-landroid-static`
 
-Remote PR: #131, `feat(workspace): add project picker landing`.
-
-Base state: PR #132, `fix(springhill): restore LCT lease in sample`, was
-squash-merged to `main` at
-`ef442fabf18d86ee6d789237ca5c827e75b343af`. This branch was rebased onto that
-post-#132 `main` and then corrected for the project-index import bug found in
-the June 6 audit.
+Base state: `origin/main` at `bf268e2 feat(workspace): add project picker
+landing`. PRs #129, #130, #132, and #131 are merged. The hosted frontend at
+`https://landroid.abstractmapping.com` has deployed the Dr. Elmore menu item,
+but `/samples/springhill-dr-elmore.landroid` still serves `index.html` because
+the Amplify SPA fallback rewrite did not exclude `.landroid` static assets.
 
 ### Scope
 
-- Keep the browser-local project picker landing surface: create, open, rename,
-  duplicate, and typed-confirm-delete project flows.
-- Keep Dexie v13 `savedProjects` index rows and per-project workspace storage
-  keys so project switching does not reuse another project's workspace, canvas,
-  side-store, or title-ledger rows.
-- Fix workspace-replacing imports. `.landroid`, Springhill sample, and CSV
-  imports now enter through `src/app/project-workspace-lifecycle.ts`, which
-  flushes the previous project, creates or reconciles the imported project
-  identity, switches the active project storage key, writes imported side
-  stores/snapshot/canvas under that key, then hydrates the visible workspace.
-- Preserve the blank-startup guard. The implicit default `Untitled Workspace`
-  shell, including a Desk Map shell with no nodes or leasehold rows, must not
-  create a saved-project index row. Explicitly created blank projects under a
-  per-project key still remain indexed.
+- Fix only hosted static asset serving for existing bundled assets.
+- Keep `/api/ai/<*>` and `/api/spine/<*>` rewrite ordering unchanged.
+- Exclude `.landroid`, `.pdf`, and `.pptx` from the SPA fallback so the
+  Springhill sample package and existing bundled deck/PDF assets serve as files.
+- Add repo-side predeploy and post-deploy smoke coverage so the issue is caught
+  before or immediately after hosted deployment.
 
 ### Latest Validation
 
-Passed locally in this worktree:
+Passed in this worktree:
 
-- `npm test -- src/app/project-workspace-lifecycle.test.ts src/storage/__tests__/active-workspace-key.test.ts src/storage/__tests__/persistence-db-key.test.ts src/storage/__tests__/workspace-shard-writer.test.ts`
-  passed, 4 files / 26 tests.
-- `npm run lint`
-  passed.
-- `npm test`
-  passed, 135 files / 927 tests. Existing intentional stderr appeared for
-  simulated title divergence, Dexie cleanup failure, and post-v8 backup failure
-  paths.
-- `npm run build`
-  passed with existing Node `module.register()` deprecation, Vite
-  dynamic/static import, and large-chunk warnings.
-- `npm run test:e2e -- --grep "project picker creates"`
-  passed, 1 Chromium test.
-- `git diff --check`
-  passed.
+- `npm ci --offline` passed with the known Node 26 engine warning.
+- `bash -n scripts/predeploy-check.sh scripts/smoke-test-hosted.sh` passed.
+- Local backend bundle generation for ignored predeploy artifacts passed:
+  `backend/ai-proxy/lambda.zip` and `backend/spine/lambda.zip` were generated
+  locally and remain untracked.
+- `npm run deploy:check` passed, including the `.landroid`, `.pdf`, and
+  `.pptx` static asset allowlist guard.
+- `npm run lint` passed.
+- `npm run build` passed with existing Vite dynamic/static import warnings,
+  large-chunk warnings, and Node `module.register()` deprecation warning.
+- Built artifact check passed: `dist/samples/springhill-dr-elmore.landroid`
+  exists and contains `OGML-LCT-Trust`, `Charlyn K. Tyra`,
+  `Magnolia Petroleum Company, LLC`, and `one-year primary term`.
+- `npm test -- src/phase0/__tests__/springhill-sample.test.ts` passed, 1 file
+  / 2 tests.
+- `git diff --check` passed.
+
+Post-merge / post-Amplify deploy validation still required:
+
+- `curl -I -L https://landroid.abstractmapping.com/samples/springhill-dr-elmore.landroid`
+  must return the `.landroid` package, not `index.html`.
+- `curl -fsSL https://landroid.abstractmapping.com/samples/springhill-dr-elmore.landroid`
+  must contain `OGML-LCT-Trust` and `one-year primary term`.
+- `bash scripts/smoke-test-hosted.sh` should pass against the hosted domain.
 
 ### Open Risks / Deferred
 
-- PR #131 has not been pushed after the rebase/import fix yet.
-- GitHub CI must be re-run on the updated branch before marking #131 ready.
-- No cloud, Dropbox, sync, non-`.landroid` export format, title read-flip
-  production enablement, Springhill follow-up, T8-T19, demo polish, branch
-  pruning, federal/private math, or drill-site tract designation is included.
+- This PR only changes the rewrite template and deployment checks. The currently
+  hosted Amplify rewrite rules will not change until the branch merges to
+  `main` and Amplify redeploys, or the JSON rewrite rules are manually updated
+  in the Amplify console.
+- No Springhill sample data, generator, lease math, project picker behavior,
+  T8-T19, demo polish, branch pruning, federal/private math, or drill-site
+  tract designation is included.
 - Do not work from the noisy root checkout. Do not stage root noise:
   `.worktrees/`, archived audit docs, or root `scripts/springhill/`.
 
 ### Likely Next Steps
 
-1. Commit the #131 import/index correctness fix.
-2. Force-with-lease push `feat/project-picker-landing`.
-3. Update PR #131 with the bug, fix, validation, and remaining risks.
-4. Wait for GitHub CI and confirm PR #131 is no longer conflicting before
-   marking it ready.
+1. Finish validation in `/private/tmp/landroid-hosted-landroid-static`.
+2. Commit and push `fix/hosted-landroid-static`.
+3. Open a PR against `main`.
+4. After merge and Amplify redeploy, run the hosted smoke script and confirm
+   the Springhill sample URL serves package data.
 
 Paste-ready next chat prompt:
 
 > Read `/Users/abstractmapping/projects/landroid/AGENTS.md`,
 > `/Users/abstractmapping/projects/landroid/PROJECT_CONTEXT.md`,
 > `/Users/abstractmapping/projects/landroid/docs/README.md`, and
-> `/private/tmp/landroid-project-picker-landing/CONTINUATION-PROMPT.md`.
-> Continue branch `feat/project-picker-landing` in
-> `/private/tmp/landroid-project-picker-landing`. PR #132 is merged into main;
-> this branch is rebased onto post-#132 main. Finish the project picker
-> import/index correctness fix: imports must select their own project storage
-> key before side-store/snapshot/autosave writes, blank startup shells must not
-> become saved projects, and #131 must not include Springhill follow-up,
-> T8-T19, demo polish, branch pruning, federal/private math, or drill-site tract
-> designation.
+> `/private/tmp/landroid-hosted-landroid-static/CONTINUATION-PROMPT.md`.
+> Continue branch `fix/hosted-landroid-static` in
+> `/private/tmp/landroid-hosted-landroid-static`. The task is to make hosted
+> `.landroid` sample files bypass the Amplify SPA fallback so the Springhill Dr.
+> Elmore demo loader works online. Do not change Springhill sample data, project
+> picker behavior, T8-T19, demo polish, branch pruning, federal/private math, or
+> drill-site tract designation.

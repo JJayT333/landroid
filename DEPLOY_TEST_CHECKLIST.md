@@ -27,6 +27,8 @@ cd ../..
 Expected:
 
 - `npm run deploy:check` passes.
+- `amplify-rewrites.json` keeps `.landroid`, `.pdf`, and `.pptx` static assets
+  out of the SPA fallback.
 - Root tests pass.
 - Backend proxy tests pass.
 - `backend/ai-proxy/lambda.zip` exists and contains `handler.js`,
