@@ -5,12 +5,12 @@ import { useEffect, useRef, useState } from 'react';
 import { useUIStore, type ViewMode } from '../../store/ui-store';
 import { useOwnerStore } from '../../store/owner-store';
 import { useWorkspaceStore } from '../../store/workspace-store';
-import { useCanvasStore } from '../../store/canvas-store';
 import { useStorageHealthStore } from '../../store/storage-health-store';
 import {
   hydrateTitleActionLogFromImportedLedger,
 } from '../../store/title-action-log';
 import { buildCurrentLandroidExport } from '../../app/current-landroid-export';
+import { importAndOpenWorkspace } from '../../app/project-workspace-lifecycle';
 import {
   downloadLandroidFile,
   importLandroidFile,
@@ -21,10 +21,6 @@ import {
   chooseRollingAutoExportDirectory,
   disableRollingAutoExport,
 } from '../../storage/rolling-auto-export-runtime';
-import {
-  replaceWorkspaceSideStores,
-  replaceWorkspaceSideStoresWithRollback,
-} from '../../storage/workspace-side-store-reset';
 import { importCSV } from '../../storage/csv-io';
 import { assertFileSize, FILE_SIZE_LIMITS } from '../../utils/file-validation';
 import { seedCombinatorialData } from '../../storage/seed-test-data';
@@ -84,7 +80,6 @@ export default function Navbar({ onOpenProjectPicker }: NavbarProps) {
   const setView = useUIStore((s) => s.setView);
   const projectName = useWorkspaceStore((s) => s.projectName);
   const setProjectName = useWorkspaceStore((s) => s.setProjectName);
-  const loadWorkspace = useWorkspaceStore((s) => s.loadWorkspace);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const fileMenuRef = useRef<HTMLDivElement>(null);
@@ -222,26 +217,8 @@ export default function Navbar({ onOpenProjectPicker }: NavbarProps) {
       assertFileSize(file, FILE_SIZE_LIMITS.LANDROID, '.landroid file');
 
       const data = await importLandroidFile(file);
-      const currentWorkspace = useWorkspaceStore.getState();
-      await replaceWorkspaceSideStoresWithRollback({
-        targetWorkspaceId: data.workspaceId,
-        targetData: {
-          ownerData: data.ownerData,
-          documentData: data.documentData,
-          mapData: data.mapData,
-          researchData: data.researchData,
-          curativeData: data.curativeData,
-        },
-        rollbackWorkspaceId: currentWorkspace.workspaceId,
-        rollbackNodes: currentWorkspace.nodes,
-      });
-      loadWorkspace(data);
+      await importAndOpenWorkspace(data);
       await mirrorLoadedTitleLedger(data);
-      useCanvasStore.getState().loadCanvas(data.canvas ?? { nodes: [], edges: [] });
-      await useWorkspaceStore
-        .getState()
-        .hydrateNodeAttachments({ strict: true })
-        .catch(() => {});
       console.log(`[springhill-sample] Loaded ${data.nodes.length} nodes`);
     } catch (err) {
       console.error('[springhill-sample] Failed:', err);
@@ -322,27 +299,8 @@ export default function Navbar({ onOpenProjectPicker }: NavbarProps) {
         if (!confirmed) return;
 
         const data = await importLandroidFile(file);
-        const currentWorkspace = useWorkspaceStore.getState();
-        await replaceWorkspaceSideStoresWithRollback({
-          targetWorkspaceId: data.workspaceId,
-          targetData: {
-            ownerData: data.ownerData,
-            documentData: data.documentData,
-            mapData: data.mapData,
-            researchData: data.researchData,
-            curativeData: data.curativeData,
-          },
-          rollbackWorkspaceId: currentWorkspace.workspaceId,
-          rollbackNodes: currentWorkspace.nodes,
-        });
-        loadWorkspace(data);
+        await importAndOpenWorkspace(data);
         await mirrorLoadedTitleLedger(data);
-        useCanvasStore.getState().loadCanvas(data.canvas ?? { nodes: [], edges: [] });
-        // Phase 5: refresh node.attachments[] after PDF table write.
-        await useWorkspaceStore
-          .getState()
-          .hydrateNodeAttachments({ strict: true })
-          .catch(() => {});
       } else if (file.name.endsWith('.csv')) {
         assertFileSize(file, FILE_SIZE_LIMITS.SPREADSHEET, 'CSV file');
         const confirmed = await requestConfirmation({
@@ -359,9 +317,7 @@ export default function Navbar({ onOpenProjectPicker }: NavbarProps) {
 
         const text = await file.text();
         const result = importCSV(text);
-        loadWorkspace(result);
-        useCanvasStore.getState().loadCanvas({ nodes: [], edges: [] });
-        await replaceWorkspaceSideStores(result.workspaceId);
+        await importAndOpenWorkspace(result);
         await mirrorLoadedTitleLedger(useWorkspaceStore.getState());
       } else {
         await showAlert({

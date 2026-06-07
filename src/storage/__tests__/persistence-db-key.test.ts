@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { CanvasSaveData } from '../../store/canvas-store';
+import type { DeskMap } from '../../types/node';
 import {
   LANDROID_FILE_VERSION,
   type WorkspaceData,
@@ -58,6 +59,19 @@ function canvasData(): CanvasSaveData {
     verticalSpacingFactor: 1,
     snapToGrid: false,
     gridSize: 20,
+  };
+}
+
+function deskMapShell(): DeskMap {
+  return {
+    id: 'dm-shell',
+    name: 'Tract 1',
+    code: 'T1',
+    tractId: 'T1',
+    grossAcres: '',
+    pooledAcres: '',
+    description: '',
+    nodeIds: [],
   };
 }
 
@@ -125,12 +139,14 @@ function shardRowsFromWorkspace(
 }
 
 async function loadPersistenceWithKeys({
+  projectIndexKey,
   workspaceKey,
   canvasKey,
   workspaceRecords = new Map<string, WorkspaceRecord>(),
   canvasRecords = new Map<string, CanvasRecord>(),
   shards,
 }: {
+  projectIndexKey?: string;
   workspaceKey: string;
   canvasKey: string;
   workspaceRecords?: Map<string, WorkspaceRecord>;
@@ -196,7 +212,7 @@ async function loadPersistenceWithKeys({
   };
 
   vi.doMock('../active-workspace-key', () => ({
-    getProjectIndexDbKey: () => workspaceKey,
+    getProjectIndexDbKey: () => projectIndexKey ?? workspaceKey,
     getWorkspaceDbKey: () => workspaceKey,
     getCanvasDbKey: () => canvasKey,
   }));
@@ -238,6 +254,48 @@ describe('persistence db keys (audit M-1)', () => {
     expect(canvases.put).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'user-alice-canvas' })
     );
+  });
+
+  it('does not index a blank default startup shell as a saved project', async () => {
+    const { workspacePersistence, db } = await loadPersistenceWithKeys({
+      workspaceKey: 'default',
+      canvasKey: 'active-canvas',
+    });
+
+    const result = await workspacePersistence.saveWorkspaceShardsToDb(
+      {
+        ...workspaceData('Untitled Workspace'),
+        workspaceId: 'ws-blank-startup',
+        deskMaps: [deskMapShell()],
+      },
+      ALWAYS_WRITABLE
+    );
+
+    expect(result.status).toBe('written');
+    expect(db.savedProjects.rows.size).toBe(0);
+  });
+
+  it('still indexes an explicitly created blank project under its project key', async () => {
+    const { workspacePersistence, db } = await loadPersistenceWithKeys({
+      projectIndexKey: 'default',
+      workspaceKey: 'default::project::ws-empty-project',
+      canvasKey: 'default::project::ws-empty-project-canvas',
+    });
+
+    const result = await workspacePersistence.saveWorkspaceShardsToDb(
+      {
+        ...workspaceData('Untitled Workspace'),
+        workspaceId: 'ws-empty-project',
+      },
+      ALWAYS_WRITABLE
+    );
+
+    expect(result.status).toBe('written');
+    expect(db.savedProjects.rows.size).toBe(1);
+    expect([...db.savedProjects.rows.values()][0]).toMatchObject({
+      workspaceId: 'ws-empty-project',
+      workspaceDbKey: 'default::project::ws-empty-project',
+    });
   });
 
   it('does not silently load or migrate the legacy default row for a hosted user key', async () => {

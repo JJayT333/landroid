@@ -649,8 +649,9 @@ These are the main workspace snapshot files. They now include:
 CSV import loads workspace data, resets the flowchart canvas, and starts a fresh empty owner/document/curative/maps/research side workspace so you can re-import and relink cleanly. It also clears pending AI approvals, the AI action/result journal, and the last AI undo snapshot. `.landroid` export/import carries node document attachments and registry metadata, including multiple PDFs on the same title card. Older v7 `.landroid` files are migrated into the current multi-document attachment shape during import.
 When PDF payloads are present, LANDroid preserves the stored filenames so Desk Map can show exactly what is attached instead of only saying that a PDF exists.
 Newer `.landroid` schema versions are rejected by older app builds. When a
-`.landroid` import replaces side stores, LANDroid rolls back to the previous
-active side-store data if replacement fails before the core workspace swap.
+`.landroid` import replaces side stores, LANDroid first switches to the
+imported project's storage key. If side-store replacement fails before the core
+workspace swap, the previously active project remains selected.
 
 ### Local browser storage
 The app also uses browser storage for local autosave. This is convenient, but it is not a substitute for named backups.

@@ -571,12 +571,22 @@ function shouldSkipBlankDefaultProjectIndexRecord(args: {
   );
 }
 
+function savedProjectMigrationScope(
+  workspaceDbKey: string,
+  workspaceId: string
+): string {
+  return `${workspaceDbKey}\u0000${workspaceId}`;
+}
+
 function manifestHasProjectContent(manifest: WorkspaceManifestShard): boolean {
-  const recordCounts = manifest.backendRecord.recordCounts;
-  const deskMapCount = recordCounts?.desk_map;
+  return (manifest.nodeCount ?? 0) > 0;
+}
+
+function leaseholdStateHasProjectContent(row: LeaseholdStateShard): boolean {
   return (
-    (manifest.nodeCount ?? 0) > 0
-    || (typeof deskMapCount === 'number' && deskMapCount > 0)
+    arrayLength(row.leaseholdAssignments) > 0
+    || arrayLength(row.leaseholdOrris) > 0
+    || arrayLength(row.leaseholdTransferOrderEntries) > 0
   );
 }
 
@@ -627,15 +637,29 @@ async function runV12ToV13SavedProjectIndexMigration(tx: Transaction): Promise<v
   const manifests = await tx
     .table<WorkspaceManifestShard, 'id'>('workspaceManifestShards')
     .toArray();
+  const leaseholdRows = await tx
+    .table<LeaseholdStateShard, 'id'>('leaseholdStateShards')
+    .toArray();
+  const contentfulLeaseholdScopes = new Set(
+    leaseholdRows
+      .filter(leaseholdStateHasProjectContent)
+      .map((row) =>
+        savedProjectMigrationScope(row.dbKey ?? 'default', row.workspaceId)
+      )
+  );
 
   for (const manifest of manifests) {
     const workspaceDbKey = manifest.dbKey ?? 'default';
     const projectName = manifest.backendRecord.projectName || 'Untitled Workspace';
+    const hasProjectContent = manifestHasProjectContent(manifest)
+      || contentfulLeaseholdScopes.has(
+        savedProjectMigrationScope(workspaceDbKey, manifest.workspaceId)
+      );
     if (
       shouldSkipBlankDefaultProjectIndexRecord({
         workspaceDbKey,
         projectName,
-        hasProjectContent: manifestHasProjectContent(manifest),
+        hasProjectContent,
       })
     ) {
       continue;

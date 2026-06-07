@@ -220,6 +220,10 @@ workspace and canvas, rehydrates side stores, and then hydrates or baselines the
 title action log. Create, open, rename, duplicate, and delete flows use the
 saved-project index in `src/storage/saved-project-index.ts` and direct
 per-project storage helpers in `src/storage/project-workspace-storage.ts`.
+Workspace-replacing `.landroid` and CSV imports also enter through this
+lifecycle so the imported workspace has its own saved-project identity and
+active storage key before side stores, snapshots, canvas rows, or later autosave
+can write.
 
 Avoid writing business rules directly into UI components when a store action,
 engine helper, or typed utility already owns the behavior.

@@ -161,6 +161,8 @@ Older stress and 8-tract leasehold demos have been retired.
   still open.
 - CSV imports create a fresh workspace and intentionally start with empty owner,
   document, curative, map, research, and transient AI side state.
+- `.landroid` and CSV imports create or reconcile a saved-project entry and
+  switch the active project storage key before imported data can autosave.
 - `.landroid` and CSV loads require the typed phrase `LOAD WORKSPACE` because
   they replace the active browser workspace.
 

@@ -2,10 +2,12 @@ import { buildCanvasAutosavePayload, buildWorkspaceAutosavePayload } from '../st
 import { saveCanvasToDb } from '../storage/canvas-persistence';
 import {
   createSavedProjectIndexRecord,
+  getSavedProject,
   getMostRecentSavedProject,
   listSavedProjects,
   markSavedProjectOpened,
   renameSavedProjectIndexRecord,
+  upsertSavedProjectFromWorkspace,
   type SavedProjectSummary,
 } from '../storage/saved-project-index';
 import {
@@ -17,8 +19,20 @@ import {
   saveProjectCanvas,
   saveProjectWorkspaceSnapshot,
 } from '../storage/project-workspace-storage';
-import { setActiveWorkspaceStorageKey } from '../storage/active-workspace-key';
-import { saveWorkspaceShardsToDb, type WorkspaceData } from '../storage/workspace-persistence';
+import {
+  getActiveWorkspaceStorageKey,
+  makeProjectWorkspaceDbKey,
+  setActiveWorkspaceStorageKey,
+} from '../storage/active-workspace-key';
+import {
+  saveWorkspaceShardsToDb,
+  type LandroidFileData,
+  type WorkspaceData,
+} from '../storage/workspace-persistence';
+import {
+  replaceWorkspaceSideStores,
+  type WorkspaceSideStoreData,
+} from '../storage/workspace-side-store-reset';
 import { useCanvasStore, type CanvasSaveData } from '../store/canvas-store';
 import { useCurativeStore } from '../store/curative-store';
 import { useMapStore } from '../store/map-store';
@@ -36,6 +50,18 @@ export type ProjectOpenResult = {
   warning: string | null;
 };
 
+export type ImportedWorkspaceData = Omit<WorkspaceData, 'instrumentTypes'>
+  & { instrumentTypes?: string[] }
+  & Partial<Pick<
+    LandroidFileData,
+    | 'canvas'
+    | 'ownerData'
+    | 'documentData'
+    | 'mapData'
+    | 'researchData'
+    | 'curativeData'
+  >>;
+
 function readTitleOwnerData() {
   const owner = useOwnerStore.getState();
   return { owners: owner.owners, leases: owner.leases };
@@ -43,6 +69,25 @@ function readTitleOwnerData() {
 
 function blankCanvas(): CanvasSaveData {
   return { nodes: [], edges: [] };
+}
+
+function sideStoreDataFromImport(
+  data: ImportedWorkspaceData
+): WorkspaceSideStoreData {
+  return {
+    ownerData: data.ownerData,
+    documentData: data.documentData,
+    mapData: data.mapData,
+    researchData: data.researchData,
+    curativeData: data.curativeData,
+  };
+}
+
+function normalizeImportedWorkspaceData(data: ImportedWorkspaceData): WorkspaceData {
+  return {
+    ...data,
+    instrumentTypes: data.instrumentTypes ?? [],
+  };
 }
 
 export function createBlankWorkspaceData(projectName: string): WorkspaceData {
@@ -180,6 +225,48 @@ export async function createAndOpenSavedProject(
     saveProjectCanvas(blankCanvas(), project.workspaceDbKey),
   ]);
   return applyLoadedProject(project, data, blankCanvas(), null);
+}
+
+export async function importAndOpenWorkspace(
+  data: ImportedWorkspaceData
+): Promise<ProjectOpenResult> {
+  const workspaceData = normalizeImportedWorkspaceData(data);
+  const previousWorkspaceDbKey = getActiveWorkspaceStorageKey();
+  await flushActiveProject();
+
+  const existingProject = await getSavedProject(workspaceData.workspaceId);
+  const workspaceDbKey =
+    existingProject?.workspaceDbKey
+      ?? makeProjectWorkspaceDbKey(workspaceData.workspaceId);
+
+  setActiveWorkspaceStorageKey(workspaceDbKey);
+  try {
+    await replaceWorkspaceSideStores(
+      workspaceData.workspaceId,
+      sideStoreDataFromImport(data)
+    );
+    await Promise.all([
+      saveProjectWorkspaceSnapshot(workspaceData, workspaceDbKey),
+      saveProjectCanvas(data.canvas ?? blankCanvas(), workspaceDbKey),
+    ]);
+    const project = await upsertSavedProjectFromWorkspace({
+      workspaceId: workspaceData.workspaceId,
+      projectName: workspaceData.projectName,
+      workspaceDbKey,
+      openedAt: new Date().toISOString(),
+    });
+    useWorkspaceStore.getState().loadWorkspace(workspaceData);
+    useCanvasStore.getState().loadCanvas(data.canvas ?? blankCanvas());
+    await useWorkspaceStore
+      .getState()
+      .hydrateNodeAttachments({ strict: true })
+      .catch(() => {});
+    useWorkspaceStore.getState().setStartupWarning(null);
+    return { project, warning: null };
+  } catch (error) {
+    setActiveWorkspaceStorageKey(previousWorkspaceDbKey);
+    throw error;
+  }
 }
 
 export async function renameSavedProject(
