@@ -80,7 +80,7 @@ import type { ResearchWorkspaceData } from './research-persistence';
 import type { CurativeWorkspaceData } from './curative-persistence';
 import { normalizeTitleIssues, type TitleIssue } from '../types/title-issue';
 import { resolveActiveUnitCode } from '../utils/desk-map-units';
-import { getWorkspaceDbKey } from './active-workspace-key';
+import { getProjectIndexDbKey, getWorkspaceDbKey } from './active-workspace-key';
 import {
   activeStorageScopedId,
   activeWorkspaceScope,
@@ -90,6 +90,7 @@ import {
   stripStorageScopedId,
 } from './db-key-scope';
 import { LANDROID_FILE_VERSION } from './landroid-file-version';
+import { upsertSavedProjectFromWorkspace } from './saved-project-index';
 import {
   type ActionRecord,
   type AuditEventRecord,
@@ -746,6 +747,29 @@ function defaultShardTimestamp(): string {
  */
 let anchoredMonolithWorkspaceId: string | null | undefined;
 
+function isBlankDefaultProjectName(value: string): boolean {
+  const trimmed = value.trim();
+  return trimmed.length === 0 || trimmed === 'Untitled Workspace';
+}
+
+function workspaceHasSavedProjectContent(data: WorkspaceData): boolean {
+  return (
+    data.nodes.length > 0
+    || (data.leaseholdAssignments?.length ?? 0) > 0
+    || (data.leaseholdOrris?.length ?? 0) > 0
+    || (data.leaseholdTransferOrderEntries?.length ?? 0) > 0
+  );
+}
+
+function shouldWriteSavedProjectIndex(
+  data: WorkspaceData,
+  dbKey: string
+): boolean {
+  if (dbKey !== getProjectIndexDbKey()) return true;
+  return workspaceHasSavedProjectContent(data)
+    || !isBlankDefaultProjectName(data.projectName);
+}
+
 /**
  * Autosave path (Phase 0.5): rebuild the workspace shard set from the current
  * {@link WorkspaceData} and write all five shard tables in a single Dexie
@@ -853,6 +877,14 @@ export async function saveWorkspaceShardsToDb(
 
   if (shouldAnchorMonolith) {
     anchoredMonolithWorkspaceId = workspaceId;
+  }
+  if (shouldWriteSavedProjectIndex(data, dbKey)) {
+    await upsertSavedProjectFromWorkspace({
+      workspaceId,
+      projectName: data.projectName,
+      workspaceDbKey: dbKey,
+      updatedAt: lastModified,
+    });
   }
   return { status: 'written' };
 }

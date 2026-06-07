@@ -1,13 +1,14 @@
 /**
  * Root application component — switches between views.
  */
-import { Suspense, lazy } from 'react';
+import { Suspense, lazy, useState } from 'react';
 import { useUIStore } from './store/ui-store';
 import { useWorkspaceStore } from './store/workspace-store';
 import Navbar from './components/shared/Navbar';
 import TitleLedgerStatusBanner from './components/shared/TitleLedgerStatusBanner';
 import WriteLeaseBanner from './components/shared/WriteLeaseBanner';
 import DeskMapView from './views/DeskMapView';
+import ProjectPickerLanding from './components/workspace/ProjectPickerLanding';
 
 const FlowchartView = lazy(() => import('./views/FlowchartView'));
 const LeaseholdView = lazy(() => import('./views/LeaseholdView'));
@@ -42,10 +43,11 @@ export default function App() {
   const view = useUIStore((s) => s.view);
   const startupWarning = useWorkspaceStore((s) => s.startupWarning);
   const setStartupWarning = useWorkspaceStore((s) => s.setStartupWarning);
+  const [projectPickerOpen, setProjectPickerOpen] = useState(true);
 
   return (
     <div className="h-screen flex flex-col bg-parchment">
-      <Navbar />
+      <Navbar onOpenProjectPicker={() => setProjectPickerOpen(true)} />
       <WriteLeaseBanner />
       <TitleLedgerStatusBanner />
       {startupWarning && (
@@ -185,6 +187,10 @@ export default function App() {
           </Suspense>
         )}
       </main>
+      <ProjectPickerLanding
+        open={projectPickerOpen}
+        onClose={() => setProjectPickerOpen(false)}
+      />
       <Suspense fallback={null}>
         <AIToggleButton />
       </Suspense>

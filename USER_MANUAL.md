@@ -47,9 +47,12 @@ The top bar also has:
   rolling timestamped `.landroid` snapshots. If folder access is unavailable or
   permission is revoked, the panel warns and `Backup Now` remains the manual
   fallback.
+- `Projects`, which opens the browser-local project picker
 - `File ▾` with `Save workspace` (exports a `.landroid` snapshot) and `Load workspace` (imports a `.landroid` or `.csv` file)
 - `Demo Data ▾` with Vulcan Mesa, Raven Forest, and the Dr. Elmore #1 Unit Springhill sample for exercising Desk Map, Leasehold, and Federal Leasing surfaces without real project data. The hosted POC site keeps this menu visible for signed-in fixture review.
 - Loading demo data requires typing `LOAD DEMO`; loading a `.landroid` or `.csv` file requires typing `LOAD WORKSPACE`, because each action replaces the active browser workspace.
+
+The project picker opens at startup and lists saved projects from this browser profile. It can create, open, rename, duplicate, and delete local projects. Delete requires typing the project name. Switching projects flushes the current workspace, canvas, side stores, and title ledger before loading the selected project. Duplicates copy the workspace snapshot, canvas, and side stores into a new workspace id; the duplicate starts a fresh title-ledger baseline when opened so audit hashes are not reused across projects.
 
 The current project name appears in the top bar and is editable inline — click the name, type a new one, and press `Enter` to commit or `Esc` to cancel. Local autosave still uses browser storage, but `Save workspace`, `Backup Now`, and rolling auto-export all capture workspace data, flowchart canvas state, owner records, owner documents, curative title issues, map assets, and Research sources, formulas, project records, saved questions, and imports through the same `.landroid` serializer.
 The top-left brand area can also carry a custom logo for demo or prospect-specific presentation.
@@ -646,11 +649,13 @@ These are the main workspace snapshot files. They now include:
 CSV import loads workspace data, resets the flowchart canvas, and starts a fresh empty owner/document/curative/maps/research side workspace so you can re-import and relink cleanly. It also clears pending AI approvals, the AI action/result journal, and the last AI undo snapshot. `.landroid` export/import carries node document attachments and registry metadata, including multiple PDFs on the same title card. Older v7 `.landroid` files are migrated into the current multi-document attachment shape during import.
 When PDF payloads are present, LANDroid preserves the stored filenames so Desk Map can show exactly what is attached instead of only saying that a PDF exists.
 Newer `.landroid` schema versions are rejected by older app builds. When a
-`.landroid` import replaces side stores, LANDroid rolls back to the previous
-active side-store data if replacement fails before the core workspace swap.
+`.landroid` import replaces side stores, LANDroid first switches to the
+imported project's storage key. If side-store replacement fails before the core
+workspace swap, the previously active project remains selected.
 
 ### Local browser storage
 The app also uses browser storage for local autosave. This is convenient, but it is not a substitute for named backups.
+The project picker is also browser-local: it indexes saved projects in IndexedDB and gives each project its own workspace storage key. If you use another browser profile or clear the `landroid-v2` database, those local project rows are not available unless you saved a `.landroid` backup.
 Autosaved workspace loads now validate the ownership graph before hydration. Warning-only title review states, such as temporary over/under allocation or orphan-style review nodes, can still be reopened. If the saved workspace or flowchart canvas is hard-corrupt, LANDroid shows a startup warning and falls back to a safe fresh state instead of quietly loading invalid data.
 
 ### Rolling local auto-export

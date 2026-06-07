@@ -21,6 +21,7 @@ interface FakeRow {
 interface FakeTable {
   rows: Map<string, FakeRow>;
   failBulkPut: boolean;
+  get: (id: string) => Promise<FakeRow | undefined>;
   toArray: () => Promise<FakeRow[]>;
   put: (row: FakeRow) => Promise<void>;
   bulkPut: (rows: FakeRow[]) => Promise<void>;
@@ -36,6 +37,7 @@ function makeTable(initial: FakeRow[] = []): FakeTable {
   const table: FakeTable = {
     rows: new Map(initial.map((row) => [row.id, row])),
     failBulkPut: false,
+    get: async (id: string) => table.rows.get(id),
     toArray: async () => [...table.rows.values()],
     put: async (row: FakeRow) => {
       table.rows.set(row.id, row);
@@ -69,11 +71,13 @@ function makeWriterDb(
   // The shard writer also anchors the monolithic backup row on a workspace
   // change. No prior load ran in these tests, so every write re-anchors it.
   const workspaces = makeTable(seed.workspaces ?? []);
-  const snapshotNames = [...SHARD_TABLE_NAMES, 'workspaces'] as const;
-  const allTables: Record<string, FakeTable> = { ...tables, workspaces };
+  const savedProjects = makeTable();
+  const snapshotNames = [...SHARD_TABLE_NAMES, 'workspaces', 'savedProjects'] as const;
+  const allTables: Record<string, FakeTable> = { ...tables, workspaces, savedProjects };
   const db = {
     ...tables,
     workspaces,
+    savedProjects,
     // Emulate Dexie transaction atomicity: snapshot every table before the
     // callback runs and restore on throw so a failed write rolls back.
     transaction: vi.fn(async (_mode: string, ...args: unknown[]) => {
@@ -124,6 +128,7 @@ function workspaceWithContent(projectName = 'Writer Workspace'): WorkspaceData {
 async function loadWriter(db: unknown, dbKey = 'user-alice') {
   vi.resetModules();
   vi.doMock('../active-workspace-key', () => ({
+    getProjectIndexDbKey: () => dbKey,
     getWorkspaceDbKey: () => dbKey,
     getCanvasDbKey: () => `${dbKey}-canvas`,
   }));

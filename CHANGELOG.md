@@ -3,6 +3,15 @@
 This file records meaningful project changes so `CONTINUATION-PROMPT.md` can
 stay short.
 
+## 2026-06-07
+
+- Stabilized the project picker branch after Springhill/LCT merged. `.landroid`
+  and CSV imports now create or reconcile a saved-project identity, switch the
+  active project storage key before side-store and snapshot writes, and avoid
+  autosaving imported workspaces under the previously active project key. Blank
+  implicit startup shells no longer become saved `Untitled Workspace` projects,
+  while explicitly created blank projects still remain indexed.
+
 ## 2026-06-06
 
 - Fixed the Dr. Elmore Springhill public sample so the LCT Revocable Trust /
@@ -36,6 +45,11 @@ stay short.
   persistence/usage status. Added `Backup Now` as a visible full `.landroid`
   export action that records the latest backup time without changing the
   serializer, autosave authority, or storage model.
+
+- Added the browser-local project picker landing surface. Saved projects are
+  indexed in Dexie, each project gets its own workspace storage key, and the
+  picker can create, open, rename, duplicate, or typed-confirm-delete projects
+  without changing the `.landroid` export/import format or title read path.
 
 ## 2026-06-04
 
