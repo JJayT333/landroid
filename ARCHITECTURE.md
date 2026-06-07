@@ -270,6 +270,13 @@ invariant. Planned storage changes must follow the staged trajectory in
 5. Consider Tauri/native filesystem only when local OCR process control,
    Finder-visible project packages, native SQLite, or corpus size forces it.
 
+The rolling auto-export surface is opt-in local file output, not a new storage
+authority. It persists only a browser folder handle where the File System
+Access API and IndexedDB support that handle, then writes timestamped
+`.landroid` blobs through the same `exportLandroidFile` serializer used by
+manual backup/export. Revoked permission or unsupported browsers degrade to
+the existing manual `Backup Now` path with a visible warning.
+
 Document originals, checksums, and source metadata are canonical. OCR text,
 embeddings, FTS rows, page images, and packet exports are derived artifacts that
 must be rebuildable from the canonical vault state.

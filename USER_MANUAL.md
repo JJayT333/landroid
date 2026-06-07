@@ -39,14 +39,19 @@ The top bar has view buttons for the active work surfaces:
 
 The top bar also has:
 - a storage health panel showing the latest browser autosave time, latest
-  `.landroid` backup/export time, and browser storage persistence/usage status
+  `.landroid` backup/export time, browser storage persistence/usage status,
+  and rolling auto-export status
 - `Backup Now`, which immediately exports the current workspace as a
   `.landroid` backup file
+- `Auto Export`, where supported by the browser, to choose a local folder for
+  rolling timestamped `.landroid` snapshots. If folder access is unavailable or
+  permission is revoked, the panel warns and `Backup Now` remains the manual
+  fallback.
 - `File ▾` with `Save workspace` (exports a `.landroid` snapshot) and `Load workspace` (imports a `.landroid` or `.csv` file)
 - `Demo Data ▾` with the Vulcan Mesa and Raven Forest sample fixtures for exercising Desk Map, Leasehold, and Federal Leasing surfaces without real project data. The hosted POC site keeps this menu visible for signed-in fixture review.
 - Loading demo data requires typing `LOAD DEMO`; loading a `.landroid` or `.csv` file requires typing `LOAD WORKSPACE`, because each action replaces the active browser workspace.
 
-The current project name appears in the top bar and is editable inline — click the name, type a new one, and press `Enter` to commit or `Esc` to cancel. Local autosave still uses browser storage, but `Save workspace` and `Backup Now` both capture workspace data, flowchart canvas state, owner records, owner documents, curative title issues, map assets, and Research sources, formulas, project records, saved questions, and imports in the exported `.landroid` file.
+The current project name appears in the top bar and is editable inline — click the name, type a new one, and press `Enter` to commit or `Esc` to cancel. Local autosave still uses browser storage, but `Save workspace`, `Backup Now`, and rolling auto-export all capture workspace data, flowchart canvas state, owner records, owner documents, curative title issues, map assets, and Research sources, formulas, project records, saved questions, and imports through the same `.landroid` serializer.
 The top-left brand area can also carry a custom logo for demo or prospect-specific presentation.
 If LANDroid detects corrupt autosaved workspace or canvas data during startup, it now opens a safe fresh state and shows a warning banner instead of silently pretending there was no saved data.
 If a render or lazy-load failure occurs, LANDroid now shows a reload screen with the error details instead of dropping to a blank page.
@@ -646,6 +651,15 @@ active side-store data if replacement fails before the core workspace swap.
 ### Local browser storage
 The app also uses browser storage for local autosave. This is convenient, but it is not a substitute for named backups.
 Autosaved workspace loads now validate the ownership graph before hydration. Warning-only title review states, such as temporary over/under allocation or orphan-style review nodes, can still be reopened. If the saved workspace or flowchart canvas is hard-corrupt, LANDroid shows a startup warning and falls back to a safe fresh state instead of quietly loading invalid data.
+
+### Rolling local auto-export
+When the browser supports the File System Access API, `Auto Export` lets you
+choose a local folder for rolling timestamped `.landroid` snapshots. LANDroid
+stores the folder handle in browser IndexedDB where the platform allows it,
+writes an immediate snapshot after selection, and queues later snapshots after
+successful local autosaves. If permission is revoked or the API is unavailable,
+the storage panel switches to a manual-backup warning and `Backup Now` remains
+the fallback.
 
 ### Recommended backup habit
 - Save a `.landroid` file before major edits
