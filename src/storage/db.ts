@@ -29,6 +29,7 @@ import {
 } from './document-migration';
 import { sha256HexOfBlob } from './blob-hash';
 import type { ContactLog, Lease, Owner, OwnerDoc } from '../types/owner';
+import type { LeasePurchaseReport } from '../types/lease-purchase-report';
 import type { MapAsset, MapExternalReference, MapRegion } from '../types/map';
 import type {
   ResearchFormula,
@@ -100,6 +101,7 @@ const db = new Dexie('landroid-v2') as Dexie & {
   canvases: EntityTable<CanvasRecord, 'id'>;
   owners: EntityTable<DbScoped<Owner>, 'id'>;
   leases: EntityTable<DbScoped<Lease>, 'id'>;
+  leasePurchaseReports: EntityTable<DbScoped<LeasePurchaseReport>, 'id'>;
   contactLogs: EntityTable<DbScoped<ContactLog>, 'id'>;
   ownerDocs: EntityTable<DbScoped<OwnerDoc>, 'id'>;
   mapAssets: EntityTable<DbScoped<MapAsset>, 'id'>;
@@ -535,6 +537,19 @@ db.version(13)
   .upgrade(async (tx) => {
     await runV12ToV13SavedProjectIndexMigration(tx);
   });
+
+/**
+ * v14 (Lease Purchase Report).
+ *
+ * Adds the lease-abstract parent table. Additive and non-destructive — a new
+ * empty store, no data migration. Existing leases keep working as standalone
+ * slices (`leasePurchaseReportId = null`) until an LPR groups them. Dexie merges
+ * this delta with the prior schema, so unchanged tables carry forward.
+ */
+db.version(14).stores({
+  leasePurchaseReports:
+    'id, dbKey, workspaceId, ownerId, [dbKey+workspaceId], [dbKey+workspaceId+ownerId], [workspaceId+ownerId]',
+});
 
 
 const PROJECT_WORKSPACE_KEY_SEPARATOR = '::project::';

@@ -73,6 +73,7 @@ async function loadOwnerPersistence(initialOwners: StoredOwner[]) {
   const db = {
     owners,
     leases: empty,
+    leasePurchaseReports: makeScopedTable([]),
     contactLogs: empty,
     ownerDocs: empty,
     transaction: vi.fn(async (_mode: string, ...args: unknown[]) => {

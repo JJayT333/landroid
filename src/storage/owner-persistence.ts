@@ -18,12 +18,22 @@ import {
   type OwnerDoc,
   type OwnerDocMeta,
 } from '../types/owner';
+import {
+  normalizeLeasePurchaseReport,
+  type LeasePurchaseReport,
+} from '../types/lease-purchase-report';
 
 export interface OwnerWorkspaceData {
   owners: Owner[];
   leases: Lease[];
   contacts: ContactLog[];
   docs: OwnerDoc[];
+  /**
+   * Lease Purchase Reports (lease abstracts). Optional for backward compat:
+   * `.landroid` files and seed fixtures written before LPRs simply omit it, and
+   * readers treat a missing value as an empty list.
+   */
+  leasePurchaseReports?: LeasePurchaseReport[];
 }
 
 /** Project-open shape: owner docs carry metadata only, never the file blob. */
@@ -32,6 +42,7 @@ export interface OwnerWorkspaceMetadata {
   leases: Lease[];
   contacts: ContactLog[];
   docs: OwnerDocMeta[];
+  leasePurchaseReports?: LeasePurchaseReport[];
 }
 
 function stripOwnerDocBlob(doc: OwnerDoc): OwnerDocMeta {
@@ -53,6 +64,25 @@ async function getLeaseRow(id: string) {
   return (await db.leases.get(activeStorageScopedId(id))) ?? db.leases.get(id);
 }
 
+async function getLeasePurchaseReportRow(id: string) {
+  return (
+    (await db.leasePurchaseReports.get(activeStorageScopedId(id)))
+    ?? db.leasePurchaseReports.get(id)
+  );
+}
+
+async function loadLeasePurchaseReports(
+  workspaceId: string
+): Promise<LeasePurchaseReport[]> {
+  const rows = await db.leasePurchaseReports
+    .where('[dbKey+workspaceId]')
+    .equals(activeWorkspaceScope(workspaceId))
+    .toArray();
+  return rows.map((row) =>
+    normalizeLeasePurchaseReport(stripStoredId(row), { workspaceId })
+  );
+}
+
 async function getContactRow(id: string) {
   return (await db.contactLogs.get(activeStorageScopedId(id))) ?? db.contactLogs.get(id);
 }
@@ -64,11 +94,12 @@ async function getOwnerDocRow(id: string) {
 export async function loadOwnerWorkspaceData(
   workspaceId: string
 ): Promise<OwnerWorkspaceData> {
-  const [owners, leases, contacts, docs] = await Promise.all([
+  const [owners, leases, contacts, docs, leasePurchaseReports] = await Promise.all([
     db.owners.where('[dbKey+workspaceId]').equals(activeWorkspaceScope(workspaceId)).sortBy('name'),
     db.leases.where('[dbKey+workspaceId]').equals(activeWorkspaceScope(workspaceId)).toArray(),
     db.contactLogs.where('[dbKey+workspaceId]').equals(activeWorkspaceScope(workspaceId)).toArray(),
     db.ownerDocs.where('[dbKey+workspaceId]').equals(activeWorkspaceScope(workspaceId)).toArray(),
+    loadLeasePurchaseReports(workspaceId),
   ]);
 
   return {
@@ -76,6 +107,7 @@ export async function loadOwnerWorkspaceData(
     leases: leases.map((lease) => normalizeLease(stripStoredId(lease), { workspaceId })),
     contacts: contacts.map(stripStoredId),
     docs: docs.map(stripStoredId),
+    leasePurchaseReports,
   };
 }
 
@@ -87,11 +119,12 @@ export async function loadOwnerWorkspaceData(
 export async function loadOwnerWorkspaceMetadata(
   workspaceId: string
 ): Promise<OwnerWorkspaceMetadata> {
-  const [owners, leases, contacts, docs] = await Promise.all([
+  const [owners, leases, contacts, docs, leasePurchaseReports] = await Promise.all([
     db.owners.where('[dbKey+workspaceId]').equals(activeWorkspaceScope(workspaceId)).sortBy('name'),
     db.leases.where('[dbKey+workspaceId]').equals(activeWorkspaceScope(workspaceId)).toArray(),
     db.contactLogs.where('[dbKey+workspaceId]').equals(activeWorkspaceScope(workspaceId)).toArray(),
     db.ownerDocs.where('[dbKey+workspaceId]').equals(activeWorkspaceScope(workspaceId)).toArray(),
+    loadLeasePurchaseReports(workspaceId),
   ]);
 
   return {
@@ -99,6 +132,7 @@ export async function loadOwnerWorkspaceMetadata(
     leases: leases.map((lease) => normalizeLease(stripStoredId(lease), { workspaceId })),
     contacts: contacts.map(stripStoredId),
     docs: docs.map((doc) => stripOwnerDocBlob(stripStoredId(doc))),
+    leasePurchaseReports,
   };
 }
 
@@ -135,6 +169,7 @@ export async function replaceOwnerWorkspaceData(
       db.workspaceWriteLeases,
       db.owners,
       db.leases,
+      db.leasePurchaseReports,
       db.contactLogs,
       db.ownerDocs,
     ],
@@ -143,6 +178,7 @@ export async function replaceOwnerWorkspaceData(
       await Promise.all([
         db.owners.where('[dbKey+workspaceId]').equals(activeWorkspaceScope(workspaceId)).delete(),
         db.leases.where('[dbKey+workspaceId]').equals(activeWorkspaceScope(workspaceId)).delete(),
+        db.leasePurchaseReports.where('[dbKey+workspaceId]').equals(activeWorkspaceScope(workspaceId)).delete(),
         db.contactLogs.where('[dbKey+workspaceId]').equals(activeWorkspaceScope(workspaceId)).delete(),
         db.ownerDocs.where('[dbKey+workspaceId]').equals(activeWorkspaceScope(workspaceId)).delete(),
       ]);
@@ -159,6 +195,17 @@ export async function replaceOwnerWorkspaceData(
           data.leases.map((lease) =>
             stampActiveDbKeyWithStorageId(
               normalizeLease(lease, { workspaceId, ownerId: lease.ownerId }),
+              'id'
+            )
+          )
+        );
+      }
+      const leasePurchaseReports = data.leasePurchaseReports ?? [];
+      if (leasePurchaseReports.length > 0) {
+        await db.leasePurchaseReports.bulkPut(
+          leasePurchaseReports.map((lpr) =>
+            stampActiveDbKeyWithStorageId(
+              normalizeLeasePurchaseReport(lpr, { workspaceId, ownerId: lpr.ownerId }),
               'id'
             )
           )
@@ -206,6 +253,42 @@ export async function saveLease(lease: Lease) {
   });
 }
 
+export async function saveLeasePurchaseReport(lpr: LeasePurchaseReport) {
+  await ensureWorkspaceWriteFence(lpr.workspaceId);
+  return db.transaction(
+    'rw',
+    db.workspaceWriteLeases,
+    db.leasePurchaseReports,
+    async () => {
+      await assertWorkspaceWriteFence(lpr.workspaceId);
+      return db.leasePurchaseReports.put(
+        stampActiveDbKeyWithStorageId(
+          normalizeLeasePurchaseReport(lpr, {
+            workspaceId: lpr.workspaceId,
+            ownerId: lpr.ownerId,
+          }),
+          'id'
+        )
+      );
+    }
+  );
+}
+
+export async function deleteLeasePurchaseReport(id: string) {
+  const lpr = await getLeasePurchaseReportRow(id);
+  if (!lpr || lpr.dbKey !== activeWorkspaceScope(lpr.workspaceId)[0]) return;
+  await ensureWorkspaceWriteFence(lpr.workspaceId);
+  return db.transaction(
+    'rw',
+    db.workspaceWriteLeases,
+    db.leasePurchaseReports,
+    async () => {
+      await assertWorkspaceWriteFence(lpr.workspaceId);
+      await db.leasePurchaseReports.delete(lpr.id);
+    }
+  );
+}
+
 export async function saveContact(contact: ContactLog) {
   await ensureWorkspaceWriteFence(contact.workspaceId);
   return db.transaction('rw', db.workspaceWriteLeases, db.contactLogs, async () => {
@@ -248,6 +331,7 @@ export async function deleteOwner(id: string) {
       db.workspaceWriteLeases,
       db.owners,
       db.leases,
+      db.leasePurchaseReports,
       db.contactLogs,
       db.ownerDocs,
     ],
@@ -258,6 +342,10 @@ export async function deleteOwner(id: string) {
       await db.owners.delete(owner.id);
       await Promise.all([
         db.leases
+          .where('[dbKey+workspaceId+ownerId]')
+          .equals([...workspaceScope, ownerId])
+          .delete(),
+        db.leasePurchaseReports
           .where('[dbKey+workspaceId+ownerId]')
           .equals([...workspaceScope, ownerId])
           .delete(),

@@ -11,6 +11,7 @@ import type { OwnershipNode } from '../../types/node';
 import {
   DEFAULT_LEASE_STATUS,
   LEASE_STATUS_OPTIONS,
+  computeNetAcres,
   createBlankLease,
   createBlankOwner,
   isLeaseStatusOption,
@@ -18,6 +19,13 @@ import {
   normalizeLease,
   type Lease,
 } from '../../types/owner';
+import {
+  DEFAULT_LEASE_FORM,
+  LEASE_TYPE_OPTIONS,
+  createBlankLeasePurchaseReport,
+  normalizeLeasePurchaseReport,
+  type LeasePurchaseReport,
+} from '../../types/lease-purchase-report';
 import { deriveCounty } from '../../utils/land';
 import { parseStrictInterestString } from '../../utils/interest-string';
 import { serialize } from '../../engine/decimal';
@@ -77,8 +85,15 @@ export default function AttachLeaseModal({
   const ownerWorkspaceId = useOwnerStore((state) => state.workspaceId);
   const owners = useOwnerStore((state) => state.owners);
   const leases = useOwnerStore((state) => state.leases);
+  const leasePurchaseReports = useOwnerStore((state) => state.leasePurchaseReports);
   const addLease = useOwnerStore((state) => state.addLease);
   const updateLease = useOwnerStore((state) => state.updateLease);
+  const addLeasePurchaseReport = useOwnerStore(
+    (state) => state.addLeasePurchaseReport
+  );
+  const updateLeasePurchaseReport = useOwnerStore(
+    (state) => state.updateLeasePurchaseReport
+  );
   const addOwner = useOwnerStore((state) => state.addOwner);
   const pdfInputRef = useRef<HTMLInputElement>(null);
 
@@ -168,6 +183,37 @@ export default function AttachLeaseModal({
           parentNode
         )
   );
+
+  // The Lease Purchase Report carries the instrument-level abstract shared
+  // across tracts (lessee, type, form, economics, term). The per-tract slice
+  // above keeps lessor interest / acres / status. Seed a fresh LPR from the
+  // lease draft so single-entry fields carry over for existing standalone leases.
+  const existingLpr = useMemo<LeasePurchaseReport | null>(() => {
+    const lprId = existingLease?.leasePurchaseReportId ?? null;
+    if (!lprId) return null;
+    return leasePurchaseReports.find((report) => report.id === lprId) ?? null;
+  }, [existingLease?.leasePurchaseReportId, leasePurchaseReports]);
+
+  const [lprDraft, setLprDraft] = useState<LeasePurchaseReport>(() => {
+    const resolvedWorkspaceId = ownerWorkspaceId ?? workspaceId;
+    const ownerId = parentNode.linkedOwnerId ?? '';
+    if (existingLpr) {
+      return normalizeLeasePurchaseReport(existingLpr, {
+        workspaceId: resolvedWorkspaceId,
+        ownerId,
+      });
+    }
+    return createBlankLeasePurchaseReport(resolvedWorkspaceId, ownerId, {
+      lesseeName: existingLease?.lessee ?? '',
+      royalty: existingLease?.royaltyRate ?? '',
+      effectiveDate: existingLease?.effectiveDate ?? '',
+      expirationDate: existingLease?.expirationDate ?? '',
+      primaryTerm: existingLease?.primaryTerm ?? '',
+      heldByProduction: existingLease?.heldByProduction ?? false,
+      comments: existingLease?.notes ?? '',
+    });
+  });
+
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [selectedOwnerId, setSelectedOwnerId] = useState('');
@@ -181,6 +227,18 @@ export default function AttachLeaseModal({
     setSaveError(null);
     setDraft((current) => ({ ...current, [field]: value }));
   };
+
+  const setLpr = (field: keyof LeasePurchaseReport, value: string) => {
+    setSaveError(null);
+    setLprDraft((current) => ({ ...current, [field]: value }));
+  };
+
+  const setLprFlag = (field: 'heldByProduction' | 'paidUp', value: boolean) => {
+    setSaveError(null);
+    setLprDraft((current) => ({ ...current, [field]: value }));
+  };
+
+  const netAcresPreview = computeNetAcres(draft.grossAcres, draft.leasedInterest);
 
   const handleSave = async () => {
     if (!isParentMineral) {
@@ -201,7 +259,7 @@ export default function AttachLeaseModal({
     // legal "not entered yet" state and parses as Decimal(0); malformed input ("abc",
     // "1/0", multi-slash garbage) returns null and blocks the save with an inline
     // error. Closes audit finding #4.
-    const parsedRoyalty = parseStrictInterestString(draft.royaltyRate);
+    const parsedRoyalty = parseStrictInterestString(lprDraft.royalty);
     if (parsedRoyalty === null) {
       setSaveError(
         'Royalty must be a fraction (e.g. 1/8), a decimal (e.g. 0.125), or blank.'
@@ -254,20 +312,43 @@ export default function AttachLeaseModal({
         ? ''
         : serialize(parsedLeasedInterest);
 
+      // The LPR is the instrument-level abstract. Build/persist it first so the
+      // tract slice can reference its id; derive the math-relevant slice scalars
+      // (royalty, lessee, dates) from it so the existing coverage/summary
+      // pipeline reads a single source of truth.
+      const lprRecord = existingLpr
+        ? normalizeLeasePurchaseReport(
+            { ...existingLpr, ...lprDraft, ownerId, workspaceId: resolvedWorkspaceId },
+            { workspaceId: resolvedWorkspaceId, ownerId }
+          )
+        : createBlankLeasePurchaseReport(resolvedWorkspaceId, ownerId, {
+            ...lprDraft,
+            ownerId,
+          });
+
+      const leaseOverrides = {
+        lessee: lprDraft.lesseeName,
+        royaltyRate: lprDraft.royalty.trim(),
+        leasedInterest: normalizedLeasedInterest,
+        effectiveDate: lprDraft.effectiveDate,
+        expirationDate: lprDraft.expirationDate,
+        primaryTerm: lprDraft.primaryTerm,
+        heldByProduction: lprDraft.heldByProduction,
+        notes: lprDraft.comments,
+        leasePurchaseReportId: lprRecord.id,
+        ownerId,
+      };
+
       const leaseRecord = existingLease
         ? {
             ...existingLease,
             ...draft,
-            royaltyRate: draft.royaltyRate.trim(),
-            leasedInterest: normalizedLeasedInterest,
-            ownerId,
+            ...leaseOverrides,
             workspaceId: resolvedWorkspaceId,
           }
         : createBlankLease(resolvedWorkspaceId, ownerId, {
             ...draft,
-            royaltyRate: draft.royaltyRate.trim(),
-            leasedInterest: normalizedLeasedInterest,
-            ownerId,
+            ...leaseOverrides,
           });
 
       const leaseNodeId =
@@ -282,6 +363,12 @@ export default function AttachLeaseModal({
         lease: leaseRecord,
         existingNode: existingLeaseNode,
       });
+
+      if (existingLpr) {
+        await updateLeasePurchaseReport(existingLpr.id, lprRecord);
+      } else {
+        await addLeasePurchaseReport(lprRecord);
+      }
 
       if (existingLease) {
         await updateLease(existingLease.id, leaseRecord);
@@ -353,7 +440,11 @@ export default function AttachLeaseModal({
     <Modal
       open
       onClose={onClose}
-      title={isEditingExistingLease ? 'Edit Lessee Node' : 'Create Lessee Node'}
+      title={
+        isEditingExistingLease
+          ? 'Edit Lease Purchase Report'
+          : 'New Lease Purchase Report'
+      }
     >
       <div className="space-y-4">
         <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-xs text-emerald-900">
@@ -389,7 +480,121 @@ export default function AttachLeaseModal({
 
         <fieldset className="space-y-2">
           <legend className="text-xs font-semibold text-ink-light uppercase tracking-wider mb-2">
-            Lease Info
+            Lessee &amp; Lease Form
+          </legend>
+          <div className="grid grid-cols-2 gap-2">
+            <FormField
+              label="Lessee"
+              value={lprDraft.lesseeName}
+              onChange={(value) => setLpr('lesseeName', value)}
+            />
+            <div>
+              <label className="text-[10px] text-ink-light uppercase tracking-wider block mb-1">
+                Lease Type
+              </label>
+              <select
+                value={lprDraft.leaseType}
+                onChange={(event) => setLpr('leaseType', event.target.value)}
+                className="w-full px-3 py-2 rounded-lg border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-emerald-600 focus:border-emerald-600 outline-none"
+              >
+                {LEASE_TYPE_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <FormField
+              label="Lease Form"
+              value={lprDraft.leaseForm}
+              onChange={(value) => setLpr('leaseForm', value)}
+            />
+          </div>
+          <div className="text-[11px] leading-5 text-ink-light">
+            Lease form defaults to {DEFAULT_LEASE_FORM}.
+          </div>
+        </fieldset>
+
+        <fieldset className="space-y-2">
+          <legend className="text-xs font-semibold text-ink-light uppercase tracking-wider mb-2">
+            Dates &amp; Term
+          </legend>
+          <div className="grid grid-cols-2 gap-2">
+            <FormField
+              label="Lease Date"
+              type="date"
+              value={lprDraft.leaseDate}
+              onChange={(value) => setLpr('leaseDate', value)}
+            />
+            <FormField
+              label="Primary Term"
+              value={lprDraft.primaryTerm}
+              onChange={(value) => setLpr('primaryTerm', value)}
+            />
+            <FormField
+              label="Effective Date"
+              type="date"
+              value={lprDraft.effectiveDate}
+              onChange={(value) => setLpr('effectiveDate', value)}
+            />
+            <FormField
+              label="Expiration Date"
+              type="date"
+              value={lprDraft.expirationDate}
+              onChange={(value) => setLpr('expirationDate', value)}
+            />
+            <label className="flex items-center gap-2 text-xs text-ink mt-1">
+              <input
+                type="checkbox"
+                checked={lprDraft.heldByProduction}
+                onChange={(event) =>
+                  setLprFlag('heldByProduction', event.target.checked)
+                }
+              />
+              Held by production (HBP)
+            </label>
+          </div>
+        </fieldset>
+
+        <fieldset className="space-y-2">
+          <legend className="text-xs font-semibold text-ink-light uppercase tracking-wider mb-2">
+            Economics
+          </legend>
+          <div className="grid grid-cols-2 gap-2">
+            <FormField
+              label="Royalty"
+              value={lprDraft.royalty}
+              onChange={(value) => setLpr('royalty', value)}
+            />
+            <div />
+            <FormField
+              label="Bonus / Ac"
+              value={lprDraft.bonusPerAcre}
+              onChange={(value) => setLpr('bonusPerAcre', value)}
+            />
+            <FormField
+              label="Rental / Ac"
+              value={lprDraft.rentalPerAcre}
+              onChange={(value) => setLpr('rentalPerAcre', value)}
+            />
+            <label className="flex items-center gap-2 text-xs text-ink mt-1">
+              <input
+                type="checkbox"
+                checked={lprDraft.paidUp}
+                onChange={(event) => setLprFlag('paidUp', event.target.checked)}
+              />
+              Paid up (no delay rentals)
+            </label>
+          </div>
+          <div className="text-[11px] leading-5 text-ink-light">
+            Royalty starts blank so a placeholder rate is not mistaken for lease evidence.
+            Blank economics stay as not entered in payout review.
+          </div>
+        </fieldset>
+
+        <fieldset className="space-y-2">
+          <legend className="text-xs font-semibold text-ink-light uppercase tracking-wider mb-2">
+            Tract
           </legend>
           <div className="grid grid-cols-2 gap-2">
             <FormField
@@ -398,32 +603,23 @@ export default function AttachLeaseModal({
               onChange={(value) => set('leaseName', value)}
             />
             <FormField
-              label="Lessee"
-              value={draft.lessee}
-              onChange={(value) => set('lessee', value)}
-            />
-            <FormField
-              label="Royalty"
-              value={draft.royaltyRate}
-              onChange={(value) => set('royaltyRate', value)}
-            />
-            <FormField
-              label="Leased Interest"
+              label="Lessor Interest"
               value={draft.leasedInterest}
               onChange={(value) => set('leasedInterest', value)}
             />
             <FormField
-              label="Effective Date"
-              type="date"
-              value={draft.effectiveDate}
-              onChange={(value) => set('effectiveDate', value)}
+              label="Gross Acres"
+              value={draft.grossAcres}
+              onChange={(value) => set('grossAcres', value)}
             />
-            <FormField
-              label="Expiration Date"
-              type="date"
-              value={draft.expirationDate}
-              onChange={(value) => set('expirationDate', value)}
-            />
+            <div>
+              <label className="text-[10px] text-ink-light uppercase tracking-wider block mb-1">
+                Net Mineral Acres
+              </label>
+              <div className="px-3 py-2 rounded-lg border border-ledger-line bg-ledger text-sm text-ink-light">
+                {netAcresPreview || '—'}
+              </div>
+            </div>
             <div>
               <label className="text-[10px] text-ink-light uppercase tracking-wider block mb-1">
                 Status
@@ -447,18 +643,18 @@ export default function AttachLeaseModal({
             />
           </div>
           <div className="text-[11px] leading-5 text-ink-light">
-            Royalty starts blank so a placeholder rate is not mistaken for lease evidence.
-            Blank economics stay as not entered in payout review.
+            Net mineral acres = gross acres x lessor interest. This is the acre view
+            of the lessor interest and does not change the ownership math.
           </div>
         </fieldset>
 
         <div>
           <label className="text-[10px] text-ink-light uppercase tracking-wider block mb-1">
-            Notes
+            Comments
           </label>
           <textarea
-            value={draft.notes}
-            onChange={(event) => set('notes', event.target.value)}
+            value={lprDraft.comments}
+            onChange={(event) => setLpr('comments', event.target.value)}
             rows={4}
             className="w-full px-3 py-2 rounded-lg border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none resize-y"
           />
@@ -554,8 +750,8 @@ export default function AttachLeaseModal({
             {saving
               ? 'Saving...'
               : isEditingExistingLease
-                ? 'Save Lessee Node'
-                : 'Create Lessee Node'}
+                ? 'Save Lease'
+                : 'Create Lease'}
           </button>
         </div>
       </div>

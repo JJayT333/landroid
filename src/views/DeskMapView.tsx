@@ -86,6 +86,7 @@ interface TreeBranchProps {
   onEdit: (id: string) => void;
   onConvey: (id: string) => void;
   onPrecede: (id: string) => void;
+  onLease: (id: string) => void;
   onAttachDoc: (id: string) => void;
   onDelete: (id: string) => void;
   onViewDoc: (id: string) => void;
@@ -102,6 +103,7 @@ function TreeBranchComponent({
   onEdit,
   onConvey,
   onPrecede,
+  onLease,
   onAttachDoc,
   onDelete,
   onViewDoc,
@@ -147,6 +149,7 @@ function TreeBranchComponent({
           onEdit={onEdit}
           onConvey={onConvey}
           onPrecede={onPrecede}
+          onLease={onLease}
           onAttachDoc={onAttachDoc}
           onDelete={onDelete}
           onViewDoc={onViewDoc}
@@ -168,6 +171,7 @@ function TreeBranchComponent({
               onEdit={onEdit}
               onConvey={onConvey}
               onPrecede={onPrecede}
+              onLease={onLease}
               onAttachDoc={onAttachDoc}
               onDelete={onDelete}
               onViewDoc={onViewDoc}
@@ -195,6 +199,7 @@ function treeBranchPropsAreEqual(
     previous.onEdit === next.onEdit &&
     previous.onConvey === next.onConvey &&
     previous.onPrecede === next.onPrecede &&
+    previous.onLease === next.onLease &&
     previous.onAttachDoc === next.onAttachDoc &&
     previous.onDelete === next.onDelete &&
     previous.onViewDoc === next.onViewDoc &&
@@ -1092,6 +1097,12 @@ export default function DeskMapView() {
     setPrecedeNodeId(id);
   }, [readOnly]);
 
+  const handleLease = useCallback((id: string) => {
+    if (readOnly) return;
+    setActiveNode(id);
+    setEditorRoute({ kind: 'lease', parentNodeId: id });
+  }, [readOnly, setActiveNode]);
+
   const handleAttachDoc = useCallback((id: string) => {
     if (readOnly) return;
     setAttachDocParentId(id);
@@ -1546,6 +1557,7 @@ export default function DeskMapView() {
                   onEdit={handleEdit}
                   onConvey={handleConvey}
                   onPrecede={handlePrecede}
+                  onLease={handleLease}
                   onAttachDoc={handleAttachDoc}
                   onDelete={handleDelete}
                   onViewDoc={handleViewDoc}

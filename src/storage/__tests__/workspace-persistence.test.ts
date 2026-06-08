@@ -6,6 +6,7 @@ import {
   createBlankMapRegion,
 } from '../../types/map';
 import { createBlankLease, createBlankOwner, createBlankOwnerDoc } from '../../types/owner';
+import { createBlankLeasePurchaseReport } from '../../types/lease-purchase-report';
 import { createBlankNode } from '../../types/node';
 import {
   createBlankResearchFormula,
@@ -395,6 +396,51 @@ function titleLandroidData(): LandroidFileData {
 }
 
 describe('workspace-persistence', () => {
+  it('round-trips Lease Purchase Reports and lease slice acre/term fields', async () => {
+    const original = buildWorkspace(null);
+    const lpr = createBlankLeasePurchaseReport('ws-1', 'owner-1', {
+      id: 'lpr-1',
+      lesseeName: 'Magnolia Petroleum Company, LLC',
+      royalty: '1/4',
+      primaryTerm: 'one year',
+      leaseForm: 'Producers 88 (7-69)',
+    });
+    const withLpr: LandroidFileData = {
+      ...original,
+      ownerData: {
+        ...original.ownerData!,
+        leases: original.ownerData!.leases.map((lease) => ({
+          ...lease,
+          leasePurchaseReportId: 'lpr-1',
+          grossAcres: '35.92',
+          leasedInterest: '0.5',
+        })),
+        leasePurchaseReports: [lpr],
+      },
+    };
+
+    const blob = await exportLandroidFile(withLpr);
+    const file = new File([await blob.text()], 'lpr.landroid', {
+      type: 'application/json',
+    });
+    const imported = await importLandroidFile(file);
+
+    expect(imported.ownerData?.leasePurchaseReports).toEqual([
+      expect.objectContaining({
+        id: 'lpr-1',
+        royalty: '1/4',
+        leaseForm: 'Producers 88 (7-69)',
+        primaryTerm: 'one year',
+      }),
+    ]);
+    const lease = imported.ownerData?.leases.find((entry) => entry.id === 'lease-1');
+    expect(lease).toMatchObject({
+      leasePurchaseReportId: 'lpr-1',
+      grossAcres: '35.92',
+      netAcres: '17.96',
+    });
+  });
+
   it('round-trips canvas state through .landroid export/import', async () => {
     const original = buildWorkspace(buildCanvas());
     const blob = await exportLandroidFile(original);
