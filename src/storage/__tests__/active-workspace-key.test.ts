@@ -22,6 +22,7 @@ describe('active-workspace-key (audit M-1)', () => {
   it('local mode: ready immediately, returns the legacy default key', async () => {
     const mod = await loadModule(false);
     await expect(mod.awaitWorkspaceKeyReady()).resolves.toBeUndefined();
+    expect(mod.getProjectIndexDbKey()).toBe('default');
     expect(mod.getWorkspaceDbKey()).toBe('default');
     expect(mod.getCanvasDbKey()).toBe('active-canvas');
     expect(mod.getActiveUserSub()).toBeNull();
@@ -30,6 +31,21 @@ describe('active-workspace-key (audit M-1)', () => {
   it('local mode: ignores any sub set on it (no namespacing in local mode)', async () => {
     const mod = await loadModule(false);
     mod.setActiveUserSub('whoever');
+    expect(mod.getWorkspaceDbKey()).toBe('default');
+    expect(mod.getCanvasDbKey()).toBe('active-canvas');
+  });
+
+  it('local mode: project-specific storage keys isolate workspace and canvas rows', async () => {
+    const mod = await loadModule(false);
+    const projectKey = mod.makeProjectWorkspaceDbKey('ws-project');
+    expect(projectKey).toBe('default::project::ws-project');
+
+    mod.setActiveWorkspaceStorageKey(projectKey);
+    expect(mod.getProjectIndexDbKey()).toBe('default');
+    expect(mod.getWorkspaceDbKey()).toBe(projectKey);
+    expect(mod.getCanvasDbKey()).toBe(`${projectKey}-canvas`);
+
+    mod.setActiveWorkspaceStorageKey(null);
     expect(mod.getWorkspaceDbKey()).toBe('default');
     expect(mod.getCanvasDbKey()).toBe('active-canvas');
   });
@@ -51,6 +67,7 @@ describe('active-workspace-key (audit M-1)', () => {
     expect(resolvedFlag).toBe(true);
 
     expect(mod.getActiveUserSub()).toBe('user-abc');
+    expect(mod.getProjectIndexDbKey()).toBe('user-user-abc');
     expect(mod.getWorkspaceDbKey()).toBe('user-user-abc');
     expect(mod.getCanvasDbKey()).toBe('user-user-abc-canvas');
   });
@@ -83,5 +100,12 @@ describe('active-workspace-key (audit M-1)', () => {
     mod.setActiveUserSub('bob');
     expect(mod.getWorkspaceDbKey()).toBe('user-bob');
     expect(mod.getCanvasDbKey()).toBe('user-bob-canvas');
+
+    const projectKey = mod.makeProjectWorkspaceDbKey('ws-hosted');
+    expect(projectKey).toBe('user-bob::project::ws-hosted');
+    mod.setActiveWorkspaceStorageKey(projectKey);
+    expect(mod.getProjectIndexDbKey()).toBe('user-bob');
+    expect(mod.getWorkspaceDbKey()).toBe(projectKey);
+    expect(mod.getCanvasDbKey()).toBe(`${projectKey}-canvas`);
   });
 });

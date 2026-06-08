@@ -78,6 +78,20 @@ export interface CanvasRecord {
   savedAt: string;
 }
 
+export interface SavedProjectRecord {
+  id: string;
+  indexDbKey: string;
+  workspaceId: string;
+  workspaceDbKey: string;
+  projectName: string;
+  createdAt: string;
+  updatedAt: string;
+  lastOpenedAt: string;
+}
+
+const SAVED_PROJECTS_STORE_DEFINITION =
+  'id, indexDbKey, workspaceId, workspaceDbKey, projectName, [indexDbKey+workspaceId], [indexDbKey+workspaceDbKey], [indexDbKey+lastOpenedAt], [indexDbKey+updatedAt], [indexDbKey+projectName]';
+
 const db = new Dexie('landroid-v2') as Dexie & {
   pdfs: EntityTable<PdfAttachment, 'nodeId'>;
   documents: EntityTable<DbScoped<DocumentRecord>, 'docId'>;
@@ -105,6 +119,7 @@ const db = new Dexie('landroid-v2') as Dexie & {
   titleActionRecords: EntityTable<StoredTitleActionRecord, 'id'>;
   titleAuditEvents: EntityTable<StoredTitleAuditEvent, 'id'>;
   workspaceWriteLeases: EntityTable<WorkspaceWriteLease, 'workspaceId'>;
+  savedProjects: EntityTable<SavedProjectRecord, 'id'>;
 };
 
 db.version(1).stores({
@@ -471,6 +486,230 @@ db.version(12).stores({
   ...WORKSPACE_SHARD_STORE_DEFINITIONS,
   ...TITLE_LEDGER_STORE_DEFINITIONS,
 });
+
+/**
+ * v13 (project picker landing).
+ *
+ * Adds a per-user saved-project index. Existing single-project rows keep their
+ * current workspace DB key; newly-created projects can use an isolated DB key
+ * recorded in this index without changing the exported `.landroid` format.
+ */
+db.version(13)
+  .stores({
+  pdfs: 'nodeId',
+  workspaces: 'id',
+  canvases: 'id',
+  owners: 'id, dbKey, workspaceId, name, [dbKey+workspaceId], [dbKey+workspaceId+name]',
+  leases:
+    'id, dbKey, workspaceId, ownerId, [dbKey+workspaceId], [dbKey+workspaceId+ownerId], [workspaceId+ownerId]',
+  contactLogs:
+    'id, dbKey, workspaceId, ownerId, [dbKey+workspaceId], [dbKey+workspaceId+ownerId], [workspaceId+ownerId]',
+  ownerDocs:
+    'id, dbKey, workspaceId, ownerId, leaseId, [dbKey+workspaceId], [dbKey+workspaceId+ownerId], [dbKey+workspaceId+leaseId], [workspaceId+ownerId], [workspaceId+leaseId]',
+  mapAssets:
+    'id, dbKey, workspaceId, isFeatured, deskMapId, nodeId, linkedOwnerId, leaseId, researchSourceId, researchProjectRecordId, [dbKey+workspaceId], [dbKey+workspaceId+isFeatured], [dbKey+workspaceId+deskMapId], [dbKey+workspaceId+nodeId], [dbKey+workspaceId+linkedOwnerId], [dbKey+workspaceId+leaseId], [workspaceId+isFeatured], [workspaceId+deskMapId], [workspaceId+nodeId], [workspaceId+linkedOwnerId], [workspaceId+leaseId], [workspaceId+researchSourceId], [workspaceId+researchProjectRecordId]',
+  mapRegions:
+    'id, dbKey, workspaceId, assetId, deskMapId, nodeId, linkedOwnerId, leaseId, researchSourceId, researchProjectRecordId, [dbKey+workspaceId], [dbKey+workspaceId+assetId], [dbKey+workspaceId+deskMapId], [dbKey+workspaceId+nodeId], [dbKey+workspaceId+linkedOwnerId], [dbKey+workspaceId+leaseId], [workspaceId+assetId], [workspaceId+deskMapId], [workspaceId+nodeId], [workspaceId+linkedOwnerId], [workspaceId+leaseId], [workspaceId+researchSourceId], [workspaceId+researchProjectRecordId]',
+  mapExternalReferences:
+    'id, dbKey, workspaceId, assetId, regionId, source, [dbKey+workspaceId], [dbKey+workspaceId+assetId], [dbKey+workspaceId+regionId], [workspaceId+assetId], [workspaceId+regionId]',
+  researchImports:
+    'id, dbKey, workspaceId, datasetId, detectedFormat, [dbKey+workspaceId], [dbKey+workspaceId+datasetId], [dbKey+workspaceId+detectedFormat], [workspaceId+datasetId], [workspaceId+detectedFormat]',
+  researchSources:
+    'id, dbKey, workspaceId, sourceType, context, [dbKey+workspaceId], [dbKey+workspaceId+sourceType], [dbKey+workspaceId+context], [workspaceId+sourceType], [workspaceId+context]',
+  researchFormulas:
+    'id, dbKey, workspaceId, category, status, [dbKey+workspaceId], [dbKey+workspaceId+category], [dbKey+workspaceId+status], [workspaceId+category], [workspaceId+status]',
+  researchProjectRecords:
+    'id, dbKey, workspaceId, recordType, jurisdiction, status, [dbKey+workspaceId], [dbKey+workspaceId+recordType], [dbKey+workspaceId+jurisdiction], [dbKey+workspaceId+status], [workspaceId+recordType], [workspaceId+jurisdiction], [workspaceId+status]',
+  researchQuestions:
+    'id, dbKey, workspaceId, status, [dbKey+workspaceId], [dbKey+workspaceId+status], [workspaceId+status]',
+  titleIssues:
+    'id, dbKey, workspaceId, status, priority, issueType, affectedDeskMapId, affectedNodeId, affectedOwnerId, affectedLeaseId, [dbKey+workspaceId], [dbKey+workspaceId+status], [dbKey+workspaceId+priority], [workspaceId+status], [workspaceId+priority]',
+  documents:
+    'docId, dbKey, workspaceId, contentHash, [dbKey+workspaceId], [dbKey+workspaceId+kind], [dbKey+workspaceId+createdAt], [workspaceId+kind], [workspaceId+createdAt]',
+  document_attachments:
+    'attachmentId, dbKey, workspaceId, docId, [dbKey+workspaceId], [dbKey+workspaceId+entityKind+entityId], [dbKey+workspaceId+docId], [workspaceId+entityKind+entityId], [entityKind+entityId], [docId+entityKind+entityId]',
+  ...WORKSPACE_SHARD_STORE_DEFINITIONS,
+  ...TITLE_LEDGER_STORE_DEFINITIONS,
+  savedProjects: SAVED_PROJECTS_STORE_DEFINITION,
+})
+  .upgrade(async (tx) => {
+    await runV12ToV13SavedProjectIndexMigration(tx);
+  });
+
+
+const PROJECT_WORKSPACE_KEY_SEPARATOR = '::project::';
+
+function savedProjectStorageId(indexDbKey: string, workspaceId: string): string {
+  return storageScopedId(workspaceId, indexDbKey);
+}
+
+function inferProjectIndexDbKey(workspaceDbKey: string, workspaceId: string): string {
+  const suffix = `${PROJECT_WORKSPACE_KEY_SEPARATOR}${workspaceId}`;
+  return workspaceDbKey.endsWith(suffix)
+    ? workspaceDbKey.slice(0, -suffix.length)
+    : workspaceDbKey;
+}
+
+function arrayLength(value: unknown): number {
+  return Array.isArray(value) ? value.length : 0;
+}
+
+function isBlankProjectName(value: string): boolean {
+  const trimmed = value.trim();
+  return trimmed.length === 0 || trimmed === 'Untitled Workspace';
+}
+
+function shouldSkipBlankDefaultProjectIndexRecord(args: {
+  workspaceDbKey: string;
+  projectName: string;
+  hasProjectContent: boolean;
+}): boolean {
+  return (
+    args.workspaceDbKey === 'default'
+    && !args.hasProjectContent
+    && isBlankProjectName(args.projectName)
+  );
+}
+
+function savedProjectMigrationScope(
+  workspaceDbKey: string,
+  workspaceId: string
+): string {
+  return `${workspaceDbKey}\u0000${workspaceId}`;
+}
+
+function manifestHasProjectContent(manifest: WorkspaceManifestShard): boolean {
+  return (manifest.nodeCount ?? 0) > 0;
+}
+
+function leaseholdStateHasProjectContent(row: LeaseholdStateShard): boolean {
+  return (
+    arrayLength(row.leaseholdAssignments) > 0
+    || arrayLength(row.leaseholdOrris) > 0
+    || arrayLength(row.leaseholdTransferOrderEntries) > 0
+  );
+}
+
+function parseWorkspaceRecordData(record: WorkspaceRecord): {
+  workspaceId: string;
+  projectName: string;
+  hasProjectContent: boolean;
+} | null {
+  try {
+    const parsed = JSON.parse(record.data) as unknown;
+    if (
+      parsed
+      && typeof parsed === 'object'
+      && typeof (parsed as { workspaceId?: unknown }).workspaceId === 'string'
+    ) {
+      return {
+        workspaceId: (parsed as { workspaceId: string }).workspaceId,
+        projectName:
+          typeof (parsed as { projectName?: unknown }).projectName === 'string'
+            ? (parsed as { projectName: string }).projectName
+            : record.projectName,
+        hasProjectContent:
+          arrayLength((parsed as { nodes?: unknown }).nodes) > 0
+          || arrayLength((parsed as { deskMaps?: unknown }).deskMaps) > 0
+          || arrayLength((parsed as { leaseholdAssignments?: unknown }).leaseholdAssignments) > 0
+          || arrayLength((parsed as { leaseholdOrris?: unknown }).leaseholdOrris) > 0
+          || arrayLength((parsed as { leaseholdTransferOrderEntries?: unknown }).leaseholdTransferOrderEntries) > 0,
+      };
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+function mergeSavedProjectRecord(
+  records: Map<string, SavedProjectRecord>,
+  next: SavedProjectRecord
+): void {
+  const current = records.get(next.id);
+  if (!current || current.updatedAt < next.updatedAt) {
+    records.set(next.id, next);
+  }
+}
+
+async function runV12ToV13SavedProjectIndexMigration(tx: Transaction): Promise<void> {
+  const records = new Map<string, SavedProjectRecord>();
+  const manifests = await tx
+    .table<WorkspaceManifestShard, 'id'>('workspaceManifestShards')
+    .toArray();
+  const leaseholdRows = await tx
+    .table<LeaseholdStateShard, 'id'>('leaseholdStateShards')
+    .toArray();
+  const contentfulLeaseholdScopes = new Set(
+    leaseholdRows
+      .filter(leaseholdStateHasProjectContent)
+      .map((row) =>
+        savedProjectMigrationScope(row.dbKey ?? 'default', row.workspaceId)
+      )
+  );
+
+  for (const manifest of manifests) {
+    const workspaceDbKey = manifest.dbKey ?? 'default';
+    const projectName = manifest.backendRecord.projectName || 'Untitled Workspace';
+    const hasProjectContent = manifestHasProjectContent(manifest)
+      || contentfulLeaseholdScopes.has(
+        savedProjectMigrationScope(workspaceDbKey, manifest.workspaceId)
+      );
+    if (
+      shouldSkipBlankDefaultProjectIndexRecord({
+        workspaceDbKey,
+        projectName,
+        hasProjectContent,
+      })
+    ) {
+      continue;
+    }
+    const indexDbKey = inferProjectIndexDbKey(workspaceDbKey, manifest.workspaceId);
+    const timestamp = manifest.backendRecord.lastModified || manifest.backendRecord.generatedAt;
+    mergeSavedProjectRecord(records, {
+      id: savedProjectStorageId(indexDbKey, manifest.workspaceId),
+      indexDbKey,
+      workspaceId: manifest.workspaceId,
+      workspaceDbKey,
+      projectName,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+      lastOpenedAt: timestamp,
+    });
+  }
+
+  const workspaceRows = await tx.table<WorkspaceRecord, 'id'>('workspaces').toArray();
+  for (const row of workspaceRows) {
+    const parsed = parseWorkspaceRecordData(row);
+    if (!parsed) continue;
+    const workspaceDbKey = row.id || 'default';
+    if (
+      shouldSkipBlankDefaultProjectIndexRecord({
+        workspaceDbKey,
+        projectName: parsed.projectName,
+        hasProjectContent: parsed.hasProjectContent,
+      })
+    ) {
+      continue;
+    }
+    const indexDbKey = inferProjectIndexDbKey(workspaceDbKey, parsed.workspaceId);
+    const timestamp = row.savedAt || new Date(0).toISOString();
+    mergeSavedProjectRecord(records, {
+      id: savedProjectStorageId(indexDbKey, parsed.workspaceId),
+      indexDbKey,
+      workspaceId: parsed.workspaceId,
+      workspaceDbKey,
+      projectName: parsed.projectName || 'Untitled Workspace',
+      createdAt: timestamp,
+      updatedAt: timestamp,
+      lastOpenedAt: timestamp,
+    });
+  }
+
+  if (records.size > 0) {
+    await tx.table<SavedProjectRecord, 'id'>('savedProjects').bulkPut([...records.values()]);
+  }
+}
 
 /**
  * Real-implementation deps for the migration. The pure helper accepts

@@ -39,7 +39,7 @@ zip_has() {
 
 printf "\n== LANDroid hosted predeploy check ==\n\n"
 
-printf "[1/7] Required repo files\n"
+printf "[1/8] Required repo files\n"
 has_file "amplify.yml"
 has_file "amplify-rewrites.json"
 has_file "customHttp.yml"
@@ -49,7 +49,7 @@ has_file "backend/spine/package.json"
 has_file "backend/spine/src/lambda.ts"
 has_file "backend/spine/src/handler.ts"
 
-printf "\n[2/7] Frontend build guard\n"
+printf "\n[2/8] Frontend build guard\n"
 if grep -q "VITE_COGNITO_DOMAIN" "$ROOT/amplify.yml" \
   && grep -q "VITE_COGNITO_CLIENT_ID" "$ROOT/amplify.yml" \
   && grep -q "VITE_COGNITO_REDIRECT_URI" "$ROOT/amplify.yml" \
@@ -59,7 +59,7 @@ else
   fail "amplify.yml does not guard required Cognito env vars"
 fi
 
-printf "\n[3/7] Lambda package scripts\n"
+printf "\n[3/8] Lambda package scripts\n"
 if node -e "const p=require('./backend/ai-proxy/package.json'); process.exit(p.scripts?.package === 'npm run bundle' ? 0 : 1)" \
   >/dev/null 2>&1; then
   pass "AI proxy npm run package delegates to npm run bundle"
@@ -88,7 +88,7 @@ else
   fail "backend spine missing aws-jwt-verify or zod dependency"
 fi
 
-printf "\n[4/7] AI proxy Lambda zip contents\n"
+printf "\n[4/8] AI proxy Lambda zip contents\n"
 if [[ -f "$AI_ZIP" ]]; then
   pass "backend/ai-proxy/lambda.zip exists"
   info "$(ls -lh "$AI_ZIP" | awk '{print "AI proxy lambda.zip size: " $5}')"
@@ -101,7 +101,7 @@ else
   fail "backend/ai-proxy/lambda.zip missing; run cd backend/ai-proxy && npm run bundle"
 fi
 
-printf "\n[5/7] Backend spine Lambda zip contents\n"
+printf "\n[5/8] Backend spine Lambda zip contents\n"
 if [[ -f "$SPINE_ZIP" ]]; then
   pass "backend/spine/lambda.zip exists"
   info "$(ls -lh "$SPINE_ZIP" | awk '{print "backend spine lambda.zip size: " $5}')"
@@ -115,7 +115,7 @@ else
   fail "backend/spine/lambda.zip missing; run cd backend/spine && npm ci && npm run bundle"
 fi
 
-printf "\n[6/7] Hosted usage-store policy\n"
+printf "\n[6/8] Hosted usage-store policy\n"
 if grep -q "USAGE_TABLE_NAME" "$ROOT/backend/ai-proxy/src/handler.ts" \
   && grep -q "ALLOW_IN_MEMORY_USAGE_STORE" "$ROOT/backend/ai-proxy/src/handler.ts"; then
   pass "handler requires durable usage table unless local fallback is explicit"
@@ -123,7 +123,17 @@ else
   fail "handler usage-store guard missing or incomplete"
 fi
 
-printf "\n[7/7] Amplify rewrite placeholders\n"
+printf "\n[7/8] Amplify static asset rewrite allowlist\n"
+REWRITE_SOURCE="$(node -e "const rewrites=require('./amplify-rewrites.json'); const rule=rewrites.find((entry)=>entry.target==='/index.html'); process.stdout.write(rule?.source || '')" 2>/dev/null || true)"
+for ext in landroid pdf pptx; do
+  if [[ "$REWRITE_SOURCE" == *"$ext"* ]]; then
+    pass "SPA fallback excludes .$ext static assets"
+  else
+    fail "SPA fallback rewrites .$ext static assets to index.html"
+  fi
+done
+
+printf "\n[8/8] Amplify rewrite placeholders\n"
 if grep -q "REPLACE_WITH_AI_FUNCTION_URL_HOST" "$ROOT/amplify-rewrites.json" \
   && grep -q "REPLACE_WITH_SPINE_FUNCTION_URL_HOST" "$ROOT/amplify-rewrites.json"; then
   warn "repo template still has AI/spine Function URL placeholders, as expected"

@@ -20,7 +20,15 @@ export interface PersistentStorageResult {
   error?: string;
 }
 
+export interface BrowserStorageEstimateResult {
+  supported: boolean;
+  usage: number | null;
+  quota: number | null;
+  error?: string;
+}
+
 interface StorageManagerLike {
+  estimate?: () => Promise<StorageEstimate>;
   persisted?: () => Promise<boolean>;
   persist?: () => Promise<boolean>;
 }
@@ -61,6 +69,35 @@ export async function requestPersistentStorage(
     return {
       status: 'error',
       alreadyPersisted: false,
+      error: error instanceof Error ? error.message : 'unknown error',
+    };
+  }
+}
+
+export async function estimateBrowserStorage(
+  env?: PersistentStorageEnv
+): Promise<BrowserStorageEstimateResult> {
+  const storage = resolveStorage(env);
+  if (!storage || typeof storage.estimate !== 'function') {
+    return {
+      supported: false,
+      usage: null,
+      quota: null,
+    };
+  }
+
+  try {
+    const estimate = await storage.estimate();
+    return {
+      supported: true,
+      usage: typeof estimate.usage === 'number' ? estimate.usage : null,
+      quota: typeof estimate.quota === 'number' ? estimate.quota : null,
+    };
+  } catch (error) {
+    return {
+      supported: true,
+      usage: null,
+      quota: null,
       error: error instanceof Error ? error.message : 'unknown error',
     };
   }

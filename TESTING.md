@@ -29,6 +29,7 @@ npm run validate:backend
 | Engine/math/store change | `npm run lint`, targeted tests, then `npm test` |
 | UI workflow change | `npm run lint`, targeted tests, `npm run build`, relevant e2e if available |
 | Import/export/persistence change | `npm run lint`, storage tests, `npm test`, and manual risk note |
+| Springhill public sample or generator change | Follow `docs/springhill-sample-workflow.md`: run the private raw generator and scrubber when source workbooks are readable, review the reconciliation/scrub reports, then run `npm test -- src/phase0/__tests__/springhill-sample.test.ts src/components/deskmap/__tests__/deskmap-coverage.test.ts src/components/leasehold/__tests__/leasehold-summary.test.ts src/storage/__tests__/workspace-persistence.test.ts`, `npm run lint`, `npm test`, and `npm run build` before handoff. If the private workbooks are unreadable, keep source-to-output claims held/draft and state the boundary explicitly. |
 | Document registry or packet-preview change | `npm run lint`, `npm test -- src/documents/__tests__/document-registry.test.ts src/storage/__tests__/document-store.test.ts src/storage/__tests__/workspace-persistence.test.ts src/storage/__tests__/document-migration.test.ts src/store/__tests__/workspace-store-doc-actions.test.ts`, plus browser smoke for navigation/inspector changes |
 | Rebuild schema/storage/vault planning change | docs diff check, then update `docs/rebuild-plan.md`, `ARCHITECTURE.md`, `ROADMAP.md`, `TESTING.md`, `SECURITY.md`, and `CONTINUATION-PROMPT.md` together |
 | Phase 0 inventory lane | document current behavior, identify existing tests, list missing tests, define golden-master fixture expectations, record manual smoke steps, and run the smallest existing validation command that proves the inspected behavior |
@@ -81,6 +82,16 @@ Do not describe a workflow as verified unless it is active in
 - Do not regenerate large fixtures unless explicitly requested.
 - If a fixture is regenerated, report why, expected impact, and runtime/size
   cost.
+- The Springhill public sample is guarded by
+  `src/phase0/__tests__/springhill-sample.test.ts`. Any future regeneration must
+  preserve the named LCT `OGML-LCT-Trust` owner lease row, related lease node,
+  Tract 1 full leased coverage, Tract 1 royalty/NRI constants, and `.landroid`
+  import/export round trip unless a reviewed source correction explicitly
+  changes those expectations.
+- Springhill source-to-output proof requires the raw private generator, scrubber,
+  report review, and public-sample tests in the same branch. A repo-local PDF
+  proof is acceptable only for a clearly bounded correction; it is not a
+  complete workbook-to-public-sample regeneration.
 - Keep real spreadsheet fixtures under `tests/fixtures` documented with a README.
 - Phase 0 rebuild fixtures should include frozen reference workspaces,
   checksums, expected math/output JSON where practical, and documented

@@ -8,6 +8,11 @@ file records the security assumptions future changes should preserve or revisit.
 - The app normally runs locally through Vite or the launcher scripts.
 - Workspace data is stored in browser IndexedDB and exported through `.landroid`
   files.
+- Rolling auto-export is opt-in local folder output where the browser supports
+  the File System Access API. LANDroid stores the selected folder handle in
+  browser IndexedDB and writes `.landroid` snapshots only to that user-chosen
+  local folder. It does not add cloud sync or send project data off the
+  machine.
 - The user is assumed to control the local machine and browser profile.
 - Hosted deployment is a POC surface: Cognito gates the app, AI calls go
   through the Lambda proxy, and workspace autosave remains browser IndexedDB

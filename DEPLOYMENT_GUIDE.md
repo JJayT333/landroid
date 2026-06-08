@@ -280,9 +280,16 @@ The JSON encodes three rules, in order:
 
 1. `/api/ai/<*>` → Lambda Function URL (the AI proxy)
 2. `/api/spine/<*>` → Lambda Function URL (the backend spine proof)
-3. SPA catch-all (excludes common asset extensions) → `/index.html`
+3. SPA catch-all (excludes common asset extensions plus bundled `.landroid`,
+   `.pdf`, and `.pptx` assets) → `/index.html`
 
 Order matters — the API rules must come before the SPA fallback.
+
+The `.landroid` exclusion is load-bearing for the hosted Dr. Elmore #1 Unit
+sample: `Demo Data -> Dr. Elmore #1 Unit` fetches
+`/samples/springhill-dr-elmore.landroid` before importing it through the normal
+workspace loader. If Amplify rewrites that path to `/index.html`, the menu item
+is visible but the sample cannot load.
 
 > **Gotcha:** when manually editing the JSON, strip the `https://` prefix and
 > any trailing slash from each Function URL host; the JSON file has `https://`
@@ -337,9 +344,10 @@ bash scripts/smoke-test-hosted.sh
 This checks the root page loads, security headers are applied, `/api/ai/*`
 rejects unauthenticated requests, `/api/spine/health` responds,
 `/api/spine/session` and `/api/spine/validate-records` reject unauthenticated
-requests, oversized spine validation requests return 413, the SPA catch-all
-works, and the Cognito user-pool OIDC metadata plus JWKS endpoints respond. Any
-failure points to a specific remediation in the output.
+requests, oversized spine validation requests return 413, the Springhill
+`.landroid` sample serves as package data instead of app HTML, the SPA
+catch-all works, and the Cognito user-pool OIDC metadata plus JWKS endpoints
+respond. Any failure points to a specific remediation in the output.
 
 Then manual end-to-end:
 

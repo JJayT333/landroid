@@ -3,6 +3,59 @@
 This file records meaningful project changes so `CONTINUATION-PROMPT.md` can
 stay short.
 
+## 2026-06-07
+
+- Fixed the hosted Amplify rewrite template so `.landroid`, `.pdf`, and
+  `.pptx` static assets bypass the SPA fallback instead of being rewritten to
+  `index.html`. Added predeploy and hosted-smoke coverage for the Springhill
+  `.landroid` sample URL so the Dr. Elmore demo loader can be verified online.
+
+- Stabilized the project picker branch after Springhill/LCT merged. `.landroid`
+  and CSV imports now create or reconcile a saved-project identity, switch the
+  active project storage key before side-store and snapshot writes, and avoid
+  autosaving imported workspaces under the previously active project key. Blank
+  implicit startup shells no longer become saved `Untitled Workspace` projects,
+  while explicitly created blank projects still remain indexed.
+
+## 2026-06-06
+
+- Fixed the Dr. Elmore Springhill public sample so the LCT Revocable Trust /
+  Charlyn K. Tyra Tract 1 owner carries the verified `OGML-LCT-Trust` lease,
+  1/4 royalty, a related Desk Map lease node, and leasehold math showing Tract
+  1 as fully leased. Added a deterministic sample regression test for the LCT
+  owner, lease row, lease node, coverage, NRI constants, and `.landroid`
+  import/export preservation.
+- Hardened the Springhill sample source workflow: the raw private generator now
+  takes configurable source/output paths, refuses to write raw private output or
+  reports inside the repository, and has a documented generator -> scrubber ->
+  public sample merge gate. README and the user manual now describe Dr. Elmore
+  #1 Unit as a bundled scrubbed `.landroid` sample.
+- Regenerated the Springhill public sample from the original NRI and DOTO
+  runsheet workbooks, then scrubbed the private raw output back into
+  `public/samples/springhill-dr-elmore.landroid`. The reconciliation report
+  shows zero missing executed lease rows, and the LCT override now preserves the
+  OGML-confirmed one-year primary term instead of the bad three-year workbook
+  remark.
+
+## 2026-06-05
+
+- Added opt-in rolling local auto-export for browsers that support choosing a
+  folder through the File System Access API. Snapshots are timestamped
+  `.landroid` files written through the same serializer as manual export, with
+  manual `Backup Now` fallback warnings when the API is unavailable or folder
+  permission is revoked.
+
+- Added a top-bar storage health panel that shows the latest successful
+  browser autosave, latest `.landroid` backup/export, and browser Storage API
+  persistence/usage status. Added `Backup Now` as a visible full `.landroid`
+  export action that records the latest backup time without changing the
+  serializer, autosave authority, or storage model.
+
+- Added the browser-local project picker landing surface. Saved projects are
+  indexed in Dexie, each project gets its own workspace storage key, and the
+  picker can create, open, rename, duplicate, or typed-confirm-delete projects
+  without changing the `.landroid` export/import format or title read path.
+
 ## 2026-06-04
 
 - Added bounded whole-project AI context. Local/full context now includes
