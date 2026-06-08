@@ -177,7 +177,7 @@ export default function ProjectPickerLanding({
               <button
                 type="button"
                 onClick={onClose}
-                className="rounded-md border border-ledger-line px-4 py-2 text-sm font-semibold text-ink-light hover:bg-ledger"
+                className="rounded-md border-2 border-leather bg-leather px-5 py-2.5 text-sm font-bold text-parchment shadow-md shadow-leather/20 hover:bg-leather-light focus:outline-none focus:ring-2 focus:ring-leather focus:ring-offset-2 focus:ring-offset-parchment"
               >
                 Return to {activeProjectName}
               </button>
