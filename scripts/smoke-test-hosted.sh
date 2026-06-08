@@ -26,7 +26,7 @@ info() { printf "  \033[36m·\033[0m %s\n" "$1"; }
 printf "\n== Smoke test: %s ==\n\n" "$BASE"
 
 # 1. Root loads, returns 200, serves HTML.
-printf "[1/6] Root page serves HTML\n"
+printf "[1/7] Root page serves HTML\n"
 ROOT=$(curl -s -o /tmp/landroid-root.html -w "%{http_code}" "$BASE/" || true)
 if [[ "$ROOT" == "200" ]]; then
   pass "GET / → 200"
@@ -40,7 +40,7 @@ else
 fi
 
 # 2. Security headers applied.
-printf "\n[2/6] Security headers present\n"
+printf "\n[2/7] Security headers present\n"
 HEADERS=$(curl -s -I "$BASE/" || true)
 for h in "strict-transport-security" "content-security-policy" "x-content-type-options" "x-frame-options"; do
   if printf "%s" "$HEADERS" | grep -qi "^$h:"; then
@@ -51,7 +51,7 @@ for h in "strict-transport-security" "content-security-policy" "x-content-type-o
 done
 
 # 3. AI proxy enforces auth.
-printf "\n[3/6] /api/ai/* rejects unauthenticated requests\n"
+printf "\n[3/7] /api/ai/* rejects unauthenticated requests\n"
 CODE=$(curl -s -o /tmp/landroid-ai.txt -w "%{http_code}" -X POST "$BASE/api/ai/chat/completions" \
   -H "content-type: application/json" \
   -d '{"model":"gpt-4o-mini","messages":[{"role":"user","content":"ping"}]}' || true)
@@ -72,7 +72,7 @@ case "$CODE" in
 esac
 
 # 4. Backend spine route exists and enforces auth beyond health.
-printf "\n[4/6] /api/spine/* health and auth boundary\n"
+printf "\n[4/7] /api/spine/* health and auth boundary\n"
 SPINE_HEALTH=$(curl -s -o /tmp/landroid-spine-health.txt -w "%{http_code}" "$BASE/api/spine/health" || true)
 if [[ "$SPINE_HEALTH" == "200" ]] && grep -q "landroid-backend-spine" /tmp/landroid-spine-health.txt; then
   pass "GET /api/spine/health → 200"
@@ -128,8 +128,23 @@ else
   info "body: $(head -c 200 /tmp/landroid-spine-oversize.txt 2>/dev/null || true)"
 fi
 
-# 5. SPA fallback serves index.html for unknown paths.
-printf "\n[5/6] SPA fallback for client-side routes\n"
+# 5. Static package/sample assets bypass the SPA fallback.
+printf "\n[5/7] Static sample package bypasses SPA fallback\n"
+SPRINGHILL=$(curl -s -L -o /tmp/landroid-springhill.landroid -w "%{http_code}" \
+  "$BASE/samples/springhill-dr-elmore.landroid" || true)
+if [[ "$SPRINGHILL" == "200" ]] \
+  && ! grep -qi "<!DOCTYPE html" /tmp/landroid-springhill.landroid \
+  && grep -q "OGML-LCT-Trust" /tmp/landroid-springhill.landroid \
+  && grep -q "one-year primary term" /tmp/landroid-springhill.landroid; then
+  pass "Springhill .landroid sample serves as package data"
+else
+  fail "Springhill .landroid sample did not serve as package data"
+  info "status: ${SPRINGHILL:-000}"
+  info "body prefix: $(head -c 120 /tmp/landroid-springhill.landroid 2>/dev/null || true)"
+fi
+
+# 6. SPA fallback serves index.html for unknown paths.
+printf "\n[6/7] SPA fallback for client-side routes\n"
 FALLBACK=$(curl -s -o /tmp/landroid-fallback.html -w "%{http_code}" "$BASE/some-deep-view-that-does-not-exist" || true)
 if [[ "$FALLBACK" == "200" ]] && grep -q "LANDroid" /tmp/landroid-fallback.html; then
   pass "unknown path → index.html"
@@ -137,8 +152,8 @@ else
   fail "unknown path → $FALLBACK (SPA catch-all rewrite not wired)"
 fi
 
-# 6. Cognito user-pool issuer metadata is reachable.
-printf "\n[6/6] Cognito user-pool metadata reachable\n"
+# 7. Cognito user-pool issuer metadata is reachable.
+printf "\n[7/7] Cognito user-pool metadata reachable\n"
 COGNITO_META=$(curl -s -o /dev/null -w "%{http_code}" "$COGNITO_METADATA" || true)
 if [[ "$COGNITO_META" == "200" ]]; then
   pass "Cognito OIDC metadata endpoint → 200"

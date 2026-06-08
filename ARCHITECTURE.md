@@ -27,6 +27,13 @@ summarizes how the app is put together and where changes should live.
   defines the pure single-writer lease decision contract for the later
   multi-tab write gate. `src/storage/workspace-shard-migration.ts` defines the
   pure monolith-to-shards and shards-to-monolith rollback helpers.
+- Saved project index: Dexie v13 adds `savedProjects` as a browser-local
+  index over saved workspaces. Each saved project carries a user-facing name,
+  timestamps, the canonical `workspaceId`, and a per-project `workspaceDbKey`.
+  `src/storage/active-workspace-key.ts` exposes the active storage key so
+  workspace, canvas, side-store, and title-ledger rows stay scoped while the
+  picker switches projects. Legacy default rows are indexed during migration,
+  but `.landroid` package format and serializer behavior are unchanged.
 - Title ledger runtime persistence: Dexie v12 adds `titleActionRecords` and
   `titleAuditEvents` through `src/storage/title-ledger-stores.ts` and
   `src/storage/title-ledger-persistence.ts`. These tables store backend-spine
@@ -206,6 +213,18 @@ Normal app edits follow this path:
 5. Autosave writes workspace/canvas/side-store data to IndexedDB.
 6. Views re-render from store state or derived selectors.
 
+Project switching is handled by `src/app/project-workspace-lifecycle.ts`. It
+flushes the active project through the existing workspace/canvas autosave and
+title-ledger lifecycle, sets the active per-project storage key, loads the saved
+workspace and canvas, rehydrates side stores, and then hydrates or baselines the
+title action log. Create, open, rename, duplicate, and delete flows use the
+saved-project index in `src/storage/saved-project-index.ts` and direct
+per-project storage helpers in `src/storage/project-workspace-storage.ts`.
+Workspace-replacing `.landroid` and CSV imports also enter through this
+lifecycle so the imported workspace has its own saved-project identity and
+active storage key before side stores, snapshots, canvas rows, or later autosave
+can write.
+
 Avoid writing business rules directly into UI components when a store action,
 engine helper, or typed utility already owns the behavior.
 
@@ -270,6 +289,13 @@ invariant. Planned storage changes must follow the staged trajectory in
 5. Consider Tauri/native filesystem only when local OCR process control,
    Finder-visible project packages, native SQLite, or corpus size forces it.
 
+The rolling auto-export surface is opt-in local file output, not a new storage
+authority. It persists only a browser folder handle where the File System
+Access API and IndexedDB support that handle, then writes timestamped
+`.landroid` blobs through the same `exportLandroidFile` serializer used by
+manual backup/export. Revoked permission or unsupported browsers degrade to
+the existing manual `Backup Now` path with a visible warning.
+
 Document originals, checksums, and source metadata are canonical. OCR text,
 embeddings, FTS rows, page images, and packet exports are derived artifacts that
 must be rebuildable from the canonical vault state.
@@ -289,6 +315,12 @@ permanent architecture rule. T3 proves a governed/default-off read-flip path fro
 the existing action-derived records after runtime persistence, MathInputView
 parity, `.landroid` round-trip, divergence, and revert gates are green. It does
 not enable production cutover.
+
+Saved project rollback is browser-local. A reverted build that predates Dexie
+v13 cannot open a profile after the project picker schema has upgraded it; save
+a `.landroid` backup first, then clear the `landroid-v2` IndexedDB database
+for that profile if you need to return to the older build. Runtime `.landroid`
+export/import remains the compatibility boundary.
 
 Runtime title-ledger persistence is a shadow mirror, not the read source.
 Rollback is still governed by the `.landroid` escape hatch. To revert lifecycle

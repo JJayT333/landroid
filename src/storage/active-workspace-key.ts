@@ -15,8 +15,10 @@ import { isHostedMode } from '../utils/deploy-env';
 
 const DEFAULT_WORKSPACE_KEY = 'default';
 const DEFAULT_CANVAS_KEY = 'active-canvas';
+const PROJECT_WORKSPACE_KEY_SEPARATOR = '::project::';
 
 let activeUserSub: string | null = null;
+let activeWorkspaceStorageKey: string | null = null;
 
 let resolveReady: () => void = () => {};
 const readyPromise = new Promise<void>((resolve) => {
@@ -60,12 +62,33 @@ function requireHostedUserSub(): string {
   );
 }
 
-export function getWorkspaceDbKey(): string {
+export function getProjectIndexDbKey(): string {
   if (isHostedMode()) return `user-${requireHostedUserSub()}`;
   return DEFAULT_WORKSPACE_KEY;
 }
 
+export function makeProjectWorkspaceDbKey(
+  workspaceId: string,
+  indexDbKey = getProjectIndexDbKey()
+): string {
+  return `${indexDbKey}${PROJECT_WORKSPACE_KEY_SEPARATOR}${workspaceId}`;
+}
+
+export function setActiveWorkspaceStorageKey(dbKey: string | null): void {
+  activeWorkspaceStorageKey = dbKey;
+}
+
+export function getActiveWorkspaceStorageKey(): string | null {
+  return activeWorkspaceStorageKey;
+}
+
+export function getWorkspaceDbKey(): string {
+  return activeWorkspaceStorageKey ?? getProjectIndexDbKey();
+}
+
 export function getCanvasDbKey(): string {
-  if (isHostedMode()) return `user-${requireHostedUserSub()}-canvas`;
+  const workspaceDbKey = getWorkspaceDbKey();
+  if (workspaceDbKey !== getProjectIndexDbKey()) return `${workspaceDbKey}-canvas`;
+  if (isHostedMode()) return `${workspaceDbKey}-canvas`;
   return DEFAULT_CANVAS_KEY;
 }
