@@ -1,7 +1,8 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import AssetPreviewModal from '../modals/AssetPreviewModal';
 import OwnerDocEditModal from '../modals/OwnerDocEditModal';
 import { useConfirmation } from '../shared/ConfirmationProvider';
+import { READ_ONLY_WORKSPACE_EDIT_TITLE } from '../../store/write-lease-store';
 import type { Lease, OwnerDoc, OwnerDocMeta } from '../../types/owner';
 import { createBlankOwnerDoc } from '../../types/owner';
 import { getOwnerDocBlob } from '../../storage/owner-persistence';
@@ -35,6 +36,7 @@ interface OwnerDocsTabProps {
   onAdd: (doc: OwnerDoc) => Promise<void>;
   onUpdate: (id: string, fields: Partial<OwnerDoc>) => Promise<void>;
   onRemove: (id: string) => Promise<void>;
+  readOnly?: boolean;
 }
 
 export default function OwnerDocsTab({
@@ -45,6 +47,7 @@ export default function OwnerDocsTab({
   onAdd,
   onUpdate,
   onRemove,
+  readOnly = false,
 }: OwnerDocsTabProps) {
   const {
     alert: showAlert,
@@ -54,6 +57,12 @@ export default function OwnerDocsTab({
   const [previewDoc, setPreviewDoc] =
     useState<{ meta: OwnerDocMeta; blob: Blob } | null>(null);
   const [editingDoc, setEditingDoc] = useState<OwnerDocMeta | null>(null);
+
+  useEffect(() => {
+    if (readOnly) {
+      setEditingDoc(null);
+    }
+  }, [readOnly]);
 
   // Owner-doc blobs are loaded on demand: the store holds metadata only, so
   // preview/download fetch the bytes from Dexie when the user asks for them.
@@ -78,9 +87,11 @@ export default function OwnerDocsTab({
         ref={inputRef}
         type="file"
         accept={OWNER_DOCUMENT_ACCEPT}
+        disabled={readOnly}
         className="hidden"
         multiple
         onChange={async (event) => {
+          if (readOnly) return;
           const files = Array.from(event.target.files ?? []);
           try {
             for (const file of files) {
@@ -118,8 +129,12 @@ export default function OwnerDocsTab({
 
       <button
         type="button"
-        onClick={() => inputRef.current?.click()}
-        className="px-3 py-2 rounded-lg text-sm font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors"
+        disabled={readOnly}
+        onClick={() => {
+          if (!readOnly) inputRef.current?.click();
+        }}
+        title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
+        className="px-3 py-2 rounded-lg text-sm font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
       >
         Upload Documents
       </button>
@@ -165,8 +180,10 @@ export default function OwnerDocsTab({
                   </button>
                   <button
                     type="button"
+                    disabled={readOnly}
                     onClick={() => setEditingDoc(doc)}
-                    className="px-3 py-1.5 rounded-lg text-xs font-semibold text-ink hover:bg-parchment-dark transition-colors"
+                    title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
+                    className="px-3 py-1.5 rounded-lg text-xs font-semibold text-ink hover:bg-parchment-dark transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Edit
                   </button>
@@ -181,7 +198,9 @@ export default function OwnerDocsTab({
                   </button>
                   <button
                     type="button"
+                    disabled={readOnly}
                     onClick={async () => {
+                      if (readOnly) return;
                       const confirmed = await requestConfirmation({
                         title: 'Delete Owner Document?',
                         message: 'Delete this document?',
@@ -191,7 +210,8 @@ export default function OwnerDocsTab({
                       if (!confirmed) return;
                       await onRemove(doc.id);
                     }}
-                    className="px-3 py-1.5 rounded-lg text-xs font-semibold text-seal hover:bg-seal/10 transition-colors"
+                    title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
+                    className="px-3 py-1.5 rounded-lg text-xs font-semibold text-seal hover:bg-seal/10 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Delete
                   </button>

@@ -36,6 +36,10 @@ import { useOwnerStore } from '../store/owner-store';
 import { useResearchStore } from '../store/research-store';
 import { useWorkspaceStore } from '../store/workspace-store';
 import {
+  READ_ONLY_WORKSPACE_EDIT_TITLE,
+  useWorkspaceReadOnly,
+} from '../store/write-lease-store';
+import {
   RESEARCH_IMPORT_ACCEPT,
   RESEARCH_IMPORT_UPLOAD_EXTENSIONS,
   assertAllowedFileExtension,
@@ -148,11 +152,13 @@ function SelectField<T extends string>({
   value,
   options,
   onChange,
+  disabled = false,
 }: {
   label: string;
   value: T;
   options: readonly T[];
   onChange: (value: T) => void;
+  disabled?: boolean;
 }) {
   return (
     <div>
@@ -161,8 +167,9 @@ function SelectField<T extends string>({
       </label>
       <select
         value={value}
+        disabled={disabled}
         onChange={(event) => onChange(event.target.value as T)}
-        className="w-full px-3 py-2 rounded-lg border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none"
+        className="w-full px-3 py-2 rounded-lg border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none disabled:cursor-not-allowed disabled:opacity-60"
       >
         {options.map((option) => (
           <option key={option} value={option}>
@@ -180,12 +187,14 @@ function NullableSelect({
   options,
   emptyLabel,
   onChange,
+  disabled = false,
 }: {
   label: string;
   value: string | null;
   options: Array<{ id: string; label: string }>;
   emptyLabel: string;
   onChange: (value: string | null) => void;
+  disabled?: boolean;
 }) {
   return (
     <div>
@@ -194,8 +203,9 @@ function NullableSelect({
       </label>
       <select
         value={value ?? ''}
+        disabled={disabled}
         onChange={(event) => onChange(event.target.value || null)}
-        className="w-full px-3 py-2 rounded-lg border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none"
+        className="w-full px-3 py-2 rounded-lg border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none disabled:cursor-not-allowed disabled:opacity-60"
       >
         <option value="">{emptyLabel}</option>
         {options.map((option) => (
@@ -214,12 +224,14 @@ function TextAreaField({
   rows = 4,
   placeholder,
   onChange,
+  disabled = false,
 }: {
   label: string;
   value: string;
   rows?: number;
   placeholder?: string;
   onChange: (value: string) => void;
+  disabled?: boolean;
 }) {
   return (
     <div>
@@ -228,10 +240,11 @@ function TextAreaField({
       </label>
       <textarea
         value={value}
+        disabled={disabled}
         rows={rows}
         placeholder={placeholder}
         onChange={(event) => onChange(event.target.value)}
-        className="w-full px-3 py-2 rounded-lg border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none resize-y"
+        className="w-full px-3 py-2 rounded-lg border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none resize-y disabled:cursor-not-allowed disabled:opacity-60"
       />
     </div>
   );
@@ -242,11 +255,13 @@ function LinkCheckboxes({
   ids,
   options,
   onChange,
+  disabled = false,
 }: {
   title: string;
   ids: string[];
   options: Array<{ id: string; label: string }>;
   onChange: (ids: string[]) => void;
+  disabled?: boolean;
 }) {
   return (
     <div className="rounded-lg border border-ledger-line bg-ledger px-3 py-3 space-y-2">
@@ -262,8 +277,9 @@ function LinkCheckboxes({
               <input
                 type="checkbox"
                 checked={ids.includes(option.id)}
+                disabled={disabled}
                 onChange={() => onChange(toggleId(ids, option.id))}
-                className="h-4 w-4 rounded border-ledger-line text-leather focus:ring-leather"
+                className="h-4 w-4 rounded border-ledger-line text-leather focus:ring-leather disabled:cursor-not-allowed disabled:opacity-60"
               />
               <span className="truncate">{option.label}</span>
             </label>
@@ -328,6 +344,7 @@ const CATEGORY_OPTIONS: DatasetCategoryFilter[] = [
 ];
 
 export default function ResearchView() {
+  const readOnly = useWorkspaceReadOnly();
   const inputRef = useRef<HTMLInputElement>(null);
   const workspaceId = useResearchStore((state) => state.workspaceId);
   const imports = useResearchStore((state) => state.imports);
@@ -335,21 +352,21 @@ export default function ResearchView() {
   const formulas = useResearchStore((state) => state.formulas);
   const projectRecords = useResearchStore((state) => state.projectRecords);
   const questions = useResearchStore((state) => state.questions);
-  const addImport = useResearchStore((state) => state.addImport);
-  const updateImport = useResearchStore((state) => state.updateImport);
-  const removeImport = useResearchStore((state) => state.removeImport);
-  const addSource = useResearchStore((state) => state.addSource);
-  const updateSource = useResearchStore((state) => state.updateSource);
-  const removeSource = useResearchStore((state) => state.removeSource);
-  const addFormula = useResearchStore((state) => state.addFormula);
-  const updateFormula = useResearchStore((state) => state.updateFormula);
-  const removeFormula = useResearchStore((state) => state.removeFormula);
-  const addProjectRecord = useResearchStore((state) => state.addProjectRecord);
-  const updateProjectRecord = useResearchStore((state) => state.updateProjectRecord);
-  const removeProjectRecord = useResearchStore((state) => state.removeProjectRecord);
-  const addQuestion = useResearchStore((state) => state.addQuestion);
-  const updateQuestion = useResearchStore((state) => state.updateQuestion);
-  const removeQuestion = useResearchStore((state) => state.removeQuestion);
+  const addImportToStore = useResearchStore((state) => state.addImport);
+  const updateImportToStore = useResearchStore((state) => state.updateImport);
+  const removeImportToStore = useResearchStore((state) => state.removeImport);
+  const addSourceToStore = useResearchStore((state) => state.addSource);
+  const updateSourceToStore = useResearchStore((state) => state.updateSource);
+  const removeSourceToStore = useResearchStore((state) => state.removeSource);
+  const addFormulaToStore = useResearchStore((state) => state.addFormula);
+  const updateFormulaToStore = useResearchStore((state) => state.updateFormula);
+  const removeFormulaToStore = useResearchStore((state) => state.removeFormula);
+  const addProjectRecordToStore = useResearchStore((state) => state.addProjectRecord);
+  const updateProjectRecordToStore = useResearchStore((state) => state.updateProjectRecord);
+  const removeProjectRecordToStore = useResearchStore((state) => state.removeProjectRecord);
+  const addQuestionToStore = useResearchStore((state) => state.addQuestion);
+  const updateQuestionToStore = useResearchStore((state) => state.updateQuestion);
+  const removeQuestionToStore = useResearchStore((state) => state.removeQuestion);
   const {
     alert: showAlert,
     confirm: requestConfirmation,
@@ -361,6 +378,37 @@ export default function ResearchView() {
   const leases = useOwnerStore((state) => state.leases);
   const mapAssets = useMapStore((state) => state.mapAssets);
   const mapRegions = useMapStore((state) => state.mapRegions);
+
+  const addImport = (...args: Parameters<typeof addImportToStore>) =>
+    readOnly ? Promise.resolve() : addImportToStore(...args);
+  const updateImport = (...args: Parameters<typeof updateImportToStore>) =>
+    readOnly ? Promise.resolve() : updateImportToStore(...args);
+  const removeImport = (...args: Parameters<typeof removeImportToStore>) =>
+    readOnly ? Promise.resolve() : removeImportToStore(...args);
+  const addSource = (...args: Parameters<typeof addSourceToStore>) =>
+    readOnly ? Promise.resolve() : addSourceToStore(...args);
+  const updateSource = (...args: Parameters<typeof updateSourceToStore>) =>
+    readOnly ? Promise.resolve() : updateSourceToStore(...args);
+  const removeSource = (...args: Parameters<typeof removeSourceToStore>) =>
+    readOnly ? Promise.resolve() : removeSourceToStore(...args);
+  const addFormula = (...args: Parameters<typeof addFormulaToStore>) =>
+    readOnly ? Promise.resolve() : addFormulaToStore(...args);
+  const updateFormula = (...args: Parameters<typeof updateFormulaToStore>) =>
+    readOnly ? Promise.resolve() : updateFormulaToStore(...args);
+  const removeFormula = (...args: Parameters<typeof removeFormulaToStore>) =>
+    readOnly ? Promise.resolve() : removeFormulaToStore(...args);
+  const addProjectRecord = (...args: Parameters<typeof addProjectRecordToStore>) =>
+    readOnly ? Promise.resolve() : addProjectRecordToStore(...args);
+  const updateProjectRecord = (...args: Parameters<typeof updateProjectRecordToStore>) =>
+    readOnly ? Promise.resolve() : updateProjectRecordToStore(...args);
+  const removeProjectRecord = (...args: Parameters<typeof removeProjectRecordToStore>) =>
+    readOnly ? Promise.resolve() : removeProjectRecordToStore(...args);
+  const addQuestion = (...args: Parameters<typeof addQuestionToStore>) =>
+    readOnly ? Promise.resolve() : addQuestionToStore(...args);
+  const updateQuestion = (...args: Parameters<typeof updateQuestionToStore>) =>
+    readOnly ? Promise.resolve() : updateQuestionToStore(...args);
+  const removeQuestion = (...args: Parameters<typeof removeQuestionToStore>) =>
+    readOnly ? Promise.resolve() : removeQuestionToStore(...args);
 
   const [section, setSection] = useState<ResearchSection>('home');
   const [search, setSearch] = useState('');
@@ -1127,12 +1175,14 @@ export default function ResearchView() {
     field: keyof NonNullable<typeof importMetadataDraft>,
     value: string | null
   ) => {
+    if (readOnly) return;
     setImportMetadataDraft((current) =>
       current ? { ...current, [field]: value } : current
     );
   };
 
   const resetImportMetadataDraft = () => {
+    if (readOnly) return;
     if (!selectedImport) return;
     pendingDatasetJumpRef.current = null;
     setImportMetadataDraft(createResearchImportMetadataDraft(selectedImport));
@@ -1140,6 +1190,7 @@ export default function ResearchView() {
   };
 
   const handleSaveImportMetadata = async () => {
+    if (readOnly) return;
     if (!selectedImport || !importMetadataDraft || !isImportMetadataDirty) return;
 
     const previousDatasetId = selectedDataset?.id ?? null;
@@ -1183,6 +1234,7 @@ export default function ResearchView() {
   };
 
   const createSourceRecord = async (overrides: Partial<ResearchSource> = {}) => {
+    if (readOnly) return;
     if (!workspaceId) return;
     const source = createBlankResearchSource(workspaceId, {
       title: 'New Source',
@@ -1194,6 +1246,7 @@ export default function ResearchView() {
   };
 
   const createFormulaRecord = async (overrides: Partial<ResearchFormula> = {}) => {
+    if (readOnly) return;
     if (!workspaceId) return;
     const formula = createBlankResearchFormula(workspaceId, {
       title: 'New Formula',
@@ -1207,6 +1260,7 @@ export default function ResearchView() {
   const createProjectRecord = async (
     overrides: Partial<ResearchProjectRecord> = {}
   ) => {
+    if (readOnly) return;
     if (!workspaceId) return;
     const record = createBlankResearchProjectRecord(workspaceId, {
       name: 'New Project Record',
@@ -1222,6 +1276,7 @@ export default function ResearchView() {
   const createQuestionRecord = async (
     overrides: Partial<ResearchQuestion> = {}
   ) => {
+    if (readOnly) return;
     if (!workspaceId) return;
     const question = createBlankResearchQuestion(workspaceId, {
       question: 'New research question',
@@ -1233,6 +1288,7 @@ export default function ResearchView() {
   };
 
   const addFormulaStarters = async () => {
+    if (readOnly) return;
     if (!workspaceId) return;
     const starters = buildResearchFormulaStarterRecords(
       workspaceId,
@@ -1337,9 +1393,10 @@ export default function ResearchView() {
           {section === 'sources' && (
             <button
               type="button"
-              disabled={!workspaceId}
+              disabled={readOnly || !workspaceId}
               onClick={() => void createSourceRecord()}
-              className="px-3 py-2 rounded-lg text-sm font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors disabled:opacity-50"
+              title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
+              className="px-3 py-2 rounded-lg text-sm font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
             >
               Add Source
             </button>
@@ -1347,9 +1404,10 @@ export default function ResearchView() {
           {section === 'formulas' && (
             <button
               type="button"
-              disabled={!workspaceId}
+              disabled={readOnly || !workspaceId}
               onClick={() => void createFormulaRecord()}
-              className="px-3 py-2 rounded-lg text-sm font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors disabled:opacity-50"
+              title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
+              className="px-3 py-2 rounded-lg text-sm font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
             >
               Add Formula
             </button>
@@ -1357,9 +1415,10 @@ export default function ResearchView() {
           {section === 'projects' && (
             <button
               type="button"
-              disabled={!workspaceId}
+              disabled={readOnly || !workspaceId}
               onClick={() => void createProjectRecord()}
-              className="px-3 py-2 rounded-lg text-sm font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors disabled:opacity-50"
+              title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
+              className="px-3 py-2 rounded-lg text-sm font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
             >
               Add Project Record
             </button>
@@ -1367,9 +1426,10 @@ export default function ResearchView() {
           {section === 'questions' && (
             <button
               type="button"
-              disabled={!workspaceId}
+              disabled={readOnly || !workspaceId}
               onClick={() => void createQuestionRecord()}
-              className="px-3 py-2 rounded-lg text-sm font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors disabled:opacity-50"
+              title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
+              className="px-3 py-2 rounded-lg text-sm font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
             >
               Add Question
             </button>
@@ -1386,6 +1446,7 @@ export default function ResearchView() {
                 actionLabel="Add Source"
                 onOpen={() => setSection('sources')}
                 onAction={() => void createSourceRecord()}
+                disabled={readOnly || !workspaceId}
               />
               <ResearchHomeTile
                 title="Formulas"
@@ -1394,6 +1455,7 @@ export default function ResearchView() {
                 actionLabel="Add Starters"
                 onOpen={() => setSection('formulas')}
                 onAction={() => void addFormulaStarters()}
+                disabled={readOnly || !workspaceId}
               />
               <ResearchHomeTile
                 title="Project Records"
@@ -1402,6 +1464,7 @@ export default function ResearchView() {
                 actionLabel="Add Record"
                 onOpen={() => setSection('projects')}
                 onAction={() => void createProjectRecord()}
+                disabled={readOnly || !workspaceId}
               />
               <ResearchHomeTile
                 title="Questions"
@@ -1410,6 +1473,7 @@ export default function ResearchView() {
                 actionLabel="Add Question"
                 onOpen={() => setSection('questions')}
                 onAction={() => void createQuestionRecord()}
+                disabled={readOnly || !workspaceId}
               />
             </div>
 
@@ -1617,6 +1681,8 @@ export default function ResearchView() {
             <DetailShell
               title={selectedSource ? labelForSource(selectedSource) : 'No source selected'}
               subtitle="A source can support formulas, project records, saved questions, maps, and import files."
+              deleteDisabled={readOnly}
+              childrenDisabled={readOnly}
               onDelete={
                 selectedSource
                   ? async () => {
@@ -1853,6 +1919,8 @@ export default function ResearchView() {
             <DetailShell
               title={selectedFormula ? labelForFormula(selectedFormula) : 'No formula selected'}
               subtitle="A formula card should explain what LANDroid calculates, what variables mean, and what source or convention supports it."
+              deleteDisabled={readOnly}
+              childrenDisabled={readOnly}
               onDelete={
                 selectedFormula
                   ? async () => {
@@ -2022,6 +2090,8 @@ export default function ResearchView() {
                   : 'No project record selected'
               }
               subtitle="Federal/private project records are information tracking only in this phase. They do not alter Texas title or payout math."
+              deleteDisabled={readOnly}
+              childrenDisabled={readOnly}
               onDelete={
                 selectedProjectRecord
                   ? async () => {
@@ -2366,6 +2436,8 @@ export default function ResearchView() {
             <DetailShell
               title={selectedQuestion ? labelForQuestion(selectedQuestion) : 'No question selected'}
               subtitle="Saved questions are manual and source-grounded now, but shaped for later AI retrieval."
+              deleteDisabled={readOnly}
+              childrenDisabled={readOnly}
               onDelete={
                 selectedQuestion
                   ? async () => {
@@ -2518,9 +2590,12 @@ export default function ResearchView() {
                 <div className="flex flex-wrap justify-end gap-2">
                   <button
                     type="button"
-                    disabled={!workspaceId}
-                    onClick={() => inputRef.current?.click()}
-                    className="px-3 py-2 rounded-lg text-sm font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors disabled:opacity-50"
+                    disabled={readOnly || !workspaceId}
+                    onClick={() => {
+                      if (!readOnly) inputRef.current?.click();
+                    }}
+                    title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
+                    className="px-3 py-2 rounded-lg text-sm font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Import Files
                   </button>
@@ -2539,10 +2614,11 @@ export default function ResearchView() {
                 ref={inputRef}
                 type="file"
                 accept={RESEARCH_IMPORT_ACCEPT}
+                disabled={readOnly}
                 className="hidden"
                 multiple
                 onChange={async (event) => {
-                  if (!workspaceId) return;
+                  if (readOnly || !workspaceId) return;
                   const files = Array.from(event.target.files ?? []);
                   try {
                     for (const file of files) {
@@ -2658,7 +2734,9 @@ export default function ResearchView() {
                             </button>
                             <button
                               type="button"
+                              disabled={readOnly}
                               onClick={async () => {
+                                if (readOnly) return;
                                 const confirmed = await requestConfirmation({
                                   title: 'Delete Imported Research File?',
                                   message: 'Delete this imported research file?',
@@ -2668,7 +2746,8 @@ export default function ResearchView() {
                                 if (!confirmed) return;
                                 await removeImport(selectedImport.id);
                               }}
-                              className="px-3 py-1.5 rounded-lg text-xs font-semibold text-seal hover:bg-seal/10 transition-colors"
+                              title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
+                              className="px-3 py-1.5 rounded-lg text-xs font-semibold text-seal hover:bg-seal/10 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                             >
                               Delete
                             </button>
@@ -2680,6 +2759,7 @@ export default function ResearchView() {
                             label="Title"
                             value={importMetadataDraft?.title ?? ''}
                             onChange={(value) => setImportMetadataField('title', value)}
+                            disabled={readOnly}
                           />
                           <div>
                             <label className="text-[10px] text-ink-light uppercase tracking-wider block mb-1">
@@ -2687,10 +2767,11 @@ export default function ResearchView() {
                             </label>
                             <select
                               value={importMetadataDraft?.datasetId ?? ''}
+                              disabled={readOnly}
                               onChange={(event) =>
                                 setImportMetadataField('datasetId', event.target.value || null)
                               }
-                              className="w-full px-3 py-2 rounded-lg border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none"
+                              className="w-full px-3 py-2 rounded-lg border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none disabled:cursor-not-allowed disabled:opacity-60"
                             >
                               {importMetadataDraft?.datasetId === null && (
                                 <option value="">Unassigned legacy import</option>
@@ -2710,6 +2791,7 @@ export default function ResearchView() {
                           rows={5}
                           placeholder="What this file is, how trustworthy it is, and what decode/manual work is still needed."
                           onChange={(value) => setImportMetadataField('notes', value)}
+                          disabled={readOnly}
                         />
 
                         <div className="flex items-center justify-between gap-3 rounded-lg border border-ledger-line bg-ledger px-3 py-2">
@@ -2719,17 +2801,19 @@ export default function ResearchView() {
                           <div className="flex items-center gap-2">
                             <button
                               type="button"
-                              disabled={!isImportMetadataDirty || isSavingImportMetadata}
+                              disabled={readOnly || !isImportMetadataDirty || isSavingImportMetadata}
                               onClick={resetImportMetadataDraft}
-                              className="px-3 py-1.5 rounded-lg text-xs font-semibold text-ink hover:bg-parchment transition-colors disabled:opacity-50"
+                              title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
+                              className="px-3 py-1.5 rounded-lg text-xs font-semibold text-ink hover:bg-parchment transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                             >
                               Reset
                             </button>
                             <button
                               type="button"
-                              disabled={!isImportMetadataDirty || isSavingImportMetadata}
+                              disabled={readOnly || !isImportMetadataDirty || isSavingImportMetadata}
                               onClick={() => void handleSaveImportMetadata()}
-                              className="px-3 py-1.5 rounded-lg bg-leather text-parchment text-xs font-semibold hover:bg-leather-light transition-colors disabled:opacity-50"
+                              title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
+                              className="px-3 py-1.5 rounded-lg bg-leather text-parchment text-xs font-semibold hover:bg-leather-light transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                             >
                               {isSavingImportMetadata ? 'Saving...' : 'Save Details'}
                             </button>
@@ -2902,6 +2986,7 @@ function ResearchHomeTile({
   actionLabel,
   onOpen,
   onAction,
+  disabled = false,
 }: {
   title: string;
   count: number;
@@ -2909,6 +2994,7 @@ function ResearchHomeTile({
   actionLabel: string;
   onOpen: () => void;
   onAction: () => void;
+  disabled?: boolean;
 }) {
   return (
     <section className="rounded-xl border border-ledger-line bg-ledger p-4 space-y-3">
@@ -2925,8 +3011,10 @@ function ResearchHomeTile({
       </button>
       <button
         type="button"
+        disabled={disabled}
         onClick={onAction}
-        className="px-3 py-2 rounded-lg text-xs font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors"
+        title={disabled ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
+        className="px-3 py-2 rounded-lg text-xs font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
       >
         {actionLabel}
       </button>
@@ -3187,11 +3275,15 @@ function DetailShell({
   title,
   subtitle,
   onDelete,
+  deleteDisabled = false,
+  childrenDisabled = false,
   children,
 }: {
   title: string;
   subtitle: string;
   onDelete?: () => Promise<void>;
+  deleteDisabled?: boolean;
+  childrenDisabled?: boolean;
   children: ReactNode;
 }) {
   return (
@@ -3204,14 +3296,20 @@ function DetailShell({
         {onDelete && (
           <button
             type="button"
+            disabled={deleteDisabled}
             onClick={() => void onDelete()}
-            className="px-3 py-1.5 rounded-lg text-xs font-semibold text-seal hover:bg-seal/10 transition-colors"
+            title={deleteDisabled ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
+            className="px-3 py-1.5 rounded-lg text-xs font-semibold text-seal hover:bg-seal/10 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
           >
             Delete
           </button>
         )}
       </div>
-      <div className="flex-1 overflow-auto p-4">{children}</div>
+      <div className="flex-1 overflow-auto p-4">
+        <fieldset disabled={childrenDisabled} className="m-0 min-w-0 border-0 p-0">
+          {children}
+        </fieldset>
+      </div>
     </div>
   );
 }

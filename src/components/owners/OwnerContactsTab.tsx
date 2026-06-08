@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import FormField from '../shared/FormField';
 import { useConfirmation } from '../shared/ConfirmationProvider';
+import { READ_ONLY_WORKSPACE_EDIT_TITLE } from '../../store/write-lease-store';
 import type { ContactLog } from '../../types/owner';
 import { createBlankContact } from '../../types/owner';
 
@@ -11,6 +12,7 @@ interface OwnerContactsTabProps {
   onAdd: (contact: ContactLog) => Promise<void>;
   onUpdate: (id: string, fields: Partial<ContactLog>) => Promise<void>;
   onRemove: (id: string) => Promise<void>;
+  readOnly?: boolean;
 }
 
 export default function OwnerContactsTab({
@@ -20,16 +22,19 @@ export default function OwnerContactsTab({
   onAdd,
   onUpdate,
   onRemove,
+  readOnly = false,
 }: OwnerContactsTabProps) {
   const { confirm: requestConfirmation } = useConfirmation();
   const [draft, setDraft] = useState<ContactLog | null>(null);
   const [saving, setSaving] = useState(false);
 
   const beginAdd = () => {
+    if (readOnly) return;
     setDraft(createBlankContact(workspaceId, ownerId));
   };
 
   const beginEdit = (contact: ContactLog) => {
+    if (readOnly) return;
     setDraft({ ...contact });
   };
 
@@ -47,21 +52,25 @@ export default function OwnerContactsTab({
               type="date"
               value={draft.contactDate}
               onChange={(value) => set('contactDate', value)}
+              disabled={readOnly}
             />
             <FormField
               label="Method"
               value={draft.method}
               onChange={(value) => set('method', value)}
+              disabled={readOnly}
             />
             <FormField
               label="Subject"
               value={draft.subject}
               onChange={(value) => set('subject', value)}
+              disabled={readOnly}
             />
             <FormField
               label="Outcome"
               value={draft.outcome}
               onChange={(value) => set('outcome', value)}
+              disabled={readOnly}
             />
           </div>
 
@@ -71,9 +80,10 @@ export default function OwnerContactsTab({
             </label>
             <textarea
               value={draft.notes}
+              disabled={readOnly}
               onChange={(event) => set('notes', event.target.value)}
               rows={4}
-              className="w-full px-3 py-2 rounded-lg border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none resize-y"
+              className="w-full px-3 py-2 rounded-lg border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none resize-y disabled:cursor-not-allowed disabled:opacity-60"
             />
           </div>
 
@@ -87,8 +97,9 @@ export default function OwnerContactsTab({
             </button>
             <button
               type="button"
-              disabled={saving}
+              disabled={readOnly || saving}
               onClick={async () => {
+                if (readOnly) return;
                 setSaving(true);
                 if (contacts.some((contact) => contact.id === draft.id)) {
                   await onUpdate(draft.id, draft);
@@ -98,7 +109,8 @@ export default function OwnerContactsTab({
                 setSaving(false);
                 setDraft(null);
               }}
-              className="px-4 py-2 rounded-lg bg-leather text-parchment text-sm font-semibold hover:bg-leather-light transition-colors disabled:opacity-60"
+              title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
+              className="px-4 py-2 rounded-lg bg-leather text-parchment text-sm font-semibold hover:bg-leather-light transition-colors disabled:cursor-not-allowed disabled:opacity-60"
             >
               {saving ? 'Saving...' : 'Save Contact'}
             </button>
@@ -107,8 +119,10 @@ export default function OwnerContactsTab({
       ) : (
         <button
           type="button"
+          disabled={readOnly}
           onClick={beginAdd}
-          className="px-3 py-2 rounded-lg text-sm font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors"
+          title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
+          className="px-3 py-2 rounded-lg text-sm font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
         >
           + Add Contact
         </button>
@@ -146,14 +160,18 @@ export default function OwnerContactsTab({
                 <div className="flex gap-2">
                   <button
                     type="button"
+                    disabled={readOnly}
                     onClick={() => beginEdit(contact)}
-                    className="px-3 py-1.5 rounded-lg text-xs font-semibold text-leather hover:bg-leather/10 transition-colors"
+                    title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
+                    className="px-3 py-1.5 rounded-lg text-xs font-semibold text-leather hover:bg-leather/10 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Edit
                   </button>
                   <button
                     type="button"
+                    disabled={readOnly}
                     onClick={async () => {
+                      if (readOnly) return;
                       const confirmed = await requestConfirmation({
                         title: 'Delete Contact Log?',
                         message: 'Delete this contact log?',
@@ -163,7 +181,8 @@ export default function OwnerContactsTab({
                       if (!confirmed) return;
                       await onRemove(contact.id);
                     }}
-                    className="px-3 py-1.5 rounded-lg text-xs font-semibold text-seal hover:bg-seal/10 transition-colors"
+                    title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
+                    className="px-3 py-1.5 rounded-lg text-xs font-semibold text-seal hover:bg-seal/10 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Delete
                   </button>

@@ -1,5 +1,6 @@
 import { memo } from 'react';
 import { useWorkspaceStore } from '../../store/workspace-store';
+import { READ_ONLY_WORKSPACE_EDIT_TITLE } from '../../store/write-lease-store';
 import type { OwnershipNode } from '../../types/node';
 import DeskMapDocumentChips from './DeskMapDocumentChips';
 
@@ -9,6 +10,7 @@ interface DeskMapLeaseCardProps {
   onAttachDoc: (nodeId: string) => void;
   onDelete: (nodeId: string) => void;
   onViewDoc: (docId: string) => void;
+  readOnly?: boolean;
 }
 
 function DeskMapLeaseCard({
@@ -17,6 +19,7 @@ function DeskMapLeaseCard({
   onAttachDoc,
   onDelete,
   onViewDoc,
+  readOnly = false,
 }: DeskMapLeaseCardProps) {
   const isActive = useWorkspaceStore((state) => state.activeNodeId === node.id);
   const termChips = node.remarks
@@ -36,8 +39,13 @@ function DeskMapLeaseCard({
               : 'border-emerald-200 shadow-[0_8px_18px_rgba(5,150,105,0.14)]'
           }
           bg-emerald-50 text-ink
+          ${readOnly ? 'cursor-default' : 'cursor-pointer'}
         `}
-        onClick={() => onEdit(node.id)}
+        aria-disabled={readOnly}
+        title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
+        onClick={() => {
+          if (!readOnly) onEdit(node.id);
+        }}
       >
         <div className="px-3 py-1.5 border-b border-emerald-200 rounded-t-lg bg-emerald-100/80">
           <div className="flex items-center justify-between gap-2">
@@ -80,8 +88,8 @@ function DeskMapLeaseCard({
         </div>
 
         <div className="hidden group-hover:flex px-2 py-1.5 border-t border-emerald-200 bg-emerald-100/70 rounded-b-lg gap-1 justify-center">
-          <ActionBtn label="ATTACH" onClick={() => onAttachDoc(node.id)} />
-          <ActionBtn label="DELETE" danger onClick={() => onDelete(node.id)} />
+          <ActionBtn label="ATTACH" disabled={readOnly} onClick={() => onAttachDoc(node.id)} />
+          <ActionBtn label="DELETE" danger disabled={readOnly} onClick={() => onDelete(node.id)} />
         </div>
       </div>
     </div>
@@ -92,19 +100,24 @@ function ActionBtn({
   label,
   onClick,
   danger = false,
+  disabled = false,
 }: {
   label: string;
   onClick: () => void;
   danger?: boolean;
+  disabled?: boolean;
 }) {
   return (
     <button
       type="button"
+      disabled={disabled}
       onClick={(event) => {
         event.stopPropagation();
+        if (disabled) return;
         onClick();
       }}
-      className={`px-2 py-1 rounded text-[9px] font-semibold transition-colors ${
+      title={disabled ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
+      className={`px-2 py-1 rounded text-[9px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
         danger
           ? 'text-seal hover:bg-seal/10'
           : 'text-emerald-900 hover:bg-emerald-200/60'
@@ -124,7 +137,8 @@ function deskMapLeaseCardPropsAreEqual(
     previous.onEdit === next.onEdit &&
     previous.onAttachDoc === next.onAttachDoc &&
     previous.onDelete === next.onDelete &&
-    previous.onViewDoc === next.onViewDoc
+    previous.onViewDoc === next.onViewDoc &&
+    previous.readOnly === next.readOnly
   );
 }
 

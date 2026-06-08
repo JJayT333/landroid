@@ -862,6 +862,16 @@ test('a second tab opens read-only and can take over the single-writer lease', a
     /open and being edited in another tab/i
   );
   await expect(readerBanner).toBeVisible();
+  await expect(readerPage.getByRole('button', { name: '+ Add Root' })).toBeDisabled();
+  await expect(readerPage.getByRole('button', { name: 'Clear Map' })).toBeDisabled();
+  await expect(writerPage.getByRole('button', { name: '+ Add Root' })).toBeEnabled();
+
+  await readerPage.getByRole('button', { name: 'Owners', exact: true }).click();
+  await expect(readerPage.getByRole('button', { name: '+ New Owner' })).toBeDisabled();
+  await readerPage.getByRole('button', { name: 'Runsheet' }).click();
+  await expect(readerPage.getByRole('button', { name: /^Edit/ }).first()).toBeDisabled();
+  await readerPage.getByRole('button', { name: 'Desk Map' }).click();
+  await expect(readerPage.getByRole('button', { name: '+ Add Root' })).toBeDisabled();
 
   // Explicit takeover from the second tab.
   await readerPage
@@ -878,6 +888,8 @@ test('a second tab opens read-only and can take over the single-writer lease', a
   // is stepped down to read-only by the claim broadcast.
   await expect(readerBanner).toBeHidden();
   await expect(writerBanner).toBeVisible();
+  await expect(readerPage.getByRole('button', { name: '+ Add Root' })).toBeEnabled();
+  await expect(writerPage.getByRole('button', { name: '+ Add Root' })).toBeDisabled();
 
   expect(writerErrors, writerErrors.join('\n')).toEqual([]);
   expect(readerErrors, readerErrors.join('\n')).toEqual([]);

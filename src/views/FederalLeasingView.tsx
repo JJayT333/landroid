@@ -19,6 +19,10 @@ import { useResearchStore } from '../store/research-store';
 import { useUIStore } from '../store/ui-store';
 import { useWorkspaceStore } from '../store/workspace-store';
 import {
+  READ_ONLY_WORKSPACE_EDIT_TITLE,
+  useWorkspaceReadOnly,
+} from '../store/write-lease-store';
+import {
   RESEARCH_PROJECT_RECORD_TYPE_OPTIONS,
   RESEARCH_PROJECT_STATUS_OPTIONS,
   createBlankResearchProjectRecord,
@@ -140,11 +144,13 @@ function SelectField<T extends string>({
   value,
   options,
   onChange,
+  disabled = false,
 }: {
   label: string;
   value: T;
   options: readonly T[];
   onChange: (value: T) => void;
+  disabled?: boolean;
 }) {
   return (
     <label className="block">
@@ -153,8 +159,9 @@ function SelectField<T extends string>({
       </span>
       <select
         value={value}
+        disabled={disabled}
         onChange={(event) => onChange(event.target.value as T)}
-        className="w-full rounded-lg border border-ledger-line bg-parchment px-3 py-1.5 text-sm text-ink outline-none focus:border-leather focus:ring-2 focus:ring-leather"
+        className="w-full rounded-lg border border-ledger-line bg-parchment px-3 py-1.5 text-sm text-ink outline-none focus:border-leather focus:ring-2 focus:ring-leather disabled:cursor-not-allowed disabled:opacity-60"
       >
         {options.map((option) => (
           <option key={option} value={option}>
@@ -172,12 +179,14 @@ function NullableSelect({
   options,
   emptyLabel,
   onChange,
+  disabled = false,
 }: {
   label: string;
   value: string | null;
   options: SelectOption[];
   emptyLabel: string;
   onChange: (value: string | null) => void;
+  disabled?: boolean;
 }) {
   return (
     <label className="block">
@@ -186,8 +195,9 @@ function NullableSelect({
       </span>
       <select
         value={value ?? ''}
+        disabled={disabled}
         onChange={(event) => onChange(event.target.value || null)}
-        className="w-full rounded-lg border border-ledger-line bg-parchment px-3 py-1.5 text-sm text-ink outline-none focus:border-leather focus:ring-2 focus:ring-leather"
+        className="w-full rounded-lg border border-ledger-line bg-parchment px-3 py-1.5 text-sm text-ink outline-none focus:border-leather focus:ring-2 focus:ring-leather disabled:cursor-not-allowed disabled:opacity-60"
       >
         <option value="">{emptyLabel}</option>
         {options.map((option) => (
@@ -205,11 +215,13 @@ function TextAreaField({
   value,
   rows = 4,
   onChange,
+  disabled = false,
 }: {
   label: string;
   value: string;
   rows?: number;
   onChange: (value: string) => void;
+  disabled?: boolean;
 }) {
   return (
     <label className="block">
@@ -218,9 +230,10 @@ function TextAreaField({
       </span>
       <textarea
         value={value}
+        disabled={disabled}
         rows={rows}
         onChange={(event) => onChange(event.target.value)}
-        className="w-full resize-y rounded-lg border border-ledger-line bg-parchment px-3 py-2 text-sm text-ink outline-none focus:border-leather focus:ring-2 focus:ring-leather"
+        className="w-full resize-y rounded-lg border border-ledger-line bg-parchment px-3 py-2 text-sm text-ink outline-none focus:border-leather focus:ring-2 focus:ring-leather disabled:cursor-not-allowed disabled:opacity-60"
       />
     </label>
   );
@@ -238,12 +251,14 @@ function LinkCheckboxes({
   options,
   emptyText,
   onChange,
+  disabled = false,
 }: {
   title: string;
   ids: string[];
   options: SelectOption[];
   emptyText: string;
   onChange: (ids: string[]) => void;
+  disabled?: boolean;
 }) {
   return (
     <div className="rounded-lg border border-ledger-line bg-parchment-dark/30 p-3">
@@ -259,8 +274,9 @@ function LinkCheckboxes({
               <input
                 type="checkbox"
                 checked={ids.includes(option.id)}
+                disabled={disabled}
                 onChange={() => onChange(toggleId(ids, option.id))}
-                className="h-4 w-4 rounded border-ledger-line text-leather focus:ring-leather"
+                className="h-4 w-4 rounded border-ledger-line text-leather focus:ring-leather disabled:cursor-not-allowed disabled:opacity-60"
               />
               <span className="truncate">{option.label}</span>
             </label>
@@ -292,6 +308,7 @@ function SummaryTile({
 }
 
 export default function FederalLeasingView() {
+  const readOnly = useWorkspaceReadOnly();
   const workspaceId = useResearchStore((state) => state.workspaceId);
   const projectRecords = useResearchStore((state) => state.projectRecords);
   const sources = useResearchStore((state) => state.sources);
@@ -441,6 +458,7 @@ export default function FederalLeasingView() {
   const createFederalRecord = async (
     overrides: Partial<ResearchProjectRecord>
   ) => {
+    if (readOnly) return;
     if (!workspaceId) return;
     const record = createBlankResearchProjectRecord(workspaceId, {
       jurisdiction: 'Federal / BLM',
@@ -453,6 +471,7 @@ export default function FederalLeasingView() {
   const updateSelectedRecord = (
     fields: Partial<ResearchProjectRecord>
   ): Promise<void> => {
+    if (readOnly) return Promise.resolve();
     if (!selectedRecord) return Promise.resolve();
     return updateProjectRecord(selectedRecord.id, fields);
   };
@@ -473,7 +492,7 @@ export default function FederalLeasingView() {
   };
 
   const openMapLink = async () => {
-    if (selectedRecord?.mapAssetId) {
+    if (!readOnly && selectedRecord?.mapAssetId) {
       await setFeaturedAsset(selectedRecord.mapAssetId);
     }
     setView('maps');
@@ -495,7 +514,7 @@ export default function FederalLeasingView() {
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              disabled={!workspaceId}
+              disabled={readOnly || !workspaceId}
               onClick={() =>
                 createFederalRecord({
                   name: 'New Federal Lease',
@@ -504,13 +523,14 @@ export default function FederalLeasingView() {
                   sourcePacketStatus: 'Needs packet',
                 })
               }
-              className="rounded-lg border border-leather/30 px-3 py-2 text-xs font-semibold text-leather transition-colors hover:bg-leather/10 disabled:opacity-50"
+              title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
+              className="rounded-lg border border-leather/30 px-3 py-2 text-xs font-semibold text-leather transition-colors hover:bg-leather/10 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Add Existing Federal Lease
             </button>
             <button
               type="button"
-              disabled={!workspaceId}
+              disabled={readOnly || !workspaceId}
               onClick={() =>
                 createFederalRecord({
                   name: 'New Federal Target',
@@ -520,13 +540,14 @@ export default function FederalLeasingView() {
                   sourcePacketStatus: 'Needs review',
                 })
               }
-              className="rounded-lg border border-leather/30 px-3 py-2 text-xs font-semibold text-leather transition-colors hover:bg-leather/10 disabled:opacity-50"
+              title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
+              className="rounded-lg border border-leather/30 px-3 py-2 text-xs font-semibold text-leather transition-colors hover:bg-leather/10 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Add Potential Target
             </button>
             <button
               type="button"
-              disabled={!workspaceId}
+              disabled={readOnly || !workspaceId}
               onClick={() =>
                 createFederalRecord({
                   name: 'New Unit / CA Reference',
@@ -535,13 +556,14 @@ export default function FederalLeasingView() {
                   sourcePacketStatus: 'Reference only',
                 })
               }
-              className="rounded-lg border border-ledger-line px-3 py-2 text-xs font-semibold text-ink-light transition-colors hover:bg-parchment-dark disabled:opacity-50"
+              title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
+              className="rounded-lg border border-ledger-line px-3 py-2 text-xs font-semibold text-ink-light transition-colors hover:bg-parchment-dark disabled:cursor-not-allowed disabled:opacity-50"
             >
               Add Unit / CA Reference
             </button>
             <button
               type="button"
-              disabled={!workspaceId}
+              disabled={readOnly || !workspaceId}
               onClick={() =>
                 createFederalRecord({
                   name: 'New Mapped Federal Tract',
@@ -550,7 +572,8 @@ export default function FederalLeasingView() {
                   sourcePacketStatus: 'Needs map/source link',
                 })
               }
-              className="rounded-lg border border-ledger-line px-3 py-2 text-xs font-semibold text-ink-light transition-colors hover:bg-parchment-dark disabled:opacity-50"
+              title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
+              className="rounded-lg border border-ledger-line px-3 py-2 text-xs font-semibold text-ink-light transition-colors hover:bg-parchment-dark disabled:cursor-not-allowed disabled:opacity-50"
             >
               Add Mapped Tract
             </button>
@@ -762,7 +785,9 @@ export default function FederalLeasingView() {
                   </button>
                   <button
                     type="button"
+                    disabled={readOnly}
                     onClick={async () => {
+                      if (readOnly) return;
                       const confirmed = await requestConfirmation({
                         title: 'Delete Federal Leasing Record?',
                         message: 'Delete this federal leasing record?',
@@ -772,7 +797,8 @@ export default function FederalLeasingView() {
                       if (!confirmed) return;
                       await removeProjectRecord(selectedRecord.id);
                     }}
-                    className="rounded-lg border border-seal/30 px-3 py-2 text-xs font-semibold text-seal transition-colors hover:bg-seal/10"
+                    title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
+                    className="rounded-lg border border-seal/30 px-3 py-2 text-xs font-semibold text-seal transition-colors hover:bg-seal/10 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Delete
                   </button>
@@ -790,6 +816,7 @@ export default function FederalLeasingView() {
                   label="Name"
                   value={selectedRecord.name}
                   onChange={(value) => void updateSelectedRecord({ name: value })}
+                  disabled={readOnly}
                 />
                 <FormField
                   label="Serial / Reference"
@@ -797,28 +824,33 @@ export default function FederalLeasingView() {
                   onChange={(value) =>
                     void updateSelectedRecord({ serialOrReference: value })
                   }
+                  disabled={readOnly}
                 />
                 <FormField
                   label="Legacy Serial"
                   value={selectedRecord.legacySerial}
                   onChange={(value) => void updateSelectedRecord({ legacySerial: value })}
+                  disabled={readOnly}
                 />
                 <FormField
                   label="MLRS Serial"
                   value={selectedRecord.mlrsSerial}
                   onChange={(value) => void updateSelectedRecord({ mlrsSerial: value })}
+                  disabled={readOnly}
                 />
                 <SelectField<ResearchProjectRecordType>
                   label="Record Type"
                   value={selectedRecord.recordType}
                   options={RESEARCH_PROJECT_RECORD_TYPE_OPTIONS}
                   onChange={(value) => void updateSelectedRecord({ recordType: value })}
+                  disabled={readOnly}
                 />
                 <SelectField<ResearchProjectStatus>
                   label="Status"
                   value={selectedRecord.status}
                   options={RESEARCH_PROJECT_STATUS_OPTIONS}
                   onChange={(value) => void updateSelectedRecord({ status: value })}
+                  disabled={readOnly}
                 />
                 <FormField
                   label="Acquisition Status"
@@ -826,11 +858,13 @@ export default function FederalLeasingView() {
                   onChange={(value) =>
                     void updateSelectedRecord({ acquisitionStatus: value })
                   }
+                  disabled={readOnly}
                 />
                 <FormField
                   label="Priority"
                   value={selectedRecord.priority}
                   onChange={(value) => void updateSelectedRecord({ priority: value })}
+                  disabled={readOnly}
                 />
                 <FormField
                   label="Source Packet Status"
@@ -838,6 +872,7 @@ export default function FederalLeasingView() {
                   onChange={(value) =>
                     void updateSelectedRecord({ sourcePacketStatus: value })
                   }
+                  disabled={readOnly}
                 />
                 <FormField
                   label="Lessee / Applicant"
@@ -845,21 +880,25 @@ export default function FederalLeasingView() {
                   onChange={(value) =>
                     void updateSelectedRecord({ lesseeOrApplicant: value })
                   }
+                  disabled={readOnly}
                 />
                 <FormField
                   label="Operator"
                   value={selectedRecord.operator}
                   onChange={(value) => void updateSelectedRecord({ operator: value })}
+                  disabled={readOnly}
                 />
                 <FormField
                   label="State"
                   value={selectedRecord.state}
                   onChange={(value) => void updateSelectedRecord({ state: value })}
+                  disabled={readOnly}
                 />
                 <FormField
                   label="County"
                   value={selectedRecord.county}
                   onChange={(value) => void updateSelectedRecord({ county: value })}
+                  disabled={readOnly}
                 />
                 <FormField
                   label="Prospect Area"
@@ -867,11 +906,13 @@ export default function FederalLeasingView() {
                   onChange={(value) =>
                     void updateSelectedRecord({ prospectArea: value })
                   }
+                  disabled={readOnly}
                 />
                 <FormField
                   label="Acres"
                   value={selectedRecord.acres}
                   onChange={(value) => void updateSelectedRecord({ acres: value })}
+                  disabled={readOnly}
                 />
                 <FormField
                   label="Effective Date"
@@ -880,6 +921,7 @@ export default function FederalLeasingView() {
                   onChange={(value) =>
                     void updateSelectedRecord({ effectiveDate: value })
                   }
+                  disabled={readOnly}
                 />
                 <FormField
                   label="Expiration Date"
@@ -888,11 +930,13 @@ export default function FederalLeasingView() {
                   onChange={(value) =>
                     void updateSelectedRecord({ expirationDate: value })
                   }
+                  disabled={readOnly}
                 />
                 <FormField
                   label="Primary Term"
                   value={selectedRecord.primaryTerm}
                   onChange={(value) => void updateSelectedRecord({ primaryTerm: value })}
+                  disabled={readOnly}
                 />
                 <FormField
                   label="Next Action Date"
@@ -901,6 +945,7 @@ export default function FederalLeasingView() {
                   onChange={(value) =>
                     void updateSelectedRecord({ nextActionDate: value })
                   }
+                  disabled={readOnly}
                 />
               </div>
 
@@ -912,12 +957,14 @@ export default function FederalLeasingView() {
                   onChange={(value) =>
                     void updateSelectedRecord({ legalDescription: value })
                   }
+                  disabled={readOnly}
                 />
                 <TextAreaField
                   label="Next Action"
                   value={selectedRecord.nextAction}
                   rows={5}
                   onChange={(value) => void updateSelectedRecord({ nextAction: value })}
+                  disabled={readOnly}
                 />
               </div>
 
@@ -930,6 +977,7 @@ export default function FederalLeasingView() {
                   onChange={(mapAssetId) =>
                     void updateSelectedRecord({ mapAssetId })
                   }
+                  disabled={readOnly}
                 />
                 <NullableSelect
                   label="Map Region"
@@ -945,6 +993,7 @@ export default function FederalLeasingView() {
                       mapRegionId,
                     });
                   }}
+                  disabled={readOnly}
                 />
                 <NullableSelect
                   label="Desk Map"
@@ -952,6 +1001,7 @@ export default function FederalLeasingView() {
                   options={deskMapOptions}
                   emptyLabel="No desk map link"
                   onChange={(deskMapId) => void updateSelectedRecord({ deskMapId })}
+                  disabled={readOnly}
                 />
                 <NullableSelect
                   label="Title / Lease Card"
@@ -959,6 +1009,7 @@ export default function FederalLeasingView() {
                   options={nodeOptions}
                   emptyLabel="No card link"
                   onChange={(nodeId) => void updateSelectedRecord({ nodeId })}
+                  disabled={readOnly}
                 />
                 <NullableSelect
                   label="Owner"
@@ -966,6 +1017,7 @@ export default function FederalLeasingView() {
                   options={ownerOptions}
                   emptyLabel="No owner link"
                   onChange={(ownerId) => void updateSelectedRecord({ ownerId })}
+                  disabled={readOnly}
                 />
                 <NullableSelect
                   label="Lease"
@@ -973,6 +1025,7 @@ export default function FederalLeasingView() {
                   options={leaseOptions}
                   emptyLabel="No lease link"
                   onChange={(leaseId) => void updateSelectedRecord({ leaseId })}
+                  disabled={readOnly}
                 />
                 <NullableSelect
                   label="Import File"
@@ -980,6 +1033,7 @@ export default function FederalLeasingView() {
                   options={importOptions}
                   emptyLabel="No import link"
                   onChange={(importId) => void updateSelectedRecord({ importId })}
+                  disabled={readOnly}
                 />
               </div>
 
@@ -989,6 +1043,7 @@ export default function FederalLeasingView() {
                 options={sourceOptions}
                 emptyText="No Research sources yet. Add source records in Research, then link them here."
                 onChange={(sourceIds) => void updateSelectedRecord({ sourceIds })}
+                disabled={readOnly}
               />
 
               <TextAreaField
@@ -996,6 +1051,7 @@ export default function FederalLeasingView() {
                 value={selectedRecord.notes}
                 rows={5}
                 onChange={(value) => void updateSelectedRecord({ notes: value })}
+                disabled={readOnly}
               />
 
               {search.trim() && (

@@ -12,6 +12,10 @@ import { useOwnerStore } from '../store/owner-store';
 import { useResearchStore } from '../store/research-store';
 import { useWorkspaceStore } from '../store/workspace-store';
 import {
+  READ_ONLY_WORKSPACE_EDIT_TITLE,
+  useWorkspaceReadOnly,
+} from '../store/write-lease-store';
+import {
   createBlankMapAsset,
   createBlankMapExternalReference,
   createBlankMapRegion,
@@ -330,6 +334,7 @@ function FeaturedMapStage({
 type ViewMode = 'present' | 'edit';
 
 export default function MapsView() {
+  const readOnly = useWorkspaceReadOnly();
   const inputRef = useRef<HTMLInputElement>(null);
   const deskMaps = useWorkspaceStore((state) => state.deskMaps);
   const nodes = useWorkspaceStore((state) => state.nodes);
@@ -364,6 +369,16 @@ export default function MapsView() {
   const [draftReference, setDraftReference] = useState<MapExternalReference | null>(null);
   const [placingRegion, setPlacingRegion] = useState(false);
   const [previewBlob, setPreviewBlob] = useState<Blob | null>(null);
+
+  useEffect(() => {
+    if (!readOnly) return;
+    setPlacingRegion(false);
+    setEditingAssetId(null);
+    setEditingRegionId(null);
+    setEditingReferenceId(null);
+    setDraftRegion(null);
+    setDraftReference(null);
+  }, [readOnly]);
 
   // Map-asset blobs are loaded on demand: the store holds metadata only, so
   // download and preview fetch the bytes from Dexie when the user asks.
@@ -539,9 +554,12 @@ export default function MapsView() {
           </div>
           <button
             type="button"
-            disabled={!workspaceId}
-            onClick={() => inputRef.current?.click()}
-            className="px-3 py-2 rounded-lg text-sm font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors disabled:opacity-50"
+            disabled={readOnly || !workspaceId}
+            onClick={() => {
+              if (!readOnly) inputRef.current?.click();
+            }}
+            title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
+            className="px-3 py-2 rounded-lg text-sm font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
           >
             Upload Asset
           </button>
@@ -553,9 +571,10 @@ export default function MapsView() {
         type="file"
         className="hidden"
         accept={MAP_ASSET_ACCEPT}
+        disabled={readOnly}
         multiple
         onChange={async (event) => {
-          if (!workspaceId) return;
+          if (readOnly || !workspaceId) return;
           const files = Array.from(event.target.files ?? []);
           try {
             for (const file of files) {
@@ -617,8 +636,12 @@ export default function MapsView() {
                   {mode === 'edit' && !selectedAsset.isFeatured && (
                     <button
                       type="button"
-                      onClick={() => setFeaturedAsset(selectedAsset.id)}
-                      className="px-3 py-1.5 rounded-lg text-xs font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors"
+                      disabled={readOnly}
+                      onClick={() => {
+                        if (!readOnly) setFeaturedAsset(selectedAsset.id);
+                      }}
+                      title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
+                      className="px-3 py-1.5 rounded-lg text-xs font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       Make Featured
                     </button>
@@ -627,11 +650,12 @@ export default function MapsView() {
                     <button
                       type="button"
                       onClick={() => {
-                        if (!supportsRegionOverlay) return;
+                        if (readOnly || !supportsRegionOverlay) return;
                         setPlacingRegion((current) => !current);
                       }}
-                      disabled={!supportsRegionOverlay}
-                      className="px-3 py-1.5 rounded-lg text-xs font-semibold text-ink hover:bg-ledger border border-ledger-line transition-colors disabled:opacity-50"
+                      disabled={readOnly || !supportsRegionOverlay}
+                      title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
+                      className="px-3 py-1.5 rounded-lg text-xs font-semibold text-ink hover:bg-ledger border border-ledger-line transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {placingRegion ? 'Cancel Placement' : 'New Region'}
                     </button>
@@ -640,6 +664,7 @@ export default function MapsView() {
                     <button
                       type="button"
                       onClick={() =>
+                        !readOnly &&
                         workspaceId &&
                         setDraftReference(
                           createBlankMapExternalReference(workspaceId, {
@@ -648,7 +673,9 @@ export default function MapsView() {
                           })
                         )
                       }
-                      className="px-3 py-1.5 rounded-lg text-xs font-semibold text-ink hover:bg-ledger border border-ledger-line transition-colors"
+                      disabled={readOnly}
+                      title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
+                      className="px-3 py-1.5 rounded-lg text-xs font-semibold text-ink hover:bg-ledger border border-ledger-line transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       Add Reference
                     </button>
@@ -663,8 +690,12 @@ export default function MapsView() {
                   {mode === 'edit' && (
                     <button
                       type="button"
-                      onClick={() => setEditingAssetId(selectedAsset.id)}
-                      className="px-3 py-1.5 rounded-lg text-xs font-semibold text-ink hover:bg-ledger transition-colors"
+                      disabled={readOnly}
+                      onClick={() => {
+                        if (!readOnly) setEditingAssetId(selectedAsset.id);
+                      }}
+                      title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
+                      className="px-3 py-1.5 rounded-lg text-xs font-semibold text-ink hover:bg-ledger transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       Edit Asset
                     </button>
@@ -683,7 +714,9 @@ export default function MapsView() {
                   {mode === 'edit' && (
                     <button
                       type="button"
+                      disabled={readOnly}
                       onClick={async () => {
+                        if (readOnly) return;
                         const confirmed = await requestConfirmation({
                           title: 'Delete Map Asset?',
                           message: 'Delete this map asset and its linked regions/references?',
@@ -693,7 +726,8 @@ export default function MapsView() {
                         if (!confirmed) return;
                         await removeAsset(selectedAsset.id);
                       }}
-                      className="px-3 py-1.5 rounded-lg text-xs font-semibold text-seal hover:bg-seal/10 transition-colors"
+                      title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
+                      className="px-3 py-1.5 rounded-lg text-xs font-semibold text-seal hover:bg-seal/10 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       Delete
                     </button>
@@ -709,7 +743,7 @@ export default function MapsView() {
                   placingRegion={placingRegion}
                   onSelectRegion={setSelectedRegionId}
                   onPlaceRegion={(position) => {
-                    if (!workspaceId) return;
+                    if (readOnly || !workspaceId) return;
                     const width = 0.18;
                     const height = 0.16;
                     setDraftRegion(
@@ -891,14 +925,20 @@ export default function MapsView() {
                         <div className="flex items-center gap-2">
                           <button
                             type="button"
-                            onClick={() => setEditingRegionId(selectedRegion.id)}
-                            className="px-3 py-1.5 rounded-lg text-xs font-semibold text-ink hover:bg-parchment transition-colors"
+                            disabled={readOnly}
+                            onClick={() => {
+                              if (!readOnly) setEditingRegionId(selectedRegion.id);
+                            }}
+                            title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
+                            className="px-3 py-1.5 rounded-lg text-xs font-semibold text-ink hover:bg-parchment transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                           >
                             Edit
                           </button>
                           <button
                             type="button"
+                            disabled={readOnly}
                             onClick={async () => {
+                              if (readOnly) return;
                               const confirmed = await requestConfirmation({
                                 title: 'Delete Map Region?',
                                 message: 'Delete this region and its linked references?',
@@ -908,7 +948,8 @@ export default function MapsView() {
                               if (!confirmed) return;
                               await removeRegion(selectedRegion.id);
                             }}
-                            className="px-3 py-1.5 rounded-lg text-xs font-semibold text-seal hover:bg-seal/10 transition-colors"
+                            title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
+                            className="px-3 py-1.5 rounded-lg text-xs font-semibold text-seal hover:bg-seal/10 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                           >
                             Delete
                           </button>
@@ -957,6 +998,7 @@ export default function MapsView() {
                       <button
                         type="button"
                         onClick={() =>
+                          !readOnly &&
                           workspaceId &&
                           setDraftReference(
                             createBlankMapExternalReference(workspaceId, {
@@ -965,7 +1007,9 @@ export default function MapsView() {
                             })
                           )
                         }
-                        className="px-3 py-1.5 rounded-lg text-xs font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors"
+                        disabled={readOnly}
+                        title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
+                        className="px-3 py-1.5 rounded-lg text-xs font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         + Reference
                       </button>
@@ -1000,14 +1044,20 @@ export default function MapsView() {
                                   <div className="flex items-center gap-2">
                                     <button
                                       type="button"
-                                      onClick={() => setEditingReferenceId(reference.id)}
-                                      className="px-2 py-1 rounded text-xs font-semibold text-ink hover:bg-ledger transition-colors"
+                                      disabled={readOnly}
+                                      onClick={() => {
+                                        if (!readOnly) setEditingReferenceId(reference.id);
+                                      }}
+                                      title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
+                                      className="px-2 py-1 rounded text-xs font-semibold text-ink hover:bg-ledger transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                                     >
                                       Edit
                                     </button>
                                     <button
                                       type="button"
+                                      disabled={readOnly}
                                       onClick={async () => {
+                                        if (readOnly) return;
                                         const confirmed = await requestConfirmation({
                                           title: 'Delete Reference Link?',
                                           message: 'Delete this reference link?',
@@ -1017,7 +1067,8 @@ export default function MapsView() {
                                         if (!confirmed) return;
                                         await removeReference(reference.id);
                                       }}
-                                      className="px-2 py-1 rounded text-xs font-semibold text-seal hover:bg-seal/10 transition-colors"
+                                      title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
+                                      className="px-2 py-1 rounded text-xs font-semibold text-seal hover:bg-seal/10 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                                     >
                                       Delete
                                     </button>
@@ -1090,7 +1141,7 @@ export default function MapsView() {
           researchProjectRecords={researchProjectRecords}
           onClose={() => setEditingAssetId(null)}
           onPreview={() => setPreviewAssetId(editingAsset.id)}
-          onSave={(fields) => updateAsset(editingAsset.id, fields)}
+          onSave={(fields) => (readOnly ? Promise.resolve() : updateAsset(editingAsset.id, fields))}
         />
       )}
 
@@ -1109,6 +1160,7 @@ export default function MapsView() {
             setDraftRegion(null);
           }}
           onSave={async (fields) => {
+            if (readOnly) return;
             if (draftRegion) {
               await addRegion({ ...draftRegion, ...fields });
               setSelectedRegionId(draftRegion.id);
@@ -1130,6 +1182,7 @@ export default function MapsView() {
             setDraftReference(null);
           }}
           onSave={async (fields) => {
+            if (readOnly) return;
             if (draftReference) {
               await addReference({ ...draftReference, ...fields });
             } else if (editingReferenceId) {

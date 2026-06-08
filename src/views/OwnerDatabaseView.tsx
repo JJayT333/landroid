@@ -6,6 +6,10 @@ import { useOwnerStore } from '../store/owner-store';
 import { useUIStore } from '../store/ui-store';
 import { useWorkspaceStore } from '../store/workspace-store';
 import {
+  READ_ONLY_WORKSPACE_EDIT_TITLE,
+  useWorkspaceReadOnly,
+} from '../store/write-lease-store';
+import {
   createBlankOwner,
   isInactiveLeaseStatus,
   type Lease,
@@ -157,6 +161,7 @@ export function sortAndFilterOwnerListRows(
 }
 
 export default function OwnerDatabaseView() {
+  const readOnly = useWorkspaceReadOnly();
   const setView = useUIStore((state) => state.setView);
   const setPendingNodeEditorRoute = useUIStore(
     (state) => state.setPendingNodeEditorRoute
@@ -300,14 +305,16 @@ export default function OwnerDatabaseView() {
     (leaseId: string, target: { deskMapId: string; leaseNodeId: string | null; parentNodeId: string }) => {
       setActiveDeskMap(target.deskMapId);
       setActiveNode(target.leaseNodeId ?? target.parentNodeId);
-      setPendingNodeEditorRoute({
-        kind: 'lease',
-        parentNodeId: target.parentNodeId,
-        leaseId,
-      });
+      if (!readOnly) {
+        setPendingNodeEditorRoute({
+          kind: 'lease',
+          parentNodeId: target.parentNodeId,
+          leaseId,
+        });
+      }
       setView('chart');
     },
-    [setActiveDeskMap, setActiveNode, setPendingNodeEditorRoute, setView]
+    [readOnly, setActiveDeskMap, setActiveNode, setPendingNodeEditorRoute, setView]
   );
 
   return (
@@ -322,9 +329,9 @@ export default function OwnerDatabaseView() {
           </div>
           <button
             type="button"
-            disabled={!workspaceId}
+            disabled={readOnly || !workspaceId}
             onClick={async () => {
-              if (!workspaceId) return;
+              if (readOnly || !workspaceId) return;
               await addOwner(
                 createBlankOwner(workspaceId, {
                   name: 'New Owner',
@@ -332,6 +339,7 @@ export default function OwnerDatabaseView() {
                 })
               );
             }}
+            title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
             className="px-3 py-2 rounded-lg text-xs font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors disabled:opacity-50"
           >
             + New Owner
@@ -465,6 +473,7 @@ export default function OwnerDatabaseView() {
             onAddDoc={addDoc}
             onUpdateDoc={updateDoc}
             onRemoveDoc={removeDoc}
+            readOnly={readOnly}
           />
         ) : unitOwners.length > 0 && visibleOwnerRows.length === 0 ? (
           <div className="h-full rounded-xl border border-dashed border-ledger-line bg-parchment flex items-center justify-center">

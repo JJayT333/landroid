@@ -10,6 +10,10 @@ import { useUIStore } from '../store/ui-store';
 import { useMapStore } from '../store/map-store';
 import { useOwnerStore } from '../store/owner-store';
 import { useWorkspaceStore } from '../store/workspace-store';
+import {
+  READ_ONLY_WORKSPACE_EDIT_TITLE,
+  useWorkspaceReadOnly,
+} from '../store/write-lease-store';
 import { d } from '../engine/decimal';
 import { formatAsFraction } from '../engine/fraction-display';
 import {
@@ -85,6 +89,7 @@ interface TreeBranchProps {
   onAttachDoc: (id: string) => void;
   onDelete: (id: string) => void;
   onViewDoc: (id: string) => void;
+  readOnly: boolean;
 }
 
 function TreeBranchComponent({
@@ -100,6 +105,7 @@ function TreeBranchComponent({
   onAttachDoc,
   onDelete,
   onViewDoc,
+  readOnly,
 }: TreeBranchProps) {
   const leaseNode = isLeaseNode(tree.node);
   const npriNode = isNpriNode(tree.node);
@@ -113,6 +119,7 @@ function TreeBranchComponent({
           onAttachDoc={onAttachDoc}
           onDelete={onDelete}
           onViewDoc={onViewDoc}
+          readOnly={readOnly}
         />
       ) : npriNode ? (
         <DeskMapNpriCard
@@ -125,6 +132,7 @@ function TreeBranchComponent({
           onAttachDoc={onAttachDoc}
           onDelete={onDelete}
           onViewDoc={onViewDoc}
+          readOnly={readOnly}
         />
       ) : (
         <DeskMapCard
@@ -142,6 +150,7 @@ function TreeBranchComponent({
           onAttachDoc={onAttachDoc}
           onDelete={onDelete}
           onViewDoc={onViewDoc}
+          readOnly={readOnly}
         />
       )}
 
@@ -162,6 +171,7 @@ function TreeBranchComponent({
               onAttachDoc={onAttachDoc}
               onDelete={onDelete}
               onViewDoc={onViewDoc}
+              readOnly={readOnly}
             />
           ))}
         </div>
@@ -187,7 +197,8 @@ function treeBranchPropsAreEqual(
     previous.onPrecede === next.onPrecede &&
     previous.onAttachDoc === next.onAttachDoc &&
     previous.onDelete === next.onDelete &&
-    previous.onViewDoc === next.onViewDoc
+    previous.onViewDoc === next.onViewDoc &&
+    previous.readOnly === next.readOnly
   );
 }
 
@@ -820,6 +831,7 @@ function UnitMapReferencePanel({
 // ── Main view ───────────────────────────────────────────
 
 export default function DeskMapView() {
+  const readOnly = useWorkspaceReadOnly();
   const pendingNodeEditorRoute = useUIStore((state) => state.pendingNodeEditorRoute);
   const setPendingNodeEditorRoute = useUIStore((state) => state.setPendingNodeEditorRoute);
   const leases = useOwnerStore((state) => state.leases);
@@ -859,18 +871,23 @@ export default function DeskMapView() {
   // Auto-create a desk map if none exist — only after persistence has loaded
   useEffect(() => {
     if (!hydrated) return;
+    if (readOnly) return;
     if (deskMaps.length === 0) {
       // Create an empty desk map — do NOT auto-assign existing nodes,
       // so the user can start with a blank canvas after deleting all desk maps
       createDeskMap('Tract 1', 'T1');
     }
-  }, [hydrated, deskMaps.length, createDeskMap]);
+  }, [hydrated, readOnly, deskMaps.length, createDeskMap]);
 
   useEffect(() => {
     if (!pendingNodeEditorRoute) return;
+    if (readOnly) {
+      setPendingNodeEditorRoute(null);
+      return;
+    }
     setEditorRoute(pendingNodeEditorRoute);
     setPendingNodeEditorRoute(null);
-  }, [pendingNodeEditorRoute, setPendingNodeEditorRoute]);
+  }, [pendingNodeEditorRoute, readOnly, setPendingNodeEditorRoute]);
 
   const nodeById = useMemo(
     () => new Map(nodes.map((node) => [node.id, node])),
@@ -1053,6 +1070,7 @@ export default function DeskMapView() {
   ]);
 
   const handleEdit = useCallback((id: string) => {
+    if (readOnly) return;
     const node = nodeById.get(id) ?? null;
     const route = resolveNodeEditorRoute(node);
 
@@ -1062,21 +1080,25 @@ export default function DeskMapView() {
 
     setActiveNode(id);
     setEditorRoute(route);
-  }, [nodeById, setActiveNode]);
+  }, [nodeById, readOnly, setActiveNode]);
 
   const handleConvey = useCallback((id: string) => {
+    if (readOnly) return;
     setConveyParentId(id);
-  }, []);
+  }, [readOnly]);
 
   const handlePrecede = useCallback((id: string) => {
+    if (readOnly) return;
     setPrecedeNodeId(id);
-  }, []);
+  }, [readOnly]);
 
   const handleAttachDoc = useCallback((id: string) => {
+    if (readOnly) return;
     setAttachDocParentId(id);
-  }, []);
+  }, [readOnly]);
 
   const handleDelete = useCallback(async (id: string) => {
+    if (readOnly) return;
     const node = nodeById.get(id) ?? null;
     const leaseDeletionPlan = planDeskMapLeaseDeletion(nodes, id);
     const title = leaseDeletionPlan.leaseId
@@ -1134,7 +1156,7 @@ export default function DeskMapView() {
         message: 'Delete failed. The card was left in place so owner data stays consistent.',
       });
     }
-  }, [nodeById, nodes, removeLeaseRecord, removeNode, requestConfirmation, showAlert]);
+  }, [nodeById, nodes, readOnly, removeLeaseRecord, removeNode, requestConfirmation, showAlert]);
 
   const handleViewDoc = useCallback((id: string) => {
     setPdfViewDocId(id);
@@ -1153,6 +1175,7 @@ export default function DeskMapView() {
   }, []);
 
   const handleAddRoot = useCallback(() => {
+    if (readOnly) return;
     const id = `node-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
     const root = {
       ...createBlankNode(id, null),
@@ -1169,9 +1192,10 @@ export default function DeskMapView() {
     }
     setActiveNode(id);
     setEditorRoute({ kind: 'node', nodeId: id });
-  }, [addNode, addNodeToActiveDeskMap, createDeskMap, deskMaps.length, setActiveNode]);
+  }, [addNode, addNodeToActiveDeskMap, createDeskMap, deskMaps.length, readOnly, setActiveNode]);
 
   const handleClearDeskMap = useCallback(async () => {
+    if (readOnly) return;
     if (!activeDeskMap) return;
     if (visibleCardCount === 0) {
       await showAlert({
@@ -1190,7 +1214,7 @@ export default function DeskMapView() {
     if (!confirmed) return;
 
     clearDeskMapNodes(activeDeskMap.id);
-  }, [activeDeskMap, clearDeskMapNodes, requestConfirmation, showAlert, visibleCardCount]);
+  }, [activeDeskMap, clearDeskMapNodes, readOnly, requestConfirmation, showAlert, visibleCardCount]);
 
   const cycleOwnerSearchMatch = useCallback((direction: 1 | -1) => {
     setOwnerSearchMatchIndex((currentIndex) => {
@@ -1232,8 +1256,11 @@ export default function DeskMapView() {
             </button>
             {!toolbarCollapsed && (
               <button
+                type="button"
+                disabled={readOnly}
                 onClick={handleAddRoot}
-                className="px-3 py-1.5 rounded-lg text-xs font-semibold text-leather hover:bg-leather/10 transition-colors"
+                title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
+                className="px-3 py-1.5 rounded-lg text-xs font-semibold text-leather hover:bg-leather/10 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
               >
                 + Add Root
               </button>
@@ -1242,9 +1269,9 @@ export default function DeskMapView() {
               <button
                 type="button"
                 onClick={handleClearDeskMap}
-                disabled={!activeDeskMap || visibleCardCount === 0}
+                disabled={readOnly || !activeDeskMap || visibleCardCount === 0}
                 className="rounded-lg border border-seal/30 px-3 py-1.5 text-xs font-semibold text-seal transition-colors hover:bg-seal/10 disabled:cursor-not-allowed disabled:opacity-40"
-                title="Clear all cards from the active Desk Map"
+                title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : 'Clear all cards from the active Desk Map'}
               >
                 Clear Map
               </button>
@@ -1490,7 +1517,9 @@ export default function DeskMapView() {
               </p>
               <button
                 onClick={handleAddRoot}
-                className="px-4 py-2 rounded-lg bg-leather text-parchment text-sm font-semibold hover:bg-leather-light transition-colors"
+                disabled={readOnly}
+                title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
+                className="px-4 py-2 rounded-lg bg-leather text-parchment text-sm font-semibold hover:bg-leather-light transition-colors disabled:cursor-not-allowed disabled:opacity-50"
               >
                 + Add Root Node
               </button>
@@ -1520,6 +1549,7 @@ export default function DeskMapView() {
                   onAttachDoc={handleAttachDoc}
                   onDelete={handleDelete}
                   onViewDoc={handleViewDoc}
+                  readOnly={readOnly}
                 />
               ))}
             </div>

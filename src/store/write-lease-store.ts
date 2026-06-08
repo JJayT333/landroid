@@ -21,6 +21,9 @@ export const useWriteLeaseStore = create<WriteLeaseState>((set) => ({
   setRole: (role, workspaceId) => set({ role, workspaceId }),
 }));
 
+export const READ_ONLY_WORKSPACE_EDIT_TITLE =
+  'Read-only: another tab holds the workspace write lease. Take over editing to make changes.';
+
 /**
  * Read-only is the reader role only. `idle` (lease not yet engaged) and
  * `writer` both allow edits, so the banner stays hidden until another tab is
@@ -28,4 +31,9 @@ export const useWriteLeaseStore = create<WriteLeaseState>((set) => ({
  */
 export function isWorkspaceReadOnly(role: WorkspaceWriteRole): boolean {
   return role === 'reader';
+}
+
+export function useWorkspaceReadOnly(): boolean {
+  const role = useWriteLeaseStore((state) => state.role);
+  return isWorkspaceReadOnly(role);
 }
