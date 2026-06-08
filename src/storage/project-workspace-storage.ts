@@ -333,6 +333,7 @@ export async function deleteProjectStorage(project: SavedProjectSummary): Promis
       db.workspaceUiStateShards,
       db.owners,
       db.leases,
+      db.leasePurchaseReports,
       db.contactLogs,
       db.ownerDocs,
       db.mapAssets,
@@ -357,6 +358,7 @@ export async function deleteProjectStorage(project: SavedProjectSummary): Promis
       await clearWorkspaceRows(db.workspaceUiStateShards, project.workspaceDbKey, project.workspaceId);
       await clearWorkspaceRows(db.owners, project.workspaceDbKey, project.workspaceId);
       await clearWorkspaceRows(db.leases, project.workspaceDbKey, project.workspaceId);
+      await clearWorkspaceRows(db.leasePurchaseReports, project.workspaceDbKey, project.workspaceId);
       await clearWorkspaceRows(db.contactLogs, project.workspaceDbKey, project.workspaceId);
       await clearWorkspaceRows(db.ownerDocs, project.workspaceDbKey, project.workspaceId);
       await clearWorkspaceRows(db.mapAssets, project.workspaceDbKey, project.workspaceId);
@@ -392,6 +394,7 @@ export async function duplicateProjectStorage(
 
   await copyWorkspaceRows(db.owners, source, target.workspaceDbKey, target.workspaceId, 'id');
   await copyWorkspaceRows(db.leases, source, target.workspaceDbKey, target.workspaceId, 'id');
+  await copyWorkspaceRows(db.leasePurchaseReports, source, target.workspaceDbKey, target.workspaceId, 'id');
   await copyWorkspaceRows(db.contactLogs, source, target.workspaceDbKey, target.workspaceId, 'id');
   await copyWorkspaceRows(db.ownerDocs, source, target.workspaceDbKey, target.workspaceId, 'id');
   await copyWorkspaceRows(db.mapAssets, source, target.workspaceDbKey, target.workspaceId, 'id');

@@ -141,7 +141,10 @@ async function loadLifecycleHarness(options: {
     ),
   }));
   vi.doMock('../storage/project-workspace-storage', () => ({
-    deleteProjectStorage: vi.fn(),
+    deleteProjectStorage: vi.fn(async (project: SavedProjectSummary) => {
+      calls.push(`deleteProjectStorage:${project.workspaceDbKey}`);
+      projects.delete(project.workspaceId);
+    }),
     duplicateProjectStorage: vi.fn(),
     loadProjectCanvas: vi.fn(async () => null),
     loadProjectWorkspace: vi.fn(async () => ({
@@ -283,6 +286,33 @@ describe('project workspace lifecycle helpers', () => {
       workspaceDbKey: 'default::project::existing-import-key',
       projectName: 'Renamed Import',
     });
+  });
+
+  it('replaces an existing demo project with a fresh slot when replaceExisting is set', async () => {
+    const existing = savedProject(
+      'ws-imported',
+      'default::project::existing-import-key',
+      'Old Name'
+    );
+    const { module, calls } = await loadLifecycleHarness({
+      existingProjects: [existing],
+    });
+
+    await module.importAndOpenWorkspace(
+      workspaceData('ws-imported', 'Fresh Demo'),
+      { replaceExisting: true }
+    );
+
+    // Purges the prior project, then imports into the deterministic fresh key
+    // (not the old custom key), guaranteeing a pristine slot.
+    expect(calls).toContain(
+      'deleteProjectStorage:default::project::existing-import-key'
+    );
+    expect(calls).toContain('setActive:default::project::ws-imported');
+    expect(calls).not.toContain('setActive:default::project::existing-import-key');
+    expect(
+      calls.indexOf('deleteProjectStorage:default::project::existing-import-key')
+    ).toBeLessThan(calls.indexOf('setActive:default::project::ws-imported'));
   });
 
   it('normalizes CSV-like imports and writes a blank canvas under the imported project key', async () => {
