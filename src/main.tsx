@@ -13,6 +13,8 @@ import { useResearchStore } from './store/research-store';
 import { useCurativeStore } from './store/curative-store';
 import { useWorkspaceStore } from './store/workspace-store';
 import { useCanvasStore } from './store/canvas-store';
+import { openMostRecentSavedProject } from './app/project-workspace-lifecycle';
+import { useStorageHealthStore } from './store/storage-health-store';
 import {
   flushTitleActionLogToStorage,
   hydrateTitleActionLogFromStorageOrBaseline,
@@ -25,7 +27,14 @@ import {
   releaseWorkspaceWriteLease,
 } from './storage/workspace-write-lease';
 import { awaitWorkspaceKeyReady } from './storage/active-workspace-key';
-import { requestPersistentStorage } from './storage/persistent-storage';
+import {
+  estimateBrowserStorage,
+  requestPersistentStorage,
+} from './storage/persistent-storage';
+import {
+  initializeRollingAutoExport,
+  scheduleRollingAutoExport,
+} from './storage/rolling-auto-export-runtime';
 import { runPostV8BackupIfNeeded } from './storage/post-v8-backup';
 import { runBackendSpineContractCheck } from './backend-spine/app-contract-check';
 import {
@@ -54,7 +63,11 @@ async function bootstrapApp() {
   // Phase 0.5: ask the browser to keep this origin's IndexedDB persistent so
   // it is not evicted under storage pressure (PWA / iPad durability). Fire and
   // forget — a refusal is recorded, never a reason to block local-first work.
-  void requestPersistentStorage().then((result) => {
+  void requestPersistentStorage().then(async (result) => {
+    useStorageHealthStore.getState().setPersistentStorageResult(result);
+    const estimate = await estimateBrowserStorage();
+    useStorageHealthStore.getState().setBrowserStorageEstimate(estimate);
+
     if (result.status === 'denied') {
       console.warn(
         '[landroid] Persistent storage was not granted; the browser may evict '
@@ -75,62 +88,81 @@ async function bootstrapApp() {
     console.warn('[landroid] post-v8 backup hook failed:', err);
   });
 
-  const [workspaceResult, canvasResult] = await Promise.all([
-    loadWorkspaceFromDb(),
-    loadCanvasFromDb(),
-  ]);
   const startupWarnings: string[] = [];
+  const savedProjectOpenResult = await openMostRecentSavedProject().catch((err) => {
+    const message = err instanceof Error ? err.message : String(err);
+    startupWarnings.push(`Saved project restore failed: ${message}`);
+    return null;
+  });
 
-  if (workspaceResult.status === 'loaded' && workspaceResult.data) {
-    useWorkspaceStore.getState().loadWorkspace(workspaceResult.data);
-    await Promise.all([
-      useOwnerStore.getState().setWorkspace(workspaceResult.data.workspaceId),
-      useMapStore.getState().setWorkspace(workspaceResult.data.workspaceId),
-      useResearchStore.getState().setWorkspace(workspaceResult.data.workspaceId),
-      useCurativeStore.getState().setWorkspace(workspaceResult.data.workspaceId),
-    ]);
-    // Phase 5: pull `node.attachments[]` from Dexie's `documents` +
-    // `document_attachments` tables after the workspace state lands.
-    // Safe to fail; the rest of the workspace still renders.
-    await useWorkspaceStore.getState().hydrateNodeAttachments().catch(() => {});
-    await hydrateTitleActionLogFromStorageOrBaseline(
-      workspaceResult.data,
-      readTitleOwnerData()
-    ).catch((err) => {
-      const message = err instanceof Error ? err.message : String(err);
-      startupWarnings.push(`Title ledger hydration failed: ${message}`);
-    });
+  if (savedProjectOpenResult) {
+    if (savedProjectOpenResult.warning) {
+      startupWarnings.push(savedProjectOpenResult.warning);
+    }
+    useWorkspaceStore.getState().setStartupWarning(
+      startupWarnings.length > 0 ? startupWarnings.join(' ') : null
+    );
   } else {
-    useWorkspaceStore.getState().setHydrated();
-    const workspaceId = useWorkspaceStore.getState().workspaceId;
-    await Promise.all([
-      useOwnerStore.getState().setWorkspace(workspaceId),
-      useMapStore.getState().setWorkspace(workspaceId),
-      useResearchStore.getState().setWorkspace(workspaceId),
-      useCurativeStore.getState().setWorkspace(workspaceId),
+    const [workspaceResult, canvasResult] = await Promise.all([
+      loadWorkspaceFromDb(),
+      loadCanvasFromDb(),
     ]);
+
+    if (workspaceResult.status === 'loaded' && workspaceResult.data) {
+      useWorkspaceStore.getState().loadWorkspace(workspaceResult.data);
+      await Promise.all([
+        useOwnerStore.getState().setWorkspace(workspaceResult.data.workspaceId),
+        useMapStore.getState().setWorkspace(workspaceResult.data.workspaceId),
+        useResearchStore.getState().setWorkspace(workspaceResult.data.workspaceId),
+        useCurativeStore.getState().setWorkspace(workspaceResult.data.workspaceId),
+      ]);
+      // Phase 5: pull `node.attachments[]` from Dexie's `documents` +
+      // `document_attachments` tables after the workspace state lands.
+      // Safe to fail; the rest of the workspace still renders.
+      await useWorkspaceStore.getState().hydrateNodeAttachments().catch(() => {});
+      await hydrateTitleActionLogFromStorageOrBaseline(
+        workspaceResult.data,
+        readTitleOwnerData()
+      ).catch((err) => {
+        const message = err instanceof Error ? err.message : String(err);
+        startupWarnings.push(`Title ledger hydration failed: ${message}`);
+      });
+    } else {
+      useWorkspaceStore.getState().setHydrated();
+      const workspaceId = useWorkspaceStore.getState().workspaceId;
+      await Promise.all([
+        useOwnerStore.getState().setWorkspace(workspaceId),
+        useMapStore.getState().setWorkspace(workspaceId),
+        useResearchStore.getState().setWorkspace(workspaceId),
+        useCurativeStore.getState().setWorkspace(workspaceId),
+      ]);
+    }
+
+    if (workspaceResult.status === 'corrupt' && workspaceResult.error) {
+      startupWarnings.push(workspaceResult.error);
+    }
+    if (workspaceResult.warning) {
+      startupWarnings.push(workspaceResult.warning);
+    }
+
+    if (canvasResult.status === 'loaded' && canvasResult.data) {
+      useCanvasStore.getState().loadCanvas(canvasResult.data);
+    } else {
+      useCanvasStore.getState().setHydrated();
+    }
+
+    if (canvasResult.status === 'corrupt' && canvasResult.error) {
+      startupWarnings.push(canvasResult.error);
+    }
+
+    useWorkspaceStore.getState().setStartupWarning(
+      startupWarnings.length > 0 ? startupWarnings.join(' ') : null
+    );
   }
 
-  if (workspaceResult.status === 'corrupt' && workspaceResult.error) {
-    startupWarnings.push(workspaceResult.error);
-  }
-  if (workspaceResult.warning) {
-    startupWarnings.push(workspaceResult.warning);
-  }
-
-  if (canvasResult.status === 'loaded' && canvasResult.data) {
-    useCanvasStore.getState().loadCanvas(canvasResult.data);
-  } else {
-    useCanvasStore.getState().setHydrated();
-  }
-
-  if (canvasResult.status === 'corrupt' && canvasResult.error) {
-    startupWarnings.push(canvasResult.error);
-  }
-
-  useWorkspaceStore.getState().setStartupWarning(
-    startupWarnings.length > 0 ? startupWarnings.join(' ') : null
-  );
+  await initializeRollingAutoExport().catch((err) => {
+    console.warn('[landroid] rolling auto-export initialization failed:', err);
+  });
 
   if (!isHostedMode()) {
     void runBackendSpineContractCheck({ logger: console });
@@ -163,6 +195,9 @@ useWorkspaceStore.subscribe((state) => {
       if (result.status !== 'written') return;
       if (saveGeneration !== workspaceSaveGeneration) return;
       await flushTitleActionLogToStorage(payload.workspaceId);
+      if (saveGeneration !== workspaceSaveGeneration) return;
+      useStorageHealthStore.getState().recordWorkspaceSaved();
+      scheduleRollingAutoExport();
     })().catch((err) => {
       console.warn('[landroid] title ledger autosave failed:', err);
     });
@@ -187,8 +222,10 @@ useCanvasStore.subscribe((state) => {
     // Canvas autosave shares the workspace's single-writer lease, so a
     // read-only tab cannot overwrite the active writer's viewport/layout.
     const workspaceId = useWorkspaceStore.getState().workspaceId;
-    void ensureWorkspaceWritable(workspaceId).then((writable) => {
-      if (writable) saveCanvasToDb(buildCanvasAutosavePayload(state), workspaceId);
+    void ensureWorkspaceWritable(workspaceId).then(async (writable) => {
+      if (!writable) return;
+      await saveCanvasToDb(buildCanvasAutosavePayload(state), workspaceId);
+      scheduleRollingAutoExport();
     });
   }, AUTOSAVE_DEBOUNCE_MS);
 });

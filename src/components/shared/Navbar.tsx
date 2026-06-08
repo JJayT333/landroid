@@ -3,27 +3,24 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import { useUIStore, type ViewMode } from '../../store/ui-store';
-import { useMapStore } from '../../store/map-store';
 import { useOwnerStore } from '../../store/owner-store';
-import { useResearchStore } from '../../store/research-store';
-import { useCurativeStore } from '../../store/curative-store';
 import { useWorkspaceStore } from '../../store/workspace-store';
-import { useCanvasStore } from '../../store/canvas-store';
+import { useStorageHealthStore } from '../../store/storage-health-store';
 import {
   hydrateTitleActionLogFromImportedLedger,
-  useTitleActionLog,
 } from '../../store/title-action-log';
+import { buildCurrentLandroidExport } from '../../app/current-landroid-export';
+import { importAndOpenWorkspace } from '../../app/project-workspace-lifecycle';
 import {
   downloadLandroidFile,
-  exportDocumentWorkspaceData,
   importLandroidFile,
   type LandroidFileData,
   type WorkspaceData,
 } from '../../storage/workspace-persistence';
 import {
-  replaceWorkspaceSideStores,
-  replaceWorkspaceSideStoresWithRollback,
-} from '../../storage/workspace-side-store-reset';
+  chooseRollingAutoExportDirectory,
+  disableRollingAutoExport,
+} from '../../storage/rolling-auto-export-runtime';
 import { importCSV } from '../../storage/csv-io';
 import { assertFileSize, FILE_SIZE_LIMITS } from '../../utils/file-validation';
 import { seedCombinatorialData } from '../../storage/seed-test-data';
@@ -32,6 +29,7 @@ import { isHostedMode } from '../../utils/deploy-env';
 import HostedUserMenu from '../../auth/HostedUserMenu';
 import { useConfirmation } from './ConfirmationProvider';
 import { shouldShowDemoDataMenu } from './navbar-policy';
+import { StorageHealthIndicator } from './StorageHealthIndicator';
 
 const landroidLogoUrl = new URL('../../assets/branding/landroid-logo.png', import.meta.url).href;
 const ravenForestBackdropUrl = new URL('../../assets/branding/raven-forest-backdrop.png', import.meta.url).href;
@@ -70,7 +68,11 @@ async function mirrorLoadedTitleLedger(
   });
 }
 
-export default function Navbar() {
+interface NavbarProps {
+  onOpenProjectPicker?: () => void;
+}
+
+export default function Navbar({ onOpenProjectPicker }: NavbarProps) {
   const hostedMode = isHostedMode();
   const showDemoDataMenu = shouldShowDemoDataMenu();
   const { alert: showAlert, confirm: requestConfirmation } = useConfirmation();
@@ -78,13 +80,6 @@ export default function Navbar() {
   const setView = useUIStore((s) => s.setView);
   const projectName = useWorkspaceStore((s) => s.projectName);
   const setProjectName = useWorkspaceStore((s) => s.setProjectName);
-  const leaseholdUnit = useWorkspaceStore((s) => s.leaseholdUnit);
-  const leaseholdAssignments = useWorkspaceStore((s) => s.leaseholdAssignments);
-  const leaseholdOrris = useWorkspaceStore((s) => s.leaseholdOrris);
-  const leaseholdTransferOrderEntries = useWorkspaceStore(
-    (s) => s.leaseholdTransferOrderEntries
-  );
-  const loadWorkspace = useWorkspaceStore((s) => s.loadWorkspace);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const fileMenuRef = useRef<HTMLDivElement>(null);
@@ -222,26 +217,8 @@ export default function Navbar() {
       assertFileSize(file, FILE_SIZE_LIMITS.LANDROID, '.landroid file');
 
       const data = await importLandroidFile(file);
-      const currentWorkspace = useWorkspaceStore.getState();
-      await replaceWorkspaceSideStoresWithRollback({
-        targetWorkspaceId: data.workspaceId,
-        targetData: {
-          ownerData: data.ownerData,
-          documentData: data.documentData,
-          mapData: data.mapData,
-          researchData: data.researchData,
-          curativeData: data.curativeData,
-        },
-        rollbackWorkspaceId: currentWorkspace.workspaceId,
-        rollbackNodes: currentWorkspace.nodes,
-      });
-      loadWorkspace(data);
+      await importAndOpenWorkspace(data);
       await mirrorLoadedTitleLedger(data);
-      useCanvasStore.getState().loadCanvas(data.canvas ?? { nodes: [], edges: [] });
-      await useWorkspaceStore
-        .getState()
-        .hydrateNodeAttachments({ strict: true })
-        .catch(() => {});
       console.log(`[springhill-sample] Loaded ${data.nodes.length} nodes`);
     } catch (err) {
       console.error('[springhill-sample] Failed:', err);
@@ -253,51 +230,47 @@ export default function Navbar() {
     setSeedLoading(false);
   };
 
+  const exportCurrentWorkspace = async () => {
+    const currentExport = await buildCurrentLandroidExport();
+    await downloadLandroidFile(currentExport.data, currentExport.options);
+    useStorageHealthStore.getState().recordWorkspaceExported();
+  };
+
   const handleSave = async () => {
     setFileMenuOpen(false);
-    const state = useWorkspaceStore.getState();
-    const canvasState = useCanvasStore.getState();
-    const titleActionLog = useTitleActionLog.getState();
-    await downloadLandroidFile(
-      {
-        workspaceId: state.workspaceId,
-        projectName: state.projectName,
-        nodes: state.nodes,
-        deskMaps: state.deskMaps,
-        leaseholdUnit,
-        leaseholdAssignments,
-        leaseholdOrris,
-        leaseholdTransferOrderEntries,
-        activeDeskMapId: state.activeDeskMapId,
-        activeUnitCode: state.activeUnitCode,
-        instrumentTypes: state.instrumentTypes,
-        ownerData: await useOwnerStore.getState().exportWorkspaceData(),
-        documentData: await exportDocumentWorkspaceData(
-          state.workspaceId,
-          state.nodes
-        ),
-        mapData: await useMapStore.getState().exportWorkspaceData(),
-        researchData: await useResearchStore.getState().exportWorkspaceData(),
-        curativeData: await useCurativeStore.getState().exportWorkspaceData(),
-        canvas: {
-          nodes: canvasState.nodes,
-          edges: canvasState.edges,
-          viewport: canvasState.viewport,
-          gridCols: canvasState.gridCols,
-          gridRows: canvasState.gridRows,
-          orientation: canvasState.orientation,
-          pageSize: canvasState.pageSize,
-          horizontalSpacingFactor: canvasState.horizontalSpacingFactor,
-          verticalSpacingFactor: canvasState.verticalSpacingFactor,
-          snapToGrid: canvasState.snapToGrid,
-          gridSize: canvasState.gridSize,
-        },
-      },
-      {
-        actionRecords: titleActionLog.actionRecords,
-        auditEvents: titleActionLog.auditEvents,
+    await exportCurrentWorkspace();
+  };
+
+  const handleBackupNow = async () => {
+    setFileMenuOpen(false);
+    setDemoMenuOpen(false);
+    await exportCurrentWorkspace();
+  };
+
+  const handleConfigureAutoExport = async () => {
+    setFileMenuOpen(false);
+    setDemoMenuOpen(false);
+    try {
+      const status = await chooseRollingAutoExportDirectory();
+      if (status === 'unsupported') {
+        await showAlert({
+          title: 'Auto Export Unsupported',
+          message:
+            'This browser does not support choosing a local folder for rolling exports. Use Backup Now for manual .landroid backups.',
+        });
       }
-    );
+    } catch (err) {
+      await showAlert({
+        title: 'Auto Export Failed',
+        message: `Auto export setup failed: ${err instanceof Error ? err.message : 'Unknown error'}`,
+      });
+    }
+  };
+
+  const handleDisableAutoExport = async () => {
+    setFileMenuOpen(false);
+    setDemoMenuOpen(false);
+    await disableRollingAutoExport();
   };
 
   const handleLoad = () => {
@@ -326,27 +299,8 @@ export default function Navbar() {
         if (!confirmed) return;
 
         const data = await importLandroidFile(file);
-        const currentWorkspace = useWorkspaceStore.getState();
-        await replaceWorkspaceSideStoresWithRollback({
-          targetWorkspaceId: data.workspaceId,
-          targetData: {
-            ownerData: data.ownerData,
-            documentData: data.documentData,
-            mapData: data.mapData,
-            researchData: data.researchData,
-            curativeData: data.curativeData,
-          },
-          rollbackWorkspaceId: currentWorkspace.workspaceId,
-          rollbackNodes: currentWorkspace.nodes,
-        });
-        loadWorkspace(data);
+        await importAndOpenWorkspace(data);
         await mirrorLoadedTitleLedger(data);
-        useCanvasStore.getState().loadCanvas(data.canvas ?? { nodes: [], edges: [] });
-        // Phase 5: refresh node.attachments[] after PDF table write.
-        await useWorkspaceStore
-          .getState()
-          .hydrateNodeAttachments({ strict: true })
-          .catch(() => {});
       } else if (file.name.endsWith('.csv')) {
         assertFileSize(file, FILE_SIZE_LIMITS.SPREADSHEET, 'CSV file');
         const confirmed = await requestConfirmation({
@@ -363,9 +317,7 @@ export default function Navbar() {
 
         const text = await file.text();
         const result = importCSV(text);
-        loadWorkspace(result);
-        useCanvasStore.getState().loadCanvas({ nodes: [], edges: [] });
-        await replaceWorkspaceSideStores(result.workspaceId);
+        await importAndOpenWorkspace(result);
         await mirrorLoadedTitleLedger(useWorkspaceStore.getState());
       } else {
         await showAlert({
@@ -460,6 +412,25 @@ export default function Navbar() {
         </div>
 
         <div className="flex gap-1 border-l border-parchment/20 pl-3">
+          <StorageHealthIndicator
+            onBackupNow={handleBackupNow}
+            onConfigureAutoExport={handleConfigureAutoExport}
+            onDisableAutoExport={handleDisableAutoExport}
+          />
+
+          {onOpenProjectPicker && (
+            <button
+              type="button"
+              onClick={() => {
+                setFileMenuOpen(false);
+                setDemoMenuOpen(false);
+                onOpenProjectPicker();
+              }}
+              className="px-3 py-1.5 rounded-lg text-xs font-medium text-parchment/70 hover:text-parchment hover:bg-ink-light/30 transition-colors"
+            >
+              Projects
+            </button>
+          )}
           <div ref={fileMenuRef} className="relative">
             <button
               type="button"

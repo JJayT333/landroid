@@ -122,20 +122,33 @@ as input warnings in the leasehold focus that they affect.
 
 ## Demo Data
 
-Use `Demo Data -> Vulcan Mesa` or the Raven Forest sample to load the
-current sample workspaces. The hosted POC site keeps Demo Data visible for
-signed-in fixture review. Demo loading replaces the active browser workspace,
-so it requires the typed phrase `LOAD DEMO` before it runs. Demo loading resets
-owner, document, curative, map, research, and transient AI approval/undo state
-before seeding the selected fixture.
+Use `Demo Data -> Vulcan Mesa`, `Demo Data -> Combinatorial - Raven Forest`, or
+`Demo Data -> Dr. Elmore #1 Unit - Sample` to load the current sample
+workspaces. The hosted POC site keeps Demo Data visible for signed-in fixture
+review. Demo loading replaces the active browser workspace, so it requires the
+typed phrase `LOAD DEMO` before it runs. Demo loading resets owner, document,
+curative, map, research, and transient AI approval/undo state before seeding or
+importing the selected fixture.
 Older stress and 8-tract leasehold demos have been retired.
 
 ## Persistence Notes
 
+- The project picker indexes saved browser-local projects and stores each
+  project under its own workspace storage key, so opening, creating, renaming,
+  duplicating, or deleting one project does not reuse another project's
+  autosave rows.
 - Browser autosave keeps the active workspace and flowchart canvas locally.
+- The top bar shows a storage health panel with last autosave, last
+  `.landroid` backup/export, and browser Storage API persistence/usage status.
 - `.landroid` files are the main named backup/export format. The current v9
   format keeps the workspace snapshot authoritative and can carry a validated
   title action/audit ledger for durability.
+- `Backup Now` triggers the same full `.landroid` export path as manual
+  workspace save so the downloaded file remains the named escape hatch.
+- In browsers with local folder access support, `Auto Export` can opt in to
+  rolling timestamped `.landroid` snapshots in a user-selected folder. If the
+  browser lacks that API or folder permission is revoked, LANDroid falls back to
+  manual `Backup Now` with a warning.
 - Phase 5 stores document blobs, content hashes, and attachments in the local
   workspace database. Phase 7A adds the `Documents` registry so LANDroid can
   edit document metadata, group documents by saved view/area, surface duplicate
@@ -148,6 +161,8 @@ Older stress and 8-tract leasehold demos have been retired.
   still open.
 - CSV imports create a fresh workspace and intentionally start with empty owner,
   document, curative, map, research, and transient AI side state.
+- `.landroid` and CSV imports create or reconcile a saved-project entry and
+  switch the active project storage key before imported data can autosave.
 - `.landroid` and CSV loads require the typed phrase `LOAD WORKSPACE` because
   they replace the active browser workspace.
 
