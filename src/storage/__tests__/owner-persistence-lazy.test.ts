@@ -65,6 +65,7 @@ async function loadStore(docs: StoredOwnerDoc[]) {
   const db = {
     owners: makeTable([], 'id'),
     leases: makeTable([], 'id'),
+    leasePurchaseReports: makeTable([], 'id'),
     contactLogs: makeTable([], 'id'),
     ownerDocs,
   };

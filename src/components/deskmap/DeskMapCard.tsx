@@ -2,7 +2,9 @@
  * Desk Map card — displays one ownership node with action buttons.
  *
  * Shows instrument/date, grantor->grantee, fractions.
- * Hover reveals action buttons: PRECEDE | CONVEY | ATTACH DOC | DELETE.
+ * Hover reveals action buttons: PRECEDE | CONVEY | LEASE | ATTACH DOC | DELETE.
+ * LEASE shows only on a present mineral owner (a lease overlays the owner, it
+ * does not convey ownership).
  * Click opens the edit modal.
  * Related docs render as compact rectangles beneath the card.
  */
@@ -33,6 +35,7 @@ interface DeskMapCardProps {
   onEdit: (nodeId: string) => void;
   onConvey: (nodeId: string) => void;
   onPrecede: (nodeId: string) => void;
+  onLease: (nodeId: string) => void;
   onAttachDoc: (nodeId: string) => void;
   onDelete: (nodeId: string) => void;
   onViewDoc: (docId: string) => void;
@@ -49,6 +52,7 @@ function DeskMapCard({
   onEdit,
   onConvey,
   onPrecede,
+  onLease,
   onAttachDoc,
   onDelete,
   onViewDoc,
@@ -89,6 +93,10 @@ function DeskMapCard({
   // is still a present mineral owner — they just have a lease attached.
   const isLeased = Boolean(leaseSummary) && holdsInterest;
   const isNpri = isNpriNode(node);
+  // Leasing is offered only on a present mineral owner (holds remaining interest,
+  // mineral class, not an NPRI/related node). A lease is an overlay on the
+  // present owner, not a conveyance — so it sits beside CONVEY here.
+  const canLease = holdsInterest && node.interestClass === 'mineral' && !isNpri;
   const cardBodyTint = hasNpriDiscrepancy
     ? 'bg-seal/5 text-ink'
     : isNpri && holdsInterest
@@ -251,6 +259,9 @@ function DeskMapCard({
         <div className="hidden group-hover:flex px-2 py-1.5 border-t border-ledger-line bg-parchment-dark rounded-b-lg gap-1 justify-center">
           <ActionBtn label="PRECEDE" variant="muted" disabled={readOnly} onClick={() => onPrecede(node.id)} />
           <ActionBtn label="CONVEY" variant="primary" disabled={readOnly} onClick={() => onConvey(node.id)} />
+          {canLease && (
+            <ActionBtn label="LEASE" variant="lease" disabled={readOnly} onClick={() => onLease(node.id)} />
+          )}
           <ActionBtn label="ATTACH" variant="accent" disabled={readOnly} onClick={() => onAttachDoc(node.id)} />
           <ActionBtn label="DELETE" variant="danger" disabled={readOnly} onClick={() => onDelete(node.id)} />
         </div>
@@ -273,6 +284,7 @@ function deskMapCardPropsAreEqual(
     previous.onEdit === next.onEdit &&
     previous.onConvey === next.onConvey &&
     previous.onPrecede === next.onPrecede &&
+    previous.onLease === next.onLease &&
     previous.onAttachDoc === next.onAttachDoc &&
     previous.onDelete === next.onDelete &&
     previous.onViewDoc === next.onViewDoc &&

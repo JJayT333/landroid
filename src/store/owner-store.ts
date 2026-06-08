@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import {
   deleteContact,
   deleteLease,
+  deleteLeasePurchaseReport,
   deleteOwner,
   deleteOwnerDoc,
   loadOwnerDocsWithBlobs,
@@ -9,6 +10,7 @@ import {
   replaceOwnerWorkspaceData,
   saveContact,
   saveLease,
+  saveLeasePurchaseReport,
   saveOwner,
   saveOwnerDoc,
   updateOwnerDocFields,
@@ -23,6 +25,10 @@ import type {
   OwnerPanelTab,
 } from '../types/owner';
 import { normalizeLease } from '../types/owner';
+import {
+  normalizeLeasePurchaseReport,
+  type LeasePurchaseReport,
+} from '../types/lease-purchase-report';
 import { useMapStore } from './map-store';
 import { useWorkspaceStore } from './workspace-store';
 
@@ -39,6 +45,15 @@ function normalizeLeases(leases: Lease[], workspaceId: string) {
   );
 }
 
+function normalizeLeasePurchaseReports(
+  reports: LeasePurchaseReport[] | undefined,
+  workspaceId: string
+): LeasePurchaseReport[] {
+  return (reports ?? []).map((report) =>
+    normalizeLeasePurchaseReport(report, { workspaceId, ownerId: report.ownerId })
+  );
+}
+
 function toOwnerDocMeta(doc: OwnerDoc): OwnerDocMeta {
   const { blob: _blob, ...meta } = doc;
   return meta;
@@ -48,6 +63,7 @@ interface OwnerState {
   workspaceId: string | null;
   owners: Owner[];
   leases: Lease[];
+  leasePurchaseReports: LeasePurchaseReport[];
   contacts: ContactLog[];
   docs: OwnerDocMeta[];
   selectedOwnerId: string | null;
@@ -67,6 +83,12 @@ interface OwnerState {
   addLease: (lease: Lease) => Promise<void>;
   updateLease: (id: string, fields: Partial<Lease>) => Promise<void>;
   removeLease: (id: string) => Promise<void>;
+  addLeasePurchaseReport: (report: LeasePurchaseReport) => Promise<void>;
+  updateLeasePurchaseReport: (
+    id: string,
+    fields: Partial<LeasePurchaseReport>
+  ) => Promise<void>;
+  removeLeasePurchaseReport: (id: string) => Promise<void>;
   addContact: (contact: ContactLog) => Promise<void>;
   updateContact: (id: string, fields: Partial<ContactLog>) => Promise<void>;
   removeContact: (id: string) => Promise<void>;
@@ -79,6 +101,7 @@ export const useOwnerStore = create<OwnerState>()((set, get) => ({
   workspaceId: null,
   owners: [],
   leases: [],
+  leasePurchaseReports: [],
   contacts: [],
   docs: [],
   selectedOwnerId: null,
@@ -91,6 +114,10 @@ export const useOwnerStore = create<OwnerState>()((set, get) => ({
       workspaceId,
       owners: data.owners,
       leases: normalizeLeases(data.leases, workspaceId),
+      leasePurchaseReports: normalizeLeasePurchaseReports(
+        data.leasePurchaseReports,
+        workspaceId
+      ),
       contacts: data.contacts,
       docs: data.docs,
       selectedOwnerId: null,
@@ -101,14 +128,20 @@ export const useOwnerStore = create<OwnerState>()((set, get) => ({
 
   replaceWorkspaceData: async (workspaceId, data) => {
     const normalizedLeases = normalizeLeases(data.leases, workspaceId);
+    const normalizedReports = normalizeLeasePurchaseReports(
+      data.leasePurchaseReports,
+      workspaceId
+    );
     await replaceOwnerWorkspaceData(workspaceId, {
       ...data,
       leases: normalizedLeases,
+      leasePurchaseReports: normalizedReports,
     });
     set({
       workspaceId,
       owners: data.owners.map((owner) => ({ ...owner, workspaceId })),
       leases: normalizedLeases,
+      leasePurchaseReports: normalizedReports,
       contacts: data.contacts.map((contact) => ({ ...contact, workspaceId })),
       docs: data.docs.map((doc) => toOwnerDocMeta({ ...doc, workspaceId })),
       selectedOwnerId: null,
@@ -118,12 +151,12 @@ export const useOwnerStore = create<OwnerState>()((set, get) => ({
   },
 
   exportWorkspaceData: async () => {
-    const { workspaceId, owners, leases, contacts } = get();
+    const { workspaceId, owners, leases, leasePurchaseReports, contacts } = get();
     // Re-read blob-bearing docs from Dexie: the in-memory store holds
     // metadata only, but `.landroid` export and the AI undo snapshot must
     // carry the file bytes.
     const docs = workspaceId ? await loadOwnerDocsWithBlobs(workspaceId) : [];
-    return { owners, leases, contacts, docs };
+    return { owners, leases, leasePurchaseReports, contacts, docs };
   },
 
   selectOwner: (selectedOwnerId) => set({ selectedOwnerId }),
@@ -170,6 +203,9 @@ export const useOwnerStore = create<OwnerState>()((set, get) => ({
     set((state) => ({
       owners: state.owners.filter((owner) => owner.id !== id),
       leases: state.leases.filter((lease) => lease.ownerId !== id),
+      leasePurchaseReports: state.leasePurchaseReports.filter(
+        (lpr) => lpr.ownerId !== id
+      ),
       contacts: state.contacts.filter((contact) => contact.ownerId !== id),
       docs: state.docs.filter((doc) => doc.ownerId !== id),
       selectedOwnerId: state.selectedOwnerId === id ? null : state.selectedOwnerId,
@@ -213,6 +249,42 @@ export const useOwnerStore = create<OwnerState>()((set, get) => ({
       leases: state.leases.filter((lease) => lease.id !== id),
       docs: state.docs.map((doc) =>
         doc.leaseId === id ? { ...doc, leaseId: null } : doc
+      ),
+    }));
+  },
+
+  addLeasePurchaseReport: async (report) => {
+    const workspaceId = get().workspaceId ?? report.workspaceId;
+    const next = normalizeLeasePurchaseReport(report, {
+      workspaceId,
+      ownerId: report.ownerId,
+    });
+    await saveLeasePurchaseReport(next);
+    set((state) => ({
+      leasePurchaseReports: [...state.leasePurchaseReports, next],
+    }));
+  },
+
+  updateLeasePurchaseReport: async (id, fields) => {
+    const current = get().leasePurchaseReports.find((report) => report.id === id);
+    if (!current) return;
+    const next = normalizeLeasePurchaseReport(
+      touch({ ...current, ...fields, workspaceId: current.workspaceId }),
+      { workspaceId: current.workspaceId, ownerId: current.ownerId }
+    );
+    await saveLeasePurchaseReport(next);
+    set((state) => ({
+      leasePurchaseReports: state.leasePurchaseReports.map((report) =>
+        report.id === id ? next : report
+      ),
+    }));
+  },
+
+  removeLeasePurchaseReport: async (id) => {
+    await deleteLeasePurchaseReport(id);
+    set((state) => ({
+      leasePurchaseReports: state.leasePurchaseReports.filter(
+        (report) => report.id !== id
       ),
     }));
   },

@@ -3,6 +3,8 @@ import {
   normalizeDepthRange,
   type DepthRange,
 } from './depth-range';
+import { d } from '../engine/decimal';
+import { parseStrictInterestString } from '../utils/interest-string';
 
 export interface Owner {
   id: string;
@@ -167,6 +169,22 @@ export interface Lease {
   docNo: string;
   notes: string;
   /**
+   * Parent Lease Purchase Report this slice belongs to, or `null` for a
+   * standalone lease. One LPR groups one-or-more per-tract slices.
+   */
+  leasePurchaseReportId: string | null;
+  /** Gross tract acres (plain number text, e.g. "35.92"). Descriptive. */
+  grossAcres: string;
+  /**
+   * Net mineral acres = grossAcres x leasedInterest. The acre view of the same
+   * `leasedInterest` that drives coverage, recomputed in `normalizeLease`.
+   */
+  netAcres: string;
+  /** Primary term as text (e.g. "1 year", "3 years"). Descriptive. */
+  primaryTerm: string;
+  /** Held by production past the primary term. Descriptive (not a math input). */
+  heldByProduction: boolean;
+  /**
    * Jurisdiction discriminator. See `LeaseJurisdiction`. Defaults to `'tx_fee'`
    * for every existing record; Phase 2 will key federal/BLM behaviors off this.
    */
@@ -237,6 +255,25 @@ function asString(value: unknown): string {
   return typeof value === 'string' ? value : '';
 }
 
+/**
+ * Net mineral acres = gross acres x lessor (leased) interest. Returns '' when
+ * either input is blank or unparseable. Rounded to 4 dp with trailing zeros
+ * trimmed. This is purely the acre view of `leasedInterest` — it never feeds the
+ * ownership/royalty/NRI math.
+ */
+export function computeNetAcres(grossAcres: string, lessorInterest: string): string {
+  const gross = asString(grossAcres).trim();
+  const interest = asString(lessorInterest).trim();
+  if (gross.length === 0 || interest.length === 0) return '';
+  // Lessor interest is a fraction in [0, 1]; gross acres is a plain non-negative
+  // number (so it must NOT go through the [0,1]-clamped interest parser).
+  const interestDec = parseStrictInterestString(interest);
+  if (interestDec === null) return '';
+  const grossNumber = Number(gross);
+  if (!Number.isFinite(grossNumber) || grossNumber < 0) return '';
+  return d(gross).times(interestDec).toDecimalPlaces(4).toString();
+}
+
 export function createBlankOwner(
   workspaceId: string,
   overrides: Partial<Owner> = {}
@@ -280,6 +317,11 @@ export function createBlankLease(
     status: DEFAULT_LEASE_STATUS,
     docNo: '',
     notes: '',
+    leasePurchaseReportId: null,
+    grossAcres: '',
+    netAcres: '',
+    primaryTerm: '',
+    heldByProduction: false,
     jurisdiction: DEFAULT_LEASE_JURISDICTION,
     depthRange: DEFAULT_DEPTH_RANGE,
     createdAt: overrides.createdAt ?? now,
@@ -293,6 +335,8 @@ export function createBlankLease(
   lease.jurisdiction = normalizeLeaseJurisdiction(lease.jurisdiction);
   lease.depthRange = normalizeDepthRange(lease.depthRange);
   lease.status = normalizeLeaseStatus(lease.status);
+  // netAcres is always derived so the acre and fraction views cannot drift.
+  lease.netAcres = computeNetAcres(lease.grossAcres, lease.leasedInterest);
   return lease;
 }
 
@@ -318,6 +362,18 @@ export function normalizeLease(
     status: normalizeLeaseStatus(lease.status),
     docNo: asString(lease.docNo),
     notes: asString(lease.notes),
+    leasePurchaseReportId:
+      typeof lease.leasePurchaseReportId === 'string'
+      && lease.leasePurchaseReportId.trim().length > 0
+        ? lease.leasePurchaseReportId
+        : null,
+    grossAcres: asString(lease.grossAcres),
+    netAcres: computeNetAcres(
+      asString(lease.grossAcres),
+      asString(lease.leasedInterest)
+    ),
+    primaryTerm: asString(lease.primaryTerm),
+    heldByProduction: lease.heldByProduction === true,
     jurisdiction: normalizeLeaseJurisdiction(lease.jurisdiction),
     depthRange: normalizeDepthRange(lease.depthRange),
     createdAt: asString(lease.createdAt) || normalized.createdAt,

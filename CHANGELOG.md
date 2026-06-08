@@ -3,6 +3,27 @@
 This file records meaningful project changes so `CONTINUATION-PROMPT.md` can
 stay short.
 
+## 2026-06-08
+
+- Added a first-class Lease workflow (Phase 1 of the Lease Purchase Report
+  feature). A `LEASE` action now appears on present mineral-owner Desk Map cards
+  (next to `CONVEY`), and the `Leasehold` view has an `Add Lease` button with an
+  owner picker — both open the same lease editor. A lease is an overlay on the
+  present owner and never changes mineral ownership, which is what distinguishes
+  it from a conveyance.
+- Introduced the `LeasePurchaseReport` record (lease abstract): lessee, lease
+  type, lease form (defaults to Producers 88 (7-69)), dates, primary term,
+  held-by-production, royalty, bonus/rental, and comments. Each lease is a
+  per-tract slice linked to its LPR; the slice still carries lessor interest,
+  gross acres, and computed net mineral acres (gross x lessor interest). Math is
+  unchanged: only lessor interest, royalty, status, and jurisdiction feed
+  coverage/royalty/NRI — every new LPR field is descriptive. Net mineral acres is
+  the acre view of the same lessor interest, so the acre and fraction views
+  cannot disagree.
+- Stored LPRs in a new `leasePurchaseReports` Dexie table (additive v14 schema,
+  per-user scoped) and added them to `.landroid` export/import with backward
+  compatibility for files written before LPRs.
+
 ## 2026-06-07
 
 - Fixed the hosted Amplify rewrite template so `.landroid`, `.pdf`, and

@@ -56,6 +56,7 @@ import {
   type Owner,
   type OwnerDoc,
 } from '../types/owner';
+import { normalizeLeasePurchaseReport } from '../types/lease-purchase-report';
 import {
   normalizeMapExternalReference,
   type MapAsset,
@@ -1008,6 +1009,9 @@ async function serializeOwnerData(
   | {
       owners: OwnerWorkspaceData['owners'];
       leases: OwnerWorkspaceData['leases'];
+      leasePurchaseReports: NonNullable<
+        OwnerWorkspaceData['leasePurchaseReports']
+      >;
       contacts: OwnerWorkspaceData['contacts'];
       docs: SerializedOwnerDoc[];
     }
@@ -1017,6 +1021,7 @@ async function serializeOwnerData(
   return {
     owners: ownerData.owners,
     leases: ownerData.leases,
+    leasePurchaseReports: ownerData.leasePurchaseReports ?? [],
     contacts: ownerData.contacts,
     docs: await Promise.all(
       ownerData.docs.map(async (doc) => ({
@@ -1580,6 +1585,30 @@ export async function importLandroidFile(file: File): Promise<LandroidFileData> 
                     isRecord(lease) && typeof lease.id === 'string'
                 )
                 .map((lease) => normalizeLease(lease, { workspaceId }))
+            : [],
+          leasePurchaseReports: Array.isArray(
+            parsed.ownerData.leasePurchaseReports
+          )
+            ? parsed.ownerData.leasePurchaseReports
+                .filter(
+                  (
+                    report
+                  ): report is Pick<
+                    NonNullable<
+                      NonNullable<LandroidFileData['ownerData']>['leasePurchaseReports']
+                    >[number],
+                    'id'
+                  > &
+                    Partial<
+                      NonNullable<
+                        NonNullable<LandroidFileData['ownerData']>['leasePurchaseReports']
+                      >[number]
+                    > =>
+                    isRecord(report) && typeof report.id === 'string'
+                )
+                .map((report) =>
+                  normalizeLeasePurchaseReport(report, { workspaceId })
+                )
             : [],
           contacts: Array.isArray(parsed.ownerData.contacts)
             ? parsed.ownerData.contacts

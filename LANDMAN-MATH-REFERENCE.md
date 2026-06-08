@@ -113,6 +113,15 @@ All LANDroid math is done with `decimal.js`, not with JavaScript floating-point 
 
 ## 5. Lease coverage allocation
 
+Lease Purchase Report fields are descriptive, not math inputs. A lease is recorded
+as a Lease Purchase Report (lessee, lease type, lease form, dates, primary term,
+held-by-production, royalty, bonus/rental, comments) with one per-tract slice each.
+Only the slice's lessor (leased) interest, royalty rate, status, and jurisdiction
+enter coverage/royalty/NRI math. Lease type, form, primary term, held-by-production,
+bonus, rental, comments, and attachments never do. Net mineral acres
+(`gross acres x lessor interest`) is the acre expression of the same lessor interest
+the coverage math already uses, so the acre and fraction views cannot diverge.
+
 LANDroid allocates lease coverage owner by owner. For each owner on a tract, it first removes inactive leases, then sorts the active leases by effective date, with earlier effective dates winning. Blank effective dates sort last. Within ties, the code falls back to created time, updated time, and ID so the result is deterministic. For each lease, the requested leased fraction is the lease's stated leased-interest field; if that field is blank, LANDroid treats the lease as requesting the owner's full fraction. It then allocates the smaller of the lease's request and the owner's remaining uncovered fraction. This is the current "first-effective wins" rule.
 
 Known limitation requiring landman attention: if multiple active leases together claim more than the owner holds, LANDroid still clips the later lease instead of forcing a legal decision. It now records a warning showing requested, allocated, and clipped fractions, but the math still proceeds on the clipped result. That means the decimal output is reviewable, not self-proving, in overlap situations. A top lease, duplicate lease entry, or unresolved title issue can therefore look mathematically tidy after clipping even though the underlying lease story still needs a landman's judgment. Source: `src/components/deskmap/deskmap-coverage.ts:36-57,59-98,103-157,188-216`.

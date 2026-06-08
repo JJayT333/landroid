@@ -23,6 +23,12 @@ import {
 } from '../types/leasehold';
 import { useOwnerStore } from '../store/owner-store';
 import { useWorkspaceStore } from '../store/workspace-store';
+import { useUIStore } from '../store/ui-store';
+import Modal from '../components/shared/Modal';
+import {
+  buildLeaseAddTargets,
+  type LeaseAddTarget,
+} from '../components/leasehold/lease-add-targets';
 import {
   READ_ONLY_WORKSPACE_EDIT_TITLE,
   useWorkspaceReadOnly,
@@ -4190,7 +4196,13 @@ export default function LeaseholdView() {
   const updateDeskMapDetailsToStore = useWorkspaceStore((state) => state.updateDeskMapDetails);
   const owners = useOwnerStore((state) => state.owners);
   const leases = useOwnerStore((state) => state.leases);
+  const setView = useUIStore((state) => state.setView);
+  const setPendingNodeEditorRoute = useUIStore(
+    (state) => state.setPendingNodeEditorRoute
+  );
+  const setActiveDeskMap = useWorkspaceStore((state) => state.setActiveDeskMap);
   const [mode, setMode] = useState<LeaseholdMode>('overview');
+  const [addLeaseOpen, setAddLeaseOpen] = useState(false);
 
   const updateLeaseholdUnit = (...args: Parameters<typeof updateLeaseholdUnitToStore>) => {
     if (!readOnly) updateLeaseholdUnitToStore(...args);
@@ -4233,6 +4245,40 @@ export default function LeaseholdView() {
   const focusedDeskMaps = useMemo(
     () => filterDeskMapsByUnitCode(deskMaps, effectiveUnitCode),
     [deskMaps, effectiveUnitCode]
+  );
+  const leaseAddTargets = useMemo(
+    () => buildLeaseAddTargets({ deskMaps: focusedDeskMaps, nodes }),
+    [focusedDeskMaps, nodes]
+  );
+  // Route the picked owner into the Desk Map's lease editor: set the owner's
+  // desk map active so the new lessee node lands on the right tract, queue the
+  // lease route, then switch to the Desk Map view which consumes the route.
+  const handleSelectLeaseTarget = useCallback(
+    (target: LeaseAddTarget) => {
+      if (readOnly) return;
+      setActiveDeskMap(target.deskMapId);
+      setPendingNodeEditorRoute({ kind: 'lease', parentNodeId: target.nodeId });
+      setView('chart');
+      setAddLeaseOpen(false);
+    },
+    [readOnly, setActiveDeskMap, setPendingNodeEditorRoute, setView]
+  );
+  const addLeaseButton = (
+    <button
+      type="button"
+      onClick={() => setAddLeaseOpen(true)}
+      disabled={readOnly || leaseAddTargets.length === 0}
+      title={
+        readOnly
+          ? READ_ONLY_WORKSPACE_EDIT_TITLE
+          : leaseAddTargets.length === 0
+            ? 'Add a present mineral owner on a tract first'
+            : 'Add a lease to a present mineral owner'
+      }
+      className="rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-100 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+    >
+      + Add Lease
+    </button>
   );
 
   const summary = useMemo(
@@ -4313,6 +4359,7 @@ export default function LeaseholdView() {
             <div className="flex items-center justify-between gap-4 px-5 py-3">
               <h1 className="text-base font-display font-bold text-ink">Leasehold</h1>
               <div className="flex items-center gap-3">
+                {addLeaseButton}
                 <UnitFocusSelector />
                 <LeaseholdDeckModeToggle mode={mode} onChange={setMode} />
               </div>
@@ -4336,7 +4383,10 @@ export default function LeaseholdView() {
                 </div>
                 <div className="flex flex-col items-start gap-3">
                   <LeaseholdDeckModeToggle mode={mode} onChange={setMode} />
-                  <UnitFocusSelector />
+                  <div className="flex items-center gap-2">
+                    <UnitFocusSelector />
+                    {addLeaseButton}
+                  </div>
                   <div className="rounded-2xl border border-gold/30 bg-gold/10 px-4 py-3 text-sm text-gold-950">
                     <div className="font-semibold">Current v1 assumption</div>
                     <div className="mt-1">
@@ -4414,6 +4464,52 @@ export default function LeaseholdView() {
             </div>
           )}
         </header>
+
+        {addLeaseOpen && (
+          <Modal open onClose={() => setAddLeaseOpen(false)} title="Add Lease">
+            <div className="space-y-3">
+              <p className="text-xs leading-5 text-ink-light">
+                Choose a present mineral owner to lease. A lease overlays the
+                present owner without changing mineral ownership, and opens the
+                Lease Purchase Report on that owner&apos;s tract.
+              </p>
+              {leaseAddTargets.length === 0 ? (
+                <div className="rounded-lg border border-dashed border-ledger-line px-4 py-5 text-sm text-ink-light">
+                  No present mineral owners on this unit&apos;s tracts yet.
+                </div>
+              ) : (
+                <div className="max-h-80 space-y-2 overflow-auto">
+                  {leaseAddTargets.map((target) => (
+                    <button
+                      key={target.nodeId}
+                      type="button"
+                      onClick={() => handleSelectLeaseTarget(target)}
+                      className="flex w-full items-center justify-between gap-3 rounded-lg border border-ledger-line bg-parchment px-3 py-2 text-left transition-colors hover:border-emerald-300 hover:bg-emerald-50"
+                    >
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-semibold text-ink">
+                          {target.label}
+                        </span>
+                        <span className="block truncate text-xs text-ink-light">
+                          {target.deskMapName}
+                        </span>
+                      </span>
+                      <span
+                        className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${
+                          target.leased
+                            ? 'bg-ledger text-ink-light'
+                            : 'bg-emerald-100 text-emerald-800'
+                        }`}
+                      >
+                        {target.leased ? 'Leased' : 'Unleased'}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </Modal>
+        )}
 
         {mode === 'overview' ? (
           <>
