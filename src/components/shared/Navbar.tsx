@@ -238,7 +238,10 @@ export default function Navbar({ onOpenProjectPicker }: NavbarProps) {
       assertFileSize(file, FILE_SIZE_LIMITS.LANDROID, '.landroid file');
 
       const data = await importLandroidFile(file);
-      await importAndOpenWorkspace(data);
+      // Demo loader: always replace any prior Dr. Elmore project with a pristine
+      // copy from the current bundled sample, so testing after a merge starts
+      // fresh every time.
+      await importAndOpenWorkspace(data, { replaceExisting: true });
       await mirrorLoadedTitleLedger(data);
       console.log(`[springhill-sample] Loaded ${data.nodes.length} nodes`);
     } catch (err) {

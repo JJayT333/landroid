@@ -228,13 +228,22 @@ export async function createAndOpenSavedProject(
 }
 
 export async function importAndOpenWorkspace(
-  data: ImportedWorkspaceData
+  data: ImportedWorkspaceData,
+  options: { replaceExisting?: boolean } = {}
 ): Promise<ProjectOpenResult> {
   const workspaceData = normalizeImportedWorkspaceData(data);
   const previousWorkspaceDbKey = getActiveWorkspaceStorageKey();
   await flushActiveProject();
 
-  const existingProject = await getSavedProject(workspaceData.workspaceId);
+  let existingProject = await getSavedProject(workspaceData.workspaceId);
+  if (options.replaceExisting && existingProject) {
+    // Demo loaders pass `replaceExisting` so every load starts from a pristine
+    // slot: purge the prior project's rows entirely, then import a clean copy.
+    // The DB key is derived deterministically from the workspace id, so the
+    // fresh import reuses the same slot with all stale rows already gone.
+    await deleteProjectStorage(existingProject);
+    existingProject = null;
+  }
   const workspaceDbKey =
     existingProject?.workspaceDbKey
       ?? makeProjectWorkspaceDbKey(workspaceData.workspaceId);
