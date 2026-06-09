@@ -39,6 +39,7 @@ import { ParityDivergenceError } from '../project-records/action-layer/parity';
 import { verifyAuditChain } from '../project-records/action-layer/audit-chain';
 import { setTitleCutoverRuntimeStateReader } from '../project-records/action-layer/title-cutover-gate';
 import {
+  checkTitleInlineParity,
   recordTitleMutation,
   TITLE_MUTATIONS,
   type TitleMutation,
@@ -54,7 +55,11 @@ import {
 } from '../storage/title-ledger-persistence';
 import type { TitleLedgerWorkspaceRows } from '../storage/title-ledger-stores';
 import { useOwnerStore } from './owner-store';
-import { setTitleActionLogResetHook, setTitleJournalHook } from './workspace-store';
+import {
+  setTitleActionLogResetHook,
+  setTitleJournalHook,
+  useWorkspaceStore,
+} from './workspace-store';
 
 type OwnerSlice = Pick<OwnerWorkspaceData, 'owners' | 'leases'>;
 
@@ -513,7 +518,41 @@ export function ensureTitleBaseline(
 }
 
 setTitleJournalHook((mutation, beforeWorkspace, afterWorkspace) => {
-  if (!useTitleActionLog.getState().enabled) return;
+  const state = useTitleActionLog.getState();
+  if (!state.enabled) return;
+
+  // Read-source cutover: the ledger is authoritative for what the live UI shows,
+  // so a parity-diverged mutation must not survive in the store. The parity check
+  // is synchronous, so we veto and roll back to the before-snapshot here — atomic
+  // with the mutation, before any read — and keep the diverged record out of the
+  // ledger (the store now matches ledger state). Shadow mode is unchanged below.
+  if (state.readPathMode === 'cutover' && isTitleMutation(mutation)) {
+    const parity = checkTitleInlineParity({
+      mutation,
+      origin: 'user',
+      beforeWorkspace,
+      afterWorkspace,
+      ownerData: readOwnerData(),
+    });
+    if (!parity.clean) {
+      useWorkspaceStore.getState().restoreTitleSlice(beforeWorkspace);
+      useTitleActionLog.setState({
+        lastDivergence: {
+          mutation,
+          message:
+            'Cutover parity divergence: the mutation was rolled back so the store '
+            + 'matches the durable ledger. Resolve before relying on cutover.',
+          at: new Date().toISOString(),
+        },
+      });
+      console.error(
+        '[title-action-log] CUTOVER ROLLBACK — mutation reverted to keep the store '
+          + `equal to the ledger (read source of truth): ${mutation}.`
+      );
+      return;
+    }
+  }
+
   const generationAtEnqueue = ledgerGeneration;
   const ownerData = readOwnerData();
   recordingChain = recordingChain.then(async () => {
