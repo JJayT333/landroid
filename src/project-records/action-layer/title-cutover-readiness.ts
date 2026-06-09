@@ -38,6 +38,20 @@ import { replayTitleProjection } from './title-replay';
 
 type OwnerSlice = Pick<OwnerWorkspaceData, 'owners' | 'leases'>;
 
+/**
+ * Canonicalize a record projection as an order-insensitive set: the title
+ * projection is a set of records keyed by `recordId`, so replay-vs-adapter
+ * equivalence must not depend on emission order (the live replay ordering is a
+ * separate Scope-B concern). Mirrors the replay test's `sortedJson`.
+ */
+function sortedRecordsJson(records: readonly BackendSpineCoreRecord[]): string {
+  return canonicalJson(
+    [...records].sort((a, b) =>
+      a.recordId < b.recordId ? -1 : a.recordId > b.recordId ? 1 : 0
+    )
+  );
+}
+
 /** A clean single-mutation parity report (one per recorded mutation). */
 const CLEAN_TITLE_PARITY_REPORT: ParityReport = {
   workflow: 'title_tree',
@@ -124,6 +138,11 @@ export async function computeTitleParityGates(
   if (input.actionRecords.length === 0) return NOT_CLEAN;
   const generatedAt = input.generatedAt ?? new Date().toISOString();
 
+  // The durable records carry projectId = the workspace id (that is the context
+  // the live ledger records under), so the adapter comparison must use the same
+  // projectId or the record bodies diverge on that field alone.
+  const projectId = input.liveWorkspace.workspaceId;
+
   let mathParityClean = false;
   try {
     mathParityClean = runTitleMathParity({
@@ -131,6 +150,7 @@ export async function computeTitleParityGates(
       records: input.actionRecords as readonly BackendSpineCoreRecord[],
       ownerData: input.ownerData,
       generatedAt,
+      projectId,
     }).clean;
   } catch {
     mathParityClean = false;
@@ -153,8 +173,9 @@ export async function computeTitleParityGates(
       workspace: input.liveWorkspace,
       ownerData: input.ownerData,
       generatedAt,
+      projectId,
     });
-    landroidRoundTripClean = canonicalJson(replayed) === canonicalJson(adapter);
+    landroidRoundTripClean = sortedRecordsJson(replayed) === sortedRecordsJson(adapter);
   } catch {
     landroidRoundTripClean = false;
   }
