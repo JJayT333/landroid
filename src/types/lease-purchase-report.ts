@@ -20,6 +20,8 @@
  * exports.
  */
 
+import { d } from '../engine/decimal';
+
 export const DEFAULT_LEASE_FORM = 'Producers 88 (7-69)';
 
 export const LEASE_TYPE_OPTIONS = [
@@ -218,6 +220,50 @@ export function toggleAttachment(
 ): LeaseAttachmentKey[] {
   const without = attachments.filter((attachment) => attachment !== key);
   return on ? [...without, key] : without;
+}
+
+/** Parse a plain non-negative money/acre amount; '' or junk -> null. */
+function parsePlainNonNegative(value: unknown): number | null {
+  const text = asString(value).trim();
+  if (text.length === 0) return null;
+  const num = Number(text);
+  if (!Number.isFinite(num) || num < 0) return null;
+  return num;
+}
+
+export interface LeaseEconomicsTotals {
+  /** bonus/ac x sum(net acres); '' when no rate or no positive net acres. */
+  totalBonus: string;
+  /** rental/ac x sum(net acres) when not paid up; '' otherwise. */
+  totalDelayRental: string;
+}
+
+/**
+ * Derived economics for the lease editor. Totals are display-only: they are
+ * NEVER persisted and NEVER feed coverage/royalty/NRI math. Inputs are plain
+ * dollar-per-acre amounts and the per-tract net-acre figures; the result is a
+ * 2-dp string suitable for direct display.
+ */
+export function computeLeaseEconomicsTotals(
+  economics: Pick<LeasePurchaseReport, 'bonusPerAcre' | 'rentalPerAcre' | 'paidUp'>,
+  netAcresList: ReadonlyArray<string>
+): LeaseEconomicsTotals {
+  let sumNet = d(0);
+  for (const netAcres of netAcresList) {
+    const parsed = parsePlainNonNegative(netAcres);
+    if (parsed !== null) sumNet = sumNet.plus(parsed);
+  }
+
+  const total = (perAcre: unknown): string => {
+    const rate = parsePlainNonNegative(perAcre);
+    if (rate === null || !sumNet.greaterThan(0)) return '';
+    return d(rate).times(sumNet).toDecimalPlaces(2).toString();
+  };
+
+  return {
+    totalBonus: total(economics.bonusPerAcre),
+    totalDelayRental: economics.paidUp ? '' : total(economics.rentalPerAcre),
+  };
 }
 
 export function createBlankLeasePurchaseReport(

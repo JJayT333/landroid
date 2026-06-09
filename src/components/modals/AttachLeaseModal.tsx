@@ -24,6 +24,7 @@ import {
   LEASE_ATTACHMENT_DEFINITIONS,
   LEASE_PROVISION_DEFINITIONS,
   LEASE_TYPE_OPTIONS,
+  computeLeaseEconomicsTotals,
   createBlankLeasePurchaseReport,
   getProvision,
   hasAttachment,
@@ -290,6 +291,12 @@ export default function AttachLeaseModal({
   };
 
   const netAcresPreview = computeNetAcres(draft.grossAcres, draft.leasedInterest);
+
+  // Display-only economics: bonus/ac x sum(net acres), delay rental when not
+  // paid up. Never persisted, never fed to coverage/royalty/NRI math. The net
+  // acres source is the single tract today; the multi-tract table feeds the
+  // full per-tract list once it lands.
+  const economicsTotals = computeLeaseEconomicsTotals(lprDraft, [netAcresPreview]);
 
   const handleSave = async () => {
     if (!isParentMineral) {
@@ -637,9 +644,28 @@ export default function AttachLeaseModal({
               Paid up (no delay rentals)
             </label>
           </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-[10px] text-ink-light uppercase tracking-wider block mb-1">
+                Total Bonus
+              </label>
+              <div className="px-3 py-2 rounded-lg border border-ledger-line bg-ledger text-sm text-ink-light">
+                {economicsTotals.totalBonus || '—'}
+              </div>
+            </div>
+            <div>
+              <label className="text-[10px] text-ink-light uppercase tracking-wider block mb-1">
+                Delay Rental
+              </label>
+              <div className="px-3 py-2 rounded-lg border border-ledger-line bg-ledger text-sm text-ink-light">
+                {lprDraft.paidUp ? 'Paid up' : economicsTotals.totalDelayRental || '—'}
+              </div>
+            </div>
+          </div>
           <div className="text-[11px] leading-5 text-ink-light">
             Royalty starts blank so a placeholder rate is not mistaken for lease evidence.
-            Blank economics stay as not entered in payout review.
+            Blank economics stay as not entered in payout review. Totals are derived
+            from net mineral acres for reference only and never change the math.
           </div>
         </fieldset>
 
