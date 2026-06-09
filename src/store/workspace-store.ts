@@ -415,6 +415,15 @@ function snapshotWorkspaceData(state: WorkspaceState): WorkspaceData {
 }
 
 /**
+ * Snapshot the current live workspace as `WorkspaceData`. Read-only; used by the
+ * title cutover readiness gate to compute math/round-trip parity against the
+ * durable ledger without the action layer reaching into the store internals.
+ */
+export function readCurrentWorkspaceData(): WorkspaceData {
+  return snapshotWorkspaceData(useWorkspaceStore.getState());
+}
+
+/**
  * Fire-and-forget hand-off to the shadow journal. `beforeState` is the store
  * state captured before `set()` (its arrays are retained, not mutated, by
  * Zustand's replace), `afterState` is the post-`set()` state. Wrapped so a

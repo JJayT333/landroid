@@ -1,102 +1,122 @@
-import { useMemo, useState } from 'react';
-import { CutoverDisabledError } from '../../project-records/action-layer/cutover';
-import type { ParityReport } from '../../project-records/action-layer/parity';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import type { TitleCutoverReadiness } from '../../project-records/action-layer/title-cutover-gate';
 import {
+  computeTitleParityGates,
+  deriveTitleCutoverReadiness,
   MIN_PASSED_TITLE_PARITIES,
-  TitleTreeCutoverGate,
-  type TitleCutoverReadiness,
-} from '../../project-records/action-layer/title-cutover-gate';
+  type TitleParityGates,
+} from '../../project-records/action-layer/title-cutover-readiness';
 import {
   DEFAULT_TITLE_READ_PATH_MODE,
-  TitleReadFlipDisabledError,
   type TitleReadPathMode,
 } from '../../project-records/action-layer/title-read-path';
 import { useTitleActionLog, type TitleLedgerDivergence } from '../../store/title-action-log';
+import { useOwnerStore } from '../../store/owner-store';
+import { readCurrentWorkspaceData } from '../../store/workspace-store';
 
-const CLEAN_TITLE_PARITY_REPORT: ParityReport = {
-  workflow: 'title_tree',
-  clean: true,
-  expectedCount: 1,
-  derivedCount: 1,
-  divergences: [],
+// The readiness helper now lives in the shared readiness module; re-export it so
+// existing import paths/tests keep working.
+export {
+  deriveTitleCutoverReadiness,
+  type TitleReadinessSnapshotInput,
+} from '../../project-records/action-layer/title-cutover-readiness';
+
+const NOT_CLEAN_GATES: TitleParityGates = {
+  mathParityClean: false,
+  landroidRoundTripClean: false,
 };
 
-export interface TitleReadinessSnapshotInput {
-  recordedMutationCount: number;
-  mathParityClean?: boolean;
-  landroidRoundTripClean?: boolean;
-  runtimeDivergenceMessage?: string | null;
-  runtimeErrorMessage?: string | null;
-}
-
-function normalizedPassedParities(count: number): number {
-  if (!Number.isFinite(count)) return 0;
-  return Math.max(0, Math.floor(count));
-}
-
-export function deriveTitleCutoverReadiness({
-  recordedMutationCount,
-  mathParityClean = false,
-  landroidRoundTripClean = false,
-  runtimeDivergenceMessage = null,
-  runtimeErrorMessage = null,
-}: TitleReadinessSnapshotInput): TitleCutoverReadiness {
-  const gate = new TitleTreeCutoverGate(undefined, MIN_PASSED_TITLE_PARITIES, () => ({
-    divergenceMessage: runtimeDivergenceMessage,
-    errorMessage: runtimeErrorMessage,
-  }));
-  const passedParities = normalizedPassedParities(recordedMutationCount);
-  for (let index = 0; index < passedParities; index += 1) {
-    gate.recordPassedParity([CLEAN_TITLE_PARITY_REPORT]);
-  }
-  gate.setMathParityClean(mathParityClean);
-  gate.setLandroidRoundTripClean(landroidRoundTripClean);
-  return gate.readiness();
-}
-
-export function attemptReviewerTitleCutover(readiness: TitleCutoverReadiness): Error {
-  try {
-    if (readiness.ready) {
-      throw new CutoverDisabledError('title_tree');
-    }
-    throw new TitleReadFlipDisabledError();
-  } catch (err) {
-    if (err instanceof Error) return err;
-    return new Error(String(err));
-  }
-}
-
-function formatReviewerFlipError(err: Error): string {
-  return `${err.name}: ${err.message}`;
-}
+// Auto-advance uses a system token; the manual reviewer control uses its own.
+// The governance check only requires a non-empty token (see TitleReadPathFlag).
+const AUTO_FLIP_TOKEN = 'auto:title-gates-green';
+const MANUAL_FLIP_TOKEN = 'reviewer:title-cutover-confirmed';
 
 export default function TitleLedgerStatusBanner() {
   const lastDivergence = useTitleActionLog((state) => state.lastDivergence);
   const lastError = useTitleActionLog((state) => state.lastError);
   const recordedMutationCount = useTitleActionLog((state) => state.recordedMutationCount);
+  const actionRecords = useTitleActionLog((state) => state.actionRecords);
+  const auditEvents = useTitleActionLog((state) => state.auditEvents);
+  const readPathMode = useTitleActionLog((state) => state.readPathMode);
+  const flipToCutover = useTitleActionLog((state) => state.flipToCutover);
+  const revertReadPathToShadow = useTitleActionLog((state) => state.revertReadPathToShadow);
+
+  // The two heavy gate inputs (MathInputView parity + .landroid round trip) are
+  // recomputed off the live workspace + durable ledger once the ledger passes the
+  // parity threshold. Below the threshold the gate is red regardless, so the work
+  // is skipped and both read NOT clean.
+  const [parityGates, setParityGates] = useState<TitleParityGates>(NOT_CLEAN_GATES);
+  useEffect(() => {
+    if (recordedMutationCount < MIN_PASSED_TITLE_PARITIES) {
+      setParityGates(NOT_CLEAN_GATES);
+      return;
+    }
+    let cancelled = false;
+    const owner = useOwnerStore.getState();
+    void computeTitleParityGates({
+      liveWorkspace: readCurrentWorkspaceData(),
+      ownerData: { owners: owner.owners, leases: owner.leases },
+      actionRecords,
+      auditEvents,
+    }).then((gates) => {
+      if (!cancelled) setParityGates(gates);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [actionRecords, auditEvents, recordedMutationCount]);
+
   const readiness = useMemo(
     () =>
       deriveTitleCutoverReadiness({
         recordedMutationCount,
+        mathParityClean: parityGates.mathParityClean,
+        landroidRoundTripClean: parityGates.landroidRoundTripClean,
         runtimeDivergenceMessage: lastDivergence
           ? `${lastDivergence.mutation}: ${lastDivergence.message}`
           : null,
         runtimeErrorMessage: lastError,
       }),
-    [lastDivergence, lastError, recordedMutationCount]
+    [lastDivergence, lastError, recordedMutationCount, parityGates]
   );
-  const [reviewerFlipError, setReviewerFlipError] = useState<string | null>(null);
+
+  const [flipError, setFlipError] = useState<string | null>(null);
+
+  // Default-to-cutover-when-green: on the rising edge of readiness, flip the
+  // record-layer read path to cutover. Reversible; a manual revert is not
+  // re-flipped until readiness drops and recovers (rising edge only), so the
+  // reviewer stays in control.
+  const wasReadyRef = useRef(false);
+  useEffect(() => {
+    if (readiness.ready && !wasReadyRef.current && readPathMode === 'shadow') {
+      try {
+        flipToCutover({ reviewerApprovalToken: AUTO_FLIP_TOKEN, ready: true });
+        setFlipError(null);
+      } catch (err) {
+        setFlipError(err instanceof Error ? `${err.name}: ${err.message}` : String(err));
+      }
+    }
+    wasReadyRef.current = readiness.ready;
+  }, [readiness.ready, readPathMode, flipToCutover]);
 
   return (
     <TitleLedgerStatusBannerContent
       lastDivergence={lastDivergence}
       lastError={lastError}
       readiness={readiness}
-      readMode={DEFAULT_TITLE_READ_PATH_MODE}
-      reviewerFlipError={reviewerFlipError}
-      onReviewerFlip={() => {
-        const err = attemptReviewerTitleCutover(readiness);
-        setReviewerFlipError(formatReviewerFlipError(err));
+      readMode={readPathMode}
+      flipError={flipError}
+      onFlip={() => {
+        try {
+          flipToCutover({ reviewerApprovalToken: MANUAL_FLIP_TOKEN, ready: readiness.ready });
+          setFlipError(null);
+        } catch (err) {
+          setFlipError(err instanceof Error ? `${err.name}: ${err.message}` : String(err));
+        }
+      }}
+      onRevert={() => {
+        revertReadPathToShadow();
+        setFlipError(null);
       }}
     />
   );
@@ -107,16 +127,19 @@ export function TitleLedgerStatusBannerContent({
   lastError,
   readiness,
   readMode = DEFAULT_TITLE_READ_PATH_MODE,
-  reviewerFlipError = null,
-  onReviewerFlip,
+  flipError = null,
+  onFlip,
+  onRevert,
 }: {
   lastDivergence: TitleLedgerDivergence | null;
   lastError: string | null;
   readiness: TitleCutoverReadiness;
   readMode?: TitleReadPathMode;
-  reviewerFlipError?: string | null;
-  onReviewerFlip?: () => void;
+  flipError?: string | null;
+  onFlip?: () => void;
+  onRevert?: () => void;
 }) {
+  const isCutover = readMode === 'cutover';
   const detail = lastDivergence
     ? `Mutation ${lastDivergence.mutation} diverged at ${lastDivergence.at}.`
     : lastError
@@ -129,25 +152,38 @@ export function TitleLedgerStatusBannerContent({
       : null;
   const readinessTone = lastDivergence || lastError
     ? 'border-red-300 bg-red-50 text-red-950'
-    : readiness.ready
-      ? 'border-emerald-300 bg-emerald-50 text-emerald-950'
-      : 'border-amber-300 bg-amber-50 text-amber-950';
+    : isCutover
+      ? 'border-emerald-400 bg-emerald-50 text-emerald-950'
+      : readiness.ready
+        ? 'border-emerald-300 bg-emerald-50 text-emerald-950'
+        : 'border-amber-300 bg-amber-50 text-amber-950';
   const labelTone = lastDivergence || lastError
     ? 'border-red-300 text-red-800'
-    : readiness.ready
+    : isCutover || readiness.ready
       ? 'border-emerald-300 text-emerald-800'
       : 'border-amber-300 text-amber-800';
   const stateLabel = lastDivergence
     ? 'Divergence'
     : lastError
       ? 'Recording error'
-      : readiness.ready
-        ? 'Ready, disabled'
-        : 'Not enough parities';
-  const disabledErrorName = readiness.ready
-    ? CutoverDisabledError.name
-    : TitleReadFlipDisabledError.name;
+      : isCutover
+        ? 'Cutover (record layer)'
+        : readiness.ready
+          ? 'Ready'
+          : 'Not enough parities';
   const role = lastDivergence || lastError ? 'alert' : 'status';
+
+  // The record-layer read path can flip to cutover only when readiness is green,
+  // and can always revert. The live Desk Map / math stay store-canonical
+  // regardless (the live read-source move is a separate, later cutover).
+  const canFlip = !isCutover && readiness.ready;
+  const buttonLabel = isCutover ? 'Revert to shadow' : 'Flip to cutover';
+  const buttonEnabled = isCutover || canFlip;
+  const buttonTitle = isCutover
+    ? 'Revert the title record read path to the store (shadow).'
+    : canFlip
+      ? 'Flip the title record read path to the durable ledger (cutover). Reversible.'
+      : 'Disabled until the readiness gates are green.';
 
   return (
     <div className={`border-b px-4 py-3 text-sm ${readinessTone}`} role={role}>
@@ -160,11 +196,17 @@ export function TitleLedgerStatusBannerContent({
             <span className="text-xs font-semibold uppercase text-slate-700">
               {stateLabel}
             </span>
-            <span className="text-xs text-slate-700">Default mode: {readMode}</span>
+            <span className="text-xs text-slate-700">Read mode: {readMode}</span>
           </div>
           {message ? <p className="mt-1 leading-6">{message}</p> : null}
           {detail ? <p className="text-xs leading-5 text-slate-700">{detail}</p> : null}
           <p className="mt-1 leading-6">{readiness.reason}</p>
+          {isCutover ? (
+            <p className="text-xs leading-5 text-slate-700">
+              Title records read from the durable ledger. The live Desk Map and math
+              remain store-canonical.
+            </p>
+          ) : null}
           <dl className="mt-2 grid gap-x-4 gap-y-1 text-xs sm:grid-cols-2 lg:grid-cols-4">
             <div>
               <dt className="font-semibold text-slate-700">Passed parities</dt>
@@ -185,20 +227,25 @@ export function TitleLedgerStatusBannerContent({
               <dd>{readiness.runtimeDivergence ? 'Active' : 'Clear'}</dd>
             </div>
           </dl>
-          {reviewerFlipError ? (
+          {flipError ? (
             <p className="mt-2 rounded border border-slate-300 bg-white px-2 py-1 text-xs text-slate-800">
-              {reviewerFlipError}
+              {flipError}
             </p>
           ) : null}
         </div>
         <button
           type="button"
-          aria-disabled="true"
-          className="cursor-not-allowed rounded border border-slate-300 bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-500 shadow-sm"
-          onClick={onReviewerFlip}
-          title={`Disabled by default governance; pressing surfaces ${disabledErrorName}.`}
+          disabled={!buttonEnabled}
+          aria-disabled={!buttonEnabled}
+          className={
+            buttonEnabled
+              ? 'rounded border border-emerald-300 bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-emerald-500'
+              : 'cursor-not-allowed rounded border border-slate-300 bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-500 shadow-sm'
+          }
+          onClick={isCutover ? onRevert : onFlip}
+          title={buttonTitle}
         >
-          Flip to cutover
+          {buttonLabel}
         </button>
       </div>
     </div>

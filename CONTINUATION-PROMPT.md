@@ -4,87 +4,54 @@ Use this file to resume the active workstream in a new chat. Read it with
 `AGENTS.md`, `PROJECT_CONTEXT.md`, and `docs/README.md` before touching code.
 Keep long history in `CHANGELOG.md`.
 
-## Active Ticket Handoff - 2026-06-07
+## Active Handoff - 2026-06-09
 
-Current workstream: hosted Springhill sample visibility.
+Current workstream: title-tree read cutover, Scope A (governed record-layer read flip).
 
-Branch: `fix/hosted-landroid-static`
+Branch: `feat/title-tree-record-cutover` (off `origin/main`).
 
-Worktree: `/private/tmp/landroid-hosted-landroid-static`
+Worktree: `/tmp/landroid-title-cutover`.
 
-Base state: `origin/main` at `bf268e2 feat(workspace): add project picker
-landing`. PRs #129, #130, #132, and #131 are merged. The hosted frontend at
-`https://landroid.abstractmapping.com` has deployed the Dr. Elmore menu item,
-but `/samples/springhill-dr-elmore.landroid` still serves `index.html` because
-the Amplify SPA fallback rewrite did not exclude `.landroid` static assets.
+Base: `origin/main` at `9b1b7d8` (PR #137 LPR full-abstract + multi-tract merged).
 
-### Scope
+### What this delivers
 
-- Fix only hosted static asset serving for existing bundled assets.
-- Keep `/api/ai/<*>` and `/api/spine/<*>` rewrite ordering unchanged.
-- Exclude `.landroid`, `.pdf`, and `.pptx` from the SPA fallback so the
-  Springhill sample package and existing bundled deck/PDF assets serve as files.
-- Add repo-side predeploy and post-deploy smoke coverage so the issue is caught
-  before or immediately after hosted deployment.
+Scope A makes the action/record layer a governed, reversible read source for the
+project-records projection, with the readiness gates computed and proven green at
+runtime. See `docs/title-tree-read-cutover.md` for the full writeup.
 
-### Latest Validation
+- `src/project-records/action-layer/title-cutover-readiness.ts` — runtime gate
+  evaluator (`computeTitleParityGates` = MathInputView parity + `.landroid`
+  export-import-replay round trip; `deriveTitleCutoverReadiness`).
+- `src/store/title-action-log.ts` — governed `readPathMode` +
+  `flipToCutover`/`revertReadPathToShadow` (enabled for `title_tree` only;
+  `DEFAULT_TITLE_READ_PATH_MODE` stays `shadow`) + `selectTitleReadPathInput` seam.
+- `src/components/shared/TitleLedgerStatusBanner.tsx` — real reversible flip,
+  auto-advance on the rising edge of readiness, live mode indicator.
 
-Passed in this worktree:
+### Invariant
 
-- `npm ci --offline` passed with the known Node 26 engine warning.
-- `bash -n scripts/predeploy-check.sh scripts/smoke-test-hosted.sh` passed.
-- Local backend bundle generation for ignored predeploy artifacts passed:
-  `backend/ai-proxy/lambda.zip` and `backend/spine/lambda.zip` were generated
-  locally and remain untracked.
-- `npm run deploy:check` passed, including the `.landroid`, `.pdf`, and
-  `.pptx` static asset allowlist guard.
-- `npm run lint` passed.
-- `npm run build` passed with existing Vite dynamic/static import warnings,
-  large-chunk warnings, and Node `module.register()` deprecation warning.
-- Built artifact check passed: `dist/samples/springhill-dr-elmore.landroid`
-  exists and contains `OGML-LCT-Trust`, `Charlyn K. Tyra`,
-  `Magnolia Petroleum Company, LLC`, and `one-year primary term`.
-- `npm test -- src/phase0/__tests__/springhill-sample.test.ts` passed, 1 file
-  / 2 tests.
-- `git diff --check` passed.
+The live Desk Map and math still read `useWorkspaceStore.nodes` in every mode; only
+the project-records read source flips. Springhill and the Phase 0 goldens are
+unchanged. The flip reverts via `revertReadPathToShadow()`.
 
-Post-merge / post-Amplify deploy validation still required:
+### Validation
 
-- `curl -I -L https://landroid.abstractmapping.com/samples/springhill-dr-elmore.landroid`
-  must return the `.landroid` package, not `index.html`.
-- `curl -fsSL https://landroid.abstractmapping.com/samples/springhill-dr-elmore.landroid`
-  must contain `OGML-LCT-Trust` and `one-year primary term`.
-- `bash scripts/smoke-test-hosted.sh` should pass against the hosted domain.
+`npm run lint`, `npm test`, `npm run build`, `git diff --check` all pass in the
+worktree (node_modules symlinked from the root checkout). New suites:
+`title-cutover-readiness.test.ts`, `title-read-flip-control.test.ts`, plus the updated
+`TitleLedgerStatusBanner.test.tsx`.
 
-### Open Risks / Deferred
+### Next steps
 
-- This PR only changes the rewrite template and deployment checks. The currently
-  hosted Amplify rewrite rules will not change until the branch merges to
-  `main` and Amplify redeploys, or the JSON rewrite rules are manually updated
-  in the Amplify console.
-- No Springhill sample data, generator, lease math, project picker behavior,
-  T8-T19, demo polish, branch pruning, federal/private math, or drill-site
-  tract designation is included.
-- Do not work from the noisy root checkout. Do not stage root noise:
-  `.worktrees/`, archived audit docs, or root `scripts/springhill/`.
+1. Review PR for `feat/title-tree-record-cutover`; squash-merge.
+2. Scope B (deferred): route the live Desk Map / Leasehold reads + math through the
+   ledger projection. Highest-risk surface — invert divergence handling to
+   block/rollback, add a cached/ordered projection, reconcile desk-map membership, keep
+   the `deleteNode` undo boundary consistent. Build on Scope A's proven-green gate.
 
-### Likely Next Steps
+### Process note
 
-1. Finish validation in `/private/tmp/landroid-hosted-landroid-static`.
-2. Commit and push `fix/hosted-landroid-static`.
-3. Open a PR against `main`.
-4. After merge and Amplify redeploy, run the hosted smoke script and confirm
-   the Springhill sample URL serves package data.
-
-Paste-ready next chat prompt:
-
-> Read `/Users/abstractmapping/projects/landroid/AGENTS.md`,
-> `/Users/abstractmapping/projects/landroid/PROJECT_CONTEXT.md`,
-> `/Users/abstractmapping/projects/landroid/docs/README.md`, and
-> `/private/tmp/landroid-hosted-landroid-static/CONTINUATION-PROMPT.md`.
-> Continue branch `fix/hosted-landroid-static` in
-> `/private/tmp/landroid-hosted-landroid-static`. The task is to make hosted
-> `.landroid` sample files bypass the Amplify SPA fallback so the Springhill Dr.
-> Elmore demo loader works online. Do not change Springhill sample data, project
-> picker behavior, T8-T19, demo polish, branch pruning, federal/private math, or
-> drill-site tract designation.
+A prior session pushed to `main` by accident (commands ran in the root checkout on
+`main`). Work only in the dedicated worktree via explicit `git -C <worktree>`; never run
+a bare `git push`; push only the feature branch; open a PR and stop for review.
