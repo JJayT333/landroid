@@ -31,6 +31,7 @@ import { create } from 'zustand';
 import type {
   ActionRecord,
   AuditEventRecord,
+  BackendSpineCoreRecord,
 } from '../backend-spine/contracts';
 import type { OwnerWorkspaceData } from '../storage/owner-persistence';
 import type { WorkspaceData } from '../storage/workspace-persistence';
@@ -291,6 +292,22 @@ setTitleCutoverRuntimeStateReader(() => {
     errorMessage: state.lastError,
   };
 });
+
+/**
+ * The single integration seam for the title record read flip. Returns the live
+ * read mode + the durable records, shaped for `buildProjectRecordsWithEvidenceVault`'s
+ * `titleReadPath` (and any future project-records consumer): in `shadow` the
+ * consumer keeps sourcing title records from the adapter; in `cutover` it
+ * replays them from this ledger. Reading is unaffected for the live Desk Map /
+ * math, which stay store-canonical.
+ */
+export function selectTitleReadPathInput(): {
+  mode: TitleReadPathMode;
+  actionRecords: readonly BackendSpineCoreRecord[];
+} {
+  const state = useTitleActionLog.getState();
+  return { mode: state.readPathMode, actionRecords: state.actionRecords };
+}
 
 function readOwnerData(): OwnerSlice {
   const owner = useOwnerStore.getState();
