@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState, type ReactNode } from 'react';
 import { buildLeaseNode, isLeaseNode } from '../deskmap/deskmap-lease-node';
 import {
   buildLeaseScopeIndex,
@@ -21,9 +21,17 @@ import {
 } from '../../types/owner';
 import {
   DEFAULT_LEASE_FORM,
+  LEASE_ATTACHMENT_DEFINITIONS,
+  LEASE_PROVISION_DEFINITIONS,
   LEASE_TYPE_OPTIONS,
   createBlankLeasePurchaseReport,
+  getProvision,
+  hasAttachment,
   normalizeLeasePurchaseReport,
+  setProvision,
+  toggleAttachment,
+  type LeaseAttachmentKey,
+  type LeaseProvisionKey,
   type LeasePurchaseReport,
 } from '../../types/lease-purchase-report';
 import { deriveCounty } from '../../utils/land';
@@ -60,6 +68,30 @@ export function getAttachLeaseModalTexasMathError(
   lease: Pick<Lease, 'jurisdiction'>
 ): string | null {
   return isTexasMathLease(lease) ? null : NON_TEXAS_LEASE_ATTACHMENT_MESSAGE;
+}
+
+/**
+ * Collapsed-by-default disclosure used for the long, optional abstract sections
+ * (provisions, attachments, preparer). Keeps the lease editor compact; native
+ * `<details>` so it needs no extra state.
+ */
+function CollapsibleSection({
+  title,
+  children,
+}: {
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <details className="rounded-lg border border-ledger-line bg-parchment/40">
+      <summary className="cursor-pointer select-none px-3 py-2 text-xs font-semibold text-ink-light uppercase tracking-wider">
+        {title}
+      </summary>
+      <div className="border-t border-ledger-line px-3 py-3 space-y-2">
+        {children}
+      </div>
+    </details>
+  );
 }
 
 export default function AttachLeaseModal({
@@ -236,6 +268,25 @@ export default function AttachLeaseModal({
   const setLprFlag = (field: 'heldByProduction' | 'paidUp', value: boolean) => {
     setSaveError(null);
     setLprDraft((current) => ({ ...current, [field]: value }));
+  };
+
+  const setProvisionField = (
+    key: LeaseProvisionKey,
+    patch: { present?: boolean; paragraph?: string }
+  ) => {
+    setSaveError(null);
+    setLprDraft((current) => ({
+      ...current,
+      provisions: setProvision(current.provisions, key, patch),
+    }));
+  };
+
+  const toggleAttachmentKey = (key: LeaseAttachmentKey, on: boolean) => {
+    setSaveError(null);
+    setLprDraft((current) => ({
+      ...current,
+      attachments: toggleAttachment(current.attachments, key, on),
+    }));
   };
 
   const netAcresPreview = computeNetAcres(draft.grossAcres, draft.leasedInterest);
@@ -591,6 +642,96 @@ export default function AttachLeaseModal({
             Blank economics stay as not entered in payout review.
           </div>
         </fieldset>
+
+        <CollapsibleSection title="Significant Provisions">
+          <div className="grid grid-cols-1 gap-1.5">
+            {LEASE_PROVISION_DEFINITIONS.map((definition) => {
+              const provision = getProvision(lprDraft.provisions, definition.key);
+              return (
+                <div
+                  key={definition.key}
+                  className="flex items-center justify-between gap-2"
+                >
+                  <label className="flex items-center gap-2 text-xs text-ink min-w-0">
+                    <input
+                      type="checkbox"
+                      checked={provision.present}
+                      onChange={(event) =>
+                        setProvisionField(definition.key, {
+                          present: event.target.checked,
+                        })
+                      }
+                    />
+                    <span className="truncate">{definition.label}</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={provision.paragraph}
+                    onChange={(event) =>
+                      setProvisionField(definition.key, {
+                        paragraph: event.target.value,
+                      })
+                    }
+                    placeholder="¶"
+                    aria-label={`${definition.label} paragraph number`}
+                    className="w-16 shrink-0 px-2 py-1 rounded border border-ledger-line bg-parchment text-xs text-ink focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 outline-none"
+                  />
+                </div>
+              );
+            })}
+          </div>
+          <div className="text-[11px] leading-5 text-ink-light">
+            Check the provisions present in this lease and note the lease paragraph
+            where each appears. Descriptive only.
+          </div>
+        </CollapsibleSection>
+
+        <CollapsibleSection title="Attachments">
+          <div className="grid grid-cols-2 gap-1.5">
+            {LEASE_ATTACHMENT_DEFINITIONS.map((definition) => (
+              <label
+                key={definition.key}
+                className="flex items-center gap-2 text-xs text-ink"
+              >
+                <input
+                  type="checkbox"
+                  checked={hasAttachment(lprDraft.attachments, definition.key)}
+                  onChange={(event) =>
+                    toggleAttachmentKey(definition.key, event.target.checked)
+                  }
+                />
+                <span className="truncate">{definition.label}</span>
+              </label>
+            ))}
+          </div>
+        </CollapsibleSection>
+
+        <CollapsibleSection title="Preparer & Legal Description">
+          <div className="grid grid-cols-2 gap-2">
+            <FormField
+              label="Prepared By"
+              value={lprDraft.preparedBy}
+              onChange={(value) => setLpr('preparedBy', value)}
+            />
+            <FormField
+              label="Prepared Date"
+              type="date"
+              value={lprDraft.preparedDate}
+              onChange={(value) => setLpr('preparedDate', value)}
+            />
+          </div>
+          <div>
+            <label className="text-[10px] text-ink-light uppercase tracking-wider block mb-1">
+              Legal Description
+            </label>
+            <textarea
+              value={lprDraft.legalDescription}
+              onChange={(event) => setLpr('legalDescription', event.target.value)}
+              rows={3}
+              className="w-full px-3 py-2 rounded-lg border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none resize-y"
+            />
+          </div>
+        </CollapsibleSection>
 
         <fieldset className="space-y-2">
           <legend className="text-xs font-semibold text-ink-light uppercase tracking-wider mb-2">

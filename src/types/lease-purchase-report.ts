@@ -167,6 +167,59 @@ function normalizeAttachments(value: unknown): LeaseAttachmentKey[] {
   return result;
 }
 
+/**
+ * Read one provision off an LPR, returning a blank `{ present:false,
+ * paragraph:'' }` entry when the key is not stored. Lets the editor render all
+ * 19 checklist rows from `LEASE_PROVISION_DEFINITIONS` without each record
+ * having to carry every key.
+ */
+export function getProvision(
+  provisions: readonly LeaseProvision[],
+  key: LeaseProvisionKey
+): LeaseProvision {
+  return (
+    provisions.find((provision) => provision.key === key)
+    ?? { key, present: false, paragraph: '' }
+  );
+}
+
+/**
+ * Upsert one provision and return a new array. Empty rows (not present, no
+ * paragraph) are kept in the draft for editing; `normalizeProvisions` drops
+ * them on save so persisted records stay lean.
+ */
+export function setProvision(
+  provisions: readonly LeaseProvision[],
+  key: LeaseProvisionKey,
+  patch: Partial<Pick<LeaseProvision, 'present' | 'paragraph'>>
+): LeaseProvision[] {
+  const current = getProvision(provisions, key);
+  const next: LeaseProvision = {
+    key,
+    present: patch.present ?? current.present,
+    paragraph: patch.paragraph ?? current.paragraph,
+  };
+  const without = provisions.filter((provision) => provision.key !== key);
+  return [...without, next];
+}
+
+export function hasAttachment(
+  attachments: readonly LeaseAttachmentKey[],
+  key: LeaseAttachmentKey
+): boolean {
+  return attachments.includes(key);
+}
+
+/** Add or remove one attachment key, returning a new array. */
+export function toggleAttachment(
+  attachments: readonly LeaseAttachmentKey[],
+  key: LeaseAttachmentKey,
+  on: boolean
+): LeaseAttachmentKey[] {
+  const without = attachments.filter((attachment) => attachment !== key);
+  return on ? [...without, key] : without;
+}
+
 export function createBlankLeasePurchaseReport(
   workspaceId: string,
   ownerId: string,
