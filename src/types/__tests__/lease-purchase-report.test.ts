@@ -2,8 +2,13 @@ import { describe, expect, it } from 'vitest';
 
 import {
   DEFAULT_LEASE_FORM,
+  computeLeaseEconomicsTotals,
   createBlankLeasePurchaseReport,
+  getProvision,
+  hasAttachment,
   normalizeLeasePurchaseReport,
+  setProvision,
+  toggleAttachment,
 } from '../lease-purchase-report';
 import { computeNetAcres, createBlankLease, normalizeLease } from '../owner';
 import { calculateDeskMapCoverageSummary } from '../../components/deskmap/deskmap-coverage';
@@ -57,6 +62,79 @@ describe('LeasePurchaseReport model', () => {
       { key: 'pugh_acreage_release', present: true, paragraph: '14' },
     ]);
     expect(lpr.attachments).toEqual(['original_lease', 'copy_check']);
+  });
+});
+
+describe('provision and attachment helpers', () => {
+  it('reads a stored provision or returns a blank default', () => {
+    const stored = [{ key: 'audits', present: true, paragraph: '12' }] as const;
+    expect(getProvision(stored, 'audits')).toEqual({
+      key: 'audits',
+      present: true,
+      paragraph: '12',
+    });
+    expect(getProvision(stored, 'shut_in_royalty')).toEqual({
+      key: 'shut_in_royalty',
+      present: false,
+      paragraph: '',
+    });
+  });
+
+  it('upserts one provision without disturbing the others', () => {
+    const start = setProvision([], 'pugh_acreage_release', { present: true });
+    const next = setProvision(start, 'pugh_acreage_release', { paragraph: '14' });
+    expect(next).toEqual([
+      { key: 'pugh_acreage_release', present: true, paragraph: '14' },
+    ]);
+    const withSecond = setProvision(next, 'audits', { present: true });
+    expect(withSecond).toHaveLength(2);
+    // Round-trips through normalize, dropping nothing meaningful.
+    const lpr = normalizeLeasePurchaseReport({ id: 'lpr-1', provisions: withSecond });
+    expect(lpr.provisions).toHaveLength(2);
+  });
+
+  it('toggles attachment keys on and off', () => {
+    const on = toggleAttachment([], 'original_lease', true);
+    expect(hasAttachment(on, 'original_lease')).toBe(true);
+    const off = toggleAttachment(on, 'original_lease', false);
+    expect(hasAttachment(off, 'original_lease')).toBe(false);
+    // Idempotent: turning on twice does not duplicate the key.
+    expect(toggleAttachment(on, 'original_lease', true)).toEqual(['original_lease']);
+  });
+});
+
+describe('derived lease economics totals', () => {
+  it('multiplies per-acre rates by the summed net acres', () => {
+    const totals = computeLeaseEconomicsTotals(
+      { bonusPerAcre: '500', rentalPerAcre: '10', paidUp: false },
+      ['10', '20', '5']
+    );
+    expect(totals.totalBonus).toBe('17500');
+    expect(totals.totalDelayRental).toBe('350');
+  });
+
+  it('suppresses delay rental when the lease is paid up', () => {
+    const totals = computeLeaseEconomicsTotals(
+      { bonusPerAcre: '500', rentalPerAcre: '10', paidUp: true },
+      ['10']
+    );
+    expect(totals.totalBonus).toBe('5000');
+    expect(totals.totalDelayRental).toBe('');
+  });
+
+  it('returns blank totals when no rate or no net acres', () => {
+    expect(
+      computeLeaseEconomicsTotals(
+        { bonusPerAcre: '', rentalPerAcre: '', paidUp: false },
+        ['10']
+      )
+    ).toEqual({ totalBonus: '', totalDelayRental: '' });
+    expect(
+      computeLeaseEconomicsTotals(
+        { bonusPerAcre: '500', rentalPerAcre: '10', paidUp: false },
+        ['', '']
+      )
+    ).toEqual({ totalBonus: '', totalDelayRental: '' });
   });
 });
 

@@ -441,6 +441,63 @@ describe('workspace-persistence', () => {
     });
   });
 
+  it('round-trips a multi-tract LPR with provisions and attachments across three slices', async () => {
+    const original = buildWorkspace(null);
+    const lpr = createBlankLeasePurchaseReport('ws-1', 'owner-1', {
+      id: 'lpr-multi',
+      lesseeName: 'Magnolia Petroleum Company, LLC',
+      royalty: '1/5',
+      legalDescription: 'Tracts 1-3, Dr. Elmore #1 Unit',
+      preparedBy: 'J. Landman',
+      preparedDate: '2026-06-09',
+      provisions: [
+        { key: 'pugh_acreage_release', present: true, paragraph: '14' },
+        { key: 'shut_in_royalty', present: true, paragraph: '6' },
+      ],
+      attachments: ['original_lease', 'copy_check'],
+    });
+    const slices = ['tract-1', 'tract-2', 'tract-3'].map((id) =>
+      createBlankLease('ws-1', 'owner-1', {
+        id,
+        leaseName: `${id} Lease`,
+        leasePurchaseReportId: 'lpr-multi',
+        leasedInterest: '0.5',
+        grossAcres: '40',
+        royaltyRate: '1/5',
+      })
+    );
+    const withMulti: LandroidFileData = {
+      ...original,
+      ownerData: {
+        ...original.ownerData!,
+        leases: slices,
+        leasePurchaseReports: [lpr],
+      },
+    };
+
+    const blob = await exportLandroidFile(withMulti);
+    const file = new File([await blob.text()], 'lpr-multi.landroid', {
+      type: 'application/json',
+    });
+    const imported = await importLandroidFile(file);
+
+    expect(imported.ownerData?.leasePurchaseReports?.[0]).toMatchObject({
+      id: 'lpr-multi',
+      legalDescription: 'Tracts 1-3, Dr. Elmore #1 Unit',
+      preparedBy: 'J. Landman',
+      provisions: [
+        { key: 'pugh_acreage_release', present: true, paragraph: '14' },
+        { key: 'shut_in_royalty', present: true, paragraph: '6' },
+      ],
+      attachments: ['original_lease', 'copy_check'],
+    });
+    const importedSlices = (imported.ownerData?.leases ?? []).filter(
+      (entry) => entry.leasePurchaseReportId === 'lpr-multi'
+    );
+    expect(importedSlices).toHaveLength(3);
+    expect(importedSlices.every((entry) => entry.netAcres === '20')).toBe(true);
+  });
+
   it('round-trips canvas state through .landroid export/import', async () => {
     const original = buildWorkspace(buildCanvas());
     const blob = await exportLandroidFile(original);
