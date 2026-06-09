@@ -5,6 +5,7 @@ import {
   getLeasesForOwnerNode,
   pickPrimaryLease,
 } from '../deskmap/deskmap-coverage';
+import { buildLeaseTractRows } from '../leasehold/lease-tract-rows';
 import { useOwnerStore } from '../../store/owner-store';
 import { useWorkspaceStore } from '../../store/workspace-store';
 import type { OwnershipNode } from '../../types/node';
@@ -53,15 +54,6 @@ interface AttachLeaseModalProps {
   onSaved?: (nodeId: string) => void;
 }
 
-function createLeaseDraft(workspaceId: string, ownerId: string, parentNode: OwnershipNode) {
-  return createBlankLease(workspaceId, ownerId || 'owner-pending', {
-    leaseName: parentNode.grantee ? `${parentNode.grantee} Lease` : '',
-    royaltyRate: '',
-    leasedInterest: parentNode.fraction,
-    status: DEFAULT_LEASE_STATUS,
-  });
-}
-
 const NON_TEXAS_LEASE_ATTACHMENT_MESSAGE =
   'Only Texas fee/state leases can attach to Desk Map math. Keep federal/private/tribal leases in Research or Federal Leasing as reference records.';
 
@@ -69,6 +61,103 @@ export function getAttachLeaseModalTexasMathError(
   lease: Pick<Lease, 'jurisdiction'>
 ): string | null {
   return isTexasMathLease(lease) ? null : NON_TEXAS_LEASE_ATTACHMENT_MESSAGE;
+}
+
+/**
+ * Per-tract editing row in the lease editor. One per tract where this lessor
+ * holds present minerals; `checked` materializes a lease slice + lessee node on
+ * that tract's desk map on save. Math-relevant scalars (royalty, dates, term)
+ * come from the shared LPR; the per-tract fields below stay on the slice.
+ */
+interface TractDraft {
+  mineralNodeId: string;
+  deskMapId: string;
+  deskMapName: string;
+  ownerLabel: string;
+  checked: boolean;
+  leaseName: string;
+  leasedInterest: string;
+  grossAcres: string;
+  status: string;
+  docNo: string;
+  existingLeaseId: string | null;
+  existingLeaseNodeId: string | null;
+}
+
+/**
+ * Seed the per-tract rows when the editor opens. Rows come from
+ * {@link buildLeaseTractRows} (this lessor's present mineral nodes across the
+ * unit's desk maps); the originating tract is always present and pre-checked.
+ * The originating tract keeps the prop-derived existing slice so editing an
+ * existing (even pre-LPR standalone) lease updates it instead of duplicating.
+ */
+function seedTractDrafts(params: {
+  parentNode: OwnershipNode;
+  ownerId: string;
+  deskMaps: Array<{ id: string; name?: string; code?: string; nodeIds: string[] }>;
+  nodes: OwnershipNode[];
+  leases: Lease[];
+  leasePurchaseReportId: string | null;
+  activeDeskMapId: string | null;
+  originatingExistingLease: Lease | null;
+  originatingExistingNodeId: string | null;
+}): TractDraft[] {
+  const rows = buildLeaseTractRows({
+    deskMaps: params.deskMaps,
+    nodes: params.nodes,
+    leases: params.leases,
+    ownerId: params.ownerId,
+    leasePurchaseReportId: params.leasePurchaseReportId,
+  });
+  const leaseById = new Map(params.leases.map((lease) => [lease.id, lease]));
+  const rowByNode = new Map(rows.map((row) => [row.mineralNodeId, row]));
+
+  const originatingDeskMap = params.deskMaps.find((deskMap) =>
+    deskMap.nodeIds.includes(params.parentNode.id)
+  );
+  const originatingRow = rowByNode.get(params.parentNode.id) ?? {
+    mineralNodeId: params.parentNode.id,
+    deskMapId: originatingDeskMap?.id ?? params.activeDeskMapId ?? '',
+    deskMapName: originatingDeskMap?.name || originatingDeskMap?.code || 'Tract',
+    ownerLabel: params.parentNode.grantee || 'Unnamed owner',
+    defaultLessorInterest: params.parentNode.fraction,
+    existingLeaseId: null as string | null,
+    existingLeaseNodeId: null as string | null,
+  };
+
+  const orderedRows = [
+    originatingRow,
+    ...rows.filter((row) => row.mineralNodeId !== params.parentNode.id),
+  ];
+
+  return orderedRows.map((row) => {
+    const isOriginating = row.mineralNodeId === params.parentNode.id;
+    const existingLeaseId = isOriginating
+      ? params.originatingExistingLease?.id ?? row.existingLeaseId
+      : row.existingLeaseId;
+    const existingLeaseNodeId = isOriginating
+      ? params.originatingExistingNodeId ?? row.existingLeaseNodeId
+      : row.existingLeaseNodeId;
+    const existing = existingLeaseId
+      ? leaseById.get(existingLeaseId) ?? null
+      : null;
+    const hasOwnerLabel = row.ownerLabel && row.ownerLabel !== 'Unnamed owner';
+
+    return {
+      mineralNodeId: row.mineralNodeId,
+      deskMapId: row.deskMapId,
+      deskMapName: row.deskMapName,
+      ownerLabel: row.ownerLabel,
+      checked: isOriginating ? true : existingLeaseId !== null,
+      leaseName: existing?.leaseName ?? (hasOwnerLabel ? `${row.ownerLabel} Lease` : ''),
+      leasedInterest: existing?.leasedInterest ?? row.defaultLessorInterest,
+      grossAcres: existing?.grossAcres ?? '',
+      status: existing?.status ?? DEFAULT_LEASE_STATUS,
+      docNo: existing?.docNo ?? '',
+      existingLeaseId,
+      existingLeaseNodeId,
+    };
+  });
 }
 
 /**
@@ -106,9 +195,10 @@ export default function AttachLeaseModal({
   const activeDeskMapId = useWorkspaceStore((state) => state.activeDeskMapId);
   const nodes = useWorkspaceStore((state) => state.nodes);
   const addNode = useWorkspaceStore((state) => state.addNode);
-  const addNodeToActiveDeskMap = useWorkspaceStore(
-    (state) => state.addNodeToActiveDeskMap
+  const addNodeToDeskMap = useWorkspaceStore(
+    (state) => state.addNodeToDeskMap
   );
+  const removeNode = useWorkspaceStore((state) => state.removeNode);
   const updateNode = useWorkspaceStore((state) => state.updateNode);
   const attachDocToNode = useWorkspaceStore((state) => state.attachDocToNode);
   const detachDocFromNode = useWorkspaceStore(
@@ -121,11 +211,15 @@ export default function AttachLeaseModal({
   const leasePurchaseReports = useOwnerStore((state) => state.leasePurchaseReports);
   const addLease = useOwnerStore((state) => state.addLease);
   const updateLease = useOwnerStore((state) => state.updateLease);
+  const removeLease = useOwnerStore((state) => state.removeLease);
   const addLeasePurchaseReport = useOwnerStore(
     (state) => state.addLeasePurchaseReport
   );
   const updateLeasePurchaseReport = useOwnerStore(
     (state) => state.updateLeasePurchaseReport
+  );
+  const removeLeasePurchaseReport = useOwnerStore(
+    (state) => state.removeLeasePurchaseReport
   );
   const addOwner = useOwnerStore((state) => state.addOwner);
   const pdfInputRef = useRef<HTMLInputElement>(null);
@@ -204,19 +298,6 @@ export default function AttachLeaseModal({
     parentNode.linkedOwnerId,
     preferredLeaseId,
   ]);
-  const [draft, setDraft] = useState<Lease>(() =>
-    existingLease
-      ? normalizeLease(existingLease, {
-          workspaceId: ownerWorkspaceId ?? workspaceId,
-          ownerId: parentNode.linkedOwnerId ?? '',
-        })
-      : createLeaseDraft(
-          ownerWorkspaceId ?? workspaceId,
-          parentNode.linkedOwnerId ?? '',
-          parentNode
-        )
-  );
-
   // The Lease Purchase Report carries the instrument-level abstract shared
   // across tracts (lessee, type, form, economics, term). The per-tract slice
   // above keeps lessor interest / acres / status. Seed a fresh LPR from the
@@ -247,18 +328,45 @@ export default function AttachLeaseModal({
     });
   });
 
+  // Per-tract rows: this lessor's present mineral-owner presence across the
+  // unit's desk maps. Seeded once on open; the originating tract is always
+  // present and pre-checked. When the parent node is not yet linked to an owner
+  // only the originating tract shows — cross-tract rows appear on later edits.
+  const [tractDrafts, setTractDrafts] = useState<TractDraft[]>(() =>
+    seedTractDrafts({
+      parentNode,
+      ownerId: parentNode.linkedOwnerId ?? '',
+      deskMaps: activeDeskMaps,
+      nodes,
+      leases,
+      leasePurchaseReportId: existingLpr?.id ?? null,
+      activeDeskMapId,
+      originatingExistingLease: existingLease
+        ? normalizeLease(existingLease, {
+            workspaceId: ownerWorkspaceId ?? workspaceId,
+            ownerId: parentNode.linkedOwnerId ?? '',
+          })
+        : null,
+      originatingExistingNodeId: existingLeaseNode?.id ?? null,
+    })
+  );
+
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [selectedOwnerId, setSelectedOwnerId] = useState('');
   const [selectedPdfFile, setSelectedPdfFile] = useState<File | null>(null);
   const isEditingExistingLease = Boolean(existingLeaseNode || existingLease);
-  const statusOptions = isLeaseStatusOption(draft.status)
-    ? [...LEASE_STATUS_OPTIONS]
-    : [draft.status, ...LEASE_STATUS_OPTIONS];
 
-  const set = (field: keyof Lease, value: string) => {
+  const setTract = (
+    mineralNodeId: string,
+    patch: Partial<Omit<TractDraft, 'mineralNodeId'>>
+  ) => {
     setSaveError(null);
-    setDraft((current) => ({ ...current, [field]: value }));
+    setTractDrafts((current) =>
+      current.map((tract) =>
+        tract.mineralNodeId === mineralNodeId ? { ...tract, ...patch } : tract
+      )
+    );
   };
 
   const setLpr = (field: keyof LeasePurchaseReport, value: string) => {
@@ -290,13 +398,17 @@ export default function AttachLeaseModal({
     }));
   };
 
-  const netAcresPreview = computeNetAcres(draft.grossAcres, draft.leasedInterest);
+  const checkedTracts = tractDrafts.filter((tract) => tract.checked);
 
-  // Display-only economics: bonus/ac x sum(net acres), delay rental when not
-  // paid up. Never persisted, never fed to coverage/royalty/NRI math. The net
-  // acres source is the single tract today; the multi-tract table feeds the
-  // full per-tract list once it lands.
-  const economicsTotals = computeLeaseEconomicsTotals(lprDraft, [netAcresPreview]);
+  // Display-only economics: bonus/ac x sum(net acres across checked tracts),
+  // delay rental when not paid up. Never persisted, never fed to
+  // coverage/royalty/NRI math.
+  const economicsTotals = computeLeaseEconomicsTotals(
+    lprDraft,
+    checkedTracts.map((tract) =>
+      computeNetAcres(tract.grossAcres, tract.leasedInterest)
+    )
+  );
 
   const handleSave = async () => {
     if (!isParentMineral) {
@@ -308,15 +420,10 @@ export default function AttachLeaseModal({
       );
       return;
     }
-    const jurisdictionError = getAttachLeaseModalTexasMathError(draft);
-    if (jurisdictionError) {
-      setSaveError(jurisdictionError);
-      return;
-    }
-    // Strict-parse both interest fields BEFORE any persistence. A blank value is a
-    // legal "not entered yet" state and parses as Decimal(0); malformed input ("abc",
-    // "1/0", multi-slash garbage) returns null and blocks the save with an inline
-    // error. Closes audit finding #4.
+    // Strict-parse the royalty BEFORE any persistence. A blank value is a legal
+    // "not entered yet" state and parses as Decimal(0); malformed input ("abc",
+    // "1/0", multi-slash garbage) returns null and blocks the save with an
+    // inline error. Closes audit finding #4.
     const parsedRoyalty = parseStrictInterestString(lprDraft.royalty);
     if (parsedRoyalty === null) {
       setSaveError(
@@ -324,13 +431,41 @@ export default function AttachLeaseModal({
       );
       return;
     }
-    const parsedLeasedInterest = parseStrictInterestString(draft.leasedInterest);
-    if (parsedLeasedInterest === null) {
-      setSaveError(
-        'Leased Interest must be a fraction (e.g. 1/2), a decimal (e.g. 0.5), or blank.'
-      );
+
+    const checked = tractDrafts.filter((tract) => tract.checked);
+    if (checked.length === 0 && !existingLpr && !existingLease) {
+      setSaveError('Select at least one tract to lease.');
       return;
     }
+
+    // Validate every checked tract before touching persistence: strict-parse the
+    // per-tract lessor interest, and keep the Texas-math gate (an existing slice
+    // could carry a non-Texas jurisdiction that must not re-enter Desk Map math).
+    const normalizedInterestByNode = new Map<string, string>();
+    for (const tract of checked) {
+      const parsed = parseStrictInterestString(tract.leasedInterest);
+      if (parsed === null) {
+        setSaveError(
+          `Lessor interest for ${tract.deskMapName} must be a fraction (e.g. 1/2), a decimal, or blank.`
+        );
+        return;
+      }
+      normalizedInterestByNode.set(
+        tract.mineralNodeId,
+        tract.leasedInterest.trim().length === 0 ? '' : serialize(parsed)
+      );
+      const existing = tract.existingLeaseId
+        ? leases.find((lease) => lease.id === tract.existingLeaseId) ?? null
+        : null;
+      if (existing) {
+        const jurisdictionError = getAttachLeaseModalTexasMathError(existing);
+        if (jurisdictionError) {
+          setSaveError(jurisdictionError);
+          return;
+        }
+      }
+    }
+
     setSaveError(null);
     setSaving(true);
 
@@ -363,16 +498,11 @@ export default function AttachLeaseModal({
         updateNode(parentNode.id, { linkedOwnerId: ownerId });
       }
 
-      // Preserve the user's raw royalty text (1/8 stays 1/8, not 0.125). Leased
-      // Interest normalizes to a serialized decimal when entered, or stays blank.
-      const trimmedLeasedInterest = draft.leasedInterest.trim();
-      const normalizedLeasedInterest = trimmedLeasedInterest.length === 0
-        ? ''
-        : serialize(parsedLeasedInterest);
+      const hasChecked = checked.length > 0;
 
-      // The LPR is the instrument-level abstract. Build/persist it first so the
-      // tract slice can reference its id; derive the math-relevant slice scalars
-      // (royalty, lessee, dates) from it so the existing coverage/summary
+      // The LPR is the instrument-level abstract shared across tracts. Build it
+      // first so each slice can reference its id; derive the math-relevant slice
+      // scalars (royalty, lessee, dates) from it so the existing coverage/summary
       // pipeline reads a single source of truth.
       const lprRecord = existingLpr
         ? normalizeLeasePurchaseReport(
@@ -384,10 +514,10 @@ export default function AttachLeaseModal({
             ownerId,
           });
 
+      // Preserve the user's raw royalty text (1/8 stays 1/8, not 0.125).
       const leaseOverrides = {
         lessee: lprDraft.lesseeName,
         royaltyRate: lprDraft.royalty.trim(),
-        leasedInterest: normalizedLeasedInterest,
         effectiveDate: lprDraft.effectiveDate,
         expirationDate: lprDraft.expirationDate,
         primaryTerm: lprDraft.primaryTerm,
@@ -397,63 +527,113 @@ export default function AttachLeaseModal({
         ownerId,
       };
 
-      const leaseRecord = existingLease
-        ? {
-            ...existingLease,
-            ...draft,
-            ...leaseOverrides,
-            workspaceId: resolvedWorkspaceId,
-          }
-        : createBlankLease(resolvedWorkspaceId, ownerId, {
-            ...draft,
-            ...leaseOverrides,
-          });
-
-      const leaseNodeId =
-        existingLeaseNode?.id ??
-        `node-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-      const leaseNode = buildLeaseNode({
-        id: leaseNodeId,
-        parentNode: {
-          ...parentNode,
-          linkedOwnerId: ownerId,
-        },
-        lease: leaseRecord,
-        existingNode: existingLeaseNode,
-      });
-
-      if (existingLpr) {
-        await updateLeasePurchaseReport(existingLpr.id, lprRecord);
-      } else {
-        await addLeasePurchaseReport(lprRecord);
-      }
-
-      if (existingLease) {
-        await updateLease(existingLease.id, leaseRecord);
-      } else {
-        await addLease(leaseRecord);
-      }
-
-      if (existingLeaseNode) {
-        updateNode(existingLeaseNode.id, leaseNode);
-      } else {
-        addNode(leaseNode);
-        addNodeToActiveDeskMap(leaseNode.id);
-      }
-
-      if (selectedPdfFile) {
-        // A4c: route the PDF through the workspace-store action so the
-        // v8 document tables and `node.attachments[]` cache both stay in
-        // sync. Replace any existing attachment (single-doc UX preserved
-        // for A4; Phase B's multi-doc surface will keep both).
-        const existingAttachment = existingLeaseNode?.attachments[0];
-        if (existingAttachment) {
-          await detachDocFromNode(leaseNodeId, existingAttachment.attachmentId);
+      if (hasChecked) {
+        if (existingLpr) {
+          await updateLeasePurchaseReport(existingLpr.id, lprRecord);
+        } else {
+          await addLeasePurchaseReport(lprRecord);
         }
-        await attachDocToNode(leaseNodeId, selectedPdfFile, { kind: 'lease' });
       }
 
-      onSaved?.(leaseNode.id);
+      // Reconcile the desired (checked) tracts against the existing slices/nodes
+      // for this LPR: create new, update kept, delete unchecked. Each lessee node
+      // lands on its own tract's desk map.
+      let originatingNodeId: string | null = null;
+      for (const tract of tractDrafts) {
+        const isOriginating = tract.mineralNodeId === parentNode.id;
+        const buildParentNode = isOriginating
+          ? { ...parentNode, linkedOwnerId: ownerId }
+          : nodes.find((node) => node.id === tract.mineralNodeId) ?? null;
+
+        if (tract.checked) {
+          if (!buildParentNode) continue;
+          const perTractFields = {
+            leaseName: tract.leaseName,
+            grossAcres: tract.grossAcres,
+            status: tract.status,
+            docNo: tract.docNo,
+            leasedInterest:
+              normalizedInterestByNode.get(tract.mineralNodeId) ?? '',
+          };
+
+          if (tract.existingLeaseId) {
+            const existing = leases.find(
+              (lease) => lease.id === tract.existingLeaseId
+            );
+            const leaseRecord = {
+              ...(existing ?? createBlankLease(resolvedWorkspaceId, ownerId)),
+              ...perTractFields,
+              ...leaseOverrides,
+              id: tract.existingLeaseId,
+              workspaceId: resolvedWorkspaceId,
+            };
+            await updateLease(tract.existingLeaseId, leaseRecord);
+            if (tract.existingLeaseNodeId) {
+              const existingNode =
+                nodes.find((node) => node.id === tract.existingLeaseNodeId) ?? null;
+              updateNode(
+                tract.existingLeaseNodeId,
+                buildLeaseNode({
+                  id: tract.existingLeaseNodeId,
+                  parentNode: buildParentNode,
+                  lease: leaseRecord,
+                  existingNode,
+                })
+              );
+              if (isOriginating) originatingNodeId = tract.existingLeaseNodeId;
+            }
+          } else {
+            const leaseRecord = createBlankLease(resolvedWorkspaceId, ownerId, {
+              ...perTractFields,
+              ...leaseOverrides,
+            });
+            await addLease(leaseRecord);
+            const newNodeId = `node-${Date.now()}-${Math.random()
+              .toString(36)
+              .slice(2, 6)}-${tract.mineralNodeId.slice(-4)}`;
+            addNode(
+              buildLeaseNode({
+                id: newNodeId,
+                parentNode: buildParentNode,
+                lease: leaseRecord,
+              })
+            );
+            addNodeToDeskMap(newNodeId, tract.deskMapId);
+            if (isOriginating) originatingNodeId = newNodeId;
+          }
+        } else if (tract.existingLeaseId) {
+          // Unchecked but previously leased: remove exactly this tract's slice
+          // and lessee node. Remove the slice explicitly first so it is gone
+          // synchronously; removeNode's owner cleanup would also cascade it.
+          await removeLease(tract.existingLeaseId);
+          if (tract.existingLeaseNodeId) {
+            removeNode(tract.existingLeaseNodeId);
+          }
+        }
+      }
+
+      // No tracts left under this LPR: drop the orphan parent record.
+      if (!hasChecked && existingLpr) {
+        await removeLeasePurchaseReport(existingLpr.id);
+      }
+
+      if (selectedPdfFile && originatingNodeId) {
+        // Route the PDF through the workspace-store action so the document
+        // tables and node.attachments[] cache stay in sync. Applies to the
+        // originating tract's lessee node only.
+        const existingAttachment = existingLeaseNode?.attachments[0];
+        if (existingAttachment && existingLeaseNode) {
+          await detachDocFromNode(
+            existingLeaseNode.id,
+            existingAttachment.attachmentId
+          );
+        }
+        await attachDocToNode(originatingNodeId, selectedPdfFile, {
+          kind: 'lease',
+        });
+      }
+
+      if (originatingNodeId) onSaved?.(originatingNodeId);
       onClose();
     } catch (saveError) {
       setSaveError(
@@ -761,57 +941,112 @@ export default function AttachLeaseModal({
 
         <fieldset className="space-y-2">
           <legend className="text-xs font-semibold text-ink-light uppercase tracking-wider mb-2">
-            Tract
+            Tracts
           </legend>
-          <div className="grid grid-cols-2 gap-2">
-            <FormField
-              label="Lease Name"
-              value={draft.leaseName}
-              onChange={(value) => set('leaseName', value)}
-            />
-            <FormField
-              label="Lessor Interest"
-              value={draft.leasedInterest}
-              onChange={(value) => set('leasedInterest', value)}
-            />
-            <FormField
-              label="Gross Acres"
-              value={draft.grossAcres}
-              onChange={(value) => set('grossAcres', value)}
-            />
-            <div>
-              <label className="text-[10px] text-ink-light uppercase tracking-wider block mb-1">
-                Net Mineral Acres
-              </label>
-              <div className="px-3 py-2 rounded-lg border border-ledger-line bg-ledger text-sm text-ink-light">
-                {netAcresPreview || '—'}
-              </div>
-            </div>
-            <div>
-              <label className="text-[10px] text-ink-light uppercase tracking-wider block mb-1">
-                Status
-              </label>
-              <select
-                value={draft.status}
-                onChange={(event) => set('status', event.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-emerald-600 focus:border-emerald-600 outline-none"
-              >
-                {statusOptions.map((status) => (
-                  <option key={status} value={status}>
-                    {isLeaseStatusOption(status) ? status : `${status} (legacy)`}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <FormField
-              label="Doc #"
-              value={draft.docNo}
-              onChange={(value) => set('docNo', value)}
-            />
+          <div className="space-y-2">
+            {tractDrafts.map((tract) => {
+              const netAcres = computeNetAcres(tract.grossAcres, tract.leasedInterest);
+              const statusOptions = isLeaseStatusOption(tract.status)
+                ? [...LEASE_STATUS_OPTIONS]
+                : [tract.status, ...LEASE_STATUS_OPTIONS];
+              return (
+                <div
+                  key={tract.mineralNodeId}
+                  className={`rounded-lg border p-3 ${
+                    tract.checked
+                      ? 'border-emerald-200 bg-emerald-50/40'
+                      : 'border-ledger-line bg-parchment/40'
+                  }`}
+                >
+                  <label className="flex items-center gap-2 text-sm font-semibold text-ink mb-2">
+                    <input
+                      type="checkbox"
+                      checked={tract.checked}
+                      onChange={(event) =>
+                        setTract(tract.mineralNodeId, {
+                          checked: event.target.checked,
+                        })
+                      }
+                    />
+                    <span className="truncate">
+                      {tract.deskMapName}
+                      <span className="font-normal text-ink-light">
+                        {' '}
+                        — {tract.ownerLabel}
+                      </span>
+                    </span>
+                  </label>
+                  {tract.checked && (
+                    <div className="grid grid-cols-2 gap-2">
+                      <FormField
+                        label="Lease Name"
+                        value={tract.leaseName}
+                        onChange={(value) =>
+                          setTract(tract.mineralNodeId, { leaseName: value })
+                        }
+                      />
+                      <FormField
+                        label="Lessor Interest"
+                        value={tract.leasedInterest}
+                        onChange={(value) =>
+                          setTract(tract.mineralNodeId, { leasedInterest: value })
+                        }
+                      />
+                      <FormField
+                        label="Gross Acres"
+                        value={tract.grossAcres}
+                        onChange={(value) =>
+                          setTract(tract.mineralNodeId, { grossAcres: value })
+                        }
+                      />
+                      <div>
+                        <label className="text-[10px] text-ink-light uppercase tracking-wider block mb-1">
+                          Net Mineral Acres
+                        </label>
+                        <div className="px-3 py-2 rounded-lg border border-ledger-line bg-ledger text-sm text-ink-light">
+                          {netAcres || '—'}
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-ink-light uppercase tracking-wider block mb-1">
+                          Status
+                        </label>
+                        <select
+                          value={tract.status}
+                          onChange={(event) =>
+                            setTract(tract.mineralNodeId, {
+                              status: event.target.value,
+                            })
+                          }
+                          className="w-full px-3 py-2 rounded-lg border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-emerald-600 focus:border-emerald-600 outline-none"
+                        >
+                          {statusOptions.map((status) => (
+                            <option key={status} value={status}>
+                              {isLeaseStatusOption(status)
+                                ? status
+                                : `${status} (legacy)`}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <FormField
+                        label="Doc #"
+                        value={tract.docNo}
+                        onChange={(value) =>
+                          setTract(tract.mineralNodeId, { docNo: value })
+                        }
+                      />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
           <div className="text-[11px] leading-5 text-ink-light">
-            Net mineral acres = gross acres x lessor interest. This is the acre view
-            of the lessor interest and does not change the ownership math.
+            Check each tract this lessor leases under this report. Saving creates one
+            lessee card per checked tract on its own desk map; unchecking removes that
+            tract&apos;s card. Net mineral acres = gross acres x lessor interest — the
+            acre view of the lessor interest, which never changes the ownership math.
           </div>
         </fieldset>
 

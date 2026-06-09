@@ -249,6 +249,12 @@ interface WorkspaceState {
   clearLinkedLease: (leaseId: string) => void;
   syncLeaseNodesFromRecord: (lease: Lease) => void;
   addNodeToActiveDeskMap: (nodeId: string) => void;
+  /**
+   * Append a node to a specific desk map by id (not the active one). Used by the
+   * multi-tract lease editor so a lessee node lands in its own tract's desk map,
+   * the same placement rule `attachLease` follows for the parent's tract.
+   */
+  addNodeToDeskMap: (nodeId: string, deskMapId: string) => void;
 
   // Document attachments (Phase 5 / ADR 0004)
   /**
@@ -1253,6 +1259,20 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
           dm.id === targetDeskMapId
             ? { ...dm, nodeIds: [...dm.nodeIds, nodeId] }
             : dm
+        ),
+      };
+    }),
+
+  addNodeToDeskMap: (nodeId, deskMapId) =>
+    set((state) => {
+      const target = state.deskMaps.find((dm) => dm.id === deskMapId);
+      if (!target) {
+        return { lastError: `Desk map ${deskMapId} not found` };
+      }
+      if (target.nodeIds.includes(nodeId)) return {};
+      return {
+        deskMaps: state.deskMaps.map((dm) =>
+          dm.id === deskMapId ? { ...dm, nodeIds: [...dm.nodeIds, nodeId] } : dm
         ),
       };
     }),

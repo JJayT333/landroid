@@ -27,7 +27,7 @@ export interface LeaseAddTargetDeskMap {
   nodeIds: string[];
 }
 
-function isPresentMineralOwner(node: OwnershipNode): boolean {
+export function isPresentMineralOwner(node: OwnershipNode): boolean {
   return (
     node.type !== 'related'
     && node.interestClass === 'mineral'
