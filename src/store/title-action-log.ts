@@ -42,6 +42,10 @@ import {
   TITLE_MUTATIONS,
   type TitleMutation,
 } from '../project-records/action-layer/title-command-sourcing';
+import {
+  TitleReadPathFlag,
+  type TitleReadPathMode,
+} from '../project-records/action-layer/title-read-path';
 import type { ProjectRecordBundle } from '../project-records/record-validation';
 import {
   listTitleLedgerWorkspaceRows,
@@ -80,6 +84,11 @@ interface TitleActionLogState {
   lastDivergence: TitleLedgerDivergence | null;
   /** Last non-divergence recording error (e.g. a malformed mutation). */
   lastError: string | null;
+  /**
+   * Live read-path mode for title records. Default `'shadow'` (store-canonical).
+   * `'cutover'` sources title records from the durable ledger. Reversible.
+   */
+  readPathMode: TitleReadPathMode;
   setEnabled: (enabled: boolean) => void;
   reset: () => void;
   /**
@@ -102,6 +111,15 @@ interface TitleActionLogState {
     approvedBy?: ActionRecord['approvedBy'];
     aiToolName?: string;
   }) => Promise<void>;
+  /**
+   * Flip the title record read path to cutover. Requires the readiness gates to
+   * be green (`ready`) and a non-empty reviewer token; governance is enabled for
+   * title_tree only. Throws {@link TitleReadFlipDisabledError} or an error when
+   * blocked. Reversible via {@link revertReadPathToShadow}.
+   */
+  flipToCutover: (input: { reviewerApprovalToken: string; ready: boolean }) => void;
+  /** Revert the title record read path to shadow. Always available. */
+  revertReadPathToShadow: () => void;
 }
 
 function isTitleMutation(value: string): value is TitleMutation {
@@ -132,6 +150,12 @@ let ledgerGeneration = 0;
 let recordingChain: Promise<void> = Promise.resolve();
 const pending = new Set<Promise<unknown>>();
 
+// Governed read-path flip for the title_tree surface (enabled for this surface
+// only — the global DEFAULT_TITLE_READ_PATH_MODE stays 'shadow'). The mode
+// starts 'shadow' and flips to 'cutover' only when the readiness gates are green
+// and a reviewer token is supplied; it reverts at any time.
+const titleReadPathFlag = new TitleReadPathFlag('shadow', { cutoverEnabled: true });
+
 export const useTitleActionLog = create<TitleActionLogState>()((set, get) => ({
   enabled: true,
   actionRecords: [],
@@ -140,12 +164,14 @@ export const useTitleActionLog = create<TitleActionLogState>()((set, get) => ({
   recordedMutationCount: 0,
   lastDivergence: null,
   lastError: null,
+  readPathMode: 'shadow',
 
   setEnabled: (enabled) => set({ enabled }),
 
   reset: () => {
     ledgerGeneration += 1;
     recordingChain = Promise.resolve();
+    titleReadPathFlag.revertToShadow();
     set({
       actionRecords: [],
       auditEvents: [],
@@ -153,12 +179,14 @@ export const useTitleActionLog = create<TitleActionLogState>()((set, get) => ({
       recordedMutationCount: 0,
       lastDivergence: null,
       lastError: null,
+      readPathMode: 'shadow',
     });
   },
 
   hydrate: ({ actionRecords, auditEvents }) => {
     ledgerGeneration += 1;
     recordingChain = Promise.resolve();
+    titleReadPathFlag.revertToShadow();
     set({
       actionRecords: [...actionRecords],
       auditEvents: [...auditEvents],
@@ -166,7 +194,26 @@ export const useTitleActionLog = create<TitleActionLogState>()((set, get) => ({
       recordedMutationCount: actionRecords.length,
       lastDivergence: null,
       lastError: null,
+      readPathMode: 'shadow',
     });
+  },
+
+  flipToCutover: ({ reviewerApprovalToken, ready }) => {
+    if (!ready) {
+      throw new Error(
+        'Title read flip blocked: cutover readiness gates are not green.'
+      );
+    }
+    // Governed + token-checked; throws TitleReadFlipDisabledError if governance
+    // were ever disabled. The store stays canonical for the live UI/math — this
+    // only changes the project-records read source (Scope A).
+    titleReadPathFlag.cutOver({ reviewerApprovalToken });
+    set({ readPathMode: titleReadPathFlag.getMode() });
+  },
+
+  revertReadPathToShadow: () => {
+    titleReadPathFlag.revertToShadow();
+    set({ readPathMode: titleReadPathFlag.getMode() });
   },
 
   record: async ({
