@@ -1,58 +1,32 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { CutoverDisabledError } from '../../project-records/action-layer/cutover';
-import type { ParityReport } from '../../project-records/action-layer/parity';
+import type { TitleCutoverReadiness } from '../../project-records/action-layer/title-cutover-gate';
 import {
+  computeTitleParityGates,
+  deriveTitleCutoverReadiness,
   MIN_PASSED_TITLE_PARITIES,
-  TitleTreeCutoverGate,
-  type TitleCutoverReadiness,
-} from '../../project-records/action-layer/title-cutover-gate';
+  type TitleParityGates,
+} from '../../project-records/action-layer/title-cutover-readiness';
 import {
   DEFAULT_TITLE_READ_PATH_MODE,
   TitleReadFlipDisabledError,
   type TitleReadPathMode,
 } from '../../project-records/action-layer/title-read-path';
 import { useTitleActionLog, type TitleLedgerDivergence } from '../../store/title-action-log';
+import { useOwnerStore } from '../../store/owner-store';
+import { readCurrentWorkspaceData } from '../../store/workspace-store';
 
-const CLEAN_TITLE_PARITY_REPORT: ParityReport = {
-  workflow: 'title_tree',
-  clean: true,
-  expectedCount: 1,
-  derivedCount: 1,
-  divergences: [],
+// The readiness helper now lives in the shared readiness module; re-export it so
+// existing import paths/tests keep working.
+export {
+  deriveTitleCutoverReadiness,
+  type TitleReadinessSnapshotInput,
+} from '../../project-records/action-layer/title-cutover-readiness';
+
+const NOT_CLEAN_GATES: TitleParityGates = {
+  mathParityClean: false,
+  landroidRoundTripClean: false,
 };
-
-export interface TitleReadinessSnapshotInput {
-  recordedMutationCount: number;
-  mathParityClean?: boolean;
-  landroidRoundTripClean?: boolean;
-  runtimeDivergenceMessage?: string | null;
-  runtimeErrorMessage?: string | null;
-}
-
-function normalizedPassedParities(count: number): number {
-  if (!Number.isFinite(count)) return 0;
-  return Math.max(0, Math.floor(count));
-}
-
-export function deriveTitleCutoverReadiness({
-  recordedMutationCount,
-  mathParityClean = false,
-  landroidRoundTripClean = false,
-  runtimeDivergenceMessage = null,
-  runtimeErrorMessage = null,
-}: TitleReadinessSnapshotInput): TitleCutoverReadiness {
-  const gate = new TitleTreeCutoverGate(undefined, MIN_PASSED_TITLE_PARITIES, () => ({
-    divergenceMessage: runtimeDivergenceMessage,
-    errorMessage: runtimeErrorMessage,
-  }));
-  const passedParities = normalizedPassedParities(recordedMutationCount);
-  for (let index = 0; index < passedParities; index += 1) {
-    gate.recordPassedParity([CLEAN_TITLE_PARITY_REPORT]);
-  }
-  gate.setMathParityClean(mathParityClean);
-  gate.setLandroidRoundTripClean(landroidRoundTripClean);
-  return gate.readiness();
-}
 
 export function attemptReviewerTitleCutover(readiness: TitleCutoverReadiness): Error {
   try {
@@ -74,16 +48,46 @@ export default function TitleLedgerStatusBanner() {
   const lastDivergence = useTitleActionLog((state) => state.lastDivergence);
   const lastError = useTitleActionLog((state) => state.lastError);
   const recordedMutationCount = useTitleActionLog((state) => state.recordedMutationCount);
+  const actionRecords = useTitleActionLog((state) => state.actionRecords);
+  const auditEvents = useTitleActionLog((state) => state.auditEvents);
+
+  // The two heavy gate inputs (MathInputView parity + .landroid round trip) are
+  // recomputed off the live workspace + durable ledger once the ledger passes the
+  // parity threshold. Below the threshold the gate is red regardless, so the work
+  // is skipped and both read NOT clean.
+  const [parityGates, setParityGates] = useState<TitleParityGates>(NOT_CLEAN_GATES);
+  useEffect(() => {
+    if (recordedMutationCount < MIN_PASSED_TITLE_PARITIES) {
+      setParityGates(NOT_CLEAN_GATES);
+      return;
+    }
+    let cancelled = false;
+    const owner = useOwnerStore.getState();
+    void computeTitleParityGates({
+      liveWorkspace: readCurrentWorkspaceData(),
+      ownerData: { owners: owner.owners, leases: owner.leases },
+      actionRecords,
+      auditEvents,
+    }).then((gates) => {
+      if (!cancelled) setParityGates(gates);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [actionRecords, auditEvents, recordedMutationCount]);
+
   const readiness = useMemo(
     () =>
       deriveTitleCutoverReadiness({
         recordedMutationCount,
+        mathParityClean: parityGates.mathParityClean,
+        landroidRoundTripClean: parityGates.landroidRoundTripClean,
         runtimeDivergenceMessage: lastDivergence
           ? `${lastDivergence.mutation}: ${lastDivergence.message}`
           : null,
         runtimeErrorMessage: lastError,
       }),
-    [lastDivergence, lastError, recordedMutationCount]
+    [lastDivergence, lastError, recordedMutationCount, parityGates]
   );
   const [reviewerFlipError, setReviewerFlipError] = useState<string | null>(null);
 
