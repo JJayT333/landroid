@@ -5,12 +5,15 @@ import {
   getLeasesForOwnerNode,
   pickPrimaryLease,
 } from '../deskmap/deskmap-coverage';
-import { buildLeaseTractRows } from '../leasehold/lease-tract-rows';
+import {
+  planTractReconcile,
+  seedTractDrafts,
+  type TractDraft,
+} from '../leasehold/lease-tract-rows';
 import { useOwnerStore } from '../../store/owner-store';
 import { useWorkspaceStore } from '../../store/workspace-store';
 import type { OwnershipNode } from '../../types/node';
 import {
-  DEFAULT_LEASE_STATUS,
   LEASE_STATUS_OPTIONS,
   computeNetAcres,
   createBlankLease,
@@ -61,103 +64,6 @@ export function getAttachLeaseModalTexasMathError(
   lease: Pick<Lease, 'jurisdiction'>
 ): string | null {
   return isTexasMathLease(lease) ? null : NON_TEXAS_LEASE_ATTACHMENT_MESSAGE;
-}
-
-/**
- * Per-tract editing row in the lease editor. One per tract where this lessor
- * holds present minerals; `checked` materializes a lease slice + lessee node on
- * that tract's desk map on save. Math-relevant scalars (royalty, dates, term)
- * come from the shared LPR; the per-tract fields below stay on the slice.
- */
-interface TractDraft {
-  mineralNodeId: string;
-  deskMapId: string;
-  deskMapName: string;
-  ownerLabel: string;
-  checked: boolean;
-  leaseName: string;
-  leasedInterest: string;
-  grossAcres: string;
-  status: string;
-  docNo: string;
-  existingLeaseId: string | null;
-  existingLeaseNodeId: string | null;
-}
-
-/**
- * Seed the per-tract rows when the editor opens. Rows come from
- * {@link buildLeaseTractRows} (this lessor's present mineral nodes across the
- * unit's desk maps); the originating tract is always present and pre-checked.
- * The originating tract keeps the prop-derived existing slice so editing an
- * existing (even pre-LPR standalone) lease updates it instead of duplicating.
- */
-function seedTractDrafts(params: {
-  parentNode: OwnershipNode;
-  ownerId: string;
-  deskMaps: Array<{ id: string; name?: string; code?: string; nodeIds: string[] }>;
-  nodes: OwnershipNode[];
-  leases: Lease[];
-  leasePurchaseReportId: string | null;
-  activeDeskMapId: string | null;
-  originatingExistingLease: Lease | null;
-  originatingExistingNodeId: string | null;
-}): TractDraft[] {
-  const rows = buildLeaseTractRows({
-    deskMaps: params.deskMaps,
-    nodes: params.nodes,
-    leases: params.leases,
-    ownerId: params.ownerId,
-    leasePurchaseReportId: params.leasePurchaseReportId,
-  });
-  const leaseById = new Map(params.leases.map((lease) => [lease.id, lease]));
-  const rowByNode = new Map(rows.map((row) => [row.mineralNodeId, row]));
-
-  const originatingDeskMap = params.deskMaps.find((deskMap) =>
-    deskMap.nodeIds.includes(params.parentNode.id)
-  );
-  const originatingRow = rowByNode.get(params.parentNode.id) ?? {
-    mineralNodeId: params.parentNode.id,
-    deskMapId: originatingDeskMap?.id ?? params.activeDeskMapId ?? '',
-    deskMapName: originatingDeskMap?.name || originatingDeskMap?.code || 'Tract',
-    ownerLabel: params.parentNode.grantee || 'Unnamed owner',
-    defaultLessorInterest: params.parentNode.fraction,
-    existingLeaseId: null as string | null,
-    existingLeaseNodeId: null as string | null,
-  };
-
-  const orderedRows = [
-    originatingRow,
-    ...rows.filter((row) => row.mineralNodeId !== params.parentNode.id),
-  ];
-
-  return orderedRows.map((row) => {
-    const isOriginating = row.mineralNodeId === params.parentNode.id;
-    const existingLeaseId = isOriginating
-      ? params.originatingExistingLease?.id ?? row.existingLeaseId
-      : row.existingLeaseId;
-    const existingLeaseNodeId = isOriginating
-      ? params.originatingExistingNodeId ?? row.existingLeaseNodeId
-      : row.existingLeaseNodeId;
-    const existing = existingLeaseId
-      ? leaseById.get(existingLeaseId) ?? null
-      : null;
-    const hasOwnerLabel = row.ownerLabel && row.ownerLabel !== 'Unnamed owner';
-
-    return {
-      mineralNodeId: row.mineralNodeId,
-      deskMapId: row.deskMapId,
-      deskMapName: row.deskMapName,
-      ownerLabel: row.ownerLabel,
-      checked: isOriginating ? true : existingLeaseId !== null,
-      leaseName: existing?.leaseName ?? (hasOwnerLabel ? `${row.ownerLabel} Lease` : ''),
-      leasedInterest: existing?.leasedInterest ?? row.defaultLessorInterest,
-      grossAcres: existing?.grossAcres ?? '',
-      status: existing?.status ?? DEFAULT_LEASE_STATUS,
-      docNo: existing?.docNo ?? '',
-      existingLeaseId,
-      existingLeaseNodeId,
-    };
-  });
 }
 
 /**
@@ -538,8 +444,9 @@ export default function AttachLeaseModal({
       // Reconcile the desired (checked) tracts against the existing slices/nodes
       // for this LPR: create new, update kept, delete unchecked. Each lessee node
       // lands on its own tract's desk map.
+      const plan = planTractReconcile(tractDrafts);
       let originatingNodeId: string | null = null;
-      for (const tract of tractDrafts) {
+      for (const tract of [...plan.create, ...plan.update, ...plan.remove]) {
         const isOriginating = tract.mineralNodeId === parentNode.id;
         const buildParentNode = isOriginating
           ? { ...parentNode, linkedOwnerId: ownerId }
