@@ -73,10 +73,34 @@ stays canonical); the flip stays default-off and reversible via `revertReadPathT
 
 This deliberately did **not** add a cached/ordered projection, per-consumer selector, or
 re-derive-on-render — none are needed while the store is kept equal to the ledger by
-rollback. Known follow-ups: a diverged `deleteNode` rolls back the title slice but not its
-already-fired async owner/document cascade (divergence is not expected once the gates are
-green); the sync check recomputes records the async recorder also builds (minor); and a
-cached projection only becomes relevant if reads ever move off the store.
+rollback. Remaining minor follow-up: the sync check recomputes records the async recorder
+also builds; a cached projection only becomes relevant if reads ever move off the store.
+
+## Scope B hardening (deep audit 2026-06-10, branch feat/scope-b-hardening)
+
+The audit found the chokepoint claim was false and the rollback leaky; both are now
+enforced in CI:
+
+- **Journal coverage is a test, not prose.** Every workspace-store action whose execution
+  changes the title slice must fire the journal hook
+  (`src/store/__tests__/title-journal-coverage.test.ts`, with a completeness guard over
+  every store action). That gate forced journaling onto eight previously-silent
+  title-visible mutations: `clearDeskMapNodes`, `deleteDeskMap`, `createDeskMap` (via
+  `initialNodeIds`), `addNodeToDeskMap`, `addNodeToActiveDeskMap` (desk-map membership is
+  `interest_reference.deskMapIds`), and `attachDocToNode`/`detachDocFromNode`/
+  `reorderNodeAttachments` (`attachments[0].docId` is `instrument_record.documentId`).
+- **The journal hook returns a verdict** (`{rolledBack}`): vetoed mutators report failure
+  (false/null/ok:false) and skip their destructive cascades, a parity check that throws
+  rolls back (unverified state never stands), and hook exceptions surface as `lastError`
+  instead of being swallowed. The diverged-`deleteNode` cascade gap is closed.
+- **The flip no longer self-arms.** `cutoverEnabled` defaults to false; the banner's
+  auto-flip is gone; the manual flip stays disabled pending the operator's Springhill
+  soak. Re-arming is a deliberate one-line change calling `setTitleCutoverArmed(true)`.
+- **AI undo hydrates-then-appends** (`src/ai/undo-ledger.ts`): the persisted chain is
+  re-hydrated after the snapshot restore and the turn's records are marked `undone`
+  append-only on the audit chain (`undoTitleActionRecord` now has its live caller);
+  `importAndOpenWorkspace` owns ledger hydration for imports. Ledger writes are fenced
+  behind the write lease and reader-tab hydration is memory-only.
 
 ## Revert recipe
 

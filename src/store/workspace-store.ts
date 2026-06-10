@@ -390,7 +390,12 @@ export type TitleJournalHook = (
   mutation: string,
   beforeWorkspace: WorkspaceData,
   afterWorkspace: WorkspaceData
-) => void;
+) => { rolledBack: boolean } | void;
+
+/** Surfaced as `lastError` when a cutover rollback vetoes a mutation (DA-H3). */
+export const CUTOVER_ROLLBACK_ERROR =
+  'Mutation reverted: cutover parity divergence. The store matches the durable '
+  + 'ledger; see the title ledger banner before retrying.';
 export type TitleActionLogResetHook = () => void;
 
 let titleJournalHook: TitleJournalHook | null = null;
@@ -430,25 +435,42 @@ export function readCurrentWorkspaceData(): WorkspaceData {
 }
 
 /**
- * Fire-and-forget hand-off to the shadow journal. `beforeState` is the store
- * state captured before `set()` (its arrays are retained, not mutated, by
- * Zustand's replace), `afterState` is the post-`set()` state. Wrapped so a
- * journal failure can never affect the canonical store.
+ * Hand-off to the title journal. `beforeState` is the store state captured
+ * before `set()` (its arrays are retained, not mutated, by Zustand's replace),
+ * `afterState` is the post-`set()` state.
+ *
+ * Returns the hook's verdict (DA-H3): `{ rolledBack: true }` means the cutover
+ * parity check vetoed the mutation and the hook already restored the title
+ * slice — the calling mutator must report failure and skip its cascades. A
+ * rollback also surfaces `CUTOVER_ROLLBACK_ERROR` as `lastError` here so every
+ * mutator gets the UI signal without repeating it. An unexpected hook
+ * exception is surfaced as `lastError` (no longer silently swallowed); the
+ * store stays canonical in that case — the hook handles its own cutover-path
+ * failures by rolling back before it returns.
  */
 function journalTitleMutation(
   mutation: string,
   beforeState: WorkspaceState,
   afterState: WorkspaceState
-): void {
-  if (!titleJournalHook) return;
+): { rolledBack: boolean } {
+  if (!titleJournalHook) return { rolledBack: false };
   try {
-    titleJournalHook(
+    const verdict = titleJournalHook(
       mutation,
       snapshotWorkspaceData(beforeState),
       snapshotWorkspaceData(afterState)
-    );
+    ) ?? { rolledBack: false };
+    if (verdict.rolledBack) {
+      useWorkspaceStore.setState({ lastError: CUTOVER_ROLLBACK_ERROR });
+    }
+    return { rolledBack: verdict.rolledBack };
   } catch (err) {
-    console.error('[workspace-store] title journal hook threw (ignored):', err);
+    const message = err instanceof Error ? err.message : String(err);
+    console.error('[workspace-store] title journal hook threw:', err);
+    useWorkspaceStore.setState({
+      lastError: `Title journal hook failed for ${mutation}: ${message}. The mutation stands; review the title ledger before relying on cutover readiness.`,
+    });
+    return { rolledBack: false };
   }
 }
 
@@ -668,6 +690,7 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
     })),
 
   createDeskMap: (name, code, initialNodeIds, fields = {}) => {
+    const before = get();
     const id = `dm-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
     const normalized = normalizeDeskMap(
       {
@@ -691,6 +714,9 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
         ? normalized.unitCode
         : resolveActiveUnitCode([...state.deskMaps, normalized], state.activeUnitCode, id),
     }));
+    // Title-visible when initialNodeIds is non-empty (membership lands in
+    // interest_reference.deskMapIds) — e.g. Add Root creating its first tract.
+    journalTitleMutation('update', before, get());
     return id;
   },
 
@@ -780,6 +806,8 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
       lastAudit: null,
       lastError: null,
     });
+    // DA-H3: skip the destructive cascades when the cutover veto rolled back.
+    if (journalTitleMutation('deleteNode', state, get()).rolledBack) return;
 
     void cascadeDeleteDocsForRemovedNodes(removedNodes).catch((err) => {
       const message = err instanceof Error ? err.message : String(err);
@@ -801,10 +829,9 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
     });
   },
 
-  deleteDeskMap: (id) =>
+  deleteDeskMap: (id) => {
+    const before = get();
     set((state) => {
-      void useMapStore.getState().unlinkDeskMap(id);
-      useCurativeStore.getState().unlinkDeskMap(id);
       const remainingDeskMaps = state.deskMaps.filter((dm) => dm.id !== id);
       const activeDeskMapId = state.activeDeskMapId === id
         ? (remainingDeskMaps[0]?.id ?? null)
@@ -829,7 +856,12 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
           : activeDeskMapId,
         activeUnitCode,
       };
-    }),
+    });
+    // Cascades run only after the journal accepts the mutation (DA-H3).
+    if (journalTitleMutation('update', before, get()).rolledBack) return;
+    void useMapStore.getState().unlinkDeskMap(id);
+    useCurativeStore.getState().unlinkDeskMap(id);
+  },
 
   getActiveDeskMapNodes: () => {
     const { nodes, deskMaps, activeDeskMapId } = get();
@@ -869,7 +901,7 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
         lastError: null,
         ...dmUpdate,
       });
-      journalTitleMutation('convey', state, get());
+      if (journalTitleMutation('convey', state, get()).rolledBack) return false;
       return true;
     }
     set({ lastError: result.error.message });
@@ -905,7 +937,7 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
         lastError: null,
         ...dmUpdate,
       });
-      journalTitleMutation('createNpri', state, get());
+      if (journalTitleMutation('createNpri', state, get()).rolledBack) return false;
       return true;
     }
     set({ lastError: result.error.message });
@@ -951,7 +983,7 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
         lastError: null,
         ...dmUpdate,
       });
-      journalTitleMutation('createRootNode', state, get());
+      if (journalTitleMutation('createRootNode', state, get()).rolledBack) return false;
       return true;
     }
     set({ lastError: result.error.message });
@@ -968,7 +1000,7 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
         lastAudit: result.audit,
         lastError: null,
       });
-      journalTitleMutation('update', state, get());
+      if (journalTitleMutation('update', state, get()).rolledBack) return false;
       return true;
     }
     set({ lastError: result.error.message });
@@ -1007,7 +1039,7 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
         lastError: null,
         ...dmUpdate,
       });
-      journalTitleMutation('precede', state, get());
+      if (journalTitleMutation('precede', state, get()).rolledBack) return false;
       return true;
     }
     set({ lastError: result.error.message });
@@ -1023,7 +1055,7 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
         lastAudit: result.audit,
         lastError: null,
       });
-      journalTitleMutation('graftToParent', state, get());
+      if (journalTitleMutation('graftToParent', state, get()).rolledBack) return false;
       return true;
     }
     set({ lastError: result.error.message });
@@ -1070,7 +1102,16 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
       lastAudit: lastAudit,
       lastError: null,
     });
-    journalTitleMutation('graftToParent', before, get());
+    if (journalTitleMutation('graftToParent', before, get()).rolledBack) {
+      return {
+        ok: false,
+        attached: [],
+        failed: items.map((item) => ({
+          nodeId: item.activeNodeId,
+          reason: CUTOVER_ROLLBACK_ERROR,
+        })),
+      };
+    }
     return { ok: true, attached, failed: [] };
   },
 
@@ -1132,7 +1173,7 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
       activeDeskMapId: targetDeskMapId ?? state.activeDeskMapId,
       lastError: null,
     });
-    journalTitleMutation('attachLease', state, get());
+    if (journalTitleMutation('attachLease', state, get()).rolledBack) return null;
     return newId;
   },
 
@@ -1175,7 +1216,9 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
       lastAudit: result.audit,
       lastError: null,
     });
-    journalTitleMutation('deleteNode', state, get());
+    // DA-H3: a cutover rollback restored the nodes — firing the cascades would
+    // permanently delete the restored nodes' documents and owner records.
+    if (journalTitleMutation('deleteNode', state, get()).rolledBack) return;
     void cascadeDeleteDocsForRemovedNodes(removedNodes).catch((err) => {
       const message = err instanceof Error ? err.message : String(err);
       console.warn('[workspace-store] document cascade delete failed:', err);
@@ -1198,38 +1241,36 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
 
   clearLinkedOwner: (ownerId) => {
     const before = get();
-    set((state) => {
-      useCurativeStore.getState().unlinkOwner(ownerId);
-      return {
-        nodes: state.nodes.map((node) =>
-          node.linkedOwnerId === ownerId ? { ...node, linkedOwnerId: null } : node
-        ),
-      };
-    });
-    journalTitleMutation('update', before, get());
+    set((state) => ({
+      nodes: state.nodes.map((node) =>
+        node.linkedOwnerId === ownerId ? { ...node, linkedOwnerId: null } : node
+      ),
+    }));
+    // Cascade runs only after the journal accepts the mutation (DA-H3).
+    if (journalTitleMutation('update', before, get()).rolledBack) return;
+    useCurativeStore.getState().unlinkOwner(ownerId);
   },
 
   clearLinkedLease: (leaseId) => {
     const before = get();
-    set((state) => {
-      useCurativeStore.getState().unlinkLease(leaseId);
-      return {
-        nodes: state.nodes.map((node) =>
-          node.linkedLeaseId === leaseId
-            ? {
-                ...node,
-                date: '',
-                fileDate: '',
-                docNo: '',
-                grantee: '',
-                remarks: 'Lease record removed; review or delete this lessee card.',
-                linkedLeaseId: null,
-              }
-            : node
-        ),
-      };
-    });
-    journalTitleMutation('update', before, get());
+    set((state) => ({
+      nodes: state.nodes.map((node) =>
+        node.linkedLeaseId === leaseId
+          ? {
+              ...node,
+              date: '',
+              fileDate: '',
+              docNo: '',
+              grantee: '',
+              remarks: 'Lease record removed; review or delete this lessee card.',
+              linkedLeaseId: null,
+            }
+          : node
+      ),
+    }));
+    // Cascade runs only after the journal accepts the mutation (DA-H3).
+    if (journalTitleMutation('update', before, get()).rolledBack) return;
+    useCurativeStore.getState().unlinkLease(leaseId);
   },
 
   syncLeaseNodesFromRecord: (lease) => {
@@ -1264,7 +1305,8 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
     journalTitleMutation('update', before, get());
   },
 
-  addNodeToActiveDeskMap: (nodeId) =>
+  addNodeToActiveDeskMap: (nodeId) => {
+    const before = get();
     set((state) => {
       const targetDeskMapId = resolveActiveDeskMapId(state.deskMaps, state.activeDeskMapId);
       if (!targetDeskMapId) return {};
@@ -1276,9 +1318,12 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
             : dm
         ),
       };
-    }),
+    });
+    journalTitleMutation('update', before, get());
+  },
 
-  addNodeToDeskMap: (nodeId, deskMapId) =>
+  addNodeToDeskMap: (nodeId, deskMapId) => {
+    const before = get();
     set((state) => {
       const target = state.deskMaps.find((dm) => dm.id === deskMapId);
       if (!target) {
@@ -1290,7 +1335,9 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
           dm.id === deskMapId ? { ...dm, nodeIds: [...dm.nodeIds, nodeId] } : dm
         ),
       };
-    }),
+    });
+    journalTitleMutation('update', before, get());
+  },
 
   restoreTitleSlice: (before) =>
     set((state) => {
@@ -1298,6 +1345,17 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
       return {
         nodes: before.nodes,
         deskMaps: before.deskMaps,
+        // DA-H3: a vetoed mutation may also have moved the active selections;
+        // restore them with the slice so the UI lands back where it was.
+        activeDeskMapId: before.activeDeskMapId,
+        activeUnitCode: before.activeUnitCode,
+        // clearDeskMapNodes/deleteDeskMap delete the desk map's leasehold rows
+        // in the same set() as the title slice — a veto must bring them back
+        // too, or the rollback silently loses leasehold work (review fix).
+        leaseholdAssignments: before.leaseholdAssignments ?? state.leaseholdAssignments,
+        leaseholdOrris: before.leaseholdOrris ?? state.leaseholdOrris,
+        leaseholdTransferOrderEntries:
+          before.leaseholdTransferOrderEntries ?? state.leaseholdTransferOrderEntries,
         activeNodeId:
           state.activeNodeId && survivingIds.has(state.activeNodeId)
             ? state.activeNodeId
@@ -1327,11 +1385,15 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
       fileName: document.fileName,
       kind: document.kind,
     };
+    const before = get();
     set((current) => ({
       nodes: current.nodes.map((n) =>
         n.id === nodeId ? { ...n, attachments: [...n.attachments, summary] } : n
       ),
     }));
+    // Title-visible when this becomes the node's first attachment: the adapter
+    // maps attachments[0].docId to instrument_record.documentId.
+    journalTitleMutation('update', before, get());
     return summary;
   },
 
@@ -1342,6 +1404,7 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
     const target = node.attachments.find((a) => a.attachmentId === attachmentId);
     if (!target) return;
     await detachDocFromEntity(target.attachmentId);
+    const before = get();
     set((current) => ({
       nodes: current.nodes.map((n) =>
         n.id === nodeId
@@ -1354,6 +1417,7 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
           : n
       ),
     }));
+    journalTitleMutation('update', before, get());
   },
 
   renameDocOnNode: async (docId, newFileName) => {
@@ -1392,11 +1456,15 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
     for (const a of node.attachments) {
       if (!seen.has(a.attachmentId)) reordered.push(a);
     }
+    const before = get();
     set((current) => ({
       nodes: current.nodes.map((n) =>
         n.id === nodeId ? { ...n, attachments: reordered } : n
       ),
     }));
+    // Reordering can change attachments[0], which the adapter maps to
+    // instrument_record.documentId.
+    journalTitleMutation('update', before, get());
   },
 
   hydrateNodeAttachments: async (options) => {

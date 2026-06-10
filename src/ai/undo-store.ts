@@ -47,6 +47,12 @@ interface WorkspaceSnapshot {
 
 export interface UndoSnapshot {
   capturedAt: number;
+  /**
+   * In-memory title ledger length at capture (post-settle). The chain is
+   * append-only, so records at or beyond this index belong to the AI turn
+   * this snapshot guards — the undo marks exactly those (see undo-ledger).
+   */
+  titleLedgerLength: number;
   workspaceId: string;
   workspace: WorkspaceSnapshot;
   owner: OwnerWorkspaceData;
@@ -87,6 +93,17 @@ export async function captureSnapshot(label: string): Promise<UndoSnapshot | nul
   const ws = useWorkspaceStore.getState();
   if (!ws.workspaceId) return null;
 
+  // Settle the title journal so the ledger length is an exact turn boundary —
+  // recording timestamps lag mutations, so positions (not times) identify
+  // which records the undo must mark (review fix). Imported lazily: a static
+  // import would close a module cycle (title-read-path → … → ai/tools → … →
+  // this module → title-action-log) and break app startup.
+  const { settleTitleActionLog, useTitleActionLog } = await import(
+    '../store/title-action-log'
+  );
+  await settleTitleActionLog();
+  const titleLedgerLength = useTitleActionLog.getState().actionRecords.length;
+
   const ownerData = await useOwnerStore.getState().exportWorkspaceData();
   const curativeData = await useCurativeStore.getState().exportWorkspaceData();
   const mapData = await useMapStore.getState().exportWorkspaceData();
@@ -97,6 +114,7 @@ export async function captureSnapshot(label: string): Promise<UndoSnapshot | nul
 
   return {
     capturedAt: Date.now(),
+    titleLedgerLength,
     workspaceId: ws.workspaceId,
     label,
     workspace: deepClone({

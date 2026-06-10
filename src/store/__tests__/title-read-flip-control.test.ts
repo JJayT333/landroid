@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import type { BackendSpineCoreRecord } from '../../backend-spine/contracts';
 import { canonicalJson } from '../../project-records/action-layer/canonical-json';
@@ -13,7 +13,13 @@ import {
   titleOwnerData,
   titleWorkspace,
 } from '../../project-records/__tests__/title-cutover-fixtures';
-import { selectTitleReadPathInput, useTitleActionLog } from '../title-action-log';
+import {
+  isTitleCutoverArmed,
+  selectTitleReadPathInput,
+  setTitleCutoverArmed,
+  useTitleActionLog,
+} from '../title-action-log';
+import { TitleReadFlipDisabledError } from '../../project-records/action-layer/title-read-path';
 
 function sortedJson(records: readonly BackendSpineCoreRecord[]): string {
   return canonicalJson(
@@ -25,6 +31,12 @@ function sortedJson(records: readonly BackendSpineCoreRecord[]): string {
 
 beforeEach(() => {
   useTitleActionLog.getState().reset();
+  // DA-C1: governance ships disarmed; these tests arm it explicitly.
+  setTitleCutoverArmed(true);
+});
+
+afterEach(() => {
+  setTitleCutoverArmed(false);
 });
 
 async function hydrateTitleWorkspaceLedger() {
@@ -48,6 +60,23 @@ describe('title read-path flip control', () => {
   it('defaults to shadow', () => {
     expect(useTitleActionLog.getState().readPathMode).toBe('shadow');
     expect(selectTitleReadPathInput().mode).toBe('shadow');
+  });
+
+  it('ships disarmed: the flip throws until governance is deliberately armed (DA-C1)', () => {
+    setTitleCutoverArmed(false);
+    expect(isTitleCutoverArmed()).toBe(false);
+    expect(() =>
+      useTitleActionLog
+        .getState()
+        .flipToCutover({ reviewerApprovalToken: 'reviewer', ready: true })
+    ).toThrow(TitleReadFlipDisabledError);
+    expect(useTitleActionLog.getState().readPathMode).toBe('shadow');
+
+    setTitleCutoverArmed(true);
+    useTitleActionLog
+      .getState()
+      .flipToCutover({ reviewerApprovalToken: 'reviewer', ready: true });
+    expect(useTitleActionLog.getState().readPathMode).toBe('cutover');
   });
 
   it('refuses to flip without a reviewer token', () => {

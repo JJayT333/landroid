@@ -38,11 +38,13 @@ import { useCurativeStore } from '../store/curative-store';
 import { useMapStore } from '../store/map-store';
 import { useOwnerStore } from '../store/owner-store';
 import { useResearchStore } from '../store/research-store';
+import { initWorkspaceWriteLease } from '../storage/workspace-write-lease';
 import {
   flushTitleActionLogToStorage,
+  hydrateTitleActionLogFromImportedLedger,
   hydrateTitleActionLogFromStorageOrBaseline,
 } from '../store/title-action-log';
-import { useWorkspaceStore } from '../store/workspace-store';
+import { readCurrentWorkspaceData, useWorkspaceStore } from '../store/workspace-store';
 import { createWorkspaceId } from '../utils/workspace-id';
 
 export type ProjectOpenResult = {
@@ -60,6 +62,7 @@ export type ImportedWorkspaceData = Omit<WorkspaceData, 'instrumentTypes'>
     | 'mapData'
     | 'researchData'
     | 'curativeData'
+    | 'actionLedger'
   >>;
 
 function readTitleOwnerData() {
@@ -151,8 +154,11 @@ async function applyLoadedProject(
     .getState()
     .hydrateNodeAttachments({ strict: true })
     .catch(() => {});
+  // Review fix: baseline against the LIVE post-hydration state, not the
+  // pre-hydration `data` — strict attachment hydration can change
+  // attachments[0], which projects into instrument_record.documentId.
   await hydrateTitleActionLogFromStorageOrBaseline(
-    data,
+    readCurrentWorkspaceData(),
     readTitleOwnerData()
   ).catch((error) => {
     const message = error instanceof Error ? error.message : String(error);
@@ -270,12 +276,38 @@ export async function importAndOpenWorkspace(
       .getState()
       .hydrateNodeAttachments({ strict: true })
       .catch(() => {});
+    // DA-H2: loadWorkspace reset the title ledger; the lifecycle owns the
+    // re-hydration (from the file's embedded ledger when present, otherwise a
+    // fresh baseline) so no caller can forget it. Baseline against the LIVE
+    // post-hydration state (see applyLoadedProject).
+    await hydrateTitleActionLogFromImportedLedger(
+      readCurrentWorkspaceData(),
+      data.actionLedger,
+      readTitleOwnerData()
+    ).catch((err) => {
+      console.warn('[landroid] title ledger import hydration failed:', err);
+    });
     useWorkspaceStore.getState().setStartupWarning(null);
     return { project, warning: null };
   } catch (error) {
     setActiveWorkspaceStorageKey(previousWorkspaceDbKey);
     throw error;
   }
+}
+
+/**
+ * DA-M15 review fix: the write-lease controller is a singleton, so acquiring a
+ * background project's lease for rename/delete/duplicate re-points its
+ * engagement, broadcast channel, and heartbeat away from the active workspace
+ * (whose lease would then silently expire while the background project's stays
+ * pinned). Re-engage the active workspace as soon as the operation finishes.
+ */
+async function reengageActiveWorkspaceLease(operatedWorkspaceId: string): Promise<void> {
+  const activeId = useWorkspaceStore.getState().workspaceId;
+  if (!activeId || activeId === operatedWorkspaceId) return;
+  await initWorkspaceWriteLease(activeId).catch((error) => {
+    console.warn('[landroid] active workspace lease re-engagement failed:', error);
+  });
 }
 
 export async function renameSavedProject(
@@ -287,11 +319,15 @@ export async function renameSavedProject(
   if (active) {
     activeWorkspace.setProjectName(projectName);
     await flushActiveProject();
+    const renamed = await renameSavedProjectIndexRecord(project.workspaceId, projectName);
+    return renamed ?? { ...project, projectName };
   }
-  const renamed = active
-    ? await renameSavedProjectIndexRecord(project.workspaceId, projectName)
-    : await renameProjectInStorage(project, projectName);
-  return renamed ?? { ...project, projectName };
+  try {
+    const renamed = await renameProjectInStorage(project, projectName);
+    return renamed ?? { ...project, projectName };
+  } finally {
+    await reengageActiveWorkspaceLease(project.workspaceId);
+  }
 }
 
 export async function duplicateSavedProject(
@@ -321,12 +357,20 @@ export async function duplicateSavedProject(
     targetData.workspaceId,
     targetData.projectName
   );
-  await duplicateProjectStorage(project, target, targetData, canvas);
+  try {
+    await duplicateProjectStorage(project, target, targetData, canvas);
+  } finally {
+    await reengageActiveWorkspaceLease(project.workspaceId);
+  }
   return target;
 }
 
 export async function deleteSavedProject(project: SavedProjectSummary): Promise<void> {
-  await deleteProjectStorage(project);
+  try {
+    await deleteProjectStorage(project);
+  } finally {
+    await reengageActiveWorkspaceLease(project.workspaceId);
+  }
   const activeWorkspace = useWorkspaceStore.getState();
   if (activeWorkspace.workspaceId !== project.workspaceId) return;
 

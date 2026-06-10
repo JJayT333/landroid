@@ -14,10 +14,17 @@ import db from './db';
 import { useWriteLeaseStore } from '../store/write-lease-store';
 import {
   evaluateWorkspaceWriteLease,
+  WORKSPACE_WRITE_LEASE_TTL_MS,
   type WorkspaceWriteLeaseDecision,
   type WorkspaceWriteLeaseRequest,
   type WorkspaceWriteLease,
 } from './workspace-write-lock';
+
+/**
+ * DA-M14: writer heartbeat cadence. TTL/3 keeps two missed ticks of margin
+ * before another tab's non-forced takeover window opens.
+ */
+export const WORKSPACE_WRITE_LEASE_HEARTBEAT_MS = WORKSPACE_WRITE_LEASE_TTL_MS / 3;
 
 /** This tab's relationship to the active workspace's write lease. */
 export type WorkspaceWriteRole = 'idle' | 'writer' | 'reader';
@@ -40,6 +47,12 @@ export interface WorkspaceWriteLeaseEnv {
   deleteLease: (workspaceId: string) => Promise<void>;
   createChannel?: (name: string) => LeaseBroadcastChannel | null;
   onRoleChange?: (role: WorkspaceWriteRole, workspaceId: string | null) => void;
+  /** Schedule the repeating writer heartbeat; returns a cancel function (DA-M14). */
+  scheduleHeartbeat?: (tick: () => void, intervalMs: number) => () => void;
+  /** Whether this tab is currently visible (heartbeat pauses while hidden). */
+  isVisible?: () => boolean;
+  /** Subscribe to tab visibility changes. */
+  onVisibilityChange?: (listener: () => void) => void;
 }
 
 export interface EnsureWritableOptions {
@@ -77,6 +90,8 @@ export class WorkspaceWriteLeaseController {
   private activeFence: ActiveWriteFence | null = null;
   private channel: LeaseBroadcastChannel | null = null;
   private channelName: string | null = null;
+  private cancelHeartbeat: (() => void) | null = null;
+  private visibilityHooked = false;
 
   constructor(private readonly env: WorkspaceWriteLeaseEnv) {}
 
@@ -106,6 +121,7 @@ export class WorkspaceWriteLeaseController {
 
     if (decision.status === 'blocked') {
       this.activeFence = null;
+      this.stopHeartbeat();
       this.setRole('reader', workspaceId);
       return false;
     }
@@ -117,6 +133,7 @@ export class WorkspaceWriteLeaseController {
       fencingToken: decision.lease.fencingToken,
     };
     this.setRole('writer', workspaceId);
+    this.startHeartbeat();
     if (!wasWriter) {
       // Only announce on a genuine transition to writer, so per-autosave
       // refreshes do not flood peers with redundant claims.
@@ -157,9 +174,67 @@ export class WorkspaceWriteLeaseController {
       || current.expiresAt <= this.env.now()
     ) {
       this.activeFence = null;
+      this.stopHeartbeat();
       this.setRole('reader', workspaceId);
       throw new Error('Workspace write lease is stale; reload or take over before saving.');
     }
+  }
+
+  /**
+   * One writer heartbeat tick (DA-M14): refresh the lease so an idle writer
+   * no longer silently expires TTL after its last save, or discover the
+   * demotion at once (role change surfaces the read-only banner). Paused
+   * while the tab is hidden; the visibility hook runs an immediate tick on
+   * return so a backgrounded-past-TTL tab learns its fate right away.
+   */
+  async heartbeat(): Promise<void> {
+    if (this.role !== 'writer' || !this.engagedWorkspaceId) {
+      this.stopHeartbeat();
+      return;
+    }
+    if (!this.isVisible()) return;
+    await this.ensureWritable(this.engagedWorkspaceId);
+  }
+
+  private isVisible(): boolean {
+    if (this.env.isVisible) return this.env.isVisible();
+    return typeof document === 'undefined' || document.visibilityState !== 'hidden';
+  }
+
+  private startHeartbeat(): void {
+    this.ensureVisibilityHook();
+    if (this.cancelHeartbeat) return;
+    const schedule =
+      this.env.scheduleHeartbeat
+      ?? ((tick: () => void, intervalMs: number) => {
+        const id = setInterval(tick, intervalMs);
+        return () => clearInterval(id);
+      });
+    this.cancelHeartbeat = schedule(() => {
+      void this.heartbeat();
+    }, WORKSPACE_WRITE_LEASE_HEARTBEAT_MS);
+  }
+
+  private stopHeartbeat(): void {
+    this.cancelHeartbeat?.();
+    this.cancelHeartbeat = null;
+  }
+
+  private ensureVisibilityHook(): void {
+    if (this.visibilityHooked) return;
+    this.visibilityHooked = true;
+    const subscribe =
+      this.env.onVisibilityChange
+      ?? ((listener: () => void) => {
+        if (typeof document !== 'undefined') {
+          document.addEventListener('visibilitychange', listener);
+        }
+      });
+    subscribe(() => {
+      if (this.isVisible() && this.role === 'writer' && this.engagedWorkspaceId) {
+        void this.ensureWritable(this.engagedWorkspaceId);
+      }
+    });
   }
 
   /** Release the lease if this tab owns it, so a peer can take over at once. */
@@ -176,6 +251,7 @@ export class WorkspaceWriteLeaseController {
     }
     if (this.engagedWorkspaceId === workspaceId) {
       this.activeFence = null;
+      this.stopHeartbeat();
       this.setRole('idle', null);
     }
   }
@@ -221,6 +297,7 @@ export class WorkspaceWriteLeaseController {
       // A peer claimed the lease we held; step down to read-only. The next
       // write re-evaluates against Dexie.
       this.activeFence = null;
+      this.stopHeartbeat();
       this.setRole('reader', this.engagedWorkspaceId);
     } else if (data.type === 'release' && this.role === 'reader') {
       // The writer released; try to promote this read-only tab without making

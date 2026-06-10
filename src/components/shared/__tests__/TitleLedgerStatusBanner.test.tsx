@@ -55,6 +55,23 @@ describe('TitleLedgerStatusBanner', () => {
     expect(html).toContain('aria-disabled="false"');
   });
 
+  it('keeps the flip disabled while governance is disarmed, even when ready (DA-C1)', () => {
+    const readiness = readyReadiness();
+    const html = renderToStaticMarkup(
+      <TitleLedgerStatusBannerContent
+        lastDivergence={null}
+        lastError={null}
+        readiness={readiness}
+        armed={false}
+      />
+    );
+
+    expect(readiness.ready).toBe(true);
+    expect(html).toContain('aria-disabled="true"');
+    expect(html).toContain('disarmed pending the Springhill');
+    expect(html).toContain('Flip to cutover');
+  });
+
   it('shows cutover mode with a revert control and a store-canonical note', () => {
     const html = renderToStaticMarkup(
       <TitleLedgerStatusBannerContent

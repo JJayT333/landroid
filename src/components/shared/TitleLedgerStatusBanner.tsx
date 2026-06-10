@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { TitleCutoverReadiness } from '../../project-records/action-layer/title-cutover-gate';
 import {
   computeTitleParityGates,
@@ -10,7 +10,11 @@ import {
   DEFAULT_TITLE_READ_PATH_MODE,
   type TitleReadPathMode,
 } from '../../project-records/action-layer/title-read-path';
-import { useTitleActionLog, type TitleLedgerDivergence } from '../../store/title-action-log';
+import {
+  isTitleCutoverArmed,
+  useTitleActionLog,
+  type TitleLedgerDivergence,
+} from '../../store/title-action-log';
 import { useOwnerStore } from '../../store/owner-store';
 import { readCurrentWorkspaceData } from '../../store/workspace-store';
 
@@ -26,9 +30,8 @@ const NOT_CLEAN_GATES: TitleParityGates = {
   landroidRoundTripClean: false,
 };
 
-// Auto-advance uses a system token; the manual reviewer control uses its own.
+// The flip is a deliberate user action only (DA-C1 removed the auto-flip).
 // The governance check only requires a non-empty token (see TitleReadPathFlag).
-const AUTO_FLIP_TOKEN = 'auto:title-gates-green';
 const MANUAL_FLIP_TOKEN = 'reviewer:title-cutover-confirmed';
 
 export default function TitleLedgerStatusBanner() {
@@ -82,23 +85,6 @@ export default function TitleLedgerStatusBanner() {
 
   const [flipError, setFlipError] = useState<string | null>(null);
 
-  // Default-to-cutover-when-green: on the rising edge of readiness, flip the
-  // record-layer read path to cutover. Reversible; a manual revert is not
-  // re-flipped until readiness drops and recovers (rising edge only), so the
-  // reviewer stays in control.
-  const wasReadyRef = useRef(false);
-  useEffect(() => {
-    if (readiness.ready && !wasReadyRef.current && readPathMode === 'shadow') {
-      try {
-        flipToCutover({ reviewerApprovalToken: AUTO_FLIP_TOKEN, ready: true });
-        setFlipError(null);
-      } catch (err) {
-        setFlipError(err instanceof Error ? `${err.name}: ${err.message}` : String(err));
-      }
-    }
-    wasReadyRef.current = readiness.ready;
-  }, [readiness.ready, readPathMode, flipToCutover]);
-
   return (
     <TitleLedgerStatusBannerContent
       lastDivergence={lastDivergence}
@@ -106,6 +92,7 @@ export default function TitleLedgerStatusBanner() {
       readiness={readiness}
       readMode={readPathMode}
       flipError={flipError}
+      armed={isTitleCutoverArmed()}
       onFlip={() => {
         try {
           flipToCutover({ reviewerApprovalToken: MANUAL_FLIP_TOKEN, ready: readiness.ready });
@@ -128,6 +115,7 @@ export function TitleLedgerStatusBannerContent({
   readiness,
   readMode = DEFAULT_TITLE_READ_PATH_MODE,
   flipError = null,
+  armed = true,
   onFlip,
   onRevert,
 }: {
@@ -136,6 +124,8 @@ export function TitleLedgerStatusBannerContent({
   readiness: TitleCutoverReadiness;
   readMode?: TitleReadPathMode;
   flipError?: string | null;
+  /** Cutover governance armed state; while false the flip stays disabled. */
+  armed?: boolean;
   onFlip?: () => void;
   onRevert?: () => void;
 }) {
@@ -173,17 +163,19 @@ export function TitleLedgerStatusBannerContent({
           : 'Not enough parities';
   const role = lastDivergence || lastError ? 'alert' : 'status';
 
-  // The record-layer read path can flip to cutover only when readiness is green,
-  // and can always revert. The live Desk Map / math stay store-canonical
-  // regardless (the live read-source move is a separate, later cutover).
-  const canFlip = !isCutover && readiness.ready;
+  // The record-layer read path can flip to cutover only when readiness is green
+  // AND governance is armed (DA-C1: disarmed pending the Springhill soak), and
+  // can always revert. The live Desk Map / math stay store-canonical regardless.
+  const canFlip = !isCutover && readiness.ready && armed;
   const buttonLabel = isCutover ? 'Revert to shadow' : 'Flip to cutover';
   const buttonEnabled = isCutover || canFlip;
   const buttonTitle = isCutover
     ? 'Revert the title record read path to the store (shadow).'
     : canFlip
       ? 'Flip the title record read path to the durable ledger (cutover). Reversible.'
-      : 'Disabled until the readiness gates are green.';
+      : !armed && readiness.ready
+        ? 'Cutover is disarmed pending the Springhill soak; re-arming is a deliberate code change (DA-C1).'
+        : 'Disabled until the readiness gates are green.';
 
   return (
     <div className={`border-b px-4 py-3 text-sm ${readinessTone}`} role={role}>
@@ -205,6 +197,12 @@ export function TitleLedgerStatusBannerContent({
             <p className="text-xs leading-5 text-slate-700">
               Title records read from the durable ledger. The live Desk Map and math
               remain store-canonical.
+            </p>
+          ) : null}
+          {!isCutover && readiness.ready && !armed ? (
+            <p className="text-xs leading-5 text-slate-700">
+              Readiness is green, but the flip stays disarmed pending the Springhill
+              soak. Re-arming is a deliberate code change.
             </p>
           ) : null}
           <dl className="mt-2 grid gap-x-4 gap-y-1 text-xs sm:grid-cols-2 lg:grid-cols-4">

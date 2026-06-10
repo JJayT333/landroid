@@ -1,6 +1,6 @@
 # LANDroid Audit Backlog
 
-Last updated: 2026-06-10
+Last updated: 2026-06-10 (scope-b-hardening statuses applied)
 
 ## 2026-06-10 Deep Audit (Claude) — new findings, not yet reconciled row-by-row
 
@@ -8,30 +8,37 @@ Full report with anchors, confidence, and patch sketches:
 `docs/deep-audit-2026-06-10.md`. Finding IDs are `DA-*`. Until each is fixed or
 explicitly accepted, treat that report as part of this backlog. Summary:
 
-- DA-C1 (Critical): `clearDeskMapNodes`/`deleteDeskMap` mutate title nodes with
-  no journal call — Scope B store==ledger invariant is false; auto-flip
-  self-arms. Fix + journal-coverage test + flip default-off first.
+- DA-C1 (Critical): FIXED (feat/scope-b-hardening) — eight title-visible
+  actions journaled (the audit's two plus six more found by the gate), the
+  journal-coverage test is the permanent CI invariant, and the flip ships
+  disarmed (`setTitleCutoverArmed`) pending the Springhill soak.
 - DA-H1: fixed NPRI deducted from lessee NRI instead of burdened lessor royalty
-  (attorney sign-off + golden update required before change).
-- DA-H2: AI Undo / `loadWorkspace` erases the durable title ledger;
-  `undoTitleActionRecord` has no live caller.
-- DA-H3/H4/H5: cutover rollback incomplete (cascades fire post-rollback, hook
-  throws swallowed); ledger flush ordering/stale-chain hydration; hash chain
-  does not cover ActionRecord payloads.
+  (attorney sign-off + golden update required before change; decision of
+  record in CONTINUATION-PROMPT.md — gate cleared, implement after Step 1).
+- DA-H2: FIXED (feat/scope-b-hardening) — AI undo hydrates-then-appends via
+  `undoTitleActionRecord` (now live-called); `importAndOpenWorkspace` owns
+  import ledger hydration.
+- DA-H3: FIXED (feat/scope-b-hardening) — journal verdict, rollback-aware
+  mutators, cascades skipped on veto, hook exceptions surfaced.
+- DA-H4/H5: ledger flush ordering/stale-chain hydration; hash chain does not
+  cover ActionRecord payloads. (Open — Step 2+.)
 - DA-H6/H7: `.landroid` export omits non-node-attached documents and
   import/undo deletes them; document hashes never re-verified (blank accepted).
 - DA-H8/H9: Flowchart stale-fraction snapshot; Map-mode branch card sums
   unit-wide ORRI decimals under one tract.
 - DA-H10: CSV import parses fractions via float64 + toFixed(9) before store.
-- DA-M1..M16, DA-L1..L10, DA-U1..U6: see report §1-2 (incl. silent
+- DA-M14/M15: FIXED (feat/scope-b-hardening) — writer heartbeat at TTL/3 with
+  visibility pause; title-ledger writes and project rename/delete/duplicate
+  fenced behind the write lease; reader-tab ledger hydration is memory-only.
+- DA-M1..M13, DA-M16, DA-L1..L10, DA-U1..U6: see report §1-2 (incl. silent
   over-conveyance cap, addNode validation bypass = LLA-H03, provenance
-  flattening = ACT-M01, no lease heartbeat + unfenced ledger writes = LLA-H02
-  remnants, unbounded rolling-export retention, broken Tailwind tokens).
+  flattening = ACT-M01, unbounded rolling-export retention, broken Tailwind
+  tokens).
 - Status updates to existing rows: ACT-H01 = Fixed (`ensureTitleBaseline`,
   Scope A); ACT-H05 = Partial (banner exists; no auto-revert, console-only in
-  shadow); ACT-M01 = Open (confirmed live); LLA-H02 = Partial (fence live,
-  ledger + heartbeat gaps); LLA-H03 = Open (confirmed: DeskMapView Add Root
-  uses raw `addNode`).
+  shadow); ACT-M01 = Open (confirmed live); LLA-H02 = Fixed
+  (feat/scope-b-hardening closed the ledger + heartbeat remnants); LLA-H03 =
+  Open (confirmed: DeskMapView Add Root uses raw `addNode`).
 
 This is the active master list for open, deferred, superseded, and newly found
 review items. It consolidates:

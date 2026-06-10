@@ -4,15 +4,16 @@ Use this file to resume the active workstream in a new chat. Read it with
 `AGENTS.md`, `PROJECT_CONTEXT.md`, and `docs/README.md` before touching code.
 Keep long history in `CHANGELOG.md`.
 
-## Active Handoff - 2026-06-10 (end of audit/research session)
+## Active Handoff - 2026-06-10 (Scope B hardening session)
 
-This branch (`claude/strange-payne-679e1f`, worktree, NEVER PUSHED) holds:
-the Part 1 + Part 2 deep audits (`docs/deep-audit-2026-06-10.md`, `-part2.md`),
-doc housecleaning, the rewritten `ROADMAP.md`, the research prompts, and the
-complete external TXM research corpus (`docs/research/txm-catalog-round-{1,2,3}.md`,
-including the three-CSV import appendix in round 3). Suite was verified green
-before the audit (979 tests / 140 files; Springhill 0.225/0.775; Phase 0
-goldens intact). Docs-only + comment-only changes since.
+STEP 0 is DONE: the audit/research branch landed as PR #140 (squash-merged to
+main as `a0bb913` — Part 1 + Part 2 deep audits, doc housecleaning, rewritten
+ROADMAP, research prompts, TXM catalog rounds 1-3). STEP 1 is IMPLEMENTED on
+`feat/scope-b-hardening` (eight commits + docs; suite 1049 tests / 144 files
+green; Springhill 0.225/0.775 and Phase 0 goldens untouched — no math files
+changed). The PR awaits operator review (ultra review offered) — after merge:
+operator Springhill soak, THEN the cutover re-arm (one line,
+`setTitleCutoverArmed(true)`) as its own reviewed change.
 
 ## Operator decisions now in force
 
@@ -32,24 +33,21 @@ goldens intact). Docs-only + comment-only changes since.
 
 ## Plan for the next session — START HERE
 
-STEP 0 — Land this branch (first hour):
-1. Scrub waived (see operator decisions above); the branch lands as-is with
-   no history rewrite.
-2. Rename the branch per conventions (e.g. `docs/deep-audit-and-research`),
-   push, open the PR (squash), merge. Everything this session produced lands.
+STEP 0 — DONE (PR #140 merged; scrub waived per operator decisions above).
 
-STEP 1 — Scope B hardening (the Critical lane; Codex tickets + Claude review;
-ultra-gate the ledger changes). From `docs/deep-audit-2026-06-10.md` §1:
-- DA-C1: journal `clearDeskMapNodes` + `deleteDeskMap`; add the
-  journal-coverage test (every store action touching nodes/deskMaps must fire
-  the hook); set `cutoverEnabled` back to false until that test is green.
-- DA-H2: `restoreSnapshot`/`loadWorkspace` hydrate-then-append instead of
-  erasing the title ledger (`undoTitleActionRecord` exists, unused).
-- DA-H3: journal hook returns a verdict; rolled-back mutations return failure
-  and skip cascades; hook exceptions stop being swallowed.
-- DA-M15: fence title-ledger Dexie writes + project rename/delete behind the
-  write lease. DA-M14: lease heartbeat interval.
-Exit: coverage test green, soak on Springhill, THEN the flip may re-arm.
+STEP 1 — IMPLEMENTED on `feat/scope-b-hardening`, awaiting review/merge.
+Closed: DA-C1 (eight title-visible actions journaled — the audit's two plus
+six more the coverage gate found: createDeskMap-with-members, the two
+addNodeToDeskMap variants, and attach/detach/reorder attachments, since
+deskMapIds and attachments[0].docId project into title records; the
+journal-coverage test is the permanent CI invariant; cutover flip DISARMED by
+default), DA-H3 (journal verdict + rollback-aware mutators + no swallowed
+hook errors), DA-H2 (AI undo hydrates-then-appends via undoTitleActionRecord;
+importAndOpenWorkspace owns import ledger hydration), DA-M15 (ledger writes +
+project rename/delete/duplicate fenced; reader hydration memory-only),
+DA-M14 (writer heartbeat at TTL/3 with visibility pause).
+Exit gate remaining: operator review + merge → Springhill soak → re-arm the
+flip (one line: `setTitleCutoverArmed(true)`) as its own reviewed change.
 
 STEP 2 — Evidence integrity + precision (parallel-safe with Step 1 review):
 - DA-H6: export ALL workspace documents (not node-joined); DA-H7: recompute

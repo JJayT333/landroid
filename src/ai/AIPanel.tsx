@@ -12,7 +12,8 @@ import {
   isConfigured,
   type HostedContextMode,
 } from './settings-store';
-import { useAIUndoStore, restoreSnapshot } from './undo-store';
+import { useAIUndoStore } from './undo-store';
+import { restoreSnapshotWithLedger } from './undo-ledger';
 import {
   approveAIProposal,
   useAIApprovalStore,
@@ -72,7 +73,7 @@ export default function AIPanel({ onClose }: { onClose: () => void }) {
     if (!undoSnapshot || undoing) return;
     setUndoing(true);
     try {
-      await restoreSnapshot(undoSnapshot);
+      await restoreSnapshotWithLedger(undoSnapshot);
       markLatestAppliedJournalEntryUndone(undoSnapshot.label);
       clearSnapshot();
       setEntries((prev) => [

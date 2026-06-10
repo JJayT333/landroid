@@ -25,6 +25,11 @@ const otherMocks = vi.hoisted(() => ({
   unlinkNode: vi.fn(),
   unlinkDeskMap: vi.fn(),
 }));
+// DA-M15: the flush path is writer-gated; default to writable, override per test.
+const leaseMocks = vi.hoisted(() => ({
+  ensureWorkspaceWritable: vi.fn(async () => true),
+  assertWorkspaceWriteFence: vi.fn(async () => {}),
+}));
 const ledgerPersistenceMocks = vi.hoisted(() => {
   type Rows = { actionRecords: unknown[]; auditEvents: unknown[] };
   const rowsByWorkspace = new Map<string, Rows>();
@@ -68,6 +73,7 @@ vi.mock('../../storage/title-ledger-persistence', () => ({
   replaceTitleLedgerWorkspaceRows:
     ledgerPersistenceMocks.replaceTitleLedgerWorkspaceRows,
 }));
+vi.mock('../../storage/workspace-write-lease', () => leaseMocks);
 
 import { useOwnerStore } from '../owner-store';
 import { useWorkspaceStore } from '../workspace-store';
@@ -186,6 +192,52 @@ describe('title action log runtime persistence lifecycle', () => {
     loadWorkspaceIntoStores(workspace);
     useTitleActionLog.getState().reset();
     useTitleActionLog.getState().setEnabled(true);
+  });
+
+  it('reader-tab hydration stays memory-only: baseline is built but never flushed (DA-M15)', async () => {
+    leaseMocks.ensureWorkspaceWritable.mockResolvedValue(false);
+    try {
+      const workspace = makeWorkspace('ws-runtime', 'root-runtime', 'DOC-1');
+      loadWorkspaceIntoStores(workspace);
+
+      const result = await hydrateTitleActionLogFromStorageOrBaseline(
+        workspace,
+        ownerDataFor(workspace.workspaceId)
+      );
+
+      // The reader still gets a working in-memory baseline…
+      expect(result.source).toBe('baseline');
+      expect(useTitleActionLog.getState().actionRecords.length).toBeGreaterThan(0);
+      // …but never rewrites the writer's persisted rows.
+      expect(ledgerPersistenceMocks.replaceTitleLedgerWorkspaceRows).not.toHaveBeenCalled();
+    } finally {
+      leaseMocks.ensureWorkspaceWritable.mockResolvedValue(true);
+    }
+  });
+
+  it('drops a flush when the ledger is reset while the flush awaits (review fix)', async () => {
+    const workspace = makeWorkspace('ws-runtime', 'root-runtime', 'DOC-1');
+    loadWorkspaceIntoStores(workspace);
+    await ensureTitleBaseline(workspace, ownerDataFor(workspace.workspaceId));
+    await settleTitleActionLog();
+
+    // Hold the flush inside its writability await, reset the ledger (as the
+    // AI-undo restore path does), then let the flush resume: it must NOT
+    // persist the emptied chain over the stored rows.
+    let releaseFlush: (value: boolean) => void = () => {};
+    leaseMocks.ensureWorkspaceWritable.mockImplementationOnce(
+      () => new Promise<boolean>((resolve) => {
+        releaseFlush = resolve;
+      })
+    );
+    const flush = flushTitleActionLogToStorage(workspace.workspaceId);
+    // Let the flush pass settle and suspend on the writability gate.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    useTitleActionLog.getState().reset();
+    releaseFlush(true);
+    await flush;
+
+    expect(ledgerPersistenceMocks.replaceTitleLedgerWorkspaceRows).not.toHaveBeenCalled();
   });
 
   it('flushes, refreshes, and hydrates the same ledger rows', async () => {

@@ -65,7 +65,7 @@ export class TitleReadPathFlag {
 
   constructor(
     initial: TitleReadPathMode = DEFAULT_TITLE_READ_PATH_MODE,
-    private readonly governance: TitleReadPathGovernance =
+    private governance: TitleReadPathGovernance =
       DEFAULT_TITLE_READ_PATH_GOVERNANCE
   ) {
     this.mode = initial;
@@ -73,6 +73,20 @@ export class TitleReadPathFlag {
 
   getMode(): TitleReadPathMode {
     return this.mode;
+  }
+
+  /** Whether cutover governance is armed (cutOver permitted when gates pass). */
+  isCutoverEnabled(): boolean {
+    return this.governance.cutoverEnabled;
+  }
+
+  /**
+   * Arm or disarm the cutover governance at runtime. While disarmed,
+   * {@link cutOver} throws {@link TitleReadFlipDisabledError};
+   * {@link revertToShadow} stays available either way.
+   */
+  setCutoverEnabled(enabled: boolean): void {
+    this.governance = { ...this.governance, cutoverEnabled: enabled };
   }
 
   isCutover(): boolean {

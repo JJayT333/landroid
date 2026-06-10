@@ -87,12 +87,13 @@ Phase 0.5 storage-sharding security rules:
   single-writer lease is live: claims are atomic (Dexie rw transaction +
   fencing token), every workspace/canvas/side-store write asserts the fence
   inside its own transaction, and a second tab opens read-only with an explicit
-  takeover banner. Known gaps (deep-audit 2026-06-10): there is no heartbeat
-  loop, so an idle writer's lease silently expires 15s after its last save
-  (DA-M14); and title-ledger Dexie writes plus project rename/delete/duplicate
-  bypass the fence entirely (DA-M15) — a reader tab can clobber the writer's
-  ledger rows. Until those close, "a stale tab cannot silently overwrite title
-  work" holds for fenced stores only, not the ledger.
+  takeover banner. A writer heartbeat (TTL/3, paused while hidden, immediate
+  refresh-or-demote on return to visible) keeps an idle writer's lease fresh
+  and surfaces demotion at once (DA-M14, fixed scope-b-hardening). Title-ledger
+  Dexie writes and project rename/delete/duplicate run behind the same lease +
+  fence, and a reader tab's ledger hydration is memory-only (DA-M15, fixed
+  scope-b-hardening) — "a stale tab cannot silently overwrite title work" now
+  covers the ledger too.
 - Project open must stay metadata-first for document/PDF rows. Blob reads are
   allowed for explicit preview, export, package backup, or import workflows, but
   not merely because a project is opened.

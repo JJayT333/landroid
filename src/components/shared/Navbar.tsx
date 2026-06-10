@@ -240,9 +240,9 @@ export default function Navbar({ onOpenProjectPicker }: NavbarProps) {
       const data = await importLandroidFile(file);
       // Demo loader: always replace any prior Dr. Elmore project with a pristine
       // copy from the current bundled sample, so testing after a merge starts
-      // fresh every time.
+      // fresh every time. importAndOpenWorkspace hydrates the title ledger
+      // itself (DA-H2), unlike the direct seed loaders below.
       await importAndOpenWorkspace(data, { replaceExisting: true });
-      await mirrorLoadedTitleLedger(data);
       console.log(`[springhill-sample] Loaded ${data.nodes.length} nodes`);
     } catch (err) {
       console.error('[springhill-sample] Failed:', err);
@@ -328,8 +328,8 @@ export default function Navbar({ onOpenProjectPicker }: NavbarProps) {
         if (!confirmed) return;
 
         const data = await importLandroidFile(file);
+        // DA-H2: importAndOpenWorkspace hydrates the title ledger itself now.
         await importAndOpenWorkspace(data);
-        await mirrorLoadedTitleLedger(data);
       } else if (file.name.endsWith('.csv')) {
         assertFileSize(file, FILE_SIZE_LIMITS.SPREADSHEET, 'CSV file');
         const confirmed = await requestConfirmation({
@@ -346,8 +346,8 @@ export default function Navbar({ onOpenProjectPicker }: NavbarProps) {
 
         const text = await file.text();
         const result = importCSV(text);
+        // DA-H2: importAndOpenWorkspace hydrates the title ledger itself now.
         await importAndOpenWorkspace(result);
-        await mirrorLoadedTitleLedger(useWorkspaceStore.getState());
       } else {
         await showAlert({
           title: 'Unsupported File Type',

@@ -5,7 +5,7 @@
  * canonical, divergence is surfaced (not swallowed), and the kill switch works.
  * Synthetic fixtures only.
  */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createBlankLease, createBlankOwner, type Lease } from '../../types/owner';
 import { createBlankNode, normalizeOwnershipNode, type OwnershipNode } from '../../types/node';
 
@@ -70,7 +70,12 @@ vi.mock('../../project-records/action-layer/title-command-sourcing', async (impo
 
 import { useWorkspaceStore } from '../workspace-store';
 import { useOwnerStore } from '../owner-store';
-import { ensureTitleBaseline, useTitleActionLog, settleTitleActionLog } from '../title-action-log';
+import {
+  ensureTitleBaseline,
+  setTitleCutoverArmed,
+  settleTitleActionLog,
+  useTitleActionLog,
+} from '../title-action-log';
 import { AUDIT_GENESIS_HASH, verifyAuditChain } from '../../project-records/action-layer/audit-chain';
 import { ParityDivergenceError } from '../../project-records/action-layer/parity';
 import { titleRecordsFromWorkspace } from '../../project-records/action-layer/title-projection';
@@ -569,6 +574,12 @@ describe('Phase 4 title read-source cutover (rollback-on-divergence)', () => {
     checkSpy.current = vi.fn(checkSpy.real!);
     reset();
     useTitleActionLog.getState().revertReadPathToShadow();
+    // DA-C1: governance ships disarmed; cutover tests arm it explicitly.
+    setTitleCutoverArmed(true);
+  });
+
+  afterEach(() => {
+    setTitleCutoverArmed(false);
   });
 
   it('keeps the store equal to the ledger projection for a clean cutover mutation', async () => {
@@ -609,6 +620,76 @@ describe('Phase 4 title read-source cutover (rollback-on-divergence)', () => {
     expect(log.lastDivergence?.mutation).toBe('createRootNode');
   });
 
+  it('returns failure from the mutator and skips cascades on a cutover rollback (DA-H3)', async () => {
+    useWorkspaceStore.getState().createRootNode('root', '1', { grantee: 'Root' });
+    useWorkspaceStore.getState().convey('root', 'child', '0.5', { grantee: 'Child' });
+    await settleTitleActionLog();
+    useTitleActionLog.getState().flipToCutover({ reviewerApprovalToken: 'reviewer', ready: true });
+    vi.clearAllMocks();
+
+    // Force the next parity check to diverge: the delete must be vetoed.
+    checkSpy.current = vi.fn().mockReturnValueOnce({
+      clean: false,
+      reports: [{ workflow: 'title_tree', clean: false, expectedCount: 1, derivedCount: 0, divergences: [] }],
+    });
+    useWorkspaceStore.getState().removeNode('child');
+    await settleTitleActionLog();
+
+    // Rolled back: node restored, destructive cascades never fired.
+    expect(useWorkspaceStore.getState().nodes.some((n) => n.id === 'child')).toBe(true);
+    expect(docMocks.deleteDocsForAttachments).not.toHaveBeenCalled();
+    expect(otherMocks.unlinkNode).not.toHaveBeenCalled();
+    expect(useWorkspaceStore.getState().lastError).toMatch(/Mutation reverted: cutover parity divergence/);
+
+    // And a boolean mutator reports the veto as failure.
+    checkSpy.current = vi.fn().mockReturnValueOnce({
+      clean: false,
+      reports: [{ workflow: 'title_tree', clean: false, expectedCount: 1, derivedCount: 0, divergences: [] }],
+    });
+    const ok = useWorkspaceStore.getState().convey('root', 'child2', '0.1', { grantee: 'C2' });
+    expect(ok).toBe(false);
+    expect(useWorkspaceStore.getState().nodes.some((n) => n.id === 'child2')).toBe(false);
+  });
+
+  it('a vetoed clearDeskMapNodes restores the tract leasehold rows too', async () => {
+    useWorkspaceStore.getState().createRootNode('root', '1', { grantee: 'Root' });
+    await settleTitleActionLog();
+    const deskMapId = useWorkspaceStore.getState().deskMaps[0].id;
+    const assignmentId = useWorkspaceStore.getState().addLeaseholdAssignment({
+      scope: 'tract',
+      deskMapId,
+    });
+    useTitleActionLog.getState().flipToCutover({ reviewerApprovalToken: 'reviewer', ready: true });
+
+    checkSpy.current = vi.fn().mockReturnValueOnce({
+      clean: false,
+      reports: [{ workflow: 'title_tree', clean: false, expectedCount: 1, derivedCount: 0, divergences: [] }],
+    });
+    useWorkspaceStore.getState().clearDeskMapNodes(deskMapId);
+    await settleTitleActionLog();
+
+    // Nodes restored AND the desk map's leasehold rows survived the veto.
+    expect(useWorkspaceStore.getState().nodes.some((n) => n.id === 'root')).toBe(true);
+    expect(
+      useWorkspaceStore.getState().leaseholdAssignments.some((a) => a.id === assignmentId)
+    ).toBe(true);
+  });
+
+  it('rolls back when the cutover parity check throws (unverified mutation is vetoed)', async () => {
+    useTitleActionLog.getState().flipToCutover({ reviewerApprovalToken: 'reviewer', ready: true });
+    checkSpy.current = vi.fn(() => {
+      throw new Error('parity exploded');
+    });
+
+    const ok = useWorkspaceStore.getState().createRootNode('root', '1', { grantee: 'Root' });
+    await settleTitleActionLog();
+
+    expect(ok).toBe(false);
+    expect(useWorkspaceStore.getState().nodes.some((n) => n.id === 'root')).toBe(false);
+    expect(useTitleActionLog.getState().lastDivergence?.message).toMatch(/failed to run/);
+    expect(useTitleActionLog.getState().actionRecords).toHaveLength(0);
+  });
+
   it('does NOT roll back in shadow mode (surface-only behavior preserved)', async () => {
     // Even if the cutover check would diverge, shadow never invokes it.
     checkSpy.current = vi.fn().mockReturnValue({
@@ -638,5 +719,118 @@ describe('Phase 4 title read-source cutover (rollback-on-divergence)', () => {
 
     expect(useWorkspaceStore.getState().nodes.some((n) => n.id === 'root')).toBe(true);
     expect(checkSpy.current).not.toHaveBeenCalled();
+  });
+});
+
+describe('DA-C1: previously-unjournaled title-visible actions now journal', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    recordSpy.current = vi.fn(recordSpy.real!);
+    checkSpy.current = vi.fn(checkSpy.real!);
+    reset();
+  });
+
+  it('clearDeskMapNodes journals a deleteNode whose replay matches the adapter', async () => {
+    const store = () => useWorkspaceStore.getState();
+    store().createRootNode('root', '1', { grantee: 'Root', interestClass: 'mineral', linkedOwnerId: 'owner-1' });
+    store().convey('root', 'child', '0.5', { grantee: 'Child' });
+    await settleTitleActionLog();
+    const recordsBefore = useTitleActionLog.getState().actionRecords.length;
+
+    store().clearDeskMapNodes(store().deskMaps[0].id);
+    await settleTitleActionLog();
+
+    const log = useTitleActionLog.getState();
+    expect(log.lastDivergence).toBeNull();
+    expect(log.lastError).toBeNull();
+    expect(store().nodes).toHaveLength(0);
+    expect(log.actionRecords).toHaveLength(recordsBefore + 1);
+    expect(log.actionRecords.at(-1)?.actionKind).toBe('title.delete_node');
+    expect((await verifyAuditChain(log.auditEvents)).valid).toBe(true);
+    expect(domainJson(replayTitleProjection(log.actionRecords))).toBe(
+      domainJson(adapterTitleRecordsForCurrent())
+    );
+  });
+
+  it('deleteDeskMap journals the surviving nodes’ membership change', async () => {
+    const store = () => useWorkspaceStore.getState();
+    store().createRootNode('root', '1', { grantee: 'Root', interestClass: 'mineral', linkedOwnerId: 'owner-1' });
+    store().createDeskMap('Tract 2', 'T2');
+    const [dm1, dm2] = store().deskMaps;
+    store().addNodeToDeskMap('root', dm2.id);
+    await settleTitleActionLog();
+    const recordsBefore = useTitleActionLog.getState().actionRecords.length;
+
+    store().deleteDeskMap(dm1.id);
+    await settleTitleActionLog();
+
+    const log = useTitleActionLog.getState();
+    expect(log.lastDivergence).toBeNull();
+    expect(log.actionRecords).toHaveLength(recordsBefore + 1);
+    expect(log.actionRecords.at(-1)?.actionKind).toBe('title.update');
+    // the node survives the map deletion; the ledger sees its new membership
+    expect(store().nodes.some((n) => n.id === 'root')).toBe(true);
+    expect(domainJson(replayTitleProjection(log.actionRecords))).toBe(
+      domainJson(adapterTitleRecordsForCurrent())
+    );
+  });
+
+  it('addNodeToDeskMap journals the deskMapIds update on the interest record', async () => {
+    const store = () => useWorkspaceStore.getState();
+    store().createRootNode('root', '1', { grantee: 'Root', interestClass: 'mineral', linkedOwnerId: 'owner-1' });
+    store().createDeskMap('Tract 2', 'T2');
+    const dm2 = store().deskMaps[1];
+    await settleTitleActionLog();
+    const recordsBefore = useTitleActionLog.getState().actionRecords.length;
+
+    store().addNodeToDeskMap('root', dm2.id);
+    await settleTitleActionLog();
+
+    const log = useTitleActionLog.getState();
+    expect(log.lastDivergence).toBeNull();
+    expect(log.actionRecords).toHaveLength(recordsBefore + 1);
+    expect(log.actionRecords.at(-1)?.actionKind).toBe('title.update');
+    const replayed = replayTitleProjection(log.actionRecords);
+    expect(findInterestRecord(replayed, 'root')?.deskMapIds).toContain(
+      stableRecordId(WS, 'desk-map', dm2.id)
+    );
+    expect(domainJson(replayed)).toBe(domainJson(adapterTitleRecordsForCurrent()));
+  });
+
+  it('createDeskMap with initial members journals their membership (Add Root path)', async () => {
+    const store = () => useWorkspaceStore.getState();
+    store().createRootNode('root', '1', { grantee: 'Root', interestClass: 'mineral', linkedOwnerId: 'owner-1' });
+    await settleTitleActionLog();
+    const recordsBefore = useTitleActionLog.getState().actionRecords.length;
+
+    store().createDeskMap('Tract 2', 'T2', ['root']);
+    await settleTitleActionLog();
+
+    const log = useTitleActionLog.getState();
+    expect(log.lastDivergence).toBeNull();
+    expect(log.lastError).toBeNull();
+    expect(log.actionRecords).toHaveLength(recordsBefore + 1);
+    expect(log.actionRecords.at(-1)?.actionKind).toBe('title.update');
+    expect(domainJson(replayTitleProjection(log.actionRecords))).toBe(
+      domainJson(adapterTitleRecordsForCurrent())
+    );
+  });
+
+  it('addNodeToActiveDeskMap journals the membership of an orphan node', async () => {
+    const store = () => useWorkspaceStore.getState();
+    store().addNode(titleNode({ id: 'n2', grantee: 'Orphan', fraction: '0.25', initialFraction: '0.25' }));
+    await settleTitleActionLog();
+    const recordsBefore = useTitleActionLog.getState().actionRecords.length;
+
+    store().addNodeToActiveDeskMap('n2');
+    await settleTitleActionLog();
+
+    const log = useTitleActionLog.getState();
+    expect(log.lastDivergence).toBeNull();
+    expect(log.actionRecords).toHaveLength(recordsBefore + 1);
+    expect(log.actionRecords.at(-1)?.actionKind).toBe('title.update');
+    expect(domainJson(replayTitleProjection(log.actionRecords))).toBe(
+      domainJson(adapterTitleRecordsForCurrent())
+    );
   });
 });

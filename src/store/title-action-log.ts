@@ -54,6 +54,7 @@ import {
   replaceTitleLedgerWorkspaceRows,
 } from '../storage/title-ledger-persistence';
 import type { TitleLedgerWorkspaceRows } from '../storage/title-ledger-stores';
+import { ensureWorkspaceWritable } from '../storage/workspace-write-lease';
 import { useOwnerStore } from './owner-store';
 import {
   setTitleActionLogResetHook,
@@ -156,11 +157,34 @@ let ledgerGeneration = 0;
 let recordingChain: Promise<void> = Promise.resolve();
 const pending = new Set<Promise<unknown>>();
 
-// Governed read-path flip for the title_tree surface (enabled for this surface
-// only — the global DEFAULT_TITLE_READ_PATH_MODE stays 'shadow'). The mode
-// starts 'shadow' and flips to 'cutover' only when the readiness gates are green
-// and a reviewer token is supplied; it reverts at any time.
-const titleReadPathFlag = new TitleReadPathFlag('shadow', { cutoverEnabled: true });
+// Governed read-path flip for the title_tree surface. DISARMED by default
+// (DA-C1): the journal-coverage exit gate must be green and the operator's
+// Springhill soak complete before re-arming, which is a deliberate one-line
+// change calling setTitleCutoverArmed(true) — never a runtime default. The
+// mode starts 'shadow'; reverting is available at any time regardless.
+const titleReadPathFlag = new TitleReadPathFlag('shadow', { cutoverEnabled: false });
+
+/**
+ * Arm or disarm the cutover flip governance. Exported for tests and for the
+ * deliberate post-soak re-arm; nothing in production calls this with `true`.
+ */
+export function setTitleCutoverArmed(enabled: boolean): void {
+  titleReadPathFlag.setCutoverEnabled(enabled);
+}
+
+/** Whether the cutover flip governance is armed (DA-C1: default false). */
+export function isTitleCutoverArmed(): boolean {
+  return titleReadPathFlag.isCutoverEnabled();
+}
+
+/**
+ * Monotonic ledger generation, bumped by reset/hydrate. Cross-module ledger
+ * writers (the AI-undo marking) read it to detect a workspace replacement
+ * mid-flight and drop their stale work instead of forking the chain.
+ */
+export function titleLedgerGeneration(): number {
+  return ledgerGeneration;
+}
 
 export const useTitleActionLog = create<TitleActionLogState>()((set, get) => ({
   enabled: true,
@@ -398,11 +422,17 @@ async function verifyTitleLedgerRows(
   if (rows.auditEvents.length === 0) {
     return rows.actionRecords.length === 0;
   }
-  if (rows.actionRecords.length !== rows.auditEvents.length) {
+  // Undo is append-only on the audit chain: each `action_record.undone` event
+  // marks an existing action record undone in place without adding a record
+  // row, so the pairing rule is records == events minus undone events (DA-H2).
+  const undoneEventCount = rows.auditEvents.filter(
+    (event) => event.eventKind === 'action_record.undone'
+  ).length;
+  if (rows.actionRecords.length !== rows.auditEvents.length - undoneEventCount) {
     console.warn(
       `[title-action-log] Ignoring ${label} ledger for workspace ${workspaceId}: ` +
         `action/audit count mismatch (${rows.actionRecords.length} actions, ` +
-        `${rows.auditEvents.length} audit events).`
+        `${rows.auditEvents.length} audit events, ${undoneEventCount} undone).`
     );
     return false;
   }
@@ -436,7 +466,24 @@ async function baselineAndFlushTitleLedger(
 export async function flushTitleActionLogToStorage(
   workspaceId: string
 ): Promise<void> {
+  const generationAtStart = ledgerGeneration;
   await settleTitleActionLog();
+  // DA-M15: only the writer persists ledger rows. A reader tab keeps its
+  // hydrated chain (or fresh baseline) in memory and never rewrites the
+  // writer's rows — previously a reader at boot/project-open could clobber
+  // the writer's ledger whenever the stored rows were empty or invalid.
+  if (!(await ensureWorkspaceWritable(workspaceId))) {
+    console.warn(
+      `[title-action-log] Skipping ledger flush for ${workspaceId}: another tab holds the write lease.`
+    );
+    return;
+  }
+  // Review fix: a reset/hydrate while this flush awaited (workspace
+  // replacement, AI-undo restore) means the in-memory chain no longer matches
+  // what this flush was asked to persist — an in-flight autosave flush could
+  // otherwise overwrite the stored chain with the freshly-emptied one before
+  // the undo's re-hydration reads it. Drop the stale flush.
+  if (generationAtStart !== ledgerGeneration) return;
   const state = useTitleActionLog.getState();
   const rows: TitleLedgerWorkspaceRows = {
     actionRecords: [...state.actionRecords],
@@ -519,29 +566,42 @@ export function ensureTitleBaseline(
 
 setTitleJournalHook((mutation, beforeWorkspace, afterWorkspace) => {
   const state = useTitleActionLog.getState();
-  if (!state.enabled) return;
+  if (!state.enabled) return { rolledBack: false };
 
   // Read-source cutover: the ledger is authoritative for what the live UI shows,
   // so a parity-diverged mutation must not survive in the store. The parity check
   // is synchronous, so we veto and roll back to the before-snapshot here — atomic
   // with the mutation, before any read — and keep the diverged record out of the
-  // ledger (the store now matches ledger state). Shadow mode is unchanged below.
+  // ledger (the store now matches ledger state). The verdict is returned to the
+  // mutator (DA-H3) so it reports failure and skips its cascades. A parity check
+  // that THROWS is an unverified mutation: in cutover the ledger has veto power,
+  // so that rolls back too rather than letting unverified state stand. Shadow
+  // mode is unchanged below.
   if (state.readPathMode === 'cutover' && isTitleMutation(mutation)) {
-    const parity = checkTitleInlineParity({
-      mutation,
-      origin: 'user',
-      beforeWorkspace,
-      afterWorkspace,
-      ownerData: readOwnerData(),
-    });
-    if (!parity.clean) {
+    let parityClean = false;
+    let failureMessage =
+      'Cutover parity divergence: the mutation was rolled back so the store '
+      + 'matches the durable ledger. Resolve before relying on cutover.';
+    try {
+      parityClean = checkTitleInlineParity({
+        mutation,
+        origin: 'user',
+        beforeWorkspace,
+        afterWorkspace,
+        ownerData: readOwnerData(),
+      }).clean;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      failureMessage =
+        `Cutover parity check failed to run (${message}): the mutation was `
+        + 'rolled back because it could not be verified against the ledger.';
+    }
+    if (!parityClean) {
       useWorkspaceStore.getState().restoreTitleSlice(beforeWorkspace);
       useTitleActionLog.setState({
         lastDivergence: {
           mutation,
-          message:
-            'Cutover parity divergence: the mutation was rolled back so the store '
-            + 'matches the durable ledger. Resolve before relying on cutover.',
+          message: failureMessage,
           at: new Date().toISOString(),
         },
       });
@@ -549,7 +609,7 @@ setTitleJournalHook((mutation, beforeWorkspace, afterWorkspace) => {
         '[title-action-log] CUTOVER ROLLBACK — mutation reverted to keep the store '
           + `equal to the ledger (read source of truth): ${mutation}.`
       );
-      return;
+      return { rolledBack: true };
     }
   }
 
@@ -571,6 +631,7 @@ setTitleJournalHook((mutation, beforeWorkspace, afterWorkspace) => {
     });
   });
   track(recordingChain);
+  return { rolledBack: false };
 });
 
 setTitleActionLogResetHook(() => {

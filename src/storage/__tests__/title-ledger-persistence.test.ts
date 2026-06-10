@@ -146,15 +146,23 @@ async function loadTitleLedgerPersistence({
     getWorkspaceDbKey: () => workspaceKey,
   }));
   vi.doMock('../db', () => ({ default: db }));
+  // DA-M15: ledger writes are fenced; default the lease to writable so the
+  // scoping tests stay focused, and let fence tests override per call.
+  const lease = {
+    ensureWorkspaceWritable: vi.fn(async () => true),
+    assertWorkspaceWriteFence: vi.fn(async () => {}),
+  };
+  vi.doMock('../workspace-write-lease', () => lease);
 
   const persistence = await import('../title-ledger-persistence');
-  return { persistence, db };
+  return { persistence, db, lease };
 }
 
 describe('title ledger persistence', () => {
   afterEach(() => {
     vi.doUnmock('../active-workspace-key');
     vi.doUnmock('../db');
+    vi.doUnmock('../workspace-write-lease');
     vi.resetModules();
   });
 
@@ -216,6 +224,54 @@ describe('title ledger persistence', () => {
     });
     expect(listed.actionRecords[0]).not.toHaveProperty('id');
     expect(listed.auditEvents[0]).not.toHaveProperty('dbKey');
+  });
+
+  it('refuses to write ledger rows from a read-only tab (DA-M15)', async () => {
+    const action = fakeActionRecord({ recordId: 'fenced-action' });
+    const audit = fakeAuditEventRecord({
+      recordId: 'fenced-audit',
+      subjectRecordIds: ['fenced-action'],
+    });
+    const { persistence, db, lease } = await loadTitleLedgerPersistence({
+      workspaceKey: 'user-alice',
+    });
+    lease.ensureWorkspaceWritable.mockResolvedValueOnce(false);
+
+    await expect(
+      persistence.replaceTitleLedgerWorkspaceRows('ws-1', {
+        actionRecords: [action],
+        auditEvents: [audit],
+      })
+    ).rejects.toThrow(/read-only/);
+    expect(db.titleActionRecords.rows.size).toBe(0);
+    expect(db.titleAuditEvents.rows.size).toBe(0);
+  });
+
+  it('asserts the fence inside the transaction and aborts on a stale lease (DA-M15)', async () => {
+    const seeded = storedAction(fakeActionRecord({ recordId: 'kept' }), 'user-alice', 0);
+    const seededAudit = storedAudit(
+      fakeAuditEventRecord({ recordId: 'kept-audit', subjectRecordIds: ['kept'] }),
+      'user-alice',
+      0
+    );
+    const { persistence, db, lease } = await loadTitleLedgerPersistence({
+      workspaceKey: 'user-alice',
+      actionRows: [seeded],
+      auditRows: [seededAudit],
+    });
+    lease.assertWorkspaceWriteFence.mockRejectedValueOnce(
+      new Error('Workspace write lease is stale')
+    );
+
+    await expect(
+      persistence.replaceTitleLedgerWorkspaceRows('ws-1', {
+        actionRecords: [fakeActionRecord({ recordId: 'clobber' })],
+        auditEvents: [fakeAuditEventRecord({ recordId: 'clobber-audit', subjectRecordIds: ['clobber'] })],
+      })
+    ).rejects.toThrow(/stale/);
+    // The writer's rows survive: the fence threw before any delete ran.
+    expect([...db.titleActionRecords.rows.values()]).toEqual([seeded]);
+    expect([...db.titleAuditEvents.rows.values()]).toEqual([seededAudit]);
   });
 
   it('clears only the active dbKey workspace rows and is idempotent', async () => {
