@@ -87,9 +87,39 @@ divergence as a warning + title issue — do not silently cap (this refines
 DA-M1's fix) and do not reject the record. Structural invariants (negative
 fractions, cycles, non-finite) remain hard blocks.
 
-STEP 4 — Math expansion opens ONLY after the attorney session:
-- First: DA-H1 decision → deliberate golden-master update (worked example
-  from catalog TXM-005/Wenske as the new fixture).
+STEP 4 — Math expansion. THE DA-H1 GATE IS CLEARED (operator decision,
+2026-06-10) — DA-H1 may be implemented as soon as Step 1 lands; the rest of
+the attorney queue (round-3 CSV 3 questions, Mar-2026 Van Dyke events) is
+still pending but blocks nothing in this step.
+
+DA-H1 DECISION OF RECORD: a fixed NPRI is satisfied out of the LESSOR'S
+royalty, not the working interest; when the fixed NPRI exceeds the lease
+royalty, the NPRI owner still collects in full, the lessor's royalty is
+exhausted to zero, and the EXCESS is charged to the WI (lessee took with
+record notice subject to the prior burden; proportionate-reduction clauses
+do not cover royalty burdens; Duhig does not transplant to leases; the
+lessee's warranty claim is economics, not allocation). Division-order form:
+  lessor RI = max(royalty − fixedNPRI, 0)   [floating already nets first]
+  WI NRI    = 1 − max(royalty, fixedNPRI)   [per burdened share]
+Caveat preserved as product behavior: the basic reduction rule is settled;
+the EXCESS allocation rests on treatise consensus (Smith & Weaver), not
+squarely on-point SCOTX authority — so the existing `overBurdened`-style
+flag becomes a `fixedNpriExceedsRoyalty` warning per slice/tract whose
+wording recommends counsel sign-off before payout reliance (warning-only,
+per the entry principle above; never block).
+Implementation sketch: in `leasehold-summary.ts`, net each slice's fixed
+burden against remaining slice royalty after floating
+(coveredByRoyalty = min(fixedBurden, max(royalty − floatingBurden, 0));
+excess = fixedBurden − coveredByRoyalty); extend the owner net rows
+(`:1007-1023`) to subtract coveredByRoyalty; feed ONLY the excess into the
+NRI-side deduction (`:554`, `:1083-1102` input). Multiple stacked fixed
+NPRIs on one branch: apply senior-first by instrument date (confirm
+stacking order with counsel if a real tract ever hits it — flag, don't
+guess). New golden fixtures: (a) 1/4 lease + 1/16 fixed → 3/16 / 1/16 / 3/4;
+(b) 1/8 lease + 1/4 fixed → 0 / 1/4 / 3/4 + warning flag; regenerate
+`demo.leasehold-decimals.json` deliberately; Springhill's asserted
+leasedOwnership/weightedRoyaltyRate/nriBeforeOrriRate values are
+NPRI-independent and must NOT change.
 - Then one slice at a time per ROADMAP: over-conveyance stop-and-ask (DA-M1,
   removes the silent cap) → double-fraction input (verbatim clause + BOTH
   readings, never auto-multiplied — Van Dyke) → intake flags (round-2 list:
