@@ -619,10 +619,16 @@ function CoverageCard({
       <div className="text-[9px] font-semibold uppercase tracking-wider leading-tight">
         {label}
       </div>
-      <div className="mt-1 text-xs font-semibold font-mono">
+      {/* min-w-0 + break-all so reconciliation-scale fractions
+          (1000000001/1000000000) wrap inside the card instead of bleeding
+          across siblings; title carries the full value for hover. */}
+      <div
+        className="mt-1 min-w-0 break-all text-xs font-semibold font-mono tabular-nums"
+        title={value}
+      >
         {formula ? <FormulaTooltip content={formula}>{value}</FormulaTooltip> : value}
       </div>
-      <div className="text-[9px] mt-0.5 opacity-80">
+      <div className="text-[9px] mt-0.5 opacity-80 font-mono tabular-nums">
         {formula ? <FormulaTooltip content={formula}>{pct}</FormulaTooltip> : pct}
       </div>
       <div className="text-[9px] mt-1 opacity-80 leading-tight">

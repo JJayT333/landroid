@@ -358,7 +358,7 @@ function SummaryCard({
       <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-light">
         {label}
       </div>
-      <div className="mt-2 text-2xl font-display font-bold text-ink">
+      <div className="mt-2 text-xl font-mono tabular-nums font-bold text-ink">
         {formula ? <FormulaTooltip content={formula}>{value}</FormulaTooltip> : value}
       </div>
       <div className="mt-1 text-xs text-ink-light">{detail}</div>
@@ -3132,7 +3132,7 @@ function TransferOrderMetricCard({
       <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-light">
         {label}
       </div>
-      <div className="mt-2 text-2xl font-display font-bold text-ink">
+      <div className="mt-2 text-xl font-mono tabular-nums font-bold text-ink">
         {formula ? <FormulaTooltip content={formula}>{value}</FormulaTooltip> : value}
       </div>
       <div className="mt-1 text-xs text-ink-light">{detail}</div>
