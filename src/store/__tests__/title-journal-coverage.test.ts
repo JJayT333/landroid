@@ -244,7 +244,12 @@ const DRIVERS: Record<ActionName, ActionDriver> = {
   syncLeaseNodesFromRecord: {
     expectation: 'title',
     drive: (s) => {
+      // Setup: this action needs a lease node to resync. attachLease both
+      // changes the slice and journals, which would mask a missing journal
+      // call in the target action — reset the spy so the gate's hook
+      // assertion tests syncLeaseNodesFromRecord's OWN call.
       s.attachLease('root', LEASE, 'ln-1');
+      hookCalls.length = 0;
       s.syncLeaseNodesFromRecord({ ...LEASE, royaltyRate: '1/6' });
     },
   },
