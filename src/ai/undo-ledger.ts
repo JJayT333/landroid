@@ -22,6 +22,7 @@ import {
   flushTitleActionLogToStorage,
   hydrateTitleActionLogFromStorageOrBaseline,
   settleTitleActionLog,
+  titleLedgerGeneration,
   useTitleActionLog,
 } from '../store/title-action-log';
 import { readCurrentWorkspaceData } from '../store/workspace-store';
@@ -34,27 +35,37 @@ function readOwnerSlice() {
 }
 
 /**
- * Mark every still-active title action recorded at/after `sinceEpochMs` as
- * undone. Append-only on the audit chain; the action record list keeps one row
- * per action (the undone copy replaces the original in place) so replay and
- * the ledger verifier stay consistent. The `title.baseline` record is never
- * undone — it carries the pre-existing state the restore returns to.
- * Returns the number of records marked.
+ * Mark every still-active title action at ledger position >= `startIndex` as
+ * undone. The chain is append-only and the snapshot records its post-settle
+ * length, so positions — not recording timestamps, which lag the mutations —
+ * identify exactly the turn's records. Append-only on the audit chain; the
+ * action record list keeps one row per action (the undone copy replaces the
+ * original in place) so replay and the ledger verifier stay consistent. The
+ * `title.baseline` record is never undone — it carries the pre-existing state
+ * the restore returns to.
+ *
+ * Bails without touching state (returns 0, records stay `applied`) when the
+ * ledger was replaced (generation bump) or advanced (head moved) while the
+ * undo events were being built — skipping the marking is safe; forking the
+ * hash chain would permanently break ledger persistence.
  */
-export async function appendTitleUndoRecordsSince(
-  sinceEpochMs: number,
+export async function appendTitleUndoRecordsFromIndex(
+  startIndex: number,
   reason: string
 ): Promise<number> {
   await settleTitleActionLog();
+  const generationAtStart = titleLedgerGeneration();
   const state = useTitleActionLog.getState();
-  const targets = state.actionRecords.filter(
-    (record) =>
-      record.status !== 'undone'
-      && record.actionKind.startsWith('title.')
-      && record.actionKind !== 'title.baseline'
-      && Date.parse(record.lastModified) >= sinceEpochMs
-  );
+  const targets = state.actionRecords
+    .slice(Math.max(0, startIndex))
+    .filter(
+      (record) =>
+        record.status !== 'undone'
+        && record.actionKind.startsWith('title.')
+        && record.actionKind !== 'title.baseline'
+    );
   if (targets.length === 0 || !state.headHash) return 0;
+  const expectedHead = state.headHash;
 
   const occurredAt = new Date().toISOString();
   const workspaceId = targets[0].workspaceId;
@@ -69,7 +80,7 @@ export async function appendTitleUndoRecordsSince(
 
   const replacements = new Map<string, ActionRecord>();
   const newEvents: AuditEventRecord[] = [];
-  let previousHash = state.headHash;
+  let previousHash = expectedHead;
   for (const target of targets) {
     const result = await undoTitleActionRecord({
       context,
@@ -84,14 +95,32 @@ export async function appendTitleUndoRecordsSince(
     previousHash = result.auditEvent.eventHash!;
   }
 
-  useTitleActionLog.setState((current) => ({
-    actionRecords: current.actionRecords.map(
-      (record) => replacements.get(record.recordId) ?? record
-    ),
-    auditEvents: [...current.auditEvents, ...newEvents],
-    headHash: previousHash,
-  }));
-  return targets.length;
+  if (generationAtStart !== titleLedgerGeneration()) {
+    console.warn(
+      '[ai-undo] ledger was replaced while building undo events; marking skipped.'
+    );
+    return 0;
+  }
+  let applied = 0;
+  useTitleActionLog.setState((current) => {
+    // Atomic with the update: a recording that landed mid-build would share
+    // expectedHead with our first undo event — refuse the fork.
+    if (current.headHash !== expectedHead) return {};
+    applied = targets.length;
+    return {
+      actionRecords: current.actionRecords.map(
+        (record) => replacements.get(record.recordId) ?? record
+      ),
+      auditEvents: [...current.auditEvents, ...newEvents],
+      headHash: previousHash,
+    };
+  });
+  if (applied === 0) {
+    console.warn(
+      '[ai-undo] ledger advanced while building undo events; marking skipped (records remain applied).'
+    );
+  }
+  return applied;
 }
 
 /**
@@ -116,8 +145,8 @@ export async function restoreSnapshotWithLedger(snapshot: UndoSnapshot): Promise
   // nothing to mark undone — pre-DA-H2 behavior stands.
   if (hydration.source !== 'storage') return;
 
-  const undone = await appendTitleUndoRecordsSince(
-    snapshot.capturedAt,
+  const undone = await appendTitleUndoRecordsFromIndex(
+    snapshot.titleLedgerLength,
     `AI undo: ${snapshot.label}`
   );
   if (undone > 0) {

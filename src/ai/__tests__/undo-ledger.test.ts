@@ -63,6 +63,25 @@ vi.mock('../../storage/workspace-write-lease', () => ({
   ensureWorkspaceWritable: vi.fn(async () => true),
   assertWorkspaceWriteFence: vi.fn(async () => {}),
 }));
+// Lets race tests inject a side effect mid-build (between settle and the
+// final setState) without timing games.
+const undoHook = vi.hoisted(() => ({ before: null as null | (() => void) }));
+vi.mock('../../project-records/action-layer/title-undo', async (importOriginal) => {
+  const actual = await importOriginal<
+    typeof import('../../project-records/action-layer/title-undo')
+  >();
+  return {
+    ...actual,
+    undoTitleActionRecord: async (
+      input: Parameters<typeof actual.undoTitleActionRecord>[0]
+    ) => {
+      const hook = undoHook.before;
+      undoHook.before = null;
+      hook?.();
+      return actual.undoTitleActionRecord(input);
+    },
+  };
+});
 // The live side-store restore (owner/doc/curative/map Dexie writes) is owned
 // by undo-store's own tests; here it is reduced to the ledger-relevant part —
 // the loadWorkspace that resets the title action log.
@@ -95,7 +114,7 @@ import {
   settleTitleActionLog,
   useTitleActionLog,
 } from '../../store/title-action-log';
-import { restoreSnapshotWithLedger } from '../undo-ledger';
+import { appendTitleUndoRecordsFromIndex, restoreSnapshotWithLedger } from '../undo-ledger';
 
 const WS = 'ws-undo-ledger';
 
@@ -128,6 +147,7 @@ function snapshotOfCurrentWorkspace(label: string): UndoSnapshot {
   const ws = useWorkspaceStore.getState();
   return {
     capturedAt: Date.now(),
+    titleLedgerLength: useTitleActionLog.getState().actionRecords.length,
     workspaceId: WS,
     label,
     workspace: structuredClone({
@@ -152,6 +172,7 @@ function snapshotOfCurrentWorkspace(label: string): UndoSnapshot {
 describe('AI undo keeps the durable title ledger (DA-H2)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    undoHook.before = null;
     ledgerPersistenceMocks.rowsByWorkspace.clear();
     seedEmptyWorkspace();
   });
@@ -201,6 +222,61 @@ describe('AI undo keeps the durable title ledger (DA-H2)', () => {
     expect(log.actionRecords[0]?.status).toBe('undone');
     expect((await verifyAuditChain(log.auditEvents)).valid).toBe(true);
     expect(replayTitleProjection(log.actionRecords)).toHaveLength(0);
+  });
+
+  it('a pre-turn user mutation stays applied; only the turn’s records are marked (review fix)', async () => {
+    // Pre-turn user work, settled before the snapshot.
+    useWorkspaceStore.getState().createRootNode('root', '1', {
+      grantee: 'Root',
+      interestClass: 'mineral',
+      linkedOwnerId: 'owner-1',
+    });
+    await settleTitleActionLog();
+    const snapshot = snapshotOfCurrentWorkspace('the AI turn'); // titleLedgerLength = 1
+
+    // The AI turn.
+    useWorkspaceStore.getState().convey('root', 'child', '0.5', { grantee: 'Child' });
+    await settleTitleActionLog();
+    await flushTitleActionLogToStorage(WS);
+
+    await restoreSnapshotWithLedger(snapshot);
+
+    const log = useTitleActionLog.getState();
+    expect(log.actionRecords).toHaveLength(2);
+    expect(log.actionRecords[0]?.status).toBe('applied'); // the user's pre-turn record
+    expect(log.actionRecords[1]?.status).toBe('undone'); // the turn's record
+    expect((await verifyAuditChain(log.auditEvents)).valid).toBe(true);
+    // Replay (user record only) matches the restored workspace (root, no child).
+    expect(useWorkspaceStore.getState().nodes.map((n) => n.id)).toEqual(['root']);
+    expect(replayTitleProjection(log.actionRecords).length).toBeGreaterThan(0);
+  });
+
+  it('skips marking when the ledger is replaced mid-build (no forked chain)', async () => {
+    useWorkspaceStore.getState().createRootNode('root', '1', { grantee: 'Root' });
+    await settleTitleActionLog();
+    await flushTitleActionLogToStorage(WS);
+
+    undoHook.before = () => useTitleActionLog.getState().reset();
+    const marked = await appendTitleUndoRecordsFromIndex(0, 'race test');
+
+    expect(marked).toBe(0);
+    // The reset state was left untouched — no undo events appended onto it.
+    expect(useTitleActionLog.getState().auditEvents).toHaveLength(0);
+  });
+
+  it('skips marking when the chain head advances mid-build (no forked chain)', async () => {
+    useWorkspaceStore.getState().createRootNode('root', '1', { grantee: 'Root' });
+    await settleTitleActionLog();
+    await flushTitleActionLogToStorage(WS);
+    const eventsBefore = useTitleActionLog.getState().auditEvents.length;
+
+    undoHook.before = () => useTitleActionLog.setState({ headHash: 'advanced-by-a-recording' });
+    const marked = await appendTitleUndoRecordsFromIndex(0, 'race test');
+
+    expect(marked).toBe(0);
+    const log = useTitleActionLog.getState();
+    expect(log.actionRecords[0]?.status).toBe('applied');
+    expect(log.auditEvents).toHaveLength(eventsBefore);
   });
 
   it('a fresh workspace with no persisted chain keeps pre-existing behavior (baseline)', async () => {

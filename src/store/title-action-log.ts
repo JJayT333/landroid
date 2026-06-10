@@ -177,6 +177,15 @@ export function isTitleCutoverArmed(): boolean {
   return titleReadPathFlag.isCutoverEnabled();
 }
 
+/**
+ * Monotonic ledger generation, bumped by reset/hydrate. Cross-module ledger
+ * writers (the AI-undo marking) read it to detect a workspace replacement
+ * mid-flight and drop their stale work instead of forking the chain.
+ */
+export function titleLedgerGeneration(): number {
+  return ledgerGeneration;
+}
+
 export const useTitleActionLog = create<TitleActionLogState>()((set, get) => ({
   enabled: true,
   actionRecords: [],
