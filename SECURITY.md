@@ -79,17 +79,20 @@ Phase 0.5 storage-sharding security rules:
 - The monolithic workspace row may be retained as a migration/rollback backup,
   but it should not keep receiving every autosave after the shard writer is
   proven, because that would preserve the large-blob failure mode.
-- The live IndexedDB/Dexie version is now bumped to v10 only to create and
-  backfill shard tables. The upgrade preserves the monolithic workspace row and
-  skips corrupt autosave JSON with a warning, so current load/save and recovery
-  behavior still depends on the proven v9 monolith path until the shard
-  reader/writer is explicitly enabled.
-- Multi-tab protection is a security and data-integrity gate, not only UX.
-  Phase 0.5 should use pessimistic single-writer behavior with heartbeat,
-  expiry, and explicit takeover so a stale or background tab cannot silently
-  overwrite title work. The first implementation slice has only the pure lease
-  evaluator and tests; live autosave/write blocking still must be wired before
-  sharded writes are production-safe.
+- The live IndexedDB/Dexie schema is at v14 (`src/storage/db.ts`). The shard
+  reader/writer is live and recency-aware; the monolithic workspace row is a
+  frozen migration backup the reader falls back to with a loud warning. (This
+  paragraph previously described the v10 transition state; updated 2026-06-10.)
+- Multi-tab protection is a security and data-integrity gate, not only UX. The
+  single-writer lease is live: claims are atomic (Dexie rw transaction +
+  fencing token), every workspace/canvas/side-store write asserts the fence
+  inside its own transaction, and a second tab opens read-only with an explicit
+  takeover banner. Known gaps (deep-audit 2026-06-10): there is no heartbeat
+  loop, so an idle writer's lease silently expires 15s after its last save
+  (DA-M14); and title-ledger Dexie writes plus project rename/delete/duplicate
+  bypass the fence entirely (DA-M15) — a reader tab can clobber the writer's
+  ledger rows. Until those close, "a stale tab cannot silently overwrite title
+  work" holds for fenced stores only, not the ledger.
 - Project open must stay metadata-first for document/PDF rows. Blob reads are
   allowed for explicit preview, export, package backup, or import workflows, but
   not merely because a project is opened.
@@ -151,9 +154,11 @@ jobs, search indexes, sharing links, audit events, and collaboration.
   fails, so LANDroid must not approve an AI edit with an empty fallback document
   snapshot. Approved proposal results are recorded in an in-memory action/result
   journal and summarized into future local model turns; treat that journal as AI
-  context, not a durable audit log. Hosted AI still receives only
-  `readOnlyLandroidTools` until the hosted approval path is reviewed, and the
-  hosted proxy rejects client-supplied `tools` / `tool_choice` bodies.
+  context, not a durable audit log. Hosted AI receives NO tools at all: the
+  hosted request body is `{model, stream, messages}` only (`runChat.ts`), and
+  the proxy independently rejects any client-supplied `tools` / `tool_choice` /
+  other fields. (`readOnlyLandroidTools` is a dead export kept only by tests;
+  reality is stricter than the earlier wording here.)
 - Phase 5 added document persistence and UI, but no AI document-mutating tools.
   If tools such as `saveDoc`, `deleteDoc`, `renameDoc`, `attachDocToEntity`, or
   `detachDocFromEntity` land later, add them to `HOSTED_BLOCKED_TOOL_NAMES`
@@ -200,7 +205,10 @@ Known risk:
   an explicit unknown jurisdiction now blocks import/normalization instead of
   silently entering Texas math.
 - `.landroid` imports from future schema versions are rejected instead of being
-  partially normalized by an older app build. Side-store replacement for
+  partially normalized by an older app build — with one known caveat: the gate
+  only fires for a numeric `version`; a file with a string or missing version
+  falls through to the legacy import path (deep-audit 2026-06-10, DA-L8; fix
+  pending). Side-store replacement for
   `.landroid` loads snapshots the previous active side stores and rolls them
   back if replacement fails before the core workspace is swapped.
 
