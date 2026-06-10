@@ -65,9 +65,12 @@ those two files win.
 - Texas math expansion, staged (rebuild-plan Phase 7 + audit §4 gap matrix):
   one design pass over the full list, then one golden-mastered slice at a time —
   over-conveyance stop-and-ask / Duhig suggestion (replaces the silent
-  fraction-mode cap, DA-M1) → double-fraction input ("a/b of c/d", verbatim
-  deed text preserved) → NPRI pooling-ratification tri-state + transfer-order
-  hold → unleased mineral-owner payout rows → then NMA/DI, depth/substance/
+  fraction-mode cap, DA-M1) → double-fraction input (verbatim clause + BOTH
+  readings, never auto-multiplied — Van Dyke presumption, TXM-002 in
+  `docs/research/txm-catalog-round-1.md`) → NPRI pooling-ratification
+  tri-state + transfer-order hold (TXM-027: unratified NPRI pays only on
+  its own tract's production) → unleased mineral-owner payout rows
+  (TXM-028 cost-bearing co-tenant) → then NMA/DI, depth/substance/
   time, probate/estate, priority conflicts, Hysaw flags, reversible deeds,
   WI flow-through, JOA per the Phase 7 order. Also route Desk Map Add Root
   through the validated engine op (DA-M2 / LLA-H03).
