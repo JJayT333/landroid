@@ -12,7 +12,6 @@ Use this map to decide which Markdown file to read or update.
 | `ARCHITECTURE.md` | Implementation map and module ownership. | Entrypoints, store ownership, data flow, or boundaries change. |
 | `TESTING.md` | Validation command selection and known warnings. | Tests, fixtures, skipped e2e status, or validation policy changes. |
 | `SECURITY.md` | Security model, AI key policy, and import risk notes. | Provider, hosting, upload, or secret-handling posture changes. |
-| `DEPLOYMENT_PLAN.md` | Hosted deployment, cloud security, and online AI rollout plan. | Hosted architecture, rollout phases, or provider strategy changes. |
 | `DEPLOYMENT_GUIDE.md` | Step-by-step AWS POC deployment instructions. | Console steps, AWS resource names, hosted env vars, or smoke-test instructions change. |
 | `DEPLOYMENT_STATE.md` | Current hosted AWS resource map and deploy behavior. | Amplify branch/domain, Lambda URL/runtime, Cognito IDs, DynamoDB table, or deploy automation changes. |
 | `DEPLOY_TEST_CHECKLIST.md` | Operational preflight and go/no-go checklist for the test deploy. | Test-deploy sequencing, AWS readiness gates, or stop conditions change. |
@@ -28,6 +27,13 @@ Use this map to decide which Markdown file to read or update.
 | `docs/phase-1-record-schema-notes.md` | Phase 1 additive-record implementation assumptions and reviewer notes. | Phase 1 assumptions, adapter scope, or projection guardrails change. |
 | `docs/phase-3-import-session-notes.md` | Phase 3 import-session assumptions, exit-gate evidence, and review questions. | Import-session staging, approval, rejection, or source-review guardrails change. |
 | `docs/springhill-sample-workflow.md` | Private-source to scrubbed-public-sample workflow for the Dr. Elmore Springhill `.landroid` sample. | Springhill generator inputs, scrub policy, source-to-output gates, or sample validation rules change. |
+| `docs/title-tree-read-cutover.md` | Title read-flip Scope A/B design and revert recipe. | Cutover gates, rollback rule, or read-path governance changes. |
+| `docs/deep-audit-2026-06-10.md` | 2026-06-10 deep audit: severity-ranked findings (DA-*), precision policy, Texas gap matrix, doc/AI assessments. | Archive once its findings are reconciled into `docs/audit-backlog.md` and fixed or accepted. |
+| `docs/title-math-research-prompt.md` | Paste-ready external research prompt for the complete Texas title-math/law catalog feeding the Phase 7 design pass. | Archive to `docs/archive/prompts/` when the research corpus is delivered. |
+| `docs/title-math-research-supplement.md` | Follow-up prompt for the same research chat: federal/BLM + NM Tier-1 promotion and the machine-importable CSV appendix shaped for the Research workspace. | Archive with the original when the corpus is delivered. |
+| `docs/research/txm-catalog-round-1.md` | External research corpus, round 1: TXM master index (50 items), temporal law ledger, Tier-1 blocks, double-fraction/probate/DOI packs. Reference, not authority — attorney check required before any formula lands. | Archive the set when reconciled into the math design pass. |
+| `docs/research/txm-catalog-round-3.md` | Round 3 (final): federal/BLM pack (three-regime royalty by lease issue date, CAs, PAs, fed/fee allocation), New Mexico pack, and the IMPORT APPENDIX (3 CSVs). Carries intake notes: one confidentiality redaction; THIRD id scheme — build the canonical master index before importing the CSVs. | Same as round 1. |
+| `docs/deep-audit-2026-06-10-part2.md` | Part 2 deep audit (DA2-*): Research, Curative, Flowchart, Maps/GIS, Federal, RRC decoders + direction plans (Miro-class canvas, ArcGIS interchange, RRC ingestion, federal register). | Archive once reconciled into `docs/audit-backlog.md` and fixed or accepted. |
 | `CHANGELOG.md` | Completed meaningful work. | A meaningful feature, fix, or docs rail lands. |
 | `CONTINUATION-PROMPT.md` | Current short handoff. | Before switching chats or after meaningful work. |
 
@@ -66,3 +72,9 @@ explicitly says so.
   completed or paused external/parallel review workstreams.
 - `docs/archive/2026/PATCH_PLAN_2026-04-19.md`: historical remediation plan
   superseded by `docs/audit-backlog.md` and current validation docs.
+- `docs/archive/2026/DEPLOYMENT_PLAN_2026-04-21.md`: pre-deploy hosted rollout
+  plan; superseded by the live deployment (`DEPLOYMENT_STATE.md` is current
+  truth, `DEPLOYMENT_GUIDE.md` the how-to).
+- `docs/archive/prompts/audit-sheet-export-brief.md`: paste-ready feature brief
+  for the per-tract printable Audit Sheet export (not yet built; pointer lives
+  in `ROADMAP.md`).

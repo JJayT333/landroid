@@ -3,6 +3,47 @@
 This file records meaningful project changes so `CONTINUATION-PROMPT.md` can
 stay short.
 
+## 2026-06-10
+
+- Delivered Part 2 of the deep audit at `docs/deep-audit-2026-06-10-part2.md`
+  covering the surfaces Part 1 skipped — Research, Curative, Flowchart/canvas,
+  Maps/GIS, Federal Leasing, RRC decoders — with `DA2-*` findings and four
+  direction plans: a staged Miro-class flowchart plan (the shape tools are
+  built but dead — `addNodes` has zero call sites), an ArcGIS Pro interchange
+  plan keyed on the existing `ExternalRef` GlobalID seam, a five-tier RRC
+  dataset-ingestion plan (ASCII/CSV/dBase/EBCDIC/shapefile-via-GIS) against
+  the live RRC download inventory, and a federal-register plan for the
+  BLM-heavy 60k-acre use case (isolation verified at six layers; rich federal
+  fields currently demo-only and non-persisted). ROADMAP gains the new lanes;
+  Research hardening (DA2-R1/R2) is sequenced ahead of the title-math catalog
+  import.
+- Added `docs/title-math-research-prompt.md` and its follow-up
+  `docs/title-math-research-supplement.md` — paste-ready external research
+  briefs for the complete Texas (+ federal/NM) title-math and temporal-law
+  catalog, with a machine-importable CSV appendix matched to the Research
+  workspace record shapes.
+- Delivered a full deep audit at `docs/deep-audit-2026-06-10.md`: severity-ranked
+  findings with `DA-*` IDs (1 Critical, 10 High), a display-precision policy and
+  migration plan, a Texas-math completeness gap matrix with build order, a
+  "lean professional" aesthetics plan, document-storage and AI assessments, and
+  roadmap resequencing. Verified against a green suite (979 tests / 140 files,
+  Springhill 0.225/0.775, Phase 0 goldens intact). New findings are summarized
+  into `docs/audit-backlog.md` pending row-by-row reconciliation.
+- Documentation housecleaning: rewrote `ROADMAP.md` as a true short priority
+  map with the audit's sequencing (Scope B hardening first) and removed the
+  duplicated posture text and stale `PATCH_PLAN.md` reference; corrected stale
+  `SECURITY.md` claims (Dexie v14, live write-fence with named heartbeat/ledger
+  gaps, hosted AI sends no tools, numeric-only future-version gate); updated
+  `docs/title-tree-read-cutover.md` status to merged (#138/#139) with audit
+  pointers; reconciled the `AGENTS.md` target root doc set to reality
+  (`PROJECT_CONTEXT.md`, `USER_MANUAL.md`, deploy docs; noted the sales-deck
+  build import pins `DEPLOYMENT_STATE.md` to root); archived
+  `DEPLOYMENT_PLAN.md` (2026-04-21, planning-only, superseded by the live
+  deployment) and the root `NEXT-audit-sheet.md` feature brief into
+  `docs/archive/`; added the audit's staged-math reconciliation note to
+  rebuild-plan Phase 7; fixed the misleading SSN comment in
+  `src/types/lease-purchase-report.ts` (no SSN field exists anywhere — DA-L9).
+
 ## 2026-06-08
 
 - Added a first-class Lease workflow (Phase 1 of the Lease Purchase Report

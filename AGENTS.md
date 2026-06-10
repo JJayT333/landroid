@@ -84,7 +84,7 @@ These are locked-in repo conventions. Do not relitigate them per session.
 - Active source-of-truth docs live at root or under `docs/` while their workstream is in flight.
 - Point-in-time artifacts (audit reports, handoff prompts, completed plans) move to `docs/archive/<yyyy>/` when their workstream closes.
 - Nothing inactive should sit at the repo root for more than 30 days. Either revive it, merge it into a live doc, or archive it.
-- The current target root doc set is: `AGENTS.md`, `README.md`, `ARCHITECTURE.md`, `ROADMAP.md`, `IDEAS.md`, `TESTING.md`, `SECURITY.md`, `LANDMAN-MATH-REFERENCE.md`, `CHANGELOG.md`, `CONTINUATION-PROMPT.md`. Everything else belongs under `docs/`.
+- The current target root doc set is: `AGENTS.md`, `PROJECT_CONTEXT.md`, `README.md`, `ARCHITECTURE.md`, `ROADMAP.md`, `IDEAS.md`, `TESTING.md`, `SECURITY.md`, `LANDMAN-MATH-REFERENCE.md`, `USER_MANUAL.md`, `CHANGELOG.md`, `CONTINUATION-PROMPT.md`, plus the operational deploy docs `DEPLOYMENT_GUIDE.md`, `DEPLOYMENT_STATE.md` (imported by `src/sales-deck/sales-deck-content.ts` — do not move without updating that import), and `DEPLOY_TEST_CHECKLIST.md`. Everything else belongs under `docs/`. (2026-06-10: list reconciled to reality; it previously omitted `PROJECT_CONTEXT.md` and `USER_MANUAL.md` while AGENTS itself references both.)
 
 ### Changelog
 - `CHANGELOG.md` will transition to auto-generated from Conventional Commits. Until that lands, manual entries continue.

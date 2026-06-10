@@ -1,7 +1,7 @@
 # LANDroid Rebuild-First Plan
 
 Status: planning source of truth.
-Last updated: 2026-06-04.
+Last updated: 2026-06-10.
 
 This document consolidates the current rebuild direction. It is not approval for
 reckless or irreversible changes. It is the working plan for rebuilding LANDroid
@@ -1420,6 +1420,19 @@ Candidate order:
 
 This phase must be revisited in detail before implementation. The math engine
 is still preserved until a specific math phase is approved.
+
+2026-06-10 reconciliation note: the deep audit (`docs/deep-audit-2026-06-10.md`
+§4) produced a frequency/risk-ordered gap matrix that front-loads small,
+high-frequency items ahead of this list's systematic order: (1) over-conveyance
+stop-and-ask / Duhig suggestion (fixes the silent fraction-mode cap, DA-M1),
+(2) double-fraction input ("a/b of c/d") with verbatim deed text preserved,
+(3) NPRI pooling-ratification tri-state + transfer-order hold, (4) unleased
+mineral-owner rows so unit-focus payout proves to 1.0, then this list's items
+5-14 as designed. Two rules govern the whole phase regardless of order: the
+DA-H1 fixed-NPRI allocation question is a correctness DECISION (attorney +
+golden update) that precedes any expansion, and every slice lands separately
+behind its own golden fixtures — one design pass over the whole list is
+encouraged; one implementation batch is not.
 
 ## Page Inventory Gate
 
