@@ -39,6 +39,38 @@ vi.mock('../../storage/document-store', () => ({
   listAttachmentsForNodes: vi.fn(),
 }));
 
+// The undo cascade capture is Dexie-backed; stub it so destructive-mutation
+// tests run without IndexedDB (its own logic is tested in
+// storage/__tests__/undo-cascade-bundle.test.ts and the undo wiring tests).
+vi.mock('../../storage/undo-cascade-bundle', () => ({
+  captureCascadeBundle: vi.fn(async () => ({ kind: 'fake-bundle' })),
+  restoreCascadeBundle: vi.fn(async () => ({})),
+  planOwnerRecordCleanup: vi.fn(
+    (
+      removedNodes: Array<{ linkedOwnerId: string | null; linkedLeaseId: string | null }>,
+      survivingNodes: Array<{ linkedOwnerId: string | null; linkedLeaseId: string | null }>,
+      leases: Array<{ id: string; ownerId: string }>
+    ) => {
+      // Mirror the real planner so the owner-cleanup tests keep their teeth.
+      const removedOwners = new Set(removedNodes.map((n) => n.linkedOwnerId).filter(Boolean));
+      const removedLeases = new Set(removedNodes.map((n) => n.linkedLeaseId).filter(Boolean));
+      const survivingOwners = new Set(survivingNodes.map((n) => n.linkedOwnerId).filter(Boolean));
+      const survivingLeases = new Set(survivingNodes.map((n) => n.linkedLeaseId).filter(Boolean));
+      for (const lease of leases) {
+        if (survivingLeases.has(lease.id)) survivingOwners.add(lease.ownerId);
+      }
+      const ownerIdsToRemove = [...removedOwners].filter((id) => !survivingOwners.has(id));
+      const ownerSet = new Set(ownerIdsToRemove);
+      const leaseIdsToRemove = [...removedLeases].filter((leaseId) => {
+        if (survivingLeases.has(leaseId)) return false;
+        const lease = leases.find((candidate) => candidate.id === leaseId);
+        return !lease || !ownerSet.has(lease.ownerId);
+      });
+      return { ownerIdsToRemove, leaseIdsToRemove };
+    }
+  ),
+}));
+
 vi.mock('../curative-store', () => ({
   useCurativeStore: {
     getState: () => ({
@@ -343,7 +375,7 @@ describe('workspace-store', () => {
     );
   });
 
-  it('clears the active desk map nodes and scoped leasehold rows without deleting other tracts', () => {
+  it('clears the active desk map nodes and scoped leasehold rows without deleting other tracts', async () => {
     const root = {
       ...createBlankNode('root-1', null),
       grantee: 'Root Owner',
@@ -452,6 +484,8 @@ describe('workspace-store', () => {
     });
 
     useWorkspaceStore.getState().clearDeskMapNodes('dm-1');
+    // Cascades now run after the (mocked) undo capture settles.
+    await new Promise((resolve) => setTimeout(resolve, 0));
 
     const state = useWorkspaceStore.getState();
     expect(state.nodes.map((node) => node.id)).toEqual(['root-2']);

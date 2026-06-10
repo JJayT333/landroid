@@ -4,6 +4,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useUIStore, type ViewMode } from '../../store/ui-store';
 import { useOwnerStore } from '../../store/owner-store';
+import { useTitleUndoCount, useTitleUndoPeekLabel } from '../../store/title-undo-stack';
 import { useWorkspaceStore } from '../../store/workspace-store';
 import { useStorageHealthStore } from '../../store/storage-health-store';
 import {
@@ -85,6 +86,20 @@ export default function Navbar({ onOpenProjectPicker }: NavbarProps) {
   const setView = useUIStore((s) => s.setView);
   const projectName = useWorkspaceStore((s) => s.projectName);
   const setProjectName = useWorkspaceStore((s) => s.setProjectName);
+  const undoLastTitleMutation = useWorkspaceStore((s) => s.undoLastTitleMutation);
+  const undoCount = useTitleUndoCount();
+  const undoPeekLabel = useTitleUndoPeekLabel();
+  const [undoing, setUndoing] = useState(false);
+  const canUndo = undoCount > 0 && !readOnly && !undoing;
+  const handleUndo = async () => {
+    if (!canUndo) return;
+    setUndoing(true);
+    try {
+      await undoLastTitleMutation();
+    } finally {
+      setUndoing(false);
+    }
+  };
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const fileMenuRef = useRef<HTMLDivElement>(null);
@@ -422,6 +437,24 @@ export default function Navbar({ onOpenProjectPicker }: NavbarProps) {
                 className="h-full w-full object-contain"
               />
             </div>
+          </div>
+          <div className="mr-1 flex items-center border-r border-parchment/15 pr-1">
+            <button
+              type="button"
+              disabled={!canUndo}
+              onClick={handleUndo}
+              aria-label={canUndo ? `Undo ${undoPeekLabel}` : 'Undo (nothing to undo)'}
+              title={
+                canUndo
+                  ? `Undo: ${undoPeekLabel} (${navigator.platform.includes('Mac') ? 'Cmd' : 'Ctrl'}+Z)`
+                  : readOnly
+                    ? READ_ONLY_WORKSPACE_EDIT_TITLE
+                    : 'Nothing to undo'
+              }
+              className="shrink-0 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors text-parchment/70 hover:text-parchment hover:bg-ink-light/30 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+            >
+              Undo
+            </button>
           </div>
           {views.map((v) => (
             <button

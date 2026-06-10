@@ -326,6 +326,18 @@ const DRIVERS: Record<ActionName, ActionDriver> = {
   getActiveDeskMapNodes: { expectation: 'non-title', drive: (s) => s.getActiveDeskMapNodes() },
   setHydrated: { expectation: 'non-title', drive: (s) => s.setHydrated() },
   setStartupWarning: { expectation: 'non-title', drive: (s) => s.setStartupWarning('warn') },
+  undoLastTitleMutation: {
+    expectation: 'title',
+    // Two setup edits, then ONE undo: the net driver change is the first
+    // edit's delta (so `changed` is true), and the spy reset isolates the
+    // undo's OWN journal call — the restore must itself be journaled.
+    drive: async (s) => {
+      s.updateNode('root', { docNo: 'R-2', remarks: 'first edit' });
+      s.updateNode('root', { docNo: 'R-3', remarks: 'second edit' });
+      hookCalls.length = 0;
+      await s.undoLastTitleMutation();
+    },
+  },
   // Lifecycle — outside the journal rule, each for a documented reason
   loadWorkspace: {
     expectation: {
@@ -342,7 +354,10 @@ const DRIVERS: Record<ActionName, ActionDriver> = {
       }),
   },
   restoreTitleSlice: {
-    expectation: { exempt: 'cutover rollback primitive, invoked BY the journal hook; journaling it would recurse' },
+    expectation: {
+      exempt:
+        'restore primitive invoked BY the journal hook (cutover veto) and by undoLastTitleMutation, which journals the restore itself; journaling here would recurse',
+    },
     drive: (s) => s.restoreTitleSlice(currentWorkspaceData()),
   },
   hydrateNodeAttachments: {

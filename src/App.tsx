@@ -1,9 +1,11 @@
 /**
  * Root application component — switches between views.
  */
-import { Suspense, lazy, useState } from 'react';
+import { Suspense, lazy, useEffect, useState } from 'react';
 import { useUIStore } from './store/ui-store';
 import { useWorkspaceStore } from './store/workspace-store';
+import { isWorkspaceReadOnly, useWriteLeaseStore } from './store/write-lease-store';
+import { shouldHandleUndoHotkey } from './utils/undo-hotkey';
 import Navbar from './components/shared/Navbar';
 import TitleLedgerStatusBanner from './components/shared/TitleLedgerStatusBanner';
 import WriteLeaseBanner from './components/shared/WriteLeaseBanner';
@@ -44,6 +46,19 @@ export default function App() {
   const startupWarning = useWorkspaceStore((s) => s.startupWarning);
   const setStartupWarning = useWorkspaceStore((s) => s.setStartupWarning);
   const [projectPickerOpen, setProjectPickerOpen] = useState(true);
+
+  // Global Cmd/Ctrl+Z → title undo. The predicate refuses editable targets so
+  // native text-field undo always wins; read-only tabs no-op.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!shouldHandleUndoHotkey(event)) return;
+      if (isWorkspaceReadOnly(useWriteLeaseStore.getState().role)) return;
+      event.preventDefault();
+      void useWorkspaceStore.getState().undoLastTitleMutation();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
 
   return (
     <div className="h-screen flex flex-col bg-parchment">

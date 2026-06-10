@@ -5,6 +5,15 @@ stay short.
 
 ## 2026-06-10
 
+- Title undo (`feat/title-undo`, operator request from the soak): a navbar
+  Undo button + Cmd/Ctrl+Z undoes the last title mutation as a NEW journaled
+  inverse record (ledger stays append-only; store==ledger holds; cutover
+  parity applies to the undo itself). Deletes are fully undoable: the doomed
+  document/attachment rows, owner-side records, and map/curative link
+  before-images are captured before the cascades fire and restored verbatim
+  with fenced bulkPuts. Per-session stack (cap 20), no redo, leasehold-only
+  edits not covered; boundaries documented in
+  docs/title-tree-read-cutover.md.
 - Armed the title cutover flip governance at boot after the operator's
   Springhill soak of the merged Scope B hardening (DA-C1 exit complete). The
   flip itself remains a manual banner action gated on green readiness; revert

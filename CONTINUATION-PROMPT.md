@@ -4,7 +4,19 @@ Use this file to resume the active workstream in a new chat. Read it with
 `AGENTS.md`, `PROJECT_CONTEXT.md`, and `docs/README.md` before touching code.
 Keep long history in `CHANGELOG.md`.
 
-## Active Handoff - 2026-06-10 (Scope B hardening session)
+## Active Handoff - 2026-06-10 (post-soak features session)
+
+Scope B is DONE end-to-end: #141 hardening + review fixes, #142/#143 soak
+fixes, #144 cutover ARMED at boot (flip = manual banner click once gates are
+green), #145/#146 soak UX — all merged and deployed. Title UNDO is
+implemented on `feat/title-undo` (journaled inverse restores + cascade
+bundles + navbar button/Cmd+Z; see docs/title-tree-read-cutover.md "Manual
+undo") — PR pending operator review. NEXT: the aesthetics pass (DA-U1 lane:
+broken tokens, Button standard, mono+tabular numeric typography for the
+overflowing coverage fractions, pill/tab + table kit), plan-first. Then
+Step 2 per the list below (DA-H6/H7 evidence integrity, DA-H10 precision).
+
+## Prior handoff - 2026-06-10 (Scope B hardening session)
 
 STEP 0 is DONE: the audit/research branch landed as PR #140 (squash-merged to
 main as `a0bb913` — Part 1 + Part 2 deep audits, doc housecleaning, rewritten
