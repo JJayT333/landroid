@@ -797,6 +797,117 @@ export default function AttachLeaseModal({
 
         <fieldset className="space-y-2">
           <legend className="text-xs font-semibold text-ink-light uppercase tracking-wider mb-2">
+            Tracts
+          </legend>
+          <div className="space-y-2">
+            {tractDrafts.map((tract) => {
+              const netAcres = computeNetAcres(tract.grossAcres, tract.leasedInterest);
+              const statusOptions = isLeaseStatusOption(tract.status)
+                ? [...LEASE_STATUS_OPTIONS]
+                : [tract.status, ...LEASE_STATUS_OPTIONS];
+              return (
+                <div
+                  key={tract.mineralNodeId}
+                  className={`rounded-lg border p-3 ${
+                    tract.checked
+                      ? 'border-emerald-200 bg-emerald-50/40'
+                      : 'border-ledger-line bg-parchment/40'
+                  }`}
+                >
+                  <label className="flex items-center gap-2 text-sm font-semibold text-ink mb-2">
+                    <input
+                      type="checkbox"
+                      checked={tract.checked}
+                      onChange={(event) =>
+                        setTract(tract.mineralNodeId, {
+                          checked: event.target.checked,
+                        })
+                      }
+                    />
+                    <span className="truncate">
+                      {tract.deskMapName}
+                      <span className="font-normal text-ink-light">
+                        {' '}
+                        — {tract.ownerLabel}
+                      </span>
+                    </span>
+                  </label>
+                  {tract.checked && (
+                    <div className="grid grid-cols-2 gap-2">
+                      <FormField
+                        label="Lease Name"
+                        value={tract.leaseName}
+                        onChange={(value) =>
+                          setTract(tract.mineralNodeId, { leaseName: value })
+                        }
+                      />
+                      <FormField
+                        label="Lessor Interest"
+                        value={tract.leasedInterest}
+                        onChange={(value) =>
+                          setTract(tract.mineralNodeId, { leasedInterest: value })
+                        }
+                      />
+                      <FormField
+                        label="Gross Acres"
+                        value={tract.grossAcres}
+                        onChange={(value) =>
+                          setTract(tract.mineralNodeId, { grossAcres: value })
+                        }
+                      />
+                      <div>
+                        <label className="text-[10px] text-ink-light uppercase tracking-wider block mb-1">
+                          Net Mineral Acres
+                        </label>
+                        <div className="px-3 py-2 rounded-lg border border-ledger-line bg-ledger text-sm text-ink-light">
+                          {netAcres || '—'}
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-ink-light uppercase tracking-wider block mb-1">
+                          Status
+                        </label>
+                        <select
+                          value={tract.status}
+                          onChange={(event) =>
+                            setTract(tract.mineralNodeId, {
+                              status: event.target.value,
+                            })
+                          }
+                          className="w-full px-3 py-2 rounded-lg border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-emerald-600 focus:border-emerald-600 outline-none"
+                        >
+                          {statusOptions.map((status) => (
+                            <option key={status} value={status}>
+                              {isLeaseStatusOption(status)
+                                ? status
+                                : `${status} (legacy)`}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <FormField
+                        label="Doc #"
+                        value={tract.docNo}
+                        onChange={(value) =>
+                          setTract(tract.mineralNodeId, { docNo: value })
+                        }
+                      />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          <div className="text-[11px] leading-5 text-ink-light">
+            Check each tract this lessor leases under this report. Saving creates one
+            lessee card per checked tract on its own desk map; unchecking removes that
+            tract&apos;s card. Net mineral acres = gross acres x lessor interest — the
+            acre view of the lessor interest, which never changes the ownership math.
+          </div>
+        </fieldset>
+
+        <fieldset className="space-y-2">
+          <legend className="text-xs font-semibold text-ink-light uppercase tracking-wider mb-2">
             Economics
           </legend>
           <div className="grid grid-cols-2 gap-2">
@@ -939,117 +1050,6 @@ export default function AttachLeaseModal({
             />
           </div>
         </CollapsibleSection>
-
-        <fieldset className="space-y-2">
-          <legend className="text-xs font-semibold text-ink-light uppercase tracking-wider mb-2">
-            Tracts
-          </legend>
-          <div className="space-y-2">
-            {tractDrafts.map((tract) => {
-              const netAcres = computeNetAcres(tract.grossAcres, tract.leasedInterest);
-              const statusOptions = isLeaseStatusOption(tract.status)
-                ? [...LEASE_STATUS_OPTIONS]
-                : [tract.status, ...LEASE_STATUS_OPTIONS];
-              return (
-                <div
-                  key={tract.mineralNodeId}
-                  className={`rounded-lg border p-3 ${
-                    tract.checked
-                      ? 'border-emerald-200 bg-emerald-50/40'
-                      : 'border-ledger-line bg-parchment/40'
-                  }`}
-                >
-                  <label className="flex items-center gap-2 text-sm font-semibold text-ink mb-2">
-                    <input
-                      type="checkbox"
-                      checked={tract.checked}
-                      onChange={(event) =>
-                        setTract(tract.mineralNodeId, {
-                          checked: event.target.checked,
-                        })
-                      }
-                    />
-                    <span className="truncate">
-                      {tract.deskMapName}
-                      <span className="font-normal text-ink-light">
-                        {' '}
-                        — {tract.ownerLabel}
-                      </span>
-                    </span>
-                  </label>
-                  {tract.checked && (
-                    <div className="grid grid-cols-2 gap-2">
-                      <FormField
-                        label="Lease Name"
-                        value={tract.leaseName}
-                        onChange={(value) =>
-                          setTract(tract.mineralNodeId, { leaseName: value })
-                        }
-                      />
-                      <FormField
-                        label="Lessor Interest"
-                        value={tract.leasedInterest}
-                        onChange={(value) =>
-                          setTract(tract.mineralNodeId, { leasedInterest: value })
-                        }
-                      />
-                      <FormField
-                        label="Gross Acres"
-                        value={tract.grossAcres}
-                        onChange={(value) =>
-                          setTract(tract.mineralNodeId, { grossAcres: value })
-                        }
-                      />
-                      <div>
-                        <label className="text-[10px] text-ink-light uppercase tracking-wider block mb-1">
-                          Net Mineral Acres
-                        </label>
-                        <div className="px-3 py-2 rounded-lg border border-ledger-line bg-ledger text-sm text-ink-light">
-                          {netAcres || '—'}
-                        </div>
-                      </div>
-                      <div>
-                        <label className="text-[10px] text-ink-light uppercase tracking-wider block mb-1">
-                          Status
-                        </label>
-                        <select
-                          value={tract.status}
-                          onChange={(event) =>
-                            setTract(tract.mineralNodeId, {
-                              status: event.target.value,
-                            })
-                          }
-                          className="w-full px-3 py-2 rounded-lg border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-emerald-600 focus:border-emerald-600 outline-none"
-                        >
-                          {statusOptions.map((status) => (
-                            <option key={status} value={status}>
-                              {isLeaseStatusOption(status)
-                                ? status
-                                : `${status} (legacy)`}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <FormField
-                        label="Doc #"
-                        value={tract.docNo}
-                        onChange={(value) =>
-                          setTract(tract.mineralNodeId, { docNo: value })
-                        }
-                      />
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-          <div className="text-[11px] leading-5 text-ink-light">
-            Check each tract this lessor leases under this report. Saving creates one
-            lessee card per checked tract on its own desk map; unchecking removes that
-            tract&apos;s card. Net mineral acres = gross acres x lessor interest — the
-            acre view of the lessor interest, which never changes the ownership math.
-          </div>
-        </fieldset>
 
         <div>
           <label className="text-[10px] text-ink-light uppercase tracking-wider block mb-1">
