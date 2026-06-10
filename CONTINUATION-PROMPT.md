@@ -4,55 +4,56 @@ Use this file to resume the active workstream in a new chat. Read it with
 `AGENTS.md`, `PROJECT_CONTEXT.md`, and `docs/README.md` before touching code.
 Keep long history in `CHANGELOG.md`.
 
-## Active Handoff - 2026-06-09
+## Active Handoff - 2026-06-10
 
-Current workstream: title-tree read cutover, Scope B (ledger-authoritative live reads).
+Current workstream: deep-audit delivery + documentation housecleaning.
+Scope A/B of the title read cutover are MERGED (#138, #139); the prior handoff
+below this one is history.
 
-Branch: `feat/title-tree-read-source-cutover` (off `origin/main`).
-
-Worktree: `/tmp/landroid-title-cutover`.
-
-Base: `origin/main` at `d88244e` (Scope A, PR #138, merged).
+Branch: `claude/strange-payne-679e1f` (worktree; rename to a
+`docs/`-prefixed branch per AGENTS.md conventions before pushing/PR).
 
 ### What this delivers
 
-Scope B makes the durable ledger authoritative for what the live UI shows, with no
-per-screen rewrite. In cutover, the single title journal chokepoint runs the synchronous
-parity check and rolls the store back to the pre-mutation snapshot on divergence, so the
-store can never hold state the ledger rejected (the store stays provably equal to the
-ledger projection and every screen reads it unchanged). Shadow mode is untouched. See
-`docs/title-tree-read-cutover.md`.
-
-- `src/project-records/action-layer/title-command-sourcing.ts` — `checkTitleInlineParity`
-  (synchronous, non-throwing; reuses the recorder's own parity logic).
-- `src/store/workspace-store.ts` — `restoreTitleSlice(before)` (non-journaling title-slice
-  rollback).
-- `src/store/title-action-log.ts` — cutover-only rollback-on-divergence in the journal hook.
-
-### Invariant
-
-`DEFAULT_TITLE_READ_PATH_MODE` stays `shadow`; the flip is reversible
-(`revertReadPathToShadow()`). The engine/math and `deskmap-coverage.ts` /
-`leasehold-summary.ts` are untouched; Springhill stays 0.225/0.775 and the Phase 0 goldens
-hold. Desk maps / leasehold / owners stay store-owned; rollback restores `nodes` +
-`deskMaps` from the journaled before-snapshot.
+1. `docs/deep-audit-2026-06-10.md` — full audit: severity-ranked findings
+   (`DA-*` IDs, every one with path:line anchors and a proposed fix), precision
+   policy spec, Texas-math gap matrix, aesthetics plan, document/AI
+   assessments, roadmap recommendations, Top 5. Headline: DA-C1 (Critical —
+   `clearDeskMapNodes`/`deleteDeskMap` are unjournaled, so the Scope B
+   store==ledger invariant is false and auto-flip should stay off), DA-H1
+   (fixed NPRI charged to lessee NRI instead of burdened lessor royalty —
+   attorney decision before change), DA-H2 (AI Undo erases the durable ledger).
+2. Housecleaning: ROADMAP rewritten around the audit sequencing (Scope B
+   hardening first); `docs/audit-backlog.md` carries a reconciliation section
+   for the new findings; SECURITY.md stale claims corrected (Dexie v14, live
+   write-fence with named gaps, hosted sends no tools, version-gate caveat);
+   `docs/title-tree-read-cutover.md` status updated; AGENTS.md target root doc
+   set reconciled to reality; `DEPLOYMENT_PLAN.md` archived to
+   `docs/archive/2026/DEPLOYMENT_PLAN_2026-04-21.md`; `NEXT-audit-sheet.md`
+   archived to `docs/archive/prompts/audit-sheet-export-brief.md` (feature
+   still wanted — pointer in ROADMAP Next); rebuild-plan Phase 7 carries the
+   audit's staged math order; the misleading SSN comment in
+   `src/types/lease-purchase-report.ts` now states SSN is unimplemented.
 
 ### Validation
 
-`npm run lint`, `npm test`, `npm run build`, `git diff --check` all pass in the worktree
-(`node_modules` from a real `npm ci --offline`). New/extended suites:
-`title-action-log.test.ts` (cutover rollback vs shadow surface, clean-cutover store ==
-ledger projection, revert), `title-cutover-readiness.test.ts` (`checkTitleInlineParity`).
+Docs-only plus one comment-only `.ts` edit. Full vitest suite was verified
+green on this tree before the audit (979 tests / 140 files, Springhill
+0.225/0.775, Phase 0 goldens). `tsc --noEmit` after the comment edit: see the
+latest commit message for the result.
 
-### Known follow-ups (not blocking)
+### Next steps (in order)
 
-- A diverged `deleteNode` rolls back the title slice but not its already-fired async
-  owner/document cascade (divergence is not expected once the gates are green).
-- The sync check recomputes records the async recorder also builds (minor duplication).
-- A cached/ordered projection only matters if reads ever move off the store.
+1. Open the housecleaning PR; review the audit report alongside it.
+2. Start ROADMAP "Now" item 1 (Scope B hardening): DA-C1 journal coverage +
+   test, flip default-off, DA-H2 undo hydration. Good Codex tickets with
+   Claude review; ultra-gate the ledger changes.
+3. Schedule the DA-H1 fixed-NPRI question with the title attorney; no Phase 7
+   math expansion before that decision.
 
-### Process note
+### Process note (keep)
 
-A prior session pushed to `main` by accident (commands ran in the root checkout on
-`main`). Work only in the dedicated worktree via explicit `git -C <worktree>`; never run a
-bare `git push`; push only the feature branch; open a PR and stop for review.
+A prior session pushed to `main` by accident (commands ran in the root checkout
+on `main`). Work only in a dedicated worktree via explicit `git -C <worktree>`;
+never run a bare `git push`; push only the feature branch; open a PR and stop
+for review.

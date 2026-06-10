@@ -14,10 +14,12 @@
  * (lease type, form, bonus, rental, provisions, attachments, comments, preparer)
  * is descriptive only.
  *
- * Lessor identity/contact (name, address, phone, email, SSN) is NOT stored here
- * — it is referenced through the linked owner record. SSN in particular is
- * sensitive and lives only on the owner, optional and excluded from shared
- * exports.
+ * Lessor identity/contact (name, address, phone, email) is NOT stored here —
+ * it is referenced through the linked owner record. SSN/TIN is deliberately
+ * deferred and UNIMPLEMENTED: no SSN field exists on Owner or anywhere else,
+ * and no masking/export-exclusion machinery exists yet. A future tax-packet
+ * workstream must design storage, masking, and export rules before adding it
+ * (deep-audit 2026-06-10, DA-L9).
  */
 
 import { d } from '../engine/decimal';

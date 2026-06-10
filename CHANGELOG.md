@@ -3,6 +3,30 @@
 This file records meaningful project changes so `CONTINUATION-PROMPT.md` can
 stay short.
 
+## 2026-06-10
+
+- Delivered a full deep audit at `docs/deep-audit-2026-06-10.md`: severity-ranked
+  findings with `DA-*` IDs (1 Critical, 10 High), a display-precision policy and
+  migration plan, a Texas-math completeness gap matrix with build order, a
+  "lean professional" aesthetics plan, document-storage and AI assessments, and
+  roadmap resequencing. Verified against a green suite (979 tests / 140 files,
+  Springhill 0.225/0.775, Phase 0 goldens intact). New findings are summarized
+  into `docs/audit-backlog.md` pending row-by-row reconciliation.
+- Documentation housecleaning: rewrote `ROADMAP.md` as a true short priority
+  map with the audit's sequencing (Scope B hardening first) and removed the
+  duplicated posture text and stale `PATCH_PLAN.md` reference; corrected stale
+  `SECURITY.md` claims (Dexie v14, live write-fence with named heartbeat/ledger
+  gaps, hosted AI sends no tools, numeric-only future-version gate); updated
+  `docs/title-tree-read-cutover.md` status to merged (#138/#139) with audit
+  pointers; reconciled the `AGENTS.md` target root doc set to reality
+  (`PROJECT_CONTEXT.md`, `USER_MANUAL.md`, deploy docs; noted the sales-deck
+  build import pins `DEPLOYMENT_STATE.md` to root); archived
+  `DEPLOYMENT_PLAN.md` (2026-04-21, planning-only, superseded by the live
+  deployment) and the root `NEXT-audit-sheet.md` feature brief into
+  `docs/archive/`; added the audit's staged-math reconciliation note to
+  rebuild-plan Phase 7; fixed the misleading SSN comment in
+  `src/types/lease-purchase-report.ts` (no SSN field exists anywhere — DA-L9).
+
 ## 2026-06-08
 
 - Added a first-class Lease workflow (Phase 1 of the Lease Purchase Report
