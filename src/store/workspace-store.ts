@@ -1341,11 +1341,15 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
       fileName: document.fileName,
       kind: document.kind,
     };
+    const before = get();
     set((current) => ({
       nodes: current.nodes.map((n) =>
         n.id === nodeId ? { ...n, attachments: [...n.attachments, summary] } : n
       ),
     }));
+    // Title-visible when this becomes the node's first attachment: the adapter
+    // maps attachments[0].docId to instrument_record.documentId.
+    journalTitleMutation('update', before, get());
     return summary;
   },
 
@@ -1356,6 +1360,7 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
     const target = node.attachments.find((a) => a.attachmentId === attachmentId);
     if (!target) return;
     await detachDocFromEntity(target.attachmentId);
+    const before = get();
     set((current) => ({
       nodes: current.nodes.map((n) =>
         n.id === nodeId
@@ -1368,6 +1373,7 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
           : n
       ),
     }));
+    journalTitleMutation('update', before, get());
   },
 
   renameDocOnNode: async (docId, newFileName) => {
@@ -1406,11 +1412,15 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
     for (const a of node.attachments) {
       if (!seen.has(a.attachmentId)) reordered.push(a);
     }
+    const before = get();
     set((current) => ({
       nodes: current.nodes.map((n) =>
         n.id === nodeId ? { ...n, attachments: reordered } : n
       ),
     }));
+    // Reordering can change attachments[0], which the adapter maps to
+    // instrument_record.documentId.
+    journalTitleMutation('update', before, get());
   },
 
   hydrateNodeAttachments: async (options) => {
