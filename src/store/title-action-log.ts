@@ -156,11 +156,25 @@ let ledgerGeneration = 0;
 let recordingChain: Promise<void> = Promise.resolve();
 const pending = new Set<Promise<unknown>>();
 
-// Governed read-path flip for the title_tree surface (enabled for this surface
-// only — the global DEFAULT_TITLE_READ_PATH_MODE stays 'shadow'). The mode
-// starts 'shadow' and flips to 'cutover' only when the readiness gates are green
-// and a reviewer token is supplied; it reverts at any time.
-const titleReadPathFlag = new TitleReadPathFlag('shadow', { cutoverEnabled: true });
+// Governed read-path flip for the title_tree surface. DISARMED by default
+// (DA-C1): the journal-coverage exit gate must be green and the operator's
+// Springhill soak complete before re-arming, which is a deliberate one-line
+// change calling setTitleCutoverArmed(true) — never a runtime default. The
+// mode starts 'shadow'; reverting is available at any time regardless.
+const titleReadPathFlag = new TitleReadPathFlag('shadow', { cutoverEnabled: false });
+
+/**
+ * Arm or disarm the cutover flip governance. Exported for tests and for the
+ * deliberate post-soak re-arm; nothing in production calls this with `true`.
+ */
+export function setTitleCutoverArmed(enabled: boolean): void {
+  titleReadPathFlag.setCutoverEnabled(enabled);
+}
+
+/** Whether the cutover flip governance is armed (DA-C1: default false). */
+export function isTitleCutoverArmed(): boolean {
+  return titleReadPathFlag.isCutoverEnabled();
+}
 
 export const useTitleActionLog = create<TitleActionLogState>()((set, get) => ({
   enabled: true,

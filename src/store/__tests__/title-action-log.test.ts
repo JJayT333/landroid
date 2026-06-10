@@ -5,7 +5,7 @@
  * canonical, divergence is surfaced (not swallowed), and the kill switch works.
  * Synthetic fixtures only.
  */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createBlankLease, createBlankOwner, type Lease } from '../../types/owner';
 import { createBlankNode, normalizeOwnershipNode, type OwnershipNode } from '../../types/node';
 
@@ -70,7 +70,12 @@ vi.mock('../../project-records/action-layer/title-command-sourcing', async (impo
 
 import { useWorkspaceStore } from '../workspace-store';
 import { useOwnerStore } from '../owner-store';
-import { ensureTitleBaseline, useTitleActionLog, settleTitleActionLog } from '../title-action-log';
+import {
+  ensureTitleBaseline,
+  setTitleCutoverArmed,
+  settleTitleActionLog,
+  useTitleActionLog,
+} from '../title-action-log';
 import { AUDIT_GENESIS_HASH, verifyAuditChain } from '../../project-records/action-layer/audit-chain';
 import { ParityDivergenceError } from '../../project-records/action-layer/parity';
 import { titleRecordsFromWorkspace } from '../../project-records/action-layer/title-projection';
@@ -569,6 +574,12 @@ describe('Phase 4 title read-source cutover (rollback-on-divergence)', () => {
     checkSpy.current = vi.fn(checkSpy.real!);
     reset();
     useTitleActionLog.getState().revertReadPathToShadow();
+    // DA-C1: governance ships disarmed; cutover tests arm it explicitly.
+    setTitleCutoverArmed(true);
+  });
+
+  afterEach(() => {
+    setTitleCutoverArmed(false);
   });
 
   it('keeps the store equal to the ledger projection for a clean cutover mutation', async () => {
