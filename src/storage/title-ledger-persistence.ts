@@ -6,6 +6,10 @@ import {
 } from '../backend-spine/contracts';
 import { activeDbKey, storageScopedId } from './db-key-scope';
 import db from './db';
+import {
+  assertWorkspaceWriteFence,
+  ensureWorkspaceWritable,
+} from './workspace-write-lease';
 import type {
   StoredTitleActionRecord,
   StoredTitleAuditEvent,
@@ -115,11 +119,20 @@ export async function replaceTitleLedgerWorkspaceRows(
     toAuditRow(record, dbKey, index)
   );
 
+  // DA-M15: ledger rows are fenced like every other store — only the lease
+  // holder writes, and the fence is re-asserted inside the rw transaction so
+  // a tab demoted mid-flight cannot clobber the writer's chain.
+  const writable = await ensureWorkspaceWritable(workspaceId);
+  if (!writable) {
+    throw new Error('Workspace is read-only because another tab holds the write lease.');
+  }
   await db.transaction(
     'rw',
+    db.workspaceWriteLeases,
     db.titleActionRecords,
     db.titleAuditEvents,
     async () => {
+      await assertWorkspaceWriteFence(workspaceId);
       await db.titleActionRecords.where('[dbKey+workspaceId]').equals(scope).delete();
       await db.titleAuditEvents.where('[dbKey+workspaceId]').equals(scope).delete();
       if (actionRows.length > 0) {
@@ -137,11 +150,17 @@ export async function clearTitleLedgerWorkspaceRows(
 ): Promise<void> {
   const dbKey = activeDbKey();
   const scope = titleLedgerScope(dbKey, workspaceId);
+  const writable = await ensureWorkspaceWritable(workspaceId);
+  if (!writable) {
+    throw new Error('Workspace is read-only because another tab holds the write lease.');
+  }
   await db.transaction(
     'rw',
+    db.workspaceWriteLeases,
     db.titleActionRecords,
     db.titleAuditEvents,
     async () => {
+      await assertWorkspaceWriteFence(workspaceId);
       await db.titleActionRecords.where('[dbKey+workspaceId]').equals(scope).delete();
       await db.titleAuditEvents.where('[dbKey+workspaceId]').equals(scope).delete();
     }

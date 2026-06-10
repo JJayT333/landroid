@@ -54,6 +54,7 @@ import {
   replaceTitleLedgerWorkspaceRows,
 } from '../storage/title-ledger-persistence';
 import type { TitleLedgerWorkspaceRows } from '../storage/title-ledger-stores';
+import { ensureWorkspaceWritable } from '../storage/workspace-write-lease';
 import { useOwnerStore } from './owner-store';
 import {
   setTitleActionLogResetHook,
@@ -457,6 +458,16 @@ export async function flushTitleActionLogToStorage(
   workspaceId: string
 ): Promise<void> {
   await settleTitleActionLog();
+  // DA-M15: only the writer persists ledger rows. A reader tab keeps its
+  // hydrated chain (or fresh baseline) in memory and never rewrites the
+  // writer's rows — previously a reader at boot/project-open could clobber
+  // the writer's ledger whenever the stored rows were empty or invalid.
+  if (!(await ensureWorkspaceWritable(workspaceId))) {
+    console.warn(
+      `[title-action-log] Skipping ledger flush for ${workspaceId}: another tab holds the write lease.`
+    );
+    return;
+  }
   const state = useTitleActionLog.getState();
   const rows: TitleLedgerWorkspaceRows = {
     actionRecords: [...state.actionRecords],

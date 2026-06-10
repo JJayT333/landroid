@@ -58,6 +58,11 @@ vi.mock('../../storage/title-ledger-persistence', () => ({
   listTitleLedgerWorkspaceRows: ledgerPersistenceMocks.listTitleLedgerWorkspaceRows,
   replaceTitleLedgerWorkspaceRows: ledgerPersistenceMocks.replaceTitleLedgerWorkspaceRows,
 }));
+// DA-M15: the flush path is writer-gated; this single-tab test is the writer.
+vi.mock('../../storage/workspace-write-lease', () => ({
+  ensureWorkspaceWritable: vi.fn(async () => true),
+  assertWorkspaceWriteFence: vi.fn(async () => {}),
+}));
 // The live side-store restore (owner/doc/curative/map Dexie writes) is owned
 // by undo-store's own tests; here it is reduced to the ledger-relevant part —
 // the loadWorkspace that resets the title action log.
