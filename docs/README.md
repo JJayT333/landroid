@@ -29,6 +29,7 @@ Use this map to decide which Markdown file to read or update.
 | `docs/springhill-sample-workflow.md` | Private-source to scrubbed-public-sample workflow for the Dr. Elmore Springhill `.landroid` sample. | Springhill generator inputs, scrub policy, source-to-output gates, or sample validation rules change. |
 | `docs/title-tree-read-cutover.md` | Title read-flip Scope A/B design and revert recipe. | Cutover gates, rollback rule, or read-path governance changes. |
 | `docs/deep-audit-2026-06-10.md` | 2026-06-10 deep audit: severity-ranked findings (DA-*), precision policy, Texas gap matrix, doc/AI assessments. | Archive once its findings are reconciled into `docs/audit-backlog.md` and fixed or accepted. |
+| `docs/title-math-research-prompt.md` | Paste-ready external research prompt for the complete Texas title-math/law catalog feeding the Phase 7 design pass. | Archive to `docs/archive/prompts/` when the research corpus is delivered. |
 | `CHANGELOG.md` | Completed meaningful work. | A meaningful feature, fix, or docs rail lands. |
 | `CONTINUATION-PROMPT.md` | Current short handoff. | Before switching chats or after meaningful work. |
 
