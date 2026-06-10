@@ -225,4 +225,97 @@ describe('WorkspaceWriteLeaseController', () => {
     expect(tabB.canWrite('ws-1')).toBe(true);
     expect(store.leases.get('ws-1')).toMatchObject({ ownerTabId: 'tab-b' });
   });
+
+  // DA-M14 — writer heartbeat with visibility pause.
+  function makeHeartbeatHarness(visible = true) {
+    const store = makeLeaseStore();
+    const clock = { value: 1000 };
+    const visibility: { visible: boolean; listener?: () => void } = { visible };
+    let tick: (() => void) | null = null;
+    let cancelled = 0;
+    const env: WorkspaceWriteLeaseEnv = {
+      ...makeEnv(store, 'tab-a', clock),
+      scheduleHeartbeat: (fn) => {
+        tick = fn;
+        return () => {
+          cancelled += 1;
+          tick = null;
+        };
+      },
+      isVisible: () => visibility.visible,
+      onVisibilityChange: (listener) => {
+        visibility.listener = listener;
+      },
+    };
+    const controller = new WorkspaceWriteLeaseController(env);
+    return {
+      store,
+      clock,
+      visibility,
+      controller,
+      runTick: async () => {
+        tick?.();
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      },
+      cancelCount: () => cancelled,
+    };
+  }
+
+  it('heartbeat keeps an idle writer fresh past the TTL (DA-M14)', async () => {
+    const a = makeHeartbeatHarness();
+    const store = a.store;
+    await a.controller.ensureWritable('ws-1');
+
+    // Idle past 2/3 of the TTL, then the heartbeat tick refreshes the lease.
+    a.clock.value = 1000 + (WORKSPACE_WRITE_LEASE_TTL_MS * 2) / 3;
+    await a.runTick();
+
+    // Without the heartbeat the lease would have expired here; a second tab
+    // stays blocked because the refresh extended it.
+    a.clock.value = 1000 + WORKSPACE_WRITE_LEASE_TTL_MS + 1;
+    const tabB = new WorkspaceWriteLeaseController(makeEnv(store, 'tab-b', a.clock));
+    await expect(tabB.ensureWritable('ws-1')).resolves.toBe(false);
+    expect(a.controller.canWrite('ws-1')).toBe(true);
+  });
+
+  it('a hidden writer pauses the heartbeat and discovers demotion when visible again', async () => {
+    const roles: string[] = [];
+    const a = makeHeartbeatHarness(false);
+    a.controller = new WorkspaceWriteLeaseController({
+      ...makeEnv(a.store, 'tab-a', a.clock, undefined, (role) => roles.push(role)),
+      scheduleHeartbeat: () => () => {},
+      isVisible: () => a.visibility.visible,
+      onVisibilityChange: (listener) => {
+        a.visibility.listener = listener;
+      },
+    });
+    await a.controller.ensureWritable('ws-1');
+
+    // Hidden: the tick refreshes nothing, the lease expires, a peer takes over.
+    a.clock.value = 1000 + WORKSPACE_WRITE_LEASE_TTL_MS + 1;
+    const tabB = new WorkspaceWriteLeaseController(makeEnv(a.store, 'tab-b', a.clock));
+    await expect(tabB.ensureWritable('ws-1')).resolves.toBe(true);
+
+    // Back to visible: the immediate refresh-or-demote tick reports 'reader'
+    // right away instead of waiting for the next save to fail.
+    a.visibility.visible = true;
+    a.visibility.listener?.();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(a.controller.canWrite('ws-1')).toBe(false);
+    expect(roles.at(-1)).toBe('reader');
+  });
+
+  it('the heartbeat stops after demotion and release', async () => {
+    const a = makeHeartbeatHarness();
+    await a.controller.ensureWritable('ws-1');
+    expect(a.cancelCount()).toBe(0);
+
+    await a.controller.release('ws-1');
+    expect(a.cancelCount()).toBe(1);
+
+    // A tick after release is a no-op (no claim attempts on the store).
+    const leaseRows = a.store.leases.size;
+    await a.runTick();
+    expect(a.store.leases.size).toBe(leaseRows);
+  });
 });
