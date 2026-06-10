@@ -44,7 +44,7 @@ import {
   hydrateTitleActionLogFromImportedLedger,
   hydrateTitleActionLogFromStorageOrBaseline,
 } from '../store/title-action-log';
-import { useWorkspaceStore } from '../store/workspace-store';
+import { readCurrentWorkspaceData, useWorkspaceStore } from '../store/workspace-store';
 import { createWorkspaceId } from '../utils/workspace-id';
 
 export type ProjectOpenResult = {
@@ -154,8 +154,11 @@ async function applyLoadedProject(
     .getState()
     .hydrateNodeAttachments({ strict: true })
     .catch(() => {});
+  // Review fix: baseline against the LIVE post-hydration state, not the
+  // pre-hydration `data` — strict attachment hydration can change
+  // attachments[0], which projects into instrument_record.documentId.
   await hydrateTitleActionLogFromStorageOrBaseline(
-    data,
+    readCurrentWorkspaceData(),
     readTitleOwnerData()
   ).catch((error) => {
     const message = error instanceof Error ? error.message : String(error);
@@ -275,9 +278,10 @@ export async function importAndOpenWorkspace(
       .catch(() => {});
     // DA-H2: loadWorkspace reset the title ledger; the lifecycle owns the
     // re-hydration (from the file's embedded ledger when present, otherwise a
-    // fresh baseline) so no caller can forget it.
+    // fresh baseline) so no caller can forget it. Baseline against the LIVE
+    // post-hydration state (see applyLoadedProject).
     await hydrateTitleActionLogFromImportedLedger(
-      workspaceData,
+      readCurrentWorkspaceData(),
       data.actionLedger,
       readTitleOwnerData()
     ).catch((err) => {

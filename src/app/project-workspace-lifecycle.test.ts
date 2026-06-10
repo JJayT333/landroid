@@ -178,6 +178,7 @@ async function loadLifecycleHarness(options: {
   }));
   vi.doMock('../store/workspace-store', () => ({
     useWorkspaceStore: { getState: () => workspaceState },
+    readCurrentWorkspaceData: vi.fn(() => workspaceState),
   }));
   vi.doMock('../store/canvas-store', () => ({
     useCanvasStore: { getState: () => canvasState },
