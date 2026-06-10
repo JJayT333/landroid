@@ -94,8 +94,11 @@ enforced in CI:
   rolls back (unverified state never stands), and hook exceptions surface as `lastError`
   instead of being swallowed. The diverged-`deleteNode` cascade gap is closed.
 - **The flip no longer self-arms.** `cutoverEnabled` defaults to false; the banner's
-  auto-flip is gone; the manual flip stays disabled pending the operator's Springhill
-  soak. Re-arming is a deliberate one-line change calling `setTitleCutoverArmed(true)`.
+  auto-flip is gone. ARMED at boot (`main.tsx` calls `setTitleCutoverArmed(true)`) by
+  operator decision on 2026-06-10 after the Springhill soak of the merged hardening.
+  Arming only permits the flip — it still requires green readiness gates plus the
+  banner's explicit manual click, and `revertReadPathToShadow()` is always available.
+  Disarming is deleting the one boot call.
 - **AI undo hydrates-then-appends** (`src/ai/undo-ledger.ts`): the persisted chain is
   re-hydrated after the snapshot restore and the turn's records are marked `undone`
   append-only on the audit chain (`undoTitleActionRecord` now has its live caller);
