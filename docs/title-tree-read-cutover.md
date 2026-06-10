@@ -1,7 +1,10 @@
 # Title-tree read cutover
 
-Status: Scope A delivered (PR #138, merged). Scope B (ledger-authoritative live reads)
-delivered on `feat/title-tree-read-source-cutover` (in review).
+Status: Scope A merged (PR #138). Scope B merged (PR #139, 2026-06-09).
+2026-06-10 deep audit found Scope B's chokepoint claim incomplete — see
+`docs/deep-audit-2026-06-10.md` DA-C1 (unjournaled `clearDeskMapNodes`/`deleteDeskMap`),
+DA-H3 (rollback gaps), DA-H4/H5 (durability/tamper coverage); hardening lane is first
+in `ROADMAP.md`.
 
 ## Background
 
