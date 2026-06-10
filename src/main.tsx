@@ -18,7 +18,15 @@ import { useStorageHealthStore } from './store/storage-health-store';
 import {
   flushTitleActionLogToStorage,
   hydrateTitleActionLogFromStorageOrBaseline,
+  setTitleCutoverArmed,
 } from './store/title-action-log';
+
+// DA-C1 exit, final step: the title read-flip governance is ARMED (operator
+// decision, 2026-06-10, after the Springhill soak on the merged hardening).
+// Arming only permits the flip — it still requires the readiness gates green
+// plus the banner's explicit manual click, and revertReadPathToShadow stays
+// available at all times. Disarm by deleting this call.
+setTitleCutoverArmed(true);
 import { saveWorkspaceShardsToDb, loadWorkspaceFromDb } from './storage/workspace-persistence';
 import { saveCanvasToDb, loadCanvasFromDb } from './storage/canvas-persistence';
 import {

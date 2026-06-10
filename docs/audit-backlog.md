@@ -8,10 +8,11 @@ Full report with anchors, confidence, and patch sketches:
 `docs/deep-audit-2026-06-10.md`. Finding IDs are `DA-*`. Until each is fixed or
 explicitly accepted, treat that report as part of this backlog. Summary:
 
-- DA-C1 (Critical): FIXED (feat/scope-b-hardening) — eight title-visible
-  actions journaled (the audit's two plus six more found by the gate), the
-  journal-coverage test is the permanent CI invariant, and the flip ships
-  disarmed (`setTitleCutoverArmed`) pending the Springhill soak.
+- DA-C1 (Critical): CLOSED — eight title-visible actions journaled (the
+  audit's two plus six more found by the gate), the journal-coverage test is
+  the permanent CI invariant, and after the operator's 2026-06-10 Springhill
+  soak the flip governance is armed at boot (manual click + green gates still
+  required to actually flip).
 - DA-H1: fixed NPRI deducted from lessee NRI instead of burdened lessor royalty
   (attorney sign-off + golden update required before change; decision of
   record in CONTINUATION-PROMPT.md — gate cleared, implement after Step 1).

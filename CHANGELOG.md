@@ -5,6 +5,12 @@ stay short.
 
 ## 2026-06-10
 
+- Armed the title cutover flip governance at boot after the operator's
+  Springhill soak of the merged Scope B hardening (DA-C1 exit complete). The
+  flip itself remains a manual banner action gated on green readiness; revert
+  stays always available. Also landed from soak findings: the
+  lease-record-without-node silent no-op fix (#142) and lessee suggestions in
+  both lease forms (#143).
 - Scope B hardening (`feat/scope-b-hardening`, deep-audit findings DA-C1,
   DA-H2, DA-H3, DA-M14, DA-M15): journaled eight previously-silent
   title-visible store mutations (desk-map membership and attachment-cache
