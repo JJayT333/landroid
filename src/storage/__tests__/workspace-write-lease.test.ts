@@ -61,6 +61,9 @@ function makeEnv(
     deleteLease: store.del,
     createChannel,
     onRoleChange,
+    // No-op by default so these tests never create real setInterval handles;
+    // the heartbeat tests override this with a captured tick.
+    scheduleHeartbeat: () => () => {},
   };
 }
 
