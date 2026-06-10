@@ -69,6 +69,17 @@ import {
   executeDeleteBranch,
 } from '../engine/math-engine';
 import type { Audit } from '../types/result';
+import {
+  clearTitleUndoStack,
+  popTitleUndoEntry,
+  pushTitleUndoEntry,
+  titleUndoLabel,
+  type CascadeRestoreThunk,
+} from './title-undo-stack';
+import {
+  READ_ONLY_WORKSPACE_EDIT_TITLE,
+  useWriteLeaseStore,
+} from './write-lease-store';
 import { createWorkspaceId } from '../utils/workspace-id';
 import { resolveActiveUnitCode } from '../utils/desk-map-units';
 import type { WorkspaceData } from '../storage/workspace-persistence';
@@ -261,6 +272,15 @@ interface WorkspaceState {
    * mutation so the live store never holds state the durable ledger rejected.
    */
   restoreTitleSlice: (before: WorkspaceData) => void;
+  /**
+   * Undo the most recent title mutation (operator undo button). Restores the
+   * entry's before-snapshot and journals the restore as a NEW mutation, so the
+   * durable ledger stays append-only and store==ledger holds. For destructive
+   * mutations the captured cascade rows (documents, owner records, map and
+   * curative links) are put back too. Returns false when there is nothing to
+   * undo, the tab is read-only, or cutover vetoed the restore.
+   */
+  undoLastTitleMutation: () => Promise<boolean>;
 
   // Document attachments (Phase 5 / ADR 0004)
   /**
@@ -434,6 +454,18 @@ export function readCurrentWorkspaceData(): WorkspaceData {
   return snapshotWorkspaceData(useWorkspaceStore.getState());
 }
 
+interface JournalTitleMutationOptions {
+  /**
+   * Destructive mutators (delete cascades) claim the undo entry's cascade
+   * slot: the returned resolver must be called (with a restore thunk or null)
+   * once their doomed rows are captured. Without this flag the slot resolves
+   * to null immediately.
+   */
+  deferUndoCascade?: boolean;
+  /** The undo action's own restore journal must not push a new undo entry. */
+  suppressUndoPush?: boolean;
+}
+
 /**
  * Hand-off to the title journal. `beforeState` is the store state captured
  * before `set()` (its arrays are retained, not mutated, by Zustand's replace),
@@ -447,31 +479,58 @@ export function readCurrentWorkspaceData(): WorkspaceData {
  * exception is surfaced as `lastError` (no longer silently swallowed); the
  * store stays canonical in that case — the hook handles its own cutover-path
  * failures by rolling back before it returns.
+ *
+ * Accepted (non-rolled-back, non-suppressed) mutations also push an entry on
+ * the in-memory undo stack, reusing the snapshot built for the hook.
  */
 function journalTitleMutation(
   mutation: string,
   beforeState: WorkspaceState,
-  afterState: WorkspaceState
-): { rolledBack: boolean } {
-  if (!titleJournalHook) return { rolledBack: false };
-  try {
-    const verdict = titleJournalHook(
-      mutation,
-      snapshotWorkspaceData(beforeState),
-      snapshotWorkspaceData(afterState)
-    ) ?? { rolledBack: false };
-    if (verdict.rolledBack) {
-      useWorkspaceStore.setState({ lastError: CUTOVER_ROLLBACK_ERROR });
+  afterState: WorkspaceState,
+  options: JournalTitleMutationOptions = {}
+): {
+  rolledBack: boolean;
+  resolveUndoCascade: ((thunk: CascadeRestoreThunk | null) => void) | null;
+} {
+  const beforeWorkspace = snapshotWorkspaceData(beforeState);
+  let rolledBack = false;
+  if (titleJournalHook) {
+    try {
+      const verdict = titleJournalHook(
+        mutation,
+        beforeWorkspace,
+        snapshotWorkspaceData(afterState)
+      ) ?? { rolledBack: false };
+      rolledBack = verdict.rolledBack;
+      if (rolledBack) {
+        useWorkspaceStore.setState({ lastError: CUTOVER_ROLLBACK_ERROR });
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('[workspace-store] title journal hook threw:', err);
+      useWorkspaceStore.setState({
+        lastError: `Title journal hook failed for ${mutation}: ${message}. The mutation stands; review the title ledger before relying on cutover readiness.`,
+      });
     }
-    return { rolledBack: verdict.rolledBack };
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    console.error('[workspace-store] title journal hook threw:', err);
-    useWorkspaceStore.setState({
-      lastError: `Title journal hook failed for ${mutation}: ${message}. The mutation stands; review the title ledger before relying on cutover readiness.`,
-    });
-    return { rolledBack: false };
   }
+  if (rolledBack || options.suppressUndoPush) {
+    return { rolledBack, resolveUndoCascade: null };
+  }
+  let resolveUndoCascade: ((thunk: CascadeRestoreThunk | null) => void) | null =
+    null;
+  const cascadeRestore: Promise<CascadeRestoreThunk | null> =
+    options.deferUndoCascade
+      ? new Promise((resolve) => {
+          resolveUndoCascade = resolve;
+        })
+      : Promise.resolve(null);
+  pushTitleUndoEntry({
+    mutation,
+    label: titleUndoLabel(mutation),
+    beforeWorkspace,
+    cascadeRestore,
+  });
+  return { rolledBack, resolveUndoCascade };
 }
 
 function resetTitleActionLogForWorkspaceReplacement(): void {
@@ -1364,6 +1423,40 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
       };
     }),
 
+  undoLastTitleMutation: async () => {
+    if (useWriteLeaseStore.getState().role === 'reader') {
+      set({ lastError: READ_ONLY_WORKSPACE_EDIT_TITLE });
+      return false;
+    }
+    const entry = popTitleUndoEntry();
+    if (!entry) return false;
+
+    const before = get();
+    get().restoreTitleSlice(entry.beforeWorkspace);
+    // The restore is itself a journaled mutation (append-only ledger); it must
+    // not push a fresh undo entry or undo would ping-pong with itself.
+    const { rolledBack } = journalTitleMutation('update', before, get(), {
+      suppressUndoPush: true,
+    });
+    if (rolledBack) return false;
+
+    const restoreCascade = await entry.cascadeRestore;
+    if (restoreCascade) {
+      try {
+        const result = await restoreCascade();
+        if (result.warning) set({ lastError: result.warning });
+        // Refresh the attachment chips from the restored Dexie rows.
+        await get().hydrateNodeAttachments().catch(() => {});
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        set({
+          lastError: `Undo restored the title cards, but some deleted documents or owner records could not be restored: ${message}.`,
+        });
+      }
+    }
+    return true;
+  },
+
   attachDocToNode: async (nodeId, file, options) => {
     const state = get();
     const node = state.nodes.find((n) => n.id === nodeId);
@@ -1505,6 +1598,9 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
 
   loadWorkspace: (data) => {
     resetTitleActionLogForWorkspaceReplacement();
+    // A replaced workspace invalidates every undo snapshot (different nodes,
+    // different ledger); the AI turn-level undo restore also lands here.
+    clearTitleUndoStack();
     set(() => {
       const normalizedNodes = data.nodes.map((node) => normalizeOwnershipNode(node));
       const nodeIdSet = new Set(normalizedNodes.map((node) => node.id));

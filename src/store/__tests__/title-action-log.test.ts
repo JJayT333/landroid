@@ -76,6 +76,7 @@ import {
   settleTitleActionLog,
   useTitleActionLog,
 } from '../title-action-log';
+import { clearTitleUndoStack, useTitleUndoStack } from '../title-undo-stack';
 import { AUDIT_GENESIS_HASH, verifyAuditChain } from '../../project-records/action-layer/audit-chain';
 import { ParityDivergenceError } from '../../project-records/action-layer/parity';
 import { titleRecordsFromWorkspace } from '../../project-records/action-layer/title-projection';
@@ -719,6 +720,99 @@ describe('Phase 4 title read-source cutover (rollback-on-divergence)', () => {
 
     expect(useWorkspaceStore.getState().nodes.some((n) => n.id === 'root')).toBe(true);
     expect(checkSpy.current).not.toHaveBeenCalled();
+  });
+});
+
+describe('title undo: journaled inverse restores', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    recordSpy.current = vi.fn(recordSpy.real!);
+    checkSpy.current = vi.fn(checkSpy.real!);
+    reset();
+    clearTitleUndoStack();
+  });
+
+  it('undo restores the store and appends the inverse record (ledger stays append-only)', async () => {
+    const store = () => useWorkspaceStore.getState();
+    store().createRootNode('root', '1', { grantee: 'Root', interestClass: 'mineral', linkedOwnerId: 'owner-1' });
+    store().convey('root', 'child', '0.5', { grantee: 'Child' });
+    await settleTitleActionLog();
+    const recordsBefore = useTitleActionLog.getState().actionRecords.length;
+
+    const undone = await store().undoLastTitleMutation();
+    await settleTitleActionLog();
+
+    expect(undone).toBe(true);
+    // Store back to pre-convey state…
+    expect(store().nodes.some((n) => n.id === 'child')).toBe(false);
+    expect(store().nodes.find((n) => n.id === 'root')?.fraction).toBe('1.000000000');
+    // …via a NEW appended record, not a rewrite.
+    const log = useTitleActionLog.getState();
+    expect(log.actionRecords).toHaveLength(recordsBefore + 1);
+    expect((await verifyAuditChain(log.auditEvents)).valid).toBe(true);
+    expect(domainJson(replayTitleProjection(log.actionRecords))).toBe(
+      domainJson(adapterTitleRecordsForCurrent())
+    );
+  });
+
+  it('undo in cutover mode passes parity and keeps store == ledger', async () => {
+    setTitleCutoverArmed(true);
+    try {
+      useTitleActionLog.getState().flipToCutover({ reviewerApprovalToken: 'reviewer', ready: true });
+      const store = () => useWorkspaceStore.getState();
+      store().createRootNode('root', '1', { grantee: 'Root' });
+      store().updateNode('root', { docNo: 'R-2', remarks: 'edited' });
+      await settleTitleActionLog();
+
+      const undone = await store().undoLastTitleMutation();
+      await settleTitleActionLog();
+
+      expect(undone).toBe(true);
+      const log = useTitleActionLog.getState();
+      expect(log.lastDivergence).toBeNull();
+      expect(store().nodes.find((n) => n.id === 'root')?.docNo).not.toBe('R-2');
+      expect(domainJson(replayTitleProjection(log.actionRecords))).toBe(
+        domainJson(adapterTitleRecordsForCurrent())
+      );
+    } finally {
+      setTitleCutoverArmed(false);
+      useTitleActionLog.getState().revertReadPathToShadow();
+    }
+  });
+
+  it('a vetoed mutation pushes no undo entry', async () => {
+    setTitleCutoverArmed(true);
+    try {
+      useTitleActionLog.getState().flipToCutover({ reviewerApprovalToken: 'reviewer', ready: true });
+      const sizeBefore = useTitleUndoStack.getState().entries.length;
+      checkSpy.current = vi.fn().mockReturnValueOnce({
+        clean: false,
+        reports: [{ workflow: 'title_tree', clean: false, expectedCount: 1, derivedCount: 0, divergences: [] }],
+      });
+      useWorkspaceStore.getState().createRootNode('root', '1', { grantee: 'Root' });
+      await settleTitleActionLog();
+      expect(useTitleUndoStack.getState().entries.length).toBe(sizeBefore);
+    } finally {
+      setTitleCutoverArmed(false);
+      useTitleActionLog.getState().revertReadPathToShadow();
+    }
+  });
+
+  it('loadWorkspace clears the undo stack', () => {
+    useWorkspaceStore.getState().createRootNode('root', '1', { grantee: 'Root' });
+    expect(useTitleUndoStack.getState().entries.length).toBeGreaterThan(0);
+    useWorkspaceStore.getState().loadWorkspace({
+      workspaceId: 'ws-other',
+      projectName: 'Other',
+      nodes: [],
+      deskMaps: [],
+      activeDeskMapId: null,
+    });
+    expect(useTitleUndoStack.getState().entries.length).toBe(0);
+  });
+
+  it('returns false with nothing to undo', async () => {
+    await expect(useWorkspaceStore.getState().undoLastTitleMutation()).resolves.toBe(false);
   });
 });
 
