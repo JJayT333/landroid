@@ -10,6 +10,7 @@ import {
   seedTractDrafts,
   type TractDraft,
 } from '../leasehold/lease-tract-rows';
+import { distinctLesseeNames } from '../leasehold/lessee-names';
 import { useOwnerStore } from '../../store/owner-store';
 import { useWorkspaceStore } from '../../store/workspace-store';
 import type { OwnershipNode } from '../../types/node';
@@ -300,6 +301,10 @@ export default function AttachLeaseModal({
     ),
     [isParentMineral, mineralOwnerIds, owners]
   );
+  // Suggest lessees already used anywhere in the project so the operator can
+  // click an existing name instead of retyping it. Assist only — typing a
+  // brand-new lessee is always allowed.
+  const lesseeSuggestions = useMemo(() => distinctLesseeNames(leases), [leases]);
   const leaseScopeIndex = useMemo(() => buildLeaseScopeIndex(nodes), [nodes]);
   const leaseNodesForParent = useMemo(
     () => nodes.filter((node) => node.parentId === parentNode.id && isLeaseNode(node)),
@@ -720,6 +725,7 @@ export default function AttachLeaseModal({
               label="Lessee"
               value={lprDraft.lesseeName}
               onChange={(value) => setLpr('lesseeName', value)}
+              suggestions={lesseeSuggestions}
             />
             <div>
               <label className="text-[10px] text-ink-light uppercase tracking-wider block mb-1">

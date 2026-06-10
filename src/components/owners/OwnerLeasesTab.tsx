@@ -1,6 +1,8 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import FormField from '../shared/FormField';
 import { useConfirmation } from '../shared/ConfirmationProvider';
+import { distinctLesseeNames } from '../leasehold/lessee-names';
+import { useOwnerStore } from '../../store/owner-store';
 import { READ_ONLY_WORKSPACE_EDIT_TITLE } from '../../store/write-lease-store';
 import {
   LEASE_STATUS_OPTIONS,
@@ -48,6 +50,13 @@ export default function OwnerLeasesTab({
   const [draft, setDraft] = useState<Lease | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  // Suggest lessees from every lease in the project, not just this owner's
+  // (the `leases` prop is owner-filtered).
+  const allLeases = useOwnerStore((state) => state.leases);
+  const lesseeSuggestions = useMemo(
+    () => distinctLesseeNames(allLeases),
+    [allLeases]
+  );
 
   const beginAdd = () => {
     if (readOnly) return;
@@ -97,6 +106,7 @@ export default function OwnerLeasesTab({
               value={draft.lessee}
               onChange={(value) => set('lessee', value)}
               disabled={readOnly}
+              suggestions={lesseeSuggestions}
             />
             <FormField
               label="Royalty"
