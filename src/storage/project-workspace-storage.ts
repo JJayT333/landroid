@@ -14,6 +14,10 @@ import {
   upsertSavedProjectFromWorkspace,
   type SavedProjectSummary,
 } from './saved-project-index';
+import {
+  assertWorkspaceWriteFence,
+  ensureWorkspaceWritable,
+} from './workspace-write-lease';
 import type { CanvasSaveData } from '../store/canvas-store';
 
 type IdField = 'id' | 'docId' | 'attachmentId';
@@ -286,7 +290,14 @@ export async function renameProjectInStorage(
     db.workspaces.get(project.workspaceDbKey),
   ]);
 
-  await db.transaction('rw', db.workspaceManifestShards, db.workspaces, async () => {
+  // DA-M15: renaming rewrites the project's shards/monolith — require that
+  // workspace's write lease so a reader tab cannot rename it under the writer.
+  const writable = await ensureWorkspaceWritable(project.workspaceId);
+  if (!writable) {
+    throw new Error('Project is read-only because another tab holds its write lease.');
+  }
+  await db.transaction('rw', db.workspaceWriteLeases, db.workspaceManifestShards, db.workspaces, async () => {
+    await assertWorkspaceWriteFence(project.workspaceId);
     for (const manifest of manifestRows) {
       await db.workspaceManifestShards.put({
         ...manifest,
@@ -319,6 +330,12 @@ export async function renameProjectInStorage(
 }
 
 export async function deleteProjectStorage(project: SavedProjectSummary): Promise<void> {
+  // DA-M15: deleting a project (including its title ledger rows) requires that
+  // workspace's write lease — a reader tab cannot delete it under the writer.
+  const writable = await ensureWorkspaceWritable(project.workspaceId);
+  if (!writable) {
+    throw new Error('Project is read-only because another tab holds its write lease.');
+  }
   await db.transaction(
     'rw',
     [
@@ -351,6 +368,7 @@ export async function deleteProjectStorage(project: SavedProjectSummary): Promis
       db.titleAuditEvents,
     ],
     async () => {
+      await assertWorkspaceWriteFence(project.workspaceId);
       await clearWorkspaceRows(db.workspaceManifestShards, project.workspaceDbKey, project.workspaceId);
       await clearWorkspaceRows(db.deskMapShards, project.workspaceDbKey, project.workspaceId);
       await clearWorkspaceRows(db.ownershipNodeCompatShards, project.workspaceDbKey, project.workspaceId);
@@ -389,6 +407,13 @@ export async function duplicateProjectStorage(
   canvas: CanvasSaveData | null,
   createdAt = nowIso()
 ): Promise<void> {
+  // DA-M15: hold the SOURCE workspace's lease for the copy so another tab
+  // cannot mutate it mid-duplicate and produce a torn copy. The fresh target
+  // has no contention by construction.
+  const writable = await ensureWorkspaceWritable(source.workspaceId);
+  if (!writable) {
+    throw new Error('Source project is read-only because another tab holds its write lease.');
+  }
   await saveProjectWorkspaceSnapshot(workspace, target.workspaceDbKey, createdAt);
   if (canvas) await saveProjectCanvas(canvas, target.workspaceDbKey, createdAt);
 
