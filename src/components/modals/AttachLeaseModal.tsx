@@ -66,6 +66,149 @@ export function getAttachLeaseModalTexasMathError(
   return isTexasMathLease(lease) ? null : NON_TEXAS_LEASE_ATTACHMENT_MESSAGE;
 }
 
+/** Store actions the tract reconcile needs; injected so it is unit-testable. */
+interface TractReconcileActions {
+  addLease: (lease: Lease) => Promise<void>;
+  updateLease: (id: string, fields: Partial<Lease>) => Promise<void>;
+  removeLease: (id: string) => Promise<void>;
+  addNode: (node: OwnershipNode) => void;
+  updateNode: (id: string, fields: Partial<OwnershipNode>) => void;
+  removeNode: (id: string) => void;
+  addNodeToDeskMap: (nodeId: string, deskMapId: string) => void;
+}
+
+/**
+ * Reconcile the desired (checked) tracts against the existing slices/nodes for
+ * this LPR: create new, update kept, delete unchecked. Each lessee node lands
+ * on its own tract's desk map. Returns the originating tract's lessee node id
+ * (PDF attachment / onSaved focus target), or null when the originating tract
+ * was not materialized. Exported for tests; the save handler is the only
+ * runtime caller.
+ */
+export async function reconcileLeaseTractNodes({
+  tractDrafts,
+  parentNode,
+  ownerId,
+  resolvedWorkspaceId,
+  nodes,
+  leases,
+  leaseOverrides,
+  normalizedInterestByNode,
+  actions,
+}: {
+  tractDrafts: readonly TractDraft[];
+  parentNode: OwnershipNode;
+  ownerId: string;
+  resolvedWorkspaceId: string;
+  nodes: OwnershipNode[];
+  leases: Lease[];
+  leaseOverrides: Partial<Lease>;
+  normalizedInterestByNode: ReadonlyMap<string, string>;
+  actions: TractReconcileActions;
+}): Promise<string | null> {
+  const {
+    addLease,
+    updateLease,
+    removeLease,
+    addNode,
+    updateNode,
+    removeNode,
+    addNodeToDeskMap,
+  } = actions;
+  const plan = planTractReconcile(tractDrafts);
+  let originatingNodeId: string | null = null;
+  for (const tract of [...plan.create, ...plan.update, ...plan.remove]) {
+    const isOriginating = tract.mineralNodeId === parentNode.id;
+    const buildParentNode = isOriginating
+      ? { ...parentNode, linkedOwnerId: ownerId }
+      : nodes.find((node) => node.id === tract.mineralNodeId) ?? null;
+
+    if (tract.checked) {
+      if (!buildParentNode) continue;
+      const perTractFields = {
+        leaseName: tract.leaseName,
+        grossAcres: tract.grossAcres,
+        status: tract.status,
+        docNo: tract.docNo,
+        leasedInterest:
+          normalizedInterestByNode.get(tract.mineralNodeId) ?? '',
+      };
+
+      if (tract.existingLeaseId) {
+        const existing = leases.find(
+          (lease) => lease.id === tract.existingLeaseId
+        );
+        const leaseRecord = {
+          ...(existing ?? createBlankLease(resolvedWorkspaceId, ownerId)),
+          ...perTractFields,
+          ...leaseOverrides,
+          id: tract.existingLeaseId,
+          workspaceId: resolvedWorkspaceId,
+        };
+        await updateLease(tract.existingLeaseId, leaseRecord);
+        if (tract.existingLeaseNodeId) {
+          const existingNode =
+            nodes.find((node) => node.id === tract.existingLeaseNodeId) ?? null;
+          updateNode(
+            tract.existingLeaseNodeId,
+            buildLeaseNode({
+              id: tract.existingLeaseNodeId,
+              parentNode: buildParentNode,
+              lease: leaseRecord,
+              existingNode,
+            })
+          );
+          if (isOriginating) originatingNodeId = tract.existingLeaseNodeId;
+        } else {
+          // Record created before node (e.g. via the Owners "Add Lease" form,
+          // then "Create Tract N" here): the slice exists but no lessee node
+          // does. Previously a silent no-op — create the missing node exactly
+          // like the create branch below.
+          const newNodeId = `node-${Date.now()}-${Math.random()
+            .toString(36)
+            .slice(2, 6)}-${tract.mineralNodeId.slice(-4)}`;
+          addNode(
+            buildLeaseNode({
+              id: newNodeId,
+              parentNode: buildParentNode,
+              lease: leaseRecord,
+            })
+          );
+          addNodeToDeskMap(newNodeId, tract.deskMapId);
+          if (isOriginating) originatingNodeId = newNodeId;
+        }
+      } else {
+        const leaseRecord = createBlankLease(resolvedWorkspaceId, ownerId, {
+          ...perTractFields,
+          ...leaseOverrides,
+        });
+        await addLease(leaseRecord);
+        const newNodeId = `node-${Date.now()}-${Math.random()
+          .toString(36)
+          .slice(2, 6)}-${tract.mineralNodeId.slice(-4)}`;
+        addNode(
+          buildLeaseNode({
+            id: newNodeId,
+            parentNode: buildParentNode,
+            lease: leaseRecord,
+          })
+        );
+        addNodeToDeskMap(newNodeId, tract.deskMapId);
+        if (isOriginating) originatingNodeId = newNodeId;
+      }
+    } else if (tract.existingLeaseId) {
+      // Unchecked but previously leased: remove exactly this tract's slice
+      // and lessee node. Remove the slice explicitly first so it is gone
+      // synchronously; removeNode's owner cleanup would also cascade it.
+      await removeLease(tract.existingLeaseId);
+      if (tract.existingLeaseNodeId) {
+        removeNode(tract.existingLeaseNodeId);
+      }
+    }
+  }
+  return originatingNodeId;
+}
+
 /**
  * Collapsed-by-default disclosure used for the long, optional abstract sections
  * (provisions, attachments, preparer). Keeps the lease editor compact; native
@@ -444,80 +587,25 @@ export default function AttachLeaseModal({
       // Reconcile the desired (checked) tracts against the existing slices/nodes
       // for this LPR: create new, update kept, delete unchecked. Each lessee node
       // lands on its own tract's desk map.
-      const plan = planTractReconcile(tractDrafts);
-      let originatingNodeId: string | null = null;
-      for (const tract of [...plan.create, ...plan.update, ...plan.remove]) {
-        const isOriginating = tract.mineralNodeId === parentNode.id;
-        const buildParentNode = isOriginating
-          ? { ...parentNode, linkedOwnerId: ownerId }
-          : nodes.find((node) => node.id === tract.mineralNodeId) ?? null;
-
-        if (tract.checked) {
-          if (!buildParentNode) continue;
-          const perTractFields = {
-            leaseName: tract.leaseName,
-            grossAcres: tract.grossAcres,
-            status: tract.status,
-            docNo: tract.docNo,
-            leasedInterest:
-              normalizedInterestByNode.get(tract.mineralNodeId) ?? '',
-          };
-
-          if (tract.existingLeaseId) {
-            const existing = leases.find(
-              (lease) => lease.id === tract.existingLeaseId
-            );
-            const leaseRecord = {
-              ...(existing ?? createBlankLease(resolvedWorkspaceId, ownerId)),
-              ...perTractFields,
-              ...leaseOverrides,
-              id: tract.existingLeaseId,
-              workspaceId: resolvedWorkspaceId,
-            };
-            await updateLease(tract.existingLeaseId, leaseRecord);
-            if (tract.existingLeaseNodeId) {
-              const existingNode =
-                nodes.find((node) => node.id === tract.existingLeaseNodeId) ?? null;
-              updateNode(
-                tract.existingLeaseNodeId,
-                buildLeaseNode({
-                  id: tract.existingLeaseNodeId,
-                  parentNode: buildParentNode,
-                  lease: leaseRecord,
-                  existingNode,
-                })
-              );
-              if (isOriginating) originatingNodeId = tract.existingLeaseNodeId;
-            }
-          } else {
-            const leaseRecord = createBlankLease(resolvedWorkspaceId, ownerId, {
-              ...perTractFields,
-              ...leaseOverrides,
-            });
-            await addLease(leaseRecord);
-            const newNodeId = `node-${Date.now()}-${Math.random()
-              .toString(36)
-              .slice(2, 6)}-${tract.mineralNodeId.slice(-4)}`;
-            addNode(
-              buildLeaseNode({
-                id: newNodeId,
-                parentNode: buildParentNode,
-                lease: leaseRecord,
-              })
-            );
-            addNodeToDeskMap(newNodeId, tract.deskMapId);
-            if (isOriginating) originatingNodeId = newNodeId;
-          }
-        } else if (tract.existingLeaseId) {
-          // Unchecked but previously leased: remove exactly this tract's slice
-          // and lessee node. Remove the slice explicitly first so it is gone
-          // synchronously; removeNode's owner cleanup would also cascade it.
-          await removeLease(tract.existingLeaseId);
-          if (tract.existingLeaseNodeId) {
-            removeNode(tract.existingLeaseNodeId);
-          }
-        }
-      }
+      const originatingNodeId = await reconcileLeaseTractNodes({
+        tractDrafts,
+        parentNode,
+        ownerId,
+        resolvedWorkspaceId,
+        nodes,
+        leases,
+        leaseOverrides,
+        normalizedInterestByNode,
+        actions: {
+          addLease,
+          updateLease,
+          removeLease,
+          addNode,
+          updateNode,
+          removeNode,
+          addNodeToDeskMap,
+        },
+      });
 
       // No tracts left under this LPR: drop the orphan parent record.
       if (!hasChecked && existingLpr) {
