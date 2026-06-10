@@ -668,6 +668,7 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
     })),
 
   createDeskMap: (name, code, initialNodeIds, fields = {}) => {
+    const before = get();
     const id = `dm-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
     const normalized = normalizeDeskMap(
       {
@@ -691,6 +692,9 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
         ? normalized.unitCode
         : resolveActiveUnitCode([...state.deskMaps, normalized], state.activeUnitCode, id),
     }));
+    // Title-visible when initialNodeIds is non-empty (membership lands in
+    // interest_reference.deskMapIds) — e.g. Add Root creating its first tract.
+    journalTitleMutation('update', before, get());
     return id;
   },
 
@@ -780,6 +784,7 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
       lastAudit: null,
       lastError: null,
     });
+    journalTitleMutation('deleteNode', state, get());
 
     void cascadeDeleteDocsForRemovedNodes(removedNodes).catch((err) => {
       const message = err instanceof Error ? err.message : String(err);
@@ -801,10 +806,11 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
     });
   },
 
-  deleteDeskMap: (id) =>
+  deleteDeskMap: (id) => {
+    const before = get();
+    void useMapStore.getState().unlinkDeskMap(id);
+    useCurativeStore.getState().unlinkDeskMap(id);
     set((state) => {
-      void useMapStore.getState().unlinkDeskMap(id);
-      useCurativeStore.getState().unlinkDeskMap(id);
       const remainingDeskMaps = state.deskMaps.filter((dm) => dm.id !== id);
       const activeDeskMapId = state.activeDeskMapId === id
         ? (remainingDeskMaps[0]?.id ?? null)
@@ -829,7 +835,9 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
           : activeDeskMapId,
         activeUnitCode,
       };
-    }),
+    });
+    journalTitleMutation('update', before, get());
+  },
 
   getActiveDeskMapNodes: () => {
     const { nodes, deskMaps, activeDeskMapId } = get();
@@ -1264,7 +1272,8 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
     journalTitleMutation('update', before, get());
   },
 
-  addNodeToActiveDeskMap: (nodeId) =>
+  addNodeToActiveDeskMap: (nodeId) => {
+    const before = get();
     set((state) => {
       const targetDeskMapId = resolveActiveDeskMapId(state.deskMaps, state.activeDeskMapId);
       if (!targetDeskMapId) return {};
@@ -1276,9 +1285,12 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
             : dm
         ),
       };
-    }),
+    });
+    journalTitleMutation('update', before, get());
+  },
 
-  addNodeToDeskMap: (nodeId, deskMapId) =>
+  addNodeToDeskMap: (nodeId, deskMapId) => {
+    const before = get();
     set((state) => {
       const target = state.deskMaps.find((dm) => dm.id === deskMapId);
       if (!target) {
@@ -1290,7 +1302,9 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
           dm.id === deskMapId ? { ...dm, nodeIds: [...dm.nodeIds, nodeId] } : dm
         ),
       };
-    }),
+    });
+    journalTitleMutation('update', before, get());
+  },
 
   restoreTitleSlice: (before) =>
     set((state) => {

@@ -640,3 +640,116 @@ describe('Phase 4 title read-source cutover (rollback-on-divergence)', () => {
     expect(checkSpy.current).not.toHaveBeenCalled();
   });
 });
+
+describe('DA-C1: previously-unjournaled title-visible actions now journal', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    recordSpy.current = vi.fn(recordSpy.real!);
+    checkSpy.current = vi.fn(checkSpy.real!);
+    reset();
+  });
+
+  it('clearDeskMapNodes journals a deleteNode whose replay matches the adapter', async () => {
+    const store = () => useWorkspaceStore.getState();
+    store().createRootNode('root', '1', { grantee: 'Root', interestClass: 'mineral', linkedOwnerId: 'owner-1' });
+    store().convey('root', 'child', '0.5', { grantee: 'Child' });
+    await settleTitleActionLog();
+    const recordsBefore = useTitleActionLog.getState().actionRecords.length;
+
+    store().clearDeskMapNodes(store().deskMaps[0].id);
+    await settleTitleActionLog();
+
+    const log = useTitleActionLog.getState();
+    expect(log.lastDivergence).toBeNull();
+    expect(log.lastError).toBeNull();
+    expect(store().nodes).toHaveLength(0);
+    expect(log.actionRecords).toHaveLength(recordsBefore + 1);
+    expect(log.actionRecords.at(-1)?.actionKind).toBe('title.delete_node');
+    expect((await verifyAuditChain(log.auditEvents)).valid).toBe(true);
+    expect(domainJson(replayTitleProjection(log.actionRecords))).toBe(
+      domainJson(adapterTitleRecordsForCurrent())
+    );
+  });
+
+  it('deleteDeskMap journals the surviving nodes’ membership change', async () => {
+    const store = () => useWorkspaceStore.getState();
+    store().createRootNode('root', '1', { grantee: 'Root', interestClass: 'mineral', linkedOwnerId: 'owner-1' });
+    store().createDeskMap('Tract 2', 'T2');
+    const [dm1, dm2] = store().deskMaps;
+    store().addNodeToDeskMap('root', dm2.id);
+    await settleTitleActionLog();
+    const recordsBefore = useTitleActionLog.getState().actionRecords.length;
+
+    store().deleteDeskMap(dm1.id);
+    await settleTitleActionLog();
+
+    const log = useTitleActionLog.getState();
+    expect(log.lastDivergence).toBeNull();
+    expect(log.actionRecords).toHaveLength(recordsBefore + 1);
+    expect(log.actionRecords.at(-1)?.actionKind).toBe('title.update');
+    // the node survives the map deletion; the ledger sees its new membership
+    expect(store().nodes.some((n) => n.id === 'root')).toBe(true);
+    expect(domainJson(replayTitleProjection(log.actionRecords))).toBe(
+      domainJson(adapterTitleRecordsForCurrent())
+    );
+  });
+
+  it('addNodeToDeskMap journals the deskMapIds update on the interest record', async () => {
+    const store = () => useWorkspaceStore.getState();
+    store().createRootNode('root', '1', { grantee: 'Root', interestClass: 'mineral', linkedOwnerId: 'owner-1' });
+    store().createDeskMap('Tract 2', 'T2');
+    const dm2 = store().deskMaps[1];
+    await settleTitleActionLog();
+    const recordsBefore = useTitleActionLog.getState().actionRecords.length;
+
+    store().addNodeToDeskMap('root', dm2.id);
+    await settleTitleActionLog();
+
+    const log = useTitleActionLog.getState();
+    expect(log.lastDivergence).toBeNull();
+    expect(log.actionRecords).toHaveLength(recordsBefore + 1);
+    expect(log.actionRecords.at(-1)?.actionKind).toBe('title.update');
+    const replayed = replayTitleProjection(log.actionRecords);
+    expect(findInterestRecord(replayed, 'root')?.deskMapIds).toContain(
+      stableRecordId(WS, 'desk-map', dm2.id)
+    );
+    expect(domainJson(replayed)).toBe(domainJson(adapterTitleRecordsForCurrent()));
+  });
+
+  it('createDeskMap with initial members journals their membership (Add Root path)', async () => {
+    const store = () => useWorkspaceStore.getState();
+    store().createRootNode('root', '1', { grantee: 'Root', interestClass: 'mineral', linkedOwnerId: 'owner-1' });
+    await settleTitleActionLog();
+    const recordsBefore = useTitleActionLog.getState().actionRecords.length;
+
+    store().createDeskMap('Tract 2', 'T2', ['root']);
+    await settleTitleActionLog();
+
+    const log = useTitleActionLog.getState();
+    expect(log.lastDivergence).toBeNull();
+    expect(log.lastError).toBeNull();
+    expect(log.actionRecords).toHaveLength(recordsBefore + 1);
+    expect(log.actionRecords.at(-1)?.actionKind).toBe('title.update');
+    expect(domainJson(replayTitleProjection(log.actionRecords))).toBe(
+      domainJson(adapterTitleRecordsForCurrent())
+    );
+  });
+
+  it('addNodeToActiveDeskMap journals the membership of an orphan node', async () => {
+    const store = () => useWorkspaceStore.getState();
+    store().addNode(titleNode({ id: 'n2', grantee: 'Orphan', fraction: '0.25', initialFraction: '0.25' }));
+    await settleTitleActionLog();
+    const recordsBefore = useTitleActionLog.getState().actionRecords.length;
+
+    store().addNodeToActiveDeskMap('n2');
+    await settleTitleActionLog();
+
+    const log = useTitleActionLog.getState();
+    expect(log.lastDivergence).toBeNull();
+    expect(log.actionRecords).toHaveLength(recordsBefore + 1);
+    expect(log.actionRecords.at(-1)?.actionKind).toBe('title.update');
+    expect(domainJson(replayTitleProjection(log.actionRecords))).toBe(
+      domainJson(adapterTitleRecordsForCurrent())
+    );
+  });
+});
