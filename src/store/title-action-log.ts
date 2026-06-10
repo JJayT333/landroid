@@ -533,29 +533,42 @@ export function ensureTitleBaseline(
 
 setTitleJournalHook((mutation, beforeWorkspace, afterWorkspace) => {
   const state = useTitleActionLog.getState();
-  if (!state.enabled) return;
+  if (!state.enabled) return { rolledBack: false };
 
   // Read-source cutover: the ledger is authoritative for what the live UI shows,
   // so a parity-diverged mutation must not survive in the store. The parity check
   // is synchronous, so we veto and roll back to the before-snapshot here — atomic
   // with the mutation, before any read — and keep the diverged record out of the
-  // ledger (the store now matches ledger state). Shadow mode is unchanged below.
+  // ledger (the store now matches ledger state). The verdict is returned to the
+  // mutator (DA-H3) so it reports failure and skips its cascades. A parity check
+  // that THROWS is an unverified mutation: in cutover the ledger has veto power,
+  // so that rolls back too rather than letting unverified state stand. Shadow
+  // mode is unchanged below.
   if (state.readPathMode === 'cutover' && isTitleMutation(mutation)) {
-    const parity = checkTitleInlineParity({
-      mutation,
-      origin: 'user',
-      beforeWorkspace,
-      afterWorkspace,
-      ownerData: readOwnerData(),
-    });
-    if (!parity.clean) {
+    let parityClean = false;
+    let failureMessage =
+      'Cutover parity divergence: the mutation was rolled back so the store '
+      + 'matches the durable ledger. Resolve before relying on cutover.';
+    try {
+      parityClean = checkTitleInlineParity({
+        mutation,
+        origin: 'user',
+        beforeWorkspace,
+        afterWorkspace,
+        ownerData: readOwnerData(),
+      }).clean;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      failureMessage =
+        `Cutover parity check failed to run (${message}): the mutation was `
+        + 'rolled back because it could not be verified against the ledger.';
+    }
+    if (!parityClean) {
       useWorkspaceStore.getState().restoreTitleSlice(beforeWorkspace);
       useTitleActionLog.setState({
         lastDivergence: {
           mutation,
-          message:
-            'Cutover parity divergence: the mutation was rolled back so the store '
-            + 'matches the durable ledger. Resolve before relying on cutover.',
+          message: failureMessage,
           at: new Date().toISOString(),
         },
       });
@@ -563,7 +576,7 @@ setTitleJournalHook((mutation, beforeWorkspace, afterWorkspace) => {
         '[title-action-log] CUTOVER ROLLBACK — mutation reverted to keep the store '
           + `equal to the ledger (read source of truth): ${mutation}.`
       );
-      return;
+      return { rolledBack: true };
     }
   }
 
@@ -585,6 +598,7 @@ setTitleJournalHook((mutation, beforeWorkspace, afterWorkspace) => {
     });
   });
   track(recordingChain);
+  return { rolledBack: false };
 });
 
 setTitleActionLogResetHook(() => {

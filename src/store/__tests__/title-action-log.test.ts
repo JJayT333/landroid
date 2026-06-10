@@ -620,6 +620,52 @@ describe('Phase 4 title read-source cutover (rollback-on-divergence)', () => {
     expect(log.lastDivergence?.mutation).toBe('createRootNode');
   });
 
+  it('returns failure from the mutator and skips cascades on a cutover rollback (DA-H3)', async () => {
+    useWorkspaceStore.getState().createRootNode('root', '1', { grantee: 'Root' });
+    useWorkspaceStore.getState().convey('root', 'child', '0.5', { grantee: 'Child' });
+    await settleTitleActionLog();
+    useTitleActionLog.getState().flipToCutover({ reviewerApprovalToken: 'reviewer', ready: true });
+    vi.clearAllMocks();
+
+    // Force the next parity check to diverge: the delete must be vetoed.
+    checkSpy.current = vi.fn().mockReturnValueOnce({
+      clean: false,
+      reports: [{ workflow: 'title_tree', clean: false, expectedCount: 1, derivedCount: 0, divergences: [] }],
+    });
+    useWorkspaceStore.getState().removeNode('child');
+    await settleTitleActionLog();
+
+    // Rolled back: node restored, destructive cascades never fired.
+    expect(useWorkspaceStore.getState().nodes.some((n) => n.id === 'child')).toBe(true);
+    expect(docMocks.deleteDocsForAttachments).not.toHaveBeenCalled();
+    expect(otherMocks.unlinkNode).not.toHaveBeenCalled();
+    expect(useWorkspaceStore.getState().lastError).toMatch(/Mutation reverted: cutover parity divergence/);
+
+    // And a boolean mutator reports the veto as failure.
+    checkSpy.current = vi.fn().mockReturnValueOnce({
+      clean: false,
+      reports: [{ workflow: 'title_tree', clean: false, expectedCount: 1, derivedCount: 0, divergences: [] }],
+    });
+    const ok = useWorkspaceStore.getState().convey('root', 'child2', '0.1', { grantee: 'C2' });
+    expect(ok).toBe(false);
+    expect(useWorkspaceStore.getState().nodes.some((n) => n.id === 'child2')).toBe(false);
+  });
+
+  it('rolls back when the cutover parity check throws (unverified mutation is vetoed)', async () => {
+    useTitleActionLog.getState().flipToCutover({ reviewerApprovalToken: 'reviewer', ready: true });
+    checkSpy.current = vi.fn(() => {
+      throw new Error('parity exploded');
+    });
+
+    const ok = useWorkspaceStore.getState().createRootNode('root', '1', { grantee: 'Root' });
+    await settleTitleActionLog();
+
+    expect(ok).toBe(false);
+    expect(useWorkspaceStore.getState().nodes.some((n) => n.id === 'root')).toBe(false);
+    expect(useTitleActionLog.getState().lastDivergence?.message).toMatch(/failed to run/);
+    expect(useTitleActionLog.getState().actionRecords).toHaveLength(0);
+  });
+
   it('does NOT roll back in shadow mode (surface-only behavior preserved)', async () => {
     // Even if the cutover check would diverge, shadow never invokes it.
     checkSpy.current = vi.fn().mockReturnValue({
