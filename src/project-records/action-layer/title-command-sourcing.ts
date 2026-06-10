@@ -53,6 +53,7 @@ import { encodeSurfaceRecordsAsCommandLog } from './encoders';
 import {
   assertParityClean,
   diffRecordSets,
+  isParityClean,
   runSurfaceParity,
   type ParityReport,
 } from './parity';
@@ -314,7 +315,18 @@ export async function materializeTitleCommand(input: {
  *  2. Round-trip: the after title projection round-trips through encode→reduce
  *     with no loss (the standing parity invariant for the surface).
  */
-export function assertTitleInlineParity(input: {
+// Fixed timestamp for the synchronous parity check: before/after records share it
+// so the generated timestamp cancels and only real title changes diverge.
+const PARITY_CHECK_GENERATED_AT = '2000-01-01T00:00:00.000Z';
+
+/**
+ * Build the two inline parity reports for a title mutation WITHOUT throwing:
+ * (1) the delta reproduces the after-projection when the command is replayed on
+ * the before-projection, and (2) the after-projection round-trips through
+ * encode/reduce. Shared by the throwing assert and the non-throwing check so the
+ * parity logic lives in one place.
+ */
+function buildTitleInlineParityReports(input: {
   beforeRecords: readonly BackendSpineCoreRecord[];
   afterRecords: readonly BackendSpineCoreRecord[];
   command: ActionCommand;
@@ -340,9 +352,61 @@ export function assertTitleInlineParity(input: {
     currentStoreRecords: input.afterRecords,
   });
 
-  const reports = [deltaReport, roundTripReport];
+  return [deltaReport, roundTripReport];
+}
+
+export function assertTitleInlineParity(input: {
+  beforeRecords: readonly BackendSpineCoreRecord[];
+  afterRecords: readonly BackendSpineCoreRecord[];
+  command: ActionCommand;
+}): ParityReport[] {
+  const reports = buildTitleInlineParityReports(input);
   assertParityClean(reports); // throws ParityDivergenceError on any divergence
   return reports;
+}
+
+/**
+ * Synchronous, non-throwing parity check over before/after workspace snapshots.
+ * This is the same parity the recorder runs (minus the async audit-chain append),
+ * so the cutover write path can decide synchronously — at mutation time — whether
+ * a mutation diverges and must be rolled back. Reuses the canonical adapter and
+ * the shared report builder; never re-derives the math.
+ */
+export function checkTitleInlineParity(input: {
+  mutation: TitleMutation;
+  origin: ActionCommand['origin'];
+  beforeWorkspace: WorkspaceData;
+  afterWorkspace: WorkspaceData;
+  ownerData?: OwnerSlice;
+}): { clean: boolean; reports: ParityReport[] } {
+  // before/after use the same projectId + generatedAt so those fields cancel in
+  // the diff; only real title-record changes can register as a divergence.
+  const adapterBase = {
+    ownerData: input.ownerData,
+    projectId: input.afterWorkspace.workspaceId,
+    generatedAt: PARITY_CHECK_GENERATED_AT,
+  };
+  const beforeRecords = titleRecordsFromWorkspace({
+    workspace: input.beforeWorkspace,
+    ...adapterBase,
+  });
+  const afterRecords = titleRecordsFromWorkspace({
+    workspace: input.afterWorkspace,
+    ...adapterBase,
+  });
+  const delta = diffTitleMutation({
+    beforeRecords,
+    afterRecords,
+    beforeNodes: input.beforeWorkspace.nodes,
+    afterNodes: input.afterWorkspace.nodes,
+  });
+  const command = buildTitleCommand({
+    mutation: input.mutation,
+    origin: input.origin,
+    effects: delta.effects,
+  });
+  const reports = buildTitleInlineParityReports({ beforeRecords, afterRecords, command });
+  return { clean: isParityClean(reports), reports };
 }
 
 export interface TitleMutationRecordResult {

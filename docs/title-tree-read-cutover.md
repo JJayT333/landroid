@@ -1,7 +1,7 @@
 # Title-tree read cutover
 
-Status: Scope A delivered on `feat/title-tree-record-cutover` (in review). Scope B
-(live Desk Map read-source move) is scoped and deferred below.
+Status: Scope A delivered (PR #138, merged). Scope B (ledger-authoritative live reads)
+delivered on `feat/title-tree-read-source-cutover` (in review).
 
 ## Background
 
@@ -49,19 +49,31 @@ the project-records read source, behind a reversible flip, with the gates provin
 ledger reconstructs title (records + MathInputView + `.landroid` round trip). Springhill
 and the Phase 0 goldens are unaffected.
 
-## Scope B — deferred follow-up
+## Scope B — delivered (ledger-authoritative live reads)
 
-Route the live Desk Map / Leasehold ownership reads + the math through
-`reconstructTitleNodes(replayTitleProjection(ledger))` instead of the store. This is the
-true canonical-read-source end state and the highest-risk change in the rebuild, because
-it **inverts the current divergence invariant**: today a diverged or in-flight mutation
-is dropped from the ledger and the store stays canonical (safe because reads come from
-the store); under Scope B, ledger-backed reads make divergence a data-loss-in-view risk,
-so divergence must become a hard block/rollback rather than a surface. It also needs a
-cached, deterministically ordered projection (open question: canonical replay order on
-`appliedAt` + a monotonic sequence), reconciliation of store-owned desk-map membership
-with ledger-owned node ownership, and a `deleteNode` undo boundary kept consistent.
-Build it on Scope A's proven-green gate.
+Scope B makes the ledger authoritative for what the live UI shows, without rewriting any
+screen. Two facts made a per-consumer rewrite unnecessary: (1) when a mutation passes its
+parity check the store **already equals** what the ledger records (the ledger's
+`titleNodeSnapshots` are the engine's own output), so the store can only drift from the
+ledger on a mutation that *fails* the check; and (2) `assertTitleInlineParity` is
+synchronous and every title mutation flows through one chokepoint, `journalTitleMutation`.
+
+So Scope B is a single rule: **in cutover, if a mutation fails the synchronous parity
+check, roll the store back to the pre-mutation snapshot** (`restoreTitleSlice`,
+`store/workspace-store.ts`) so the store never holds state the ledger rejected, and keep
+the diverged record out of the ledger. The check is factored as `checkTitleInlineParity`
+(`action-layer/title-command-sourcing.ts`, no new math, no async); the rollback is wired
+in the title journal hook (`store/title-action-log.ts`) for cutover only. The store thus
+stays provably equal to the ledger projection, every existing screen reads it unchanged,
+and the ledger has veto power. **Shadow mode is untouched** (divergence surfaced, store
+stays canonical); the flip stays default-off and reversible via `revertReadPathToShadow()`.
+
+This deliberately did **not** add a cached/ordered projection, per-consumer selector, or
+re-derive-on-render — none are needed while the store is kept equal to the ledger by
+rollback. Known follow-ups: a diverged `deleteNode` rolls back the title slice but not its
+already-fired async owner/document cascade (divergence is not expected once the gates are
+green); the sync check recomputes records the async recorder also builds (minor); and a
+cached projection only becomes relevant if reads ever move off the store.
 
 ## Revert recipe
 

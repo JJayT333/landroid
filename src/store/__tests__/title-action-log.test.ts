@@ -27,6 +27,12 @@ const recordSpy = vi.hoisted(() => ({
   current: null as null | ((...args: any[]) => any),
   real: null as null | ((...args: any[]) => any),
 }));
+// Same pattern for the synchronous cutover parity check, so tests can force a
+// rollback by overriding `current` for one call.
+const checkSpy = vi.hoisted(() => ({
+  current: null as null | ((...args: any[]) => any),
+  real: null as null | ((...args: any[]) => any),
+}));
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
 vi.mock('../../storage/document-store', () => docMocks);
@@ -51,9 +57,14 @@ vi.mock('../../project-records/action-layer/title-command-sourcing', async (impo
   recordSpy.current = vi.fn(actual.recordTitleMutation);
   const wrapped = (...args: Parameters<typeof actual.recordTitleMutation>) =>
     recordSpy.current!(...args);
+  checkSpy.real = actual.checkTitleInlineParity;
+  checkSpy.current = vi.fn(actual.checkTitleInlineParity);
+  const wrappedCheck = (...args: Parameters<typeof actual.checkTitleInlineParity>) =>
+    checkSpy.current!(...args);
   return {
     ...actual,
     recordTitleMutation: wrapped as typeof actual.recordTitleMutation,
+    checkTitleInlineParity: wrappedCheck as typeof actual.checkTitleInlineParity,
   };
 });
 
@@ -548,5 +559,84 @@ describe('Phase 4 LIVE title journal (real store auto-records)', () => {
     expect(useTitleActionLog.getState().actionRecords).toHaveLength(0);
     // store still canonical
     expect(useWorkspaceStore.getState().nodes.some((n) => n.id === 'root')).toBe(true);
+  });
+});
+
+describe('Phase 4 title read-source cutover (rollback-on-divergence)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    recordSpy.current = vi.fn(recordSpy.real!);
+    checkSpy.current = vi.fn(checkSpy.real!);
+    reset();
+    useTitleActionLog.getState().revertReadPathToShadow();
+  });
+
+  it('keeps the store equal to the ledger projection for a clean cutover mutation', async () => {
+    useTitleActionLog.getState().flipToCutover({ reviewerApprovalToken: 'reviewer', ready: true });
+    useWorkspaceStore.getState().createRootNode('root', '1', { grantee: 'Root' });
+    await settleTitleActionLog();
+
+    const log = useTitleActionLog.getState();
+    expect(log.readPathMode).toBe('cutover');
+    expect(log.lastDivergence).toBeNull();
+    expect(log.recordedMutationCount).toBe(1);
+    expect(useWorkspaceStore.getState().nodes.some((n) => n.id === 'root')).toBe(true);
+    // The store is provably the ledger's projection.
+    expect(domainJson(replayTitleProjection(log.actionRecords))).toBe(
+      domainJson(adapterTitleRecordsForCurrent())
+    );
+  });
+
+  it('rolls the store back to the pre-mutation snapshot on a cutover divergence', async () => {
+    useTitleActionLog.getState().flipToCutover({ reviewerApprovalToken: 'reviewer', ready: true });
+    const before = workspaceSnapshot();
+    // Force the synchronous cutover parity check to diverge for this mutation.
+    checkSpy.current = vi.fn().mockReturnValueOnce({
+      clean: false,
+      reports: [{ workflow: 'title_tree', clean: false, expectedCount: 1, derivedCount: 0, divergences: [] }],
+    });
+
+    useWorkspaceStore.getState().createRootNode('root', '1', { grantee: 'Root' });
+    await settleTitleActionLog();
+
+    const log = useTitleActionLog.getState();
+    // The diverged mutation was rolled out of the store AND kept out of the ledger.
+    expect(useWorkspaceStore.getState().nodes.some((n) => n.id === 'root')).toBe(false);
+    expect(useWorkspaceStore.getState().nodes).toEqual(before.nodes);
+    expect(useWorkspaceStore.getState().deskMaps).toEqual(before.deskMaps);
+    expect(log.recordedMutationCount).toBe(0);
+    expect(log.actionRecords).toHaveLength(0);
+    expect(log.lastDivergence?.mutation).toBe('createRootNode');
+  });
+
+  it('does NOT roll back in shadow mode (surface-only behavior preserved)', async () => {
+    // Even if the cutover check would diverge, shadow never invokes it.
+    checkSpy.current = vi.fn().mockReturnValue({
+      clean: false,
+      reports: [{ workflow: 'title_tree', clean: false, expectedCount: 1, derivedCount: 0, divergences: [] }],
+    });
+
+    useWorkspaceStore.getState().createRootNode('root', '1', { grantee: 'Root' });
+    await settleTitleActionLog();
+
+    // shadow keeps the store canonical and records via the (real) async recorder
+    expect(useWorkspaceStore.getState().nodes.some((n) => n.id === 'root')).toBe(true);
+    expect(useTitleActionLog.getState().recordedMutationCount).toBe(1);
+    expect(checkSpy.current).not.toHaveBeenCalled();
+  });
+
+  it('stops rolling back after reverting to shadow', async () => {
+    useTitleActionLog.getState().flipToCutover({ reviewerApprovalToken: 'reviewer', ready: true });
+    useTitleActionLog.getState().revertReadPathToShadow();
+    checkSpy.current = vi.fn().mockReturnValue({
+      clean: false,
+      reports: [{ workflow: 'title_tree', clean: false, expectedCount: 1, derivedCount: 0, divergences: [] }],
+    });
+
+    useWorkspaceStore.getState().createRootNode('root', '1', { grantee: 'Root' });
+    await settleTitleActionLog();
+
+    expect(useWorkspaceStore.getState().nodes.some((n) => n.id === 'root')).toBe(true);
+    expect(checkSpy.current).not.toHaveBeenCalled();
   });
 });

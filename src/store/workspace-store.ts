@@ -255,6 +255,12 @@ interface WorkspaceState {
    * the same placement rule `attachLease` follows for the parent's tract.
    */
   addNodeToDeskMap: (nodeId: string, deskMapId: string) => void;
+  /**
+   * Restore the title slice (`nodes` + `deskMaps`) to a prior snapshot WITHOUT
+   * journaling. Used by the title read cutover to roll back a parity-diverged
+   * mutation so the live store never holds state the durable ledger rejected.
+   */
+  restoreTitleSlice: (before: WorkspaceData) => void;
 
   // Document attachments (Phase 5 / ADR 0004)
   /**
@@ -1283,6 +1289,20 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
         deskMaps: state.deskMaps.map((dm) =>
           dm.id === deskMapId ? { ...dm, nodeIds: [...dm.nodeIds, nodeId] } : dm
         ),
+      };
+    }),
+
+  restoreTitleSlice: (before) =>
+    set((state) => {
+      const survivingIds = new Set(before.nodes.map((node) => node.id));
+      return {
+        nodes: before.nodes,
+        deskMaps: before.deskMaps,
+        activeNodeId:
+          state.activeNodeId && survivingIds.has(state.activeNodeId)
+            ? state.activeNodeId
+            : null,
+        lastError: null,
       };
     }),
 
