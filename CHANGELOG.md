@@ -5,6 +5,24 @@ stay short.
 
 ## 2026-06-10
 
+- Scope B hardening (`feat/scope-b-hardening`, deep-audit findings DA-C1,
+  DA-H2, DA-H3, DA-M14, DA-M15): journaled eight previously-silent
+  title-visible store mutations (desk-map membership and attachment-cache
+  changes project into title records); added the journal-coverage exit-gate
+  test (semantic check + completeness guard, the new permanent CI invariant);
+  disarmed the self-arming cutover flip (`cutoverEnabled` defaults false,
+  banner auto-flip removed, re-arm = deliberate `setTitleCutoverArmed(true)`
+  after the Springhill soak); journal hook returns a rollback verdict so
+  vetoed mutators report failure and skip destructive cascades, and hook
+  exceptions surface instead of being swallowed; AI undo now
+  hydrates-then-appends (`undoTitleActionRecord` gained its live caller;
+  `importAndOpenWorkspace` owns import ledger hydration); title-ledger writes
+  and project rename/delete/duplicate are fenced behind the write lease with
+  reader-tab hydration memory-only; and the write lease gained a TTL/3 writer
+  heartbeat with visibility pause. Docs: SECURITY.md multi-tab section and
+  docs/title-tree-read-cutover.md updated to match; audit-backlog statuses
+  applied.
+
 - Delivered Part 2 of the deep audit at `docs/deep-audit-2026-06-10-part2.md`
   covering the surfaces Part 1 skipped — Research, Curative, Flowchart/canvas,
   Maps/GIS, Federal Leasing, RRC decoders — with `DA2-*` findings and four
