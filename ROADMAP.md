@@ -66,8 +66,9 @@ those two files win.
   one design pass over the full list, then one golden-mastered slice at a time —
   over-conveyance stop-and-ask / Duhig suggestion (replaces the silent
   fraction-mode cap, DA-M1) → double-fraction input (verbatim clause + BOTH
-  readings, never auto-multiplied — Van Dyke presumption, TXM-002 in
-  `docs/research/txm-catalog-round-1.md`) → NPRI pooling-ratification
+  readings, never auto-multiplied — Van Dyke presumption; catalog R1 TXM-002 =
+  v1 TXM-004, see `docs/research/txm-catalog-round-2.md` ID warning) →
+  NPRI pooling-ratification
   tri-state + transfer-order hold (TXM-027: unratified NPRI pays only on
   its own tract's production) → unleased mineral-owner payout rows
   (TXM-028 cost-bearing co-tenant) → then NMA/DI, depth/substance/
