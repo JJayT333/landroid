@@ -24,18 +24,17 @@ goldens intact). Docs-only + comment-only changes since.
   legacy paths may be deleted opportunistically, each behind a deliberate
   golden/fixture update (the v7 migration golden would be retired, not
   silently broken).
-- CONFIDENTIAL: the future federal project's acreage figure must not appear
-  in the repo. It exists in 4 committed files on THIS UNPUSHED branch
-  (supplement, part-2 audit, ROADMAP, CHANGELOG); round 3 was redacted at
-  intake. The history scrub (decision deferred) MUST happen before any push.
+- CONFIDENTIALITY SCRUB WAIVED (operator decision, 2026-06-10): the planned
+  pre-push scrub of the federal project's acreage figure and footprint
+  references was waived; the operator chose to land the branch as-is with the
+  repo's public visibility surfaced and accepted. Any future sharing happens
+  from a separate repo.
 
 ## Plan for the next session — START HERE
 
 STEP 0 — Land this branch (first hour):
-1. Settle the scrub scope with the operator (acreage figure only, or also
-   county/forest references), rewrite the unpushed history accordingly
-   (reset + recommit in logical groups is fine; branch never left the machine),
-   verify `git log -p | grep` finds no trace.
+1. Scrub waived (see operator decisions above); the branch lands as-is with
+   no history rewrite.
 2. Rename the branch per conventions (e.g. `docs/deep-audit-and-research`),
    push, open the PR (squash), merge. Everything this session produced lands.
 
