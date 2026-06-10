@@ -105,6 +105,25 @@ enforced in CI:
   `importAndOpenWorkspace` owns ledger hydration for imports. Ledger writes are fenced
   behind the write lease and reader-tab hydration is memory-only.
 
+## Manual undo (operator undo button, 2026-06-10)
+
+The navbar Undo button / Cmd+Z is built ON the journal, not around it: every
+accepted title mutation pushes its before-snapshot onto a capped per-session
+stack (`src/store/title-undo-stack.ts`), and `undoLastTitleMutation` applies
+that snapshot as a NEW journaled `'update'` mutation. The recorder diffs full
+record sets, so the inverse lands as an appended record — the ledger stays
+append-only, store==ledger holds, and in cutover the undo passes the same
+parity veto as any mutation. Destructive mutations additionally capture
+exactly the rows their cascades destroy (`src/storage/undo-cascade-bundle.ts`:
+doomed document/attachment rows under the delete's own survival rule,
+owner-side rows via the shared `planOwnerRecordCleanup`, map/curative link
+before-images) and undo puts them back verbatim with fenced `bulkPut`s.
+Boundaries: per-tab, per-session stack (F5 clears it; the ledger remains the
+permanent record); no redo; leasehold-only edits do not journal and are not
+undoable; undoing `attachDocToNode` leaves the saved document as an Unlinked
+registry entry (a document is never deleted by undo); undoing `attachLease`
+leaves the owner-side lease record visible in Owners.
+
 ## Revert recipe
 
 Runtime: `revertReadPathToShadow()` (banner control) returns the record read path to the
