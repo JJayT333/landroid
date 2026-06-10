@@ -203,6 +203,12 @@ async function loadLifecycleHarness(options: {
       calls.push(`hydrateImportedLedger:${activeWorkspaceKey}`);
     }),
   }));
+  vi.doMock('../storage/workspace-write-lease', () => ({
+    initWorkspaceWriteLease: vi.fn(async (workspaceId: string) => {
+      calls.push(`reengageLease:${workspaceId}`);
+      return true;
+    }),
+  }));
   vi.doMock('../utils/workspace-id', () => ({
     createWorkspaceId: () => 'ws-new-project',
   }));
@@ -360,5 +366,30 @@ describe('project workspace lifecycle helpers', () => {
 
     expect(getActiveWorkspaceKey()).toBe('default::project::ws-active');
     expect(workspaceState.loadWorkspace).not.toHaveBeenCalled();
+  });
+
+  it('re-engages the active workspace lease after renaming a background project', async () => {
+    const background = savedProject('ws-other', 'default::project::ws-other', 'Other');
+    const { module, calls } = await loadLifecycleHarness({
+      existingProjects: [background],
+    });
+
+    await module.renameSavedProject(background, 'Renamed Other');
+
+    // The rename engaged ws-other's lease (singleton controller); the active
+    // workspace must be re-engaged so its heartbeat/channel keep running.
+    expect(calls).toContain('reengageLease:ws-active');
+  });
+
+  it('re-engages the active workspace lease after deleting a background project', async () => {
+    const background = savedProject('ws-other', 'default::project::ws-other', 'Other');
+    const { module, calls } = await loadLifecycleHarness({
+      existingProjects: [background],
+    });
+
+    await module.deleteSavedProject(background);
+
+    expect(calls).toContain('deleteProjectStorage:default::project::ws-other');
+    expect(calls).toContain('reengageLease:ws-active');
   });
 });
