@@ -77,6 +77,16 @@ STEP 3 — Research lane (prepares the math work; no engine changes):
   excess case), the 10 questions in round 3 CSV 3, and the two Mar-2026
   Van Dyke events (Clifton vs Eastland remand).
 
+PRODUCT PRINCIPLE (operator directive, 2026-06-10, governs all Step 4+ work):
+the user must be able to enter incorrect/conflicting information when the
+records require it — warn, never hard-block. Stop-and-ask gates block silent
+COMPUTATION, never SAVING. Where the tree model cannot structurally hold an
+over-claim (e.g., conveying more than a parent's remainder), capture the
+instrument's stated value verbatim alongside the booked value and surface the
+divergence as a warning + title issue — do not silently cap (this refines
+DA-M1's fix) and do not reject the record. Structural invariants (negative
+fractions, cycles, non-finite) remain hard blocks.
+
 STEP 4 — Math expansion opens ONLY after the attorney session:
 - First: DA-H1 decision → deliberate golden-master update (worked example
   from catalog TXM-005/Wenske as the new fixture).
