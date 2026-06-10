@@ -651,6 +651,30 @@ describe('Phase 4 title read-source cutover (rollback-on-divergence)', () => {
     expect(useWorkspaceStore.getState().nodes.some((n) => n.id === 'child2')).toBe(false);
   });
 
+  it('a vetoed clearDeskMapNodes restores the tract leasehold rows too', async () => {
+    useWorkspaceStore.getState().createRootNode('root', '1', { grantee: 'Root' });
+    await settleTitleActionLog();
+    const deskMapId = useWorkspaceStore.getState().deskMaps[0].id;
+    const assignmentId = useWorkspaceStore.getState().addLeaseholdAssignment({
+      scope: 'tract',
+      deskMapId,
+    });
+    useTitleActionLog.getState().flipToCutover({ reviewerApprovalToken: 'reviewer', ready: true });
+
+    checkSpy.current = vi.fn().mockReturnValueOnce({
+      clean: false,
+      reports: [{ workflow: 'title_tree', clean: false, expectedCount: 1, derivedCount: 0, divergences: [] }],
+    });
+    useWorkspaceStore.getState().clearDeskMapNodes(deskMapId);
+    await settleTitleActionLog();
+
+    // Nodes restored AND the desk map's leasehold rows survived the veto.
+    expect(useWorkspaceStore.getState().nodes.some((n) => n.id === 'root')).toBe(true);
+    expect(
+      useWorkspaceStore.getState().leaseholdAssignments.some((a) => a.id === assignmentId)
+    ).toBe(true);
+  });
+
   it('rolls back when the cutover parity check throws (unverified mutation is vetoed)', async () => {
     useTitleActionLog.getState().flipToCutover({ reviewerApprovalToken: 'reviewer', ready: true });
     checkSpy.current = vi.fn(() => {

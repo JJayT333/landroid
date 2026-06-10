@@ -1349,6 +1349,13 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
         // restore them with the slice so the UI lands back where it was.
         activeDeskMapId: before.activeDeskMapId,
         activeUnitCode: before.activeUnitCode,
+        // clearDeskMapNodes/deleteDeskMap delete the desk map's leasehold rows
+        // in the same set() as the title slice — a veto must bring them back
+        // too, or the rollback silently loses leasehold work (review fix).
+        leaseholdAssignments: before.leaseholdAssignments ?? state.leaseholdAssignments,
+        leaseholdOrris: before.leaseholdOrris ?? state.leaseholdOrris,
+        leaseholdTransferOrderEntries:
+          before.leaseholdTransferOrderEntries ?? state.leaseholdTransferOrderEntries,
         activeNodeId:
           state.activeNodeId && survivingIds.has(state.activeNodeId)
             ? state.activeNodeId
