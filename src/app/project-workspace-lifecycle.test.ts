@@ -199,6 +199,9 @@ async function loadLifecycleHarness(options: {
       calls.push(`flushTitle:${activeWorkspaceKey}`);
     }),
     hydrateTitleActionLogFromStorageOrBaseline: vi.fn(),
+    hydrateTitleActionLogFromImportedLedger: vi.fn(async () => {
+      calls.push(`hydrateImportedLedger:${activeWorkspaceKey}`);
+    }),
   }));
   vi.doMock('../utils/workspace-id', () => ({
     createWorkspaceId: () => 'ws-new-project',
@@ -262,6 +265,8 @@ describe('project workspace lifecycle helpers', () => {
       'default::project::ws-imported'
     );
     expect(calls).toContain('loadWorkspace:default::project::ws-imported:ws-imported');
+    // DA-H2: the lifecycle owns the post-load title ledger hydration.
+    expect(calls).toContain('hydrateImportedLedger:default::project::ws-imported');
   });
 
   it('reuses an existing saved-project storage key for repeat imports', async () => {

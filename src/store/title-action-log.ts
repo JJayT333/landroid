@@ -412,11 +412,17 @@ async function verifyTitleLedgerRows(
   if (rows.auditEvents.length === 0) {
     return rows.actionRecords.length === 0;
   }
-  if (rows.actionRecords.length !== rows.auditEvents.length) {
+  // Undo is append-only on the audit chain: each `action_record.undone` event
+  // marks an existing action record undone in place without adding a record
+  // row, so the pairing rule is records == events minus undone events (DA-H2).
+  const undoneEventCount = rows.auditEvents.filter(
+    (event) => event.eventKind === 'action_record.undone'
+  ).length;
+  if (rows.actionRecords.length !== rows.auditEvents.length - undoneEventCount) {
     console.warn(
       `[title-action-log] Ignoring ${label} ledger for workspace ${workspaceId}: ` +
         `action/audit count mismatch (${rows.actionRecords.length} actions, ` +
-        `${rows.auditEvents.length} audit events).`
+        `${rows.auditEvents.length} audit events, ${undoneEventCount} undone).`
     );
     return false;
   }

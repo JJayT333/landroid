@@ -40,6 +40,7 @@ import { useOwnerStore } from '../store/owner-store';
 import { useResearchStore } from '../store/research-store';
 import {
   flushTitleActionLogToStorage,
+  hydrateTitleActionLogFromImportedLedger,
   hydrateTitleActionLogFromStorageOrBaseline,
 } from '../store/title-action-log';
 import { useWorkspaceStore } from '../store/workspace-store';
@@ -60,6 +61,7 @@ export type ImportedWorkspaceData = Omit<WorkspaceData, 'instrumentTypes'>
     | 'mapData'
     | 'researchData'
     | 'curativeData'
+    | 'actionLedger'
   >>;
 
 function readTitleOwnerData() {
@@ -270,6 +272,16 @@ export async function importAndOpenWorkspace(
       .getState()
       .hydrateNodeAttachments({ strict: true })
       .catch(() => {});
+    // DA-H2: loadWorkspace reset the title ledger; the lifecycle owns the
+    // re-hydration (from the file's embedded ledger when present, otherwise a
+    // fresh baseline) so no caller can forget it.
+    await hydrateTitleActionLogFromImportedLedger(
+      workspaceData,
+      data.actionLedger,
+      readTitleOwnerData()
+    ).catch((err) => {
+      console.warn('[landroid] title ledger import hydration failed:', err);
+    });
     useWorkspaceStore.getState().setStartupWarning(null);
     return { project, warning: null };
   } catch (error) {
