@@ -38,16 +38,27 @@ those two files win.
    gating Print (DA-H8); per-tract ORRI on the Map-mode branch card (DA-H9);
    formula tooltips render the summary's own staged intermediates and the
    engine fraction formatter (DA-M6/M7).
-5. Fixed-NPRI allocation decision (DA-H1) — attorney review of "fixed NPRI
+5. Research-workspace hardening, before the title-math catalog lands there
+   (`docs/deep-audit-2026-06-10-part2.md` §1): rollback-on-failed-save for
+   research stores (DA2-R1), `documentId` links on research records +
+   `'research'` document attachments (DA2-R2), cross-store unlink cascades
+   (DA2-R3/R4). The catalog CSV importer
+   (`docs/title-math-research-supplement.md` Addition 3) follows.
+6. Fixed-NPRI allocation decision (DA-H1) — attorney review of "fixed NPRI
    comes out of the burdened lessor's royalty to its extent; excess to WI with
    a warning flag," then a deliberate golden-master update. This is a
    correctness decision and precedes any Phase 7 math expansion.
-6. Carry-overs still active: make batch graft/attach operations atomic; harden
+7. Flowchart wiring sprint (F-Phase 1, Part 2 §3 — parallel-safe Codex lane,
+   touches no math files): activate the built-but-dead shape tools (DA2-F1),
+   fix the select-tool lasso (DA2-F2), merge-import that preserves
+   annotations (DA2-F3), restore the saved viewport (DA2-F7), PNG export.
+8. Carry-overs still active: make batch graft/attach operations atomic; harden
    `.landroid` and CSV import validation (includes the non-numeric
-   future-version gate bypass, DA-L8); test CSV row staging against more
-   recurring spreadsheet formats; evaluate a safe binary Excel parser before
-   re-enabling `.xlsx`/`.xls` in AI imports.
-7. Preserve `.landroid` package export permanently, through every change above.
+   future-version gate bypass DA-L8 and the lease-jurisdiction whole-file
+   abort DA2-FED5); test CSV row staging against more recurring spreadsheet
+   formats; evaluate a safe binary Excel parser before re-enabling
+   `.xlsx`/`.xls` in AI imports.
+9. Preserve `.landroid` package export permanently, through every change above.
 
 ## Next
 
@@ -70,6 +81,33 @@ those two files win.
 - Audit Sheet export — printable per-tract derivation sheets built from the
   existing FormulaTooltip `FormulaContent` structures; brief at
   `docs/archive/prompts/audit-sheet-export-brief.md`.
+- Curative upgrade (Part 2 §2): open Critical/High issues become transfer-order
+  hold reasons + Desk Map warning-dot inputs (DA2-C2, golden-safe); then the
+  structural model — requirement numbers, opinion document link, multi-tract
+  scope, curative-instrument/evidence document links (DA2-C1, design-first);
+  printable requirement report via the Audit-Sheet pattern (DA2-C3); dirty-form
+  guard (DA2-C4).
+- Flowchart F-Phase 2/3 (Part 2 §3): print-renderer registry for new element
+  kinds, edge labels, copy/paste, z-order, frames-as-pages via React Flow
+  groups, image nodes routed through the hashed document vault, virtualization
+  for 1k+ node trees. Print goldens per new element kind.
+- ArcGIS interchange increments (Part 2 §4): hash map assets (DA2-M2); export
+  per-tract status/decimal attributes as CSV/GeoJSON keyed `LAND_TRACT_ID` for
+  ArcGIS Pro joins (DA2-M3); GeoJSON feature→tract matcher writing the existing
+  `ExternalRef` GlobalID hooks (DA2-M4); then bulk-import the Raven Forest
+  layer-attached lease PDFs into the vault (after Part 1 DA-H6/H7 land).
+- RRC dataset ingestion, staged by workflow value (Part 2 §6): real-excerpt
+  goldens for the three live decoders first (DA2-X1); then nightly permits
+  w/ lat-long → production query dump (CSV) → statewide API (.dbf parser) →
+  P-5/P-4 EBCDIC pilot (CP037 table + byte framing + zoned/packed numerics) →
+  district ledgers; one shared streaming/worker/persisted-rows lane sized for
+  multi-hundred-MB files; shapefiles route through the GIS lane, not a parser.
+- Federal register fields, reference-only ahead of the Phase 2 gate
+  (Part 2 §5): persist the lease-document fields (royalty/bonus/rental) and
+  stipulations/COAs (DA2-FED1/2), rental tickler schedule, lease↔Unit-CA
+  membership links, serial validation + NM-realistic seed (DA2-FED3/4/9).
+  Phase 2 math design doc anchored on the real 60k-acre CA documents, with
+  worked examples from the research supplement as its golden fixtures.
 - Aesthetics consolidation ("lean professional", audit §5): fix the broken
   token references (DA-U1), add the two missing tokens, one shared
   Button/focus/radius standard, numeric typography rule (mono + tabular

@@ -5,6 +5,23 @@ stay short.
 
 ## 2026-06-10
 
+- Delivered Part 2 of the deep audit at `docs/deep-audit-2026-06-10-part2.md`
+  covering the surfaces Part 1 skipped — Research, Curative, Flowchart/canvas,
+  Maps/GIS, Federal Leasing, RRC decoders — with `DA2-*` findings and four
+  direction plans: a staged Miro-class flowchart plan (the shape tools are
+  built but dead — `addNodes` has zero call sites), an ArcGIS Pro interchange
+  plan keyed on the existing `ExternalRef` GlobalID seam, a five-tier RRC
+  dataset-ingestion plan (ASCII/CSV/dBase/EBCDIC/shapefile-via-GIS) against
+  the live RRC download inventory, and a federal-register plan for the
+  BLM-heavy 60k-acre use case (isolation verified at six layers; rich federal
+  fields currently demo-only and non-persisted). ROADMAP gains the new lanes;
+  Research hardening (DA2-R1/R2) is sequenced ahead of the title-math catalog
+  import.
+- Added `docs/title-math-research-prompt.md` and its follow-up
+  `docs/title-math-research-supplement.md` — paste-ready external research
+  briefs for the complete Texas (+ federal/NM) title-math and temporal-law
+  catalog, with a machine-importable CSV appendix matched to the Research
+  workspace record shapes.
 - Delivered a full deep audit at `docs/deep-audit-2026-06-10.md`: severity-ranked
   findings with `DA-*` IDs (1 Critical, 10 High), a display-precision policy and
   migration plan, a Texas-math completeness gap matrix with build order, a
