@@ -567,7 +567,7 @@ export default function DocumentsView() {
                         onChange={() => toggleSelected(row.document.docId)}
                         onClick={(event) => event.stopPropagation()}
                         aria-label={`Select ${row.displayTitle}`}
-                        className="h-4 w-4 rounded border-ledger-line text-leather focus:ring-leather"
+                        className="h-4 w-4 accent-leather"
                       />
                     </td>
                     <td className="max-w-[18rem] px-3 py-2 align-top">

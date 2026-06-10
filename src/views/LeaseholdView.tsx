@@ -408,7 +408,7 @@ function LeaseholdUnitAssignmentWarningPanel({
   }
 
   return (
-    <div className="rounded-2xl border border-gold/40 bg-gold/10 px-4 py-3 text-sm text-gold-950">
+    <div className="rounded-2xl border border-gold/40 bg-gold/10 px-4 py-3 text-sm text-ink">
       <div className="font-semibold">
         {warnings.length} unit-scoped ORRI/WI record
         {warnings.length === 1 ? '' : 's'} excluded - needs unit assignment
@@ -642,7 +642,7 @@ function LeaseholdTractCard({
           <span className="rounded-full bg-emerald-50 px-3 py-1.5 font-medium text-emerald-800">
             Leased {formatPercent(tract.leasedOwnership)}
           </span>
-          <span className="rounded-full bg-gold/10 px-3 py-1.5 font-medium text-gold-900">
+          <span className="rounded-full bg-gold/10 px-3 py-1.5 font-medium text-ink">
             Unit royalty decimal {formatPercent(tract.unitRoyaltyDecimal)}
           </span>
           <span className="rounded-full bg-sky-50 px-3 py-1.5 font-medium text-sky-900">
@@ -1498,7 +1498,7 @@ function LeaseholdGraphUnleasedBranchCard({
   ownerName: string;
 }) {
   return (
-    <div className="w-60 rounded-lg border-2 border-gold/35 bg-gold/10 text-gold-950 shadow-sm">
+    <div className="w-60 rounded-lg border-2 border-gold/35 bg-gold/10 text-ink shadow-sm">
       <div className="rounded-t-lg border-b border-gold/30 bg-gold/15 px-3 py-1.5">
         <div className="text-[10px] font-semibold uppercase tracking-[0.16em]">
           Unleased Branch
@@ -2344,7 +2344,7 @@ function LeaseholdNpriDeckCard({
               </span>
             </>
           ) : (
-            <span className="rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-[9px] text-gold-900">
+            <span className="rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-[9px] text-ink">
               Tracked only until the burdened branch is leased
             </span>
           )}
@@ -2424,7 +2424,7 @@ function LeaseholdOrriDeckCard({
         className="m-0 min-w-0 space-y-3 border-0 px-3 py-3"
       >
         {needsUnitAssignment && (
-          <div className="rounded-xl border border-gold/40 bg-gold/10 px-3 py-2 text-[11px] leading-5 text-gold-950">
+          <div className="rounded-xl border border-gold/40 bg-gold/10 px-3 py-2 text-[11px] leading-5 text-ink">
             <div className="font-semibold">Excluded - needs unit assignment</div>
             <div className="mt-1">
               This unit-scoped ORRI is not in payout math until it is assigned to a unit.
@@ -2432,7 +2432,7 @@ function LeaseholdOrriDeckCard({
             <button
               type="button"
               onClick={() => onUpdate(orri.id, { unitCode: activeUnitCode })}
-              className="mt-2 rounded-lg border border-gold/40 bg-white/80 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-gold-950 transition-colors hover:bg-gold/15"
+              className="mt-2 rounded-lg border border-gold/40 bg-white/80 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-ink transition-colors hover:bg-gold/15"
             >
               Assign to {activeUnitCode}
             </button>
@@ -2635,7 +2635,7 @@ function LeaseholdOrriDeckCard({
             {orri.scope === 'unit' ? 'Unit-wide burden' : summary?.tractName ?? 'Single tract burden'}
           </span>
           {needsUnitAssignment ? (
-            <span className="rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-gold-900">
+            <span className="rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-ink">
               Excluded - needs unit assignment
             </span>
           ) : summary?.includedInMath ? (
@@ -2646,7 +2646,7 @@ function LeaseholdOrriDeckCard({
               </FormulaTooltip>
             </span>
           ) : (
-            <span className="rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-gold-900">
+            <span className="rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-ink">
               Tracked only until gross 8/8 math applies
             </span>
           )}
@@ -2829,7 +2829,7 @@ function LeaseholdAssignmentDeckCard({
         className="m-0 min-w-0 space-y-3 border-0 px-3 py-3"
       >
         {needsUnitAssignment && (
-          <div className="rounded-xl border border-gold/40 bg-gold/10 px-3 py-2 text-[11px] leading-5 text-gold-950">
+          <div className="rounded-xl border border-gold/40 bg-gold/10 px-3 py-2 text-[11px] leading-5 text-ink">
             <div className="font-semibold">Excluded - needs unit assignment</div>
             <div className="mt-1">
               This unit-scoped WI assignment is not in payout math until it is assigned to a unit.
@@ -2837,7 +2837,7 @@ function LeaseholdAssignmentDeckCard({
             <button
               type="button"
               onClick={() => onUpdate(assignment.id, { unitCode: activeUnitCode })}
-              className="mt-2 rounded-lg border border-gold/40 bg-white/80 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-gold-950 transition-colors hover:bg-gold/15"
+              className="mt-2 rounded-lg border border-gold/40 bg-white/80 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-ink transition-colors hover:bg-gold/15"
             >
               Assign to {activeUnitCode}
             </button>
@@ -3037,7 +3037,7 @@ function LeaseholdAssignmentDeckCard({
               : summary?.tractName ?? 'Single tract split'}
           </span>
           {needsUnitAssignment ? (
-            <span className="rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-gold-900">
+            <span className="rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-ink">
               Excluded - needs unit assignment
             </span>
           ) : summary?.includedInMath ? (
@@ -3055,7 +3055,7 @@ function LeaseholdAssignmentDeckCard({
               )}
             </>
           ) : (
-            <span className="rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-gold-900">
+            <span className="rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-ink">
               Tracked only until a valid tract is linked
             </span>
           )}
@@ -3168,13 +3168,13 @@ function transferOrderRowStatus(row: LeaseholdDecimalRow) {
   if (missingEffectiveDate) {
     return {
       label: 'Need date',
-      classes: 'border-gold/40 bg-gold/10 text-gold-900',
+      classes: 'border-gold/40 bg-gold/10 text-ink',
     };
   }
 
   return {
     label: 'Need doc no',
-    classes: 'border-gold/40 bg-gold/10 text-gold-900',
+    classes: 'border-gold/40 bg-gold/10 text-ink',
   };
 }
 
@@ -3421,7 +3421,7 @@ function LeaseholdDecimalLedger({
               >
                 {payoutHold ? 'Payout hold' : 'No NPRI payout hold'}
               </span>
-              <span className="rounded-full bg-gold/10 px-3 py-1.5 font-medium text-gold-900">
+              <span className="rounded-full bg-gold/10 px-3 py-1.5 font-medium text-ink">
                 Ready {readyCount}
               </span>
               <span className="rounded-full bg-seal/10 px-3 py-1.5 font-medium text-seal">
@@ -3515,7 +3515,7 @@ function LeaseholdDecimalLedger({
       )}
 
       {transferOrderHoldReasons.length > 0 && (
-        <div className="mt-4 rounded-2xl border border-gold/40 bg-gold/10 px-4 py-3 text-sm text-gold-950">
+        <div className="mt-4 rounded-2xl border border-gold/40 bg-gold/10 px-4 py-3 text-sm text-ink">
           <div className="font-semibold">Transfer-order readiness on hold</div>
           <ul className="mt-1 space-y-1">
             {transferOrderHoldReasons.map((reason) => (
@@ -3867,7 +3867,7 @@ function LeaseholdDeck({
               The selected tract stays front and center, and unit-wide burdens follow it down.
             </p>
           </div>
-          <div className="rounded-2xl border border-gold/30 bg-gold/10 px-4 py-3 text-sm text-gold-950">
+          <div className="rounded-2xl border border-gold/30 bg-gold/10 px-4 py-3 text-sm text-ink">
             Title stays in Desk Map. Leasehold burdens, WI, and assignments live here.
           </div>
         </div>
@@ -4387,7 +4387,7 @@ export default function LeaseholdView() {
                     <UnitFocusSelector />
                     {addLeaseButton}
                   </div>
-                  <div className="rounded-2xl border border-gold/30 bg-gold/10 px-4 py-3 text-sm text-gold-950">
+                  <div className="rounded-2xl border border-gold/30 bg-gold/10 px-4 py-3 text-sm text-ink">
                     <div className="font-semibold">Current v1 assumption</div>
                     <div className="mt-1">
                       {activeUnit

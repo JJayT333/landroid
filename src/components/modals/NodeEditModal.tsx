@@ -342,7 +342,7 @@ export default function NodeEditModal({
               type="checkbox"
               checked={form.isDeceased}
               onChange={(e) => set('isDeceased', e.target.checked)}
-              className="rounded border-ledger-line text-leather focus:ring-leather"
+              className="accent-leather"
             />
             Deceased
           </label>

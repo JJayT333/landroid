@@ -477,7 +477,7 @@ function HostedContextControl({
           : 'Full sends current project details to the hosted AI proxy, including names, fractions, lease economics, remarks, document refs, and identifiers.'}
       </div>
       {mode === 'full' && !fullAccepted && (
-        <div className="rounded border border-gold/40 bg-gold/10 p-2 text-gold-950">
+        <div className="rounded border border-gold/40 bg-gold/10 p-2 text-ink">
           <div className="font-semibold">Disclosure required for this workspace</div>
           <div className="mt-1 leading-5">
             Accept to send full current workspace context for this browser session. Switching
@@ -486,7 +486,7 @@ function HostedContextControl({
           <button
             type="button"
             onClick={() => onAcceptFull(workspaceId)}
-            className="mt-2 rounded border border-gold/50 bg-parchment px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-gold-950 hover:bg-gold/10"
+            className="mt-2 rounded border border-gold/50 bg-parchment px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-ink hover:bg-gold/10"
           >
             Accept full context
           </button>
