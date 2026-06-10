@@ -39,6 +39,7 @@ import { planDeskMapLeaseDeletion } from '../components/deskmap/deskmap-lease-de
 import { isLeaseNode } from '../components/deskmap/deskmap-lease-node';
 import {
   buildDeskMapTree,
+  visibleDeskMapNodes,
   type DeskMapTreeNode,
 } from '../components/deskmap/deskmap-tree';
 import DeskMapTabs from '../components/deskmap/DeskMapTabs';
@@ -442,6 +443,19 @@ function PanZoomContainer({
 
 function formatCoveragePercent(value: string) {
   return `${d(value).times(100).toFixed(2)}%`;
+}
+
+// Per-browser display preference for the NPRI card toggle. Deliberately plain
+// localStorage: this never touches the workspace store, autosave, or the
+// .landroid format.
+const DESK_MAP_HIDE_NPRIS_KEY = 'landroid:deskMapHideNpris';
+
+function readStoredHideNpris(): boolean {
+  try {
+    return window.localStorage.getItem(DESK_MAP_HIDE_NPRIS_KEY) === '1';
+  } catch {
+    return false;
+  }
 }
 
 export interface DeskMapOwnerSearchMatch {
@@ -868,6 +882,8 @@ export default function DeskMapView() {
   // Phase 7 polish: collapsible toolbar so the canvas stays unobstructed once
   // the landman knows the controls.
   const [toolbarCollapsed, setToolbarCollapsed] = useState(false);
+  // Display-only NPRI card visibility. Read once per mount; default shown.
+  const [hideNpris, setHideNpris] = useState(readStoredHideNpris);
   const [pinnedFormulas, setPinnedFormulas] = useState<PinnedFormula[]>([]);
   const [mapReferenceCollapsed, setMapReferenceCollapsed] = useState(false);
 
@@ -1031,7 +1047,17 @@ export default function DeskMapView() {
         || discrepancy.npriNodeIds.some((nodeId) => visibleNodeIds.has(nodeId))
     );
   }, [activeDeskMap, npriDiscrepancyState]);
-  const trees = useMemo(() => buildDeskMapTree(visibleNodes), [visibleNodes]);
+  const npriCardCount = useMemo(
+    () => visibleNodes.filter((node) => isNpriNode(node)).length,
+    [visibleNodes]
+  );
+  // Render-time filter only. Coverage math, warning dots, NPRI-discrepancy
+  // checks, and owner search above all keep reading the unfiltered nodes.
+  const renderedNodes = useMemo(
+    () => visibleDeskMapNodes(visibleNodes, { hideNpris }),
+    [hideNpris, visibleNodes]
+  );
+  const trees = useMemo(() => buildDeskMapTree(renderedNodes), [renderedNodes]);
   const ownerSearchMatches = useMemo(
     () => buildDeskMapOwnerSearchMatches({ deskMaps, nodes, query: ownerSearchQuery }),
     [deskMaps, nodes, ownerSearchQuery]
@@ -1227,6 +1253,18 @@ export default function DeskMapView() {
     clearDeskMapNodes(activeDeskMap.id);
   }, [activeDeskMap, clearDeskMapNodes, readOnly, requestConfirmation, showAlert, visibleCardCount]);
 
+  const handleToggleNpris = useCallback(() => {
+    setHideNpris((current) => {
+      const next = !current;
+      try {
+        window.localStorage.setItem(DESK_MAP_HIDE_NPRIS_KEY, next ? '1' : '0');
+      } catch {
+        // Persistence is best-effort; the in-session toggle still applies.
+      }
+      return next;
+    });
+  }, []);
+
   const cycleOwnerSearchMatch = useCallback((direction: 1 | -1) => {
     setOwnerSearchMatchIndex((currentIndex) => {
       if (ownerSearchMatches.length === 0) {
@@ -1301,6 +1339,28 @@ export default function DeskMapView() {
           </div>
           {!toolbarCollapsed && (
           <>
+          {npriCardCount > 0 && (
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleToggleNpris}
+                aria-pressed={hideNpris}
+                className="rounded-lg border border-ledger-line px-3 py-1.5 text-xs font-semibold text-ink-light transition-colors hover:bg-parchment-dark/70"
+                title={
+                  hideNpris
+                    ? 'Show NPRI cards on the canvas'
+                    : 'Hide NPRI cards from the canvas. Display only — coverage, totals, and warnings are unchanged.'
+                }
+              >
+                {hideNpris ? 'Show' : 'Hide'} NPRIs ({npriCardCount})
+              </button>
+              {hideNpris && (
+                <span className="text-[9px] leading-tight text-ink-light">
+                  Hidden from canvas only — totals and warnings unchanged.
+                </span>
+              )}
+            </div>
+          )}
           <div className="text-[9px] leading-tight text-ink-light">
             Add more than one root when title starts from separate families. Temporary
             coverage over 100% is okay until you reconcile farther back in title.
@@ -1538,7 +1598,7 @@ export default function DeskMapView() {
           </div>
         ) : (
           <PanZoomContainer
-            resetKey={`${activeDeskMapId ?? 'none'}:${visibleNodes.map((node) => node.id).join('|')}`}
+            resetKey={`${activeDeskMapId ?? 'none'}:${renderedNodes.map((node) => node.id).join('|')}`}
           >
             <div className="flex gap-16" data-desk-map-fit-content>
               {trees.map((tree) => (

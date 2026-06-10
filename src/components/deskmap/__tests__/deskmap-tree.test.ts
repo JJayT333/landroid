@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { createBlankNode } from '../../../types/node';
-import { buildDeskMapTree } from '../deskmap-tree';
+import { createBlankNode, type OwnershipNode } from '../../../types/node';
+import { buildDeskMapTree, visibleDeskMapNodes } from '../deskmap-tree';
 
 describe('deskmap-tree', () => {
   it('treats lease nodes as terminal children while keeping other related docs inline', () => {
@@ -68,5 +68,85 @@ describe('deskmap-tree', () => {
     ]);
     expect(trees[0]?.children).toEqual([]);
     expect(trees[1]?.children.map((entry) => entry.node.id)).toEqual(['family-2-child']);
+  });
+});
+
+describe('visibleDeskMapNodes', () => {
+  function buildSampleNodes(): OwnershipNode[] {
+    const root = {
+      ...createBlankNode('root'),
+      grantee: 'Pat Doe',
+      fraction: '1',
+      initialFraction: '1',
+    };
+    const mineralChild = {
+      ...createBlankNode('mineral-child', 'root'),
+      grantee: 'Sam Doe',
+      fraction: '0.5',
+      initialFraction: '0.5',
+    };
+    const npri = {
+      ...createBlankNode('npri-1', 'root'),
+      grantee: 'Royalty Holder',
+      interestClass: 'npri' as const,
+      royaltyKind: 'fixed' as const,
+      fraction: '0.0625',
+      initialFraction: '0.0625',
+    };
+    const npriSplit = {
+      ...createBlankNode('npri-1-split', 'npri-1'),
+      grantee: 'Royalty Heir',
+      interestClass: 'npri' as const,
+      royaltyKind: 'fixed' as const,
+      fraction: '0.03125',
+      initialFraction: '0.03125',
+    };
+    const npriDoc = {
+      ...createBlankNode('npri-1-doc', 'npri-1'),
+      type: 'related' as const,
+      relatedKind: 'document' as const,
+      instrument: 'Affidavit of Heirship',
+    };
+    return [root, mineralChild, npri, npriSplit, npriDoc];
+  }
+
+  it('hides NPRI nodes and their full subtrees when hideNpris is on', () => {
+    const nodes = buildSampleNodes();
+
+    const filtered = visibleDeskMapNodes(nodes, { hideNpris: true });
+
+    expect(filtered.map((node) => node.id)).toEqual(['root', 'mineral-child']);
+    // Nothing from the hidden subtree may be orphan-promoted to a root.
+    const trees = buildDeskMapTree(filtered);
+    expect(trees.map((entry) => entry.node.id)).toEqual(['root']);
+    expect(trees[0]?.children.map((entry) => entry.node.id)).toEqual(['mineral-child']);
+  });
+
+  it('returns the input array unchanged when hideNpris is off', () => {
+    const nodes = buildSampleNodes();
+
+    const result = visibleDeskMapNodes(nodes, { hideNpris: false });
+
+    expect(result).toBe(nodes);
+  });
+
+  it('returns the input array unchanged when no NPRI nodes are present', () => {
+    const nodes = buildSampleNodes().filter(
+      (node) => node.interestClass !== 'npri' && node.parentId !== 'npri-1'
+    );
+
+    const result = visibleDeskMapNodes(nodes, { hideNpris: true });
+
+    expect(result).toBe(nodes);
+  });
+
+  it('never mutates the input nodes or array', () => {
+    const nodes = buildSampleNodes();
+    const snapshot = structuredClone(nodes);
+
+    visibleDeskMapNodes(nodes, { hideNpris: true });
+    visibleDeskMapNodes(nodes, { hideNpris: false });
+
+    expect(nodes).toEqual(snapshot);
   });
 });
