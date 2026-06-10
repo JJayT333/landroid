@@ -590,6 +590,93 @@ export async function deleteDocsForAttachments(
   });
 }
 
+export interface DoomedDocumentRows {
+  attachments: StoredDocumentAttachment[];
+  documents: StoredDocumentRecord[];
+}
+
+/**
+ * The rows `deleteDocsForAttachments` would remove for these attachment ids:
+ * the attachment rows themselves plus every document whose remaining
+ * attachments are all inside the removed set (the same survival rule — keep
+ * the two in lockstep). Read-only; used by the undo cascade capture so a
+ * deleted branch's documents can later be restored verbatim.
+ */
+export async function readDoomedDocumentRows(
+  attachmentIds: ReadonlyArray<string>
+): Promise<DoomedDocumentRows> {
+  const uniqueAttachmentIds = [...new Set(attachmentIds)].filter(Boolean);
+  if (uniqueAttachmentIds.length === 0) {
+    return { attachments: [], documents: [] };
+  }
+  const attachments = (await getAttachmentRows(uniqueAttachmentIds)).filter(
+    (attachment): attachment is StoredDocumentAttachment =>
+      Boolean(
+        attachment
+        && attachment.dbKey === activeWorkspaceScope(attachment.workspaceId)[0]
+      )
+  );
+  if (attachments.length === 0) {
+    return { attachments: [], documents: [] };
+  }
+  const removedAttachmentSet = new Set(
+    attachments.map((attachment) => attachment.attachmentId)
+  );
+  const docIds = [...new Set(attachments.map((attachment) => attachment.docId))];
+  const workspaceId = attachments[0].workspaceId;
+  const allAttachmentsForDocs = await db.document_attachments
+    .where('[dbKey+workspaceId+docId]')
+    .anyOf(docIds.map((docId) => [...activeWorkspaceScope(workspaceId), docId]))
+    .toArray();
+  const attachmentsByDoc = new Map<string, DocumentAttachment[]>();
+  for (const attachment of allAttachmentsForDocs) {
+    const existing = attachmentsByDoc.get(attachment.docId) ?? [];
+    existing.push(attachment);
+    attachmentsByDoc.set(attachment.docId, existing);
+  }
+  const doomedDocIds = docIds.filter((docId) => {
+    const rows = attachmentsByDoc.get(docId) ?? [];
+    return (
+      rows.length > 0
+      && rows.every((attachment) => removedAttachmentSet.has(attachment.attachmentId))
+    );
+  });
+  const documents = (await getDocumentRows(doomedDocIds)).filter(
+    (doc) => doc.dbKey === activeWorkspaceScope(doc.workspaceId)[0]
+  );
+  return { attachments, documents };
+}
+
+/**
+ * Fenced verbatim put-back of rows captured by {@link readDoomedDocumentRows}
+ * (undo of a delete cascade). bulkPut preserves stored ids, hashes, and blobs
+ * exactly — never route this through saveDoc, which mints new ids.
+ */
+export async function restoreDocumentRows(rows: DoomedDocumentRows): Promise<void> {
+  if (rows.attachments.length === 0 && rows.documents.length === 0) return;
+  const workspaceIds = [
+    ...new Set(
+      [...rows.attachments, ...rows.documents].map((row) => row.workspaceId)
+    ),
+  ];
+  await ensureWorkspacesWritable(workspaceIds);
+  await db.transaction(
+    'rw',
+    db.workspaceWriteLeases,
+    db.documents,
+    db.document_attachments,
+    async () => {
+      await assertWorkspacesWritable(workspaceIds);
+      if (rows.documents.length > 0) {
+        await db.documents.bulkPut(rows.documents);
+      }
+      if (rows.attachments.length > 0) {
+        await db.document_attachments.bulkPut(rows.attachments);
+      }
+    }
+  );
+}
+
 export async function getDocBlob(docId: string): Promise<Blob | undefined> {
   const doc = await getDocumentRow(docId);
   if (!doc || doc.dbKey !== activeWorkspaceScope(doc.workspaceId)[0]) return undefined;

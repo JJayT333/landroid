@@ -18,6 +18,13 @@ const docMocks = vi.hoisted(() => ({
   saveDoc: vi.fn(),
 }));
 const otherMocks = vi.hoisted(() => ({ unlinkNode: vi.fn(), unlinkDeskMap: vi.fn() }));
+// Undo cascade capture/restore is Dexie-backed; mock it so the store-level
+// wiring (defer → capture → restore thunk) is testable without IndexedDB.
+const cascadeMocks = vi.hoisted(() => ({
+  captureCascadeBundle: vi.fn(async () => ({ kind: 'fake-bundle' })),
+  restoreCascadeBundle: vi.fn(async () => ({} as { warning?: string })),
+  planOwnerRecordCleanup: vi.fn(() => ({ ownerIdsToRemove: [], leaseIdsToRemove: [] })),
+}));
 // A controllable wrapper around the real recordTitleMutation: `current` is what
 // the hook calls (default delegates to `real`); tests may override `current`
 // once, and beforeEach restores it from `real`. Typed `any` (test-only) so the
@@ -36,6 +43,7 @@ const checkSpy = vi.hoisted(() => ({
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
 vi.mock('../../storage/document-store', () => docMocks);
+vi.mock('../../storage/undo-cascade-bundle', () => cascadeMocks);
 vi.mock('../map-store', () => ({
   useMapStore: { getState: () => ({ unlinkNode: otherMocks.unlinkNode, unlinkDeskMap: otherMocks.unlinkDeskMap }) },
 }));
@@ -813,6 +821,73 @@ describe('title undo: journaled inverse restores', () => {
 
   it('returns false with nothing to undo', async () => {
     await expect(useWorkspaceStore.getState().undoLastTitleMutation()).resolves.toBe(false);
+  });
+
+  it('undo of a delete restores the captured cascade rows', async () => {
+    const store = () => useWorkspaceStore.getState();
+    store().createRootNode('root', '1', { grantee: 'Root' });
+    store().convey('root', 'child', '0.5', { grantee: 'Child' });
+    await settleTitleActionLog();
+
+    store().removeNode('child');
+    // Let the fire-and-forget capture block resolve the cascade slot.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(cascadeMocks.captureCascadeBundle).toHaveBeenCalledTimes(1);
+
+    const undone = await store().undoLastTitleMutation();
+    await settleTitleActionLog();
+
+    expect(undone).toBe(true);
+    expect(store().nodes.some((n) => n.id === 'child')).toBe(true);
+    expect(cascadeMocks.restoreCascadeBundle).toHaveBeenCalledTimes(1);
+    expect(cascadeMocks.restoreCascadeBundle).toHaveBeenCalledWith({ kind: 'fake-bundle' });
+  });
+
+  it('a partial cascade restore surfaces its warning as lastError', async () => {
+    cascadeMocks.restoreCascadeBundle.mockResolvedValueOnce({
+      warning: 'Undo restored the title cards, but some related records could not be fully restored.',
+    });
+    const store = () => useWorkspaceStore.getState();
+    store().createRootNode('root', '1', { grantee: 'Root' });
+    await settleTitleActionLog();
+    store().removeNode('root');
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    await store().undoLastTitleMutation();
+
+    expect(store().lastError).toMatch(/could not be fully restored/);
+    expect(store().nodes.some((n) => n.id === 'root')).toBe(true);
+  });
+
+  it('a failed capture still lets undo restore the title slice', async () => {
+    cascadeMocks.captureCascadeBundle.mockRejectedValueOnce(new Error('capture exploded'));
+    const store = () => useWorkspaceStore.getState();
+    store().createRootNode('root', '1', { grantee: 'Root' });
+    await settleTitleActionLog();
+    store().removeNode('root');
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const undone = await store().undoLastTitleMutation();
+
+    expect(undone).toBe(true);
+    expect(store().nodes.some((n) => n.id === 'root')).toBe(true);
+    expect(cascadeMocks.restoreCascadeBundle).not.toHaveBeenCalled();
+  });
+
+  it('the owner-cleanup no-op cascade does not bury the delete entry', async () => {
+    const store = () => useWorkspaceStore.getState();
+    store().createRootNode('root', '1', { grantee: 'Root' });
+    store().convey('root', 'child', '0.5', { grantee: 'Child' });
+    await settleTitleActionLog();
+    const sizeBefore = useTitleUndoStack.getState().entries.length;
+
+    store().removeNode('child');
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    // Exactly one new entry (the delete) — the cleanup's clearLinkedOwner /
+    // clearLinkedLease no-ops are suppressed by the same-slice check.
+    expect(useTitleUndoStack.getState().entries.length).toBe(sizeBefore + 1);
+    expect(useTitleUndoStack.getState().entries.at(-1)?.label).toBe('delete branch');
   });
 });
 
