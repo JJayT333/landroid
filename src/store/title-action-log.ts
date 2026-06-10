@@ -457,6 +457,7 @@ async function baselineAndFlushTitleLedger(
 export async function flushTitleActionLogToStorage(
   workspaceId: string
 ): Promise<void> {
+  const generationAtStart = ledgerGeneration;
   await settleTitleActionLog();
   // DA-M15: only the writer persists ledger rows. A reader tab keeps its
   // hydrated chain (or fresh baseline) in memory and never rewrites the
@@ -468,6 +469,12 @@ export async function flushTitleActionLogToStorage(
     );
     return;
   }
+  // Review fix: a reset/hydrate while this flush awaited (workspace
+  // replacement, AI-undo restore) means the in-memory chain no longer matches
+  // what this flush was asked to persist — an in-flight autosave flush could
+  // otherwise overwrite the stored chain with the freshly-emptied one before
+  // the undo's re-hydration reads it. Drop the stale flush.
+  if (generationAtStart !== ledgerGeneration) return;
   const state = useTitleActionLog.getState();
   const rows: TitleLedgerWorkspaceRows = {
     actionRecords: [...state.actionRecords],

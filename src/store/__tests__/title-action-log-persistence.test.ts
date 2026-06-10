@@ -215,6 +215,31 @@ describe('title action log runtime persistence lifecycle', () => {
     }
   });
 
+  it('drops a flush when the ledger is reset while the flush awaits (review fix)', async () => {
+    const workspace = makeWorkspace('ws-runtime', 'root-runtime', 'DOC-1');
+    loadWorkspaceIntoStores(workspace);
+    await ensureTitleBaseline(workspace, ownerDataFor(workspace.workspaceId));
+    await settleTitleActionLog();
+
+    // Hold the flush inside its writability await, reset the ledger (as the
+    // AI-undo restore path does), then let the flush resume: it must NOT
+    // persist the emptied chain over the stored rows.
+    let releaseFlush: (value: boolean) => void = () => {};
+    leaseMocks.ensureWorkspaceWritable.mockImplementationOnce(
+      () => new Promise<boolean>((resolve) => {
+        releaseFlush = resolve;
+      })
+    );
+    const flush = flushTitleActionLogToStorage(workspace.workspaceId);
+    // Let the flush pass settle and suspend on the writability gate.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    useTitleActionLog.getState().reset();
+    releaseFlush(true);
+    await flush;
+
+    expect(ledgerPersistenceMocks.replaceTitleLedgerWorkspaceRows).not.toHaveBeenCalled();
+  });
+
   it('flushes, refreshes, and hydrates the same ledger rows', async () => {
     const workspace = makeWorkspace('ws-runtime', 'root-runtime', 'DOC-1');
     loadWorkspaceIntoStores(workspace);
