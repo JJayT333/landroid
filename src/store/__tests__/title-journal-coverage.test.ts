@@ -354,7 +354,10 @@ const DRIVERS: Record<ActionName, ActionDriver> = {
       }),
   },
   restoreTitleSlice: {
-    expectation: { exempt: 'cutover rollback primitive, invoked BY the journal hook; journaling it would recurse' },
+    expectation: {
+      exempt:
+        'restore primitive invoked BY the journal hook (cutover veto) and by undoLastTitleMutation, which journals the restore itself; journaling here would recurse',
+    },
     drive: (s) => s.restoreTitleSlice(currentWorkspaceData()),
   },
   hydrateNodeAttachments: {
