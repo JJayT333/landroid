@@ -7,7 +7,10 @@ import {
   deriveTitleCutoverReadiness,
 } from '../action-layer/title-cutover-readiness';
 import { MIN_PASSED_TITLE_PARITIES } from '../action-layer/title-cutover-gate';
-import { recordTitleMutation } from '../action-layer/title-command-sourcing';
+import {
+  checkTitleInlineParity,
+  recordTitleMutation,
+} from '../action-layer/title-command-sourcing';
 import type { RecordBuildContext } from '../record-helpers';
 import {
   emptyTitleWorkspace,
@@ -136,6 +139,31 @@ describe('deriveTitleCutoverReadiness', () => {
     });
     expect(readiness.ready).toBe(false);
     expect(readiness.runtimeDivergence).toBe(true);
+  });
+});
+
+describe('checkTitleInlineParity (synchronous cutover guard)', () => {
+  it('is clean for a faithful mutation (empty -> populated title)', () => {
+    const result = checkTitleInlineParity({
+      mutation: 'createRootNode',
+      origin: 'system',
+      beforeWorkspace: emptyTitleWorkspace(),
+      afterWorkspace: titleWorkspace(),
+      ownerData: titleOwnerData(),
+    });
+    expect(result.clean).toBe(true);
+    expect(result.reports.every((report) => report.clean)).toBe(true);
+  });
+
+  it('is clean for a no-op (identical before/after)', () => {
+    const result = checkTitleInlineParity({
+      mutation: 'update',
+      origin: 'user',
+      beforeWorkspace: titleWorkspace(),
+      afterWorkspace: titleWorkspace(),
+      ownerData: titleOwnerData(),
+    });
+    expect(result.clean).toBe(true);
   });
 });
 

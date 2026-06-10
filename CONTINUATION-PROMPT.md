@@ -6,52 +6,53 @@ Keep long history in `CHANGELOG.md`.
 
 ## Active Handoff - 2026-06-09
 
-Current workstream: title-tree read cutover, Scope A (governed record-layer read flip).
+Current workstream: title-tree read cutover, Scope B (ledger-authoritative live reads).
 
-Branch: `feat/title-tree-record-cutover` (off `origin/main`).
+Branch: `feat/title-tree-read-source-cutover` (off `origin/main`).
 
 Worktree: `/tmp/landroid-title-cutover`.
 
-Base: `origin/main` at `9b1b7d8` (PR #137 LPR full-abstract + multi-tract merged).
+Base: `origin/main` at `d88244e` (Scope A, PR #138, merged).
 
 ### What this delivers
 
-Scope A makes the action/record layer a governed, reversible read source for the
-project-records projection, with the readiness gates computed and proven green at
-runtime. See `docs/title-tree-read-cutover.md` for the full writeup.
+Scope B makes the durable ledger authoritative for what the live UI shows, with no
+per-screen rewrite. In cutover, the single title journal chokepoint runs the synchronous
+parity check and rolls the store back to the pre-mutation snapshot on divergence, so the
+store can never hold state the ledger rejected (the store stays provably equal to the
+ledger projection and every screen reads it unchanged). Shadow mode is untouched. See
+`docs/title-tree-read-cutover.md`.
 
-- `src/project-records/action-layer/title-cutover-readiness.ts` — runtime gate
-  evaluator (`computeTitleParityGates` = MathInputView parity + `.landroid`
-  export-import-replay round trip; `deriveTitleCutoverReadiness`).
-- `src/store/title-action-log.ts` — governed `readPathMode` +
-  `flipToCutover`/`revertReadPathToShadow` (enabled for `title_tree` only;
-  `DEFAULT_TITLE_READ_PATH_MODE` stays `shadow`) + `selectTitleReadPathInput` seam.
-- `src/components/shared/TitleLedgerStatusBanner.tsx` — real reversible flip,
-  auto-advance on the rising edge of readiness, live mode indicator.
+- `src/project-records/action-layer/title-command-sourcing.ts` — `checkTitleInlineParity`
+  (synchronous, non-throwing; reuses the recorder's own parity logic).
+- `src/store/workspace-store.ts` — `restoreTitleSlice(before)` (non-journaling title-slice
+  rollback).
+- `src/store/title-action-log.ts` — cutover-only rollback-on-divergence in the journal hook.
 
 ### Invariant
 
-The live Desk Map and math still read `useWorkspaceStore.nodes` in every mode; only
-the project-records read source flips. Springhill and the Phase 0 goldens are
-unchanged. The flip reverts via `revertReadPathToShadow()`.
+`DEFAULT_TITLE_READ_PATH_MODE` stays `shadow`; the flip is reversible
+(`revertReadPathToShadow()`). The engine/math and `deskmap-coverage.ts` /
+`leasehold-summary.ts` are untouched; Springhill stays 0.225/0.775 and the Phase 0 goldens
+hold. Desk maps / leasehold / owners stay store-owned; rollback restores `nodes` +
+`deskMaps` from the journaled before-snapshot.
 
 ### Validation
 
-`npm run lint`, `npm test`, `npm run build`, `git diff --check` all pass in the
-worktree (node_modules symlinked from the root checkout). New suites:
-`title-cutover-readiness.test.ts`, `title-read-flip-control.test.ts`, plus the updated
-`TitleLedgerStatusBanner.test.tsx`.
+`npm run lint`, `npm test`, `npm run build`, `git diff --check` all pass in the worktree
+(`node_modules` from a real `npm ci --offline`). New/extended suites:
+`title-action-log.test.ts` (cutover rollback vs shadow surface, clean-cutover store ==
+ledger projection, revert), `title-cutover-readiness.test.ts` (`checkTitleInlineParity`).
 
-### Next steps
+### Known follow-ups (not blocking)
 
-1. Review PR for `feat/title-tree-record-cutover`; squash-merge.
-2. Scope B (deferred): route the live Desk Map / Leasehold reads + math through the
-   ledger projection. Highest-risk surface — invert divergence handling to
-   block/rollback, add a cached/ordered projection, reconcile desk-map membership, keep
-   the `deleteNode` undo boundary consistent. Build on Scope A's proven-green gate.
+- A diverged `deleteNode` rolls back the title slice but not its already-fired async
+  owner/document cascade (divergence is not expected once the gates are green).
+- The sync check recomputes records the async recorder also builds (minor duplication).
+- A cached/ordered projection only matters if reads ever move off the store.
 
 ### Process note
 
 A prior session pushed to `main` by accident (commands ran in the root checkout on
-`main`). Work only in the dedicated worktree via explicit `git -C <worktree>`; never run
-a bare `git push`; push only the feature branch; open a PR and stop for review.
+`main`). Work only in the dedicated worktree via explicit `git -C <worktree>`; never run a
+bare `git push`; push only the feature branch; open a PR and stop for review.
