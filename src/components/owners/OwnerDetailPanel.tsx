@@ -43,6 +43,8 @@ interface OwnerDetailPanelProps {
   onAddDoc: (doc: OwnerDoc) => Promise<void>;
   onUpdateDoc: (id: string, fields: Partial<OwnerDoc>) => Promise<void>;
   onRemoveDoc: (id: string) => Promise<void>;
+  /** Distinct focused tracts whose cards link to this owner (quick stat). */
+  tractCount?: number;
   readOnly?: boolean;
 }
 
@@ -67,26 +69,73 @@ export default function OwnerDetailPanel({
   onAddDoc,
   onUpdateDoc,
   onRemoveDoc,
+  tractCount,
   readOnly = false,
 }: OwnerDetailPanelProps) {
   const tabBaseId = `owner-${owner.id}`;
   const activePanelId = `${tabBaseId}-${tab}-panel`;
 
+  const initials = (() => {
+    const words = (owner.name || '?').trim().split(/\s+/).filter(Boolean);
+    if (words.length === 0) return '?';
+    if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+    return (words[0][0] + words[words.length - 1][0]).toUpperCase();
+  })();
+  const stats: { label: string; value: number }[] = [
+    ...(typeof tractCount === 'number' ? [{ label: 'Tracts', value: tractCount }] : []),
+    { label: 'Lease Records', value: leases.length },
+    { label: 'Contacts', value: contacts.length },
+    { label: 'Documents', value: docs.length },
+  ];
+
   return (
-    <div className="h-full flex flex-col rounded-md border border-ledger-line bg-parchment shadow-sm overflow-hidden">
-      <div className="px-5 py-4 border-b border-ledger-line bg-ledger">
-        <div className="text-xl font-display font-bold text-ink">
-          {owner.name || 'Unnamed Owner'}
+    <div className="flex h-full flex-col overflow-hidden">
+      {/* CRM profile header */}
+      <div className="flex items-center gap-3.5 rounded-xl border border-ledger-line bg-parchment-light p-4">
+        <div className="flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-[11px] bg-leather font-display text-lg font-bold text-[#fff6ec]">
+          {initials}
         </div>
-        <div className="text-sm text-ink-light">
-          {[owner.entityType, owner.county, owner.prospect].filter(Boolean).join(' • ') || 'No owner details yet'}
+        <div className="min-w-0 flex-1">
+          <div className="truncate font-display text-[19px] font-bold text-ink">
+            {owner.name || 'Unnamed Owner'}
+          </div>
+          <div className="mt-1 flex flex-wrap gap-1.5">
+            {[owner.entityType, owner.county && `${owner.county} Co.`, owner.prospect]
+              .filter(Boolean)
+              .map((chip) => (
+                <span
+                  key={String(chip)}
+                  className="rounded-md border border-ledger-line px-2 py-0.5 text-[10px] font-semibold text-ink-soft"
+                >
+                  {chip}
+                </span>
+              ))}
+          </div>
         </div>
       </div>
 
+      {/* Quick stats */}
+      <div className="mt-3 grid gap-2.5 [grid-template-columns:repeat(auto-fit,minmax(130px,1fr))]">
+        {stats.map((stat) => (
+          <div
+            key={stat.label}
+            className="rounded-[10px] border border-ledger-line bg-parchment-light px-3 py-2.5"
+          >
+            <div className="text-[8.5px] font-bold uppercase tracking-[0.1em] text-ink-light">
+              {stat.label}
+            </div>
+            <div className="mt-1 font-mono text-base font-semibold tabular-nums text-ink">
+              {stat.value}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Underline tabs */}
       <div
         role="tablist"
         aria-label={`${owner.name || 'Owner'} sections`}
-        className="px-4 py-3 border-b border-ledger-line bg-parchment-dark/50 flex gap-2"
+        className="mt-4 flex gap-0.5 border-b border-ledger-line"
       >
         {tabs.map((item) => (
           <button
@@ -98,10 +147,10 @@ export default function OwnerDetailPanel({
             aria-controls={`${tabBaseId}-${item.id}-panel`}
             tabIndex={tab === item.id ? 0 : -1}
             onClick={() => onChangeTab(item.id)}
-            className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
+            className={`-mb-px border-b-2 px-3.5 py-2 text-[12.5px] font-semibold transition-colors ${
               tab === item.id
-                ? 'bg-leather text-parchment'
-                : 'text-ink-light hover:bg-ledger'
+                ? 'border-leather text-ink'
+                : 'border-transparent text-ink-light hover:text-ink'
             }`}
           >
             {item.label}
@@ -113,7 +162,7 @@ export default function OwnerDetailPanel({
         id={activePanelId}
         role="tabpanel"
         aria-labelledby={`${tabBaseId}-${tab}-tab`}
-        className="flex-1 overflow-auto p-5"
+        className="flex-1 overflow-auto py-4"
       >
         {tab === 'info' && (
           <OwnerInfoTab
