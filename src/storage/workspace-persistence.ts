@@ -1399,50 +1399,55 @@ export async function exportPdfWorkspaceData(
 }
 
 /**
- * Read every document + attachment touching the given nodes, with their
- * blobs, ready for v8 `.landroid` export. Workspace-scoped — only
- * documents that share the workspace ID with at least one of the
- * touched nodes are emitted.
+ * Read EVERY document + attachment in the given workspace, with their blobs,
+ * for `.landroid` export and for the side-store / AI-undo snapshots that
+ * restore through {@link replaceDocumentWorkspaceData}.
+ *
+ * DA-H6: this is workspace-scoped, NOT node-joined. A detached document, or
+ * one attached to a non-node entity, is an advertised "Unlinked" state and is
+ * still the workspace's evidence — it must survive export → import and any
+ * undo/rollback. The earlier node-join silently omitted those originals, and
+ * because the restore side ({@link replaceDocumentWorkspaceData}) wipes the
+ * entire workspace document scope before re-adding the supplied set, an
+ * incomplete snapshot meant permanent loss of original PDFs through routine
+ * flows. The scope queried here (`[dbKey+workspaceId]`) is identical to that
+ * delete scope, so the round trip is provably complete.
+ *
+ * `_legacyNodes` is retained only for call-site stability and is deliberately
+ * ignored. Reintroducing a node filter here would resurrect DA-H6 — the
+ * round-trip completeness test guards against exactly that.
  */
 export async function exportDocumentWorkspaceData(
   workspaceId: string,
-  nodes: OwnershipNode[]
+  _legacyNodes?: OwnershipNode[]
 ): Promise<DocumentWorkspaceData> {
-  const nodeIds = nodes.map((node) => node.id);
-  if (nodeIds.length === 0) return { documents: [], attachments: [] };
+  const scope = activeWorkspaceScope(workspaceId);
 
-  const attachments = await db.document_attachments
-    .where('entityKind')
-    .equals('node')
-    .and((row) =>
-      row.dbKey === activeWorkspaceScope(workspaceId)[0]
-      && row.workspaceId === workspaceId
-      && nodeIds.includes(row.entityId)
-    )
+  const storedDocs = await db.documents
+    .where('[dbKey+workspaceId]')
+    .equals(scope)
     .toArray();
-  const scopedAttachments = attachments.map(stripStoredAttachmentId);
-  if (scopedAttachments.length === 0) return { documents: [], attachments: [] };
-
-  const docIds = [...new Set(scopedAttachments.map((a) => a.docId))];
-  const docs = await getDocumentRows(docIds);
   const documents: DocumentRecord[] = [];
   const docIdSeen = new Set<string>();
-  for (const doc of docs) {
-    if (
-      doc
-      && doc.dbKey === activeWorkspaceScope(workspaceId)[0]
-      && doc.workspaceId === workspaceId
-      && doc.blob.size > 0
-    ) {
+  for (const doc of storedDocs) {
+    // Empty-blob rows are degenerate placeholders the restore side drops
+    // anyway (replaceDocumentWorkspaceData filters blob.size > 0).
+    if (doc.blob.size > 0) {
       const cleanDoc = stripStoredDocId(doc);
       documents.push(cleanDoc);
       docIdSeen.add(cleanDoc.docId);
     }
   }
-  return {
-    documents,
-    attachments: scopedAttachments.filter((a) => docIdSeen.has(a.docId)),
-  };
+
+  const storedAttachments = await db.document_attachments
+    .where('[dbKey+workspaceId]')
+    .equals(scope)
+    .toArray();
+  const attachments = storedAttachments
+    .map(stripStoredAttachmentId)
+    .filter((attachment) => docIdSeen.has(attachment.docId));
+
+  return { documents, attachments };
 }
 
 /**
