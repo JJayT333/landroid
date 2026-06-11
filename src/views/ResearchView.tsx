@@ -5,6 +5,7 @@ import HorizontalDrillingDecoderPanel from '../components/research/HorizontalDri
 import PendingDrillingDecoderPanel from '../components/research/PendingDrillingDecoderPanel';
 import RrcDelimitedPreviewTable from '../components/research/RrcDelimitedPreviewTable';
 import Button from '../components/shared/Button';
+import UndoRedoControls from '../components/shell/UndoRedoControls';
 import { useConfirmation } from '../components/shared/ConfirmationProvider';
 import FormField from '../components/shared/FormField';
 import { RRC_DATASET_CATALOG } from '../data/rrc-datasets';
@@ -1311,19 +1312,29 @@ export default function ResearchView() {
     sources.length + formulas.length + projectRecords.length + questions.length;
 
   return (
-    <div className="h-full grid gap-4 p-4 bg-parchment-dark/30 lg:grid-cols-[320px_minmax(0,1fr)]">
-      <aside className="rounded-md border border-ledger-line bg-parchment shadow-sm overflow-hidden flex flex-col">
-        <div className="px-4 py-4 border-b border-ledger-line bg-ledger space-y-3">
-          <div>
-            <div className="text-lg font-display font-bold text-ink">Research</div>
-            <div className="text-xs text-ink-light">
-              Source library, formula cards, federal/private project records, and saved questions.
-            </div>
+    <div className="flex h-full min-h-0 flex-col bg-parchment text-ink">
+      {/* Command header */}
+      <header className="flex shrink-0 flex-wrap items-center gap-3 border-b border-ledger-line bg-parchment-light px-5 py-3">
+        <div className="min-w-0">
+          <h1 className="font-display text-[19px] font-bold leading-tight text-ink">Research</h1>
+          <div className="mt-px truncate text-[11px] text-ink-light">
+            Source-grounded review ·{' '}
+            <span className="font-mono text-[10.5px]">
+              {totalRecords} records · {questions.length} questions
+            </span>
           </div>
+        </div>
+        <div className="ml-auto flex items-center gap-2">
+          <UndoRedoControls variant="secondary" />
+        </div>
+      </header>
 
+      <div className="flex min-h-0 flex-1">
+      <aside className="flex w-[296px] shrink-0 flex-col border-r border-ledger-line bg-parchment-light">
+        <div className="space-y-2 px-3 pt-3">
           <FormField label="Search Research" value={search} onChange={setSearch} />
 
-          <div className="rounded-md border border-ledger-line bg-parchment px-3 py-2 text-[11px] text-ink-light">
+          <div className="rounded-[9px] border border-ledger-line bg-ledger px-2.5 py-2 text-[10.5px] leading-[1.5] text-ink-light">
             This workspace is for source-grounded review. RRC downloads remain available in
             Data Imports, but DBF/EBCDIC decoding is no longer the main track.
           </div>
@@ -1332,7 +1343,7 @@ export default function ResearchView() {
         <div
           role="navigation"
           aria-label="Research sections"
-          className="flex-1 overflow-auto"
+          className="mt-2 flex-1 overflow-auto border-t border-[#f1eada] px-2 pb-2.5"
         >
           {RESEARCH_SECTIONS.map((item) => {
             const count =
@@ -1353,39 +1364,41 @@ export default function ResearchView() {
                 type="button"
                 onClick={() => setSection(item.id)}
                 aria-current={section === item.id ? 'page' : undefined}
-                className={`w-full border-b border-ledger-line px-4 py-3 text-left transition-colors ${
-                  section === item.id ? 'bg-leather/10' : 'hover:bg-ledger'
+                className={`mt-1 w-full rounded-[9px] px-2.5 py-2 text-left transition-colors ${
+                  section === item.id
+                    ? 'bg-[#f7efdf] shadow-[inset_2px_0_0_var(--color-leather)]'
+                    : 'hover:bg-parchment'
                 }`}
               >
                 <div className="flex items-center justify-between gap-3">
-                  <div className="text-sm font-semibold text-ink">{item.label}</div>
-                  <span className="text-[11px] text-ink-light">{count}</span>
+                  <div className="text-xs font-semibold text-ink">{item.label}</div>
+                  <span className="font-mono text-[10px] text-ink-faint">{count}</span>
                 </div>
-                <div className="mt-1 text-xs text-ink-light">{item.description}</div>
+                <div className="mt-0.5 text-[10.5px] leading-[1.45] text-ink-light">{item.description}</div>
               </button>
             );
           })}
         </div>
       </aside>
 
-      <section className="min-w-0 grid gap-4 grid-rows-[auto_minmax(0,1fr)]">
-        <div className="rounded-md border border-ledger-line bg-parchment shadow-sm p-4 flex items-start justify-between gap-4">
+      <section className="grid min-w-[360px] flex-1 grid-rows-[auto_minmax(0,1fr)] gap-3.5 overflow-y-auto box-border p-4">
+        <div className="flex items-start justify-between gap-4 rounded-xl border border-ledger-line bg-parchment-light p-4">
           <div>
-            <div className="text-xl font-display font-bold text-ink">
+            <div className="font-display text-lg font-bold text-ink">
               {activeSection.label}
             </div>
-            <div className="text-sm text-ink-light">{activeSection.description}</div>
-            <div className="mt-2 flex flex-wrap gap-2 text-[11px] font-semibold text-ink-light">
-              <span className="rounded-full border border-ledger-line bg-ledger px-2 py-0.5">
+            <div className="text-xs text-ink-light">{activeSection.description}</div>
+            <div className="mt-2 flex flex-wrap gap-1.5 text-[10px] font-semibold text-ink-soft">
+              <span className="rounded-md border border-ledger-line px-2 py-0.5">
                 {sources.length} sources
               </span>
-              <span className="rounded-full border border-ledger-line bg-ledger px-2 py-0.5">
+              <span className="rounded-md border border-ledger-line px-2 py-0.5">
                 {formulas.length} formulas
               </span>
-              <span className="rounded-full border border-ledger-line bg-ledger px-2 py-0.5">
+              <span className="rounded-md border border-ledger-line px-2 py-0.5">
                 {projectRecords.length} project records
               </span>
-              <span className="rounded-full border border-ledger-line bg-ledger px-2 py-0.5">
+              <span className="rounded-md border border-ledger-line px-2 py-0.5">
                 {totalRecords} source-of-truth records
               </span>
             </div>
@@ -1397,7 +1410,7 @@ export default function ResearchView() {
               disabled={readOnly || !workspaceId}
               onClick={() => void createSourceRecord()}
               title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
-              className="px-3 py-2 rounded-md text-sm font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-lg border border-line-strong bg-[rgba(255,252,246,0.45)] px-3 py-1.5 text-xs font-semibold text-ink backdrop-blur-[6px] transition-colors hover:bg-[rgba(243,229,217,0.7)] disabled:cursor-not-allowed disabled:opacity-50"
             >
               Add Source
             </button>
@@ -1408,7 +1421,7 @@ export default function ResearchView() {
               disabled={readOnly || !workspaceId}
               onClick={() => void createFormulaRecord()}
               title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
-              className="px-3 py-2 rounded-md text-sm font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-lg border border-line-strong bg-[rgba(255,252,246,0.45)] px-3 py-1.5 text-xs font-semibold text-ink backdrop-blur-[6px] transition-colors hover:bg-[rgba(243,229,217,0.7)] disabled:cursor-not-allowed disabled:opacity-50"
             >
               Add Formula
             </button>
@@ -1419,7 +1432,7 @@ export default function ResearchView() {
               disabled={readOnly || !workspaceId}
               onClick={() => void createProjectRecord()}
               title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
-              className="px-3 py-2 rounded-md text-sm font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-lg border border-line-strong bg-[rgba(255,252,246,0.45)] px-3 py-1.5 text-xs font-semibold text-ink backdrop-blur-[6px] transition-colors hover:bg-[rgba(243,229,217,0.7)] disabled:cursor-not-allowed disabled:opacity-50"
             >
               Add Project Record
             </button>
@@ -1430,7 +1443,7 @@ export default function ResearchView() {
               disabled={readOnly || !workspaceId}
               onClick={() => void createQuestionRecord()}
               title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
-              className="px-3 py-2 rounded-md text-sm font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-lg border border-line-strong bg-[rgba(255,252,246,0.45)] px-3 py-1.5 text-xs font-semibold text-ink backdrop-blur-[6px] transition-colors hover:bg-[rgba(243,229,217,0.7)] disabled:cursor-not-allowed disabled:opacity-50"
             >
               Add Question
             </button>
@@ -2596,7 +2609,7 @@ export default function ResearchView() {
                       if (!readOnly) inputRef.current?.click();
                     }}
                     title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
-                    className="px-3 py-2 rounded-md text-sm font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                    className="rounded-lg border border-line-strong bg-[rgba(255,252,246,0.45)] px-3 py-1.5 text-xs font-semibold text-ink backdrop-blur-[6px] transition-colors hover:bg-[rgba(243,229,217,0.7)] disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Import Files
                   </button>
@@ -2889,6 +2902,7 @@ export default function ResearchView() {
           </div>
         )}
       </section>
+      </div>
 
       {previewImport && (
         <AssetPreviewModal
@@ -2916,25 +2930,27 @@ function RecordList({
   onSelect: (id: string) => void;
 }) {
   return (
-    <div className="rounded-md border border-ledger-line bg-parchment shadow-sm overflow-hidden flex flex-col">
-      {toolbar && <div className="border-b border-ledger-line bg-ledger p-3">{toolbar}</div>}
-      <div className="flex-1 overflow-auto">
+    <div className="flex flex-col overflow-hidden rounded-xl border border-ledger-line bg-parchment-light">
+      {toolbar && <div className="border-b border-ledger-line p-3">{toolbar}</div>}
+      <div className="flex-1 overflow-auto px-2 pb-2.5">
         {records.length === 0 ? (
-          <div className="px-4 py-6 text-sm text-ink-light">{emptyText}</div>
+          <div className="px-2 py-6 text-sm text-ink-light">{emptyText}</div>
         ) : (
           records.map((record) => (
             <button
               key={record.id}
               type="button"
               onClick={() => onSelect(record.id)}
-              className={`w-full text-left px-4 py-3 border-b border-ledger-line transition-colors ${
-                selectedId === record.id ? 'bg-leather/10' : 'hover:bg-ledger'
+              className={`mt-1 w-full rounded-[9px] px-2.5 py-2 text-left transition-colors ${
+                selectedId === record.id
+                  ? 'bg-[#f7efdf] shadow-[inset_2px_0_0_var(--color-leather)]'
+                  : 'hover:bg-parchment'
               }`}
             >
-              <div className="text-sm font-semibold text-ink">{record.title}</div>
-              <div className="mt-1 text-[11px] text-ink-light">{record.meta}</div>
+              <div className="text-xs font-semibold text-ink">{record.title}</div>
+              <div className="mt-0.5 text-[10px] text-ink-light">{record.meta}</div>
               {record.body && (
-                <div className="mt-2 line-clamp-2 text-xs text-ink">{record.body}</div>
+                <div className="mt-1.5 line-clamp-2 text-[11px] leading-[1.5] text-ink-soft">{record.body}</div>
               )}
             </button>
           ))
@@ -3014,7 +3030,7 @@ function ResearchHomeTile({
         disabled={disabled}
         onClick={onAction}
         title={disabled ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
-        className="px-3 py-2 rounded-md text-xs font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+        className="rounded-lg border border-line-strong bg-[rgba(255,252,246,0.45)] px-3 py-1.5 text-xs font-semibold text-ink backdrop-blur-[6px] transition-colors hover:bg-[rgba(243,229,217,0.7)] disabled:cursor-not-allowed disabled:opacity-50"
       >
         {actionLabel}
       </button>
@@ -3287,11 +3303,11 @@ function DetailShell({
   children: ReactNode;
 }) {
   return (
-    <div className="rounded-md border border-ledger-line bg-parchment shadow-sm overflow-hidden flex flex-col">
-      <div className="border-b border-ledger-line bg-ledger px-4 py-3 flex items-start justify-between gap-4">
+    <div className="flex flex-col overflow-hidden rounded-xl border border-ledger-line bg-parchment-light">
+      <div className="flex items-start justify-between gap-4 border-b border-ledger-line px-4 py-3">
         <div className="min-w-0">
-          <div className="text-lg font-display font-bold text-ink truncate">{title}</div>
-          <div className="text-xs text-ink-light">{subtitle}</div>
+          <div className="truncate font-display text-[15px] font-bold text-ink">{title}</div>
+          <div className="text-[11px] text-ink-light">{subtitle}</div>
         </div>
         {onDelete && (
           <button
@@ -3299,7 +3315,7 @@ function DetailShell({
             disabled={deleteDisabled}
             onClick={() => void onDelete()}
             title={deleteDisabled ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
-            className="px-3 py-1.5 rounded-md text-xs font-semibold text-seal hover:bg-seal/10 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-lg px-2.5 py-1 text-[11px] font-semibold text-seal transition-colors hover:bg-[rgba(247,233,228,0.8)] disabled:cursor-not-allowed disabled:opacity-50"
           >
             Delete
           </button>
@@ -3316,10 +3332,10 @@ function DetailShell({
 
 function EmptyDetail({ message }: { message: string }) {
   return (
-    <div className="h-full rounded-md border border-dashed border-ledger-line bg-parchment flex items-center justify-center">
+    <div className="flex h-full items-center justify-center rounded-xl border border-dashed border-line-strong bg-parchment-light">
       <div className="max-w-lg px-6 text-center">
-        <div className="text-xl font-display font-bold text-ink">Nothing selected</div>
-        <div className="mt-2 text-sm text-ink-light">{message}</div>
+        <div className="font-display text-lg font-bold text-ink">Nothing selected</div>
+        <div className="mt-1.5 text-sm text-ink-light">{message}</div>
       </div>
     </div>
   );

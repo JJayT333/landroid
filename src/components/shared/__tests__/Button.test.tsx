@@ -3,10 +3,13 @@ import { describe, expect, it } from 'vitest';
 import Button from '../Button';
 
 describe('Button', () => {
-  it('renders the canonical primary treatment by default', () => {
+  it('renders the letterpress-glass primary (G1) by default', () => {
     const html = renderToStaticMarkup(<Button>Save</Button>);
-    expect(html).toContain('bg-leather');
-    expect(html).toContain('text-[#fff6ec]');
+    expect(html).toContain('border-ink');
+    expect(html).toContain('backdrop-blur-[10px]');
+    // The signature hard offset stamp shadow, pressing in on hover.
+    expect(html).toContain('2px_2px_0_var(--color-ink)');
+    expect(html).toContain('hover:translate-x-px');
     expect(html).toContain('rounded-lg');
     expect(html).toContain('focus-visible:ring-2');
     expect(html).toContain('type="button"');
@@ -15,10 +18,11 @@ describe('Button', () => {
 
   it('renders each variant', () => {
     expect(renderToStaticMarkup(<Button variant="secondary">A</Button>)).toContain('border-line-strong');
-    expect(renderToStaticMarkup(<Button variant="ghost">B</Button>)).toContain('hover:bg-parchment-dark');
-    expect(renderToStaticMarkup(<Button variant="destructive">C</Button>)).toContain('bg-seal');
+    expect(renderToStaticMarkup(<Button variant="ghost">B</Button>)).toContain('text-ink-light');
+    // Danger stamp keeps the letterpress anatomy in seal.
+    expect(renderToStaticMarkup(<Button variant="destructive">C</Button>)).toContain('2px_2px_0_var(--color-seal)');
     expect(renderToStaticMarkup(<Button variant="destructive-ghost">D</Button>)).toContain('text-seal');
-    expect(renderToStaticMarkup(<Button variant="glass">E</Button>)).toContain('backdrop-blur-md');
+    expect(renderToStaticMarkup(<Button variant="glass">E</Button>)).toContain('backdrop-blur-[6px]');
   });
 
   it('renders each size', () => {
