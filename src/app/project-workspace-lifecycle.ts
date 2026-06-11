@@ -59,6 +59,7 @@ export type ImportedWorkspaceData = Omit<WorkspaceData, 'instrumentTypes'>
     | 'canvas'
     | 'ownerData'
     | 'documentData'
+    | 'documentFixityWarning'
     | 'mapData'
     | 'researchData'
     | 'curativeData'
@@ -287,8 +288,12 @@ export async function importAndOpenWorkspace(
     ).catch((err) => {
       console.warn('[landroid] title ledger import hydration failed:', err);
     });
-    useWorkspaceStore.getState().setStartupWarning(null);
-    return { project, warning: null };
+    // DA-H7: surface a document fixity mismatch (recorded hash ≠ contents) as
+    // the dismissible startup banner. The recomputed hashes are already stored;
+    // this only flags the originals for review.
+    const fixityWarning = data.documentFixityWarning ?? null;
+    useWorkspaceStore.getState().setStartupWarning(fixityWarning);
+    return { project, warning: fixityWarning };
   } catch (error) {
     setActiveWorkspaceStorageKey(previousWorkspaceDbKey);
     throw error;
