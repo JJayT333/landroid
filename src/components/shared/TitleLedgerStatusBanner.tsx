@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { TitleCutoverReadiness } from '../../project-records/action-layer/title-cutover-gate';
 import {
   computeTitleParityGates,
@@ -34,7 +34,25 @@ const NOT_CLEAN_GATES: TitleParityGates = {
 // The governance check only requires a non-empty token (see TitleReadPathFlag).
 const MANUAL_FLIP_TOKEN = 'reviewer:title-cutover-confirmed';
 
+/**
+ * App-level banner: quiet when healthy. Post-flip daily reality is
+ * "cutover, no divergence, no error" — that state renders nothing here (the
+ * sidebar's LedgerStatusChip keeps the panel one click away, revert included).
+ * Any trouble (divergence, recording error) or any pre-flip state brings the
+ * full banner back across the main column. The heavy parity gates only
+ * compute while the panel is actually mounted.
+ */
 export default function TitleLedgerStatusBanner() {
+  const lastDivergence = useTitleActionLog((state) => state.lastDivergence);
+  const lastError = useTitleActionLog((state) => state.lastError);
+  const readPathMode = useTitleActionLog((state) => state.readPathMode);
+  const healthy = readPathMode === 'cutover' && !lastDivergence && !lastError;
+  if (healthy) return null;
+  return <TitleLedgerStatusPanel />;
+}
+
+/** Floating popover host for the chip (heavy gates compute only while open). */
+export function TitleLedgerStatusPanel() {
   const lastDivergence = useTitleActionLog((state) => state.lastDivergence);
   const lastError = useTitleActionLog((state) => state.lastError);
   const recordedMutationCount = useTitleActionLog((state) => state.recordedMutationCount);
@@ -106,6 +124,65 @@ export default function TitleLedgerStatusBanner() {
         setFlipError(null);
       }}
     />
+  );
+}
+
+/**
+ * Compact sidebar-footer chip: dot + read-mode label, cheap subscriptions
+ * only. Click opens the full readiness panel (with the revert control) as a
+ * popover anchored above the footer.
+ */
+export function LedgerStatusChip() {
+  const lastDivergence = useTitleActionLog((state) => state.lastDivergence);
+  const lastError = useTitleActionLog((state) => state.lastError);
+  const readPathMode = useTitleActionLog((state) => state.readPathMode);
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDocClick = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onDocClick);
+    return () => document.removeEventListener('mousedown', onDocClick);
+  }, [open]);
+
+  const trouble = Boolean(lastDivergence || lastError);
+  const label = trouble
+    ? lastDivergence
+      ? 'Divergence'
+      : 'Ledger error'
+    : readPathMode === 'cutover'
+      ? 'Cutover'
+      : 'Shadow';
+  const dotClass = trouble
+    ? 'bg-seal'
+    : readPathMode === 'cutover'
+      ? 'bg-[#3f7d4e]'
+      : 'bg-gold';
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        title={`Title ledger read mode: ${readPathMode}. Click for readiness details.`}
+        className="flex shrink-0 items-center gap-1.5 rounded-[7px] border border-ledger-line px-2 py-[3px] text-[10px] font-semibold text-ink-light transition-colors hover:bg-parchment-dark"
+      >
+        <span className={`h-1.5 w-1.5 rounded-full ${dotClass}`} />
+        {label}
+      </button>
+      {open && (
+        <div className="absolute bottom-8 left-1/2 z-50 w-[34rem] max-w-[80vw] -translate-x-1/2 overflow-hidden rounded-[10px] border border-ledger-line bg-parchment-light shadow-[0_12px_30px_rgba(45,33,20,0.16)]">
+          <TitleLedgerStatusPanel />
+        </div>
+      )}
+    </div>
   );
 }
 
