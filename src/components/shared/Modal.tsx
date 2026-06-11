@@ -137,13 +137,13 @@ export default function Modal({ open, onClose, title, children, wide }: ModalPro
         aria-modal="true"
         aria-label={title}
         className={`
-          relative bg-parchment rounded-xl shadow-2xl border border-ledger-line
+          relative bg-parchment rounded-md shadow-2xl border border-ledger-line
           mx-4 max-h-[90vh] overflow-y-auto outline-none
           ${wide ? 'max-w-2xl w-full' : 'max-w-lg w-full'}
         `}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-ledger-line sticky top-0 bg-parchment rounded-t-xl z-10">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-ledger-line sticky top-0 bg-parchment rounded-t-md z-10">
           <h2 className="text-lg font-display font-bold text-ink">{title}</h2>
           <button
             onClick={onClose}

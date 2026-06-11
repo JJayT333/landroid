@@ -54,7 +54,7 @@ export default function UnitFocusSelector({
   };
 
   return (
-    <div className="rounded-xl border border-ledger-line bg-parchment px-3 py-2 shadow-sm">
+    <div className="rounded-md border border-ledger-line bg-parchment px-3 py-2 shadow-sm">
       <div className="flex flex-wrap items-end gap-3">
         <label className="min-w-[14rem] flex-1">
           <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-light">
@@ -64,7 +64,7 @@ export default function UnitFocusSelector({
             value={selectedUnitCode}
             disabled={unitOptions.length === 0}
             onChange={(event) => setActiveUnitCode(event.target.value || null)}
-            className="mt-1.5 w-full rounded-lg border border-ledger-line bg-white px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-leather disabled:bg-ledger disabled:text-ink-light"
+            className="mt-1.5 w-full rounded-md border border-ledger-line bg-white px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-leather disabled:bg-ledger disabled:text-ink-light"
           >
             {unitOptions.length === 0 ? (
               <option value="">No units yet</option>
@@ -78,7 +78,7 @@ export default function UnitFocusSelector({
           </select>
         </label>
 
-        <div className="rounded-lg border border-ledger-line bg-white px-3 py-2 text-xs text-ink-light">
+        <div className="rounded-md border border-ledger-line bg-white px-3 py-2 text-xs text-ink-light">
           {selectedUnit
             ? `${selectedUnit.tractCount} tract${selectedUnit.tractCount === 1 ? '' : 's'}`
             : `${deskMaps.length} tract${deskMaps.length === 1 ? '' : 's'}`}
@@ -87,7 +87,7 @@ export default function UnitFocusSelector({
         <button
           type="button"
           onClick={() => setAdding((current) => !current)}
-          className="rounded-lg border border-leather/30 px-3 py-2 text-xs font-semibold text-leather transition-colors hover:bg-leather/10"
+          className="rounded-md border border-leather/30 px-3 py-2 text-xs font-semibold text-leather transition-colors hover:bg-leather/10"
         >
           {adding ? 'Cancel' : '+ Add Unit'}
         </button>
@@ -103,7 +103,7 @@ export default function UnitFocusSelector({
               value={unitNameDraft}
               onChange={(event) => setUnitNameDraft(event.target.value)}
               placeholder="Raven Forest Unit C"
-              className="mt-1 w-full rounded-lg border border-ledger-line bg-white px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-leather"
+              className="mt-1 w-full rounded-md border border-ledger-line bg-white px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-leather"
             />
           </label>
           <label>
@@ -114,14 +114,14 @@ export default function UnitFocusSelector({
               value={unitCodeDraft}
               onChange={(event) => setUnitCodeDraft(event.target.value)}
               placeholder="C"
-              className="mt-1 w-full rounded-lg border border-ledger-line bg-white px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-leather"
+              className="mt-1 w-full rounded-md border border-ledger-line bg-white px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-leather"
             />
           </label>
           <button
             type="button"
             disabled={!unitNameDraft.trim()}
             onClick={handleCreateUnit}
-            className="self-end rounded-lg bg-leather px-4 py-2 text-sm font-semibold text-parchment transition-colors hover:bg-leather-light disabled:opacity-50"
+            className="self-end rounded-md bg-leather px-4 py-2 text-sm font-semibold text-parchment transition-colors hover:bg-leather-light disabled:opacity-50"
           >
             Create
           </button>

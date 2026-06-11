@@ -6,6 +6,7 @@
  * changes, it's a simple updateNode with no cascade.
  */
 import { useState } from 'react';
+import Button from '../shared/Button';
 import Modal from '../shared/Modal';
 import FormField from '../shared/FormField';
 import InstrumentSelect from '../shared/InstrumentSelect';
@@ -179,7 +180,7 @@ export default function NodeEditModal({
             {interestClass === 'npri' ? 'Royalty Interest' : 'Ownership Interest'}
           </legend>
 
-          <div className="bg-ledger rounded-lg p-3 space-y-2">
+          <div className="bg-ledger rounded-md p-3 space-y-2">
             {interestClass === 'npri' && (
               <>
                 <div className="space-y-1.5">
@@ -204,7 +205,7 @@ export default function NodeEditModal({
                                 : null,
                           }))
                         }
-                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                        className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
                           form.royaltyKind === kind
                             ? 'bg-amber-700 text-amber-50'
                             : 'text-amber-900 hover:bg-amber-100 border border-amber-200'
@@ -230,7 +231,7 @@ export default function NodeEditModal({
                           key={basis}
                           type="button"
                           onClick={() => set('fixedRoyaltyBasis', basis)}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                          className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
                             form.fixedRoyaltyBasis === basis
                               ? 'bg-leather text-parchment'
                               : 'text-ink hover:bg-parchment-dark border border-ledger-line'
@@ -258,7 +259,7 @@ export default function NodeEditModal({
                 type="text"
                 value={form.initialFraction}
                 onChange={(e) => set('initialFraction', e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-ledger-line bg-parchment text-ink font-mono text-sm focus:ring-2 focus:ring-leather focus:border-leather outline-none"
+                className="w-full px-3 py-2 rounded-md border border-ledger-line bg-parchment text-ink font-mono text-sm focus:ring-2 focus:ring-leather focus:border-leather outline-none"
               />
               <div className="text-[10px] text-ink-light mt-1 font-mono">
                 = {previewFrac}
@@ -266,7 +267,7 @@ export default function NodeEditModal({
             </div>
 
             {(npriExceedsFullShare || fixedWholeTractExceedsBranch) && (
-              <div className="rounded-lg border border-seal/30 bg-seal/10 px-3 py-2 text-xs leading-5 text-seal">
+              <div className="rounded-md border border-seal/30 bg-seal/10 px-3 py-2 text-xs leading-5 text-seal">
                 <span className="font-semibold">Title discrepancy allowed.</span>{' '}
                 LANDroid will save this NPRI and highlight the affected Desk Map branch in red.
                 {npriExceedsFullShare && ' The entered NPRI is greater than 100%.'}
@@ -277,7 +278,7 @@ export default function NodeEditModal({
             )}
 
             {initialChanged && (
-              <div className="bg-gold/10 border border-gold/30 rounded-lg p-2 text-xs text-ink">
+              <div className="bg-gold/10 border border-gold/30 rounded-md p-2 text-xs text-ink">
                 <span className="font-semibold">Cascade warning:</span> Changing
                 from {oldFrac} to {previewFrac} will scale ALL descendants
                 by factor {(() => {
@@ -316,7 +317,7 @@ export default function NodeEditModal({
               value={form.landDesc}
               onChange={(e) => set('landDesc', e.target.value)}
               rows={2}
-              className="w-full px-3 py-2 rounded-lg border border-ledger-line bg-parchment text-ink text-sm focus:ring-2 focus:ring-leather focus:border-leather outline-none resize-y"
+              className="w-full px-3 py-2 rounded-md border border-ledger-line bg-parchment text-ink text-sm focus:ring-2 focus:ring-leather focus:border-leather outline-none resize-y"
             />
           </div>
           <div>
@@ -327,7 +328,7 @@ export default function NodeEditModal({
               value={form.remarks}
               onChange={(e) => set('remarks', e.target.value)}
               rows={2}
-              className="w-full px-3 py-2 rounded-lg border border-ledger-line bg-parchment text-ink text-sm focus:ring-2 focus:ring-leather focus:border-leather outline-none resize-y"
+              className="w-full px-3 py-2 rounded-md border border-ledger-line bg-parchment text-ink text-sm focus:ring-2 focus:ring-leather focus:border-leather outline-none resize-y"
             />
           </div>
         </fieldset>
@@ -342,7 +343,7 @@ export default function NodeEditModal({
               type="checkbox"
               checked={form.isDeceased}
               onChange={(e) => set('isDeceased', e.target.checked)}
-              className="rounded border-ledger-line text-leather focus:ring-leather"
+              className="accent-leather"
             />
             Deceased
           </label>
@@ -367,7 +368,7 @@ export default function NodeEditModal({
             <legend className="text-xs font-semibold text-ink-light uppercase tracking-wider mb-2">
               Owner Record
             </legend>
-            <div className="rounded-lg border border-ledger-line bg-ledger px-3 py-3 flex items-center justify-between gap-3">
+            <div className="rounded-md border border-ledger-line bg-ledger px-3 py-3 flex items-center justify-between gap-3">
               <div>
                 <div className="text-sm font-semibold text-ink">
                   {linkedOwnerName || 'No owner record linked yet'}
@@ -381,7 +382,7 @@ export default function NodeEditModal({
               <button
                 type="button"
                 onClick={() => onManageOwner?.(node.id)}
-                className="px-3 py-2 rounded-lg text-xs font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors"
+                className="px-3 py-2 rounded-md text-xs font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors"
               >
                 {linkedOwnerName ? 'Open Owner' : 'Create Owner'}
               </button>
@@ -395,7 +396,7 @@ export default function NodeEditModal({
                   <select
                     value={ownerLinkDraftId}
                     onChange={(event) => setOwnerLinkDraftId(event.target.value)}
-                    className="w-full px-3 py-2 rounded-lg border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none"
+                    className="w-full px-3 py-2 rounded-md border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none"
                   >
                     <option value="">Choose owner record...</option>
                     {ownerLinkOptions.map((owner) => (
@@ -413,7 +414,7 @@ export default function NodeEditModal({
                     onLinkOwner?.(node.id, ownerLinkDraftId);
                     setOwnerLinkDraftId('');
                   }}
-                  className="self-end px-3 py-2 rounded-lg text-xs font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors disabled:opacity-50"
+                  className="self-end px-3 py-2 rounded-md text-xs font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors disabled:opacity-50"
                 >
                   Link Owner
                 </button>
@@ -427,7 +428,7 @@ export default function NodeEditModal({
             <legend className="text-xs font-semibold text-ink-light uppercase tracking-wider mb-2">
               Lease / Lessee Node
             </legend>
-            <div className="rounded-lg border border-emerald-200 bg-emerald-50/70 px-3 py-3 flex items-center justify-between gap-3">
+            <div className="rounded-md border border-emerald-200 bg-emerald-50/70 px-3 py-3 flex items-center justify-between gap-3">
               <div>
                 <div className="text-sm font-semibold text-emerald-950">
                   {leaseStatusText || 'No lease node linked yet'}
@@ -439,7 +440,7 @@ export default function NodeEditModal({
               <button
                 type="button"
                 onClick={() => onManageLease?.(node.id)}
-                className="px-3 py-2 rounded-lg text-xs font-semibold text-emerald-900 hover:bg-emerald-100 border border-emerald-300 transition-colors"
+                className="px-3 py-2 rounded-md text-xs font-semibold text-emerald-900 hover:bg-emerald-100 border border-emerald-300 transition-colors"
               >
                 {leaseStatusText ? 'Open Lease' : 'Create Lease'}
               </button>
@@ -452,7 +453,7 @@ export default function NodeEditModal({
             <legend className="text-xs font-semibold text-ink-light uppercase tracking-wider mb-2">
               Royalty Burdens
             </legend>
-            <div className="rounded-lg border border-amber-200 bg-amber-50/70 px-3 py-3 flex items-center justify-between gap-3">
+            <div className="rounded-md border border-amber-200 bg-amber-50/70 px-3 py-3 flex items-center justify-between gap-3">
               <div>
                 <div className="text-sm font-semibold text-amber-950">
                   Add a fixed or floating NPRI without reducing the mineral total.
@@ -464,7 +465,7 @@ export default function NodeEditModal({
               <button
                 type="button"
                 onClick={() => onManageNpri?.(node.id)}
-                className="px-3 py-2 rounded-lg text-xs font-semibold text-amber-900 hover:bg-amber-100 border border-amber-300 transition-colors"
+                className="px-3 py-2 rounded-md text-xs font-semibold text-amber-900 hover:bg-amber-100 border border-amber-300 transition-colors"
               >
                 Add NPRI
               </button>
@@ -474,22 +475,21 @@ export default function NodeEditModal({
 
         {/* Error display */}
         {error && (
-          <div className="bg-seal/10 border border-seal/30 rounded-lg p-3 text-sm text-seal">
+          <div className="bg-seal/10 border border-seal/30 rounded-md p-3 text-sm text-seal">
             {error}
           </div>
         )}
 
         {/* Actions */}
         <div className="flex justify-end gap-2 pt-2 border-t border-ledger-line">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 rounded-lg text-sm text-ink-light hover:bg-parchment-dark transition-colors"
-          >
+          <Button variant="ghost" onClick={onClose}>
             Cancel
-          </button>
+          </Button>
+          {/* Conditional gold treatment signals a cascading rebalance; the shared
+              Button has no gold variant, so this one stays hand-rolled. */}
           <button
             onClick={handleSave}
-            className={`px-4 py-2 rounded-lg text-sm font-semibold text-parchment transition-colors ${
+            className={`px-4 py-2 rounded-md text-sm font-semibold text-parchment transition-colors ${
               initialChanged
                 ? 'bg-gold hover:bg-gold-light'
                 : 'bg-leather hover:bg-leather-light'

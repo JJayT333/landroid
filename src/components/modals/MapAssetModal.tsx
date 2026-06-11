@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import Button from '../shared/Button';
 import Modal from '../shared/Modal';
 import FormField from '../shared/FormField';
 import type { DeskMap, OwnershipNode } from '../../types/node';
@@ -59,7 +60,7 @@ export default function MapAssetModal({
   return (
     <Modal open onClose={onClose} title="Map Asset Details" wide>
       <div className="space-y-4">
-        <div className="rounded-lg border border-ledger-line bg-ledger px-3 py-2">
+        <div className="rounded-md border border-ledger-line bg-ledger px-3 py-2">
           <div className="text-xs font-semibold text-ink">{asset.fileName}</div>
           <div className="text-[11px] text-ink-light">{asset.mimeType || 'Unknown type'}</div>
         </div>
@@ -74,7 +75,7 @@ export default function MapAssetModal({
             <select
               value={form.kind}
               onChange={(event) => set('kind', event.target.value as MapAssetKind)}
-              className="w-full px-3 py-2 rounded-lg border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none"
+              className="w-full px-3 py-2 rounded-md border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none"
             >
               {MAP_ASSET_KIND_OPTIONS.map((option) => (
                 <option key={option} value={option}>
@@ -99,7 +100,7 @@ export default function MapAssetModal({
           <FormField label="Source" value={form.source} onChange={(value) => set('source', value)} />
         </div>
 
-        <label className="flex items-center gap-2 rounded-lg border border-ledger-line bg-ledger px-3 py-2 text-sm text-ink">
+        <label className="flex items-center gap-2 rounded-md border border-ledger-line bg-ledger px-3 py-2 text-sm text-ink">
           <input
             type="checkbox"
             checked={form.isFeatured}
@@ -122,7 +123,7 @@ export default function MapAssetModal({
             <select
               value={form.deskMapId}
               onChange={(event) => set('deskMapId', event.target.value)}
-              className="w-full px-3 py-2 rounded-lg border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none"
+              className="w-full px-3 py-2 rounded-md border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none"
             >
               <option value="">Not linked</option>
               {deskMaps.map((deskMap) => (
@@ -140,7 +141,7 @@ export default function MapAssetModal({
             <select
               value={form.nodeId}
               onChange={(event) => set('nodeId', event.target.value)}
-              className="w-full px-3 py-2 rounded-lg border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none"
+              className="w-full px-3 py-2 rounded-md border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none"
             >
               <option value="">Not linked</option>
               {nodes.map((node) => (
@@ -158,7 +159,7 @@ export default function MapAssetModal({
             <select
               value={form.linkedOwnerId}
               onChange={(event) => set('linkedOwnerId', event.target.value)}
-              className="w-full px-3 py-2 rounded-lg border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none"
+              className="w-full px-3 py-2 rounded-md border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none"
             >
               <option value="">Not linked</option>
               {owners.map((owner) => (
@@ -176,7 +177,7 @@ export default function MapAssetModal({
             <select
               value={form.leaseId}
               onChange={(event) => set('leaseId', event.target.value)}
-              className="w-full px-3 py-2 rounded-lg border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none"
+              className="w-full px-3 py-2 rounded-md border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none"
             >
               <option value="">Not linked</option>
               {leases.map((lease) => (
@@ -194,7 +195,7 @@ export default function MapAssetModal({
             <select
               value={form.researchSourceId}
               onChange={(event) => set('researchSourceId', event.target.value)}
-              className="w-full px-3 py-2 rounded-lg border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none"
+              className="w-full px-3 py-2 rounded-md border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none"
             >
               <option value="">Not linked</option>
               {researchSources.map((source) => (
@@ -212,7 +213,7 @@ export default function MapAssetModal({
             <select
               value={form.researchProjectRecordId}
               onChange={(event) => set('researchProjectRecordId', event.target.value)}
-              className="w-full px-3 py-2 rounded-lg border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none"
+              className="w-full px-3 py-2 rounded-md border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none"
             >
               <option value="">Not linked</option>
               {researchProjectRecords.map((record) => (
@@ -232,7 +233,7 @@ export default function MapAssetModal({
             value={form.presentationSummary}
             onChange={(event) => set('presentationSummary', event.target.value)}
             rows={3}
-            className="w-full px-3 py-2 rounded-lg border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none resize-y"
+            className="w-full px-3 py-2 rounded-md border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none resize-y"
             placeholder="Plain-English context for presentations or quick handoffs"
           />
         </div>
@@ -245,7 +246,7 @@ export default function MapAssetModal({
             value={form.notes}
             onChange={(event) => set('notes', event.target.value)}
             rows={4}
-            className="w-full px-3 py-2 rounded-lg border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none resize-y"
+            className="w-full px-3 py-2 rounded-md border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none resize-y"
           />
         </div>
 
@@ -253,20 +254,15 @@ export default function MapAssetModal({
           <button
             type="button"
             onClick={onPreview}
-            className="px-3 py-2 rounded-lg text-xs font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors"
+            className="px-3 py-2 rounded-md text-xs font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors"
           >
             Preview
           </button>
           <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-3 py-2 rounded-lg text-sm text-ink-light hover:bg-parchment-dark transition-colors"
-            >
+            <Button variant="ghost" onClick={onClose}>
               Cancel
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
               disabled={saving}
               onClick={async () => {
                 setSaving(true);
@@ -290,10 +286,9 @@ export default function MapAssetModal({
                 setSaving(false);
                 onClose();
               }}
-              className="px-4 py-2 rounded-lg bg-leather text-parchment text-sm font-semibold hover:bg-leather-light transition-colors disabled:opacity-60"
             >
               Save
-            </button>
+            </Button>
           </div>
         </div>
       </div>

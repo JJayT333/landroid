@@ -266,7 +266,7 @@ function SelectField<T extends string>({
         value={value}
         disabled={disabled}
         onChange={(event) => onChange(event.target.value as T)}
-        className="w-full rounded-lg border border-ledger-line bg-parchment px-3 py-1.5 text-sm text-ink outline-none focus:border-leather focus:ring-2 focus:ring-leather disabled:cursor-not-allowed disabled:opacity-60"
+        className="w-full rounded-md border border-ledger-line bg-parchment px-3 py-1.5 text-sm text-ink outline-none focus:border-leather focus:ring-2 focus:ring-leather disabled:cursor-not-allowed disabled:opacity-60"
       >
         {options.map((option) => (
           <option key={option} value={option}>
@@ -300,7 +300,7 @@ function LinkedSelect({
         value={value ?? ''}
         disabled={disabled}
         onChange={(event) => onChange(event.target.value || null)}
-        className="w-full rounded-lg border border-ledger-line bg-parchment px-3 py-1.5 text-sm text-ink outline-none focus:border-leather focus:ring-2 focus:ring-leather disabled:cursor-not-allowed disabled:opacity-60"
+        className="w-full rounded-md border border-ledger-line bg-parchment px-3 py-1.5 text-sm text-ink outline-none focus:border-leather focus:ring-2 focus:ring-leather disabled:cursor-not-allowed disabled:opacity-60"
       >
         <option value="">None linked</option>
         {options.map((option) => (
@@ -449,7 +449,7 @@ export default function CurativeView() {
 
   return (
     <div className="grid h-full gap-4 bg-parchment-dark/30 p-4 lg:grid-cols-[360px_minmax(0,1fr)]">
-      <aside className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-ledger-line bg-parchment shadow-sm">
+      <aside className="flex min-h-0 flex-col overflow-hidden rounded-md border border-ledger-line bg-parchment shadow-sm">
         <div className="border-b border-ledger-line bg-ledger px-4 py-4">
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -474,14 +474,14 @@ export default function CurativeView() {
                 );
               }}
               title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
-              className="rounded-lg border border-leather/30 px-3 py-2 text-xs font-semibold text-leather transition-colors hover:bg-leather/10 disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-md border border-leather/30 px-3 py-2 text-xs font-semibold text-leather transition-colors hover:bg-leather/10 disabled:cursor-not-allowed disabled:opacity-50"
             >
               + New Issue
             </button>
           </div>
 
           <div className="mt-4 grid grid-cols-3 gap-2 text-center">
-            <div className="rounded-lg border border-ledger-line bg-white px-2 py-2">
+            <div className="rounded-md border border-ledger-line bg-white px-2 py-2">
               <div className="text-lg font-display font-bold text-seal">
                 {criticalIssues.length}
               </div>
@@ -489,7 +489,7 @@ export default function CurativeView() {
                 High Risk
               </div>
             </div>
-            <div className="rounded-lg border border-ledger-line bg-white px-2 py-2">
+            <div className="rounded-md border border-ledger-line bg-white px-2 py-2">
               <div className="text-lg font-display font-bold text-amber-700">
                 {overdueIssues.length}
               </div>
@@ -497,7 +497,7 @@ export default function CurativeView() {
                 Overdue
               </div>
             </div>
-            <div className="rounded-lg border border-ledger-line bg-white px-2 py-2">
+            <div className="rounded-md border border-ledger-line bg-white px-2 py-2">
               <div className="text-lg font-display font-bold text-leather">
                 {reviewIssues.length}
               </div>
@@ -517,7 +517,7 @@ export default function CurativeView() {
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
               placeholder="Owner, tract, defect, doc no., cure..."
-              className="mt-1.5 w-full rounded-lg border border-ledger-line bg-white px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-leather"
+              className="mt-1.5 w-full rounded-md border border-ledger-line bg-white px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-leather"
             />
           </label>
           <div className="mt-3 grid grid-cols-2 gap-2">
@@ -528,7 +528,7 @@ export default function CurativeView() {
               <select
                 value={statusFilter}
                 onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}
-                className="mt-1.5 w-full rounded-lg border border-ledger-line bg-white px-3 py-2 text-sm text-ink outline-none focus:border-leather"
+                className="mt-1.5 w-full rounded-md border border-ledger-line bg-white px-3 py-2 text-sm text-ink outline-none focus:border-leather"
               >
                 {STATUS_FILTER_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -546,7 +546,7 @@ export default function CurativeView() {
                 onChange={(event) =>
                   setPriorityFilter(event.target.value as PriorityFilter)
                 }
-                className="mt-1.5 w-full rounded-lg border border-ledger-line bg-white px-3 py-2 text-sm text-ink outline-none focus:border-leather"
+                className="mt-1.5 w-full rounded-md border border-ledger-line bg-white px-3 py-2 text-sm text-ink outline-none focus:border-leather"
               >
                 {PRIORITY_FILTER_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -617,7 +617,7 @@ export default function CurativeView() {
 
       <section className="min-w-0">
         {issueForPanel && form ? (
-          <div className="flex h-full flex-col overflow-hidden rounded-xl border border-ledger-line bg-parchment shadow-sm">
+          <div className="flex h-full flex-col overflow-hidden rounded-md border border-ledger-line bg-parchment shadow-sm">
             <div className="border-b border-ledger-line bg-ledger px-5 py-4">
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
@@ -643,7 +643,7 @@ export default function CurativeView() {
                     type="button"
                     disabled={!issueForPanel.affectedDeskMapId}
                     onClick={openLinkedDeskMap}
-                    className="rounded-lg border border-leather/30 px-3 py-2 text-xs font-semibold text-leather transition-colors hover:bg-leather/10 disabled:opacity-40"
+                    className="rounded-md border border-leather/30 px-3 py-2 text-xs font-semibold text-leather transition-colors hover:bg-leather/10 disabled:opacity-40"
                   >
                     Open Desk Map
                   </button>
@@ -662,7 +662,7 @@ export default function CurativeView() {
                       await removeIssue(issueForPanel.id);
                     }}
                     title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
-                    className="rounded-lg px-3 py-2 text-xs font-semibold text-seal transition-colors hover:bg-seal/10 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="rounded-md px-3 py-2 text-xs font-semibold text-seal transition-colors hover:bg-seal/10 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Delete
                   </button>
@@ -734,7 +734,7 @@ export default function CurativeView() {
                         setFormField('requiredCurativeAction', event.target.value)
                       }
                       rows={4}
-                      className="w-full resize-y rounded-lg border border-ledger-line bg-parchment px-3 py-2 text-sm text-ink outline-none focus:border-leather focus:ring-2 focus:ring-leather disabled:cursor-not-allowed disabled:opacity-60"
+                      className="w-full resize-y rounded-md border border-ledger-line bg-parchment px-3 py-2 text-sm text-ink outline-none focus:border-leather focus:ring-2 focus:ring-leather disabled:cursor-not-allowed disabled:opacity-60"
                       placeholder="Example: obtain affidavit of heirship, probate order, release, ratification, correction deed, or title-opinion waiver."
                     />
                   </div>
@@ -748,7 +748,7 @@ export default function CurativeView() {
                       disabled={readOnly}
                       onChange={(event) => setFormField('notes', event.target.value)}
                       rows={5}
-                      className="w-full resize-y rounded-lg border border-ledger-line bg-parchment px-3 py-2 text-sm text-ink outline-none focus:border-leather focus:ring-2 focus:ring-leather disabled:cursor-not-allowed disabled:opacity-60"
+                      className="w-full resize-y rounded-md border border-ledger-line bg-parchment px-3 py-2 text-sm text-ink outline-none focus:border-leather focus:ring-2 focus:ring-leather disabled:cursor-not-allowed disabled:opacity-60"
                     />
                   </div>
 
@@ -763,14 +763,14 @@ export default function CurativeView() {
                         setFormField('resolutionNotes', event.target.value)
                       }
                       rows={3}
-                      className="w-full resize-y rounded-lg border border-ledger-line bg-parchment px-3 py-2 text-sm text-ink outline-none focus:border-leather focus:ring-2 focus:ring-leather disabled:cursor-not-allowed disabled:opacity-60"
+                      className="w-full resize-y rounded-md border border-ledger-line bg-parchment px-3 py-2 text-sm text-ink outline-none focus:border-leather focus:ring-2 focus:ring-leather disabled:cursor-not-allowed disabled:opacity-60"
                       placeholder="Who approved it, what document cured it, or why it was deferred."
                     />
                   </div>
                 </div>
 
                 <div className="space-y-4">
-                  <div className="rounded-xl border border-ledger-line bg-white/70 p-4">
+                  <div className="rounded-md border border-ledger-line bg-white/70 p-4">
                     <div className="text-sm font-display font-bold text-ink">
                       Affected Title
                     </div>
@@ -865,7 +865,7 @@ export default function CurativeView() {
                     </div>
                   </div>
 
-                  <div className="rounded-xl border border-ledger-line bg-white/70 p-4">
+                  <div className="rounded-md border border-ledger-line bg-white/70 p-4">
                     <div className="text-sm font-display font-bold text-ink">
                       Current Link Summary
                     </div>
@@ -902,7 +902,7 @@ export default function CurativeView() {
                     </div>
                   </div>
 
-                  <div className="rounded-xl border border-gold/40 bg-gold/10 p-4 text-sm text-ink">
+                  <div className="rounded-md border border-gold/40 bg-gold/10 p-4 text-sm text-ink">
                     <div className="font-display font-bold">Company readiness list</div>
                     <div className="mt-2 text-xs leading-5 text-ink-light">
                       Added to the running roadmap after curative:
@@ -932,14 +932,14 @@ export default function CurativeView() {
                   setSaving(false);
                 }}
                 title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
-                className="rounded-lg bg-leather px-4 py-2 text-sm font-semibold text-parchment transition-colors hover:bg-leather-light disabled:cursor-not-allowed disabled:opacity-60"
+                className="rounded-md bg-leather px-4 py-2 text-sm font-semibold text-parchment transition-colors hover:bg-leather-light disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {saving ? 'Saving...' : 'Save Issue'}
               </button>
             </div>
           </div>
         ) : (
-          <div className="flex h-full items-center justify-center rounded-xl border border-dashed border-ledger-line bg-parchment">
+          <div className="flex h-full items-center justify-center rounded-md border border-dashed border-ledger-line bg-parchment">
             <div className="max-w-lg px-6 text-center">
               <div className="text-xl font-display font-bold text-ink">
                 No curative issue selected

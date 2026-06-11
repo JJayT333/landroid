@@ -153,7 +153,7 @@ export default function RunsheetView() {
         </span>
         <button
           onClick={() => setTractFilter('all')}
-          className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors ${
+          className={`px-4 py-2 rounded-md text-xs font-semibold whitespace-nowrap transition-colors ${
             tractFilter === 'all'
               ? 'bg-leather text-parchment'
               : 'bg-parchment-dark text-ink-light hover:bg-parchment'
@@ -165,7 +165,7 @@ export default function RunsheetView() {
           <button
             key={tract.id}
             onClick={() => setTractFilter(tract.id)}
-            className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors ${
+            className={`px-4 py-2 rounded-md text-xs font-semibold whitespace-nowrap transition-colors ${
               tractFilter === tract.id
                 ? 'bg-leather text-parchment'
                 : 'bg-parchment-dark text-ink-light hover:bg-parchment'
@@ -180,7 +180,7 @@ export default function RunsheetView() {
           </span>
           <button
             onClick={handleExport}
-            className="px-3 py-1.5 rounded-lg text-xs font-semibold text-leather hover:bg-leather/10 border border-ledger-line transition-colors"
+            className="px-3 py-1.5 rounded-md text-xs font-semibold text-leather hover:bg-leather/10 border border-ledger-line transition-colors"
           >
             Export Runsheet
           </button>
@@ -240,7 +240,7 @@ export default function RunsheetView() {
                     disabled={readOnly}
                     onClick={() => handleOpenEditor(node)}
                     title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
-                    className="px-3 py-1.5 rounded-lg text-[11px] font-semibold text-leather hover:bg-leather/10 border border-ledger-line transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                    className="px-3 py-1.5 rounded-md text-[11px] font-semibold text-leather hover:bg-leather/10 border border-ledger-line transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {isLeaseNode(node) ? 'Edit Lease' : 'Edit'}
                   </button>

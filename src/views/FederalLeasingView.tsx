@@ -161,7 +161,7 @@ function SelectField<T extends string>({
         value={value}
         disabled={disabled}
         onChange={(event) => onChange(event.target.value as T)}
-        className="w-full rounded-lg border border-ledger-line bg-parchment px-3 py-1.5 text-sm text-ink outline-none focus:border-leather focus:ring-2 focus:ring-leather disabled:cursor-not-allowed disabled:opacity-60"
+        className="w-full rounded-md border border-ledger-line bg-parchment px-3 py-1.5 text-sm text-ink outline-none focus:border-leather focus:ring-2 focus:ring-leather disabled:cursor-not-allowed disabled:opacity-60"
       >
         {options.map((option) => (
           <option key={option} value={option}>
@@ -197,7 +197,7 @@ function NullableSelect({
         value={value ?? ''}
         disabled={disabled}
         onChange={(event) => onChange(event.target.value || null)}
-        className="w-full rounded-lg border border-ledger-line bg-parchment px-3 py-1.5 text-sm text-ink outline-none focus:border-leather focus:ring-2 focus:ring-leather disabled:cursor-not-allowed disabled:opacity-60"
+        className="w-full rounded-md border border-ledger-line bg-parchment px-3 py-1.5 text-sm text-ink outline-none focus:border-leather focus:ring-2 focus:ring-leather disabled:cursor-not-allowed disabled:opacity-60"
       >
         <option value="">{emptyLabel}</option>
         {options.map((option) => (
@@ -233,7 +233,7 @@ function TextAreaField({
         disabled={disabled}
         rows={rows}
         onChange={(event) => onChange(event.target.value)}
-        className="w-full resize-y rounded-lg border border-ledger-line bg-parchment px-3 py-2 text-sm text-ink outline-none focus:border-leather focus:ring-2 focus:ring-leather disabled:cursor-not-allowed disabled:opacity-60"
+        className="w-full resize-y rounded-md border border-ledger-line bg-parchment px-3 py-2 text-sm text-ink outline-none focus:border-leather focus:ring-2 focus:ring-leather disabled:cursor-not-allowed disabled:opacity-60"
       />
     </label>
   );
@@ -261,7 +261,7 @@ function LinkCheckboxes({
   disabled?: boolean;
 }) {
   return (
-    <div className="rounded-lg border border-ledger-line bg-parchment-dark/30 p-3">
+    <div className="rounded-md border border-ledger-line bg-parchment-dark/30 p-3">
       <div className="text-[10px] font-semibold uppercase tracking-wider text-ink-light">
         {title}
       </div>
@@ -297,7 +297,7 @@ function SummaryTile({
   detail: string;
 }) {
   return (
-    <div className="rounded-lg border border-ledger-line bg-parchment px-3 py-3">
+    <div className="rounded-md border border-ledger-line bg-parchment px-3 py-3">
       <div className="text-2xl font-display font-bold text-ink">{value}</div>
       <div className="text-xs font-semibold uppercase tracking-wider text-ink-light">
         {label}
@@ -500,7 +500,7 @@ export default function FederalLeasingView() {
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-4 overflow-hidden bg-parchment-dark/30 p-4">
-      <header className="rounded-xl border border-ledger-line bg-parchment shadow-sm">
+      <header className="rounded-md border border-ledger-line bg-parchment shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-4 border-b border-ledger-line bg-ledger px-4 py-4">
           <div className="min-w-0">
             <div className="text-lg font-display font-bold text-ink">
@@ -524,7 +524,7 @@ export default function FederalLeasingView() {
                 })
               }
               title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
-              className="rounded-lg border border-leather/30 px-3 py-2 text-xs font-semibold text-leather transition-colors hover:bg-leather/10 disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-md border border-leather/30 px-3 py-2 text-xs font-semibold text-leather transition-colors hover:bg-leather/10 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Add Existing Federal Lease
             </button>
@@ -541,7 +541,7 @@ export default function FederalLeasingView() {
                 })
               }
               title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
-              className="rounded-lg border border-leather/30 px-3 py-2 text-xs font-semibold text-leather transition-colors hover:bg-leather/10 disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-md border border-leather/30 px-3 py-2 text-xs font-semibold text-leather transition-colors hover:bg-leather/10 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Add Potential Target
             </button>
@@ -557,7 +557,7 @@ export default function FederalLeasingView() {
                 })
               }
               title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
-              className="rounded-lg border border-ledger-line px-3 py-2 text-xs font-semibold text-ink-light transition-colors hover:bg-parchment-dark disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-md border border-ledger-line px-3 py-2 text-xs font-semibold text-ink-light transition-colors hover:bg-parchment-dark disabled:cursor-not-allowed disabled:opacity-50"
             >
               Add Unit / CA Reference
             </button>
@@ -573,7 +573,7 @@ export default function FederalLeasingView() {
                 })
               }
               title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
-              className="rounded-lg border border-ledger-line px-3 py-2 text-xs font-semibold text-ink-light transition-colors hover:bg-parchment-dark disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-md border border-ledger-line px-3 py-2 text-xs font-semibold text-ink-light transition-colors hover:bg-parchment-dark disabled:cursor-not-allowed disabled:opacity-50"
             >
               Add Mapped Tract
             </button>
@@ -595,7 +595,7 @@ export default function FederalLeasingView() {
       </header>
 
       <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[360px_minmax(0,1fr)]">
-        <aside className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-ledger-line bg-parchment shadow-sm">
+        <aside className="flex min-h-0 flex-col overflow-hidden rounded-md border border-ledger-line bg-parchment shadow-sm">
           <div className="border-b border-ledger-line bg-ledger px-4 py-3">
             <div className="flex items-center justify-between gap-3">
               <div>
@@ -608,7 +608,7 @@ export default function FederalLeasingView() {
                 <button
                   type="button"
                   onClick={() => setSearch('')}
-                  className="rounded-lg border border-ledger-line px-3 py-1.5 text-xs font-semibold text-ink-light transition-colors hover:bg-parchment"
+                  className="rounded-md border border-ledger-line px-3 py-1.5 text-xs font-semibold text-ink-light transition-colors hover:bg-parchment"
                 >
                   Clear
                 </button>
@@ -622,7 +622,7 @@ export default function FederalLeasingView() {
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="Serial, county, prospect, source..."
-                className="w-full rounded-lg border border-ledger-line bg-white px-3 py-2 text-sm text-ink outline-none focus:border-leather"
+                className="w-full rounded-md border border-ledger-line bg-white px-3 py-2 text-sm text-ink outline-none focus:border-leather"
               />
             </label>
           </div>
@@ -643,7 +643,7 @@ export default function FederalLeasingView() {
                   aria-controls={`federal-leasing-${candidate.id}-panel`}
                   tabIndex={tab === candidate.id ? 0 : -1}
                   onClick={() => setTab(candidate.id)}
-                  className={`rounded-lg border px-3 py-2 text-left transition-colors ${
+                  className={`rounded-md border px-3 py-2 text-left transition-colors ${
                     tab === candidate.id
                       ? 'border-leather bg-leather/10'
                       : 'border-ledger-line bg-parchment hover:bg-ledger'
@@ -718,7 +718,7 @@ export default function FederalLeasingView() {
           id={`federal-leasing-${tab}-panel`}
           role="tabpanel"
           aria-labelledby={`federal-leasing-${tab}-tab`}
-          className="min-h-0 overflow-auto rounded-xl border border-ledger-line bg-parchment shadow-sm"
+          className="min-h-0 overflow-auto rounded-md border border-ledger-line bg-parchment shadow-sm"
         >
           {selectedRecord ? (
             <div className="space-y-4 p-4">
@@ -743,7 +743,7 @@ export default function FederalLeasingView() {
                     type="button"
                     disabled={!selectedRecord.deskMapId}
                     onClick={openDeskMapLink}
-                    className="rounded-lg border border-ledger-line px-3 py-2 text-xs font-semibold text-ink-light transition-colors hover:bg-ledger disabled:opacity-50"
+                    className="rounded-md border border-ledger-line px-3 py-2 text-xs font-semibold text-ink-light transition-colors hover:bg-ledger disabled:opacity-50"
                   >
                     Open Desk Map
                   </button>
@@ -751,7 +751,7 @@ export default function FederalLeasingView() {
                     type="button"
                     disabled={!selectedRecord.ownerId}
                     onClick={openOwnerLink}
-                    className="rounded-lg border border-ledger-line px-3 py-2 text-xs font-semibold text-ink-light transition-colors hover:bg-ledger disabled:opacity-50"
+                    className="rounded-md border border-ledger-line px-3 py-2 text-xs font-semibold text-ink-light transition-colors hover:bg-ledger disabled:opacity-50"
                   >
                     Open Owner
                   </button>
@@ -759,14 +759,14 @@ export default function FederalLeasingView() {
                     type="button"
                     disabled={!selectedRecord.mapAssetId}
                     onClick={() => void openMapLink()}
-                    className="rounded-lg border border-ledger-line px-3 py-2 text-xs font-semibold text-ink-light transition-colors hover:bg-ledger disabled:opacity-50"
+                    className="rounded-md border border-ledger-line px-3 py-2 text-xs font-semibold text-ink-light transition-colors hover:bg-ledger disabled:opacity-50"
                   >
                     Open Map
                   </button>
                   <button
                     type="button"
                     onClick={() => setView('research')}
-                    className="rounded-lg border border-ledger-line px-3 py-2 text-xs font-semibold text-ink-light transition-colors hover:bg-ledger"
+                    className="rounded-md border border-ledger-line px-3 py-2 text-xs font-semibold text-ink-light transition-colors hover:bg-ledger"
                   >
                     Open Research
                   </button>
@@ -774,7 +774,7 @@ export default function FederalLeasingView() {
                     type="button"
                     disabled={!getFederalLeaseDocument(selectedRecord.id)}
                     onClick={() => setLeaseDocumentRecordId(selectedRecord.id)}
-                    className="rounded-lg border border-leather/30 bg-leather/5 px-3 py-2 text-xs font-semibold text-leather transition-colors hover:bg-leather/10 disabled:opacity-50"
+                    className="rounded-md border border-leather/30 bg-leather/5 px-3 py-2 text-xs font-semibold text-leather transition-colors hover:bg-leather/10 disabled:opacity-50"
                     title={
                       getFederalLeaseDocument(selectedRecord.id)
                         ? 'View structured BLM Form 3100-11 summary'
@@ -798,14 +798,14 @@ export default function FederalLeasingView() {
                       await removeProjectRecord(selectedRecord.id);
                     }}
                     title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
-                    className="rounded-lg border border-seal/30 px-3 py-2 text-xs font-semibold text-seal transition-colors hover:bg-seal/10 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="rounded-md border border-seal/30 px-3 py-2 text-xs font-semibold text-seal transition-colors hover:bg-seal/10 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Delete
                   </button>
                 </div>
               </div>
 
-              <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
                 Reference only: this record tracks lease facts, deadlines, maps, and
                 source support without running federal royalty, ONRR, payout, or CA/TPF
                 calculations.
@@ -1055,7 +1055,7 @@ export default function FederalLeasingView() {
               />
 
               {search.trim() && (
-                <div className="rounded-lg border border-ledger-line bg-ledger px-3 py-2 text-xs text-ink-light">
+                <div className="rounded-md border border-ledger-line bg-ledger px-3 py-2 text-xs text-ink-light">
                   Search index preview:{' '}
                   {buildFederalLeaseSearchText(
                     selectedRecord,

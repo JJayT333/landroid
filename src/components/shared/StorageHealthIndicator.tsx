@@ -71,7 +71,7 @@ export function StorageHealthIndicatorContent({
   return (
     <div
       aria-label="Storage health"
-      className="flex min-w-[27rem] items-center gap-2 rounded-lg border border-parchment/15 bg-parchment/5 px-2 py-1"
+      className="flex min-w-[27rem] items-center gap-2 rounded-md border border-parchment/15 bg-parchment/5 px-2 py-1"
     >
       <div className="grid min-w-0 flex-1 grid-cols-[0.7fr_0.7fr_1.1fr_1.2fr] gap-2 text-[10px] leading-tight text-parchment/70">
         <StatusField label="Saved" value={formatTimestamp(lastSavedAt)} />

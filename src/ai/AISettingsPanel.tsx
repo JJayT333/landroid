@@ -13,7 +13,7 @@ export default function AISettingsPanel({ onClose }: { onClose: () => void }) {
 
   if (isHostedMode()) {
     return (
-      <div className="space-y-2 rounded-lg border border-leather/40 bg-parchment/60 p-3 text-xs text-ink">
+      <div className="space-y-2 rounded-md border border-leather/40 bg-parchment/60 p-3 text-xs text-ink">
         <div className="flex items-center justify-between">
           <span className="font-semibold uppercase tracking-wide text-ink-light">AI Settings</span>
           <button
@@ -33,7 +33,7 @@ export default function AISettingsPanel({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <div className="space-y-3 rounded-lg border border-leather/40 bg-parchment/60 p-3 text-xs text-ink">
+    <div className="space-y-3 rounded-md border border-leather/40 bg-parchment/60 p-3 text-xs text-ink">
       <div className="flex items-center justify-between">
         <span className="font-semibold uppercase tracking-wide text-ink-light">AI Settings</span>
         <button

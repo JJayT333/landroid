@@ -36,7 +36,7 @@ export default function DrillingPermitMasterDecoderPanel({
 }: DrillingPermitMasterDecoderPanelProps) {
   if (isLoading) {
     return (
-      <div className="rounded-xl border border-ledger-line bg-ledger p-4">
+      <div className="rounded-md border border-ledger-line bg-ledger p-4">
         <div className="text-sm font-semibold text-ink">Permit Master Decoder</div>
         <div className="text-sm text-ink-light mt-2">
           Reading the imported fixed-width permit files and building the joined preview.
@@ -47,7 +47,7 @@ export default function DrillingPermitMasterDecoderPanel({
 
   if (errorMessage) {
     return (
-      <div className="rounded-xl border border-seal/30 bg-seal/5 p-4">
+      <div className="rounded-md border border-seal/30 bg-seal/5 p-4">
         <div className="text-sm font-semibold text-seal">Permit Master Decoder</div>
         <div className="text-sm text-seal mt-2">{errorMessage}</div>
       </div>
@@ -61,7 +61,7 @@ export default function DrillingPermitMasterDecoderPanel({
   const decodedPermits = decoded?.permits ?? [];
 
   return (
-    <div className="rounded-xl border border-ledger-line bg-parchment-dark/30 p-4 space-y-4">
+    <div className="rounded-md border border-ledger-line bg-parchment-dark/30 p-4 space-y-4">
       <div className="space-y-2">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div className="text-sm font-semibold text-ink">Permit Master Decoder</div>
@@ -79,7 +79,7 @@ export default function DrillingPermitMasterDecoderPanel({
       </div>
 
       <div className="grid gap-3 md:grid-cols-4">
-        <div className="rounded-lg border border-ledger-line bg-parchment px-3 py-3">
+        <div className="rounded-md border border-ledger-line bg-parchment px-3 py-3">
           <div className="text-[10px] uppercase tracking-wider text-ink-light">
             Permit Rows
           </div>
@@ -87,7 +87,7 @@ export default function DrillingPermitMasterDecoderPanel({
             {decoded?.totals.permitCount ?? 0}
           </div>
         </div>
-        <div className="rounded-lg border border-ledger-line bg-parchment px-3 py-3">
+        <div className="rounded-md border border-ledger-line bg-parchment px-3 py-3">
           <div className="text-[10px] uppercase tracking-wider text-ink-light">
             Surface Coords
           </div>
@@ -95,7 +95,7 @@ export default function DrillingPermitMasterDecoderPanel({
             {decoded?.totals.surfaceLocationCount ?? 0}
           </div>
         </div>
-        <div className="rounded-lg border border-ledger-line bg-parchment px-3 py-3">
+        <div className="rounded-md border border-ledger-line bg-parchment px-3 py-3">
           <div className="text-[10px] uppercase tracking-wider text-ink-light">
             Bottom-Hole Coords
           </div>
@@ -103,7 +103,7 @@ export default function DrillingPermitMasterDecoderPanel({
             {decoded?.totals.bottomHoleCount ?? 0}
           </div>
         </div>
-        <div className="rounded-lg border border-ledger-line bg-parchment px-3 py-3">
+        <div className="rounded-md border border-ledger-line bg-parchment px-3 py-3">
           <div className="text-[10px] uppercase tracking-wider text-ink-light">
             Recognized Files
           </div>
@@ -113,7 +113,7 @@ export default function DrillingPermitMasterDecoderPanel({
         </div>
       </div>
 
-      <div className="rounded-lg border border-ledger-line bg-ledger px-3 py-3 text-sm text-ink">
+      <div className="rounded-md border border-ledger-line bg-ledger px-3 py-3 text-sm text-ink">
         {selectedSummary ? (
           <>
             <div className="font-semibold text-ink">
@@ -137,7 +137,7 @@ export default function DrillingPermitMasterDecoderPanel({
       </div>
 
       {displayedWarnings.length > 0 && (
-        <div className="rounded-lg border border-ledger-line bg-parchment px-3 py-3">
+        <div className="rounded-md border border-ledger-line bg-parchment px-3 py-3">
           <div className="text-[10px] uppercase tracking-wider text-ink-light">
             Decoder Notes
           </div>
@@ -167,7 +167,7 @@ export default function DrillingPermitMasterDecoderPanel({
         </div>
 
         {decodedPermits.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-ledger-line bg-parchment px-4 py-6 text-sm text-ink-light">
+          <div className="rounded-md border border-dashed border-ledger-line bg-parchment px-4 py-6 text-sm text-ink-light">
             No permit master rows are ready yet. Import a fixed-width permit file to
             build the structured preview.
           </div>
@@ -175,7 +175,7 @@ export default function DrillingPermitMasterDecoderPanel({
           decodedPermits.slice(0, 25).map((permit) => (
             <div
               key={permit.permitKey}
-              className="rounded-xl border border-ledger-line bg-parchment px-4 py-4 space-y-3"
+              className="rounded-md border border-ledger-line bg-parchment px-4 py-4 space-y-3"
             >
               <div className="flex items-start justify-between gap-4 flex-wrap">
                 <div>

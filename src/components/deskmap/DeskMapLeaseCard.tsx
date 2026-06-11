@@ -31,7 +31,7 @@ function DeskMapLeaseCard({
     <div className="flex flex-col items-center">
       <div
         className={`
-          group w-72 rounded-lg border-2 shadow-md cursor-pointer transition-all
+          group w-72 rounded-md border-2 shadow-md cursor-pointer transition-all
           hover:shadow-lg hover:border-emerald-500
           ${
             isActive
@@ -47,7 +47,7 @@ function DeskMapLeaseCard({
           if (!readOnly) onEdit(node.id);
         }}
       >
-        <div className="px-3 py-1.5 border-b border-emerald-200 rounded-t-lg bg-emerald-100/80">
+        <div className="px-3 py-1.5 border-b border-emerald-200 rounded-t-md bg-emerald-100/80">
           <div className="flex items-center justify-between gap-2">
             <span className="text-[10px] font-semibold text-emerald-900 uppercase tracking-wide truncate">
               {node.instrument || 'Lease'}
@@ -87,7 +87,7 @@ function DeskMapLeaseCard({
           <DeskMapDocumentChips node={node} tone="emerald" onViewDoc={onViewDoc} />
         </div>
 
-        <div className="hidden group-hover:flex px-2 py-1.5 border-t border-emerald-200 bg-emerald-100/70 rounded-b-lg gap-1 justify-center">
+        <div className="hidden group-hover:flex px-2 py-1.5 border-t border-emerald-200 bg-emerald-100/70 rounded-b-md gap-1 justify-center">
           <ActionBtn label="ATTACH" disabled={readOnly} onClick={() => onAttachDoc(node.id)} />
           <ActionBtn label="DELETE" danger disabled={readOnly} onClick={() => onDelete(node.id)} />
         </div>

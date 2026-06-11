@@ -354,11 +354,11 @@ function SummaryCard({
   formula?: FormulaContent;
 }) {
   return (
-    <div className="rounded-2xl border border-ledger-line bg-parchment px-4 py-3 shadow-sm">
+    <div className="rounded-md border border-ledger-line bg-parchment px-4 py-3 shadow-sm">
       <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-light">
         {label}
       </div>
-      <div className="mt-2 text-2xl font-display font-bold text-ink">
+      <div className="mt-2 text-xl font-mono tabular-nums font-bold text-ink">
         {formula ? <FormulaTooltip content={formula}>{value}</FormulaTooltip> : value}
       </div>
       <div className="mt-1 text-xs text-ink-light">{detail}</div>
@@ -376,7 +376,7 @@ function LeaseholdInputWarningPanel({
   }
 
   return (
-    <div className="rounded-2xl border border-seal/30 bg-seal/10 px-4 py-3 text-sm text-seal">
+    <div className="rounded-md border border-seal/30 bg-seal/10 px-4 py-3 text-sm text-seal">
       <div className="font-semibold">
         {warnings.length} malformed economic input{warnings.length === 1 ? '' : 's'} need review
       </div>
@@ -408,7 +408,7 @@ function LeaseholdUnitAssignmentWarningPanel({
   }
 
   return (
-    <div className="rounded-2xl border border-gold/40 bg-gold/10 px-4 py-3 text-sm text-gold-950">
+    <div className="rounded-md border border-gold/40 bg-gold/10 px-4 py-3 text-sm text-ink">
       <div className="font-semibold">
         {warnings.length} unit-scoped ORRI/WI record
         {warnings.length === 1 ? '' : 's'} excluded - needs unit assignment
@@ -496,7 +496,7 @@ function LeaseholdOverrideOverview({
   ];
 
   return (
-    <div className="mt-4 rounded-2xl border border-ledger-line bg-parchment px-4 py-3 shadow-sm">
+    <div className="mt-4 rounded-md border border-ledger-line bg-parchment px-4 py-3 shadow-sm">
       <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-light">
@@ -512,7 +512,7 @@ function LeaseholdOverrideOverview({
       </div>
       <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         {rows.map((row) => (
-          <div key={row.label} className={`rounded-xl border px-3 py-3 ${row.tone}`}>
+          <div key={row.label} className={`rounded-md border px-3 py-3 ${row.tone}`}>
             <div className="text-[10px] font-semibold uppercase tracking-[0.14em] opacity-80">
               {row.label}
             </div>
@@ -619,7 +619,7 @@ function LeaseholdTractCard({
   ].filter((item) => d(item.value).greaterThan(0));
 
   return (
-    <section className="rounded-3xl border border-ledger-line bg-parchment/95 p-5 shadow-md">
+    <section className="rounded-md border border-ledger-line bg-parchment/95 p-5 shadow-md">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <div className="flex items-center gap-2">
@@ -642,7 +642,7 @@ function LeaseholdTractCard({
           <span className="rounded-full bg-emerald-50 px-3 py-1.5 font-medium text-emerald-800">
             Leased {formatPercent(tract.leasedOwnership)}
           </span>
-          <span className="rounded-full bg-gold/10 px-3 py-1.5 font-medium text-gold-900">
+          <span className="rounded-full bg-gold/10 px-3 py-1.5 font-medium text-ink">
             Unit royalty decimal {formatPercent(tract.unitRoyaltyDecimal)}
           </span>
           <span className="rounded-full bg-sky-50 px-3 py-1.5 font-medium text-sky-900">
@@ -670,7 +670,7 @@ function LeaseholdTractCard({
             onKeyDown={handleGrossAcresKeyDown}
             placeholder="100"
             inputMode="decimal"
-            className="w-full rounded-xl border border-ledger-line bg-white px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-leather disabled:cursor-not-allowed disabled:opacity-60"
+            className="w-full rounded-md border border-ledger-line bg-white px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-leather disabled:cursor-not-allowed disabled:opacity-60"
           />
           <div className="mt-1 text-[11px] text-ink-light">
             Title acreage for the full tract.
@@ -689,7 +689,7 @@ function LeaseholdTractCard({
             onKeyDown={handlePooledAcresKeyDown}
             placeholder="100"
             inputMode="decimal"
-            className="w-full rounded-xl border border-ledger-line bg-white px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-leather disabled:cursor-not-allowed disabled:opacity-60"
+            className="w-full rounded-md border border-ledger-line bg-white px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-leather disabled:cursor-not-allowed disabled:opacity-60"
           />
           <div className="mt-1 text-[11px] text-ink-light">
             Drives unit participation and payout decimals.
@@ -708,7 +708,7 @@ function LeaseholdTractCard({
             onKeyDown={handleDescriptionKeyDown}
             rows={3}
             placeholder="Brief tract description"
-            className="w-full rounded-xl border border-ledger-line bg-white px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-leather disabled:cursor-not-allowed disabled:opacity-60"
+            className="w-full rounded-md border border-ledger-line bg-white px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-leather disabled:cursor-not-allowed disabled:opacity-60"
           />
           <div className="mt-1 text-[11px] text-ink-light">
             Short unit-facing note for this tract. Use Cmd/Ctrl + Enter to save from the keyboard.
@@ -765,7 +765,7 @@ function LeaseholdTractCard({
         </span>
       </div>
 
-      <div className="mt-5 overflow-x-auto rounded-2xl border border-ledger-line">
+      <div className="mt-5 overflow-x-auto rounded-md border border-ledger-line">
         <table className="min-w-full border-collapse text-sm">
           <thead className="bg-parchment-dark/80">
             <tr>
@@ -911,7 +911,7 @@ function LeaseholdUnitEditor({
   };
 
   return (
-    <section className="rounded-3xl border border-ledger-line bg-parchment/95 p-5 shadow-md">
+    <section className="rounded-md border border-ledger-line bg-parchment/95 p-5 shadow-md">
       <div className="flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <div className="text-[10px] font-semibold uppercase tracking-[0.2em] text-ink-light">
@@ -924,7 +924,7 @@ function LeaseholdUnitEditor({
             Lock these unit-level inputs before WI splits and transfer-order review math.
           </p>
         </div>
-        <div className="rounded-2xl bg-ink/5 px-4 py-3 text-xs text-ink-light">
+        <div className="rounded-md bg-ink/5 px-4 py-3 text-xs text-ink-light">
           Current framework assumes payout decimals are acreage-allocated by pooled acres.
         </div>
       </div>
@@ -943,7 +943,7 @@ function LeaseholdUnitEditor({
               setNameDraft(next);
               commitField('name', next);
             }}
-            className="w-full rounded-xl border border-ledger-line bg-white px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-leather disabled:cursor-not-allowed disabled:opacity-60"
+            className="w-full rounded-md border border-ledger-line bg-white px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-leather disabled:cursor-not-allowed disabled:opacity-60"
           />
         </label>
 
@@ -960,7 +960,7 @@ function LeaseholdUnitEditor({
               setOperatorDraft(next);
               commitField('operator', next);
             }}
-            className="w-full rounded-xl border border-ledger-line bg-white px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-leather disabled:cursor-not-allowed disabled:opacity-60"
+            className="w-full rounded-md border border-ledger-line bg-white px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-leather disabled:cursor-not-allowed disabled:opacity-60"
           />
         </label>
 
@@ -974,7 +974,7 @@ function LeaseholdUnitEditor({
             disabled={readOnly}
             onChange={(event) => setEffectiveDateDraft(event.target.value)}
             onBlur={() => commitField('effectiveDate', effectiveDateDraft)}
-            className="w-full rounded-xl border border-ledger-line bg-white px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-leather disabled:cursor-not-allowed disabled:opacity-60"
+            className="w-full rounded-md border border-ledger-line bg-white px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-leather disabled:cursor-not-allowed disabled:opacity-60"
           />
         </label>
 
@@ -992,7 +992,7 @@ function LeaseholdUnitEditor({
               commitField('description', next);
             }}
             rows={3}
-            className="w-full rounded-xl border border-ledger-line bg-white px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-leather disabled:cursor-not-allowed disabled:opacity-60"
+            className="w-full rounded-md border border-ledger-line bg-white px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-leather disabled:cursor-not-allowed disabled:opacity-60"
           />
         </label>
       </div>
@@ -1008,13 +1008,13 @@ function LeaseholdDeckModeToggle({
   onChange: (mode: LeaseholdMode) => void;
 }) {
   return (
-    <div className="inline-flex rounded-2xl border border-ledger-line bg-parchment-dark p-1 shadow-sm">
+    <div className="inline-flex rounded-md border border-ledger-line bg-parchment-dark p-1 shadow-sm">
       {(['overview', 'map', 'deck'] as const).map((option) => (
         <button
           key={option}
           type="button"
           onClick={() => onChange(option)}
-          className={`rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
+          className={`rounded-md px-4 py-2 text-sm font-semibold transition-colors ${
             mode === option
               ? 'bg-parchment text-ink shadow-sm'
               : 'text-ink-light hover:text-ink'
@@ -1151,8 +1151,8 @@ function LeaseholdGraphUnitCard({
   unitSummary: ReturnType<typeof buildLeaseholdUnitSummary>;
 }) {
   return (
-    <div className="w-80 rounded-lg border-2 border-emerald-200 bg-emerald-50 text-ink shadow-[0_8px_18px_rgba(5,150,105,0.14)]">
-      <div className="rounded-t-lg border-b border-emerald-200 bg-emerald-100/80 px-4 py-2">
+    <div className="w-80 rounded-md border-2 border-emerald-200 bg-emerald-50 text-ink shadow-[0_8px_18px_rgba(5,150,105,0.14)]">
+      <div className="rounded-t-md border-b border-emerald-200 bg-emerald-100/80 px-4 py-2">
         <div className="flex items-center justify-between gap-2">
           <span className="truncate text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-900">
             Leasehold Unit
@@ -1225,13 +1225,13 @@ function LeaseholdGraphOverviewTractCard({
     <button
       type="button"
       onClick={onSelect}
-      className={`w-72 rounded-lg border-2 text-left shadow-sm transition-transform hover:-translate-y-0.5 ${
+      className={`w-72 rounded-md border-2 text-left shadow-sm transition-transform hover:-translate-y-0.5 ${
         selected
           ? 'border-leather bg-leather/10'
           : 'border-ledger-line bg-parchment hover:border-leather/40'
       }`}
     >
-      <div className="rounded-t-lg border-b border-ledger-line bg-parchment-dark/60 px-3 py-2">
+      <div className="rounded-t-md border-b border-ledger-line bg-parchment-dark/60 px-3 py-2">
         <div className="flex items-center justify-between gap-2">
           <div>
             <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-light">
@@ -1319,8 +1319,8 @@ function LeaseholdGraphTractRootCard({
   tract: LeaseholdTractSummary;
 }) {
   return (
-    <div className="w-80 rounded-lg border-2 border-leather/30 bg-leather/5 text-ink shadow-[0_8px_18px_rgba(120,53,15,0.12)]">
-      <div className="rounded-t-lg border-b border-leather/20 bg-leather/10 px-4 py-2">
+    <div className="w-80 rounded-md border-2 border-leather/30 bg-leather/5 text-ink shadow-[0_8px_18px_rgba(120,53,15,0.12)]">
+      <div className="rounded-t-md border-b border-leather/20 bg-leather/10 px-4 py-2">
         <div className="flex items-center justify-between gap-2">
           <div>
             <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-leather">
@@ -1380,8 +1380,8 @@ function LeaseholdGraphOwnerBranchCard({
   const { owner, leaseSlices, npris } = branch;
 
   return (
-    <div className="w-72 rounded-lg border-2 border-ledger-line bg-parchment text-ink shadow-sm">
-      <div className="rounded-t-lg border-b border-ledger-line bg-parchment-dark/70 px-3 py-2">
+    <div className="w-72 rounded-md border-2 border-ledger-line bg-parchment text-ink shadow-sm">
+      <div className="rounded-t-md border-b border-ledger-line bg-parchment-dark/70 px-3 py-2">
         <div className="flex items-center justify-between gap-2">
           <span className="truncate text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-light">
             Owner Branch
@@ -1443,8 +1443,8 @@ function LeaseholdGraphLeaseSliceCard({
   owner: LeaseholdOwnerSummary;
 }) {
   return (
-    <div className="w-64 rounded-lg border-2 border-emerald-200 bg-emerald-50 text-ink shadow-[0_8px_18px_rgba(5,150,105,0.12)]">
-      <div className="rounded-t-lg border-b border-emerald-200 bg-emerald-100/80 px-3 py-1.5">
+    <div className="w-64 rounded-md border-2 border-emerald-200 bg-emerald-50 text-ink shadow-[0_8px_18px_rgba(5,150,105,0.12)]">
+      <div className="rounded-t-md border-b border-emerald-200 bg-emerald-100/80 px-3 py-1.5">
         <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-900">
           Lease Slice
         </div>
@@ -1498,8 +1498,8 @@ function LeaseholdGraphUnleasedBranchCard({
   ownerName: string;
 }) {
   return (
-    <div className="w-60 rounded-lg border-2 border-gold/35 bg-gold/10 text-gold-950 shadow-sm">
-      <div className="rounded-t-lg border-b border-gold/30 bg-gold/15 px-3 py-1.5">
+    <div className="w-60 rounded-md border-2 border-gold/35 bg-gold/10 text-ink shadow-sm">
+      <div className="rounded-t-md border-b border-gold/30 bg-gold/15 px-3 py-1.5">
         <div className="text-[10px] font-semibold uppercase tracking-[0.16em]">
           Unleased Branch
         </div>
@@ -1524,8 +1524,8 @@ function LeaseholdGraphNpriLeafCard({
     : 'border-amber-300 bg-amber-50 text-amber-950';
 
   return (
-    <div className={`w-60 rounded-lg border-2 shadow-sm ${toneClasses}`}>
-      <div className="rounded-t-lg border-b border-current/20 bg-white/40 px-3 py-1.5">
+    <div className={`w-60 rounded-md border-2 shadow-sm ${toneClasses}`}>
+      <div className="rounded-t-md border-b border-current/20 bg-white/40 px-3 py-1.5">
         <div className="flex items-center justify-between gap-2">
           <span className="text-[10px] font-semibold uppercase tracking-[0.16em]">NPRI</span>
           <span className="rounded-full border border-current/20 bg-white/70 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide">
@@ -1619,7 +1619,7 @@ function LeaseholdGraphEmptyLeafCard({
   note: string;
 }) {
   return (
-    <div className="w-60 rounded-lg border-2 border-ledger-line bg-parchment-dark/70 px-3 py-3 text-sm text-ink-light shadow-sm">
+    <div className="w-60 rounded-md border-2 border-ledger-line bg-parchment-dark/70 px-3 py-3 text-sm text-ink-light shadow-sm">
       <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-light">
         {title}
       </div>
@@ -1638,8 +1638,8 @@ function LeaseholdGraphOrriBranchCard({
   const totalDecimal = orris.reduce((sum, orri) => sum.plus(orri.unitDecimal), d(0));
 
   return (
-    <div className="w-72 rounded-lg border-2 border-amber-300 bg-amber-50 text-amber-950 shadow-[0_8px_18px_rgba(217,119,6,0.14)]">
-      <div className="rounded-t-lg border-b border-amber-300 bg-amber-100/80 px-3 py-2">
+    <div className="w-72 rounded-md border-2 border-amber-300 bg-amber-50 text-amber-950 shadow-[0_8px_18px_rgba(217,119,6,0.14)]">
+      <div className="rounded-t-md border-b border-amber-300 bg-amber-100/80 px-3 py-2">
         <div className="flex items-center justify-between gap-2">
           <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-amber-900">
             ORRI Branch
@@ -1686,7 +1686,7 @@ function LeaseholdGraphOrriLeafCard({
   tract: LeaseholdTractSummary;
 }) {
   return (
-    <div className="w-60 rounded-lg border-2 border-amber-200 bg-amber-50/80 px-3 py-3 text-amber-950 shadow-sm">
+    <div className="w-60 rounded-md border-2 border-amber-200 bg-amber-50/80 px-3 py-3 text-amber-950 shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-amber-900">
@@ -1763,8 +1763,8 @@ function LeaseholdGraphWorkingInterestBranchCard({
   assignmentCount: number;
 }) {
   return (
-    <div className="w-72 rounded-lg border-2 border-leather/30 bg-leather/5 text-ink shadow-[0_8px_18px_rgba(120,53,15,0.12)]">
-      <div className="rounded-t-lg border-b border-leather/20 bg-leather/10 px-3 py-2">
+    <div className="w-72 rounded-md border-2 border-leather/30 bg-leather/5 text-ink shadow-[0_8px_18px_rgba(120,53,15,0.12)]">
+      <div className="rounded-t-md border-b border-leather/20 bg-leather/10 px-3 py-2">
         <div className="flex items-center justify-between gap-2">
           <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-leather">
             Working Interest
@@ -1807,7 +1807,7 @@ function LeaseholdGraphRetainedWorkingInterestLeafCard({
   tract: LeaseholdTractSummary;
 }) {
   return (
-    <div className="w-60 rounded-lg border-2 border-ledger-line bg-parchment px-3 py-3 text-ink shadow-sm">
+    <div className="w-60 rounded-md border-2 border-ledger-line bg-parchment px-3 py-3 text-ink shadow-sm">
       <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-light">
         Retained WI
       </div>
@@ -1841,7 +1841,7 @@ function LeaseholdGraphAssignmentLeafCard({
   tract: LeaseholdTractSummary;
 }) {
   return (
-    <div className="w-60 rounded-lg border-2 border-leather/20 bg-leather/5 px-3 py-3 text-ink shadow-sm">
+    <div className="w-60 rounded-md border-2 border-leather/20 bg-leather/5 px-3 py-3 text-ink shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-leather">
@@ -1957,8 +1957,8 @@ function LeaseholdGraphMode({
   );
 
   return (
-    <section className="relative h-full min-h-[42rem] overflow-hidden rounded-3xl border border-ledger-line bg-canvas-bg shadow-md">
-      <div className="absolute left-3 top-3 z-20 w-[22rem] max-w-[calc(100%-1.5rem)] space-y-2.5 rounded-xl border border-ledger-line bg-parchment/92 p-3 shadow-md backdrop-blur">
+    <section className="relative h-full min-h-[42rem] overflow-hidden rounded-md border border-ledger-line bg-canvas-bg shadow-md">
+      <div className="absolute left-3 top-3 z-20 w-[22rem] max-w-[calc(100%-1.5rem)] space-y-2.5 rounded-md border border-ledger-line bg-parchment/92 p-3 shadow-md backdrop-blur">
         <div className="flex items-start justify-between gap-3">
           <div>
             <div className="text-[9px] font-semibold uppercase tracking-[0.16em] text-ink-light">
@@ -1972,7 +1972,7 @@ function LeaseholdGraphMode({
             <button
               type="button"
               onClick={() => setFocusedDeskMapId(null)}
-              className="rounded-lg border border-ledger-line bg-white/80 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-ink-light transition-colors hover:border-leather/40 hover:text-ink"
+              className="rounded-md border border-ledger-line bg-white/80 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-ink-light transition-colors hover:border-leather/40 hover:text-ink"
             >
               Unit View
             </button>
@@ -2059,7 +2059,7 @@ function LeaseholdGraphMode({
         </div>
       </div>
 
-      <div className="absolute right-3 top-3 z-20 w-[19rem] max-w-[calc(100%-1.5rem)] rounded-xl border border-ledger-line bg-parchment/92 p-3 shadow-md backdrop-blur">
+      <div className="absolute right-3 top-3 z-20 w-[19rem] max-w-[calc(100%-1.5rem)] rounded-md border border-ledger-line bg-parchment/92 p-3 shadow-md backdrop-blur">
         {focusedTract && tractDetail ? (
           <div className="space-y-2.5">
             <div>
@@ -2093,18 +2093,18 @@ function LeaseholdGraphMode({
               </span>
             </div>
             {focusedTract.overFloatingNpriBurdened && (
-              <div className="rounded-lg border border-seal/25 bg-seal/5 px-3 py-2 text-[11px] leading-5 text-seal">
+              <div className="rounded-md border border-seal/25 bg-seal/5 px-3 py-2 text-[11px] leading-5 text-seal">
                 Floating NPRIs exceed available lease royalty on at least one branch. Editing stays
                 open, but payout review remains on hold until the burden mix is corrected.
               </div>
             )}
             {focusedTract.leaseOverlaps.length > 0 && (
-              <div className="rounded-lg border border-seal/25 bg-seal/5 px-3 py-2 text-[11px] leading-5 text-seal">
+              <div className="rounded-md border border-seal/25 bg-seal/5 px-3 py-2 text-[11px] leading-5 text-seal">
                 {focusedTract.leaseOverlaps.length} lease overlap warning
                 {focusedTract.leaseOverlaps.length === 1 ? '' : 's'} still need landman review.
               </div>
             )}
-            <div className="rounded-lg border border-ledger-line bg-white/80 px-3 py-2 text-[11px] leading-5 text-ink-light">
+            <div className="rounded-md border border-ledger-line bg-white/80 px-3 py-2 text-[11px] leading-5 text-ink-light">
               Owner branches stay separate. Lease slices and NPRIs remain attached to the branch
               they burden, while ORRI and WI stay as tract-level leasehold branches.
             </div>
@@ -2130,7 +2130,7 @@ function LeaseholdGraphMode({
                 {unitSummary.trackedOrriCount} ORRI
               </span>
             </div>
-            <div className="rounded-lg border border-ledger-line bg-white/80 px-3 py-2 text-[11px] leading-5 text-ink-light">
+            <div className="rounded-md border border-ledger-line bg-white/80 px-3 py-2 text-[11px] leading-5 text-ink-light">
               Map mode is full-size and visual-first. Overview is still the setup surface, and Deck
               remains the editable payout and transfer-order review surface.
             </div>
@@ -2204,8 +2204,8 @@ function LeaseholdDeckLesseeCard({
   preWiFormula?: FormulaContent;
 }) {
   return (
-    <div className="w-80 rounded-lg border-2 border-emerald-200 bg-emerald-50 text-ink shadow-[0_8px_18px_rgba(5,150,105,0.14)]">
-      <div className="rounded-t-lg border-b border-emerald-200 bg-emerald-100/80 px-3 py-1.5">
+    <div className="w-80 rounded-md border-2 border-emerald-200 bg-emerald-50 text-ink shadow-[0_8px_18px_rgba(5,150,105,0.14)]">
+      <div className="rounded-t-md border-b border-emerald-200 bg-emerald-100/80 px-3 py-1.5">
         <div className="flex items-center justify-between gap-2">
           <span className="truncate text-[10px] font-semibold uppercase tracking-wide text-emerald-900">
             Leasehold Estate
@@ -2276,8 +2276,8 @@ function LeaseholdDeckPlaceholderCard({
       };
 
   return (
-    <div className={`w-80 rounded-lg border-2 ${toneClasses.border} ${toneClasses.bg} shadow-sm`}>
-      <div className={`rounded-t-lg border-b px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide ${toneClasses.header}`}>
+    <div className={`w-80 rounded-md border-2 ${toneClasses.border} ${toneClasses.bg} shadow-sm`}>
+      <div className={`rounded-t-md border-b px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide ${toneClasses.header}`}>
         {title}
       </div>
       <div className={`px-3 py-3 text-sm leading-6 ${toneClasses.body}`}>{body}</div>
@@ -2291,8 +2291,8 @@ function LeaseholdNpriDeckCard({
   summary: LeaseholdNpriSummary;
 }) {
   return (
-    <div className="w-80 rounded-lg border-2 border-sky-200 bg-sky-50 text-ink shadow-[0_8px_18px_rgba(14,165,233,0.12)]">
-      <div className="rounded-t-lg border-b border-sky-200 bg-sky-100/80 px-3 py-1.5">
+    <div className="w-80 rounded-md border-2 border-sky-200 bg-sky-50 text-ink shadow-[0_8px_18px_rgba(14,165,233,0.12)]">
+      <div className="rounded-t-md border-b border-sky-200 bg-sky-100/80 px-3 py-1.5">
         <div className="flex items-center justify-between gap-2">
           <span className="truncate text-[10px] font-semibold uppercase tracking-wide text-sky-900">
             NPRI
@@ -2344,7 +2344,7 @@ function LeaseholdNpriDeckCard({
               </span>
             </>
           ) : (
-            <span className="rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-[9px] text-gold-900">
+            <span className="rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-[9px] text-ink">
               Tracked only until the burdened branch is leased
             </span>
           )}
@@ -2397,8 +2397,8 @@ function LeaseholdOrriDeckCard({
   const needsUnitAssignment = needsActiveUnitAssignment(summary, activeUnitCode);
 
   return (
-    <div className="w-80 rounded-lg border-2 border-amber-200 bg-amber-50 text-ink shadow-[0_8px_18px_rgba(217,119,6,0.14)]">
-      <div className="rounded-t-lg border-b border-amber-200 bg-amber-100/80 px-3 py-1.5">
+    <div className="w-80 rounded-md border-2 border-amber-200 bg-amber-50 text-ink shadow-[0_8px_18px_rgba(217,119,6,0.14)]">
+      <div className="rounded-t-md border-b border-amber-200 bg-amber-100/80 px-3 py-1.5">
         <div className="flex items-center justify-between gap-2">
           <span className="truncate text-[10px] font-semibold uppercase tracking-wide text-amber-900">
             ORRI
@@ -2424,7 +2424,7 @@ function LeaseholdOrriDeckCard({
         className="m-0 min-w-0 space-y-3 border-0 px-3 py-3"
       >
         {needsUnitAssignment && (
-          <div className="rounded-xl border border-gold/40 bg-gold/10 px-3 py-2 text-[11px] leading-5 text-gold-950">
+          <div className="rounded-md border border-gold/40 bg-gold/10 px-3 py-2 text-[11px] leading-5 text-ink">
             <div className="font-semibold">Excluded - needs unit assignment</div>
             <div className="mt-1">
               This unit-scoped ORRI is not in payout math until it is assigned to a unit.
@@ -2432,7 +2432,7 @@ function LeaseholdOrriDeckCard({
             <button
               type="button"
               onClick={() => onUpdate(orri.id, { unitCode: activeUnitCode })}
-              className="mt-2 rounded-lg border border-gold/40 bg-white/80 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-gold-950 transition-colors hover:bg-gold/15"
+              className="mt-2 rounded-md border border-gold/40 bg-white/80 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-ink transition-colors hover:bg-gold/15"
             >
               Assign to {activeUnitCode}
             </button>
@@ -2453,7 +2453,7 @@ function LeaseholdOrriDeckCard({
               }
             }}
             placeholder="Override payee"
-            className="w-full rounded-xl border border-amber-200 bg-white/90 px-3 py-2 text-sm text-amber-950 outline-none transition-colors focus:border-amber-400"
+            className="w-full rounded-md border border-amber-200 bg-white/90 px-3 py-2 text-sm text-amber-950 outline-none transition-colors focus:border-amber-400"
           />
         </label>
 
@@ -2489,7 +2489,7 @@ function LeaseholdOrriDeckCard({
                 }
               }}
               placeholder="1/64"
-              className={`w-full rounded-xl border bg-white/90 px-3 py-2 text-sm text-amber-950 outline-none transition-colors ${
+              className={`w-full rounded-md border bg-white/90 px-3 py-2 text-sm text-amber-950 outline-none transition-colors ${
                 burdenFractionError
                   ? 'border-seal/50 focus:border-seal'
                   : 'border-amber-200 focus:border-amber-400'
@@ -2510,7 +2510,7 @@ function LeaseholdOrriDeckCard({
               onChange={(event) =>
                 onUpdate(orri.id, { effectiveDate: event.target.value })
               }
-              className="w-full rounded-xl border border-amber-200 bg-white/90 px-3 py-2 text-sm text-amber-950 outline-none transition-colors focus:border-amber-400"
+              className="w-full rounded-md border border-amber-200 bg-white/90 px-3 py-2 text-sm text-amber-950 outline-none transition-colors focus:border-amber-400"
             />
           </label>
 
@@ -2526,7 +2526,7 @@ function LeaseholdOrriDeckCard({
                   deskMapId: event.target.value === 'tract' ? orri.deskMapId : null,
                 })
               }
-              className="w-full rounded-xl border border-amber-200 bg-white/90 px-3 py-2 text-sm text-amber-950 outline-none transition-colors focus:border-amber-400"
+              className="w-full rounded-md border border-amber-200 bg-white/90 px-3 py-2 text-sm text-amber-950 outline-none transition-colors focus:border-amber-400"
             >
               {LEASEHOLD_ORRI_SCOPE_OPTIONS.map((option) => (
                 <option key={option} value={option}>
@@ -2547,7 +2547,7 @@ function LeaseholdOrriDeckCard({
                   burdenBasis: event.target.value as LeaseholdOrri['burdenBasis'],
                 })
               }
-              className="w-full rounded-xl border border-amber-200 bg-white/90 px-3 py-2 text-sm text-amber-950 outline-none transition-colors focus:border-amber-400"
+              className="w-full rounded-md border border-amber-200 bg-white/90 px-3 py-2 text-sm text-amber-950 outline-none transition-colors focus:border-amber-400"
             >
               {LEASEHOLD_ORRI_BURDEN_BASIS_OPTIONS.map((option) => (
                 <option key={option} value={option}>
@@ -2577,7 +2577,7 @@ function LeaseholdOrriDeckCard({
                   deskMapId: event.target.value || null,
                 })
               }
-              className="w-full rounded-xl border border-amber-200 bg-white/90 px-3 py-2 text-sm text-amber-950 outline-none transition-colors focus:border-amber-400 disabled:bg-amber-50/60 disabled:text-amber-900/50"
+              className="w-full rounded-md border border-amber-200 bg-white/90 px-3 py-2 text-sm text-amber-950 outline-none transition-colors focus:border-amber-400 disabled:bg-amber-50/60 disabled:text-amber-900/50"
             >
               <option value="">{orri.scope === 'tract' ? 'Select tract' : 'Not used'}</option>
               {deskMaps.map((deskMap) => (
@@ -2603,7 +2603,7 @@ function LeaseholdOrriDeckCard({
                 }
               }}
               placeholder="Book / file / doc no."
-              className="w-full rounded-xl border border-amber-200 bg-white/90 px-3 py-2 text-sm text-amber-950 outline-none transition-colors focus:border-amber-400"
+              className="w-full rounded-md border border-amber-200 bg-white/90 px-3 py-2 text-sm text-amber-950 outline-none transition-colors focus:border-amber-400"
             />
           </label>
         </div>
@@ -2624,18 +2624,18 @@ function LeaseholdOrriDeckCard({
             }}
             rows={3}
             placeholder="Optional remarks about this burden"
-            className="w-full rounded-xl border border-amber-200 bg-white/90 px-3 py-2 text-sm text-amber-950 outline-none transition-colors focus:border-amber-400"
+            className="w-full rounded-md border border-amber-200 bg-white/90 px-3 py-2 text-sm text-amber-950 outline-none transition-colors focus:border-amber-400"
           />
         </label>
       </fieldset>
 
-      <div className="rounded-b-lg border-t border-amber-200 bg-amber-100/40 px-3 py-2">
+      <div className="rounded-b-md border-t border-amber-200 bg-amber-100/40 px-3 py-2">
         <div className="flex flex-wrap items-center gap-2 text-xs">
           <span className="rounded-full border border-amber-300 bg-white/80 px-2 py-0.5 text-amber-900">
             {orri.scope === 'unit' ? 'Unit-wide burden' : summary?.tractName ?? 'Single tract burden'}
           </span>
           {needsUnitAssignment ? (
-            <span className="rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-gold-900">
+            <span className="rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-ink">
               Excluded - needs unit assignment
             </span>
           ) : summary?.includedInMath ? (
@@ -2646,7 +2646,7 @@ function LeaseholdOrriDeckCard({
               </FormulaTooltip>
             </span>
           ) : (
-            <span className="rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-gold-900">
+            <span className="rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-ink">
               Tracked only until gross 8/8 math applies
             </span>
           )}
@@ -2691,8 +2691,8 @@ function LeaseholdDeckRetainedCard({
   assignedFormula?: FormulaContent;
 }) {
   return (
-    <div className="w-80 rounded-lg border-2 border-ledger-line bg-parchment text-ink shadow-sm">
-      <div className="rounded-t-lg border-b border-ledger-line bg-parchment-dark px-3 py-1.5">
+    <div className="w-80 rounded-md border-2 border-ledger-line bg-parchment text-ink shadow-sm">
+      <div className="rounded-t-md border-b border-ledger-line bg-parchment-dark px-3 py-1.5">
         <div className="flex items-center justify-between gap-2">
           <span className="truncate text-[10px] font-semibold uppercase tracking-wide text-ink-light">
             Working Interest
@@ -2799,8 +2799,8 @@ function LeaseholdAssignmentDeckCard({
   const needsUnitAssignment = needsActiveUnitAssignment(summary, activeUnitCode);
 
   return (
-    <div className="w-80 rounded-lg border-2 border-leather/25 bg-leather/5 text-ink shadow-[0_8px_18px_rgba(120,53,15,0.14)]">
-      <div className="rounded-t-lg border-b border-leather/20 bg-leather/10 px-3 py-1.5">
+    <div className="w-80 rounded-md border-2 border-leather/25 bg-leather/5 text-ink shadow-[0_8px_18px_rgba(120,53,15,0.14)]">
+      <div className="rounded-t-md border-b border-leather/20 bg-leather/10 px-3 py-1.5">
         <div className="flex items-center justify-between gap-2">
           <span className="truncate text-[10px] font-semibold uppercase tracking-wide text-leather">
             Assignment
@@ -2829,7 +2829,7 @@ function LeaseholdAssignmentDeckCard({
         className="m-0 min-w-0 space-y-3 border-0 px-3 py-3"
       >
         {needsUnitAssignment && (
-          <div className="rounded-xl border border-gold/40 bg-gold/10 px-3 py-2 text-[11px] leading-5 text-gold-950">
+          <div className="rounded-md border border-gold/40 bg-gold/10 px-3 py-2 text-[11px] leading-5 text-ink">
             <div className="font-semibold">Excluded - needs unit assignment</div>
             <div className="mt-1">
               This unit-scoped WI assignment is not in payout math until it is assigned to a unit.
@@ -2837,7 +2837,7 @@ function LeaseholdAssignmentDeckCard({
             <button
               type="button"
               onClick={() => onUpdate(assignment.id, { unitCode: activeUnitCode })}
-              className="mt-2 rounded-lg border border-gold/40 bg-white/80 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-gold-950 transition-colors hover:bg-gold/15"
+              className="mt-2 rounded-md border border-gold/40 bg-white/80 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-ink transition-colors hover:bg-gold/15"
             >
               Assign to {activeUnitCode}
             </button>
@@ -2859,7 +2859,7 @@ function LeaseholdAssignmentDeckCard({
                 }
               }}
               placeholder="Assignor"
-              className="w-full rounded-xl border border-leather/20 bg-white/90 px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-leather"
+              className="w-full rounded-md border border-leather/20 bg-white/90 px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-leather"
             />
           </label>
 
@@ -2878,7 +2878,7 @@ function LeaseholdAssignmentDeckCard({
                 }
               }}
               placeholder="Assignee"
-              className="w-full rounded-xl border border-leather/20 bg-white/90 px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-leather"
+              className="w-full rounded-md border border-leather/20 bg-white/90 px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-leather"
             />
           </label>
         </div>
@@ -2913,7 +2913,7 @@ function LeaseholdAssignmentDeckCard({
                 }
               }}
               placeholder="1/2"
-              className={`w-full rounded-xl border bg-white/90 px-3 py-2 text-sm text-ink outline-none transition-colors ${
+              className={`w-full rounded-md border bg-white/90 px-3 py-2 text-sm text-ink outline-none transition-colors ${
                 workingInterestError
                   ? 'border-seal/50 focus:border-seal'
                   : 'border-leather/20 focus:border-leather'
@@ -2934,7 +2934,7 @@ function LeaseholdAssignmentDeckCard({
               onChange={(event) =>
                 onUpdate(assignment.id, { effectiveDate: event.target.value })
               }
-              className="w-full rounded-xl border border-leather/20 bg-white/90 px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-leather"
+              className="w-full rounded-md border border-leather/20 bg-white/90 px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-leather"
             />
           </label>
 
@@ -2951,7 +2951,7 @@ function LeaseholdAssignmentDeckCard({
                     event.target.value === 'tract' ? assignment.deskMapId : null,
                 })
               }
-              className="w-full rounded-xl border border-leather/20 bg-white/90 px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-leather"
+              className="w-full rounded-md border border-leather/20 bg-white/90 px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-leather"
             >
               {LEASEHOLD_ASSIGNMENT_SCOPE_OPTIONS.map((option) => (
                 <option key={option} value={option}>
@@ -2973,7 +2973,7 @@ function LeaseholdAssignmentDeckCard({
                   deskMapId: event.target.value || null,
                 })
               }
-              className="w-full rounded-xl border border-leather/20 bg-white/90 px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-leather disabled:bg-parchment-dark/70 disabled:text-ink-light"
+              className="w-full rounded-md border border-leather/20 bg-white/90 px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-leather disabled:bg-parchment-dark/70 disabled:text-ink-light"
             >
               <option value="">
                 {assignment.scope === 'tract' ? 'Select tract' : 'Not used'}
@@ -3003,7 +3003,7 @@ function LeaseholdAssignmentDeckCard({
                 }
               }}
               placeholder="Book / file / doc no."
-              className="w-full rounded-xl border border-leather/20 bg-white/90 px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-leather"
+              className="w-full rounded-md border border-leather/20 bg-white/90 px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-leather"
             />
           </label>
         </div>
@@ -3024,12 +3024,12 @@ function LeaseholdAssignmentDeckCard({
             }}
             rows={3}
             placeholder="Optional remarks about this assignment"
-            className="w-full rounded-xl border border-leather/20 bg-white/90 px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-leather"
+            className="w-full rounded-md border border-leather/20 bg-white/90 px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-leather"
           />
         </label>
       </fieldset>
 
-      <div className="rounded-b-lg border-t border-leather/20 bg-leather/5 px-3 py-2">
+      <div className="rounded-b-md border-t border-leather/20 bg-leather/5 px-3 py-2">
         <div className="flex flex-wrap items-center gap-2 text-xs">
           <span className="rounded-full border border-leather/30 bg-white/80 px-2 py-0.5 text-leather">
             {assignment.scope === 'unit'
@@ -3037,7 +3037,7 @@ function LeaseholdAssignmentDeckCard({
               : summary?.tractName ?? 'Single tract split'}
           </span>
           {needsUnitAssignment ? (
-            <span className="rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-gold-900">
+            <span className="rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-ink">
               Excluded - needs unit assignment
             </span>
           ) : summary?.includedInMath ? (
@@ -3055,7 +3055,7 @@ function LeaseholdAssignmentDeckCard({
               )}
             </>
           ) : (
-            <span className="rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-gold-900">
+            <span className="rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-ink">
               Tracked only until a valid tract is linked
             </span>
           )}
@@ -3128,11 +3128,11 @@ function TransferOrderMetricCard({
       : 'border-ledger-line bg-parchment';
 
   return (
-    <div className={`rounded-2xl border px-4 py-3 shadow-sm ${toneClasses}`}>
+    <div className={`rounded-md border px-4 py-3 shadow-sm ${toneClasses}`}>
       <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-light">
         {label}
       </div>
-      <div className="mt-2 text-2xl font-display font-bold text-ink">
+      <div className="mt-2 text-xl font-mono tabular-nums font-bold text-ink">
         {formula ? <FormulaTooltip content={formula}>{value}</FormulaTooltip> : value}
       </div>
       <div className="mt-1 text-xs text-ink-light">{detail}</div>
@@ -3168,13 +3168,13 @@ function transferOrderRowStatus(row: LeaseholdDecimalRow) {
   if (missingEffectiveDate) {
     return {
       label: 'Need date',
-      classes: 'border-gold/40 bg-gold/10 text-gold-900',
+      classes: 'border-gold/40 bg-gold/10 text-ink',
     };
   }
 
   return {
     label: 'Need doc no',
-    classes: 'border-gold/40 bg-gold/10 text-gold-900',
+    classes: 'border-gold/40 bg-gold/10 text-ink',
   };
 }
 
@@ -3231,7 +3231,7 @@ function LeaseholdTransferOrderEntryEditor({
 
   if (!editable) {
     return (
-      <div className="rounded-xl border border-ledger-line bg-parchment-dark/60 px-2.5 py-2 text-[11px] text-ink-light">
+      <div className="rounded-md border border-ledger-line bg-parchment-dark/60 px-2.5 py-2 text-[11px] text-ink-light">
         Edit in unit focus.
       </div>
     );
@@ -3265,7 +3265,7 @@ function LeaseholdTransferOrderEntryEditor({
         onChange={(event) => setOwnerNumberDraft(event.target.value)}
         onBlur={() => commit({ ownerNumber: ownerNumberDraft })}
         placeholder="Owner no. / pay code"
-        className="w-full rounded-lg border border-ledger-line bg-white px-2.5 py-1.5 text-xs text-ink outline-none transition-colors focus:border-leather disabled:cursor-not-allowed disabled:opacity-60"
+        className="w-full rounded-md border border-ledger-line bg-white px-2.5 py-1.5 text-xs text-ink outline-none transition-colors focus:border-leather disabled:cursor-not-allowed disabled:opacity-60"
       />
       <div className="flex items-center gap-2">
         <select
@@ -3274,7 +3274,7 @@ function LeaseholdTransferOrderEntryEditor({
           onChange={(event) =>
             commit({ status: event.target.value as LeaseholdTransferOrderStatus })
           }
-          className="min-w-0 flex-1 rounded-lg border border-ledger-line bg-white px-2.5 py-1.5 text-xs text-ink outline-none transition-colors focus:border-leather disabled:cursor-not-allowed disabled:opacity-60"
+          className="min-w-0 flex-1 rounded-md border border-ledger-line bg-white px-2.5 py-1.5 text-xs text-ink outline-none transition-colors focus:border-leather disabled:cursor-not-allowed disabled:opacity-60"
         >
           {LEASEHOLD_TRANSFER_ORDER_STATUS_OPTIONS.filter(
             (status) => !payoutHold || status !== 'ready'
@@ -3303,7 +3303,7 @@ function LeaseholdTransferOrderEntryEditor({
         )}
       </div>
       {payoutHold && (
-        <div className="rounded-lg border border-seal/20 bg-seal/5 px-2.5 py-2 text-[11px] leading-5 text-seal">
+        <div className="rounded-md border border-seal/20 bg-seal/5 px-2.5 py-2 text-[11px] leading-5 text-seal">
           {payoutHoldReason}
         </div>
       )}
@@ -3314,7 +3314,7 @@ function LeaseholdTransferOrderEntryEditor({
         onBlur={() => commit({ notes: notesDraft })}
         rows={2}
         placeholder="Transfer-order note"
-        className="w-full rounded-lg border border-ledger-line bg-white px-2.5 py-1.5 text-xs text-ink outline-none transition-colors focus:border-leather resize-y disabled:cursor-not-allowed disabled:opacity-60"
+        className="w-full rounded-md border border-ledger-line bg-white px-2.5 py-1.5 text-xs text-ink outline-none transition-colors focus:border-leather resize-y disabled:cursor-not-allowed disabled:opacity-60"
       />
     </div>
   );
@@ -3382,7 +3382,7 @@ function LeaseholdDecimalLedger({
   const holdCount = visibleEntryStatuses.filter((status) => status === 'hold').length;
 
   return (
-    <section className="rounded-3xl border border-ledger-line bg-parchment/95 p-5 shadow-md">
+    <section className="rounded-md border border-ledger-line bg-parchment/95 p-5 shadow-md">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <div className="text-[10px] font-semibold uppercase tracking-[0.2em] text-ink-light">
@@ -3421,7 +3421,7 @@ function LeaseholdDecimalLedger({
               >
                 {payoutHold ? 'Payout hold' : 'No NPRI payout hold'}
               </span>
-              <span className="rounded-full bg-gold/10 px-3 py-1.5 font-medium text-gold-900">
+              <span className="rounded-full bg-gold/10 px-3 py-1.5 font-medium text-ink">
                 Ready {readyCount}
               </span>
               <span className="rounded-full bg-seal/10 px-3 py-1.5 font-medium text-seal">
@@ -3479,7 +3479,7 @@ function LeaseholdDecimalLedger({
       </div>
 
       {overAssignedFocus && (
-        <div className="mt-4 rounded-2xl border border-seal/25 bg-seal/5 px-4 py-3 text-sm text-seal">
+        <div className="mt-4 rounded-md border border-seal/25 bg-seal/5 px-4 py-3 text-sm text-seal">
           <div className="font-semibold">Warning-only over-assignment in v1</div>
           <div className="mt-1">
             Assignment rows stay visible for review even when they exceed 100% of the available
@@ -3490,7 +3490,7 @@ function LeaseholdDecimalLedger({
       )}
 
       {overBurdenedFocus && (
-        <div className="mt-4 rounded-2xl border border-seal/25 bg-seal/5 px-4 py-3 text-sm text-seal">
+        <div className="mt-4 rounded-md border border-seal/25 bg-seal/5 px-4 py-3 text-sm text-seal">
           <div className="font-semibold">Non-cost-bearing burdens exceed available NRI</div>
           <div className="mt-1">
             Fixed NPRIs plus the ORRI stack on this focus exceed the lessee's available NRI before
@@ -3502,7 +3502,7 @@ function LeaseholdDecimalLedger({
       )}
 
       {overFloatingNpriBurdenedFocus && (
-        <div className="mt-4 rounded-2xl border border-seal/25 bg-seal/5 px-4 py-3 text-sm text-seal">
+        <div className="mt-4 rounded-md border border-seal/25 bg-seal/5 px-4 py-3 text-sm text-seal">
           <div className="font-semibold">Floating NPRIs exceed available lease royalty</div>
           <div className="mt-1">
             One or more floating NPRIs in this focus claim more than 100% of the lease royalty on
@@ -3515,7 +3515,7 @@ function LeaseholdDecimalLedger({
       )}
 
       {transferOrderHoldReasons.length > 0 && (
-        <div className="mt-4 rounded-2xl border border-gold/40 bg-gold/10 px-4 py-3 text-sm text-gold-950">
+        <div className="mt-4 rounded-md border border-gold/40 bg-gold/10 px-4 py-3 text-sm text-ink">
           <div className="font-semibold">Transfer-order readiness on hold</div>
           <ul className="mt-1 space-y-1">
             {transferOrderHoldReasons.map((reason) => (
@@ -3526,7 +3526,7 @@ function LeaseholdDecimalLedger({
       )}
 
       {leaseOverlapsFocus.length > 0 && (
-        <div className="mt-4 rounded-2xl border border-seal/25 bg-seal/5 px-4 py-3 text-sm text-seal">
+        <div className="mt-4 rounded-md border border-seal/25 bg-seal/5 px-4 py-3 text-sm text-seal">
           <div className="font-semibold">
             Lease overlap ({leaseOverlapsFocus.length}
             {leaseOverlapsFocus.length === 1 ? ' lease' : ' leases'} clipped)
@@ -3552,7 +3552,7 @@ function LeaseholdDecimalLedger({
       )}
 
       {!editable && (
-        <div className="mt-4 rounded-2xl border border-ledger-line bg-parchment-dark/70 px-4 py-3 text-sm text-ink-light">
+        <div className="mt-4 rounded-md border border-ledger-line bg-parchment-dark/70 px-4 py-3 text-sm text-ink-light">
           Unit focus is the editable payout-entry surface. Tract focus stays review-only because
           those decimals are partial tract contributions, not final unit payout rows.
         </div>
@@ -3578,7 +3578,7 @@ function LeaseholdDecimalLedger({
       )}
 
       {review.rows.length > 0 ? (
-        <div className="mt-4 overflow-x-auto rounded-2xl border border-ledger-line">
+        <div className="mt-4 overflow-x-auto rounded-md border border-ledger-line">
           <table className="min-w-full border-collapse text-sm">
             <thead className="bg-parchment-dark/80">
               <tr>
@@ -3662,7 +3662,7 @@ function LeaseholdDecimalLedger({
           </table>
         </div>
       ) : (
-        <div className="mt-4 rounded-2xl border border-ledger-line bg-parchment-dark/70 px-4 py-6 text-sm text-ink-light">
+        <div className="mt-4 rounded-md border border-ledger-line bg-parchment-dark/70 px-4 py-6 text-sm text-ink-light">
           No decimal rows are available for this focus yet.
         </div>
       )}
@@ -3853,7 +3853,7 @@ function LeaseholdDeck({
 
   return (
     <div className="space-y-5">
-      <section className="rounded-3xl border border-ledger-line bg-parchment/95 p-5 shadow-md">
+      <section className="rounded-md border border-ledger-line bg-parchment/95 p-5 shadow-md">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <div className="text-[10px] font-semibold uppercase tracking-[0.2em] text-ink-light">
@@ -3867,7 +3867,7 @@ function LeaseholdDeck({
               The selected tract stays front and center, and unit-wide burdens follow it down.
             </p>
           </div>
-          <div className="rounded-2xl border border-gold/30 bg-gold/10 px-4 py-3 text-sm text-gold-950">
+          <div className="rounded-md border border-gold/30 bg-gold/10 px-4 py-3 text-sm text-ink">
             Title stays in Desk Map. Leasehold burdens, WI, and assignments live here.
           </div>
         </div>
@@ -3956,7 +3956,7 @@ function LeaseholdDeck({
         )}
       </section>
 
-      <section className="rounded-3xl border border-ledger-line bg-parchment/95 p-5 shadow-md">
+      <section className="rounded-md border border-ledger-line bg-parchment/95 p-5 shadow-md">
         <div className="text-[10px] font-semibold uppercase tracking-[0.2em] text-ink-light">
           Leasehold Estate
         </div>
@@ -3977,7 +3977,7 @@ function LeaseholdDeck({
         </div>
       </section>
 
-      <section className="rounded-3xl border border-ledger-line bg-parchment/95 p-5 shadow-md">
+      <section className="rounded-md border border-ledger-line bg-parchment/95 p-5 shadow-md">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <div className="text-[10px] font-semibold uppercase tracking-[0.2em] text-ink-light">
@@ -4008,7 +4008,7 @@ function LeaseholdDeck({
         </div>
       </section>
 
-      <section className="rounded-3xl border border-ledger-line bg-parchment/95 p-5 shadow-md">
+      <section className="rounded-md border border-ledger-line bg-parchment/95 p-5 shadow-md">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <div className="text-[10px] font-semibold uppercase tracking-[0.2em] text-ink-light">
@@ -4025,7 +4025,7 @@ function LeaseholdDeck({
             disabled={readOnly}
             onClick={() => onAddOrri(focusedDeskMapId)}
             title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
-            className="rounded-xl border border-amber-300 bg-amber-100 px-4 py-2 text-sm font-semibold text-amber-950 transition-colors hover:bg-amber-200/80 disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-md border border-amber-300 bg-amber-100 px-4 py-2 text-sm font-semibold text-amber-950 transition-colors hover:bg-amber-200/80 disabled:cursor-not-allowed disabled:opacity-50"
           >
             + Add ORRI
           </button>
@@ -4055,7 +4055,7 @@ function LeaseholdDeck({
         </div>
       </section>
 
-      <section className="rounded-3xl border border-ledger-line bg-parchment/95 p-5 shadow-md">
+      <section className="rounded-md border border-ledger-line bg-parchment/95 p-5 shadow-md">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <div className="text-[10px] font-semibold uppercase tracking-[0.2em] text-ink-light">
@@ -4078,7 +4078,7 @@ function LeaseholdDeck({
               })
             }
             title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
-            className="rounded-xl border border-leather/30 bg-leather/10 px-4 py-2 text-sm font-semibold text-leather transition-colors hover:bg-leather/15 disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-md border border-leather/30 bg-leather/10 px-4 py-2 text-sm font-semibold text-leather transition-colors hover:bg-leather/15 disabled:cursor-not-allowed disabled:opacity-50"
           >
             + Add Assignment
           </button>
@@ -4275,7 +4275,7 @@ export default function LeaseholdView() {
             ? 'Add a present mineral owner on a tract first'
             : 'Add a lease to a present mineral owner'
       }
-      className="rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-100 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+      className="rounded-md border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-100 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
     >
       + Add Lease
     </button>
@@ -4332,7 +4332,7 @@ export default function LeaseholdView() {
   if (focusedDeskMaps.length === 0) {
     return (
       <div className="flex h-full items-center justify-center bg-canvas-bg p-5">
-        <div className="w-full max-w-2xl space-y-4 rounded-3xl border border-ledger-line bg-parchment p-6 text-center shadow-md">
+        <div className="w-full max-w-2xl space-y-4 rounded-md border border-ledger-line bg-parchment p-6 text-center shadow-md">
           <h2 className="text-2xl font-display font-bold text-ink">No tracts in this unit yet</h2>
           <p className="text-sm text-ink-light">
             Add a unit or create the first tract for the selected unit before reviewing leasehold math.
@@ -4354,7 +4354,7 @@ export default function LeaseholdView() {
           isMapMode ? 'flex h-full flex-col space-y-5' : 'mx-auto max-w-7xl space-y-5'
         }
       >
-        <header className="shrink-0 rounded-3xl border border-ledger-line bg-parchment/95 shadow-md">
+        <header className="shrink-0 rounded-md border border-ledger-line bg-parchment/95 shadow-md">
           {isMapMode ? (
             <div className="flex items-center justify-between gap-4 px-5 py-3">
               <h1 className="text-base font-display font-bold text-ink">Leasehold</h1>
@@ -4387,7 +4387,7 @@ export default function LeaseholdView() {
                     <UnitFocusSelector />
                     {addLeaseButton}
                   </div>
-                  <div className="rounded-2xl border border-gold/30 bg-gold/10 px-4 py-3 text-sm text-gold-950">
+                  <div className="rounded-md border border-gold/30 bg-gold/10 px-4 py-3 text-sm text-ink">
                     <div className="font-semibold">Current v1 assumption</div>
                     <div className="mt-1">
                       {activeUnit
@@ -4449,7 +4449,7 @@ export default function LeaseholdView() {
                 </div>
               )}
               {npriSummary.total > 0 && (
-                <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+                <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
                   <div className="font-semibold">NPRI payout layer active</div>
                   <div className="mt-1 leading-6">
                     {npriSummary.total} NPRI branch{npriSummary.total === 1 ? '' : 'es'} on file
@@ -4474,7 +4474,7 @@ export default function LeaseholdView() {
                 Lease Purchase Report on that owner&apos;s tract.
               </p>
               {leaseAddTargets.length === 0 ? (
-                <div className="rounded-lg border border-dashed border-ledger-line px-4 py-5 text-sm text-ink-light">
+                <div className="rounded-md border border-dashed border-ledger-line px-4 py-5 text-sm text-ink-light">
                   No present mineral owners on this unit&apos;s tracts yet.
                 </div>
               ) : (
@@ -4484,7 +4484,7 @@ export default function LeaseholdView() {
                       key={target.nodeId}
                       type="button"
                       onClick={() => handleSelectLeaseTarget(target)}
-                      className="flex w-full items-center justify-between gap-3 rounded-lg border border-ledger-line bg-parchment px-3 py-2 text-left transition-colors hover:border-emerald-300 hover:bg-emerald-50"
+                      className="flex w-full items-center justify-between gap-3 rounded-md border border-ledger-line bg-parchment px-3 py-2 text-left transition-colors hover:border-emerald-300 hover:bg-emerald-50"
                     >
                       <span className="min-w-0">
                         <span className="block truncate text-sm font-semibold text-ink">

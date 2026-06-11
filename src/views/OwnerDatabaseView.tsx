@@ -319,7 +319,7 @@ export default function OwnerDatabaseView() {
 
   return (
     <div className="h-full grid gap-4 p-4 bg-parchment-dark/30 lg:grid-cols-[320px_minmax(0,1fr)]">
-      <aside className="min-h-0 rounded-xl border border-ledger-line bg-parchment shadow-sm overflow-hidden flex flex-col">
+      <aside className="min-h-0 rounded-md border border-ledger-line bg-parchment shadow-sm overflow-hidden flex flex-col">
         <div className="px-4 py-4 border-b border-ledger-line bg-ledger flex items-center justify-between gap-3">
           <div>
             <div className="text-lg font-display font-bold text-ink">Owners</div>
@@ -340,7 +340,7 @@ export default function OwnerDatabaseView() {
               );
             }}
             title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
-            className="px-3 py-2 rounded-lg text-xs font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors disabled:opacity-50"
+            className="px-3 py-2 rounded-md text-xs font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors disabled:opacity-50"
           >
             + New Owner
           </button>
@@ -358,13 +358,13 @@ export default function OwnerDatabaseView() {
                 value={ownerSearchQuery}
                 onChange={(event) => setOwnerSearchQuery(event.target.value)}
                 placeholder="Owner, county, prospect, lease..."
-                className="min-w-0 flex-1 rounded-lg border border-ledger-line bg-white px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-leather"
+                className="min-w-0 flex-1 rounded-md border border-ledger-line bg-white px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-leather"
               />
               {ownerSearchQuery.trim().length > 0 && (
                 <button
                   type="button"
                   onClick={() => setOwnerSearchQuery('')}
-                  className="rounded-lg border border-ledger-line px-3 py-2 text-xs font-semibold text-ink-light transition-colors hover:bg-ledger"
+                  className="rounded-md border border-ledger-line px-3 py-2 text-xs font-semibold text-ink-light transition-colors hover:bg-ledger"
                 >
                   Clear
                 </button>
@@ -380,7 +380,7 @@ export default function OwnerDatabaseView() {
               <select
                 value={ownerSortMode}
                 onChange={(event) => setOwnerSortMode(event.target.value as OwnerListSortMode)}
-                className="mt-1.5 w-full rounded-lg border border-ledger-line bg-white px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-leather"
+                className="mt-1.5 w-full rounded-md border border-ledger-line bg-white px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-leather"
               >
                 {OWNER_LIST_SORT_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -389,7 +389,7 @@ export default function OwnerDatabaseView() {
                 ))}
               </select>
             </label>
-            <div className="rounded-lg border border-ledger-line bg-white px-3 py-2 text-xs text-ink-light">
+            <div className="rounded-md border border-ledger-line bg-white px-3 py-2 text-xs text-ink-light">
               Showing {visibleOwnerRows.length}/{unitOwners.length}
             </div>
           </div>
@@ -476,7 +476,7 @@ export default function OwnerDatabaseView() {
             readOnly={readOnly}
           />
         ) : unitOwners.length > 0 && visibleOwnerRows.length === 0 ? (
-          <div className="h-full rounded-xl border border-dashed border-ledger-line bg-parchment flex items-center justify-center">
+          <div className="h-full rounded-md border border-dashed border-ledger-line bg-parchment flex items-center justify-center">
             <div className="text-center px-6">
               <div className="text-xl font-display font-bold text-ink">
                 No owners match the current search
@@ -487,7 +487,7 @@ export default function OwnerDatabaseView() {
             </div>
           </div>
         ) : (
-          <div className="h-full rounded-xl border border-dashed border-ledger-line bg-parchment flex items-center justify-center">
+          <div className="h-full rounded-md border border-dashed border-ledger-line bg-parchment flex items-center justify-center">
             <div className="text-center px-6">
               <div className="text-xl font-display font-bold text-ink">
                 No owner selected

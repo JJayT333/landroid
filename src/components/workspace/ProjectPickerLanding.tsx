@@ -12,6 +12,7 @@ import {
   type SavedProjectSummary,
 } from '../../storage/saved-project-index';
 import { useWorkspaceStore } from '../../store/workspace-store';
+import Button from '../shared/Button';
 import { useConfirmation } from '../shared/ConfirmationProvider';
 
 interface ProjectPickerLandingProps {
@@ -174,13 +175,9 @@ export default function ProjectPickerLanding({
           </div>
           <div className="flex flex-wrap gap-2">
             {workspaceHydrated && (
-              <button
-                type="button"
-                onClick={onClose}
-                className="rounded-md border-2 border-leather bg-leather px-5 py-2.5 text-sm font-bold text-parchment shadow-md shadow-leather/20 hover:bg-leather-light focus:outline-none focus:ring-2 focus:ring-leather focus:ring-offset-2 focus:ring-offset-parchment"
-              >
+              <Button onClick={onClose}>
                 Return to {activeProjectName}
-              </button>
+              </Button>
             )}
           </div>
         </header>
@@ -202,14 +199,9 @@ export default function ProjectPickerLanding({
               className="mt-1 w-full rounded-md border border-ledger-line bg-white px-3 py-2 text-sm text-ink outline-none focus:border-leather focus:ring-2 focus:ring-leather/20"
             />
           </label>
-          <button
-            type="button"
-            onClick={handleCreate}
-            disabled={Boolean(busy)}
-            className="self-end rounded-md bg-leather px-4 py-2 text-sm font-semibold text-parchment hover:bg-leather-dark disabled:cursor-not-allowed disabled:opacity-50"
-          >
+          <Button className="self-end" onClick={handleCreate} disabled={Boolean(busy)}>
             Create Project
-          </button>
+          </Button>
         </section>
 
         {error && (
@@ -322,21 +314,12 @@ export default function ProjectPickerLanding({
               />
             </label>
             <div className="mt-5 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setEditor(null)}
-                className="rounded-md border border-ledger-line px-4 py-2 text-sm font-semibold text-ink-light hover:bg-ledger"
-              >
+              <Button variant="secondary" onClick={() => setEditor(null)}>
                 Cancel
-              </button>
-              <button
-                type="button"
-                onClick={commitEditor}
-                disabled={Boolean(busy)}
-                className="rounded-md bg-leather px-4 py-2 text-sm font-semibold text-parchment hover:bg-leather-dark disabled:cursor-not-allowed disabled:opacity-50"
-              >
+              </Button>
+              <Button onClick={commitEditor} disabled={Boolean(busy)}>
                 {editor.mode === 'rename' ? 'Rename' : 'Duplicate'}
-              </button>
+              </Button>
             </div>
           </div>
         </div>

@@ -31,7 +31,7 @@ export default function PendingDrillingDecoderPanel({
 }: PendingDrillingDecoderPanelProps) {
   if (isLoading) {
     return (
-      <div className="rounded-xl border border-ledger-line bg-ledger p-4">
+      <div className="rounded-md border border-ledger-line bg-ledger p-4">
         <div className="text-sm font-semibold text-ink">Pending Permit Decoder</div>
         <div className="text-sm text-ink-light mt-2">
           Reading the imported pending-permit files and building the joined preview.
@@ -42,7 +42,7 @@ export default function PendingDrillingDecoderPanel({
 
   if (errorMessage) {
     return (
-      <div className="rounded-xl border border-seal/30 bg-seal/5 p-4">
+      <div className="rounded-md border border-seal/30 bg-seal/5 p-4">
         <div className="text-sm font-semibold text-seal">Pending Permit Decoder</div>
         <div className="text-sm text-seal mt-2">{errorMessage}</div>
       </div>
@@ -64,7 +64,7 @@ export default function PendingDrillingDecoderPanel({
   ];
 
   return (
-    <div className="rounded-xl border border-ledger-line bg-parchment-dark/30 p-4 space-y-4">
+    <div className="rounded-md border border-ledger-line bg-parchment-dark/30 p-4 space-y-4">
       <div className="space-y-2">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div className="text-sm font-semibold text-ink">Pending Permit Decoder</div>
@@ -84,7 +84,7 @@ export default function PendingDrillingDecoderPanel({
       </div>
 
       <div className="grid gap-3 md:grid-cols-4">
-        <div className="rounded-lg border border-ledger-line bg-parchment px-3 py-3">
+        <div className="rounded-md border border-ledger-line bg-parchment px-3 py-3">
           <div className="text-[10px] uppercase tracking-wider text-ink-light">
             Permit Rows
           </div>
@@ -92,7 +92,7 @@ export default function PendingDrillingDecoderPanel({
             {decoded?.totals.permitCount ?? 0}
           </div>
         </div>
-        <div className="rounded-lg border border-ledger-line bg-parchment px-3 py-3">
+        <div className="rounded-md border border-ledger-line bg-parchment px-3 py-3">
           <div className="text-[10px] uppercase tracking-wider text-ink-light">
             Wellbore Rows
           </div>
@@ -100,7 +100,7 @@ export default function PendingDrillingDecoderPanel({
             {decoded?.totals.wellboreCount ?? 0}
           </div>
         </div>
-        <div className="rounded-lg border border-ledger-line bg-parchment px-3 py-3">
+        <div className="rounded-md border border-ledger-line bg-parchment px-3 py-3">
           <div className="text-[10px] uppercase tracking-wider text-ink-light">
             Coordinate Rows
           </div>
@@ -108,7 +108,7 @@ export default function PendingDrillingDecoderPanel({
             {decoded?.totals.coordinateCount ?? 0}
           </div>
         </div>
-        <div className="rounded-lg border border-ledger-line bg-parchment px-3 py-3">
+        <div className="rounded-md border border-ledger-line bg-parchment px-3 py-3">
           <div className="text-[10px] uppercase tracking-wider text-ink-light">
             Recognized Files
           </div>
@@ -118,7 +118,7 @@ export default function PendingDrillingDecoderPanel({
         </div>
       </div>
 
-      <div className="rounded-lg border border-ledger-line bg-ledger px-3 py-3 text-sm text-ink">
+      <div className="rounded-md border border-ledger-line bg-ledger px-3 py-3 text-sm text-ink">
         {selectedSummary ? (
           selectedSummary.fileKind ? (
             <>
@@ -153,7 +153,7 @@ export default function PendingDrillingDecoderPanel({
       </div>
 
       {decoded && decoded.missingCoreFiles.length > 0 && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-900">
+        <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-900">
           <div className="font-semibold">Preview can get richer with more files</div>
           <div className="mt-1">
             Still missing:{' '}
@@ -165,7 +165,7 @@ export default function PendingDrillingDecoderPanel({
       )}
 
       {displayedWarnings.length > 0 && (
-        <div className="rounded-lg border border-ledger-line bg-parchment px-3 py-3">
+        <div className="rounded-md border border-ledger-line bg-parchment px-3 py-3">
           <div className="text-[10px] uppercase tracking-wider text-ink-light">
             Decoder Notes
           </div>
@@ -201,7 +201,7 @@ export default function PendingDrillingDecoderPanel({
         </div>
 
         {decodedPermits.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-ledger-line bg-parchment px-4 py-6 text-sm text-ink-light">
+          <div className="rounded-md border border-dashed border-ledger-line bg-parchment px-4 py-6 text-sm text-ink-light">
             No joined permit rows are ready yet. Import at least the permit file, and
             ideally the wellbore and lat/long files too.
           </div>
@@ -209,7 +209,7 @@ export default function PendingDrillingDecoderPanel({
           decodedPermits.slice(0, 25).map((permit) => (
             <div
               key={permit.universalDocNo || `${permit.statusNumber}-${permit.leaseName}`}
-              className="rounded-xl border border-ledger-line bg-parchment px-4 py-4 space-y-3"
+              className="rounded-md border border-ledger-line bg-parchment px-4 py-4 space-y-3"
             >
               <div className="flex items-start justify-between gap-4 flex-wrap">
                 <div>
@@ -272,7 +272,7 @@ export default function PendingDrillingDecoderPanel({
                 </div>
               </div>
 
-              <div className="rounded-lg border border-ledger-line bg-ledger px-3 py-3 space-y-3">
+              <div className="rounded-md border border-ledger-line bg-ledger px-3 py-3 space-y-3">
                 <div className="text-[10px] uppercase tracking-wider text-ink-light">
                   Wellbore + Coordinate Join
                 </div>
@@ -284,7 +284,7 @@ export default function PendingDrillingDecoderPanel({
                   permit.wellbores.map((wellbore) => (
                     <div
                       key={`${wellbore.universalDocNo}-${wellbore.wellboreId}-${wellbore.apiSequenceNumber}`}
-                      className="rounded-lg border border-ledger-line bg-parchment px-3 py-3 space-y-2"
+                      className="rounded-md border border-ledger-line bg-parchment px-3 py-3 space-y-2"
                     >
                       <div className="flex items-start justify-between gap-3 flex-wrap">
                         <div>

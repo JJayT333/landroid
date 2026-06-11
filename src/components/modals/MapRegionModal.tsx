@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import Button from '../shared/Button';
 import Modal from '../shared/Modal';
 import FormField from '../shared/FormField';
 import type { DeskMap, OwnershipNode } from '../../types/node';
@@ -72,7 +73,7 @@ export default function MapRegionModal({
             <select
               value={form.status}
               onChange={(event) => set('status', event.target.value)}
-              className="w-full px-3 py-2 rounded-lg border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none"
+              className="w-full px-3 py-2 rounded-md border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none"
             >
               {MAP_REGION_STATUS_OPTIONS.map((status) => (
                 <option key={status} value={status}>
@@ -125,7 +126,7 @@ export default function MapRegionModal({
             <select
               value={form.deskMapId}
               onChange={(event) => set('deskMapId', event.target.value)}
-              className="w-full px-3 py-2 rounded-lg border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none"
+              className="w-full px-3 py-2 rounded-md border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none"
             >
               <option value="">Not linked</option>
               {deskMaps.map((deskMap) => (
@@ -143,7 +144,7 @@ export default function MapRegionModal({
             <select
               value={form.nodeId}
               onChange={(event) => set('nodeId', event.target.value)}
-              className="w-full px-3 py-2 rounded-lg border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none"
+              className="w-full px-3 py-2 rounded-md border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none"
             >
               <option value="">Not linked</option>
               {nodes.map((node) => (
@@ -161,7 +162,7 @@ export default function MapRegionModal({
             <select
               value={form.linkedOwnerId}
               onChange={(event) => set('linkedOwnerId', event.target.value)}
-              className="w-full px-3 py-2 rounded-lg border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none"
+              className="w-full px-3 py-2 rounded-md border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none"
             >
               <option value="">Not linked</option>
               {owners.map((owner) => (
@@ -179,7 +180,7 @@ export default function MapRegionModal({
             <select
               value={form.leaseId}
               onChange={(event) => set('leaseId', event.target.value)}
-              className="w-full px-3 py-2 rounded-lg border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none"
+              className="w-full px-3 py-2 rounded-md border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none"
             >
               <option value="">Not linked</option>
               {leases.map((lease) => (
@@ -197,7 +198,7 @@ export default function MapRegionModal({
             <select
               value={form.researchSourceId}
               onChange={(event) => set('researchSourceId', event.target.value)}
-              className="w-full px-3 py-2 rounded-lg border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none"
+              className="w-full px-3 py-2 rounded-md border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none"
             >
               <option value="">Not linked</option>
               {researchSources.map((source) => (
@@ -215,7 +216,7 @@ export default function MapRegionModal({
             <select
               value={form.researchProjectRecordId}
               onChange={(event) => set('researchProjectRecordId', event.target.value)}
-              className="w-full px-3 py-2 rounded-lg border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none"
+              className="w-full px-3 py-2 rounded-md border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none"
             >
               <option value="">Not linked</option>
               {researchProjectRecords.map((record) => (
@@ -235,7 +236,7 @@ export default function MapRegionModal({
             value={form.summary}
             onChange={(event) => set('summary', event.target.value)}
             rows={3}
-            className="w-full px-3 py-2 rounded-lg border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none resize-y"
+            className="w-full px-3 py-2 rounded-md border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none resize-y"
           />
         </div>
 
@@ -247,20 +248,15 @@ export default function MapRegionModal({
             value={form.notes}
             onChange={(event) => set('notes', event.target.value)}
             rows={4}
-            className="w-full px-3 py-2 rounded-lg border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none resize-y"
+            className="w-full px-3 py-2 rounded-md border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none resize-y"
           />
         </div>
 
         <div className="flex justify-end gap-2 pt-2 border-t border-ledger-line">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-3 py-2 rounded-lg text-sm text-ink-light hover:bg-parchment-dark transition-colors"
-          >
+          <Button variant="ghost" onClick={onClose}>
             Cancel
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
             disabled={saving}
             onClick={async () => {
               setSaving(true);
@@ -289,10 +285,9 @@ export default function MapRegionModal({
               setSaving(false);
               onClose();
             }}
-            className="px-4 py-2 rounded-lg bg-leather text-parchment text-sm font-semibold hover:bg-leather-light transition-colors disabled:opacity-60"
           >
             Save Region
-          </button>
+          </Button>
         </div>
       </div>
     </Modal>

@@ -5,6 +5,7 @@
  * user-added types persist and appear in future uses.
  */
 import { useState, useRef, useEffect, useId } from 'react';
+import Button from './Button';
 import { useWorkspaceStore } from '../../store/workspace-store';
 
 interface InstrumentSelectProps {
@@ -82,7 +83,7 @@ export default function InstrumentSelect({
         onClick={() => { setOpen(!open); setFilter(''); }}
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
-        className="w-full px-3 py-1.5 rounded-lg border border-ledger-line bg-parchment text-ink text-sm text-left focus:ring-2 focus:ring-leather focus:border-leather outline-none flex items-center justify-between disabled:bg-leather/10 disabled:opacity-70"
+        className="w-full px-3 py-1.5 rounded-md border border-ledger-line bg-parchment text-ink text-sm text-left focus:ring-2 focus:ring-leather focus:border-leather outline-none flex items-center justify-between disabled:bg-leather/10 disabled:opacity-70"
       >
         <span className={value ? 'text-ink' : 'text-ink-light'}>{value || 'Select...'}</span>
         <span className="text-ink-light text-xs">&#9662;</span>
@@ -91,7 +92,7 @@ export default function InstrumentSelect({
       {open && (
         <div
           id={menuId}
-          className="absolute z-50 mt-1 w-full bg-parchment border border-ledger-line rounded-lg shadow-xl max-h-60 overflow-y-auto"
+          className="absolute z-50 mt-1 w-full bg-parchment border border-ledger-line rounded-md shadow-xl max-h-60 overflow-y-auto"
         >
           {/* Search filter */}
           <div className="p-2 border-b border-ledger-line">
@@ -144,13 +145,9 @@ export default function InstrumentSelect({
                   className="flex-1 px-2 py-1 rounded border border-ledger-line bg-parchment text-sm text-ink focus:ring-1 focus:ring-leather outline-none"
                   autoFocus
                 />
-                <button
-                  type="button"
-                  onClick={handleAddCustom}
-                  className="px-2 py-1 rounded bg-leather text-parchment text-xs font-semibold"
-                >
+                <Button size="sm" onClick={handleAddCustom}>
                   Add
-                </button>
+                </Button>
               </div>
             ) : (
               <button

@@ -55,7 +55,7 @@ function DeskMapNpriCard({
     <div className="flex flex-col items-center">
       <div
         className={`
-          group w-72 rounded-lg border-2 shadow-md cursor-pointer transition-all
+          group w-72 rounded-md border-2 shadow-md cursor-pointer transition-all
           hover:shadow-lg ${hasDiscrepancy ? 'hover:border-seal' : 'hover:border-amber-500'}
           ${
             hasDiscrepancy
@@ -73,7 +73,7 @@ function DeskMapNpriCard({
           if (!readOnly) onEdit(node.id);
         }}
       >
-        <div className={`px-3 py-1.5 border-b rounded-t-lg ${
+        <div className={`px-3 py-1.5 border-b rounded-t-md ${
           hasDiscrepancy
             ? 'border-seal/20 bg-seal/10'
             : 'border-amber-200 bg-amber-100/80'
@@ -206,7 +206,7 @@ function DeskMapNpriCard({
           </div>
         )}
 
-        <div className="hidden group-hover:flex px-2 py-1.5 border-t border-amber-200 bg-amber-100/70 rounded-b-lg gap-1 justify-center">
+        <div className="hidden group-hover:flex px-2 py-1.5 border-t border-amber-200 bg-amber-100/70 rounded-b-md gap-1 justify-center">
           <ActionBtn label="PRECEDE" disabled={readOnly} onClick={() => onPrecede(node.id)} />
           <ActionBtn label="CONVEY" disabled={readOnly} onClick={() => onConvey(node.id)} />
           <ActionBtn label="ATTACH" disabled={readOnly} onClick={() => onAttachDoc(node.id)} />

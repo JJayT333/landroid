@@ -117,7 +117,7 @@ function DeskMapCard({
       {/* Main card */}
       <div
         className={`
-          group w-72 rounded-lg border-2 shadow-md cursor-pointer transition-all
+          group w-72 rounded-md border-2 shadow-md cursor-pointer transition-all
           hover:shadow-lg ${hasNpriDiscrepancy ? 'hover:border-seal' : 'hover:border-leather'}
           ${hasNpriDiscrepancy
             ? 'border-seal ring-2 ring-seal/20 shadow-[0_10px_24px_rgba(127,29,29,0.20)]'
@@ -138,7 +138,7 @@ function DeskMapCard({
       >
         {/* Header */}
         <div
-          className={`px-3 py-1.5 border-b border-ledger-line rounded-t-lg ${headerTint}`}
+          className={`px-3 py-1.5 border-b border-ledger-line rounded-t-md ${headerTint}`}
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5 min-w-0">
@@ -256,7 +256,7 @@ function DeskMapCard({
         )}
 
         {/* Action buttons */}
-        <div className="hidden group-hover:flex px-2 py-1.5 border-t border-ledger-line bg-parchment-dark rounded-b-lg gap-1 justify-center">
+        <div className="hidden group-hover:flex px-2 py-1.5 border-t border-ledger-line bg-parchment-dark rounded-b-md gap-1 justify-center">
           <ActionBtn label="PRECEDE" variant="muted" disabled={readOnly} onClick={() => onPrecede(node.id)} />
           <ActionBtn label="CONVEY" variant="primary" disabled={readOnly} onClick={() => onConvey(node.id)} />
           {canLease && (

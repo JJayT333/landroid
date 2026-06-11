@@ -23,7 +23,7 @@ export default function HorizontalDrillingDecoderPanel({
 }: HorizontalDrillingDecoderPanelProps) {
   if (isLoading) {
     return (
-      <div className="rounded-xl border border-ledger-line bg-ledger p-4">
+      <div className="rounded-md border border-ledger-line bg-ledger p-4">
         <div className="text-sm font-semibold text-ink">Horizontal Permit Decoder</div>
         <div className="text-sm text-ink-light mt-2">
           Reading the imported horizontal permit file and building the fixed-width preview.
@@ -34,7 +34,7 @@ export default function HorizontalDrillingDecoderPanel({
 
   if (errorMessage) {
     return (
-      <div className="rounded-xl border border-seal/30 bg-seal/5 p-4">
+      <div className="rounded-md border border-seal/30 bg-seal/5 p-4">
         <div className="text-sm font-semibold text-seal">Horizontal Permit Decoder</div>
         <div className="text-sm text-seal mt-2">{errorMessage}</div>
       </div>
@@ -48,7 +48,7 @@ export default function HorizontalDrillingDecoderPanel({
   const permits = decoded?.permits ?? [];
 
   return (
-    <div className="rounded-xl border border-ledger-line bg-parchment-dark/30 p-4 space-y-4">
+    <div className="rounded-md border border-ledger-line bg-parchment-dark/30 p-4 space-y-4">
       <div className="space-y-2">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div className="text-sm font-semibold text-ink">Horizontal Permit Decoder</div>
@@ -65,25 +65,25 @@ export default function HorizontalDrillingDecoderPanel({
       </div>
 
       <div className="grid gap-3 md:grid-cols-4">
-        <div className="rounded-lg border border-ledger-line bg-parchment px-3 py-3">
+        <div className="rounded-md border border-ledger-line bg-parchment px-3 py-3">
           <div className="text-[10px] uppercase tracking-wider text-ink-light">Permit Rows</div>
           <div className="text-2xl font-display font-bold text-ink mt-2">
             {decoded?.totals.permitCount ?? 0}
           </div>
         </div>
-        <div className="rounded-lg border border-ledger-line bg-parchment px-3 py-3">
+        <div className="rounded-md border border-ledger-line bg-parchment px-3 py-3">
           <div className="text-[10px] uppercase tracking-wider text-ink-light">Gas</div>
           <div className="text-2xl font-display font-bold text-ink mt-2">
             {decoded?.totals.gasCount ?? 0}
           </div>
         </div>
-        <div className="rounded-lg border border-ledger-line bg-parchment px-3 py-3">
+        <div className="rounded-md border border-ledger-line bg-parchment px-3 py-3">
           <div className="text-[10px] uppercase tracking-wider text-ink-light">Oil</div>
           <div className="text-2xl font-display font-bold text-ink mt-2">
             {decoded?.totals.oilCount ?? 0}
           </div>
         </div>
-        <div className="rounded-lg border border-ledger-line bg-parchment px-3 py-3">
+        <div className="rounded-md border border-ledger-line bg-parchment px-3 py-3">
           <div className="text-[10px] uppercase tracking-wider text-ink-light">Off Schedule</div>
           <div className="text-2xl font-display font-bold text-ink mt-2">
             {decoded?.totals.offScheduleCount ?? 0}
@@ -91,7 +91,7 @@ export default function HorizontalDrillingDecoderPanel({
         </div>
       </div>
 
-      <div className="rounded-lg border border-ledger-line bg-ledger px-3 py-3 text-sm text-ink">
+      <div className="rounded-md border border-ledger-line bg-ledger px-3 py-3 text-sm text-ink">
         {selectedSummary ? (
           <>
             <div className="font-semibold text-ink">Current file: {selectedSummary.label}</div>
@@ -109,7 +109,7 @@ export default function HorizontalDrillingDecoderPanel({
       </div>
 
       {displayedWarnings.length > 0 && (
-        <div className="rounded-lg border border-ledger-line bg-parchment px-3 py-3">
+        <div className="rounded-md border border-ledger-line bg-parchment px-3 py-3">
           <div className="text-[10px] uppercase tracking-wider text-ink-light">Decoder Notes</div>
           <div className="space-y-2 mt-2">
             {displayedWarnings.map((warning) => (
@@ -135,14 +135,14 @@ export default function HorizontalDrillingDecoderPanel({
         </div>
 
         {permits.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-ledger-line bg-parchment px-4 py-6 text-sm text-ink-light">
+          <div className="rounded-md border border-dashed border-ledger-line bg-parchment px-4 py-6 text-sm text-ink-light">
             No horizontal permit rows are ready yet.
           </div>
         ) : (
           permits.slice(0, 25).map((permit) => (
             <div
               key={permit.permitKey}
-              className="rounded-xl border border-ledger-line bg-parchment px-4 py-4 space-y-3"
+              className="rounded-md border border-ledger-line bg-parchment px-4 py-4 space-y-3"
             >
               <div className="flex items-start justify-between gap-4 flex-wrap">
                 <div>

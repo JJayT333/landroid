@@ -12,7 +12,7 @@ export default function RrcDelimitedPreviewTable({
   description,
 }: RrcDelimitedPreviewTableProps) {
   return (
-    <div className="rounded-xl border border-ledger-line bg-parchment-dark/30 p-4 space-y-3">
+    <div className="rounded-md border border-ledger-line bg-parchment-dark/30 p-4 space-y-3">
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
           <div className="text-sm font-semibold text-ink">{title}</div>
@@ -32,7 +32,7 @@ export default function RrcDelimitedPreviewTable({
         {preview.truncated && ` Showing first ${preview.rows.length} rows.`}
       </div>
 
-      <div className="max-h-[26rem] overflow-auto rounded-lg border border-ledger-line bg-parchment">
+      <div className="max-h-[26rem] overflow-auto rounded-md border border-ledger-line bg-parchment">
         <table className="min-w-full border-collapse text-xs">
           <thead className="sticky top-0 bg-ledger">
             <tr>

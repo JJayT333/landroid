@@ -7,7 +7,7 @@ export function RootErrorFallback({
 }) {
   return (
     <div className="flex min-h-screen items-center justify-center bg-parchment px-6 py-10">
-      <div className="w-full max-w-2xl rounded-3xl border border-seal/20 bg-parchment shadow-xl">
+      <div className="w-full max-w-2xl rounded-md border border-seal/20 bg-parchment shadow-xl">
         <div className="border-b border-seal/15 bg-seal/5 px-6 py-4">
           <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-seal">
             Application Error
@@ -22,7 +22,7 @@ export function RootErrorFallback({
         </div>
 
         <div className="space-y-4 px-6 py-5">
-          <div className="rounded-2xl border border-ledger-line bg-white/70 px-4 py-3">
+          <div className="rounded-md border border-ledger-line bg-white/70 px-4 py-3">
             <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-light">
               Error Message
             </div>
@@ -31,7 +31,7 @@ export function RootErrorFallback({
             </div>
           </div>
 
-          <details className="rounded-2xl border border-ledger-line bg-white/70 px-4 py-3 text-sm text-ink-light">
+          <details className="rounded-md border border-ledger-line bg-white/70 px-4 py-3 text-sm text-ink-light">
             <summary className="cursor-pointer font-semibold text-ink">
               Technical details
             </summary>
@@ -44,7 +44,7 @@ export function RootErrorFallback({
             <button
               type="button"
               onClick={() => window.location.reload()}
-              className="rounded-xl bg-leather px-4 py-2 text-sm font-semibold text-parchment transition-colors hover:bg-leather-light"
+              className="rounded-md bg-leather px-4 py-2 text-sm font-semibold text-parchment transition-colors hover:bg-leather-light"
             >
               Reload App
             </button>

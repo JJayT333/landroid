@@ -5,6 +5,7 @@
  * They don't convey interest but are relevant to the title chain.
  */
 import { useState } from 'react';
+import Button from '../shared/Button';
 import Modal from '../shared/Modal';
 import FormField from '../shared/FormField';
 import InstrumentSelect from '../shared/InstrumentSelect';
@@ -91,7 +92,7 @@ export default function AttachDocModal({ parentNodeId, onClose }: AttachDocModal
   return (
     <Modal open onClose={onClose} title="Attach Related Document">
       <div className="space-y-4">
-        <div className="bg-gold/10 border border-gold/30 rounded-lg p-2 text-xs text-ink">
+        <div className="bg-gold/10 border border-gold/30 rounded-md p-2 text-xs text-ink">
           This document will be attached as a related record — it does not convey any interest.
         </div>
 
@@ -123,7 +124,7 @@ export default function AttachDocModal({ parentNodeId, onClose }: AttachDocModal
             value={form.remarks}
             onChange={(e) => set('remarks', e.target.value)}
             rows={3}
-            className="w-full px-3 py-2 rounded-lg border border-ledger-line bg-parchment text-ink text-sm focus:ring-2 focus:ring-leather focus:border-leather outline-none resize-y"
+            className="w-full px-3 py-2 rounded-md border border-ledger-line bg-parchment text-ink text-sm focus:ring-2 focus:ring-leather focus:border-leather outline-none resize-y"
             placeholder="Describe the document's relevance..."
           />
         </div>
@@ -177,19 +178,12 @@ export default function AttachDocModal({ parentNodeId, onClose }: AttachDocModal
         </fieldset>
 
         <div className="flex justify-end gap-2 pt-2 border-t border-ledger-line">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 rounded-lg text-sm text-ink-light hover:bg-parchment-dark transition-colors"
-          >
+          <Button variant="ghost" onClick={onClose}>
             Cancel
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={pending}
-            className="px-4 py-2 rounded-lg text-sm font-semibold bg-leather text-parchment hover:bg-leather-light transition-colors"
-          >
+          </Button>
+          <Button onClick={handleSave} disabled={pending}>
             {pending ? 'Attaching...' : 'Attach'}
-          </button>
+          </Button>
         </div>
       </div>
     </Modal>

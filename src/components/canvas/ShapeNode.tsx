@@ -20,7 +20,7 @@ function ShapeNodeComponent({ data, selected }: NodeProps & { data: ShapeNodeDat
   const shapeClass = (() => {
     switch (shapeType) {
       case 'ellipse': return `${baseStyle} rounded-full`;
-      case 'roundRect': return `${baseStyle} rounded-2xl`;
+      case 'roundRect': return `${baseStyle} rounded-md`;
       case 'diamond': return `${baseStyle} rotate-45`;
       case 'note': return `${baseStyle} rounded-sm border-l-4 border-l-gold bg-ledger`;
       default: return `${baseStyle} rounded-md`;

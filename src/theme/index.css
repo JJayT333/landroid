@@ -2,14 +2,21 @@
 @source not "../../**/*.md";
 
 /* ── Courthouse Theme Tokens ────────────────────────────── */
+/* DA-U1: every color class used in src must resolve to a token here —
+   Tailwind v4 silently drops classes whose tokens don't exist (see
+   src/theme/__tests__/theme-tokens.test.ts, the CI guard). Brand values are
+   de-saturated off the CSS named-color defaults; gold is an accent, seal is
+   destructive. */
 @theme {
   --color-parchment: #faf3e8;
+  --color-parchment-light: #fdf9f0;
   --color-parchment-dark: #f0e6d3;
   --color-ink: #2c1810;
   --color-ink-light: #5c3d2e;
-  --color-leather: #8b4513;
+  --color-leather: #7a4a21;
   --color-leather-light: #a0522d;
-  --color-gold: #daa520;
+  --color-leather-dark: #6f3710;
+  --color-gold: #b8860b;
   --color-gold-light: #f0c75e;
   --color-seal: #b22222;
   --color-seal-light: #cd5c5c;
@@ -19,7 +26,7 @@
   --color-canvas-dot: #c4b89a;
 
   --font-display: "Playfair Display", Georgia, "Times New Roman", serif;
-  --font-mono: "Courier Prime", "Courier New", monospace;
+  --font-mono: "IBM Plex Mono", "Courier Prime", "Courier New", monospace;
   --font-body: system-ui, -apple-system, sans-serif;
 }
 
@@ -28,6 +35,14 @@ body {
   font-family: var(--font-body);
   background-color: var(--color-parchment);
   color: var(--color-ink);
+}
+
+/* One visible keyboard-focus treatment app-wide (audit §5 item 3). The
+   !important deliberately beats the scattered `outline-none` utilities —
+   focus visibility is accessibility, not decoration. */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--color-leather) 40%, transparent) !important;
+  outline-offset: 1px;
 }
 
 /* ── React Flow overrides ────────────────────────────────── */

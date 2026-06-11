@@ -39,14 +39,14 @@ export default function HostedUserMenu() {
         aria-haspopup="menu"
         aria-expanded={open}
         title={email}
-        className="px-3 py-1.5 rounded-lg text-xs font-medium text-parchment/70 hover:text-parchment hover:bg-ink-light/30 transition-colors"
+        className="px-3 py-1.5 rounded-md text-xs font-medium text-parchment/70 hover:text-parchment hover:bg-ink-light/30 transition-colors"
       >
         {label} ▾
       </button>
       {open && (
         <div
           role="menu"
-          className="absolute right-0 z-20 mt-1 w-44 overflow-hidden rounded-lg border border-leather bg-ink shadow-xl"
+          className="absolute right-0 z-20 mt-1 w-44 overflow-hidden rounded-md border border-leather bg-ink shadow-xl"
         >
           <div className="px-3 py-2 text-[11px] text-parchment/50 font-mono truncate">
             {email}
