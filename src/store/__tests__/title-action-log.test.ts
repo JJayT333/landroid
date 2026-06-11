@@ -23,6 +23,8 @@ const otherMocks = vi.hoisted(() => ({ unlinkNode: vi.fn(), unlinkDeskMap: vi.fn
 const cascadeMocks = vi.hoisted(() => ({
   captureCascadeBundle: vi.fn(async () => ({ kind: 'fake-bundle' })),
   restoreCascadeBundle: vi.fn(async () => ({} as { warning?: string })),
+  captureCascadeReapply: vi.fn(async () => ({ kind: 'fake-reapply' })),
+  reapplyCascadeBundle: vi.fn(async () => ({} as { warning?: string })),
   planOwnerRecordCleanup: vi.fn(() => ({ ownerIdsToRemove: [], leaseIdsToRemove: [] })),
 }));
 // A controllable wrapper around the real recordTitleMutation: `current` is what
@@ -1001,5 +1003,150 @@ describe('DA-C1: previously-unjournaled title-visible actions now journal', () =
     expect(domainJson(replayTitleProjection(log.actionRecords))).toBe(
       domainJson(adapterTitleRecordsForCurrent())
     );
+  });
+});
+
+describe('title redo: journaled re-applies', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    recordSpy.current = vi.fn(recordSpy.real!);
+    checkSpy.current = vi.fn(checkSpy.real!);
+    reset();
+    clearTitleUndoStack();
+  });
+
+  it('redo re-applies the undone mutation as another appended record', async () => {
+    const store = () => useWorkspaceStore.getState();
+    store().createRootNode('root', '1', { grantee: 'Root' });
+    store().updateNode('root', { docNo: 'R-2', remarks: 'edited' });
+    await settleTitleActionLog();
+    const recordsBefore = useTitleActionLog.getState().actionRecords.length;
+
+    await store().undoLastTitleMutation();
+    expect(store().nodes.find((n) => n.id === 'root')?.docNo).not.toBe('R-2');
+    const redone = await store().redoLastTitleMutation();
+    await settleTitleActionLog();
+
+    expect(redone).toBe(true);
+    expect(store().nodes.find((n) => n.id === 'root')?.docNo).toBe('R-2');
+    // Undo + redo are BOTH fresh appended records — never rewrites.
+    const log = useTitleActionLog.getState();
+    expect(log.actionRecords).toHaveLength(recordsBefore + 2);
+    expect((await verifyAuditChain(log.auditEvents)).valid).toBe(true);
+    expect(domainJson(replayTitleProjection(log.actionRecords))).toBe(
+      domainJson(adapterTitleRecordsForCurrent())
+    );
+  });
+
+  it('undo→redo→undo ping-pongs between identical states', async () => {
+    const store = () => useWorkspaceStore.getState();
+    store().createRootNode('root', '1', { grantee: 'Root' });
+    await settleTitleActionLog();
+    const slice = () =>
+      JSON.stringify({ nodes: store().nodes, deskMaps: store().deskMaps });
+    store().updateNode('root', { docNo: 'R-9', remarks: 'edit to ping-pong' });
+    const afterEdit = slice();
+    await settleTitleActionLog();
+
+    await store().undoLastTitleMutation();
+    const afterUndo = slice();
+    expect(afterUndo).not.toBe(afterEdit);
+
+    await store().redoLastTitleMutation();
+    expect(slice()).toBe(afterEdit);
+    await store().undoLastTitleMutation();
+    expect(slice()).toBe(afterUndo);
+    await store().redoLastTitleMutation();
+    expect(slice()).toBe(afterEdit);
+
+    await settleTitleActionLog();
+    const log = useTitleActionLog.getState();
+    expect(domainJson(replayTitleProjection(log.actionRecords))).toBe(
+      domainJson(adapterTitleRecordsForCurrent())
+    );
+  });
+
+  it('a new mutation clears the redo stack (divergent future)', async () => {
+    const store = () => useWorkspaceStore.getState();
+    store().createRootNode('root', '1', { grantee: 'Root' });
+    store().updateNode('root', { docNo: 'R-2', remarks: 'will be undone' });
+    await store().undoLastTitleMutation();
+    expect(useTitleUndoStack.getState().redoEntries).toHaveLength(1);
+
+    store().updateNode('root', { remarks: 'divergent future' });
+    expect(useTitleUndoStack.getState().redoEntries).toHaveLength(0);
+    await expect(store().redoLastTitleMutation()).resolves.toBe(false);
+  });
+
+  it('redo of a delete re-applies the cascade snapshot; undo restores again', async () => {
+    const store = () => useWorkspaceStore.getState();
+    store().createRootNode('root', '1', { grantee: 'Root' });
+    store().convey('root', 'child', '0.5', { grantee: 'Child' });
+    await settleTitleActionLog();
+    store().removeNode('child');
+    // Let the fire-and-forget cascade block settle and resolve the slot.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    await store().undoLastTitleMutation();
+    expect(store().nodes.some((n) => n.id === 'child')).toBe(true);
+    // The post-cascade snapshot was taken from the captured bundle…
+    expect(cascadeMocks.captureCascadeReapply).toHaveBeenCalledWith({ kind: 'fake-bundle' });
+
+    const redone = await store().redoLastTitleMutation();
+    expect(redone).toBe(true);
+    expect(store().nodes.some((n) => n.id === 'child')).toBe(false);
+    // …and redo re-applied exactly that snapshot.
+    expect(cascadeMocks.reapplyCascadeBundle).toHaveBeenCalledWith({ kind: 'fake-reapply' });
+
+    // The entry returned to the undo stack with the ORIGINAL bundle.
+    await store().undoLastTitleMutation();
+    expect(store().nodes.some((n) => n.id === 'child')).toBe(true);
+    expect(cascadeMocks.restoreCascadeBundle).toHaveBeenCalledTimes(2);
+  });
+
+  it('redo in cutover mode passes parity and keeps store == ledger', async () => {
+    setTitleCutoverArmed(true);
+    try {
+      useTitleActionLog.getState().flipToCutover({ reviewerApprovalToken: 'reviewer', ready: true });
+      const store = () => useWorkspaceStore.getState();
+      store().createRootNode('root', '1', { grantee: 'Root' });
+      store().updateNode('root', { docNo: 'R-2', remarks: 'edited' });
+      await settleTitleActionLog();
+
+      await store().undoLastTitleMutation();
+      const redone = await store().redoLastTitleMutation();
+      await settleTitleActionLog();
+
+      expect(redone).toBe(true);
+      const log = useTitleActionLog.getState();
+      expect(log.lastDivergence).toBeNull();
+      expect(store().nodes.find((n) => n.id === 'root')?.docNo).toBe('R-2');
+      expect(domainJson(replayTitleProjection(log.actionRecords))).toBe(
+        domainJson(adapterTitleRecordsForCurrent())
+      );
+    } finally {
+      setTitleCutoverArmed(false);
+      useTitleActionLog.getState().revertReadPathToShadow();
+    }
+  });
+
+  it('returns false with nothing to redo', async () => {
+    await expect(useWorkspaceStore.getState().redoLastTitleMutation()).resolves.toBe(false);
+  });
+
+  it('loadWorkspace clears the redo stack too', async () => {
+    const store = () => useWorkspaceStore.getState();
+    store().createRootNode('root', '1', { grantee: 'Root' });
+    store().updateNode('root', { docNo: 'R-2' });
+    await store().undoLastTitleMutation();
+    expect(useTitleUndoStack.getState().redoEntries).toHaveLength(1);
+    store().loadWorkspace({
+      workspaceId: 'ws-other',
+      projectName: 'Other',
+      nodes: [],
+      deskMaps: [],
+      activeDeskMapId: null,
+    });
+    expect(useTitleUndoStack.getState().redoEntries).toHaveLength(0);
   });
 });

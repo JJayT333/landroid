@@ -1,8 +1,9 @@
 /**
- * Navbar chip shown only in hosted mode: signed-in email + sign-out.
+ * Account row shown only in hosted mode: signed-in email + sign-out. Lives in
+ * the sidebar's ⋯ ProjectMenu since the shell redesign.
  *
- * Must be rendered inside `<AuthProvider>` — `Navbar` guards that with
- * `isHostedMode()` before importing this module at runtime.
+ * Must be rendered inside `<AuthProvider>` — callers guard with
+ * `isHostedMode()` before rendering.
  */
 import { useEffect, useRef, useState } from 'react';
 import { useAuth } from './AuthProvider';
@@ -39,16 +40,17 @@ export default function HostedUserMenu() {
         aria-haspopup="menu"
         aria-expanded={open}
         title={email}
-        className="px-3 py-1.5 rounded-md text-xs font-medium text-parchment/70 hover:text-parchment hover:bg-ink-light/30 transition-colors"
+        className="flex w-full items-center justify-between rounded-[7px] px-2.5 py-1.5 text-left text-[12.5px] text-ink transition-colors hover:bg-parchment-dark"
       >
-        {label} ▾
+        <span className="truncate">{label}</span>
+        <span className="text-ink-light">▾</span>
       </button>
       {open && (
         <div
           role="menu"
-          className="absolute right-0 z-20 mt-1 w-44 overflow-hidden rounded-md border border-leather bg-ink shadow-xl"
+          className="absolute left-0 right-0 z-50 mt-1 overflow-hidden rounded-[7px] border border-ledger-line bg-parchment-light shadow-[0_12px_30px_rgba(45,33,20,0.16)]"
         >
-          <div className="px-3 py-2 text-[11px] text-parchment/50 font-mono truncate">
+          <div className="truncate px-2.5 py-2 font-mono text-[10.5px] text-ink-light">
             {email}
           </div>
           <button
@@ -58,7 +60,7 @@ export default function HostedUserMenu() {
               setOpen(false);
               signOut();
             }}
-            className="block w-full px-3 py-2 text-left text-xs text-parchment/80 hover:bg-ink-light/40 hover:text-parchment"
+            className="block w-full px-2.5 py-1.5 text-left text-[12.5px] text-ink transition-colors hover:bg-parchment-dark"
           >
             Sign out
           </button>

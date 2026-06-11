@@ -71,15 +71,21 @@ import {
 import type { Audit } from '../types/result';
 import {
   captureCascadeBundle,
+  captureCascadeReapply,
   planOwnerRecordCleanup,
+  reapplyCascadeBundle,
   restoreCascadeBundle,
+  type CascadeBundle,
+  type CascadeReapplyBundle,
 } from '../storage/undo-cascade-bundle';
 import {
+  clearTitleRedoStack,
   clearTitleUndoStack,
+  popTitleRedoEntry,
   popTitleUndoEntry,
+  pushTitleRedoEntry,
   pushTitleUndoEntry,
   titleUndoLabel,
-  type CascadeRestoreThunk,
 } from './title-undo-stack';
 import {
   READ_ONLY_WORKSPACE_EDIT_TITLE,
@@ -253,6 +259,15 @@ interface WorkspaceState {
    * undo, the tab is read-only, or cutover vetoed the restore.
    */
   undoLastTitleMutation: () => Promise<boolean>;
+  /**
+   * Re-apply the most recently undone title mutation. The redo restore is a
+   * fresh journaled mutation (append-only ledger), the entry returns to the
+   * undo stack, and a destructive mutation's cascade is re-applied from the
+   * post-cascade row snapshot captured at undo time. Any new mutation clears
+   * the redo stack. Returns false when there is nothing to redo, the tab is
+   * read-only, or cutover vetoed the restore.
+   */
+  redoLastTitleMutation: () => Promise<boolean>;
 
   // Document attachments (Phase 5 / ADR 0004)
   /**
@@ -452,12 +467,13 @@ function sameTitleUndoSlice(before: WorkspaceState, after: WorkspaceState): bool
 interface JournalTitleMutationOptions {
   /**
    * Destructive mutators (delete cascades) claim the undo entry's cascade
-   * slot: the returned resolver must be called (with a restore thunk or null)
-   * once their doomed rows are captured. Without this flag the slot resolves
-   * to null immediately.
+   * slot: the returned resolver must be called (with the captured doomed-row
+   * bundle or null) AFTER their cascades settle — undo awaits the slot, so a
+   * late resolve is what keeps an immediate undo from racing in-flight
+   * deletes. Without this flag the slot resolves to null immediately.
    */
   deferUndoCascade?: boolean;
-  /** The undo action's own restore journal must not push a new undo entry. */
+  /** Undo/redo's own restore journals must not push a new undo entry. */
   suppressUndoPush?: boolean;
 }
 
@@ -485,7 +501,7 @@ function journalTitleMutation(
   options: JournalTitleMutationOptions = {}
 ): {
   rolledBack: boolean;
-  resolveUndoCascade: ((thunk: CascadeRestoreThunk | null) => void) | null;
+  resolveUndoCascade: ((bundle: CascadeBundle | null) => void) | null;
 } {
   const beforeWorkspace = snapshotWorkspaceData(beforeState);
   let rolledBack = false;
@@ -515,20 +531,23 @@ function journalTitleMutation(
   ) {
     return { rolledBack, resolveUndoCascade: null };
   }
-  let resolveUndoCascade: ((thunk: CascadeRestoreThunk | null) => void) | null =
+  let resolveUndoCascade: ((bundle: CascadeBundle | null) => void) | null =
     null;
-  const cascadeRestore: Promise<CascadeRestoreThunk | null> =
-    options.deferUndoCascade
-      ? new Promise((resolve) => {
-          resolveUndoCascade = resolve;
-        })
-      : Promise.resolve(null);
+  const cascade: Promise<CascadeBundle | null> = options.deferUndoCascade
+    ? new Promise((resolve) => {
+        resolveUndoCascade = resolve;
+      })
+    : Promise.resolve(null);
   pushTitleUndoEntry({
     mutation,
     label: titleUndoLabel(mutation),
     beforeWorkspace,
-    cascadeRestore,
+    cascade,
   });
+  // A genuinely new mutation forks history: the undone future is no longer
+  // re-playable. Undo/redo journal with suppressUndoPush, so they never land
+  // here and the redo stack survives chained undos/redos.
+  clearTitleRedoStack();
   return { rolledBack, resolveUndoCascade };
 }
 
@@ -871,40 +890,49 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
     if (verdict.rolledBack) return;
 
     void (async () => {
+      // Undo capture FIRST: read the rows these cascades are about to destroy.
+      let cascadeBundle: CascadeBundle | null = null;
       try {
         const { useOwnerStore } = await import('./owner-store');
-        const bundle = await captureCascadeBundle({
+        cascadeBundle = await captureCascadeBundle({
           workspaceId: state.workspaceId,
           removedNodes,
           survivingNodes,
           leases: useOwnerStore.getState().leases,
         });
-        verdict.resolveUndoCascade?.(() => restoreCascadeBundle(bundle));
       } catch (err) {
-        verdict.resolveUndoCascade?.(null);
         console.warn(
           '[workspace-store] undo capture failed; undo will restore title cards only:',
           err
         );
       }
-      await cascadeDeleteDocsForRemovedNodes(removedNodes).catch((err) => {
-        const message = err instanceof Error ? err.message : String(err);
-        console.warn('[workspace-store] document cascade delete failed:', err);
-        set({
-          lastError: `Document cleanup failed after clearing tract: ${message}. Save a backup and retry cleanup before relying on document registry state.`,
+      try {
+        await cascadeDeleteDocsForRemovedNodes(removedNodes).catch((err) => {
+          const message = err instanceof Error ? err.message : String(err);
+          console.warn('[workspace-store] document cascade delete failed:', err);
+          set({
+            lastError: `Document cleanup failed after clearing tract: ${message}. Save a backup and retry cleanup before relying on document registry state.`,
+          });
         });
-      });
-      for (const nodeId of deletedIds) {
-        void useMapStore.getState().unlinkNode(nodeId);
-        useCurativeStore.getState().unlinkNode(nodeId);
+        await Promise.all(
+          deletedIds.map((nodeId) => useMapStore.getState().unlinkNode(nodeId))
+        ).catch(() => {});
+        for (const nodeId of deletedIds) {
+          useCurativeStore.getState().unlinkNode(nodeId);
+        }
+        await cleanupOwnerRecordsForRemovedNodes(removedNodes, survivingNodes).catch((err) => {
+          const message = err instanceof Error ? err.message : String(err);
+          console.warn('[workspace-store] owner cleanup failed after clearing tract:', err);
+          set({
+            lastError: `Owner/lease cleanup failed after clearing tract: ${message}. Review Owners and Leasehold for stale linked records before relying on side-panel data.`,
+          });
+        });
+      } finally {
+        // Resolve only after the cascades settle: undo awaits this slot, so
+        // a late resolve is what keeps an immediate undo from restoring rows
+        // an in-flight cascade is still deleting.
+        verdict.resolveUndoCascade?.(cascadeBundle);
       }
-      await cleanupOwnerRecordsForRemovedNodes(removedNodes, survivingNodes).catch((err) => {
-        const message = err instanceof Error ? err.message : String(err);
-        console.warn('[workspace-store] owner cleanup failed after clearing tract:', err);
-        set({
-          lastError: `Owner/lease cleanup failed after clearing tract: ${message}. Review Owners and Leasehold for stale linked records before relying on side-panel data.`,
-        });
-      });
     })();
   },
 
@@ -944,25 +972,29 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
     void (async () => {
       // Capture the map/curative rows whose desk-map links the unlinks below
       // are about to null, so undo can restore them.
+      let cascadeBundle: CascadeBundle | null = null;
       try {
         const { useOwnerStore } = await import('./owner-store');
-        const bundle = await captureCascadeBundle({
+        cascadeBundle = await captureCascadeBundle({
           workspaceId: before.workspaceId,
           removedNodes: [],
           survivingNodes: get().nodes,
           leases: useOwnerStore.getState().leases,
           removedDeskMapId: id,
         });
-        verdict.resolveUndoCascade?.(() => restoreCascadeBundle(bundle));
       } catch (err) {
-        verdict.resolveUndoCascade?.(null);
         console.warn(
           '[workspace-store] undo capture failed; undo will restore title cards only:',
           err
         );
       }
-      void useMapStore.getState().unlinkDeskMap(id);
-      useCurativeStore.getState().unlinkDeskMap(id);
+      try {
+        await useMapStore.getState().unlinkDeskMap(id);
+        useCurativeStore.getState().unlinkDeskMap(id);
+      } finally {
+        // Resolve only after the unlinks settle (undo awaits this slot).
+        verdict.resolveUndoCascade?.(cascadeBundle);
+      }
     })();
   },
 
@@ -1328,40 +1360,46 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
     void (async () => {
       // Undo capture FIRST: read the rows these cascades are about to destroy
       // so undoLastTitleMutation can put them back verbatim.
+      let cascadeBundle: CascadeBundle | null = null;
       try {
         const { useOwnerStore } = await import('./owner-store');
-        const bundle = await captureCascadeBundle({
+        cascadeBundle = await captureCascadeBundle({
           workspaceId: state.workspaceId,
           removedNodes,
           survivingNodes,
           leases: useOwnerStore.getState().leases,
         });
-        verdict.resolveUndoCascade?.(() => restoreCascadeBundle(bundle));
       } catch (err) {
-        verdict.resolveUndoCascade?.(null);
         console.warn(
           '[workspace-store] undo capture failed; undo will restore title cards only:',
           err
         );
       }
-      await cascadeDeleteDocsForRemovedNodes(removedNodes).catch((err) => {
-        const message = err instanceof Error ? err.message : String(err);
-        console.warn('[workspace-store] document cascade delete failed:', err);
-        set({
-          lastError: `Document cleanup failed after deleting branch: ${message}. Save a backup and retry cleanup before relying on document registry state.`,
+      try {
+        await cascadeDeleteDocsForRemovedNodes(removedNodes).catch((err) => {
+          const message = err instanceof Error ? err.message : String(err);
+          console.warn('[workspace-store] document cascade delete failed:', err);
+          set({
+            lastError: `Document cleanup failed after deleting branch: ${message}. Save a backup and retry cleanup before relying on document registry state.`,
+          });
         });
-      });
-      for (const removedId of removedIds) {
-        void useMapStore.getState().unlinkNode(removedId);
-        useCurativeStore.getState().unlinkNode(removedId);
+        await Promise.all(
+          removedIds.map((removedId) => useMapStore.getState().unlinkNode(removedId))
+        ).catch(() => {});
+        for (const removedId of removedIds) {
+          useCurativeStore.getState().unlinkNode(removedId);
+        }
+        await cleanupOwnerRecordsForRemovedNodes(removedNodes, survivingNodes).catch((err) => {
+          const message = err instanceof Error ? err.message : String(err);
+          console.warn('[workspace-store] owner cleanup failed after deleting branch:', err);
+          set({
+            lastError: `Owner/lease cleanup failed after deleting branch: ${message}. Review Owners and Leasehold for stale linked records before relying on side-panel data.`,
+          });
+        });
+      } finally {
+        // Resolve only after the cascades settle (undo awaits this slot).
+        verdict.resolveUndoCascade?.(cascadeBundle);
       }
-      await cleanupOwnerRecordsForRemovedNodes(removedNodes, survivingNodes).catch((err) => {
-        const message = err instanceof Error ? err.message : String(err);
-        console.warn('[workspace-store] owner cleanup failed after deleting branch:', err);
-        set({
-          lastError: `Owner/lease cleanup failed after deleting branch: ${message}. Review Owners and Leasehold for stale linked records before relying on side-panel data.`,
-        });
-      });
     })();
   },
 
@@ -1501,16 +1539,23 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
     const before = get();
     get().restoreTitleSlice(entry.beforeWorkspace);
     // The restore is itself a journaled mutation (append-only ledger); it must
-    // not push a fresh undo entry or undo would ping-pong with itself.
+    // not push a fresh undo entry or undo would ping-pong with itself (and it
+    // must not clear the redo stack — only genuinely new mutations do).
     const { rolledBack } = journalTitleMutation('update', before, get(), {
       suppressUndoPush: true,
     });
     if (rolledBack) return false;
 
-    const restoreCascade = await entry.cascadeRestore;
-    if (restoreCascade) {
+    // Resolves only after the destructive cascades settled (producer contract).
+    const bundle = await entry.cascade;
+    let cascadeReapply: CascadeReapplyBundle | null = null;
+    if (bundle) {
+      // Snapshot the post-cascade form of the captured rows BEFORE restoring
+      // the originals: redo re-applies that exact form (deleted rows
+      // re-deleted, nulled links re-nulled) without re-running cascade logic.
+      cascadeReapply = await captureCascadeReapply(bundle).catch(() => null);
       try {
-        const result = await restoreCascade();
+        const result = await restoreCascadeBundle(bundle);
         if (result.warning) set({ lastError: result.warning });
         // Refresh the attachment chips from the restored Dexie rows.
         await get().hydrateNodeAttachments().catch(() => {});
@@ -1521,6 +1566,55 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
         });
       }
     }
+    pushTitleRedoEntry({
+      mutation: entry.mutation,
+      label: entry.label,
+      // `before` is the pre-undo state = the state the original mutation
+      // produced; redo restores exactly it.
+      afterWorkspace: snapshotWorkspaceData(before),
+      cascadeBundle: bundle,
+      cascadeReapply,
+    });
+    return true;
+  },
+
+  redoLastTitleMutation: async () => {
+    if (useWriteLeaseStore.getState().role === 'reader') {
+      set({ lastError: READ_ONLY_WORKSPACE_EDIT_TITLE });
+      return false;
+    }
+    const entry = popTitleRedoEntry();
+    if (!entry) return false;
+
+    const before = get();
+    get().restoreTitleSlice(entry.afterWorkspace);
+    // Same append-only rule as undo: the redo restore journals as a fresh
+    // mutation but never pushes/clears stacks through the chokepoint.
+    const { rolledBack } = journalTitleMutation('update', before, get(), {
+      suppressUndoPush: true,
+    });
+    if (rolledBack) return false;
+
+    if (entry.cascadeReapply) {
+      try {
+        const result = await reapplyCascadeBundle(entry.cascadeReapply);
+        if (result.warning) set({ lastError: result.warning });
+        await get().hydrateNodeAttachments().catch(() => {});
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        set({
+          lastError: `Redo restored the title cards, but some related document or owner records could not be re-applied: ${message}.`,
+        });
+      }
+    }
+    // Hand the entry back to the undo stack so the redo can itself be undone;
+    // the original bundle still restores the cascade-deleted rows verbatim.
+    pushTitleUndoEntry({
+      mutation: entry.mutation,
+      label: entry.label,
+      beforeWorkspace: snapshotWorkspaceData(before),
+      cascade: Promise.resolve(entry.cascadeBundle),
+    });
     return true;
   },
 

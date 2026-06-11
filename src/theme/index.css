@@ -1,29 +1,46 @@
 @import "tailwindcss";
 @source not "../../**/*.md";
 
-/* ── Courthouse Theme Tokens ────────────────────────────── */
+/* ── Courthouse Theme Tokens — "Ledger Refined" ─────────── */
 /* DA-U1: every color class used in src must resolve to a token here —
    Tailwind v4 silently drops classes whose tokens don't exist (see
-   src/theme/__tests__/theme-tokens.test.ts, the CI guard). Brand values are
-   de-saturated off the CSS named-color defaults; gold is an accent, seal is
-   destructive. */
+   src/theme/__tests__/theme-tokens.test.ts, the CI guard). Palette is the
+   operator-approved Claude Design winner (design handoff 2026-06-11):
+   parchment = app bg, parchment-light = raised surface, parchment-dark =
+   hover wash; leather is the saddle accent, gold is status/warning amber,
+   seal is destructive. */
 @theme {
-  --color-parchment: #faf3e8;
-  --color-parchment-light: #fdf9f0;
-  --color-parchment-dark: #f0e6d3;
-  --color-ink: #2c1810;
-  --color-ink-light: #5c3d2e;
-  --color-leather: #7a4a21;
-  --color-leather-light: #a0522d;
-  --color-leather-dark: #6f3710;
-  --color-gold: #b8860b;
-  --color-gold-light: #f0c75e;
-  --color-seal: #b22222;
-  --color-seal-light: #cd5c5c;
-  --color-ledger: #f5f0e1;
-  --color-ledger-line: #d4c5a9;
-  --color-canvas-bg: #e8dcc8;
-  --color-canvas-dot: #c4b89a;
+  --color-parchment: #f6f1e7;
+  --color-parchment-light: #fffcf6;
+  --color-parchment-dark: #f3e5d9;
+  --color-ink: #2d2114;
+  --color-ink-light: #77654e;
+  --color-ink-soft: #4e4435;
+  --color-ink-faint: #a6967d;
+  --color-leather: #8a4b2d;
+  --color-leather-light: #9c5836;
+  --color-leather-dark: #733d23;
+  --color-gold: #b07818;
+  --color-gold-light: #bc9237;
+  --color-seal: #a4342c;
+  --color-seal-light: #c45a52;
+  --color-ledger: #fbf7ec;
+  --color-ledger-line: #e7dcc5;
+  --color-line-strong: #d9cbab;
+  --color-connector: #cbb893;
+  --color-pin: #b08968;
+  --color-canvas-bg: #efe8d8;
+  --color-canvas-dot: #dcd1b9;
+
+  /* Status-tint customs where the design diverges from Tailwind's own
+     sky/emerald samples (card borders + label inks). */
+  --color-tint-sky-line: #b9d5e6;
+  --color-tint-sky-ink: #4a6276;
+  --color-tint-green-line: #b5dec6;
+  --color-tint-green-ink: #2f6b47;
+  --color-tint-amber: #fbf1dc;
+  --color-tint-amber-line: #ead9ac;
+  --color-tint-amber-ink: #8a6a1f;
 
   --font-display: "Playfair Display", Georgia, "Times New Roman", serif;
   --font-mono: "IBM Plex Mono", "Courier Prime", "Courier New", monospace;
@@ -43,6 +60,16 @@ body {
 :where(a, button, input, select, textarea, [tabindex]):focus-visible {
   outline: 2px solid color-mix(in srgb, var(--color-leather) 40%, transparent) !important;
   outline-offset: 1px;
+}
+
+/* Scrollable rows whose scrollbar is ugly chrome (tract tabs, facet chips):
+   keep the scroll, hide the bar — locked decision from the design session. */
+.scrollbar-hidden {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scrollbar-hidden::-webkit-scrollbar {
+  display: none;
 }
 
 /* ── React Flow overrides ────────────────────────────────── */
@@ -91,7 +118,7 @@ body {
   top: 0;
   left: 50%;
   height: 20px;
-  border-left: 2px solid var(--color-leather);
+  border-left: 2px solid var(--color-connector);
 }
 
 /* Horizontal bar connecting siblings */
@@ -101,7 +128,7 @@ body {
   top: -20px;
   left: 0;
   right: 0;
-  border-top: 2px solid var(--color-leather);
+  border-top: 2px solid var(--color-connector);
 }
 
 /* First child: horizontal bar only right half */
@@ -126,7 +153,7 @@ body {
   top: -20px;
   left: 50%;
   height: 20px;
-  border-left: 2px solid var(--color-leather);
+  border-left: 2px solid var(--color-connector);
   z-index: 1;
 }
 

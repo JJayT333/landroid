@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import PdfViewerModal from '../components/modals/PdfViewerModal';
 import Button from '../components/shared/Button';
+import UndoRedoControls from '../components/shell/UndoRedoControls';
 import {
   DOCUMENT_AREA_LABELS,
   DOCUMENT_KIND_LABELS,
@@ -389,70 +390,56 @@ export default function DocumentsView() {
   return (
     <div className="flex h-full min-h-0 bg-parchment text-ink">
       <section className="flex min-w-0 flex-1 flex-col">
-        <header className="border-b border-ledger-line bg-ledger px-4 py-3">
-          <div className="flex flex-wrap items-center justify-between gap-3">
+        <header className="border-b border-ledger-line bg-parchment-light px-5 py-3">
+          <div className="flex flex-wrap items-center gap-3">
             <div className="min-w-0">
-              <h2 className="text-lg font-display font-bold text-ink">Documents</h2>
-              <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs font-mono text-ink-light">
-                <span>{projectName}</span>
-                <span>{rows.length} docs</span>
-                <span>{registryData.attachments.length} links</span>
-                <span>{formatBytes(rows.reduce((sum, row) => sum + row.document.byteLength, 0))}</span>
+              <h2 className="font-display text-[19px] font-bold leading-tight text-ink">Documents</h2>
+              <div className="mt-px truncate text-[11px] text-ink-light">
+                {projectName} ·{' '}
+                <span className="font-mono text-[10.5px]">
+                  {rows.length} docs · {registryData.attachments.length} links ·{' '}
+                  {formatBytes(rows.reduce((sum, row) => sum + row.document.byteLength, 0))}
+                </span>
               </div>
             </div>
-            <div className="flex flex-wrap items-center gap-2 text-xs font-semibold">
-              <button
-                type="button"
-                onClick={() => setPacketSource('filter')}
-                aria-pressed={packetSource === 'filter'}
-                className={`rounded-md border px-3 py-1.5 ${
-                  packetSource === 'filter'
-                    ? 'border-leather bg-leather text-parchment'
-                    : 'border-ledger-line text-leather hover:bg-leather/10'
-                }`}
+            <div className="ml-auto flex flex-wrap items-center gap-2">
+              <UndoRedoControls variant="secondary" />
+              <div
+                className="inline-flex gap-0.5 rounded-[9px] bg-[#f1e8d5] p-[3px]"
+                title="Which documents the attorney packet builds from"
               >
-                Packet: Filter
-              </button>
-              <button
-                type="button"
-                onClick={() => setPacketSource('selected')}
-                aria-pressed={packetSource === 'selected'}
-                className={`rounded-md border px-3 py-1.5 ${
-                  packetSource === 'selected'
-                    ? 'border-leather bg-leather text-parchment'
-                    : 'border-ledger-line text-leather hover:bg-leather/10'
-                }`}
-              >
-                Packet: Selected
-              </button>
-              <button
-                type="button"
-                onClick={() => setPacketSource('runsheet')}
-                aria-pressed={packetSource === 'runsheet'}
-                className={`rounded-md border px-3 py-1.5 ${
-                  packetSource === 'runsheet'
-                    ? 'border-leather bg-leather text-parchment'
-                    : 'border-ledger-line text-leather hover:bg-leather/10'
-                }`}
-              >
-                Packet: Runsheet
-              </button>
+                {(['filter', 'selected', 'runsheet'] as const).map((source) => (
+                  <button
+                    key={source}
+                    type="button"
+                    onClick={() => setPacketSource(source)}
+                    aria-pressed={packetSource === source}
+                    className={`rounded-[7px] px-3 py-1 text-xs font-semibold capitalize transition-colors ${
+                      packetSource === source
+                        ? 'bg-parchment-light text-ink shadow-[0_1px_3px_rgba(45,33,20,0.14)]'
+                        : 'text-ink-light hover:text-ink'
+                    }`}
+                  >
+                    Packet: {source}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         </header>
 
-        <div className="border-b border-ledger-line bg-parchment px-4 py-3">
-          <div className="mb-3 flex gap-2 overflow-x-auto pb-1">
+        <div className="border-b border-ledger-line bg-parchment-light px-5 pb-3 pt-2.5">
+          <div className="scrollbar-hidden flex gap-1.5 overflow-x-auto">
             {DOCUMENT_REGISTRY_VIEWS.map((view) => (
               <button
                 key={view.id}
                 type="button"
                 onClick={() => setViewFilter(view.id)}
                 aria-pressed={viewFilter === view.id}
-                className={`shrink-0 rounded-md px-3 py-1.5 text-xs font-semibold ${
+                className={`shrink-0 rounded-full border px-3 py-1 text-[11.5px] font-semibold transition-colors ${
                   viewFilter === view.id
-                    ? 'bg-leather text-parchment'
-                    : 'bg-parchment-dark text-ink-light hover:bg-ledger hover:text-ink'
+                    ? 'border-leather bg-leather text-[#fff6ec]'
+                    : 'border-ledger-line text-ink-light hover:bg-parchment-dark hover:text-ink'
                 }`}
               >
                 {view.label}
@@ -460,16 +447,15 @@ export default function DocumentsView() {
             ))}
           </div>
 
-          <div className="grid gap-2 md:grid-cols-[minmax(12rem,1fr)_9rem_11rem_10rem_9rem_9rem]">
+          <div className="mt-2.5 grid gap-2 md:grid-cols-[minmax(12rem,1fr)_9rem_11rem_10rem_9rem_9rem]">
             <label className="block">
-              <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-ink-light">
-                Search
-              </span>
+              <span className="sr-only">Search documents</span>
               <input
                 type="search"
                 value={searchQuery}
                 onChange={(event) => setSearchQuery(event.target.value)}
-                className="w-full rounded-md border border-ledger-line bg-parchment px-2 py-1.5 text-sm text-ink outline-none focus:border-leather focus:ring-2 focus:ring-leather"
+                placeholder="Search title, grantor, grantee, instrument no.…"
+                className="w-full rounded-lg border border-ledger-line bg-white px-2.5 py-1.5 text-xs text-ink outline-none transition-colors placeholder:text-ink-faint focus:border-leather"
               />
             </label>
             <SelectField
@@ -508,10 +494,10 @@ export default function DocumentsView() {
           </div>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-auto">
+        <div className="min-h-0 flex-1 overflow-auto bg-white">
           <table className="w-full min-w-[980px] border-collapse text-sm">
-            <thead className="sticky top-0 z-10 bg-parchment-dark shadow-sm">
-              <tr className="border-b border-ledger-line">
+            <thead className="sticky top-0 z-10 bg-ledger shadow-[0_1px_0_var(--color-ledger-line)]">
+              <tr>
                 <th className="w-10 px-3 py-2 text-left">
                   <span className="sr-only">Select</span>
                 </th>
@@ -557,8 +543,10 @@ export default function DocumentsView() {
                   <tr
                     key={row.document.docId}
                     onClick={() => setActiveDocId(row.document.docId)}
-                    className={`cursor-pointer border-b border-ledger-line transition-colors ${
-                      active ? 'bg-gold/15' : 'hover:bg-parchment-dark/50'
+                    className={`cursor-pointer border-b border-[#f1eada] transition-colors ${
+                      active
+                        ? 'bg-[#f7efdf] shadow-[inset_2px_0_0_var(--color-leather)]'
+                        : 'hover:bg-ledger/60'
                     }`}
                   >
                     <td className="px-3 py-2 align-top">
@@ -618,40 +606,40 @@ export default function DocumentsView() {
                     <td className="px-3 py-2 align-top text-xs">
                       <div className="flex flex-wrap gap-1">
                         {row.missingMetadata.length > 0 && (
-                          <span className="rounded bg-amber-100 px-2 py-1 text-amber-900">
-                            Missing
+                          <span className="rounded-md bg-[#efebe2] px-2 py-[3px] text-[9.5px] font-bold uppercase tracking-[0.04em] text-ink-light">
+                            Missing metadata
                           </span>
                         )}
                         {row.duplicateDocIds.length > 0 && (
-                          <span className="rounded bg-seal/10 px-2 py-1 text-seal">
+                          <span className="rounded-md bg-[#f7e5e3] px-2 py-[3px] text-[9.5px] font-bold uppercase tracking-[0.04em] text-seal">
                             Duplicate
                           </span>
                         )}
                         {row.needsOcr && (
-                          <span className="rounded bg-parchment-dark px-2 py-1 text-ink-light">
+                          <span className="rounded-md bg-tint-amber px-2 py-[3px] text-[9.5px] font-bold uppercase tracking-[0.04em] text-tint-amber-ink">
                             Needs OCR
                           </span>
                         )}
                         {row.missingMetadata.length === 0
                           && row.duplicateDocIds.length === 0
                           && !row.needsOcr && (
-                            <span className="rounded bg-emerald-50 px-2 py-1 text-emerald-800">
-                              Ready
+                            <span className="rounded-md bg-[#e4efe1] px-2 py-[3px] text-[9.5px] font-bold uppercase tracking-[0.04em] text-tint-green-ink">
+                              Verified
                             </span>
                           )}
                       </div>
                     </td>
                     <td className="px-3 py-2 text-right align-top">
-                      <button
-                        type="button"
+                      <Button
+                        variant="ghost"
+                        size="xs"
                         onClick={(event) => {
                           event.stopPropagation();
                           setPdfViewDocId(row.document.docId);
                         }}
-                        className="rounded-md border border-ledger-line px-3 py-1.5 text-[11px] font-semibold text-leather hover:bg-leather/10"
                       >
                         PDF
-                      </button>
+                      </Button>
                     </td>
                   </tr>
                 );
@@ -661,7 +649,7 @@ export default function DocumentsView() {
         </div>
       </section>
 
-      <aside className="flex w-[26rem] shrink-0 flex-col border-l border-ledger-line bg-ledger">
+      <aside className="flex w-[26rem] shrink-0 flex-col border-l border-ledger-line bg-parchment-light">
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
           <section className="border-b border-ledger-line pb-4">
             <div className="flex items-start justify-between gap-3">

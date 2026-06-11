@@ -5,12 +5,22 @@ import { Suspense, lazy, useEffect, useState } from 'react';
 import { useUIStore } from './store/ui-store';
 import { useWorkspaceStore } from './store/workspace-store';
 import { isWorkspaceReadOnly, useWriteLeaseStore } from './store/write-lease-store';
-import { shouldHandleUndoHotkey } from './utils/undo-hotkey';
-import Navbar from './components/shared/Navbar';
+import { classifyUndoHotkey } from './utils/undo-hotkey';
+import Sidebar from './components/shell/Sidebar';
+import UndoRedoControls from './components/shell/UndoRedoControls';
 import TitleLedgerStatusBanner from './components/shared/TitleLedgerStatusBanner';
 import WriteLeaseBanner from './components/shared/WriteLeaseBanner';
 import DeskMapView from './views/DeskMapView';
 import ProjectPickerLanding from './components/workspace/ProjectPickerLanding';
+import type { ViewMode } from './store/ui-store';
+
+/**
+ * Views that mount the Undo/Redo cluster inside their own chrome (Desk Map's
+ * canvas next to Fit; Leasehold/Documents command headers). Every other view
+ * gets the shell's floating cluster so undo/redo stays visible app-wide
+ * (locked decision: always visible, never upper-left).
+ */
+const VIEWS_WITH_OWN_UNDO: ViewMode[] = ['chart', 'leasehold', 'documents'];
 
 const FlowchartView = lazy(() => import('./views/FlowchartView'));
 const LeaseholdView = lazy(() => import('./views/LeaseholdView'));
@@ -47,39 +57,50 @@ export default function App() {
   const setStartupWarning = useWorkspaceStore((s) => s.setStartupWarning);
   const [projectPickerOpen, setProjectPickerOpen] = useState(true);
 
-  // Global Cmd/Ctrl+Z → title undo. The predicate refuses editable targets so
-  // native text-field undo always wins; read-only tabs no-op.
+  // Global Cmd/Ctrl+Z → title undo, Cmd/Ctrl+Shift+Z (Ctrl+Y on Windows) →
+  // redo. The classifier refuses editable targets so native text-field undo
+  // always wins; read-only tabs no-op.
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (!shouldHandleUndoHotkey(event)) return;
+      const action = classifyUndoHotkey(event);
+      if (!action) return;
       if (isWorkspaceReadOnly(useWriteLeaseStore.getState().role)) return;
       event.preventDefault();
-      void useWorkspaceStore.getState().undoLastTitleMutation();
+      const store = useWorkspaceStore.getState();
+      void (action === 'undo'
+        ? store.undoLastTitleMutation()
+        : store.redoLastTitleMutation());
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, []);
 
   return (
-    <div className="h-screen flex flex-col bg-parchment">
-      <Navbar onOpenProjectPicker={() => setProjectPickerOpen(true)} />
-      <WriteLeaseBanner />
-      <TitleLedgerStatusBanner />
-      {startupWarning && (
-        <div className="border-b border-amber-300 bg-amber-100 px-4 py-3 text-sm text-amber-900">
-          <div className="mx-auto flex max-w-6xl items-start justify-between gap-4">
-            <p className="leading-6">{startupWarning}</p>
-            <button
-              type="button"
-              className="shrink-0 rounded border border-amber-400 px-2 py-1 text-xs font-semibold uppercase tracking-wide hover:bg-amber-200"
-              onClick={() => setStartupWarning(null)}
-            >
-              Dismiss
-            </button>
+    <div className="flex h-screen bg-parchment">
+      <Sidebar onOpenProjectPicker={() => setProjectPickerOpen(true)} />
+      <div className="flex min-w-0 flex-1 flex-col">
+        <WriteLeaseBanner />
+        <TitleLedgerStatusBanner />
+        {startupWarning && (
+          <div className="border-b border-tint-amber-line bg-tint-amber px-4 py-3 text-sm text-tint-amber-ink">
+            <div className="mx-auto flex max-w-6xl items-start justify-between gap-4">
+              <p className="leading-6">{startupWarning}</p>
+              <button
+                type="button"
+                className="shrink-0 rounded-[7px] border border-line-strong px-2 py-1 text-xs font-semibold uppercase tracking-wide hover:bg-parchment-dark"
+                onClick={() => setStartupWarning(null)}
+              >
+                Dismiss
+              </button>
+            </div>
           </div>
-        </div>
-      )}
-      <main className="flex-1 overflow-hidden">
+        )}
+        <main className="relative flex-1 overflow-hidden">
+          {!VIEWS_WITH_OWN_UNDO.includes(view) && (
+            <div className="absolute right-4 top-4 z-20">
+              <UndoRedoControls />
+            </div>
+          )}
         {view === 'flowchart' && (
           <Suspense
             fallback={
@@ -201,7 +222,8 @@ export default function App() {
             <ResearchView />
           </Suspense>
         )}
-      </main>
+        </main>
+      </div>
       <ProjectPickerLanding
         open={projectPickerOpen}
         onClose={() => setProjectPickerOpen(false)}

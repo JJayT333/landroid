@@ -15,6 +15,11 @@ interface ModalProps {
   title: string;
   children: ReactNode;
   wide?: boolean;
+  /**
+   * Optional controls rendered in the header's top-right, before the close ×
+   * (e.g. the node editor's Delete — prominent but out of the content's way).
+   */
+  headerActions?: ReactNode;
 }
 
 /**
@@ -42,7 +47,7 @@ function getFocusable(container: HTMLElement): HTMLElement[] {
     .filter((el) => !el.hasAttribute('aria-hidden') && el.offsetParent !== null);
 }
 
-export default function Modal({ open, onClose, title, children, wide }: ModalProps) {
+export default function Modal({ open, onClose, title, children, wide, headerActions }: ModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
 
@@ -145,13 +150,16 @@ export default function Modal({ open, onClose, title, children, wide }: ModalPro
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-ledger-line sticky top-0 bg-parchment rounded-t-md z-10">
           <h2 className="text-lg font-display font-bold text-ink">{title}</h2>
-          <button
-            onClick={onClose}
-            className="text-ink-light hover:text-ink text-2xl leading-none px-1"
-            aria-label="Close"
-          >
-            &times;
-          </button>
+          <div className="flex items-center gap-2">
+            {headerActions}
+            <button
+              onClick={onClose}
+              className="text-ink-light hover:text-ink text-2xl leading-none px-1"
+              aria-label="Close"
+            >
+              &times;
+            </button>
+          </div>
         </div>
 
         {/* Content */}

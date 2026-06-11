@@ -349,3 +349,175 @@ export async function restoreCascadeBundle(
   }
   return {};
 }
+
+/* ── Redo: re-apply a cascade exactly ───────────────────── */
+
+/**
+ * The cascades do two different things to the captured rows: delete some
+ * (documents, removed owners/leases) and merely NULL link fields on others
+ * (map assets, curative issues, lease-linked owner docs). Re-running cascade
+ * logic on redo would have to re-derive that split; instead, undo snapshots
+ * the POST-cascade form of the same row ids before restoring the originals —
+ * rows found get re-put in that exact form, rows missing get re-deleted.
+ * Redo is then a verbatim inverse with zero cascade logic of its own.
+ */
+const REAPPLY_TABLE_NAMES = [
+  'documents',
+  'document_attachments',
+  'owners',
+  'leases',
+  'leasePurchaseReports',
+  'contactLogs',
+  'ownerDocs',
+  'mapAssets',
+  'mapRegions',
+  'titleIssues',
+] as const;
+type ReapplyTableName = (typeof REAPPLY_TABLE_NAMES)[number];
+
+interface BulkTable {
+  bulkGet(keys: string[]): Promise<unknown[]>;
+  bulkPut(rows: unknown[]): Promise<unknown>;
+  bulkDelete(keys: string[]): Promise<void>;
+}
+
+function reapplyTable(name: ReapplyTableName): BulkTable {
+  return db[name] as unknown as BulkTable;
+}
+
+/** Primary keys the bundle captured, per table (pk fields per db.ts schema). */
+function bundleKeysByTable(bundle: CascadeBundle): Array<{ tableName: ReapplyTableName; keys: string[] }> {
+  const { documents, ownerRows, linkRows } = bundle;
+  const id = (row: { id: string }) => row.id;
+  return [
+    { tableName: 'documents', keys: documents.documents.map((row) => row.docId) },
+    {
+      tableName: 'document_attachments',
+      keys: documents.attachments.map((row) => row.attachmentId),
+    },
+    { tableName: 'owners', keys: ownerRows.owners.map((row) => id(row as { id: string })) },
+    { tableName: 'leases', keys: ownerRows.leases.map((row) => id(row as { id: string })) },
+    {
+      tableName: 'leasePurchaseReports',
+      keys: ownerRows.leasePurchaseReports.map((row) => id(row as { id: string })),
+    },
+    { tableName: 'contactLogs', keys: ownerRows.contactLogs.map((row) => id(row as { id: string })) },
+    { tableName: 'ownerDocs', keys: ownerRows.ownerDocs.map((row) => id(row as { id: string })) },
+    { tableName: 'mapAssets', keys: linkRows.mapAssets.map((row) => row.id) },
+    { tableName: 'mapRegions', keys: linkRows.mapRegions.map((row) => row.id) },
+    { tableName: 'titleIssues', keys: linkRows.titleIssues.map((row) => id(row as { id: string })) },
+  ].filter((section) => section.keys.length > 0) as Array<{
+    tableName: ReapplyTableName;
+    keys: string[];
+  }>;
+}
+
+export interface CascadeReapplySection {
+  tableName: ReapplyTableName;
+  /** Rows that survived the cascade (links nulled etc.) — re-put verbatim. */
+  puts: unknown[];
+  /** Rows the cascade deleted — re-deleted by primary key. */
+  deleteKeys: string[];
+}
+
+export interface CascadeReapplyBundle {
+  workspaceId: string;
+  sections: CascadeReapplySection[];
+}
+
+/**
+ * Snapshot the post-cascade state of every row the bundle captured. Must run
+ * AFTER the destructive cascades settle and BEFORE `restoreCascadeBundle`
+ * puts the originals back (undo does exactly this). Read-only.
+ */
+export async function captureCascadeReapply(
+  bundle: CascadeBundle
+): Promise<CascadeReapplyBundle | null> {
+  if (isEmptyBundle(bundle)) return null;
+  const sections: CascadeReapplySection[] = [];
+  for (const { tableName, keys } of bundleKeysByTable(bundle)) {
+    const rows = await reapplyTable(tableName).bulkGet(keys);
+    const puts = rows.filter((row) => row != null);
+    const deleteKeys = keys.filter((_, index) => rows[index] == null);
+    if (puts.length > 0 || deleteKeys.length > 0) {
+      sections.push({ tableName, puts, deleteKeys });
+    }
+  }
+  if (sections.length === 0) return null;
+  return { workspaceId: bundle.workspaceId, sections };
+}
+
+/**
+ * Re-apply a cascade for redo: fenced verbatim write of the post-cascade
+ * snapshot. Best-effort like the restore — the title slice has already moved,
+ * so failures surface as a warning (warn, never block).
+ */
+export async function reapplyCascadeBundle(
+  reapply: CascadeReapplyBundle
+): Promise<{ warning?: string }> {
+  const failures: string[] = [];
+  try {
+    const writable = await ensureWorkspaceWritable(reapply.workspaceId);
+    if (!writable) {
+      throw new Error('workspace is read-only');
+    }
+    await db.transaction(
+      'rw',
+      [
+        db.workspaceWriteLeases,
+        db.documents,
+        db.document_attachments,
+        db.owners,
+        db.leases,
+        db.leasePurchaseReports,
+        db.contactLogs,
+        db.ownerDocs,
+        db.mapAssets,
+        db.mapRegions,
+        db.titleIssues,
+      ],
+      async () => {
+        await assertWorkspaceWriteFence(reapply.workspaceId);
+        for (const section of reapply.sections) {
+          const table = reapplyTable(section.tableName);
+          if (section.deleteKeys.length > 0) {
+            await table.bulkDelete(section.deleteKeys);
+          }
+          if (section.puts.length > 0) {
+            await table.bulkPut(section.puts);
+          }
+        }
+      }
+    );
+  } catch (err) {
+    failures.push(err instanceof Error ? err.message : String(err));
+  }
+
+  try {
+    const [{ useOwnerStore }, { useMapStore }, { useCurativeStore }] =
+      await Promise.all([
+        import('../store/owner-store'),
+        import('../store/map-store'),
+        import('../store/curative-store'),
+      ]);
+    await Promise.all([
+      useOwnerStore.getState().setWorkspace(reapply.workspaceId),
+      useMapStore.getState().setWorkspace(reapply.workspaceId),
+      useCurativeStore.getState().setWorkspace(reapply.workspaceId),
+    ]);
+  } catch (err) {
+    failures.push(
+      `side-store refresh (${err instanceof Error ? err.message : String(err)})`
+    );
+  }
+
+  if (failures.length > 0) {
+    return {
+      warning:
+        'Redo re-applied the title cards, but some related records could not '
+        + `be re-applied: ${failures.join('; ')}. Review Owners, Documents, and `
+        + 'Maps before relying on them.',
+    };
+  }
+  return {};
+}

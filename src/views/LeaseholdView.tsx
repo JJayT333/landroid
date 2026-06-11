@@ -25,6 +25,8 @@ import { useOwnerStore } from '../store/owner-store';
 import { useWorkspaceStore } from '../store/workspace-store';
 import { useUIStore } from '../store/ui-store';
 import Modal from '../components/shared/Modal';
+import Button from '../components/shared/Button';
+import UndoRedoControls from '../components/shell/UndoRedoControls';
 import {
   buildLeaseAddTargets,
   type LeaseAddTarget,
@@ -354,14 +356,14 @@ function SummaryCard({
   formula?: FormulaContent;
 }) {
   return (
-    <div className="rounded-md border border-ledger-line bg-parchment px-4 py-3 shadow-sm">
-      <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-light">
+    <div className="rounded-[10px] border border-ledger-line bg-parchment-light px-[13px] py-3">
+      <div className="text-[9px] font-bold uppercase tracking-[0.1em] text-ink-light">
         {label}
       </div>
-      <div className="mt-2 text-xl font-mono tabular-nums font-bold text-ink">
+      <div className="mt-1 truncate font-display text-2xl font-bold text-ink" title={value}>
         {formula ? <FormulaTooltip content={formula}>{value}</FormulaTooltip> : value}
       </div>
-      <div className="mt-1 text-xs text-ink-light">{detail}</div>
+      <div className="mt-0.5 text-[9.5px] leading-[1.4] text-ink-light">{detail}</div>
     </div>
   );
 }
@@ -458,7 +460,7 @@ function LeaseholdOverrideOverview({
       value: formatPercent(summary.totalNpriDecimal),
       count: `${summary.includedNpriCount}/${summary.trackedNpriCount} in payout math`,
       detail: 'Mineral-side royalty burdens from Desk Map title branches.',
-      tone: 'border-sky-200 bg-sky-50 text-sky-950',
+      tone: 'border-tint-sky-line bg-sky-50 text-tint-sky-ink',
     },
     {
       label: 'ORRI overrides',
@@ -468,7 +470,7 @@ function LeaseholdOverrideOverview({
           ? `${summary.includedOrriCount}/${summary.trackedOrriCount} in payout math; ${orriUnitAssignmentWarningCount} need unit`
           : `${summary.includedOrriCount}/${summary.trackedOrriCount} in payout math`,
       detail: 'Leasehold-side burdens carved before retained working interest.',
-      tone: 'border-seal/30 bg-seal/10 text-seal',
+      tone: 'border-[#e8c5be] bg-[#fdf3f1] text-seal',
     },
     {
       label: 'WI assignments',
@@ -478,7 +480,7 @@ function LeaseholdOverrideOverview({
           ? `${summary.includedAssignmentCount}/${summary.trackedAssignmentCount} in payout math; ${wiUnitAssignmentWarningCount} need unit`
           : `${summary.includedAssignmentCount}/${summary.trackedAssignmentCount} in payout math`,
       detail: 'Working-interest splits after royalty, NPRI, and ORRI burdens.',
-      tone: 'border-leather/30 bg-leather/10 text-leather',
+      tone: 'border-ledger-line bg-ledger text-tint-amber-ink',
     },
     {
       label: 'Retained WI',
@@ -490,35 +492,35 @@ function LeaseholdOverrideOverview({
       detail: 'Remaining leasehold working interest after visible assignments.',
       tone:
         summary.overAssignedTractCount > 0
-          ? 'border-seal/30 bg-seal/10 text-seal'
-          : 'border-emerald-200 bg-emerald-50 text-emerald-900',
+          ? 'border-[#e8c5be] bg-[#fdf3f1] text-seal'
+          : 'border-tint-green-line bg-emerald-50 text-tint-green-ink',
     },
   ];
 
   return (
-    <div className="mt-4 rounded-md border border-ledger-line bg-parchment px-4 py-3 shadow-sm">
-      <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-light">
-            Override Review
-          </div>
-          <div className="mt-1 text-sm font-semibold text-ink">
-            Leasehold overrides affecting this overview
-          </div>
+    <div className="rounded-xl border border-ledger-line bg-parchment-light px-4 py-3.5">
+      <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
+        <div className="text-[9px] font-bold uppercase tracking-[0.12em] text-ink-light">
+          Override Review
         </div>
-        <div className="text-xs text-ink-light">
-          Counts show included/tracked records for the active unit focus.
+        <div className="text-xs text-ink-soft">
+          Leasehold overrides affecting this overview
+        </div>
+        <div className="ml-auto text-[10px] text-ink-faint">
+          Counts show included / tracked records for the active unit focus
         </div>
       </div>
-      <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+      <div className="mt-2.5 grid gap-2.5 md:grid-cols-2 xl:grid-cols-4">
         {rows.map((row) => (
-          <div key={row.label} className={`rounded-md border px-3 py-3 ${row.tone}`}>
-            <div className="text-[10px] font-semibold uppercase tracking-[0.14em] opacity-80">
+          <div key={row.label} className={`rounded-[10px] border px-3 py-2.5 ${row.tone}`}>
+            <div className="text-[9px] font-bold uppercase tracking-[0.08em]">
               {row.label}
             </div>
-            <div className="mt-1 font-mono text-lg font-semibold">{row.value}</div>
-            <div className="mt-1 text-xs font-semibold">{row.count}</div>
-            <div className="mt-1 text-[11px] leading-5 opacity-85">{row.detail}</div>
+            <div className="mt-1 font-mono text-[17px] font-semibold tabular-nums text-ink">
+              {row.value}
+            </div>
+            <div className="mt-0.5 font-mono text-[9.5px]">{row.count}</div>
+            <div className="mt-1 text-[9.5px] leading-[1.45] opacity-85">{row.detail}</div>
           </div>
         ))}
       </div>
@@ -1008,15 +1010,15 @@ function LeaseholdDeckModeToggle({
   onChange: (mode: LeaseholdMode) => void;
 }) {
   return (
-    <div className="inline-flex rounded-md border border-ledger-line bg-parchment-dark p-1 shadow-sm">
+    <div className="inline-flex gap-0.5 rounded-[9px] bg-[#f1e8d5] p-[3px]">
       {(['overview', 'map', 'deck'] as const).map((option) => (
         <button
           key={option}
           type="button"
           onClick={() => onChange(option)}
-          className={`rounded-md px-4 py-2 text-sm font-semibold transition-colors ${
+          className={`rounded-[7px] px-3.5 py-1 text-xs font-semibold transition-colors ${
             mode === option
-              ? 'bg-parchment text-ink shadow-sm'
+              ? 'bg-parchment-light text-ink shadow-[0_1px_3px_rgba(45,33,20,0.14)]'
               : 'text-ink-light hover:text-ink'
           }`}
         >
@@ -4264,8 +4266,8 @@ export default function LeaseholdView() {
     [readOnly, setActiveDeskMap, setPendingNodeEditorRoute, setView]
   );
   const addLeaseButton = (
-    <button
-      type="button"
+    <Button
+      size="sm"
       onClick={() => setAddLeaseOpen(true)}
       disabled={readOnly || leaseAddTargets.length === 0}
       title={
@@ -4275,10 +4277,9 @@ export default function LeaseholdView() {
             ? 'Add a present mineral owner on a tract first'
             : 'Add a lease to a present mineral owner'
       }
-      className="rounded-md border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-100 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
     >
       + Add Lease
-    </button>
+    </Button>
   );
 
   const summary = useMemo(
@@ -4344,126 +4345,129 @@ export default function LeaseholdView() {
   }
 
   return (
-    <div
-      className={`h-full bg-canvas-bg px-5 py-5 ${
-        isMapMode ? 'overflow-hidden' : 'overflow-auto'
-      }`}
-    >
+    <div className="flex h-full flex-col">
+      {/* Command header — shared by Overview / Map / Deck (design handoff). */}
+      <div className="flex shrink-0 items-center gap-3 border-b border-ledger-line bg-parchment-light px-5 py-3">
+        <div className="min-w-0">
+          <h1 className="font-display text-[19px] font-bold leading-tight text-ink">Leasehold</h1>
+          <div className="mt-px truncate text-[11px] text-ink-light">
+            {activeUnit ? activeUnit.unitName : 'All tracts'} · {summary.tractCount} tract
+            {summary.tractCount === 1 ? '' : 's'} ·{' '}
+            <span className="font-mono text-[10.5px]">
+              {formatAcres(summary.totalPooledAcres)} ac pooled
+            </span>
+          </div>
+        </div>
+        <div className="ml-3 hidden sm:block">
+          <LeaseholdDeckModeToggle mode={mode} onChange={setMode} />
+        </div>
+        <div className="ml-auto flex shrink-0 items-center gap-2">
+          <UndoRedoControls variant="secondary" />
+          {addLeaseButton}
+        </div>
+      </div>
+
+      {/* Unit focus bar */}
+      <div className="flex shrink-0 items-center gap-2.5 border-b border-ledger-line bg-parchment-light px-5 py-2">
+        <span className="hidden text-[9px] font-bold uppercase tracking-[0.12em] text-ink-light md:block">
+          Unit Focus
+        </span>
+        <UnitFocusSelector />
+        <span className="hidden font-mono text-[10.5px] text-ink-light lg:block">
+          {summary.tractCount} tracts · {summary.currentOwnerCount} present owners
+        </span>
+        <span
+          className="ml-auto hidden min-w-0 items-center gap-1.5 truncate rounded-[7px] border border-tint-amber-line bg-tint-amber px-2.5 py-1 text-[10.5px] text-tint-amber-ink md:inline-flex"
+          title="Gross-acre NMA and pooled-acre participation acres are both shown so the tract view makes the base acreage explicit."
+        >
+          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-gold" />
+          <span className="truncate">
+            v1 assumption:{' '}
+            {activeUnit
+              ? `${activeUnit.unitName} is isolated — payout math uses its tracts only`
+              : 'payout decimals are acreage-weighted by pooled acres'}
+          </span>
+        </span>
+      </div>
+
+      <div
+        className={`flex-1 ${
+          isMapMode ? 'overflow-hidden px-5 py-4' : 'overflow-auto px-5 py-[18px]'
+        }`}
+      >
       <div
         className={
-          isMapMode ? 'flex h-full flex-col space-y-5' : 'mx-auto max-w-7xl space-y-5'
+          isMapMode ? 'flex h-full flex-col space-y-4' : 'mx-auto max-w-7xl space-y-4'
         }
       >
-        <header className="shrink-0 rounded-md border border-ledger-line bg-parchment/95 shadow-md">
-          {isMapMode ? (
-            <div className="flex items-center justify-between gap-4 px-5 py-3">
-              <h1 className="text-base font-display font-bold text-ink">Leasehold</h1>
-              <div className="flex items-center gap-3">
-                {addLeaseButton}
-                <UnitFocusSelector />
-                <LeaseholdDeckModeToggle mode={mode} onChange={setMode} />
-              </div>
+        {mode === 'overview' && (
+          <>
+            {/* KPI strip */}
+            <div className="grid gap-2.5 [grid-template-columns:repeat(auto-fit,minmax(150px,1fr))]">
+              <SummaryCard
+                label="Tracts"
+                value={summary.tractCount.toString()}
+                detail={`${summary.currentOwnerCount} present owners across the unit`}
+              />
+              <SummaryCard
+                label="Gross Acres"
+                value={formatAcres(summary.totalGrossAcres)}
+                detail={`${summary.configuredGrossAcresCount}/${summary.tractCount} tracts configured`}
+              />
+              <SummaryCard
+                label="Pooled Acres"
+                value={formatAcres(summary.totalPooledAcres)}
+                detail={`${summary.configuredPooledAcresCount}/${summary.tractCount} tracts configured`}
+              />
+              <SummaryCard
+                label="Unit Royalty"
+                value={formatPercent(summary.totalRoyaltyDecimal)}
+                detail="Total unit royalty decimal from all active owner leases"
+              />
+              <SummaryCard
+                label="Unit NPRI"
+                value={formatPercent(summary.totalNpriDecimal)}
+                detail={`${summary.includedNpriCount}/${summary.trackedNpriCount} NPRI branches currently in payout math`}
+              />
+              <SummaryCard
+                label="Fully Leased"
+                value={`${summary.fullyLeasedTractCount}/${summary.tractCount}`}
+                detail="Based on current owner lease coverage"
+              />
+              <SummaryCard
+                label="Lessee Set"
+                value={summary.uniqueLessees.length.toString()}
+                detail={
+                  summary.uniqueLessees.length > 0
+                    ? summary.uniqueLessees.join(', ')
+                    : 'No active lessees linked yet'
+                }
+              />
             </div>
-          ) : (
-            <div className="p-6">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-                <div className="max-w-3xl">
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.2em] text-ink-light">
-                    Leasehold Template
-                  </div>
-                  <h1 className="mt-2 text-3xl font-display font-bold text-ink">Leasehold</h1>
-                  <p className="mt-2 text-sm leading-6 text-ink-light">
-                    Pooled acres now drive participation here. Leasehold derives tract participation,
-                    owner net mineral acres, lease royalty, fixed and floating NPRI payout burdens,
-                    ORRI burdens, and working-interest splits from the current Desk Map title chain
-                    plus active lease records. Use `Overview` for setup and numeric review, `Map` for
-                    the full-size leasehold canvas, and `Deck` for the card-based leasehold side with
-                    NPRIs, ORRIs, retained WI, and assignments.
-                  </p>
-                </div>
-                <div className="flex flex-col items-start gap-3">
-                  <LeaseholdDeckModeToggle mode={mode} onChange={setMode} />
-                  <div className="flex items-center gap-2">
-                    <UnitFocusSelector />
-                    {addLeaseButton}
-                  </div>
-                  <div className="rounded-md border border-gold/30 bg-gold/10 px-4 py-3 text-sm text-ink">
-                    <div className="font-semibold">Current v1 assumption</div>
-                    <div className="mt-1">
-                      {activeUnit
-                        ? `${activeUnit.unitName} is isolated here; royalty, NPRI, ORRI, and WI payout decimals only use that unit's tracts.`
-                        : 'Royalty, NPRI, ORRI, and WI payout decimals are acreage-weighted by pooled acres.'}
-                      {' '}Gross-acre NMA and pooled-acre participation acres are both shown so the tract view
-                      makes the base acreage explicit.
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-7">
-                <SummaryCard
-                  label="Tracts"
-                  value={summary.tractCount.toString()}
-                  detail={`${summary.currentOwnerCount} present owners across the unit`}
-                />
-                <SummaryCard
-                  label="Gross Acres"
-                  value={formatAcres(summary.totalGrossAcres)}
-                  detail={`${summary.configuredGrossAcresCount}/${summary.tractCount} tracts configured`}
-                />
-                <SummaryCard
-                  label="Pooled Acres"
-                  value={formatAcres(summary.totalPooledAcres)}
-                  detail={`${summary.configuredPooledAcresCount}/${summary.tractCount} tracts configured`}
-                />
-                <SummaryCard
-                  label="Unit Royalty"
-                  value={formatPercent(summary.totalRoyaltyDecimal)}
-                  detail="Total unit royalty decimal from all active owner leases"
-                />
-                <SummaryCard
-                  label="Unit NPRI"
-                  value={formatPercent(summary.totalNpriDecimal)}
-                  detail={`${summary.includedNpriCount}/${summary.trackedNpriCount} NPRI branches currently in payout math`}
-                />
-                <SummaryCard
-                  label="Fully Leased"
-                  value={`${summary.fullyLeasedTractCount}/${summary.tractCount}`}
-                  detail="Based on current owner lease coverage"
-                />
-                <SummaryCard
-                  label="Lessee Set"
-                  value={summary.uniqueLessees.length.toString()}
-                  detail={
-                    summary.uniqueLessees.length > 0
-                      ? summary.uniqueLessees.join(', ')
-                      : 'No active lessees linked yet'
-                  }
-                />
-              </div>
-              <LeaseholdOverrideOverview summary={summary} />
-              {summary.unitAssignmentWarningCount > 0 && (
-                <div className="mt-4">
-                  <LeaseholdUnitAssignmentWarningPanel
-                    warnings={summary.unitAssignmentWarnings}
-                  />
-                </div>
-              )}
-              {npriSummary.total > 0 && (
-                <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-                  <div className="font-semibold">NPRI payout layer active</div>
-                  <div className="mt-1 leading-6">
+            <LeaseholdOverrideOverview summary={summary} />
+            {summary.unitAssignmentWarningCount > 0 && (
+              <LeaseholdUnitAssignmentWarningPanel
+                warnings={summary.unitAssignmentWarnings}
+              />
+            )}
+            {npriSummary.total > 0 && (
+              <div className="flex items-start gap-2.5 rounded-xl border border-tint-amber-line bg-tint-amber px-4 py-3 text-sm text-[#6b5417]">
+                <span className="mt-1.5 h-[7px] w-[7px] shrink-0 rounded-full bg-gold" />
+                <div className="min-w-0 flex-1">
+                  <div className="text-xs font-bold">NPRI payout layer active</div>
+                  <div className="mt-0.5 text-[11.5px] leading-[1.55]">
                     {npriSummary.total} NPRI branch{npriSummary.total === 1 ? '' : 'es'} on file
                     ({npriSummary.fixedCount} fixed, {npriSummary.floatingCount} floating). Fixed
-                    NPRIs now carry a deed-basis choice, so LANDroid can distinguish whole-tract fixed
-                    burdens from branch-based fixed burdens; floating NPRIs still burden lease royalty.
-                    Review the NPRI lane and transfer-order ledger before treating the deck as final
+                    NPRIs carry a deed-basis choice, distinguishing whole-tract fixed burdens from
+                    branch-based fixed burdens; floating NPRIs still burden lease royalty. Review
+                    the NPRI lane and transfer-order ledger before treating the deck as final
                     payout support.
                   </div>
                 </div>
-              )}
-            </div>
-          )}
-        </header>
+              </div>
+            )}
+          </>
+        )}
 
         {addLeaseOpen && (
           <Modal open onClose={() => setAddLeaseOpen(false)} title="Add Lease">
@@ -4595,6 +4599,7 @@ export default function LeaseholdView() {
             onRemoveTransferOrderEntry={removeLeaseholdTransferOrderEntry}
           />
         )}
+      </div>
       </div>
     </div>
   );
