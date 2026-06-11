@@ -20,7 +20,14 @@ import type { ViewMode } from './store/ui-store';
  * gets the shell's floating cluster so undo/redo stays visible app-wide
  * (locked decision: always visible, never upper-left).
  */
-const VIEWS_WITH_OWN_UNDO: ViewMode[] = ['chart', 'leasehold', 'documents', 'master', 'owners'];
+const VIEWS_WITH_OWN_UNDO: ViewMode[] = [
+  'chart',
+  'leasehold',
+  'documents',
+  'master',
+  'owners',
+  'research',
+];
 
 const FlowchartView = lazy(() => import('./views/FlowchartView'));
 const LeaseholdView = lazy(() => import('./views/LeaseholdView'));
