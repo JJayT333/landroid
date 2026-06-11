@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { create } from 'zustand';
 import type { TitleCutoverReadiness } from '../../project-records/action-layer/title-cutover-gate';
 import {
   computeTitleParityGates,
@@ -35,24 +36,50 @@ const NOT_CLEAN_GATES: TitleParityGates = {
 const MANUAL_FLIP_TOKEN = 'reviewer:title-cutover-confirmed';
 
 /**
+ * Operator banner preference (the "see the full screen" toggle): manually
+ * hidden via the banner's Hide button or the sidebar chip's toggle, persisted
+ * per browser. Safety override below: a divergence or recording error always
+ * shows the banner regardless of this preference.
+ */
+const LEDGER_BANNER_HIDDEN_KEY = 'landroid.shell.ledgerBannerHidden';
+
+const useLedgerBannerPref = create<{ hidden: boolean }>()(() => ({
+  hidden:
+    typeof window !== 'undefined'
+    && window.localStorage.getItem(LEDGER_BANNER_HIDDEN_KEY) === '1',
+}));
+
+export function setLedgerBannerHidden(hidden: boolean): void {
+  try {
+    window.localStorage.setItem(LEDGER_BANNER_HIDDEN_KEY, hidden ? '1' : '0');
+  } catch {
+    // Preference persistence is best-effort.
+  }
+  useLedgerBannerPref.setState({ hidden });
+}
+
+/**
  * App-level banner: quiet when healthy. Post-flip daily reality is
  * "cutover, no divergence, no error" — that state renders nothing here (the
  * sidebar's LedgerStatusChip keeps the panel one click away, revert included).
- * Any trouble (divergence, recording error) or any pre-flip state brings the
- * full banner back across the main column. The heavy parity gates only
- * compute while the panel is actually mounted.
+ * The operator can also hide it manually to reclaim the screen; any trouble
+ * (divergence, recording error) overrides the preference and brings the full
+ * banner back. The heavy parity gates only compute while the panel is
+ * actually mounted.
  */
 export default function TitleLedgerStatusBanner() {
   const lastDivergence = useTitleActionLog((state) => state.lastDivergence);
   const lastError = useTitleActionLog((state) => state.lastError);
   const readPathMode = useTitleActionLog((state) => state.readPathMode);
-  const healthy = readPathMode === 'cutover' && !lastDivergence && !lastError;
-  if (healthy) return null;
-  return <TitleLedgerStatusPanel />;
+  const manuallyHidden = useLedgerBannerPref((state) => state.hidden);
+  const trouble = Boolean(lastDivergence || lastError);
+  const healthy = readPathMode === 'cutover' && !trouble;
+  if (healthy || (manuallyHidden && !trouble)) return null;
+  return <TitleLedgerStatusPanel onHide={() => setLedgerBannerHidden(true)} />;
 }
 
 /** Floating popover host for the chip (heavy gates compute only while open). */
-export function TitleLedgerStatusPanel() {
+export function TitleLedgerStatusPanel({ onHide }: { onHide?: () => void } = {}) {
   const lastDivergence = useTitleActionLog((state) => state.lastDivergence);
   const lastError = useTitleActionLog((state) => state.lastError);
   const recordedMutationCount = useTitleActionLog((state) => state.recordedMutationCount);
@@ -110,6 +137,7 @@ export function TitleLedgerStatusPanel() {
       readiness={readiness}
       readMode={readPathMode}
       flipError={flipError}
+      onHide={onHide}
       armed={isTitleCutoverArmed()}
       onFlip={() => {
         try {
@@ -136,6 +164,7 @@ export function LedgerStatusChip() {
   const lastDivergence = useTitleActionLog((state) => state.lastDivergence);
   const lastError = useTitleActionLog((state) => state.lastError);
   const readPathMode = useTitleActionLog((state) => state.readPathMode);
+  const bannerHidden = useLedgerBannerPref((state) => state.hidden);
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -180,6 +209,18 @@ export function LedgerStatusChip() {
       {open && (
         <div className="absolute bottom-8 left-1/2 z-50 w-[34rem] max-w-[80vw] -translate-x-1/2 overflow-hidden rounded-[10px] border border-ledger-line bg-parchment-light shadow-[0_12px_30px_rgba(45,33,20,0.16)]">
           <TitleLedgerStatusPanel />
+          <div className="flex items-center justify-between border-t border-ledger-line px-4 py-2">
+            <span className="text-[10px] text-ink-light">
+              Banner on screen{readPathMode !== 'cutover' ? '' : ' (auto-hidden while healthy in cutover)'}
+            </span>
+            <button
+              type="button"
+              onClick={() => setLedgerBannerHidden(!bannerHidden)}
+              className="rounded-[7px] border border-ledger-line px-2.5 py-1 text-[11px] font-semibold text-ink transition-colors hover:bg-parchment-dark"
+            >
+              {bannerHidden ? 'Show banner' : 'Hide banner'}
+            </button>
+          </div>
         </div>
       )}
     </div>
@@ -195,6 +236,7 @@ export function TitleLedgerStatusBannerContent({
   armed = true,
   onFlip,
   onRevert,
+  onHide,
 }: {
   lastDivergence: TitleLedgerDivergence | null;
   lastError: string | null;
@@ -205,6 +247,8 @@ export function TitleLedgerStatusBannerContent({
   armed?: boolean;
   onFlip?: () => void;
   onRevert?: () => void;
+  /** Manual banner hide (operator screen-space toggle); divergence overrides. */
+  onHide?: () => void;
 }) {
   const isCutover = readMode === 'cutover';
   const detail = lastDivergence
@@ -308,20 +352,32 @@ export function TitleLedgerStatusBannerContent({
             </p>
           ) : null}
         </div>
-        <button
-          type="button"
-          disabled={!buttonEnabled}
-          aria-disabled={!buttonEnabled}
-          className={
-            buttonEnabled
-              ? 'rounded border border-emerald-300 bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-emerald-500'
-              : 'cursor-not-allowed rounded border border-slate-300 bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-500 shadow-sm'
-          }
-          onClick={isCutover ? onRevert : onFlip}
-          title={buttonTitle}
-        >
-          {buttonLabel}
-        </button>
+        <div className="flex shrink-0 flex-col items-end gap-1.5">
+          <button
+            type="button"
+            disabled={!buttonEnabled}
+            aria-disabled={!buttonEnabled}
+            className={
+              buttonEnabled
+                ? 'rounded border border-emerald-300 bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-emerald-500'
+                : 'cursor-not-allowed rounded border border-slate-300 bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-500 shadow-sm'
+            }
+            onClick={isCutover ? onRevert : onFlip}
+            title={buttonTitle}
+          >
+            {buttonLabel}
+          </button>
+          {onHide && (
+            <button
+              type="button"
+              onClick={onHide}
+              className="rounded px-2 py-1 text-[11px] font-semibold text-slate-600 transition-colors hover:bg-white/60 hover:text-slate-900"
+              title="Hide this banner (the sidebar's ledger chip brings it back; a divergence always shows it)"
+            >
+              Hide banner
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

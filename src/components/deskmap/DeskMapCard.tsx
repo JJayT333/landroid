@@ -36,7 +36,6 @@ interface DeskMapCardProps {
   onConvey: (nodeId: string) => void;
   onPrecede: (nodeId: string) => void;
   onLease: (nodeId: string) => void;
-  onAttachDoc: (nodeId: string) => void;
   onDelete: (nodeId: string) => void;
   onViewDoc: (docId: string) => void;
   readOnly?: boolean;
@@ -53,7 +52,6 @@ function DeskMapCard({
   onConvey,
   onPrecede,
   onLease,
-  onAttachDoc,
   onDelete,
   onViewDoc,
   readOnly = false,
@@ -269,17 +267,17 @@ function DeskMapCard({
           </div>
         )}
 
-        {/* Action buttons */}
-        <div className={`hidden gap-0.5 rounded-b-[9px] border-t bg-white/70 px-2 py-[5px] group-hover:flex ${innerLine}`}>
+        {/* Action row — three slots, Convey centered (operator feedback).
+            Attach and Delete live inside the editor now; the empty third cell
+            keeps Convey centered when Lease doesn't apply. */}
+        <div className={`hidden grid-cols-3 justify-items-center rounded-b-[9px] border-t bg-white/70 px-2 py-[5px] group-hover:grid ${innerLine}`}>
           <ActionBtn label="Precede" variant="muted" disabled={readOnly} onClick={() => onPrecede(node.id)} />
           <ActionBtn label="Convey" variant="primary" disabled={readOnly} onClick={() => onConvey(node.id)} />
-          {canLease && (
+          {canLease ? (
             <ActionBtn label="Lease" variant="lease" disabled={readOnly} onClick={() => onLease(node.id)} />
+          ) : (
+            <span aria-hidden="true" />
           )}
-          <ActionBtn label="Attach" variant="accent" disabled={readOnly} onClick={() => onAttachDoc(node.id)} />
-          <span className="ml-auto">
-            <ActionBtn label="Delete" variant="danger" disabled={readOnly} onClick={() => onDelete(node.id)} />
-          </span>
         </div>
       </div>
     </div>
@@ -301,7 +299,6 @@ function deskMapCardPropsAreEqual(
     previous.onConvey === next.onConvey &&
     previous.onPrecede === next.onPrecede &&
     previous.onLease === next.onLease &&
-    previous.onAttachDoc === next.onAttachDoc &&
     previous.onDelete === next.onDelete &&
     previous.onViewDoc === next.onViewDoc &&
     previous.readOnly === next.readOnly

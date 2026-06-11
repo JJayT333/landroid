@@ -27,6 +27,8 @@ interface NodeEditModalProps {
   onLinkOwner?: (nodeId: string, ownerId: string) => void;
   onManageLease?: (nodeId: string) => void;
   onManageNpri?: (nodeId: string) => void;
+  /** Card deletion, rehomed from the canvas hover row (operator feedback). */
+  onDelete?: () => void;
   onClose: () => void;
 }
 
@@ -41,6 +43,7 @@ export default function NodeEditModal({
   onLinkOwner,
   onManageLease,
   onManageNpri,
+  onDelete,
 }: NodeEditModalProps) {
   const updateNode = useWorkspaceStore((s) => s.updateNode);
   const rebalance = useWorkspaceStore((s) => s.rebalance);
@@ -145,7 +148,24 @@ export default function NodeEditModal({
   };
 
   return (
-    <Modal open onClose={onClose} title="Edit Node" wide>
+    <Modal
+      open
+      onClose={onClose}
+      title="Edit Node"
+      wide
+      headerActions={
+        onDelete && (
+          <Button
+            variant="destructive-ghost"
+            size="xs"
+            onClick={onDelete}
+            title="Delete this card (asks to confirm)"
+          >
+            Delete
+          </Button>
+        )
+      }
+    >
       <div className="space-y-4">
         {/* Document info */}
         <fieldset className="space-y-2">

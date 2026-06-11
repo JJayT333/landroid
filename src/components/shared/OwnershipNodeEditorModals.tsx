@@ -34,6 +34,12 @@ interface OwnershipNodeEditorModalsProps {
    */
   pdfViewDocId: string | null;
   onSetPdfViewDocId: (docId: string | null) => void;
+  /**
+   * Card deletion from inside the node editor (Delete moved off the canvas
+   * hover row). The handler owns its own confirmation flow; the editor
+   * auto-closes when the node disappears from the store.
+   */
+  onDeleteNode?: (nodeId: string) => void;
 }
 
 export default function OwnershipNodeEditorModals({
@@ -43,6 +49,7 @@ export default function OwnershipNodeEditorModals({
   onSetNpriParentId,
   pdfViewDocId,
   onSetPdfViewDocId,
+  onDeleteNode,
 }: OwnershipNodeEditorModalsProps) {
   const setView = useUIStore((state) => state.setView);
   const owners = useOwnerStore((state) => state.owners);
@@ -239,6 +246,9 @@ export default function OwnershipNodeEditorModals({
           onLinkOwner={handleLinkExistingOwner}
           onManageLease={handleManageLease}
           onManageNpri={handleManageNpri}
+          onDelete={
+            onDeleteNode ? () => onDeleteNode(editNode.id) : undefined
+          }
           onClose={() => onSetRoute(null)}
           onViewDoc={(docId) => {
             onSetRoute(null);

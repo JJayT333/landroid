@@ -57,7 +57,6 @@ import {
 } from '../components/deskmap/deskmap-coverage';
 import ConveyModal from '../components/modals/ConveyModal';
 import PredecessorModal from '../components/modals/PredecessorModal';
-import AttachDocModal from '../components/modals/AttachDocModal';
 import { useConfirmation } from '../components/shared/ConfirmationProvider';
 import OwnershipNodeEditorModals from '../components/shared/OwnershipNodeEditorModals';
 import {
@@ -90,7 +89,6 @@ interface TreeBranchProps {
   onConvey: (id: string) => void;
   onPrecede: (id: string) => void;
   onLease: (id: string) => void;
-  onAttachDoc: (id: string) => void;
   onDelete: (id: string) => void;
   onViewDoc: (id: string) => void;
   readOnly: boolean;
@@ -107,7 +105,6 @@ function TreeBranchComponent({
   onConvey,
   onPrecede,
   onLease,
-  onAttachDoc,
   onDelete,
   onViewDoc,
   readOnly,
@@ -121,8 +118,6 @@ function TreeBranchComponent({
         <DeskMapLeaseCard
           node={tree.node}
           onEdit={onEdit}
-          onAttachDoc={onAttachDoc}
-          onDelete={onDelete}
           onViewDoc={onViewDoc}
           readOnly={readOnly}
         />
@@ -134,8 +129,6 @@ function TreeBranchComponent({
           onEdit={onEdit}
           onConvey={onConvey}
           onPrecede={onPrecede}
-          onAttachDoc={onAttachDoc}
-          onDelete={onDelete}
           onViewDoc={onViewDoc}
           readOnly={readOnly}
         />
@@ -153,7 +146,6 @@ function TreeBranchComponent({
           onConvey={onConvey}
           onPrecede={onPrecede}
           onLease={onLease}
-          onAttachDoc={onAttachDoc}
           onDelete={onDelete}
           onViewDoc={onViewDoc}
           readOnly={readOnly}
@@ -175,7 +167,6 @@ function TreeBranchComponent({
               onConvey={onConvey}
               onPrecede={onPrecede}
               onLease={onLease}
-              onAttachDoc={onAttachDoc}
               onDelete={onDelete}
               onViewDoc={onViewDoc}
               readOnly={readOnly}
@@ -203,7 +194,6 @@ function treeBranchPropsAreEqual(
     previous.onConvey === next.onConvey &&
     previous.onPrecede === next.onPrecede &&
     previous.onLease === next.onLease &&
-    previous.onAttachDoc === next.onAttachDoc &&
     previous.onDelete === next.onDelete &&
     previous.onViewDoc === next.onViewDoc &&
     previous.readOnly === next.readOnly
@@ -900,7 +890,6 @@ export default function DeskMapView() {
   const [editorRoute, setEditorRoute] = useState<NodeEditorRoute | null>(null);
   const [conveyParentId, setConveyParentId] = useState<string | null>(null);
   const [precedeNodeId, setPrecedeNodeId] = useState<string | null>(null);
-  const [attachDocParentId, setAttachDocParentId] = useState<string | null>(null);
   const [npriParentId, setNpriParentId] = useState<string | null>(null);
   const [pdfViewDocId, setPdfViewDocId] = useState<string | null>(null);
   const [ownerSearchQuery, setOwnerSearchQuery] = useState('');
@@ -1154,11 +1143,6 @@ export default function DeskMapView() {
     setActiveNode(id);
     setEditorRoute({ kind: 'lease', parentNodeId: id });
   }, [readOnly, setActiveNode]);
-
-  const handleAttachDoc = useCallback((id: string) => {
-    if (readOnly) return;
-    setAttachDocParentId(id);
-  }, [readOnly]);
 
   const handleDelete = useCallback(async (id: string) => {
     if (readOnly) return;
@@ -1628,7 +1612,6 @@ export default function DeskMapView() {
                   onConvey={handleConvey}
                   onPrecede={handlePrecede}
                   onLease={handleLease}
-                  onAttachDoc={handleAttachDoc}
                   onDelete={handleDelete}
                   onViewDoc={handleViewDoc}
                   readOnly={readOnly}
@@ -1663,6 +1646,7 @@ export default function DeskMapView() {
           onSetNpriParentId={setNpriParentId}
           pdfViewDocId={pdfViewDocId}
           onSetPdfViewDocId={setPdfViewDocId}
+          onDeleteNode={handleDelete}
         />
 
         {/* Convey modal */}
@@ -1681,13 +1665,6 @@ export default function DeskMapView() {
           />
         )}
 
-        {/* Attach doc modal */}
-        {attachDocParentId && (
-          <AttachDocModal
-            parentNodeId={attachDocParentId}
-            onClose={() => setAttachDocParentId(null)}
-          />
-        )}
       </div>
     </div>
     </FormulaPinProvider>

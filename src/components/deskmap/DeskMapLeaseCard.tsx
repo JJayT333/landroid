@@ -7,8 +7,6 @@ import DeskMapDocumentChips from './DeskMapDocumentChips';
 interface DeskMapLeaseCardProps {
   node: OwnershipNode;
   onEdit: (nodeId: string) => void;
-  onAttachDoc: (nodeId: string) => void;
-  onDelete: (nodeId: string) => void;
   onViewDoc: (docId: string) => void;
   readOnly?: boolean;
 }
@@ -16,8 +14,6 @@ interface DeskMapLeaseCardProps {
 function DeskMapLeaseCard({
   node,
   onEdit,
-  onAttachDoc,
-  onDelete,
   onViewDoc,
   readOnly = false,
 }: DeskMapLeaseCardProps) {
@@ -87,48 +83,11 @@ function DeskMapLeaseCard({
           <DeskMapDocumentChips node={node} tone="emerald" onViewDoc={onViewDoc} />
         </div>
 
-        <div className="hidden gap-0.5 rounded-b-[9px] border-t border-tint-green-line bg-white/70 px-2 py-[4px] group-hover:flex">
-          <ActionBtn label="Attach" disabled={readOnly} onClick={() => onAttachDoc(node.id)} />
-          <span className="ml-auto">
-            <ActionBtn label="Delete" danger disabled={readOnly} onClick={() => onDelete(node.id)} />
-          </span>
-        </div>
       </div>
     </div>
   );
 }
 
-function ActionBtn({
-  label,
-  onClick,
-  danger = false,
-  disabled = false,
-}: {
-  label: string;
-  onClick: () => void;
-  danger?: boolean;
-  disabled?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={(event) => {
-        event.stopPropagation();
-        if (disabled) return;
-        onClick();
-      }}
-      title={disabled ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
-      className={`rounded-[5px] px-[5px] py-[3px] text-[8px] font-bold uppercase tracking-[0.05em] transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
-        danger
-          ? 'text-seal hover:bg-[#f7e9e4]'
-          : 'text-tint-green-ink hover:bg-emerald-100'
-      }`}
-    >
-      {label}
-    </button>
-  );
-}
 
 function deskMapLeaseCardPropsAreEqual(
   previous: DeskMapLeaseCardProps,
@@ -137,8 +96,6 @@ function deskMapLeaseCardPropsAreEqual(
   return (
     previous.node === next.node &&
     previous.onEdit === next.onEdit &&
-    previous.onAttachDoc === next.onAttachDoc &&
-    previous.onDelete === next.onDelete &&
     previous.onViewDoc === next.onViewDoc &&
     previous.readOnly === next.readOnly
   );

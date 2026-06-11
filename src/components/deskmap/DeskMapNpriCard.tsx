@@ -20,8 +20,6 @@ interface DeskMapNpriCardProps {
   onEdit: (nodeId: string) => void;
   onConvey: (nodeId: string) => void;
   onPrecede: (nodeId: string) => void;
-  onAttachDoc: (nodeId: string) => void;
-  onDelete: (nodeId: string) => void;
   onViewDoc: (docId: string) => void;
   readOnly?: boolean;
 }
@@ -33,8 +31,6 @@ function DeskMapNpriCard({
   onEdit,
   onConvey,
   onPrecede,
-  onAttachDoc,
-  onDelete,
   onViewDoc,
   readOnly = false,
 }: DeskMapNpriCardProps) {
@@ -206,13 +202,12 @@ function DeskMapNpriCard({
           </div>
         )}
 
-        <div className="hidden gap-0.5 rounded-b-[9px] border-t border-tint-amber-line bg-white/70 px-2 py-[4px] group-hover:flex">
+        {/* Three slots like the mineral card — empty third keeps Convey
+            centered (NPRIs never lease). Attach/Delete live in the editor. */}
+        <div className="hidden grid-cols-3 justify-items-center rounded-b-[9px] border-t border-tint-amber-line bg-white/70 px-2 py-[4px] group-hover:grid">
           <ActionBtn label="Precede" disabled={readOnly} onClick={() => onPrecede(node.id)} />
           <ActionBtn label="Convey" disabled={readOnly} onClick={() => onConvey(node.id)} />
-          <ActionBtn label="Attach" disabled={readOnly} onClick={() => onAttachDoc(node.id)} />
-          <span className="ml-auto">
-            <ActionBtn label="Delete" danger disabled={readOnly} onClick={() => onDelete(node.id)} />
-          </span>
+          <span aria-hidden="true" />
         </div>
       </div>
     </div>
@@ -262,8 +257,6 @@ function deskMapNpriCardPropsAreEqual(
     previous.onEdit === next.onEdit &&
     previous.onConvey === next.onConvey &&
     previous.onPrecede === next.onPrecede &&
-    previous.onAttachDoc === next.onAttachDoc &&
-    previous.onDelete === next.onDelete &&
     previous.onViewDoc === next.onViewDoc &&
     previous.readOnly === next.readOnly
   );
