@@ -338,6 +338,18 @@ const DRIVERS: Record<ActionName, ActionDriver> = {
       await s.undoLastTitleMutation();
     },
   },
+  redoLastTitleMutation: {
+    expectation: 'title',
+    // Edit, undo it, then ONE redo: the spy reset isolates the redo's OWN
+    // journal call — the re-apply must itself be journaled, same append-only
+    // rule as undo.
+    drive: async (s) => {
+      s.updateNode('root', { docNo: 'R-4', remarks: 'redo target edit' });
+      await s.undoLastTitleMutation();
+      hookCalls.length = 0;
+      await s.redoLastTitleMutation();
+    },
+  },
   // Lifecycle — outside the journal rule, each for a documented reason
   loadWorkspace: {
     expectation: {

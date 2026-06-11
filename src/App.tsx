@@ -5,7 +5,7 @@ import { Suspense, lazy, useEffect, useState } from 'react';
 import { useUIStore } from './store/ui-store';
 import { useWorkspaceStore } from './store/workspace-store';
 import { isWorkspaceReadOnly, useWriteLeaseStore } from './store/write-lease-store';
-import { shouldHandleUndoHotkey } from './utils/undo-hotkey';
+import { classifyUndoHotkey } from './utils/undo-hotkey';
 import Navbar from './components/shared/Navbar';
 import TitleLedgerStatusBanner from './components/shared/TitleLedgerStatusBanner';
 import WriteLeaseBanner from './components/shared/WriteLeaseBanner';
@@ -47,14 +47,19 @@ export default function App() {
   const setStartupWarning = useWorkspaceStore((s) => s.setStartupWarning);
   const [projectPickerOpen, setProjectPickerOpen] = useState(true);
 
-  // Global Cmd/Ctrl+Z → title undo. The predicate refuses editable targets so
-  // native text-field undo always wins; read-only tabs no-op.
+  // Global Cmd/Ctrl+Z → title undo, Cmd/Ctrl+Shift+Z (Ctrl+Y on Windows) →
+  // redo. The classifier refuses editable targets so native text-field undo
+  // always wins; read-only tabs no-op.
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (!shouldHandleUndoHotkey(event)) return;
+      const action = classifyUndoHotkey(event);
+      if (!action) return;
       if (isWorkspaceReadOnly(useWriteLeaseStore.getState().role)) return;
       event.preventDefault();
-      void useWorkspaceStore.getState().undoLastTitleMutation();
+      const store = useWorkspaceStore.getState();
+      void (action === 'undo'
+        ? store.undoLastTitleMutation()
+        : store.redoLastTitleMutation());
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);

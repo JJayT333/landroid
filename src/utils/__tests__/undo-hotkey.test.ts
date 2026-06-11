@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { shouldHandleUndoHotkey } from '../undo-hotkey';
+import { classifyUndoHotkey, shouldHandleUndoHotkey } from '../undo-hotkey';
 
 function event(overrides: Partial<Parameters<typeof shouldHandleUndoHotkey>[0]> = {}) {
   return {
@@ -35,5 +35,30 @@ describe('shouldHandleUndoHotkey', () => {
       shouldHandleUndoHotkey(event({ target: { tagName: 'DIV', isContentEditable: true } }))
     ).toBe(false);
     expect(shouldHandleUndoHotkey(event({ target: null }))).toBe(true);
+  });
+});
+
+describe('classifyUndoHotkey', () => {
+  it('classifies undo and redo combos', () => {
+    expect(classifyUndoHotkey(event())).toBe('undo');
+    expect(classifyUndoHotkey(event({ shiftKey: true }))).toBe('redo');
+    expect(classifyUndoHotkey(event({ key: 'Z', shiftKey: true }))).toBe('redo');
+    // Windows-style Ctrl+Y redo; Cmd+Y is not a redo on mac.
+    expect(
+      classifyUndoHotkey(event({ key: 'y', metaKey: false, ctrlKey: true }))
+    ).toBe('redo');
+    expect(classifyUndoHotkey(event({ key: 'y' }))).toBeNull();
+  });
+
+  it('refuses editable targets and alt combos for both directions', () => {
+    expect(classifyUndoHotkey(event({ altKey: true, shiftKey: true }))).toBeNull();
+    expect(
+      classifyUndoHotkey(event({ shiftKey: true, target: { tagName: 'INPUT' } }))
+    ).toBeNull();
+    expect(
+      classifyUndoHotkey(
+        event({ key: 'y', metaKey: false, ctrlKey: true, target: { tagName: 'TEXTAREA' } })
+      )
+    ).toBeNull();
   });
 });
