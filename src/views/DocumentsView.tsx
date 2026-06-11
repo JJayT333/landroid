@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import PdfViewerModal from '../components/modals/PdfViewerModal';
+import Button from '../components/shared/Button';
 import {
   DOCUMENT_AREA_LABELS,
   DOCUMENT_KIND_LABELS,
@@ -703,15 +704,14 @@ export default function DocumentsView() {
             <section className="border-b border-ledger-line py-4">
               <div className="mb-3 flex items-center justify-between gap-3">
                 <h4 className="text-sm font-bold text-ink">Metadata</h4>
-                <button
-                  type="button"
+                <Button
+                  size="sm"
                   onClick={handleSaveMetadata}
                   disabled={readOnly || saving}
                   title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
-                  className="rounded-lg bg-leather px-3 py-1.5 text-xs font-semibold text-parchment hover:bg-leather-light disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {saving ? 'Saving...' : 'Save'}
-                </button>
+                </Button>
               </div>
               <div className="space-y-3">
                 <TextField

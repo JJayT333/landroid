@@ -6,6 +6,7 @@
  *  - a simple sign-in screen that redirects to Cognito Hosted UI.
  */
 import type { ReactNode } from 'react';
+import Button from '../components/shared/Button';
 import { useAuth } from './AuthProvider';
 
 export default function LoginGate({ children }: { children: ReactNode }) {
@@ -32,13 +33,9 @@ export default function LoginGate({ children }: { children: ReactNode }) {
               {error}
             </div>
           )}
-          <button
-            type="button"
-            onClick={signIn}
-            className="w-full rounded-lg bg-leather px-4 py-2 text-sm font-semibold text-parchment shadow-sm hover:bg-leather-dark"
-          >
+          <Button className="w-full shadow-sm" onClick={signIn}>
             Sign in
-          </button>
+          </Button>
           <div className="text-center text-[11px] text-ink-light">
             Access is by invitation only.
           </div>

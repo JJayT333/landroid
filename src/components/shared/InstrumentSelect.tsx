@@ -5,6 +5,7 @@
  * user-added types persist and appear in future uses.
  */
 import { useState, useRef, useEffect, useId } from 'react';
+import Button from './Button';
 import { useWorkspaceStore } from '../../store/workspace-store';
 
 interface InstrumentSelectProps {
@@ -144,13 +145,9 @@ export default function InstrumentSelect({
                   className="flex-1 px-2 py-1 rounded border border-ledger-line bg-parchment text-sm text-ink focus:ring-1 focus:ring-leather outline-none"
                   autoFocus
                 />
-                <button
-                  type="button"
-                  onClick={handleAddCustom}
-                  className="px-2 py-1 rounded bg-leather text-parchment text-xs font-semibold"
-                >
+                <Button size="sm" onClick={handleAddCustom}>
                   Add
-                </button>
+                </Button>
               </div>
             ) : (
               <button

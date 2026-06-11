@@ -7,6 +7,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import Button from './Button';
 import Modal from './Modal';
 
 type ConfirmationTone = 'default' | 'danger';
@@ -194,40 +195,29 @@ export function ConfirmationProvider({ children }: { children: ReactNode }) {
                   </div>
                 )}
                 <div className="flex justify-end gap-3">
-                  <button
-                    type="button"
+                  <Button
+                    variant="secondary"
                     data-autofocus={typedState.required ? undefined : 'true'}
                     onClick={() => closeConfirm(false)}
-                    className="rounded-md border border-ledger-line px-4 py-2 text-sm font-semibold text-ink-light transition-colors hover:bg-parchment-dark/70"
                   >
                     {pending.options.cancelLabel}
-                  </button>
-                  <button
-                    type="button"
+                  </Button>
+                  <Button
+                    variant={pending.options.tone === 'danger' ? 'destructive' : 'primary'}
                     disabled={!typedState.confirmed}
                     onClick={() => {
                       if (typedState.confirmed) closeConfirm(true);
                     }}
-                    className={
-                      pending.options.tone === 'danger'
-                        ? 'rounded-md bg-seal px-4 py-2 text-sm font-semibold text-parchment transition-colors hover:bg-seal/90 disabled:cursor-not-allowed disabled:opacity-45'
-                        : 'rounded-md bg-leather px-4 py-2 text-sm font-semibold text-parchment transition-colors hover:bg-leather-dark disabled:cursor-not-allowed disabled:opacity-45'
-                    }
                   >
                     {pending.options.confirmLabel}
-                  </button>
+                  </Button>
                 </div>
               </div>
             ) : (
               <div className="flex justify-end">
-                <button
-                  type="button"
-                  data-autofocus="true"
-                  onClick={() => closeConfirm(true)}
-                  className="rounded-md bg-leather px-4 py-2 text-sm font-semibold text-parchment transition-colors hover:bg-leather-dark"
-                >
+                <Button data-autofocus="true" onClick={() => closeConfirm(true)}>
                   {pending.options.acknowledgeLabel}
-                </button>
+                </Button>
               </div>
             )}
           </div>

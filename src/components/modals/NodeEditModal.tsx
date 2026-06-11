@@ -6,6 +6,7 @@
  * changes, it's a simple updateNode with no cascade.
  */
 import { useState } from 'react';
+import Button from '../shared/Button';
 import Modal from '../shared/Modal';
 import FormField from '../shared/FormField';
 import InstrumentSelect from '../shared/InstrumentSelect';
@@ -481,12 +482,11 @@ export default function NodeEditModal({
 
         {/* Actions */}
         <div className="flex justify-end gap-2 pt-2 border-t border-ledger-line">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 rounded-lg text-sm text-ink-light hover:bg-parchment-dark transition-colors"
-          >
+          <Button variant="ghost" onClick={onClose}>
             Cancel
-          </button>
+          </Button>
+          {/* Conditional gold treatment signals a cascading rebalance; the shared
+              Button has no gold variant, so this one stays hand-rolled. */}
           <button
             onClick={handleSave}
             className={`px-4 py-2 rounded-lg text-sm font-semibold text-parchment transition-colors ${

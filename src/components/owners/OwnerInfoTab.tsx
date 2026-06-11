@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import Button from '../shared/Button';
 import FormField from '../shared/FormField';
 import { useConfirmation } from '../shared/ConfirmationProvider';
 import { READ_ONLY_WORKSPACE_EDIT_TITLE } from '../../store/write-lease-store';
@@ -110,8 +111,7 @@ export default function OwnerInfoTab({
         >
           Delete Owner
         </button>
-        <button
-          type="button"
+        <Button
           disabled={readOnly || saving}
           onClick={async () => {
             if (readOnly) return;
@@ -120,10 +120,9 @@ export default function OwnerInfoTab({
             setSaving(false);
           }}
           title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
-          className="px-4 py-2 rounded-lg bg-leather text-parchment text-sm font-semibold hover:bg-leather-light transition-colors disabled:cursor-not-allowed disabled:opacity-60"
         >
           {saving ? 'Saving...' : 'Save Owner'}
-        </button>
+        </Button>
       </div>
     </div>
   );

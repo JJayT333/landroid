@@ -25,6 +25,7 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
+import Button from '../components/shared/Button';
 import OwnershipNodeComponent from '../components/canvas/OwnershipNode';
 import OwnershipEdgeComponent from '../components/canvas/OwnershipEdge';
 import ShapeNodeComponent from '../components/canvas/ShapeNode';
@@ -369,8 +370,9 @@ function ResizeOverlay({
       </div>
 
       {/* Done button */}
-      <button
-        className="pointer-events-auto px-3 py-1.5 rounded-lg text-xs font-semibold bg-leather text-parchment hover:bg-leather-light shadow-lg transition-colors"
+      <Button
+        size="sm"
+        className="pointer-events-auto shadow-lg"
         style={{
           position: 'absolute',
           left: screenX + screenW / 2 - 40,
@@ -379,7 +381,7 @@ function ResizeOverlay({
         onClick={onDone}
       >
         Done Resizing
-      </button>
+      </Button>
     </div>
   );
 }

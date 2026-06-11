@@ -6,6 +6,7 @@
  * Click a card to edit, hover for action buttons (convey, precede, delete).
  */
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import Button from '../components/shared/Button';
 import { useUIStore } from '../store/ui-store';
 import { useMapStore } from '../store/map-store';
 import { useOwnerStore } from '../store/owner-store';
@@ -1592,14 +1593,13 @@ export default function DeskMapView() {
               <p className="text-ink-light text-sm">
                 Add a root node to start building, or load a .landroid / CSV file.
               </p>
-              <button
+              <Button
                 onClick={handleAddRoot}
                 disabled={readOnly}
                 title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
-                className="px-4 py-2 rounded-lg bg-leather text-parchment text-sm font-semibold hover:bg-leather-light transition-colors disabled:cursor-not-allowed disabled:opacity-50"
               >
                 + Add Root Node
-              </button>
+              </Button>
             </div>
           </div>
         ) : (

@@ -2,6 +2,7 @@
  * Predecessor insert modal — insert a predecessor node above an existing node.
  */
 import { useState } from 'react';
+import Button from '../shared/Button';
 import Modal from '../shared/Modal';
 import FormField from '../shared/FormField';
 import InstrumentSelect from '../shared/InstrumentSelect';
@@ -117,18 +118,12 @@ export default function PredecessorModal({ node, onClose }: PredecessorModalProp
         )}
 
         <div className="flex justify-end gap-2 pt-2 border-t border-ledger-line">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 rounded-lg text-sm text-ink-light hover:bg-parchment-dark transition-colors"
-          >
+          <Button variant="ghost" onClick={onClose}>
             Cancel
-          </button>
-          <button
-            onClick={handleSave}
-            className="px-4 py-2 rounded-lg text-sm font-semibold bg-leather text-parchment hover:bg-leather-light transition-colors"
-          >
+          </Button>
+          <Button onClick={handleSave}>
             Insert Predecessor
-          </button>
+          </Button>
         </div>
       </div>
     </Modal>

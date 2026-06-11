@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import Button from '../shared/Button';
 import Modal from '../shared/Modal';
 import FormField from '../shared/FormField';
 import type { MapExternalReference, MapReferenceSource } from '../../types/map';
@@ -79,15 +80,10 @@ export default function MapReferenceModal({
         </div>
 
         <div className="flex justify-end gap-2 pt-2 border-t border-ledger-line">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-3 py-2 rounded-lg text-sm text-ink-light hover:bg-parchment-dark transition-colors"
-          >
+          <Button variant="ghost" onClick={onClose}>
             Cancel
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
             disabled={saving}
             onClick={async () => {
               const normalizedUrl = normalizeMapReferenceUrl(form.url);
@@ -110,10 +106,9 @@ export default function MapReferenceModal({
                 setSaving(false);
               }
             }}
-            className="px-4 py-2 rounded-lg bg-leather text-parchment text-sm font-semibold hover:bg-leather-light transition-colors disabled:opacity-60"
           >
             Save Link
-          </button>
+          </Button>
         </div>
       </div>
     </Modal>

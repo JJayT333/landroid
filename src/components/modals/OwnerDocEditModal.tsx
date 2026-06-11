@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import Button from '../shared/Button';
 import Modal from '../shared/Modal';
 import type { Lease, OwnerDocCategory, OwnerDocMeta } from '../../types/owner';
 import { DOC_CATEGORY_OPTIONS } from '../../types/owner';
@@ -90,15 +91,10 @@ export default function OwnerDocEditModal({
             Preview
           </button>
           <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-3 py-2 rounded-lg text-sm text-ink-light hover:bg-parchment-dark transition-colors"
-            >
+            <Button variant="ghost" onClick={onClose}>
               Cancel
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
               onClick={() => {
                 onSave({
                   category,
@@ -107,10 +103,9 @@ export default function OwnerDocEditModal({
                 });
                 onClose();
               }}
-              className="px-4 py-2 rounded-lg bg-leather text-parchment text-sm font-semibold hover:bg-leather-light transition-colors"
             >
               Save
-            </button>
+            </Button>
           </div>
         </div>
       </div>

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import Button from '../shared/Button';
 import FormField from '../shared/FormField';
 import { useConfirmation } from '../shared/ConfirmationProvider';
 import { READ_ONLY_WORKSPACE_EDIT_TITLE } from '../../store/write-lease-store';
@@ -88,15 +89,10 @@ export default function OwnerContactsTab({
           </div>
 
           <div className="flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => setDraft(null)}
-              className="px-3 py-2 rounded-lg text-sm text-ink-light hover:bg-parchment-dark transition-colors"
-            >
+            <Button variant="ghost" onClick={() => setDraft(null)}>
               Cancel
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
               disabled={readOnly || saving}
               onClick={async () => {
                 if (readOnly) return;
@@ -110,10 +106,9 @@ export default function OwnerContactsTab({
                 setDraft(null);
               }}
               title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
-              className="px-4 py-2 rounded-lg bg-leather text-parchment text-sm font-semibold hover:bg-leather-light transition-colors disabled:cursor-not-allowed disabled:opacity-60"
             >
               {saving ? 'Saving...' : 'Save Contact'}
-            </button>
+            </Button>
           </div>
         </div>
       ) : (

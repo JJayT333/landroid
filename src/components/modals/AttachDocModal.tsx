@@ -5,6 +5,7 @@
  * They don't convey interest but are relevant to the title chain.
  */
 import { useState } from 'react';
+import Button from '../shared/Button';
 import Modal from '../shared/Modal';
 import FormField from '../shared/FormField';
 import InstrumentSelect from '../shared/InstrumentSelect';
@@ -177,19 +178,12 @@ export default function AttachDocModal({ parentNodeId, onClose }: AttachDocModal
         </fieldset>
 
         <div className="flex justify-end gap-2 pt-2 border-t border-ledger-line">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 rounded-lg text-sm text-ink-light hover:bg-parchment-dark transition-colors"
-          >
+          <Button variant="ghost" onClick={onClose}>
             Cancel
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={pending}
-            className="px-4 py-2 rounded-lg text-sm font-semibold bg-leather text-parchment hover:bg-leather-light transition-colors"
-          >
+          </Button>
+          <Button onClick={handleSave} disabled={pending}>
             {pending ? 'Attaching...' : 'Attach'}
-          </button>
+          </Button>
         </div>
       </div>
     </Modal>

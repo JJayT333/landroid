@@ -4,6 +4,7 @@ import DrillingPermitMasterDecoderPanel from '../components/research/DrillingPer
 import HorizontalDrillingDecoderPanel from '../components/research/HorizontalDrillingDecoderPanel';
 import PendingDrillingDecoderPanel from '../components/research/PendingDrillingDecoderPanel';
 import RrcDelimitedPreviewTable from '../components/research/RrcDelimitedPreviewTable';
+import Button from '../components/shared/Button';
 import { useConfirmation } from '../components/shared/ConfirmationProvider';
 import FormField from '../components/shared/FormField';
 import { RRC_DATASET_CATALOG } from '../data/rrc-datasets';
@@ -2799,24 +2800,23 @@ export default function ResearchView() {
                             Import edits stay local until you save them.
                           </div>
                           <div className="flex items-center gap-2">
-                            <button
-                              type="button"
+                            <Button
+                              variant="ghost"
+                              size="sm"
                               disabled={readOnly || !isImportMetadataDirty || isSavingImportMetadata}
                               onClick={resetImportMetadataDraft}
                               title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
-                              className="px-3 py-1.5 rounded-lg text-xs font-semibold text-ink hover:bg-parchment transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                             >
                               Reset
-                            </button>
-                            <button
-                              type="button"
+                            </Button>
+                            <Button
+                              size="sm"
                               disabled={readOnly || !isImportMetadataDirty || isSavingImportMetadata}
                               onClick={() => void handleSaveImportMetadata()}
                               title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
-                              className="px-3 py-1.5 rounded-lg bg-leather text-parchment text-xs font-semibold hover:bg-leather-light transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                             >
                               {isSavingImportMetadata ? 'Saving...' : 'Save Details'}
-                            </button>
+                            </Button>
                           </div>
                         </div>
 

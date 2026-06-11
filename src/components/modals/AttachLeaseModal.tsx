@@ -44,6 +44,7 @@ import { deriveCounty } from '../../utils/land';
 import { parseStrictInterestString } from '../../utils/interest-string';
 import { serialize } from '../../engine/decimal';
 import { assertFileSize, FILE_SIZE_LIMITS } from '../../utils/file-validation';
+import Button from '../shared/Button';
 import FormField from '../shared/FormField';
 import Modal from '../shared/Modal';
 import {
@@ -661,13 +662,9 @@ export default function AttachLeaseModal({
             </p>
           </div>
           <div className="flex justify-end">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 rounded-lg text-sm font-semibold bg-leather text-parchment hover:bg-leather/90 transition-colors"
-            >
+            <Button onClick={onClose}>
               Close
-            </button>
+            </Button>
           </div>
         </div>
       </Modal>

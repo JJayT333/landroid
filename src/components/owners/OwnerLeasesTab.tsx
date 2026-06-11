@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import Button from '../shared/Button';
 import FormField from '../shared/FormField';
 import { useConfirmation } from '../shared/ConfirmationProvider';
 import { distinctLesseeNames } from '../leasehold/lessee-names';
@@ -179,18 +180,16 @@ export default function OwnerLeasesTab({
           )}
 
           <div className="flex justify-end gap-2">
-            <button
-              type="button"
+            <Button
+              variant="ghost"
               onClick={() => {
                 setSaveError(null);
                 setDraft(null);
               }}
-              className="px-3 py-2 rounded-lg text-sm text-ink-light hover:bg-parchment-dark transition-colors"
             >
               Cancel
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
               disabled={readOnly || saving}
               onClick={async () => {
                 if (readOnly) return;
@@ -235,10 +234,9 @@ export default function OwnerLeasesTab({
                 setDraft(null);
               }}
               title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
-              className="px-4 py-2 rounded-lg bg-leather text-parchment text-sm font-semibold hover:bg-leather-light transition-colors disabled:cursor-not-allowed disabled:opacity-60"
             >
               {saving ? 'Saving...' : 'Save Lease'}
-            </button>
+            </Button>
           </div>
         </div>
       ) : (
