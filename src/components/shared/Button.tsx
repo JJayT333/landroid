@@ -1,34 +1,66 @@
 /**
- * The one Button (audit §5 item 2). Every primary/secondary/ghost/destructive
- * action shares this treatment so the app stops shipping ~20 hand-rolled
- * stylings of the same concept. Lean professional: no icon library, no
- * animation beyond color transitions. Nav tabs and pills are a different
- * concept and deliberately not this component.
+ * The one Button — "Ledger Refined" kit (design handoff 2026-06-11).
+ * Small, quiet, precise: 600-weight type, 8px radius, saddle primary with a
+ * near-invisible top-light gradient and pressed compression, hairline
+ * secondary, ghost washes, and a liquid-glass variant for chrome that floats
+ * over the canvas. Nav rows, pills, and tabs are different concepts and
+ * deliberately not this component.
+ *
+ * `destructive` is the SOLID seal treatment (typed-confirm modals, real
+ * deletes); `destructive-ghost` is the quiet inline form (Clear, card-row
+ * DELETE) so destructive actions read as dangerous only when they are.
  */
 import type { ButtonHTMLAttributes } from 'react';
 
-export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'destructive';
-export type ButtonSize = 'sm' | 'md';
+export type ButtonVariant =
+  | 'primary'
+  | 'secondary'
+  | 'ghost'
+  | 'destructive'
+  | 'destructive-ghost'
+  | 'glass';
+export type ButtonSize = 'xs' | 'sm' | 'md';
 
 const BASE =
-  'inline-flex items-center justify-center gap-1.5 rounded-md font-medium transition-colors '
-  + 'focus-visible:ring-2 focus-visible:ring-leather/40 focus-visible:ring-offset-1 focus-visible:ring-offset-parchment outline-none '
-  + 'disabled:opacity-50 disabled:cursor-not-allowed';
+  'inline-flex items-center justify-center gap-1.5 rounded-lg font-semibold whitespace-nowrap select-none '
+  + 'transition-all duration-150 ease-out outline-none '
+  + 'focus-visible:ring-2 focus-visible:ring-leather/40 focus-visible:ring-offset-1 focus-visible:ring-offset-parchment '
+  + 'disabled:opacity-45 disabled:cursor-not-allowed disabled:shadow-none disabled:active:translate-y-0';
+
+/* Raised variants share the lift choreography: inset top highlight at rest,
+   a touch more air on hover, compressed flat on press. */
+const RAISED_REST = 'shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_1px_2px_rgba(45,33,20,0.18)]';
+const RAISED_HOVER = 'hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_2px_6px_rgba(45,33,20,0.22)]';
+const RAISED_PRESS = 'active:translate-y-px active:shadow-[inset_0_1px_1px_rgba(45,33,20,0.25)]';
 
 const VARIANTS: Record<ButtonVariant, string> = {
   primary:
-    'bg-leather text-parchment hover:bg-leather-dark active:bg-leather-dark/90 disabled:hover:bg-leather',
+    `bg-leather bg-[linear-gradient(180deg,#96532f,#8a4b2d_55%)] text-[#fff6ec] ${RAISED_REST} `
+    + `hover:bg-[linear-gradient(180deg,#a25c39,#9c5836_55%)] ${RAISED_HOVER} `
+    + `active:bg-leather-dark active:bg-none ${RAISED_PRESS} `
+    + 'disabled:hover:bg-[linear-gradient(180deg,#96532f,#8a4b2d_55%)]',
   secondary:
-    'border border-ledger-line bg-parchment text-ink hover:bg-parchment-dark active:bg-parchment-dark/80 disabled:hover:bg-parchment',
+    'border border-line-strong bg-parchment-light text-ink shadow-[0_1px_2px_rgba(45,33,20,0.05)] '
+    + 'hover:bg-parchment-dark active:bg-parchment-dark active:shadow-none disabled:hover:bg-parchment-light',
   ghost:
-    'text-ink-light hover:text-ink hover:bg-parchment-dark/60 disabled:hover:bg-transparent',
+    'text-ink-soft hover:text-ink hover:bg-parchment-dark active:bg-parchment-dark/80 disabled:hover:bg-transparent disabled:hover:text-ink-soft',
   destructive:
-    'bg-seal text-parchment hover:bg-seal/85 active:bg-seal/75 disabled:hover:bg-seal',
+    `bg-seal bg-[linear-gradient(180deg,#b23e35,#a4342c_55%)] text-[#fff6ec] ${RAISED_REST} `
+    + `hover:bg-[linear-gradient(180deg,#bd4b42,#b03b32_55%)] ${RAISED_HOVER} `
+    + `active:bg-[#8e2d26] active:bg-none ${RAISED_PRESS} `
+    + 'disabled:hover:bg-[linear-gradient(180deg,#b23e35,#a4342c_55%)]',
+  'destructive-ghost':
+    'text-seal hover:bg-[#f7e9e4] active:bg-[#f2ddd7] disabled:hover:bg-transparent',
+  glass:
+    'border border-ledger-line bg-parchment-light/70 text-ink backdrop-blur-md backdrop-saturate-150 '
+    + 'shadow-[0_2px_8px_rgba(45,33,20,0.07)] hover:bg-parchment-dark/80 active:bg-parchment-dark '
+    + 'disabled:hover:bg-parchment-light/70',
 };
 
 const SIZES: Record<ButtonSize, string> = {
-  sm: 'px-2.5 py-1 text-xs',
-  md: 'px-3.5 py-2 text-sm',
+  xs: 'px-2.5 py-1 text-[11px]',
+  sm: 'px-3 py-[5px] text-xs',
+  md: 'px-3.5 py-1.5 text-sm',
 };
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
