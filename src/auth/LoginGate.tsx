@@ -23,7 +23,7 @@ export default function LoginGate({ children }: { children: ReactNode }) {
   if (!user) {
     return (
       <div className="flex h-screen items-center justify-center bg-parchment">
-        <div className="w-full max-w-sm space-y-6 rounded-2xl border border-leather/30 bg-parchment/80 p-8 shadow-lg">
+        <div className="w-full max-w-sm space-y-6 rounded-md border border-leather/30 bg-parchment/80 p-8 shadow-lg">
           <div className="space-y-1 text-center">
             <h1 className="font-display text-3xl font-bold text-ink">LANDroid</h1>
             <p className="text-sm text-ink-light">Sign in to continue</p>

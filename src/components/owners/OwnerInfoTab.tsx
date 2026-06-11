@@ -74,7 +74,7 @@ export default function OwnerInfoTab({
           disabled={readOnly}
           onChange={(event) => set('mailingAddress', event.target.value)}
           rows={3}
-          className="w-full px-3 py-2 rounded-lg border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none resize-y disabled:cursor-not-allowed disabled:opacity-60"
+          className="w-full px-3 py-2 rounded-md border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none resize-y disabled:cursor-not-allowed disabled:opacity-60"
         />
       </div>
 
@@ -87,7 +87,7 @@ export default function OwnerInfoTab({
           disabled={readOnly}
           onChange={(event) => set('notes', event.target.value)}
           rows={5}
-          className="w-full px-3 py-2 rounded-lg border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none resize-y disabled:cursor-not-allowed disabled:opacity-60"
+          className="w-full px-3 py-2 rounded-md border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none resize-y disabled:cursor-not-allowed disabled:opacity-60"
         />
       </div>
 
@@ -107,7 +107,7 @@ export default function OwnerInfoTab({
             await onDelete();
           }}
           title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
-          className="px-3 py-2 rounded-lg text-xs font-semibold text-seal hover:bg-seal/10 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+          className="px-3 py-2 rounded-md text-xs font-semibold text-seal hover:bg-seal/10 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
         >
           Delete Owner
         </button>

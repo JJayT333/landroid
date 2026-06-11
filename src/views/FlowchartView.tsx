@@ -731,7 +731,7 @@ function FlowchartCanvas() {
       />
 
       {nodes.length > 0 && (
-        <div className="no-print absolute bottom-3 left-3 z-10 px-3 py-1.5 rounded-lg bg-parchment border border-ledger-line shadow text-xs font-mono text-ink-light">
+        <div className="no-print absolute bottom-3 left-3 z-10 px-3 py-1.5 rounded-md bg-parchment border border-ledger-line shadow text-xs font-mono text-ink-light">
           {nodes.length} nodes on canvas
         </div>
       )}
@@ -772,14 +772,14 @@ function FlowchartCanvas() {
           color="var(--color-canvas-dot)"
         />
         <Controls
-          className="!bg-parchment !border-ledger-line !rounded-xl !shadow-lg"
+          className="!bg-parchment !border-ledger-line !rounded-md !shadow-lg"
           showInteractive={false}
         />
         <MiniMap
           nodeStrokeColor="#8b4513"
           nodeColor="#faf3e8"
           maskColor="rgba(250, 243, 232, 0.7)"
-          className="!rounded-xl"
+          className="!rounded-md"
           pannable
           zoomable
         />

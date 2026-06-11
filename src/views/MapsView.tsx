@@ -182,7 +182,7 @@ function FeaturedMapStage({
 
   if ((isImageAsset(asset) || isPdfAsset(asset)) && !objectUrl) {
     return (
-      <div className="rounded-xl border border-ledger-line bg-ledger p-6 text-sm text-ink-light">
+      <div className="rounded-md border border-ledger-line bg-ledger p-6 text-sm text-ink-light">
         Loading map…
       </div>
     );
@@ -191,7 +191,7 @@ function FeaturedMapStage({
   if (isImageAsset(asset)) {
     return (
       <div className="space-y-3">
-        <div className="rounded-xl border border-ledger-line bg-ledger p-3 overflow-auto">
+        <div className="rounded-md border border-ledger-line bg-ledger p-3 overflow-auto">
           <div
             className={`relative inline-block max-w-full ${
               placingRegion ? 'cursor-crosshair' : ''
@@ -207,7 +207,7 @@ function FeaturedMapStage({
             <img
               src={objectUrl ?? undefined}
               alt={asset.title || asset.fileName}
-              className="block max-h-[calc(100vh-17rem)] max-w-full rounded-lg shadow-sm"
+              className="block max-h-[calc(100vh-17rem)] max-w-full rounded-md shadow-sm"
             />
             <div className="absolute inset-0 pointer-events-none">
               {regions.map((region) => {
@@ -220,7 +220,7 @@ function FeaturedMapStage({
                       event.stopPropagation();
                       onSelectRegion(region.id);
                     }}
-                    className={`absolute rounded-lg border-2 shadow-sm transition-all pointer-events-auto ${
+                    className={`absolute rounded-md border-2 shadow-sm transition-all pointer-events-auto ${
                       isSelected ? 'ring-2 ring-ink/35' : 'hover:scale-[1.01]'
                     }`}
                     style={{
@@ -263,7 +263,7 @@ function FeaturedMapStage({
         <iframe
           src={objectUrl ?? undefined}
           sandbox="allow-downloads"
-          className="w-full rounded-xl border border-ledger-line bg-ledger"
+          className="w-full rounded-md border border-ledger-line bg-ledger"
           style={{ height: 'calc(100vh - 17rem)' }}
           title={asset.fileName}
         />
@@ -279,7 +279,7 @@ function FeaturedMapStage({
     return (
       <div className="space-y-3">
         {geoJsonSummary && (
-          <div className="rounded-xl border border-ledger-line bg-ledger p-4 space-y-3">
+          <div className="rounded-md border border-ledger-line bg-ledger p-4 space-y-3">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <div className="text-sm font-semibold text-ink">GeoJSON Features</div>
@@ -300,7 +300,7 @@ function FeaturedMapStage({
               {geoJsonSummary.features.slice(0, 8).map((feature) => (
                 <div
                   key={feature.id}
-                  className="rounded-lg border border-ledger-line bg-parchment px-3 py-2"
+                  className="rounded-md border border-ledger-line bg-parchment px-3 py-2"
                 >
                   <div className="text-sm font-semibold text-ink truncate">
                     {feature.label}
@@ -313,7 +313,7 @@ function FeaturedMapStage({
             </div>
           </div>
         )}
-        <pre className="max-h-[calc(100vh-17rem)] overflow-auto rounded-xl border border-ledger-line bg-ledger p-4 text-xs text-ink whitespace-pre-wrap break-words">
+        <pre className="max-h-[calc(100vh-17rem)] overflow-auto rounded-md border border-ledger-line bg-ledger p-4 text-xs text-ink whitespace-pre-wrap break-words">
           {textPreview ?? 'Loading preview...'}
         </pre>
         <div className="text-xs text-ink-light">
@@ -325,7 +325,7 @@ function FeaturedMapStage({
   }
 
   return (
-    <div className="rounded-xl border border-ledger-line bg-ledger p-6 text-sm text-ink-light">
+    <div className="rounded-md border border-ledger-line bg-ledger p-6 text-sm text-ink-light">
       This file type does not have an inline stage yet. Use Preview or Download to review it.
     </div>
   );
@@ -527,7 +527,7 @@ export default function MapsView() {
 
   return (
     <div className="h-full flex flex-col gap-4 p-4 bg-parchment-dark/30">
-      <div className="rounded-xl border border-ledger-line bg-parchment shadow-sm px-4 py-4 flex items-center justify-between gap-4">
+      <div className="rounded-md border border-ledger-line bg-parchment shadow-sm px-4 py-4 flex items-center justify-between gap-4">
         <div>
           <div className="text-xl font-display font-bold text-ink">Maps</div>
           <div className="text-sm text-ink-light">
@@ -536,7 +536,7 @@ export default function MapsView() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <div className="rounded-lg border border-ledger-line bg-ledger p-1 flex items-center">
+          <div className="rounded-md border border-ledger-line bg-ledger p-1 flex items-center">
             {(['present', 'edit'] as ViewMode[]).map((viewMode) => (
               <button
                 key={viewMode}
@@ -559,7 +559,7 @@ export default function MapsView() {
               if (!readOnly) inputRef.current?.click();
             }}
             title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
-            className="px-3 py-2 rounded-lg text-sm font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+            className="px-3 py-2 rounded-md text-sm font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
           >
             Upload Asset
           </button>
@@ -598,7 +598,7 @@ export default function MapsView() {
       />
 
       {mapAssets.length === 0 ? (
-        <div className="flex-1 rounded-xl border border-dashed border-ledger-line bg-parchment shadow-sm flex items-center justify-center px-6">
+        <div className="flex-1 rounded-md border border-dashed border-ledger-line bg-parchment shadow-sm flex items-center justify-center px-6">
           <div className="max-w-xl text-center">
             <div className="text-2xl font-display font-bold text-ink">
               Start with the main prospect map
@@ -612,7 +612,7 @@ export default function MapsView() {
         </div>
       ) : selectedAsset ? (
         <div className="grid flex-1 min-h-0 gap-4 lg:grid-cols-[minmax(0,2.35fr)_340px]">
-            <section className="min-h-0 rounded-xl border border-ledger-line bg-parchment shadow-sm overflow-hidden grid grid-rows-[auto_minmax(0,1fr)_auto]">
+            <section className="min-h-0 rounded-md border border-ledger-line bg-parchment shadow-sm overflow-hidden grid grid-rows-[auto_minmax(0,1fr)_auto]">
               <div className="px-4 py-3 border-b border-ledger-line bg-ledger flex items-center justify-between gap-3">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
@@ -641,7 +641,7 @@ export default function MapsView() {
                         if (!readOnly) setFeaturedAsset(selectedAsset.id);
                       }}
                       title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
-                      className="px-3 py-1.5 rounded-lg text-xs font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                      className="px-3 py-1.5 rounded-md text-xs font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       Make Featured
                     </button>
@@ -655,7 +655,7 @@ export default function MapsView() {
                       }}
                       disabled={readOnly || !supportsRegionOverlay}
                       title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
-                      className="px-3 py-1.5 rounded-lg text-xs font-semibold text-ink hover:bg-ledger border border-ledger-line transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                      className="px-3 py-1.5 rounded-md text-xs font-semibold text-ink hover:bg-ledger border border-ledger-line transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {placingRegion ? 'Cancel Placement' : 'New Region'}
                     </button>
@@ -675,7 +675,7 @@ export default function MapsView() {
                       }
                       disabled={readOnly}
                       title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
-                      className="px-3 py-1.5 rounded-lg text-xs font-semibold text-ink hover:bg-ledger border border-ledger-line transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                      className="px-3 py-1.5 rounded-md text-xs font-semibold text-ink hover:bg-ledger border border-ledger-line transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       Add Reference
                     </button>
@@ -683,7 +683,7 @@ export default function MapsView() {
                   <button
                     type="button"
                     onClick={() => setPreviewAssetId(selectedAsset.id)}
-                    className="px-3 py-1.5 rounded-lg text-xs font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors"
+                    className="px-3 py-1.5 rounded-md text-xs font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors"
                   >
                     Preview
                   </button>
@@ -695,7 +695,7 @@ export default function MapsView() {
                         if (!readOnly) setEditingAssetId(selectedAsset.id);
                       }}
                       title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
-                      className="px-3 py-1.5 rounded-lg text-xs font-semibold text-ink hover:bg-ledger transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                      className="px-3 py-1.5 rounded-md text-xs font-semibold text-ink hover:bg-ledger transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       Edit Asset
                     </button>
@@ -707,7 +707,7 @@ export default function MapsView() {
                         downloadBlob(blob, selectedAsset.fileName)
                       )
                     }
-                    className="px-3 py-1.5 rounded-lg text-xs font-semibold text-ink hover:bg-ledger transition-colors"
+                    className="px-3 py-1.5 rounded-md text-xs font-semibold text-ink hover:bg-ledger transition-colors"
                   >
                     Download
                   </button>
@@ -727,7 +727,7 @@ export default function MapsView() {
                         await removeAsset(selectedAsset.id);
                       }}
                       title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
-                      className="px-3 py-1.5 rounded-lg text-xs font-semibold text-seal hover:bg-seal/10 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                      className="px-3 py-1.5 rounded-md text-xs font-semibold text-seal hover:bg-seal/10 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       Delete
                     </button>
@@ -783,7 +783,7 @@ export default function MapsView() {
                         key={asset.id}
                         type="button"
                         onClick={() => setSelectedAssetId(asset.id)}
-                        className={`min-w-[220px] max-w-[220px] text-left rounded-xl border p-3 transition-colors ${
+                        className={`min-w-[220px] max-w-[220px] text-left rounded-md border p-3 transition-colors ${
                           selectedAsset?.id === asset.id
                             ? 'border-leather bg-leather/10'
                             : 'border-ledger-line bg-parchment-dark/30 hover:bg-parchment'
@@ -812,7 +812,7 @@ export default function MapsView() {
               </div>
             </section>
 
-            <aside className="min-h-0 rounded-xl border border-ledger-line bg-parchment shadow-sm overflow-hidden flex flex-col">
+            <aside className="min-h-0 rounded-md border border-ledger-line bg-parchment shadow-sm overflow-hidden flex flex-col">
               <div className="px-4 py-3 border-b border-ledger-line bg-ledger">
                 <div className="text-lg font-display font-bold text-ink">
                   {selectedRegion ? 'Region Story' : 'Map Story'}
@@ -825,7 +825,7 @@ export default function MapsView() {
               </div>
 
               <div className="flex-1 overflow-auto p-4 space-y-4">
-                <section className="rounded-xl border border-ledger-line bg-parchment-dark/40 p-3 space-y-2">
+                <section className="rounded-md border border-ledger-line bg-parchment-dark/40 p-3 space-y-2">
                   <div className="flex items-center justify-between gap-3">
                     <div className="text-sm font-semibold text-ink">Featured Map Summary</div>
                     <span className="text-[11px] text-ink-light">{selectedAsset.kind}</span>
@@ -865,7 +865,7 @@ export default function MapsView() {
                   </div>
 
                   {assetRegions.length === 0 ? (
-                    <div className="rounded-xl border border-dashed border-ledger-line bg-parchment-dark/30 p-3 text-sm text-ink-light">
+                    <div className="rounded-md border border-dashed border-ledger-line bg-parchment-dark/30 p-3 text-sm text-ink-light">
                       {supportsRegionOverlay
                         ? 'Switch to Edit mode and place your first region directly on the map.'
                         : 'This asset can be featured now, but clickable regions start with PNG or JPG map exports.'}
@@ -877,7 +877,7 @@ export default function MapsView() {
                           key={region.id}
                           type="button"
                           onClick={() => setSelectedRegionId(region.id)}
-                          className={`w-full text-left rounded-xl border p-3 transition-colors ${
+                          className={`w-full text-left rounded-md border p-3 transition-colors ${
                             selectedRegionId === region.id
                               ? 'border-leather bg-leather/10'
                               : 'border-ledger-line bg-parchment-dark/30 hover:bg-ledger'
@@ -911,7 +911,7 @@ export default function MapsView() {
                 </section>
 
                 {selectedRegion && (
-                  <section className="rounded-xl border border-ledger-line bg-ledger p-3 space-y-3">
+                  <section className="rounded-md border border-ledger-line bg-ledger p-3 space-y-3">
                     <div className="flex items-center justify-between gap-3">
                       <div>
                         <div className="text-sm font-semibold text-ink">
@@ -930,7 +930,7 @@ export default function MapsView() {
                               if (!readOnly) setEditingRegionId(selectedRegion.id);
                             }}
                             title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
-                            className="px-3 py-1.5 rounded-lg text-xs font-semibold text-ink hover:bg-parchment transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                            className="px-3 py-1.5 rounded-md text-xs font-semibold text-ink hover:bg-parchment transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                           >
                             Edit
                           </button>
@@ -949,7 +949,7 @@ export default function MapsView() {
                               await removeRegion(selectedRegion.id);
                             }}
                             title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
-                            className="px-3 py-1.5 rounded-lg text-xs font-semibold text-seal hover:bg-seal/10 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                            className="px-3 py-1.5 rounded-md text-xs font-semibold text-seal hover:bg-seal/10 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                           >
                             Delete
                           </button>
@@ -1009,7 +1009,7 @@ export default function MapsView() {
                         }
                         disabled={readOnly}
                         title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
-                        className="px-3 py-1.5 rounded-lg text-xs font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                        className="px-3 py-1.5 rounded-md text-xs font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         + Reference
                       </button>
@@ -1017,7 +1017,7 @@ export default function MapsView() {
                   </div>
 
                   {(selectedRegion ? regionReferences : assetReferences).length === 0 ? (
-                    <div className="rounded-xl border border-dashed border-ledger-line bg-parchment-dark/30 p-3 text-sm text-ink-light">
+                    <div className="rounded-md border border-dashed border-ledger-line bg-parchment-dark/30 p-3 text-sm text-ink-light">
                       Save deep links here for RRC lookups, downloads, or other outside reference pages.
                     </div>
                   ) : (
@@ -1029,7 +1029,7 @@ export default function MapsView() {
                           return (
                             <div
                               key={reference.id}
-                              className="rounded-xl border border-ledger-line bg-parchment-dark/30 p-3 space-y-2"
+                              className="rounded-md border border-ledger-line bg-parchment-dark/30 p-3 space-y-2"
                             >
                               <div className="flex items-center justify-between gap-3">
                                 <div>
@@ -1102,7 +1102,7 @@ export default function MapsView() {
                   )}
 
                   {selectedRegion && assetReferences.length > 0 && (
-                    <div className="rounded-xl border border-ledger-line bg-parchment-dark/20 p-3 space-y-2">
+                    <div className="rounded-md border border-ledger-line bg-parchment-dark/20 p-3 space-y-2">
                       <div className="text-xs font-semibold uppercase tracking-wider text-ink-light">
                         Map-level references
                       </div>

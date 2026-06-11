@@ -424,7 +424,7 @@ function PanZoomContainer({
       <button
         type="button"
         onClick={fitToContent}
-        className="absolute right-3 top-3 z-20 rounded-lg border border-ledger-line bg-parchment/95 px-3 py-1.5 text-xs font-semibold text-ink shadow-sm hover:bg-parchment-dark/80"
+        className="absolute right-3 top-3 z-20 rounded-md border border-ledger-line bg-parchment/95 px-3 py-1.5 text-xs font-semibold text-ink shadow-sm hover:bg-parchment-dark/80"
       >
         Fit
       </button>
@@ -668,7 +668,7 @@ function FormulaTray({
   if (formulas.length === 0) return null;
 
   return (
-    <aside className="absolute bottom-3 right-3 top-14 z-30 flex w-[22rem] max-w-[calc(100%-1.5rem)] flex-col rounded-lg border border-ledger-line bg-parchment/96 shadow-xl backdrop-blur">
+    <aside className="absolute bottom-3 right-3 top-14 z-30 flex w-[22rem] max-w-[calc(100%-1.5rem)] flex-col rounded-md border border-ledger-line bg-parchment/96 shadow-xl backdrop-blur">
       <div className="flex items-center justify-between gap-2 border-b border-ledger-line px-3 py-2">
         <div>
           <div className="text-xs font-semibold uppercase tracking-wider text-ink">
@@ -690,7 +690,7 @@ function FormulaTray({
         {formulas.map((formula) => (
           <section
             key={formula.id}
-            className="rounded-lg border border-leather/50 bg-ink p-3 text-xs text-parchment shadow-sm"
+            className="rounded-md border border-leather/50 bg-ink p-3 text-xs text-parchment shadow-sm"
           >
             <div className="mb-2 flex justify-end">
               <button
@@ -763,7 +763,7 @@ function UnitMapReferencePanel({
       <button
         type="button"
         onClick={onToggle}
-        className="absolute right-3 top-3 z-20 rounded-xl border border-ledger-line bg-parchment/95 px-3 py-2 text-xs font-semibold text-ink shadow-md backdrop-blur transition-colors hover:bg-parchment"
+        className="absolute right-3 top-3 z-20 rounded-md border border-ledger-line bg-parchment/95 px-3 py-2 text-xs font-semibold text-ink shadow-md backdrop-blur transition-colors hover:bg-parchment"
         title="Open Unit Map Reference"
       >
         Map Ref
@@ -772,7 +772,7 @@ function UnitMapReferencePanel({
   }
 
   return (
-    <aside className="absolute right-3 top-3 z-20 flex max-h-[min(34rem,calc(100%-1.5rem))] w-[21rem] max-w-[calc(100%-1.5rem)] flex-col overflow-hidden rounded-xl border border-ledger-line bg-parchment/96 shadow-xl backdrop-blur">
+    <aside className="absolute right-3 top-3 z-20 flex max-h-[min(34rem,calc(100%-1.5rem))] w-[21rem] max-w-[calc(100%-1.5rem)] flex-col overflow-hidden rounded-md border border-ledger-line bg-parchment/96 shadow-xl backdrop-blur">
       <div className="flex items-start justify-between gap-3 border-b border-ledger-line bg-ledger px-3 py-2">
         <div className="min-w-0">
           <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-light">
@@ -797,24 +797,24 @@ function UnitMapReferencePanel({
 
       <div className="min-h-0 flex-1 overflow-auto p-3">
         {(isImageMapAsset(asset) || isPdfMapAsset(asset)) && !objectUrl ? (
-          <div className="rounded-lg border border-dashed border-ledger-line bg-parchment-dark/40 px-3 py-4 text-sm text-ink-light">
+          <div className="rounded-md border border-dashed border-ledger-line bg-parchment-dark/40 px-3 py-4 text-sm text-ink-light">
             Loading map…
           </div>
         ) : isImageMapAsset(asset) ? (
           <img
             src={objectUrl ?? undefined}
             alt={asset.title || asset.fileName}
-            className="max-h-80 w-full rounded-lg border border-ledger-line bg-white object-contain"
+            className="max-h-80 w-full rounded-md border border-ledger-line bg-white object-contain"
           />
         ) : isPdfMapAsset(asset) ? (
           <iframe
             src={objectUrl ?? undefined}
             sandbox="allow-downloads"
-            className="h-80 w-full rounded-lg border border-ledger-line bg-white"
+            className="h-80 w-full rounded-md border border-ledger-line bg-white"
             title={asset.fileName}
           />
         ) : (
-          <div className="rounded-lg border border-dashed border-ledger-line bg-parchment-dark/40 px-3 py-4 text-sm text-ink-light">
+          <div className="rounded-md border border-dashed border-ledger-line bg-parchment-dark/40 px-3 py-4 text-sm text-ink-light">
             This map asset is saved as {asset.kind}. Use Maps for the full preview.
           </div>
         )}
@@ -840,7 +840,7 @@ function UnitMapReferencePanel({
           </div>
           <div className="break-all">{asset.fileName}</div>
           {(asset.presentationSummary || asset.notes) && (
-            <div className="rounded-lg border border-ledger-line bg-parchment-dark/35 p-2 leading-5 text-ink">
+            <div className="rounded-md border border-ledger-line bg-parchment-dark/35 p-2 leading-5 text-ink">
               {asset.presentationSummary || asset.notes}
             </div>
           )}
@@ -1292,7 +1292,7 @@ export default function DeskMapView() {
       <div className="flex-1 relative overflow-hidden bg-canvas-bg">
         {/* Toolbar */}
         <div
-          className={`absolute top-3 left-3 z-20 max-w-[calc(100%-1.5rem)] rounded-xl bg-parchment/92 backdrop-blur border border-ledger-line shadow-md ${
+          className={`absolute top-3 left-3 z-20 max-w-[calc(100%-1.5rem)] rounded-md bg-parchment/92 backdrop-blur border border-ledger-line shadow-md ${
             toolbarCollapsed ? 'w-auto p-2' : 'w-[19.5rem] p-2.5 space-y-2.5'
           }`}
         >
@@ -1316,7 +1316,7 @@ export default function DeskMapView() {
                 disabled={readOnly}
                 onClick={handleAddRoot}
                 title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
-                className="px-3 py-1.5 rounded-lg text-xs font-semibold text-leather hover:bg-leather/10 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                className="px-3 py-1.5 rounded-md text-xs font-semibold text-leather hover:bg-leather/10 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
               >
                 + Add Root
               </button>
@@ -1326,7 +1326,7 @@ export default function DeskMapView() {
                 type="button"
                 onClick={handleClearDeskMap}
                 disabled={readOnly || !activeDeskMap || visibleCardCount === 0}
-                className="rounded-lg border border-seal/30 px-3 py-1.5 text-xs font-semibold text-seal transition-colors hover:bg-seal/10 disabled:cursor-not-allowed disabled:opacity-40"
+                className="rounded-md border border-seal/30 px-3 py-1.5 text-xs font-semibold text-seal transition-colors hover:bg-seal/10 disabled:cursor-not-allowed disabled:opacity-40"
                 title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : 'Clear all cards from the active Desk Map'}
               >
                 Clear Map
@@ -1352,7 +1352,7 @@ export default function DeskMapView() {
                 type="button"
                 onClick={handleToggleNpris}
                 aria-pressed={hideNpris}
-                className="rounded-lg border border-ledger-line px-3 py-1.5 text-xs font-semibold text-ink-light transition-colors hover:bg-parchment-dark/70"
+                className="rounded-md border border-ledger-line px-3 py-1.5 text-xs font-semibold text-ink-light transition-colors hover:bg-parchment-dark/70"
                 title={
                   hideNpris
                     ? 'Show NPRI cards on the canvas'
@@ -1390,13 +1390,13 @@ export default function DeskMapView() {
                     cycleOwnerSearchMatch(event.shiftKey ? -1 : 1);
                   }}
                   placeholder="Type owner name..."
-                  className="min-w-0 flex-1 rounded-lg border border-ledger-line bg-white px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-leather"
+                  className="min-w-0 flex-1 rounded-md border border-ledger-line bg-white px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-leather"
                 />
                 {ownerSearchQuery.trim().length > 0 && (
                   <button
                     type="button"
                     onClick={() => setOwnerSearchQuery('')}
-                    className="rounded-lg border border-ledger-line px-2.5 py-2 text-[10px] font-semibold uppercase tracking-wider text-ink-light transition-colors hover:bg-parchment-dark/70"
+                    className="rounded-md border border-ledger-line px-2.5 py-2 text-[10px] font-semibold uppercase tracking-wider text-ink-light transition-colors hover:bg-parchment-dark/70"
                   >
                     Clear
                   </button>
@@ -1405,7 +1405,7 @@ export default function DeskMapView() {
             </label>
 
             {ownerSearchQuery.trim().length > 0 && (
-              <div className="rounded-lg border border-ledger-line bg-parchment-dark/35 px-2.5 py-2">
+              <div className="rounded-md border border-ledger-line bg-parchment-dark/35 px-2.5 py-2">
                 {activeOwnerSearchMatch ? (
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between gap-2">
@@ -1473,7 +1473,7 @@ export default function DeskMapView() {
           </div>
 
           {visibleNpriDiscrepancies.length > 0 && (
-            <div className="rounded-lg border border-seal/30 bg-seal/10 px-2.5 py-2 text-[10px] leading-4 text-seal">
+            <div className="rounded-md border border-seal/30 bg-seal/10 px-2.5 py-2 text-[10px] leading-4 text-seal">
               <div className="font-semibold uppercase tracking-wider">
                 NPRI title discrepancy
               </div>
@@ -1526,7 +1526,7 @@ export default function DeskMapView() {
               />
             </div>
             {d(coverageSummary.currentOwnership).greaterThan(1) && (
-              <div className="rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-2 text-[10px] leading-4 text-amber-950">
+              <div className="rounded-md border border-amber-300 bg-amber-50 px-2.5 py-2 text-[10px] leading-4 text-amber-950">
                 <div className="font-semibold uppercase tracking-wider">
                   Over 100% mineral coverage
                 </div>
@@ -1547,7 +1547,7 @@ export default function DeskMapView() {
             )}
             {coverageSummary.leaseOverlaps.length > 0 && (
               <div
-                className="rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-2 text-[10px] leading-4 text-amber-950"
+                className="rounded-md border border-amber-300 bg-amber-50 px-2.5 py-2 text-[10px] leading-4 text-amber-950"
                 title="Audit M5: overlapping active leases on the same owner. Later leases are clipped by earlier ones until reconciled."
               >
                 <div className="font-semibold uppercase tracking-wider">

@@ -30,7 +30,7 @@ export default function OwnerDocEditModal({
   return (
     <Modal open onClose={onClose} title="Edit Owner Document">
       <div className="space-y-4">
-        <div className="rounded-lg border border-ledger-line bg-ledger px-3 py-2">
+        <div className="rounded-md border border-ledger-line bg-ledger px-3 py-2">
           <div className="text-xs font-semibold text-ink">{doc.fileName}</div>
           <div className="text-[11px] text-ink-light">{doc.mimeType || 'Unknown type'}</div>
         </div>
@@ -42,7 +42,7 @@ export default function OwnerDocEditModal({
           <select
             value={category}
             onChange={(event) => setCategory(event.target.value as OwnerDocCategory)}
-            className="w-full px-3 py-2 rounded-lg border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none"
+            className="w-full px-3 py-2 rounded-md border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none"
           >
             {DOC_CATEGORY_OPTIONS.map((option) => (
               <option key={option} value={option}>
@@ -59,7 +59,7 @@ export default function OwnerDocEditModal({
           <select
             value={leaseId}
             onChange={(event) => setLeaseId(event.target.value)}
-            className="w-full px-3 py-2 rounded-lg border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none"
+            className="w-full px-3 py-2 rounded-md border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none"
           >
             <option value="">Not linked</option>
             {leases.map((lease) => (
@@ -78,7 +78,7 @@ export default function OwnerDocEditModal({
             value={notes}
             onChange={(event) => setNotes(event.target.value)}
             rows={4}
-            className="w-full px-3 py-2 rounded-lg border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none resize-y"
+            className="w-full px-3 py-2 rounded-md border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none resize-y"
           />
         </div>
 
@@ -86,7 +86,7 @@ export default function OwnerDocEditModal({
           <button
             type="button"
             onClick={onPreview}
-            className="px-3 py-2 rounded-lg text-xs font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors"
+            className="px-3 py-2 rounded-md text-xs font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors"
           >
             Preview
           </button>

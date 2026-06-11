@@ -180,7 +180,7 @@ export default function DeskMapTabs() {
                   setActiveDeskMap(dm.id);
                 }
               }}
-              className={`group flex items-center gap-2 px-6 py-2.5 rounded-2xl text-sm font-semibold whitespace-nowrap cursor-pointer transition-colors ${
+              className={`group flex items-center gap-2 px-6 py-2.5 rounded-md text-sm font-semibold whitespace-nowrap cursor-pointer transition-colors ${
                 activeDeskMapId === dm.id
                   ? 'bg-leather text-parchment'
                   : 'text-ink-light hover:bg-parchment-dark/70'
@@ -200,7 +200,7 @@ export default function DeskMapTabs() {
                   onClick={(e) => e.stopPropagation()}
                   aria-label={`Rename ${dm.name}`}
                   title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
-                  className="w-36 px-2 py-1 rounded-lg text-sm bg-parchment text-ink border border-ledger-line outline-none disabled:cursor-not-allowed disabled:opacity-60"
+                  className="w-36 px-2 py-1 rounded-md text-sm bg-parchment text-ink border border-ledger-line outline-none disabled:cursor-not-allowed disabled:opacity-60"
                 />
               ) : (
                 <span
@@ -244,7 +244,7 @@ export default function DeskMapTabs() {
         type="button"
         disabled={readOnly}
         onClick={handleCreate}
-        className="px-5 py-2.5 rounded-2xl text-sm font-semibold whitespace-nowrap text-leather hover:bg-leather/10 border border-dashed border-leather/40 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+        className="px-5 py-2.5 rounded-md text-sm font-semibold whitespace-nowrap text-leather hover:bg-leather/10 border border-dashed border-leather/40 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
         title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : 'Add new desk map'}
       >
         + Add Tract

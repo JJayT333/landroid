@@ -170,7 +170,7 @@ function SelectField<T extends string>({
         value={value}
         disabled={disabled}
         onChange={(event) => onChange(event.target.value as T)}
-        className="w-full px-3 py-2 rounded-lg border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none disabled:cursor-not-allowed disabled:opacity-60"
+        className="w-full px-3 py-2 rounded-md border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none disabled:cursor-not-allowed disabled:opacity-60"
       >
         {options.map((option) => (
           <option key={option} value={option}>
@@ -206,7 +206,7 @@ function NullableSelect({
         value={value ?? ''}
         disabled={disabled}
         onChange={(event) => onChange(event.target.value || null)}
-        className="w-full px-3 py-2 rounded-lg border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none disabled:cursor-not-allowed disabled:opacity-60"
+        className="w-full px-3 py-2 rounded-md border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none disabled:cursor-not-allowed disabled:opacity-60"
       >
         <option value="">{emptyLabel}</option>
         {options.map((option) => (
@@ -245,7 +245,7 @@ function TextAreaField({
         rows={rows}
         placeholder={placeholder}
         onChange={(event) => onChange(event.target.value)}
-        className="w-full px-3 py-2 rounded-lg border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none resize-y disabled:cursor-not-allowed disabled:opacity-60"
+        className="w-full px-3 py-2 rounded-md border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none resize-y disabled:cursor-not-allowed disabled:opacity-60"
       />
     </div>
   );
@@ -265,7 +265,7 @@ function LinkCheckboxes({
   disabled?: boolean;
 }) {
   return (
-    <div className="rounded-lg border border-ledger-line bg-ledger px-3 py-3 space-y-2">
+    <div className="rounded-md border border-ledger-line bg-ledger px-3 py-3 space-y-2">
       <div className="text-xs font-semibold uppercase tracking-wider text-ink-light">
         {title}
       </div>
@@ -1312,7 +1312,7 @@ export default function ResearchView() {
 
   return (
     <div className="h-full grid gap-4 p-4 bg-parchment-dark/30 lg:grid-cols-[320px_minmax(0,1fr)]">
-      <aside className="rounded-xl border border-ledger-line bg-parchment shadow-sm overflow-hidden flex flex-col">
+      <aside className="rounded-md border border-ledger-line bg-parchment shadow-sm overflow-hidden flex flex-col">
         <div className="px-4 py-4 border-b border-ledger-line bg-ledger space-y-3">
           <div>
             <div className="text-lg font-display font-bold text-ink">Research</div>
@@ -1323,7 +1323,7 @@ export default function ResearchView() {
 
           <FormField label="Search Research" value={search} onChange={setSearch} />
 
-          <div className="rounded-lg border border-ledger-line bg-parchment px-3 py-2 text-[11px] text-ink-light">
+          <div className="rounded-md border border-ledger-line bg-parchment px-3 py-2 text-[11px] text-ink-light">
             This workspace is for source-grounded review. RRC downloads remain available in
             Data Imports, but DBF/EBCDIC decoding is no longer the main track.
           </div>
@@ -1369,7 +1369,7 @@ export default function ResearchView() {
       </aside>
 
       <section className="min-w-0 grid gap-4 grid-rows-[auto_minmax(0,1fr)]">
-        <div className="rounded-xl border border-ledger-line bg-parchment shadow-sm p-4 flex items-start justify-between gap-4">
+        <div className="rounded-md border border-ledger-line bg-parchment shadow-sm p-4 flex items-start justify-between gap-4">
           <div>
             <div className="text-xl font-display font-bold text-ink">
               {activeSection.label}
@@ -1397,7 +1397,7 @@ export default function ResearchView() {
               disabled={readOnly || !workspaceId}
               onClick={() => void createSourceRecord()}
               title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
-              className="px-3 py-2 rounded-lg text-sm font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+              className="px-3 py-2 rounded-md text-sm font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
             >
               Add Source
             </button>
@@ -1408,7 +1408,7 @@ export default function ResearchView() {
               disabled={readOnly || !workspaceId}
               onClick={() => void createFormulaRecord()}
               title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
-              className="px-3 py-2 rounded-lg text-sm font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+              className="px-3 py-2 rounded-md text-sm font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
             >
               Add Formula
             </button>
@@ -1419,7 +1419,7 @@ export default function ResearchView() {
               disabled={readOnly || !workspaceId}
               onClick={() => void createProjectRecord()}
               title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
-              className="px-3 py-2 rounded-lg text-sm font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+              className="px-3 py-2 rounded-md text-sm font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
             >
               Add Project Record
             </button>
@@ -1430,7 +1430,7 @@ export default function ResearchView() {
               disabled={readOnly || !workspaceId}
               onClick={() => void createQuestionRecord()}
               title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
-              className="px-3 py-2 rounded-lg text-sm font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+              className="px-3 py-2 rounded-md text-sm font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
             >
               Add Question
             </button>
@@ -1438,7 +1438,7 @@ export default function ResearchView() {
         </div>
 
         {section === 'home' && (
-          <div className="min-h-0 overflow-auto rounded-xl border border-ledger-line bg-parchment shadow-sm p-4 space-y-4">
+          <div className="min-h-0 overflow-auto rounded-md border border-ledger-line bg-parchment shadow-sm p-4 space-y-4">
             <div className="grid gap-3 xl:grid-cols-4 md:grid-cols-2">
               <ResearchHomeTile
                 title="Sources"
@@ -1479,7 +1479,7 @@ export default function ResearchView() {
             </div>
 
             <div className="grid gap-4 xl:grid-cols-[minmax(0,1.25fr)_minmax(320px,0.75fr)]">
-              <section className="rounded-xl border border-ledger-line bg-ledger p-4 space-y-3">
+              <section className="rounded-md border border-ledger-line bg-ledger p-4 space-y-3">
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <div className="text-sm font-semibold text-ink">
@@ -1556,20 +1556,20 @@ export default function ResearchView() {
                       filteredProjectRecords.length +
                       filteredQuestions.length ===
                       0 && (
-                      <div className="rounded-lg border border-dashed border-ledger-line bg-parchment px-4 py-5 text-sm text-ink-light">
+                      <div className="rounded-md border border-dashed border-ledger-line bg-parchment px-4 py-5 text-sm text-ink-light">
                         No Research records match this search.
                       </div>
                     )}
                   </div>
                 ) : (
-                  <div className="rounded-lg border border-dashed border-ledger-line bg-parchment px-4 py-5 text-sm text-ink-light">
+                  <div className="rounded-md border border-dashed border-ledger-line bg-parchment px-4 py-5 text-sm text-ink-light">
                     Use the search box to find sources, formulas, project records, and
                     saved questions from one place.
                   </div>
                 )}
               </section>
 
-              <section className="rounded-xl border border-ledger-line bg-ledger p-4 space-y-3">
+              <section className="rounded-md border border-ledger-line bg-ledger p-4 space-y-3">
                 <div>
                   <div className="text-sm font-semibold text-ink">Review Queue</div>
                   <div className="text-xs text-ink-light">
@@ -1620,7 +1620,7 @@ export default function ResearchView() {
                     setQuestionStatusFilter('Needs Review');
                   }}
                 />
-                <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
                   Federal/private records stay reference-only here. They do not run
                   Texas Desk Map, Leasehold, NPRI, ORRI, WI, payout, or ONRR math.
                 </div>
@@ -1902,7 +1902,7 @@ export default function ResearchView() {
                     type="button"
                     disabled={!workspaceId}
                     onClick={() => void addFormulaStarters()}
-                    className="self-end px-3 py-2 rounded-lg text-xs font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors disabled:opacity-50"
+                    className="self-end px-3 py-2 rounded-md text-xs font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors disabled:opacity-50"
                   >
                     Add Math Starters
                   </button>
@@ -2110,7 +2110,7 @@ export default function ResearchView() {
             >
               {selectedProjectRecord ? (
                 <div className="space-y-4">
-                  <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                  <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
                     Federal/private math is intentionally not active here yet. Use this
                     record to track leases, tracts, acquisition status, maps, and sources.
                   </div>
@@ -2523,7 +2523,7 @@ export default function ResearchView() {
 
         {section === 'imports' && (
           <div className="grid min-h-0 gap-4 lg:grid-cols-[360px_minmax(0,1fr)]">
-            <aside className="rounded-xl border border-ledger-line bg-parchment shadow-sm overflow-hidden flex flex-col">
+            <aside className="rounded-md border border-ledger-line bg-parchment shadow-sm overflow-hidden flex flex-col">
               <div className="px-4 py-4 border-b border-ledger-line bg-ledger space-y-3">
                 <div>
                   <div className="text-sm font-semibold text-ink">RRC Data Imports</div>
@@ -2576,7 +2576,7 @@ export default function ResearchView() {
               </div>
             </aside>
 
-            <section className="rounded-xl border border-ledger-line bg-parchment shadow-sm overflow-hidden flex flex-col">
+            <section className="rounded-md border border-ledger-line bg-parchment shadow-sm overflow-hidden flex flex-col">
               <div className="px-4 py-4 border-b border-ledger-line bg-ledger flex items-start justify-between gap-4">
                 <div>
                   <div className="text-lg font-display font-bold text-ink">
@@ -2596,7 +2596,7 @@ export default function ResearchView() {
                       if (!readOnly) inputRef.current?.click();
                     }}
                     title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
-                    className="px-3 py-2 rounded-lg text-sm font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                    className="px-3 py-2 rounded-md text-sm font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Import Files
                   </button>
@@ -2604,7 +2604,7 @@ export default function ResearchView() {
                     href={selectedDataset?.officialUrl ?? RRC_DATASETS_PAGE_URL}
                     target="_blank"
                     rel="noreferrer"
-                    className="px-3 py-2 rounded-lg text-sm font-semibold text-ink hover:bg-parchment border border-ledger-line transition-colors"
+                    className="px-3 py-2 rounded-md text-sm font-semibold text-ink hover:bg-parchment border border-ledger-line transition-colors"
                   >
                     Open Official Page
                   </a>
@@ -2657,7 +2657,7 @@ export default function ResearchView() {
               />
 
               <div className="grid min-h-0 flex-1 gap-4 p-4 lg:grid-cols-[300px_minmax(0,1fr)]">
-                <div className="rounded-xl border border-ledger-line bg-ledger overflow-hidden flex flex-col">
+                <div className="rounded-md border border-ledger-line bg-ledger overflow-hidden flex flex-col">
                   <div className="px-4 py-3 border-b border-ledger-line">
                     <div className="text-sm font-semibold text-ink">Imported Files</div>
                     <div className="text-xs text-ink-light">{visibleImports.length} files</div>
@@ -2700,7 +2700,7 @@ export default function ResearchView() {
                 <div className="min-h-0 overflow-auto">
                   {selectedImport ? (
                     <div className="space-y-4">
-                      <div className="rounded-xl border border-ledger-line bg-parchment-dark/30 p-4 space-y-3">
+                      <div className="rounded-md border border-ledger-line bg-parchment-dark/30 p-4 space-y-3">
                         <div className="flex items-start justify-between gap-4">
                           <div className="space-y-1 min-w-0">
                             <div className="text-lg font-display font-bold text-ink">
@@ -2720,7 +2720,7 @@ export default function ResearchView() {
                             <button
                               type="button"
                               onClick={() => setPreviewImportId(selectedImport.id)}
-                              className="px-3 py-1.5 rounded-lg text-xs font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors"
+                              className="px-3 py-1.5 rounded-md text-xs font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors"
                             >
                               Preview
                             </button>
@@ -2729,7 +2729,7 @@ export default function ResearchView() {
                               onClick={() =>
                                 downloadBlob(selectedImport.blob, selectedImport.fileName)
                               }
-                              className="px-3 py-1.5 rounded-lg text-xs font-semibold text-ink hover:bg-ledger transition-colors"
+                              className="px-3 py-1.5 rounded-md text-xs font-semibold text-ink hover:bg-ledger transition-colors"
                             >
                               Download
                             </button>
@@ -2748,7 +2748,7 @@ export default function ResearchView() {
                                 await removeImport(selectedImport.id);
                               }}
                               title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
-                              className="px-3 py-1.5 rounded-lg text-xs font-semibold text-seal hover:bg-seal/10 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                              className="px-3 py-1.5 rounded-md text-xs font-semibold text-seal hover:bg-seal/10 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                             >
                               Delete
                             </button>
@@ -2772,7 +2772,7 @@ export default function ResearchView() {
                               onChange={(event) =>
                                 setImportMetadataField('datasetId', event.target.value || null)
                               }
-                              className="w-full px-3 py-2 rounded-lg border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none disabled:cursor-not-allowed disabled:opacity-60"
+                              className="w-full px-3 py-2 rounded-md border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none disabled:cursor-not-allowed disabled:opacity-60"
                             >
                               {importMetadataDraft?.datasetId === null && (
                                 <option value="">Unassigned legacy import</option>
@@ -2795,7 +2795,7 @@ export default function ResearchView() {
                           disabled={readOnly}
                         />
 
-                        <div className="flex items-center justify-between gap-3 rounded-lg border border-ledger-line bg-ledger px-3 py-2">
+                        <div className="flex items-center justify-between gap-3 rounded-md border border-ledger-line bg-ledger px-3 py-2">
                           <div className="text-xs text-ink-light">
                             Import edits stay local until you save them.
                           </div>
@@ -2821,26 +2821,26 @@ export default function ResearchView() {
                         </div>
 
                         {importMetadataSaveError && (
-                          <div className="rounded-lg border border-seal/30 bg-seal/5 px-3 py-2 text-sm text-seal">
+                          <div className="rounded-md border border-seal/30 bg-seal/5 px-3 py-2 text-sm text-seal">
                             {importMetadataSaveError}
                           </div>
                         )}
                       </div>
 
-                      <div className="rounded-xl border border-ledger-line bg-ledger p-4 text-sm text-ink">
+                      <div className="rounded-md border border-ledger-line bg-ledger p-4 text-sm text-ink">
                         Data imports are now secondary. Use them when a raw official
                         download needs to support a source, project record, or saved
                         research question.
                       </div>
 
                       {selectedTextPreviewState.isLoading && (
-                        <div className="rounded-xl border border-ledger-line bg-ledger p-4 text-sm text-ink-light">
+                        <div className="rounded-md border border-ledger-line bg-ledger p-4 text-sm text-ink-light">
                           Building a readable table preview for this text file.
                         </div>
                       )}
 
                       {selectedTextPreviewState.errorMessage && (
-                        <div className="rounded-xl border border-seal/30 bg-seal/5 p-4 text-sm text-seal">
+                        <div className="rounded-md border border-seal/30 bg-seal/5 p-4 text-sm text-seal">
                           {selectedTextPreviewState.errorMessage}
                         </div>
                       )}
@@ -2916,7 +2916,7 @@ function RecordList({
   onSelect: (id: string) => void;
 }) {
   return (
-    <div className="rounded-xl border border-ledger-line bg-parchment shadow-sm overflow-hidden flex flex-col">
+    <div className="rounded-md border border-ledger-line bg-parchment shadow-sm overflow-hidden flex flex-col">
       {toolbar && <div className="border-b border-ledger-line bg-ledger p-3">{toolbar}</div>}
       <div className="flex-1 overflow-auto">
         {records.length === 0 ? (
@@ -2967,7 +2967,7 @@ function FilterSelect({
       <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="w-full px-3 py-2 rounded-lg border border-ledger-line bg-parchment text-xs text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none"
+        className="w-full px-3 py-2 rounded-md border border-ledger-line bg-parchment text-xs text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none"
       >
         {options.map((option) => (
           <option key={option} value={option}>
@@ -2997,7 +2997,7 @@ function ResearchHomeTile({
   disabled?: boolean;
 }) {
   return (
-    <section className="rounded-xl border border-ledger-line bg-ledger p-4 space-y-3">
+    <section className="rounded-md border border-ledger-line bg-ledger p-4 space-y-3">
       <button
         type="button"
         onClick={onOpen}
@@ -3014,7 +3014,7 @@ function ResearchHomeTile({
         disabled={disabled}
         onClick={onAction}
         title={disabled ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
-        className="px-3 py-2 rounded-lg text-xs font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+        className="px-3 py-2 rounded-md text-xs font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
       >
         {actionLabel}
       </button>
@@ -3037,7 +3037,7 @@ function SearchResultButton({
     <button
       type="button"
       onClick={onClick}
-      className="w-full rounded-lg border border-ledger-line bg-parchment px-3 py-2 text-left hover:border-leather/40 hover:bg-parchment-dark/30 transition-colors"
+      className="w-full rounded-md border border-ledger-line bg-parchment px-3 py-2 text-left hover:border-leather/40 hover:bg-parchment-dark/30 transition-colors"
     >
       <div className="text-[11px] font-semibold uppercase tracking-wider text-ink-light">
         {type}
@@ -3061,7 +3061,7 @@ function ReviewQueueRow({
     <button
       type="button"
       onClick={onClick}
-      className="w-full rounded-lg border border-ledger-line bg-parchment px-3 py-2 text-left hover:border-leather/40 hover:bg-parchment-dark/30 transition-colors"
+      className="w-full rounded-md border border-ledger-line bg-parchment px-3 py-2 text-left hover:border-leather/40 hover:bg-parchment-dark/30 transition-colors"
     >
       <div className="flex items-center justify-between gap-3">
         <span className="text-sm text-ink">{label}</span>
@@ -3194,7 +3194,7 @@ const LANDMAN_RESOURCE_GROUPS: LandmanResourceGroup[] = [
 
 function LandmanResourcesPanel() {
   return (
-    <section className="rounded-xl border border-ledger-line bg-ledger p-4 space-y-3">
+    <section className="rounded-md border border-ledger-line bg-ledger p-4 space-y-3">
       <div>
         <div className="text-sm font-semibold text-ink">Landman Resources</div>
         <div className="text-xs text-ink-light">
@@ -3206,7 +3206,7 @@ function LandmanResourcesPanel() {
         {LANDMAN_RESOURCE_GROUPS.map((group) => (
           <div
             key={group.title}
-            className="rounded-lg border border-ledger-line bg-parchment p-3 space-y-2"
+            className="rounded-md border border-ledger-line bg-parchment p-3 space-y-2"
           >
             <div>
               <div className="text-[11px] font-bold uppercase tracking-wider text-leather">
@@ -3248,7 +3248,7 @@ function LinkedSummary({
   items: Array<{ label: string; meta: string }>;
 }) {
   return (
-    <div className="rounded-lg border border-ledger-line bg-ledger px-3 py-3 space-y-2">
+    <div className="rounded-md border border-ledger-line bg-ledger px-3 py-3 space-y-2">
       <div className="text-xs font-semibold uppercase tracking-wider text-ink-light">
         {title}
       </div>
@@ -3259,7 +3259,7 @@ function LinkedSummary({
           {items.map((item) => (
             <div
               key={`${item.meta}-${item.label}`}
-              className="rounded-lg border border-ledger-line bg-parchment px-3 py-2"
+              className="rounded-md border border-ledger-line bg-parchment px-3 py-2"
             >
               <div className="text-sm font-semibold text-ink truncate">{item.label}</div>
               <div className="mt-1 text-[11px] text-ink-light">{item.meta}</div>
@@ -3287,7 +3287,7 @@ function DetailShell({
   children: ReactNode;
 }) {
   return (
-    <div className="rounded-xl border border-ledger-line bg-parchment shadow-sm overflow-hidden flex flex-col">
+    <div className="rounded-md border border-ledger-line bg-parchment shadow-sm overflow-hidden flex flex-col">
       <div className="border-b border-ledger-line bg-ledger px-4 py-3 flex items-start justify-between gap-4">
         <div className="min-w-0">
           <div className="text-lg font-display font-bold text-ink truncate">{title}</div>
@@ -3299,7 +3299,7 @@ function DetailShell({
             disabled={deleteDisabled}
             onClick={() => void onDelete()}
             title={deleteDisabled ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
-            className="px-3 py-1.5 rounded-lg text-xs font-semibold text-seal hover:bg-seal/10 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+            className="px-3 py-1.5 rounded-md text-xs font-semibold text-seal hover:bg-seal/10 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
           >
             Delete
           </button>
@@ -3316,7 +3316,7 @@ function DetailShell({
 
 function EmptyDetail({ message }: { message: string }) {
   return (
-    <div className="h-full rounded-xl border border-dashed border-ledger-line bg-parchment flex items-center justify-center">
+    <div className="h-full rounded-md border border-dashed border-ledger-line bg-parchment flex items-center justify-center">
       <div className="max-w-lg px-6 text-center">
         <div className="text-xl font-display font-bold text-ink">Nothing selected</div>
         <div className="mt-2 text-sm text-ink-light">{message}</div>

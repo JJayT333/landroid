@@ -94,7 +94,7 @@ export default function OwnerLeasesTab({
   return (
     <div className="space-y-4">
       {draft ? (
-        <div className="rounded-xl border border-ledger-line bg-ledger p-4 space-y-3">
+        <div className="rounded-md border border-ledger-line bg-ledger p-4 space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <FormField
               label="Lease Name"
@@ -143,7 +143,7 @@ export default function OwnerLeasesTab({
                 value={draft.status}
                 disabled={readOnly}
                 onChange={(event) => set('status', event.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none disabled:cursor-not-allowed disabled:opacity-60"
+                className="w-full px-3 py-2 rounded-md border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {statusOptions.map((status) => (
                   <option key={status} value={status}>
@@ -169,12 +169,12 @@ export default function OwnerLeasesTab({
               disabled={readOnly}
               onChange={(event) => set('notes', event.target.value)}
               rows={4}
-              className="w-full px-3 py-2 rounded-lg border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none resize-y disabled:cursor-not-allowed disabled:opacity-60"
+              className="w-full px-3 py-2 rounded-md border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none resize-y disabled:cursor-not-allowed disabled:opacity-60"
             />
           </div>
 
           {saveError && (
-            <div className="rounded-lg border border-seal/30 bg-seal/10 px-3 py-2 text-xs text-seal">
+            <div className="rounded-md border border-seal/30 bg-seal/10 px-3 py-2 text-xs text-seal">
               {saveError}
             </div>
           )}
@@ -245,7 +245,7 @@ export default function OwnerLeasesTab({
           disabled={readOnly}
           onClick={beginAdd}
           title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
-          className="px-3 py-2 rounded-lg text-sm font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+          className="px-3 py-2 rounded-md text-sm font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
         >
           + Add Lease
         </button>
@@ -253,7 +253,7 @@ export default function OwnerLeasesTab({
 
       <div className="space-y-3">
         {leases.length === 0 && (
-          <div className="rounded-lg border border-dashed border-ledger-line px-4 py-5 text-sm text-ink-light">
+          <div className="rounded-md border border-dashed border-ledger-line px-4 py-5 text-sm text-ink-light">
             No leases linked to this owner yet.
           </div>
         )}
@@ -261,7 +261,7 @@ export default function OwnerLeasesTab({
         {leases.map((lease) => (
           <div
             key={lease.id}
-            className="rounded-xl border border-ledger-line bg-parchment px-4 py-3"
+            className="rounded-md border border-ledger-line bg-parchment px-4 py-3"
           >
             {(() => {
               const deskMapTargets = getDeskMapTargetsForLease(lease.id);
@@ -309,7 +309,7 @@ export default function OwnerLeasesTab({
                   disabled={readOnly}
                   onClick={() => beginEdit(lease)}
                   title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
-                  className="px-3 py-1.5 rounded-lg text-xs font-semibold text-leather hover:bg-leather/10 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                  className="px-3 py-1.5 rounded-md text-xs font-semibold text-leather hover:bg-leather/10 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Edit
                 </button>
@@ -328,7 +328,7 @@ export default function OwnerLeasesTab({
                     await onRemove(lease.id);
                   }}
                   title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
-                  className="px-3 py-1.5 rounded-lg text-xs font-semibold text-seal hover:bg-seal/10 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                  className="px-3 py-1.5 rounded-md text-xs font-semibold text-seal hover:bg-seal/10 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Delete
                 </button>
@@ -351,7 +351,7 @@ export default function OwnerLeasesTab({
                                 ? READ_ONLY_WORKSPACE_EDIT_TITLE
                                 : undefined
                             }
-                            className="px-3 py-1.5 rounded-lg text-xs font-semibold text-emerald-900 hover:bg-emerald-100 border border-emerald-300 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                            className="px-3 py-1.5 rounded-md text-xs font-semibold text-emerald-900 hover:bg-emerald-100 border border-emerald-300 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                           >
                             {target.leaseNodeId ? 'Open' : 'Create'} {target.deskMapName}
                           </button>
@@ -360,7 +360,7 @@ export default function OwnerLeasesTab({
                         <button
                           type="button"
                           disabled
-                          className="px-3 py-1.5 rounded-lg text-xs font-semibold text-ink-light border border-ledger-line opacity-70 cursor-not-allowed"
+                          className="px-3 py-1.5 rounded-md text-xs font-semibold text-ink-light border border-ledger-line opacity-70 cursor-not-allowed"
                         >
                           Link Owner In Desk Map First
                         </button>

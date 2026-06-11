@@ -385,7 +385,7 @@ export default function Navbar({ onOpenProjectPicker }: NavbarProps) {
       className="no-print flex items-center justify-between px-4 py-2 bg-ink text-parchment border-b border-leather"
     >
       <div className="flex min-w-0 items-center gap-3">
-        <div className="flex h-11 w-[4.25rem] shrink-0 items-center justify-center overflow-hidden rounded-xl border border-parchment/15 bg-parchment/5 px-1.5 shadow-lg">
+        <div className="flex h-11 w-[4.25rem] shrink-0 items-center justify-center overflow-hidden rounded-md border border-parchment/15 bg-parchment/5 px-1.5 shadow-lg">
           <img
             src={landroidLogoUrl}
             alt="LANDroid logo"
@@ -430,7 +430,7 @@ export default function Navbar({ onOpenProjectPicker }: NavbarProps) {
       <div className="flex min-w-0 items-center gap-4">
         <div className="flex min-w-0 gap-1 overflow-x-auto">
           <div className="flex items-center pr-2">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-parchment/15 bg-parchment/10 p-1 shadow-md">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-md border border-parchment/15 bg-parchment/10 p-1 shadow-md">
               <img
                 src={ravenForestBackdropUrl}
                 alt="Prospect mark"
@@ -451,7 +451,7 @@ export default function Navbar({ onOpenProjectPicker }: NavbarProps) {
                     ? READ_ONLY_WORKSPACE_EDIT_TITLE
                     : 'Nothing to undo'
               }
-              className="shrink-0 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors text-parchment/70 hover:text-parchment hover:bg-ink-light/30 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+              className="shrink-0 px-3 py-1.5 rounded-md text-sm font-medium transition-colors text-parchment/70 hover:text-parchment hover:bg-ink-light/30 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
             >
               Undo
             </button>
@@ -463,7 +463,7 @@ export default function Navbar({ onOpenProjectPicker }: NavbarProps) {
               onClick={() => setView(v.id)}
               aria-current={view === v.id ? 'page' : undefined}
               className={`
-                shrink-0 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors
+                shrink-0 px-3 py-1.5 rounded-md text-sm font-medium transition-colors
                 ${view === v.id
                   ? 'bg-leather text-parchment'
                   : 'text-parchment/70 hover:text-parchment hover:bg-ink-light/30'}
@@ -489,7 +489,7 @@ export default function Navbar({ onOpenProjectPicker }: NavbarProps) {
                 setDemoMenuOpen(false);
                 onOpenProjectPicker();
               }}
-              className="px-3 py-1.5 rounded-lg text-xs font-medium text-parchment/70 hover:text-parchment hover:bg-ink-light/30 transition-colors"
+              className="px-3 py-1.5 rounded-md text-xs font-medium text-parchment/70 hover:text-parchment hover:bg-ink-light/30 transition-colors"
             >
               Projects
             </button>
@@ -503,14 +503,14 @@ export default function Navbar({ onOpenProjectPicker }: NavbarProps) {
               }}
               aria-haspopup="menu"
               aria-expanded={fileMenuOpen}
-              className="px-3 py-1.5 rounded-lg text-xs font-medium text-parchment/70 hover:text-parchment hover:bg-ink-light/30 transition-colors"
+              className="px-3 py-1.5 rounded-md text-xs font-medium text-parchment/70 hover:text-parchment hover:bg-ink-light/30 transition-colors"
             >
               File ▾
             </button>
             {fileMenuOpen && (
               <div
                 role="menu"
-                className="absolute right-0 z-20 mt-1 w-40 overflow-hidden rounded-lg border border-leather bg-ink shadow-xl"
+                className="absolute right-0 z-20 mt-1 w-40 overflow-hidden rounded-md border border-leather bg-ink shadow-xl"
               >
                 <button
                   type="button"
@@ -549,14 +549,14 @@ export default function Navbar({ onOpenProjectPicker }: NavbarProps) {
                 title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
                 aria-haspopup="menu"
                 aria-expanded={demoMenuOpen}
-                className="px-3 py-1.5 rounded-lg text-xs font-medium text-gold/80 hover:text-gold hover:bg-gold/10 transition-colors disabled:opacity-50"
+                className="px-3 py-1.5 rounded-md text-xs font-medium text-gold/80 hover:text-gold hover:bg-gold/10 transition-colors disabled:opacity-50"
               >
                 {seedLoading ? 'Loading…' : 'Demo Data ▾'}
               </button>
               {demoMenuOpen && (
                 <div
                   role="menu"
-                  className="absolute right-0 z-20 mt-1 w-56 overflow-hidden rounded-lg border border-leather bg-ink shadow-xl"
+                  className="absolute right-0 z-20 mt-1 w-56 overflow-hidden rounded-md border border-leather bg-ink shadow-xl"
                 >
                   <button
                     type="button"

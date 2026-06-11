@@ -83,7 +83,7 @@ export default function InstrumentSelect({
         onClick={() => { setOpen(!open); setFilter(''); }}
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
-        className="w-full px-3 py-1.5 rounded-lg border border-ledger-line bg-parchment text-ink text-sm text-left focus:ring-2 focus:ring-leather focus:border-leather outline-none flex items-center justify-between disabled:bg-leather/10 disabled:opacity-70"
+        className="w-full px-3 py-1.5 rounded-md border border-ledger-line bg-parchment text-ink text-sm text-left focus:ring-2 focus:ring-leather focus:border-leather outline-none flex items-center justify-between disabled:bg-leather/10 disabled:opacity-70"
       >
         <span className={value ? 'text-ink' : 'text-ink-light'}>{value || 'Select...'}</span>
         <span className="text-ink-light text-xs">&#9662;</span>
@@ -92,7 +92,7 @@ export default function InstrumentSelect({
       {open && (
         <div
           id={menuId}
-          className="absolute z-50 mt-1 w-full bg-parchment border border-ledger-line rounded-lg shadow-xl max-h-60 overflow-y-auto"
+          className="absolute z-50 mt-1 w-full bg-parchment border border-ledger-line rounded-md shadow-xl max-h-60 overflow-y-auto"
         >
           {/* Search filter */}
           <div className="p-2 border-b border-ledger-line">

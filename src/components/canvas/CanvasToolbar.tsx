@@ -173,13 +173,13 @@ export default function CanvasToolbar({
   };
 
   return (
-    <div className="no-print absolute top-3 left-3 z-10 flex items-center gap-1 rounded-xl bg-parchment/95 backdrop-blur border border-ledger-line shadow-lg px-2 py-1.5">
+    <div className="no-print absolute top-3 left-3 z-10 flex items-center gap-1 rounded-md bg-parchment/95 backdrop-blur border border-ledger-line shadow-lg px-2 py-1.5">
       {/* Undo / Redo */}
       <button
         type="button"
         onClick={undo}
         disabled={!canUndo}
-        className="px-2 py-1.5 rounded-lg text-sm transition-colors text-ink-light hover:bg-parchment-dark disabled:opacity-30"
+        className="px-2 py-1.5 rounded-md text-sm transition-colors text-ink-light hover:bg-parchment-dark disabled:opacity-30"
         title="Undo (Ctrl+Z)"
         aria-label="Undo"
       >
@@ -189,7 +189,7 @@ export default function CanvasToolbar({
         type="button"
         onClick={redo}
         disabled={!canRedo}
-        className="px-2 py-1.5 rounded-lg text-sm transition-colors text-ink-light hover:bg-parchment-dark disabled:opacity-30"
+        className="px-2 py-1.5 rounded-md text-sm transition-colors text-ink-light hover:bg-parchment-dark disabled:opacity-30"
         title="Redo (Ctrl+Shift+Z)"
         aria-label="Redo"
       >
@@ -207,7 +207,7 @@ export default function CanvasToolbar({
           aria-label={tool.label}
           aria-pressed={activeTool === tool.id}
           className={`
-            px-2.5 py-1.5 rounded-lg text-sm transition-colors
+            px-2.5 py-1.5 rounded-md text-sm transition-colors
             ${activeTool === tool.id
               ? 'bg-leather text-parchment font-semibold'
               : 'text-ink-light hover:bg-parchment-dark'}
@@ -224,7 +224,7 @@ export default function CanvasToolbar({
       <button
         type="button"
         onClick={onImportTree}
-        className="px-3 py-1.5 rounded-lg text-xs font-semibold text-leather hover:bg-leather/10 transition-colors"
+        className="px-3 py-1.5 rounded-md text-xs font-semibold text-leather hover:bg-leather/10 transition-colors"
         title="Import active desk map to canvas"
       >
         Import Desk Map
@@ -238,7 +238,7 @@ export default function CanvasToolbar({
         onClick={() => setSnapToGrid(!snapToGrid)}
         aria-label="Snap to grid"
         aria-pressed={snapToGrid}
-        className={`px-2 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+        className={`px-2 py-1.5 rounded-md text-xs font-medium transition-colors ${
           snapToGrid
             ? 'bg-leather/20 text-leather font-semibold'
             : 'text-ink-light hover:bg-parchment-dark'
@@ -256,7 +256,7 @@ export default function CanvasToolbar({
         <select
           value={pageSize}
           onChange={(e) => setPageSize(e.target.value as typeof pageSize)}
-          className="rounded-lg border border-ledger-line bg-parchment px-2 py-1 text-[11px] font-medium text-ink outline-none"
+          className="rounded-md border border-ledger-line bg-parchment px-2 py-1 text-[11px] font-medium text-ink outline-none"
           title="Canvas paper size"
         >
           {PAGE_SIZE_DEFINITIONS.map((definition) => (
@@ -287,7 +287,7 @@ export default function CanvasToolbar({
           setOrientation(orientation === 'landscape' ? 'portrait' : 'landscape')
         }
         aria-label={`Switch to ${orientation === 'landscape' ? 'portrait' : 'landscape'}`}
-        className="px-2 py-1.5 rounded-lg text-xs font-medium text-ink-light hover:bg-parchment-dark transition-colors"
+        className="px-2 py-1.5 rounded-md text-xs font-medium text-ink-light hover:bg-parchment-dark transition-colors"
         title={`Switch to ${orientation === 'landscape' ? 'portrait' : 'landscape'}`}
       >
         {orientation === 'landscape' ? '⬌' : '⬍'}
@@ -315,7 +315,7 @@ export default function CanvasToolbar({
       <button
         type="button"
         onClick={onFitToGrid}
-        className="px-3 py-1.5 rounded-lg text-xs font-semibold text-leather hover:bg-leather/10 transition-colors"
+        className="px-3 py-1.5 rounded-md text-xs font-semibold text-leather hover:bg-leather/10 transition-colors"
         title="Scale tree to fit within page grid"
       >
         Fit to Grid
@@ -324,7 +324,7 @@ export default function CanvasToolbar({
         type="button"
         onClick={onResize}
         aria-pressed={resizeMode}
-        className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+        className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
           resizeMode
             ? 'bg-leather text-parchment'
             : 'text-leather hover:bg-leather/10'
@@ -336,7 +336,7 @@ export default function CanvasToolbar({
       <button
         type="button"
         onClick={selectAll}
-        className="px-3 py-1.5 rounded-lg text-xs font-medium text-ink-light hover:bg-parchment-dark transition-colors"
+        className="px-3 py-1.5 rounded-md text-xs font-medium text-ink-light hover:bg-parchment-dark transition-colors"
         title="Select all nodes (Ctrl+A)"
       >
         Select All
@@ -348,7 +348,7 @@ export default function CanvasToolbar({
       <button
         type="button"
         onClick={onPrint}
-        className="px-3 py-1.5 rounded-lg text-xs font-semibold text-leather hover:bg-leather/10 transition-colors"
+        className="px-3 py-1.5 rounded-md text-xs font-semibold text-leather hover:bg-leather/10 transition-colors"
         title="Print flowchart pages"
       >
         Print
@@ -359,7 +359,7 @@ export default function CanvasToolbar({
       <button
         type="button"
         onClick={() => void handleClearCanvas()}
-        className="px-3 py-1.5 rounded-lg text-xs font-medium text-seal hover:bg-seal/10 transition-colors"
+        className="px-3 py-1.5 rounded-md text-xs font-medium text-seal hover:bg-seal/10 transition-colors"
         title="Clear all canvas nodes"
       >
         Clear

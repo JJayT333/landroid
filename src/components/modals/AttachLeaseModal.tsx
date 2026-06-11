@@ -224,7 +224,7 @@ function CollapsibleSection({
   children: ReactNode;
 }) {
   return (
-    <details className="rounded-lg border border-ledger-line bg-parchment/40">
+    <details className="rounded-md border border-ledger-line bg-parchment/40">
       <summary className="cursor-pointer select-none px-3 py-2 text-xs font-semibold text-ink-light uppercase tracking-wider">
         {title}
       </summary>
@@ -651,7 +651,7 @@ export default function AttachLeaseModal({
     return (
       <Modal open onClose={onClose} title="Lease Attachment Blocked">
         <div className="space-y-4">
-          <div className="rounded-lg border border-seal/30 bg-seal/10 p-3 text-sm text-seal">
+          <div className="rounded-md border border-seal/30 bg-seal/10 p-3 text-sm text-seal">
             <p className="font-semibold mb-1">Leases can only be attached to mineral owners.</p>
             <p className="text-xs leading-5">
               This card carries the{' '}
@@ -682,7 +682,7 @@ export default function AttachLeaseModal({
       }
     >
       <div className="space-y-4">
-        <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-xs text-emerald-900">
+        <div className="bg-emerald-50 border border-emerald-200 rounded-md p-3 text-xs text-emerald-900">
           This creates or updates the terminal lessee node under the present owner without changing mineral ownership.
         </div>
 
@@ -701,7 +701,7 @@ export default function AttachLeaseModal({
                 setSaveError(null);
                 setSelectedOwnerId(event.target.value);
               }}
-              className="w-full px-3 py-2 rounded-lg border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-emerald-600 focus:border-emerald-600 outline-none"
+              className="w-full px-3 py-2 rounded-md border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-emerald-600 outline-none"
             >
               <option value="">Create owner from this title card</option>
               {ownerLinkOptions.map((owner) => (
@@ -731,7 +731,7 @@ export default function AttachLeaseModal({
               <select
                 value={lprDraft.leaseType}
                 onChange={(event) => setLpr('leaseType', event.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-emerald-600 focus:border-emerald-600 outline-none"
+                className="w-full px-3 py-2 rounded-md border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-emerald-600 outline-none"
               >
                 {LEASE_TYPE_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -805,7 +805,7 @@ export default function AttachLeaseModal({
               return (
                 <div
                   key={tract.mineralNodeId}
-                  className={`rounded-lg border p-3 ${
+                  className={`rounded-md border p-3 ${
                     tract.checked
                       ? 'border-emerald-200 bg-emerald-50/40'
                       : 'border-ledger-line bg-parchment/40'
@@ -856,7 +856,7 @@ export default function AttachLeaseModal({
                         <label className="text-[10px] text-ink-light uppercase tracking-wider block mb-1">
                           Net Mineral Acres
                         </label>
-                        <div className="px-3 py-2 rounded-lg border border-ledger-line bg-ledger text-sm text-ink-light">
+                        <div className="px-3 py-2 rounded-md border border-ledger-line bg-ledger text-sm text-ink-light">
                           {netAcres || '—'}
                         </div>
                       </div>
@@ -871,7 +871,7 @@ export default function AttachLeaseModal({
                               status: event.target.value,
                             })
                           }
-                          className="w-full px-3 py-2 rounded-lg border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-emerald-600 focus:border-emerald-600 outline-none"
+                          className="w-full px-3 py-2 rounded-md border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-emerald-600 outline-none"
                         >
                           {statusOptions.map((status) => (
                             <option key={status} value={status}>
@@ -938,7 +938,7 @@ export default function AttachLeaseModal({
               <label className="text-[10px] text-ink-light uppercase tracking-wider block mb-1">
                 Total Bonus
               </label>
-              <div className="px-3 py-2 rounded-lg border border-ledger-line bg-ledger text-sm text-ink-light">
+              <div className="px-3 py-2 rounded-md border border-ledger-line bg-ledger text-sm text-ink-light">
                 {economicsTotals.totalBonus || '—'}
               </div>
             </div>
@@ -946,7 +946,7 @@ export default function AttachLeaseModal({
               <label className="text-[10px] text-ink-light uppercase tracking-wider block mb-1">
                 Delay Rental
               </label>
-              <div className="px-3 py-2 rounded-lg border border-ledger-line bg-ledger text-sm text-ink-light">
+              <div className="px-3 py-2 rounded-md border border-ledger-line bg-ledger text-sm text-ink-light">
                 {lprDraft.paidUp ? 'Paid up' : economicsTotals.totalDelayRental || '—'}
               </div>
             </div>
@@ -989,7 +989,7 @@ export default function AttachLeaseModal({
                     }
                     placeholder="¶"
                     aria-label={`${definition.label} paragraph number`}
-                    className="w-16 shrink-0 px-2 py-1 rounded border border-ledger-line bg-parchment text-xs text-ink focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 outline-none"
+                    className="w-16 shrink-0 px-2 py-1 rounded border border-ledger-line bg-parchment text-xs text-ink focus:ring-1 focus:ring-leather focus:border-emerald-600 outline-none"
                   />
                 </div>
               );
@@ -1043,7 +1043,7 @@ export default function AttachLeaseModal({
               value={lprDraft.legalDescription}
               onChange={(event) => setLpr('legalDescription', event.target.value)}
               rows={3}
-              className="w-full px-3 py-2 rounded-lg border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none resize-y"
+              className="w-full px-3 py-2 rounded-md border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none resize-y"
             />
           </div>
         </CollapsibleSection>
@@ -1056,7 +1056,7 @@ export default function AttachLeaseModal({
             value={lprDraft.comments}
             onChange={(event) => setLpr('comments', event.target.value)}
             rows={4}
-            className="w-full px-3 py-2 rounded-lg border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none resize-y"
+            className="w-full px-3 py-2 rounded-md border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none resize-y"
           />
         </div>
 
@@ -1105,7 +1105,7 @@ export default function AttachLeaseModal({
               type="button"
               disabled={saving}
               onClick={() => pdfInputRef.current?.click()}
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold text-emerald-800 hover:bg-emerald-100 border border-emerald-200 transition-colors disabled:opacity-60"
+              className="px-3 py-1.5 rounded-md text-xs font-semibold text-emerald-800 hover:bg-emerald-100 border border-emerald-200 transition-colors disabled:opacity-60"
             >
               {existingLeaseNode?.attachments[0] || selectedPdfFile
                 ? 'Replace PDF'
@@ -1116,7 +1116,7 @@ export default function AttachLeaseModal({
                 type="button"
                 disabled={saving}
                 onClick={() => setSelectedPdfFile(null)}
-                className="px-3 py-1.5 rounded-lg text-xs text-seal hover:bg-seal/10 transition-colors disabled:opacity-60"
+                className="px-3 py-1.5 rounded-md text-xs text-seal hover:bg-seal/10 transition-colors disabled:opacity-60"
               >
                 Clear Selected PDF
               </button>
@@ -1128,7 +1128,7 @@ export default function AttachLeaseModal({
         </fieldset>
 
         {saveError && (
-          <div className="rounded-lg border border-seal/30 bg-seal/10 px-3 py-2 text-xs text-seal">
+          <div className="rounded-md border border-seal/30 bg-seal/10 px-3 py-2 text-xs text-seal">
             {saveError}
           </div>
         )}
@@ -1137,7 +1137,7 @@ export default function AttachLeaseModal({
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 rounded-lg text-sm text-ink-light hover:bg-parchment-dark transition-colors"
+            className="px-4 py-2 rounded-md text-sm text-ink-light hover:bg-parchment-dark transition-colors"
           >
             Cancel
           </button>
@@ -1145,7 +1145,7 @@ export default function AttachLeaseModal({
             type="button"
             disabled={saving}
             onClick={handleSave}
-            className="px-4 py-2 rounded-lg text-sm font-semibold bg-emerald-700 text-white hover:bg-emerald-600 transition-colors disabled:opacity-60"
+            className="px-4 py-2 rounded-md text-sm font-semibold bg-emerald-700 text-white hover:bg-emerald-600 transition-colors disabled:opacity-60"
           >
             {saving
               ? 'Saving...'

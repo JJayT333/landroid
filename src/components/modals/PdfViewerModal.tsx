@@ -86,7 +86,7 @@ export default function PdfViewerModal({
         <iframe
           src={objectUrl}
           sandbox="allow-downloads"
-          className="w-full rounded-lg border border-ledger-line"
+          className="w-full rounded-md border border-ledger-line"
           style={{ height: '70vh' }}
           title={fileName}
         />

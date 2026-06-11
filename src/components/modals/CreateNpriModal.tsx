@@ -120,7 +120,7 @@ export default function CreateNpriModal({
   return (
     <Modal open onClose={onClose} title={`Create NPRI from ${parentNode.grantee || 'Owner'}`} wide>
       <div className="space-y-4">
-        <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-3 text-xs text-amber-950">
+        <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-3 text-xs text-amber-950">
           This creates a separate NPRI branch on Desk Map without reducing the mineral ownership totals.
         </div>
 
@@ -154,7 +154,7 @@ export default function CreateNpriModal({
                 key={kind}
                 type="button"
                 onClick={() => set('royaltyKind', kind)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
                   form.royaltyKind === kind
                     ? 'bg-amber-700 text-amber-50'
                     : 'text-amber-900 hover:bg-amber-100 border border-amber-200'
@@ -165,7 +165,7 @@ export default function CreateNpriModal({
             ))}
           </div>
 
-          <div className="rounded-lg border border-ledger-line bg-ledger px-3 py-2 text-xs text-ink-light">
+          <div className="rounded-md border border-ledger-line bg-ledger px-3 py-2 text-xs text-ink-light">
             {form.royaltyKind === 'floating'
               ? 'Floating NPRI records a fraction of the lease royalty, such as 1/2 of lessor royalty.'
               : form.fixedRoyaltyBasis === 'whole_tract'
@@ -194,7 +194,7 @@ export default function CreateNpriModal({
                     key={basis}
                     type="button"
                     onClick={() => set('fixedRoyaltyBasis', basis)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                    className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
                       form.fixedRoyaltyBasis === basis
                         ? 'bg-leather text-parchment'
                         : 'text-ink hover:bg-parchment-dark border border-ledger-line'
@@ -218,18 +218,18 @@ export default function CreateNpriModal({
               type="text"
               value={form.numerator}
               onChange={(event) => set('numerator', event.target.value)}
-              className="w-20 px-3 py-1.5 rounded-lg border border-ledger-line bg-parchment text-ink font-mono text-sm text-center focus:ring-2 focus:ring-leather outline-none"
+              className="w-20 px-3 py-1.5 rounded-md border border-ledger-line bg-parchment text-ink font-mono text-sm text-center focus:ring-2 focus:ring-leather outline-none"
             />
             <span className="text-ink-light text-lg">/</span>
             <input
               type="text"
               value={form.denominator}
               onChange={(event) => set('denominator', event.target.value)}
-              className="w-20 px-3 py-1.5 rounded-lg border border-ledger-line bg-parchment text-ink font-mono text-sm text-center focus:ring-2 focus:ring-leather outline-none"
+              className="w-20 px-3 py-1.5 rounded-md border border-ledger-line bg-parchment text-ink font-mono text-sm text-center focus:ring-2 focus:ring-leather outline-none"
             />
           </div>
 
-          <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-3">
+          <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-3">
             <div className="flex items-center justify-between gap-3">
               <span className="text-[10px] font-semibold uppercase tracking-wider text-amber-900">
                 Recorded Burden
@@ -242,7 +242,7 @@ export default function CreateNpriModal({
               Stored on Desk Map as {preview.formatted} {previewLabel}.
             </div>
             {(exceedsFullShare || exceedsGrantorBranch) && (
-              <div className="mt-2 rounded-lg border border-seal/30 bg-seal/10 px-2.5 py-2 text-[10px] leading-4 text-seal">
+              <div className="mt-2 rounded-md border border-seal/30 bg-seal/10 px-2.5 py-2 text-[10px] leading-4 text-seal">
                 LANDroid will allow this discrepancy and highlight the branch in red.
                 {exceedsFullShare && ' The entered NPRI is greater than 100%.'}
                 {exceedsGrantorBranch && ` The entered fixed whole-tract burden exceeds the grantor branch share of ${formatAsFraction(d(parentNode.initialFraction))}.`}
@@ -259,12 +259,12 @@ export default function CreateNpriModal({
             value={form.remarks}
             onChange={(event) => set('remarks', event.target.value)}
             rows={3}
-            className="w-full px-3 py-2 rounded-lg border border-ledger-line bg-parchment text-ink text-sm focus:ring-2 focus:ring-leather focus:border-leather outline-none resize-y"
+            className="w-full px-3 py-2 rounded-md border border-ledger-line bg-parchment text-ink text-sm focus:ring-2 focus:ring-leather focus:border-leather outline-none resize-y"
           />
         </div>
 
         {error && (
-          <div className="bg-seal/10 border border-seal/30 rounded-lg p-3 text-sm text-seal">
+          <div className="bg-seal/10 border border-seal/30 rounded-md p-3 text-sm text-seal">
             {error}
           </div>
         )}
@@ -273,14 +273,14 @@ export default function CreateNpriModal({
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 rounded-lg text-sm text-ink-light hover:bg-parchment-dark transition-colors"
+            className="px-4 py-2 rounded-md text-sm text-ink-light hover:bg-parchment-dark transition-colors"
           >
             Cancel
           </button>
           <button
             type="button"
             onClick={handleSave}
-            className="px-4 py-2 rounded-lg text-sm font-semibold bg-amber-700 text-amber-50 hover:bg-amber-800 transition-colors"
+            className="px-4 py-2 rounded-md text-sm font-semibold bg-amber-700 text-amber-50 hover:bg-amber-800 transition-colors"
           >
             Create NPRI
           </button>

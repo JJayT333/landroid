@@ -236,7 +236,7 @@ export default function AIPanel({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <aside className="fixed bottom-4 right-4 top-16 z-40 flex w-[420px] flex-col overflow-hidden rounded-2xl border border-leather/60 bg-parchment-light shadow-2xl">
+    <aside className="fixed bottom-4 right-4 top-16 z-40 flex w-[420px] flex-col overflow-hidden rounded-md border border-leather/60 bg-parchment-light shadow-2xl">
       <header className="flex items-center justify-between border-b border-leather/40 bg-ink px-4 py-2 text-parchment">
         <div className="flex items-center gap-2">
           <span className="text-sm font-display font-bold">LANDroid AI</span>
@@ -321,7 +321,7 @@ export default function AIPanel({ onClose }: { onClose: () => void }) {
               <AIActionJournalSummary entries={actionJournalEntries} />
             )}
             {entries.length === 0 && (
-              <div className="rounded-lg border border-leather/30 bg-parchment p-3 text-xs text-ink-light">
+              <div className="rounded-md border border-leather/30 bg-parchment p-3 text-xs text-ink-light">
                 Ask about the current project, a tract, a lessor, or a mineral-math
                 scenario. All active calculations assume Texas oil-and-gas rules.
                 Try: <em>"What's in this project?"</em>
@@ -449,7 +449,7 @@ function HostedContextControl({
   onAcceptFull: (workspaceId: string) => void;
 }) {
   return (
-    <div className="space-y-2 rounded-lg border border-leather/30 bg-parchment p-3 text-xs text-ink">
+    <div className="space-y-2 rounded-md border border-leather/30 bg-parchment p-3 text-xs text-ink">
       <div className="flex items-center justify-between gap-2">
         <span className="font-semibold uppercase tracking-wide text-ink-light">
           Hosted Context
@@ -508,7 +508,7 @@ function AIApprovalQueue({
   onReject: (id: string) => void;
 }) {
   return (
-    <div className="space-y-2 rounded-lg border border-gold/40 bg-gold/10 p-2 text-xs">
+    <div className="space-y-2 rounded-md border border-gold/40 bg-gold/10 p-2 text-xs">
       <div className="font-semibold uppercase tracking-wide text-ink">
         AI changes awaiting approval
       </div>
@@ -661,7 +661,7 @@ function approvalValidationTone(status: AIApprovalPreviewValidationStatus): stri
 function AIActionJournalSummary({ entries }: { entries: AIActionJournalEntry[] }) {
   const recent = entries.slice(-5).reverse();
   return (
-    <details className="rounded-lg border border-leather/30 bg-parchment p-2 text-xs">
+    <details className="rounded-md border border-leather/30 bg-parchment p-2 text-xs">
       <summary className="cursor-pointer font-semibold text-ink">
         Approved AI actions this session ({entries.length})
       </summary>
@@ -881,7 +881,7 @@ function ChatBubble({ entry }: { entry: ChatEntry }) {
   if (entry.role === 'user') {
     return (
       <div className="flex justify-end">
-        <div className="max-w-[85%] rounded-lg bg-ink px-3 py-2 text-sm text-parchment">
+        <div className="max-w-[85%] rounded-md bg-ink px-3 py-2 text-sm text-parchment">
           {entry.text}
         </div>
       </div>
@@ -890,12 +890,12 @@ function ChatBubble({ entry }: { entry: ChatEntry }) {
   return (
     <div className="flex flex-col gap-2">
       {entry.error ? (
-        <div className="rounded-lg border border-rose-400 bg-rose-50 px-3 py-2 text-xs text-rose-900">
+        <div className="rounded-md border border-rose-400 bg-rose-50 px-3 py-2 text-xs text-rose-900">
           <div className="mb-1 font-semibold">Error</div>
           {entry.error}
         </div>
       ) : (
-        <div className="max-w-[90%] whitespace-pre-wrap rounded-lg border border-leather/30 bg-parchment px-3 py-2 text-sm text-ink">
+        <div className="max-w-[90%] whitespace-pre-wrap rounded-md border border-leather/30 bg-parchment px-3 py-2 text-sm text-ink">
           {entry.text}
         </div>
       )}

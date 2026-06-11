@@ -92,7 +92,7 @@ export default function AttachDocModal({ parentNodeId, onClose }: AttachDocModal
   return (
     <Modal open onClose={onClose} title="Attach Related Document">
       <div className="space-y-4">
-        <div className="bg-gold/10 border border-gold/30 rounded-lg p-2 text-xs text-ink">
+        <div className="bg-gold/10 border border-gold/30 rounded-md p-2 text-xs text-ink">
           This document will be attached as a related record — it does not convey any interest.
         </div>
 
@@ -124,7 +124,7 @@ export default function AttachDocModal({ parentNodeId, onClose }: AttachDocModal
             value={form.remarks}
             onChange={(e) => set('remarks', e.target.value)}
             rows={3}
-            className="w-full px-3 py-2 rounded-lg border border-ledger-line bg-parchment text-ink text-sm focus:ring-2 focus:ring-leather focus:border-leather outline-none resize-y"
+            className="w-full px-3 py-2 rounded-md border border-ledger-line bg-parchment text-ink text-sm focus:ring-2 focus:ring-leather focus:border-leather outline-none resize-y"
             placeholder="Describe the document's relevance..."
           />
         </div>

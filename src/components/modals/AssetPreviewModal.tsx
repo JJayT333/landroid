@@ -136,7 +136,7 @@ export default function AssetPreviewModal({
           <button
             type="button"
             onClick={() => downloadBlob(blob, fileName)}
-            className="px-3 py-1.5 rounded-lg text-xs font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors"
+            className="px-3 py-1.5 rounded-md text-xs font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors"
           >
             Download
           </button>
@@ -144,26 +144,26 @@ export default function AssetPreviewModal({
 
         {isPdf && (
           pdfError ? (
-            <div className="rounded-lg border border-seal/30 bg-seal/5 p-4 text-sm text-seal">
+            <div className="rounded-md border border-seal/30 bg-seal/5 p-4 text-sm text-seal">
               {pdfError}
             </div>
           ) : pdfObjectUrl ? (
             <iframe
               src={pdfObjectUrl}
               sandbox="allow-downloads"
-              className="w-full rounded-lg border border-ledger-line"
+              className="w-full rounded-md border border-ledger-line"
               style={{ height: '70vh' }}
               title={fileName}
             />
           ) : (
-            <div className="rounded-lg border border-ledger-line bg-ledger p-4 text-sm text-ink-light">
+            <div className="rounded-md border border-ledger-line bg-ledger p-4 text-sm text-ink-light">
               Loading PDF preview...
             </div>
           )
         )}
 
         {isImage && objectUrl && (
-          <div className="rounded-lg border border-ledger-line bg-ledger p-3">
+          <div className="rounded-md border border-ledger-line bg-ledger p-3">
             <img
               src={objectUrl}
               alt={fileName}
@@ -181,13 +181,13 @@ export default function AssetPreviewModal({
         )}
 
         {!isPdf && !isImage && isTextLike && !delimitedPreview && (
-          <pre className="max-h-[70vh] overflow-auto rounded-lg border border-ledger-line bg-ledger p-4 text-xs text-ink whitespace-pre-wrap break-words">
+          <pre className="max-h-[70vh] overflow-auto rounded-md border border-ledger-line bg-ledger p-4 text-xs text-ink whitespace-pre-wrap break-words">
             {textPreview ?? 'Loading preview...'}
           </pre>
         )}
 
         {!isPdf && !isImage && !isTextLike && (
-          <div className="rounded-lg border border-ledger-line bg-ledger p-4 text-sm text-ink-light">
+          <div className="rounded-md border border-ledger-line bg-ledger p-4 text-sm text-ink-light">
             No inline preview is available for this file type yet.
           </div>
         )}

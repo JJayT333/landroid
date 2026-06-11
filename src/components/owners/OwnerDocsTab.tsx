@@ -134,13 +134,13 @@ export default function OwnerDocsTab({
           if (!readOnly) inputRef.current?.click();
         }}
         title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
-        className="px-3 py-2 rounded-lg text-sm font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+        className="px-3 py-2 rounded-md text-sm font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
       >
         Upload Documents
       </button>
 
       {docs.length === 0 && (
-        <div className="rounded-lg border border-dashed border-ledger-line px-4 py-5 text-sm text-ink-light">
+        <div className="rounded-md border border-dashed border-ledger-line px-4 py-5 text-sm text-ink-light">
           No owner documents yet. Click to upload files.
         </div>
       )}
@@ -152,7 +152,7 @@ export default function OwnerDocsTab({
           return (
             <div
               key={doc.id}
-              className="rounded-xl border border-ledger-line bg-parchment px-4 py-3"
+              className="rounded-md border border-ledger-line bg-parchment px-4 py-3"
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="space-y-1 min-w-0">
@@ -174,7 +174,7 @@ export default function OwnerDocsTab({
                         setPreviewDoc({ meta: doc, blob })
                       )
                     }
-                    className="px-3 py-1.5 rounded-lg text-xs font-semibold text-leather hover:bg-leather/10 transition-colors"
+                    className="px-3 py-1.5 rounded-md text-xs font-semibold text-leather hover:bg-leather/10 transition-colors"
                   >
                     Preview
                   </button>
@@ -183,7 +183,7 @@ export default function OwnerDocsTab({
                     disabled={readOnly}
                     onClick={() => setEditingDoc(doc)}
                     title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
-                    className="px-3 py-1.5 rounded-lg text-xs font-semibold text-ink hover:bg-parchment-dark transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                    className="px-3 py-1.5 rounded-md text-xs font-semibold text-ink hover:bg-parchment-dark transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Edit
                   </button>
@@ -192,7 +192,7 @@ export default function OwnerDocsTab({
                     onClick={() =>
                       withDocBlob(doc, (blob) => downloadBlob(blob, doc.fileName))
                     }
-                    className="px-3 py-1.5 rounded-lg text-xs font-semibold text-ink hover:bg-parchment-dark transition-colors"
+                    className="px-3 py-1.5 rounded-md text-xs font-semibold text-ink hover:bg-parchment-dark transition-colors"
                   >
                     Download
                   </button>
@@ -211,7 +211,7 @@ export default function OwnerDocsTab({
                       await onRemove(doc.id);
                     }}
                     title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
-                    className="px-3 py-1.5 rounded-lg text-xs font-semibold text-seal hover:bg-seal/10 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                    className="px-3 py-1.5 rounded-md text-xs font-semibold text-seal hover:bg-seal/10 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Delete
                   </button>

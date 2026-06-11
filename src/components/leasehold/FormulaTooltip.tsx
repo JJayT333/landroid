@@ -177,7 +177,7 @@ export function FormulaTooltip({
               role="tooltip"
               style={tooltipStyle}
               className={[
-                'fixed z-[80] max-h-[min(28rem,calc(100vh-1.5rem))] overflow-y-auto rounded-lg border border-leather bg-ink p-3 text-left text-xs text-parchment shadow-xl',
+                'fixed z-[80] max-h-[min(28rem,calc(100vh-1.5rem))] overflow-y-auto rounded-md border border-leather bg-ink p-3 text-left text-xs text-parchment shadow-xl',
                 pinned ? 'ring-1 ring-amber-400/60' : '',
               ].join(' ')}
               data-placement={placement}

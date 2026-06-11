@@ -45,7 +45,7 @@ export default function LeaseDocumentModal({
   if (!resolved) {
     return (
       <Modal open onClose={onClose} title="Lease Document" wide>
-        <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-3 text-sm text-amber-900">
+        <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-3 text-sm text-amber-900">
           No structured lease document is registered for this record. Seed the
           combinatorial Raven Forest workspace to populate BLM Form 3100-11
           summaries, or attach a PDF in a future revision.
@@ -62,7 +62,7 @@ export default function LeaseDocumentModal({
       wide
     >
       <div className="space-y-4">
-        <div className="rounded-lg border border-leather/30 bg-leather/5 p-3">
+        <div className="rounded-md border border-leather/30 bg-leather/5 p-3">
           <div className="text-[10px] font-bold uppercase tracking-wider text-leather">
             United States Department of the Interior — Bureau of Land Management
           </div>
@@ -75,7 +75,7 @@ export default function LeaseDocumentModal({
           </div>
         </div>
 
-        <section className="rounded-lg border border-ledger-line bg-parchment p-3 space-y-3">
+        <section className="rounded-md border border-ledger-line bg-parchment p-3 space-y-3">
           <div className="text-[11px] font-bold uppercase tracking-wider text-ink">
             Identification
           </div>
@@ -87,7 +87,7 @@ export default function LeaseDocumentModal({
           </div>
         </section>
 
-        <section className="rounded-lg border border-ledger-line bg-parchment p-3 space-y-3">
+        <section className="rounded-md border border-ledger-line bg-parchment p-3 space-y-3">
           <div className="text-[11px] font-bold uppercase tracking-wider text-ink">
             Legal Description
           </div>
@@ -101,7 +101,7 @@ export default function LeaseDocumentModal({
           </div>
         </section>
 
-        <section className="rounded-lg border border-ledger-line bg-parchment p-3 space-y-3">
+        <section className="rounded-md border border-ledger-line bg-parchment p-3 space-y-3">
           <div className="text-[11px] font-bold uppercase tracking-wider text-ink">
             Term &amp; Consideration
           </div>
@@ -118,7 +118,7 @@ export default function LeaseDocumentModal({
           </div>
         </section>
 
-        <section className="rounded-lg border border-ledger-line bg-parchment p-3 space-y-2">
+        <section className="rounded-md border border-ledger-line bg-parchment p-3 space-y-2">
           <div className="text-[11px] font-bold uppercase tracking-wider text-ink">
             Stipulations
           </div>
@@ -135,7 +135,7 @@ export default function LeaseDocumentModal({
         </section>
 
         {resolved.notes && (
-          <section className="rounded-lg border border-ledger-line bg-parchment p-3 space-y-2">
+          <section className="rounded-md border border-ledger-line bg-parchment p-3 space-y-2">
             <div className="text-[11px] font-bold uppercase tracking-wider text-ink">
               Notes
             </div>
@@ -147,7 +147,7 @@ export default function LeaseDocumentModal({
           <iframe
             src={pdfUrl}
             sandbox="allow-downloads"
-            className="w-full rounded-lg border border-ledger-line"
+            className="w-full rounded-md border border-ledger-line"
             style={{ height: '60vh' }}
             title={`${resolved.mlrsSerial} attachment`}
           />

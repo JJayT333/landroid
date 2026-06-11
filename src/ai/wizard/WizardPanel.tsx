@@ -112,13 +112,13 @@ export default function WizardPanel() {
       {status === 'idle' && <UploadZone onFile={handleFile} />}
 
       {(status === 'parsing' || status === 'analyzing') && (
-        <div className="rounded-lg border border-leather/30 bg-parchment p-3 text-xs text-ink-light">
+        <div className="rounded-md border border-leather/30 bg-parchment p-3 text-xs text-ink-light">
           {status === 'parsing' ? 'Parsing CSV…' : 'AI is analyzing rows…'}
         </div>
       )}
 
       {status === 'error' && (
-        <div className="rounded-lg border border-rose-400 bg-rose-50 p-3 text-xs text-rose-900">
+        <div className="rounded-md border border-rose-400 bg-rose-50 p-3 text-xs text-rose-900">
           <div className="mb-1 font-semibold">Error</div>
           {error}
           <button
@@ -375,7 +375,7 @@ function StagedImportReview({
 
   if (!currentRow) {
     return (
-      <section className="rounded-lg border border-rose-300 bg-rose-50 p-3 text-xs text-rose-900">
+      <section className="rounded-md border border-rose-300 bg-rose-50 p-3 text-xs text-rose-900">
         <div className="font-semibold">No rows ready for review.</div>
         {result.warnings.map((warning) => (
           <div key={warning} className="mt-1">{warning}</div>
@@ -410,7 +410,7 @@ function StagedImportReview({
       </div>
 
       {(result.warnings.length > 0 || result.sheetSummaries.length > 0) && (
-        <details className="rounded-lg border border-leather/30 bg-parchment p-3 text-xs">
+        <details className="rounded-md border border-leather/30 bg-parchment p-3 text-xs">
           <summary className="cursor-pointer font-semibold text-ink">
             Sheet mapping
           </summary>
@@ -434,7 +434,7 @@ function StagedImportReview({
         </details>
       )}
 
-      <div className="rounded-lg border border-leather/30 bg-parchment p-3 text-xs">
+      <div className="rounded-md border border-leather/30 bg-parchment p-3 text-xs">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <div className="font-semibold text-ink">ActionPlan selection</div>
@@ -502,7 +502,7 @@ function StagedImportReview({
         })}
       </div>
 
-      <div className="rounded-lg border-2 border-gold/50 bg-parchment p-3 text-xs">
+      <div className="rounded-md border-2 border-gold/50 bg-parchment p-3 text-xs">
         <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
           <div>
             <div className="font-semibold text-ink">
@@ -814,7 +814,7 @@ function isEditableRowStatus(status: StagedImportRowStatus): boolean {
 
 function UploadZone({ onFile }: { onFile: (f: File) => void }) {
   return (
-    <label className="block cursor-pointer rounded-lg border-2 border-dashed border-leather/40 bg-parchment/40 p-6 text-center text-xs text-ink-light hover:border-gold hover:bg-parchment">
+    <label className="block cursor-pointer rounded-md border-2 border-dashed border-leather/40 bg-parchment/40 p-6 text-center text-xs text-ink-light hover:border-gold hover:bg-parchment">
       <div className="mb-1 font-semibold text-ink">Upload a spreadsheet</div>
       <div>.csv — landman runsheet, NRI status, document list</div>
       <div className="mt-2 text-[10px] uppercase tracking-wide">
@@ -836,7 +836,7 @@ function UploadZone({ onFile }: { onFile: (f: File) => void }) {
 
 function WorkbookSummary({ parsed }: { parsed: ParsedWorkbook }) {
   return (
-    <details open className="rounded-lg border border-leather/30 bg-parchment">
+    <details open className="rounded-md border border-leather/30 bg-parchment">
       <summary className="cursor-pointer px-3 py-2 text-xs font-semibold text-ink">
         {parsed.fileName} · {parsed.sheets.length} sheet
         {parsed.sheets.length === 1 ? '' : 's'}
@@ -876,7 +876,7 @@ function ProposalView({
       </div>
 
       {Object.keys(proposal.project).length > 0 && (
-        <section className="rounded-lg border border-leather/30 bg-parchment p-3 text-xs">
+        <section className="rounded-md border border-leather/30 bg-parchment p-3 text-xs">
           <h4 className="mb-1 font-semibold uppercase tracking-wide text-ink-light">
             Project header
           </h4>
@@ -894,7 +894,7 @@ function ProposalView({
       )}
 
       {proposal.tracts.length > 0 && (
-        <section className="rounded-lg border border-leather/30 bg-parchment p-3 text-xs">
+        <section className="rounded-md border border-leather/30 bg-parchment p-3 text-xs">
           <h4 className="mb-1 font-semibold uppercase tracking-wide text-ink-light">
             Tracts
           </h4>
@@ -926,7 +926,7 @@ function ProposalView({
       </section>
 
       {proposal.clarifyingQuestions.length > 0 && (
-        <section className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900">
+        <section className="rounded-md border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900">
           <h4 className="mb-1 font-semibold uppercase tracking-wide">
             Clarifying questions
           </h4>
@@ -939,7 +939,7 @@ function ProposalView({
       )}
 
       {proposal.warnings.length > 0 && (
-        <section className="rounded-lg border border-rose-300 bg-rose-50 p-3 text-xs text-rose-900">
+        <section className="rounded-md border border-rose-300 bg-rose-50 p-3 text-xs text-rose-900">
           <h4 className="mb-1 font-semibold uppercase tracking-wide">Warnings</h4>
           <ul className="list-disc space-y-1 pl-4">
             {proposal.warnings.map((w, i) => (
@@ -949,7 +949,7 @@ function ProposalView({
         </section>
       )}
 
-      <section className="rounded-lg border border-leather/30 bg-parchment p-3 text-xs text-ink-light">
+      <section className="rounded-md border border-leather/30 bg-parchment p-3 text-xs text-ink-light">
         AI proposal is preview-only. Use row review to build and approve a
         staged ImportSession ActionPlan before any workspace mutation.
       </section>
@@ -960,7 +960,7 @@ function ProposalView({
 function SheetProposalCard({ sheet }: { sheet: WorkspaceImportProposal['sheets'][number] }) {
   const meta = ROLE_LABELS[sheet.role];
   return (
-    <div className="rounded-lg border border-leather/30 bg-parchment p-3 text-xs">
+    <div className="rounded-md border border-leather/30 bg-parchment p-3 text-xs">
       <div className="flex items-center justify-between gap-2">
         <span className="truncate font-mono text-ink" title={sheet.sheetName}>
           {sheet.sheetName}

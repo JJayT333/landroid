@@ -126,7 +126,7 @@ function SelectField<TValue extends string>({
         value={value}
         disabled={disabled}
         onChange={(event) => onChange(event.target.value as TValue)}
-        className="w-full rounded-lg border border-ledger-line bg-parchment px-2 py-1.5 text-sm text-ink outline-none focus:border-leather focus:ring-2 focus:ring-leather disabled:cursor-not-allowed disabled:opacity-60"
+        className="w-full rounded-md border border-ledger-line bg-parchment px-2 py-1.5 text-sm text-ink outline-none focus:border-leather focus:ring-2 focus:ring-leather disabled:cursor-not-allowed disabled:opacity-60"
       >
         {options.map((option) => (
           <option key={option.value} value={option.value}>
@@ -163,7 +163,7 @@ function TextField({
         value={value}
         disabled={disabled}
         onChange={(event) => onChange(event.target.value)}
-        className="w-full rounded-lg border border-ledger-line bg-parchment px-2 py-1.5 text-sm text-ink outline-none focus:border-leather focus:ring-2 focus:ring-leather disabled:cursor-not-allowed disabled:opacity-60"
+        className="w-full rounded-md border border-ledger-line bg-parchment px-2 py-1.5 text-sm text-ink outline-none focus:border-leather focus:ring-2 focus:ring-leather disabled:cursor-not-allowed disabled:opacity-60"
       />
     </label>
   );
@@ -190,7 +190,7 @@ function TextAreaField({
         disabled={disabled}
         onChange={(event) => onChange(event.target.value)}
         rows={3}
-        className="w-full resize-y rounded-lg border border-ledger-line bg-parchment px-2 py-1.5 text-sm text-ink outline-none focus:border-leather focus:ring-2 focus:ring-leather disabled:cursor-not-allowed disabled:opacity-60"
+        className="w-full resize-y rounded-md border border-ledger-line bg-parchment px-2 py-1.5 text-sm text-ink outline-none focus:border-leather focus:ring-2 focus:ring-leather disabled:cursor-not-allowed disabled:opacity-60"
       />
     </label>
   );
@@ -405,7 +405,7 @@ export default function DocumentsView() {
                 type="button"
                 onClick={() => setPacketSource('filter')}
                 aria-pressed={packetSource === 'filter'}
-                className={`rounded-lg border px-3 py-1.5 ${
+                className={`rounded-md border px-3 py-1.5 ${
                   packetSource === 'filter'
                     ? 'border-leather bg-leather text-parchment'
                     : 'border-ledger-line text-leather hover:bg-leather/10'
@@ -417,7 +417,7 @@ export default function DocumentsView() {
                 type="button"
                 onClick={() => setPacketSource('selected')}
                 aria-pressed={packetSource === 'selected'}
-                className={`rounded-lg border px-3 py-1.5 ${
+                className={`rounded-md border px-3 py-1.5 ${
                   packetSource === 'selected'
                     ? 'border-leather bg-leather text-parchment'
                     : 'border-ledger-line text-leather hover:bg-leather/10'
@@ -429,7 +429,7 @@ export default function DocumentsView() {
                 type="button"
                 onClick={() => setPacketSource('runsheet')}
                 aria-pressed={packetSource === 'runsheet'}
-                className={`rounded-lg border px-3 py-1.5 ${
+                className={`rounded-md border px-3 py-1.5 ${
                   packetSource === 'runsheet'
                     ? 'border-leather bg-leather text-parchment'
                     : 'border-ledger-line text-leather hover:bg-leather/10'
@@ -449,7 +449,7 @@ export default function DocumentsView() {
                 type="button"
                 onClick={() => setViewFilter(view.id)}
                 aria-pressed={viewFilter === view.id}
-                className={`shrink-0 rounded-lg px-3 py-1.5 text-xs font-semibold ${
+                className={`shrink-0 rounded-md px-3 py-1.5 text-xs font-semibold ${
                   viewFilter === view.id
                     ? 'bg-leather text-parchment'
                     : 'bg-parchment-dark text-ink-light hover:bg-ledger hover:text-ink'
@@ -469,7 +469,7 @@ export default function DocumentsView() {
                 type="search"
                 value={searchQuery}
                 onChange={(event) => setSearchQuery(event.target.value)}
-                className="w-full rounded-lg border border-ledger-line bg-parchment px-2 py-1.5 text-sm text-ink outline-none focus:border-leather focus:ring-2 focus:ring-leather"
+                className="w-full rounded-md border border-ledger-line bg-parchment px-2 py-1.5 text-sm text-ink outline-none focus:border-leather focus:ring-2 focus:ring-leather"
               />
             </label>
             <SelectField
@@ -648,7 +648,7 @@ export default function DocumentsView() {
                           event.stopPropagation();
                           setPdfViewDocId(row.document.docId);
                         }}
-                        className="rounded-lg border border-ledger-line px-3 py-1.5 text-[11px] font-semibold text-leather hover:bg-leather/10"
+                        className="rounded-md border border-ledger-line px-3 py-1.5 text-[11px] font-semibold text-leather hover:bg-leather/10"
                       >
                         PDF
                       </button>
@@ -679,7 +679,7 @@ export default function DocumentsView() {
                 <button
                   type="button"
                   onClick={() => setPdfViewDocId(activeRow.document.docId)}
-                  className="shrink-0 rounded-lg border border-ledger-line px-3 py-1.5 text-xs font-semibold text-leather hover:bg-leather/10"
+                  className="shrink-0 rounded-md border border-ledger-line px-3 py-1.5 text-xs font-semibold text-leather hover:bg-leather/10"
                 >
                   PDF
                 </button>
@@ -843,7 +843,7 @@ export default function DocumentsView() {
                   activeRow.linkedEntities.map((entity) => (
                     <div
                       key={entity.attachmentId}
-                      className="rounded-lg border border-ledger-line bg-parchment px-3 py-2"
+                      className="rounded-md border border-ledger-line bg-parchment px-3 py-2"
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
@@ -878,7 +878,7 @@ export default function DocumentsView() {
             <section className="border-b border-ledger-line py-4">
               <h4 className="text-sm font-bold text-ink">Duplicate Status</h4>
               {activeRow.duplicateDocIds.length > 0 ? (
-                <div className="mt-2 rounded-lg border border-seal/30 bg-seal/5 px-3 py-2 text-sm text-seal">
+                <div className="mt-2 rounded-md border border-seal/30 bg-seal/5 px-3 py-2 text-sm text-seal">
                   Same content hash as {activeRow.duplicateDocIds.length} document
                   {activeRow.duplicateDocIds.length === 1 ? '' : 's'}.
                 </div>
@@ -886,7 +886,7 @@ export default function DocumentsView() {
                 <p className="mt-2 text-sm text-ink-light">No duplicate hash match.</p>
               )}
               {activeRow.missingMetadata.length > 0 && (
-                <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
                   Missing: {activeRow.missingMetadata.join(', ')}
                 </div>
               )}
@@ -900,30 +900,30 @@ export default function DocumentsView() {
                 type="button"
                 onClick={downloadManifest}
                 disabled={packetPreview.rows.length === 0}
-                className="rounded-lg border border-ledger-line px-3 py-1.5 text-xs font-semibold text-leather hover:bg-leather/10 disabled:opacity-50"
+                className="rounded-md border border-ledger-line px-3 py-1.5 text-xs font-semibold text-leather hover:bg-leather/10 disabled:opacity-50"
               >
                 Manifest JSON
               </button>
             </div>
             <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-              <div className="rounded-lg border border-ledger-line bg-parchment px-3 py-2">
+              <div className="rounded-md border border-ledger-line bg-parchment px-3 py-2">
                 <div className="text-[10px] uppercase tracking-wider text-ink-light">Docs</div>
                 <div className="text-lg font-bold">{packetPreview.rows.length}</div>
               </div>
-              <div className="rounded-lg border border-ledger-line bg-parchment px-3 py-2">
+              <div className="rounded-md border border-ledger-line bg-parchment px-3 py-2">
                 <div className="text-[10px] uppercase tracking-wider text-ink-light">Size</div>
                 <div className="text-lg font-bold">{formatBytes(packetPreview.totalBytes)}</div>
               </div>
-              <div className="rounded-lg border border-ledger-line bg-parchment px-3 py-2">
+              <div className="rounded-md border border-ledger-line bg-parchment px-3 py-2">
                 <div className="text-[10px] uppercase tracking-wider text-ink-light">Missing</div>
                 <div className="text-lg font-bold">{packetPreview.missingMetadataCount}</div>
               </div>
-              <div className="rounded-lg border border-ledger-line bg-parchment px-3 py-2">
+              <div className="rounded-md border border-ledger-line bg-parchment px-3 py-2">
                 <div className="text-[10px] uppercase tracking-wider text-ink-light">Duplicates</div>
                 <div className="text-lg font-bold">{packetPreview.duplicateDocCount}</div>
               </div>
             </div>
-            <div className="mt-3 max-h-48 overflow-y-auto rounded-lg border border-ledger-line bg-parchment">
+            <div className="mt-3 max-h-48 overflow-y-auto rounded-md border border-ledger-line bg-parchment">
               {packetPreview.rows.length === 0 ? (
                 <p className="px-3 py-4 text-sm text-ink-light">No packet documents.</p>
               ) : (

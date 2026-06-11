@@ -46,7 +46,7 @@ export default function OwnerContactsTab({
   return (
     <div className="space-y-4">
       {draft ? (
-        <div className="rounded-xl border border-ledger-line bg-ledger p-4 space-y-3">
+        <div className="rounded-md border border-ledger-line bg-ledger p-4 space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <FormField
               label="Contact Date"
@@ -84,7 +84,7 @@ export default function OwnerContactsTab({
               disabled={readOnly}
               onChange={(event) => set('notes', event.target.value)}
               rows={4}
-              className="w-full px-3 py-2 rounded-lg border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none resize-y disabled:cursor-not-allowed disabled:opacity-60"
+              className="w-full px-3 py-2 rounded-md border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none resize-y disabled:cursor-not-allowed disabled:opacity-60"
             />
           </div>
 
@@ -117,7 +117,7 @@ export default function OwnerContactsTab({
           disabled={readOnly}
           onClick={beginAdd}
           title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
-          className="px-3 py-2 rounded-lg text-sm font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+          className="px-3 py-2 rounded-md text-sm font-semibold text-leather hover:bg-leather/10 border border-leather/30 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
         >
           + Add Contact
         </button>
@@ -125,7 +125,7 @@ export default function OwnerContactsTab({
 
       <div className="space-y-3">
         {contacts.length === 0 && (
-          <div className="rounded-lg border border-dashed border-ledger-line px-4 py-5 text-sm text-ink-light">
+          <div className="rounded-md border border-dashed border-ledger-line px-4 py-5 text-sm text-ink-light">
             No contact history recorded yet.
           </div>
         )}
@@ -136,7 +136,7 @@ export default function OwnerContactsTab({
           .map((contact) => (
             <div
               key={contact.id}
-              className="rounded-xl border border-ledger-line bg-parchment px-4 py-3"
+              className="rounded-md border border-ledger-line bg-parchment px-4 py-3"
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="space-y-1">
@@ -158,7 +158,7 @@ export default function OwnerContactsTab({
                     disabled={readOnly}
                     onClick={() => beginEdit(contact)}
                     title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
-                    className="px-3 py-1.5 rounded-lg text-xs font-semibold text-leather hover:bg-leather/10 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                    className="px-3 py-1.5 rounded-md text-xs font-semibold text-leather hover:bg-leather/10 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Edit
                   </button>
@@ -177,7 +177,7 @@ export default function OwnerContactsTab({
                       await onRemove(contact.id);
                     }}
                     title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
-                    className="px-3 py-1.5 rounded-lg text-xs font-semibold text-seal hover:bg-seal/10 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                    className="px-3 py-1.5 rounded-md text-xs font-semibold text-seal hover:bg-seal/10 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Delete
                   </button>

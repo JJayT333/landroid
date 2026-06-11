@@ -67,7 +67,7 @@ export default function PredecessorModal({ node, onClose }: PredecessorModalProp
   return (
     <Modal open onClose={onClose} title={`Insert Predecessor above ${node.grantee || 'Unknown'}`}>
       <div className="space-y-4">
-        <div className="bg-ledger rounded-lg p-3 text-xs text-ink-light">
+        <div className="bg-ledger rounded-md p-3 text-xs text-ink-light">
           <span className="uppercase tracking-wider">Current node interest: </span>
           <span className="font-mono font-semibold text-ink">{currentFrac}</span>
         </div>
@@ -98,13 +98,13 @@ export default function PredecessorModal({ node, onClose }: PredecessorModalProp
               type="text"
               value={form.newInitialFraction}
               onChange={(e) => set('newInitialFraction', e.target.value)}
-              className="w-full px-3 py-2 rounded-lg border border-ledger-line bg-parchment text-ink font-mono text-sm focus:ring-2 focus:ring-leather focus:border-leather outline-none"
+              className="w-full px-3 py-2 rounded-md border border-ledger-line bg-parchment text-ink font-mono text-sm focus:ring-2 focus:ring-leather focus:border-leather outline-none"
             />
             <div className="text-[10px] text-ink-light mt-1 font-mono">= {newFrac}</div>
           </div>
 
           {willScale && (
-            <div className="bg-gold/10 border border-gold/30 rounded-lg p-2 text-xs text-ink">
+            <div className="bg-gold/10 border border-gold/30 rounded-md p-2 text-xs text-ink">
               <span className="font-semibold">Cascade:</span> The current node and all
               its descendants will be scaled to fit under this new predecessor's interest.
             </div>
@@ -112,7 +112,7 @@ export default function PredecessorModal({ node, onClose }: PredecessorModalProp
         </fieldset>
 
         {error && (
-          <div className="bg-seal/10 border border-seal/30 rounded-lg p-3 text-sm text-seal">
+          <div className="bg-seal/10 border border-seal/30 rounded-md p-3 text-sm text-seal">
             {error}
           </div>
         )}

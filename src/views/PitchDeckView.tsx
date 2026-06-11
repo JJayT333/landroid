@@ -42,21 +42,21 @@ export default function PitchDeckView() {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-lg border border-ledger-line bg-ledger px-3 py-2 text-xs font-semibold text-ink-light">
+            <span className="rounded-md border border-ledger-line bg-ledger px-3 py-2 text-xs font-semibold text-ink-light">
               Slide {progressLabel}
             </span>
             <a
               href={deckPdfUrl}
               target="_blank"
               rel="noreferrer"
-              className="rounded-lg border border-leather/40 px-3 py-2 text-xs font-semibold text-leather hover:bg-leather/10"
+              className="rounded-md border border-leather/40 px-3 py-2 text-xs font-semibold text-leather hover:bg-leather/10"
             >
               Open PDF
             </a>
             <a
               href={deckPptxUrl}
               download="LANDroid-Features.pptx"
-              className="rounded-lg bg-ink px-3 py-2 text-xs font-semibold text-parchment hover:bg-ink-light"
+              className="rounded-md bg-ink px-3 py-2 text-xs font-semibold text-parchment hover:bg-ink-light"
             >
               Download PowerPoint
             </a>

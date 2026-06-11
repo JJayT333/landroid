@@ -73,7 +73,7 @@ export default function OwnerDetailPanel({
   const activePanelId = `${tabBaseId}-${tab}-panel`;
 
   return (
-    <div className="h-full flex flex-col rounded-xl border border-ledger-line bg-parchment shadow-sm overflow-hidden">
+    <div className="h-full flex flex-col rounded-md border border-ledger-line bg-parchment shadow-sm overflow-hidden">
       <div className="px-5 py-4 border-b border-ledger-line bg-ledger">
         <div className="text-xl font-display font-bold text-ink">
           {owner.name || 'Unnamed Owner'}
@@ -98,7 +98,7 @@ export default function OwnerDetailPanel({
             aria-controls={`${tabBaseId}-${item.id}-panel`}
             tabIndex={tab === item.id ? 0 : -1}
             onClick={() => onChangeTab(item.id)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+            className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
               tab === item.id
                 ? 'bg-leather text-parchment'
                 : 'text-ink-light hover:bg-ledger'

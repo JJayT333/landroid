@@ -37,6 +37,14 @@ body {
   color: var(--color-ink);
 }
 
+/* One visible keyboard-focus treatment app-wide (audit §5 item 3). The
+   !important deliberately beats the scattered `outline-none` utilities —
+   focus visibility is accessibility, not decoration. */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--color-leather) 40%, transparent) !important;
+  outline-offset: 1px;
+}
+
 /* ── React Flow overrides ────────────────────────────────── */
 .react-flow__background {
   background-color: var(--color-canvas-bg) !important;

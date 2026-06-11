@@ -120,7 +120,7 @@ export default function ConveyModal({ parentNode, onClose }: ConveyModalProps) {
     >
       <div className="space-y-4">
         {/* Parent info */}
-        <div className="bg-ledger rounded-lg p-3 text-xs text-ink-light">
+        <div className="bg-ledger rounded-md p-3 text-xs text-ink-light">
           <span className="uppercase tracking-wider">{parentRemainingLabel}: </span>
           <span className="font-mono font-semibold text-ink">{parentRemaining}</span>
         </div>
@@ -157,7 +157,7 @@ export default function ConveyModal({ parentNode, onClose }: ConveyModalProps) {
               <button
                 key={mode}
                 onClick={() => set('conveyanceMode', mode)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
                   form.conveyanceMode === mode
                     ? 'bg-leather text-parchment'
                     : 'text-ink-light hover:bg-parchment-dark border border-ledger-line'
@@ -196,14 +196,14 @@ export default function ConveyModal({ parentNode, onClose }: ConveyModalProps) {
                   type="text"
                   value={form.numerator}
                   onChange={(e) => set('numerator', e.target.value)}
-                  className="w-20 px-3 py-1.5 rounded-lg border border-ledger-line bg-parchment text-ink font-mono text-sm text-center focus:ring-2 focus:ring-leather outline-none"
+                  className="w-20 px-3 py-1.5 rounded-md border border-ledger-line bg-parchment text-ink font-mono text-sm text-center focus:ring-2 focus:ring-leather outline-none"
                 />
                 <span className="text-ink-light text-lg">/</span>
                 <input
                   type="text"
                   value={form.denominator}
                   onChange={(e) => set('denominator', e.target.value)}
-                  className="w-20 px-3 py-1.5 rounded-lg border border-ledger-line bg-parchment text-ink font-mono text-sm text-center focus:ring-2 focus:ring-leather outline-none"
+                  className="w-20 px-3 py-1.5 rounded-md border border-ledger-line bg-parchment text-ink font-mono text-sm text-center focus:ring-2 focus:ring-leather outline-none"
                 />
               </div>
             </>
@@ -213,7 +213,7 @@ export default function ConveyModal({ parentNode, onClose }: ConveyModalProps) {
             <FormField label="Fixed Amount (decimal)" value={form.manualAmount} onChange={(v) => set('manualAmount', v)} />
           )}
 
-          <div className="bg-ledger rounded-lg p-3">
+          <div className="bg-ledger rounded-md p-3">
             <div className="flex items-center justify-between">
               <span className="text-[10px] text-ink-light uppercase tracking-wider">
                 {isNpriParent
@@ -230,7 +230,7 @@ export default function ConveyModal({ parentNode, onClose }: ConveyModalProps) {
         </fieldset>
 
         {error && (
-          <div className="bg-seal/10 border border-seal/30 rounded-lg p-3 text-sm text-seal">
+          <div className="bg-seal/10 border border-seal/30 rounded-md p-3 text-sm text-seal">
             {error}
           </div>
         )}

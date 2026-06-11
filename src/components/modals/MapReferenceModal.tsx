@@ -46,7 +46,7 @@ export default function MapReferenceModal({
           <select
             value={form.source}
             onChange={(event) => set('source', event.target.value)}
-            className="w-full px-3 py-2 rounded-lg border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none"
+            className="w-full px-3 py-2 rounded-md border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none"
           >
             {MAP_REFERENCE_SOURCE_OPTIONS.map((option) => (
               <option key={option} value={option}>
@@ -75,7 +75,7 @@ export default function MapReferenceModal({
             value={form.notes}
             onChange={(event) => set('notes', event.target.value)}
             rows={4}
-            className="w-full px-3 py-2 rounded-lg border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none resize-y"
+            className="w-full px-3 py-2 rounded-md border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-leather outline-none resize-y"
           />
         </div>
 

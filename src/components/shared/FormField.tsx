@@ -50,7 +50,7 @@ export default function FormField({
         disabled={disabled}
         list={listId}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full px-3 py-1.5 rounded-lg border border-ledger-line bg-parchment text-ink text-sm focus:ring-2 focus:ring-leather focus:border-leather outline-none disabled:cursor-not-allowed disabled:opacity-60"
+        className="w-full px-3 py-1.5 rounded-sm border border-ledger-line bg-parchment text-ink text-sm focus:ring-2 focus:ring-leather focus:border-leather outline-none disabled:cursor-not-allowed disabled:opacity-60"
       />
       {listId && (
         <datalist id={listId}>

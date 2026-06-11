@@ -166,7 +166,7 @@ export function ConfirmationProvider({ children }: { children: ReactNode }) {
             {pending.kind === 'confirm' ? (
               <div className="space-y-4">
                 {typedState.required && (
-                  <div className="rounded-lg border border-seal/25 bg-seal/5 p-3">
+                  <div className="rounded-md border border-seal/25 bg-seal/5 p-3">
                     <label
                       htmlFor={typedInputId}
                       className="block text-[10px] font-semibold uppercase tracking-wider text-seal"
@@ -186,7 +186,7 @@ export function ConfirmationProvider({ children }: { children: ReactNode }) {
                         }
                       }}
                       aria-describedby={typedHelpId}
-                      className="mt-1.5 w-full rounded-md border border-ledger-line bg-parchment px-3 py-2 font-mono text-sm text-ink outline-none transition-colors focus:border-seal focus:ring-2 focus:ring-seal/20"
+                      className="mt-1.5 w-full rounded-md border border-ledger-line bg-parchment px-3 py-2 font-mono text-sm text-ink outline-none transition-colors focus:border-seal focus:ring-2 focus:ring-leather/20"
                     />
                     <div id={typedHelpId} className="mt-1.5 text-xs text-ink-light">
                       {pending.options.typedConfirmationHelp ??
