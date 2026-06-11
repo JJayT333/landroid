@@ -55,16 +55,16 @@ function DeskMapNpriCard({
     <div className="flex flex-col items-center">
       <div
         className={`
-          group w-72 rounded-md border-2 shadow-md cursor-pointer transition-all
-          hover:shadow-lg ${hasDiscrepancy ? 'hover:border-seal' : 'hover:border-amber-500'}
+          group w-[208px] rounded-[10px] border transition-all
+          ${hasDiscrepancy ? 'hover:border-seal' : 'hover:border-tint-amber-ink/60 hover:shadow-[0_4px_12px_rgba(45,33,20,0.11)]'}
           ${
             hasDiscrepancy
               ? 'border-seal ring-2 ring-seal/20 shadow-[0_10px_24px_rgba(127,29,29,0.20)]'
               : isActive
-              ? 'border-amber-600 ring-2 ring-amber-200'
-              : 'border-amber-200 shadow-[0_8px_18px_rgba(217,119,6,0.14)]'
+              ? 'border-tint-amber-ink shadow-[0_0_0_3px_var(--color-parchment-dark),0_2px_8px_rgba(45,33,20,0.07)]'
+              : 'border-tint-amber-line shadow-[0_2px_8px_rgba(45,33,20,0.07)]'
           }
-          ${hasDiscrepancy ? 'bg-seal/5 text-ink' : 'bg-amber-50 text-ink'}
+          ${hasDiscrepancy ? 'bg-seal/5 text-ink' : 'bg-tint-amber text-ink'}
           ${readOnly ? 'cursor-default' : 'cursor-pointer'}
         `}
         aria-disabled={readOnly}
@@ -73,13 +73,13 @@ function DeskMapNpriCard({
           if (!readOnly) onEdit(node.id);
         }}
       >
-        <div className={`px-3 py-1.5 border-b rounded-t-md ${
+        <div className={`rounded-t-[9px] border-b px-[9px] py-[5px] ${
           hasDiscrepancy
             ? 'border-seal/20 bg-seal/10'
-            : 'border-amber-200 bg-amber-100/80'
+            : 'border-tint-amber-line bg-[#f4e6c2]/80'
         }`}>
           <div className="flex items-center justify-between gap-2">
-            <span className="text-[10px] font-semibold text-amber-900 uppercase tracking-wide truncate">
+            <span className="truncate text-[8.5px] font-bold uppercase tracking-wide text-tint-amber-ink">
               {node.instrument || 'Royalty Deed'}
             </span>
             <div className="flex items-center gap-1.5">
@@ -102,7 +102,7 @@ function DeskMapNpriCard({
             </div>
           </div>
           {(node.date || node.fileDate || node.docNo) && (
-            <div className="mt-0.5 text-[9px] text-amber-900/75 font-mono">
+            <div className="mt-0.5 font-mono text-[9px] text-tint-amber-ink/80">
               {[node.date || node.fileDate, node.docNo ? `Doc# ${node.docNo}` : '']
                 .filter(Boolean)
                 .join(' • ')}
@@ -110,15 +110,15 @@ function DeskMapNpriCard({
           )}
         </div>
 
-        <div className="px-3 py-2 space-y-1.5">
-          <div className="text-[10px] text-amber-900/75 truncate">
+        <div className="space-y-1 px-[9px] py-[7px]">
+          <div className="truncate text-[9px] text-tint-amber-ink/90">
             From: {node.grantor || 'Unknown grantor'}
           </div>
-          <div className="text-sm font-bold font-display text-amber-950 truncate">
+          <div className="truncate font-display text-[12.5px] font-bold leading-snug text-ink">
             {node.grantee || 'NPRI holder on file'}
           </div>
           {node.remarks && (
-            <div className="text-[10px] text-amber-900/75 line-clamp-2">
+            <div className="line-clamp-2 text-[9.5px] text-tint-amber-ink/90">
               {node.remarks}
             </div>
           )}
@@ -145,16 +145,16 @@ function DeskMapNpriCard({
           )}
         </div>
 
-        <div className="px-3 py-2 border-t border-amber-200 bg-amber-100/40 space-y-0.5">
+        <div className="grid gap-[3px] border-t border-tint-amber-line px-[9px] py-[7px]">
           <div className="flex items-center justify-between gap-2">
-            <span className="text-amber-900/75 text-[10px] uppercase tracking-wider shrink-0">
+            <span className="shrink-0 text-[8.5px] font-semibold uppercase tracking-[0.05em] text-tint-amber-ink">
               {isFloating
                 ? 'Of Lease Royalty'
                 : node.fixedRoyaltyBasis === 'whole_tract'
                   ? 'Of Whole Tract'
                   : 'Of Burdened Branch'}
             </span>
-            <span className="text-sm font-mono font-semibold text-amber-950">
+            <span className="font-mono text-[11.5px] font-semibold tabular-nums text-ink">
               <FormulaTooltip content={npriInitialFractionFormula(node)}>
                 {formatAsFraction(initial)}
               </FormulaTooltip>
@@ -162,10 +162,10 @@ function DeskMapNpriCard({
           </div>
           {hasConveyedSome && (
             <div className="flex items-center justify-between gap-2">
-              <span className="text-amber-900/75 text-[10px] uppercase tracking-wider shrink-0">
+              <span className="shrink-0 text-[8.5px] font-semibold uppercase tracking-[0.05em] text-tint-amber-ink">
                 Remaining
               </span>
-              <span className="text-sm font-mono font-semibold text-amber-900">
+              <span className="font-mono text-[11.5px] font-semibold tabular-nums text-tint-amber-ink">
                 <FormulaTooltip content={remainingFractionFormula(node)}>
                   {formatAsFraction(remaining)}
                 </FormulaTooltip>
@@ -175,7 +175,7 @@ function DeskMapNpriCard({
         </div>
 
         {relatedDocs.length > 0 && (
-          <div className="px-2 py-1.5 border-t border-amber-200 space-y-1">
+          <div className="space-y-1 border-t border-tint-amber-line px-2 py-1.5">
             {relatedDocs.map((doc) => (
               <div
                 key={doc.id}
@@ -206,11 +206,13 @@ function DeskMapNpriCard({
           </div>
         )}
 
-        <div className="hidden group-hover:flex px-2 py-1.5 border-t border-amber-200 bg-amber-100/70 rounded-b-md gap-1 justify-center">
-          <ActionBtn label="PRECEDE" disabled={readOnly} onClick={() => onPrecede(node.id)} />
-          <ActionBtn label="CONVEY" disabled={readOnly} onClick={() => onConvey(node.id)} />
-          <ActionBtn label="ATTACH" disabled={readOnly} onClick={() => onAttachDoc(node.id)} />
-          <ActionBtn label="DELETE" danger disabled={readOnly} onClick={() => onDelete(node.id)} />
+        <div className="hidden gap-0.5 rounded-b-[9px] border-t border-tint-amber-line bg-white/70 px-2 py-[4px] group-hover:flex">
+          <ActionBtn label="Precede" disabled={readOnly} onClick={() => onPrecede(node.id)} />
+          <ActionBtn label="Convey" disabled={readOnly} onClick={() => onConvey(node.id)} />
+          <ActionBtn label="Attach" disabled={readOnly} onClick={() => onAttachDoc(node.id)} />
+          <span className="ml-auto">
+            <ActionBtn label="Delete" danger disabled={readOnly} onClick={() => onDelete(node.id)} />
+          </span>
         </div>
       </div>
     </div>
@@ -238,10 +240,10 @@ function ActionBtn({
         onClick();
       }}
       title={disabled ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
-      className={`px-2 py-1 rounded text-[9px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+      className={`rounded-[5px] px-[5px] py-[3px] text-[8px] font-bold uppercase tracking-[0.05em] transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
         danger
-          ? 'text-seal hover:bg-seal/10'
-          : 'text-amber-900 hover:bg-amber-200/60'
+          ? 'text-seal hover:bg-[#f7e9e4]'
+          : 'text-tint-amber-ink hover:bg-[#f4e6c2]'
       }`}
     >
       {label}

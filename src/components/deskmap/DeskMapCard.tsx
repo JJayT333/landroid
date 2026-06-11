@@ -103,30 +103,44 @@ function DeskMapCard({
       ? 'bg-green-50 text-ink'
       : holdsInterest
         ? 'bg-sky-50 text-ink'
-        : 'bg-parchment text-ink';
+        : 'bg-parchment-light text-ink';
   const headerTint = hasNpriDiscrepancy
     ? 'bg-seal/10'
     : isNpri && holdsInterest
       ? 'bg-green-100/70'
       : holdsInterest
         ? 'bg-sky-100/70'
-        : 'bg-parchment-dark';
+        : 'bg-[#f1e8d5]';
+  // Hairline + label inks follow the tint family (design handoff values).
+  const innerLine = hasNpriDiscrepancy
+    ? 'border-seal/25'
+    : isNpri && holdsInterest
+      ? 'border-tint-green-line'
+      : holdsInterest
+        ? 'border-tint-sky-line'
+        : 'border-ledger-line';
+  const mutedInk = hasNpriDiscrepancy
+    ? 'text-ink-light'
+    : isNpri && holdsInterest
+      ? 'text-tint-green-ink'
+      : holdsInterest
+        ? 'text-tint-sky-ink'
+        : 'text-ink-light';
 
   return (
     <div className="flex flex-col items-center">
       {/* Main card */}
       <div
         className={`
-          group w-72 rounded-md border-2 shadow-md cursor-pointer transition-all
-          hover:shadow-lg ${hasNpriDiscrepancy ? 'hover:border-seal' : 'hover:border-leather'}
+          group w-[232px] rounded-[10px] border transition-all
           ${hasNpriDiscrepancy
-            ? 'border-seal ring-2 ring-seal/20 shadow-[0_10px_24px_rgba(127,29,29,0.20)]'
+            ? 'border-seal ring-2 ring-seal/20 shadow-[0_10px_24px_rgba(127,29,29,0.20)] hover:border-seal'
             : isActive
-            ? 'border-leather ring-2 ring-gold/50'
+            ? 'border-leather shadow-[0_0_0_3px_var(--color-parchment-dark),0_3px_10px_rgba(45,33,20,0.09)] hover:border-leather'
             : holdsInterest
-              ? 'border-leather/60 shadow-[0_8px_18px_rgba(92,61,46,0.12)]'
-              : 'border-ledger-line'}
-          ${isFullyConveyed ? 'opacity-75' : ''}
+              ? `${innerLine} shadow-[0_3px_10px_rgba(45,33,20,0.09)] hover:border-leather/70 hover:shadow-[0_5px_14px_rgba(45,33,20,0.13)]`
+              : 'border-ledger-line shadow-[0_2px_8px_rgba(45,33,20,0.07)] hover:border-leather/50'}
+          ${isFullyConveyed ? 'opacity-85' : ''}
           ${readOnly ? 'cursor-default' : 'cursor-pointer'}
           ${cardBodyTint}
         `}
@@ -138,17 +152,17 @@ function DeskMapCard({
       >
         {/* Header */}
         <div
-          className={`px-3 py-1.5 border-b border-ledger-line rounded-t-md ${headerTint}`}
+          className={`rounded-t-[9px] border-b px-2.5 py-1.5 ${innerLine} ${headerTint}`}
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5 min-w-0">
               {holdsInterest && (
                 <span
-                  className="h-2 w-2 shrink-0 rounded-full bg-gold shadow-[0_0_0_2px_rgba(212,197,169,0.9)]"
+                  className="h-[7px] w-[7px] shrink-0 rounded-full bg-gold-light shadow-[0_0_0_2px_rgba(255,255,255,0.8)]"
                   title={isLeased ? 'Present owner — leased' : 'Present owner'}
                 />
               )}
-              <span className="text-[10px] font-semibold text-ink-light uppercase tracking-wide truncate">
+              <span className={`truncate text-[8.5px] font-bold uppercase tracking-wide ${mutedInk}`}>
                 {node.instrument || 'Document'}
               </span>
             </div>
@@ -159,7 +173,7 @@ function DeskMapCard({
                 </span>
               )}
               {(node.date || node.fileDate) && (
-                <span className="text-[10px] text-ink-light font-mono">
+                <span className={`font-mono text-[9px] ${mutedInk}`}>
                   {node.date || node.fileDate}
                 </span>
               )}
@@ -182,16 +196,16 @@ function DeskMapCard({
         </div>
 
         {/* Body */}
-        <div className="px-3 py-2">
+        <div className="px-2.5 py-2">
           {node.grantor && (
-            <div className="text-[10px] text-ink-light truncate">
+            <div className={`truncate text-[9.5px] ${mutedInk}`}>
               From: {node.grantor}
             </div>
           )}
-          <div className="text-sm font-bold font-display truncate">
+          <div className="truncate font-display text-[13.5px] font-bold leading-snug text-ink">
             {node.grantee || 'Unknown'}
             {node.isDeceased && (
-              <span className="ml-1 text-[10px] text-seal font-normal">(deceased)</span>
+              <span className="ml-1 text-[10px] text-seal font-normal font-body">(deceased)</span>
             )}
           </div>
           <DeskMapDocumentChips node={node} onViewDoc={onViewDoc} />
@@ -204,18 +218,18 @@ function DeskMapCard({
         </div>
 
         {/* Fractions */}
-        <div className="px-3 py-2 border-t border-ledger-line bg-ledger space-y-0.5">
+        <div className={`grid gap-[3px] border-t px-2.5 py-[7px] ${innerLine}`}>
           <div className="flex items-center justify-between gap-2">
-            <span className="text-ink-light text-[10px] uppercase tracking-wider shrink-0">Granted</span>
-            <span className="text-sm font-mono font-semibold text-leather">
+            <span className={`shrink-0 text-[8.5px] font-semibold uppercase tracking-[0.05em] ${mutedInk}`}>Granted</span>
+            <span className="font-mono text-[11.5px] font-semibold tabular-nums text-ink">
               <FormulaTooltip content={grantedFractionFormula(node, parentInitialFraction)}>
                 {grantedFrac}
               </FormulaTooltip>
             </span>
           </div>
           <div className="flex items-center justify-between gap-2">
-            <span className="text-ink-light text-[10px] uppercase tracking-wider shrink-0">Of Whole</span>
-            <span className="text-sm font-mono font-semibold text-ink">
+            <span className={`shrink-0 text-[8.5px] font-semibold uppercase tracking-[0.05em] ${mutedInk}`}>Of Whole</span>
+            <span className="font-mono text-[11.5px] font-semibold tabular-nums text-ink">
               <FormulaTooltip content={ofWholeFractionFormula(node)}>
                 {ofWholeFrac}
               </FormulaTooltip>
@@ -223,10 +237,10 @@ function DeskMapCard({
           </div>
           {hasConveyedSome && (
             <div className="flex items-center justify-between gap-2">
-              <span className="text-ink-light text-[10px] uppercase tracking-wider shrink-0">
+              <span className={`shrink-0 text-[8.5px] font-semibold uppercase tracking-[0.05em] ${mutedInk}`}>
                 {isFullyConveyed ? 'Conveyed All' : 'Remaining'}
               </span>
-              <span className={`text-sm font-mono font-semibold ${isFullyConveyed ? 'text-ink-light' : 'text-seal'}`}>
+              <span className={`font-mono text-[11.5px] font-semibold tabular-nums ${isFullyConveyed ? 'text-ink-light' : 'text-seal'}`}>
                 {isFullyConveyed ? (
                   '\u2014'
                 ) : (
@@ -241,7 +255,7 @@ function DeskMapCard({
 
         {/* Related docs — shown inline beneath fractions */}
         {relatedDocs.length > 0 && (
-          <div className="px-2 py-1.5 border-t border-ledger-line space-y-1">
+          <div className={`space-y-1 border-t px-2 py-1.5 ${innerLine}`}>
             {relatedDocs.map((doc) => (
               <RelatedDocChip
                 key={doc.id}
@@ -256,14 +270,16 @@ function DeskMapCard({
         )}
 
         {/* Action buttons */}
-        <div className="hidden group-hover:flex px-2 py-1.5 border-t border-ledger-line bg-parchment-dark rounded-b-md gap-1 justify-center">
-          <ActionBtn label="PRECEDE" variant="muted" disabled={readOnly} onClick={() => onPrecede(node.id)} />
-          <ActionBtn label="CONVEY" variant="primary" disabled={readOnly} onClick={() => onConvey(node.id)} />
+        <div className={`hidden gap-0.5 rounded-b-[9px] border-t bg-white/70 px-2 py-[5px] group-hover:flex ${innerLine}`}>
+          <ActionBtn label="Precede" variant="muted" disabled={readOnly} onClick={() => onPrecede(node.id)} />
+          <ActionBtn label="Convey" variant="primary" disabled={readOnly} onClick={() => onConvey(node.id)} />
           {canLease && (
-            <ActionBtn label="LEASE" variant="lease" disabled={readOnly} onClick={() => onLease(node.id)} />
+            <ActionBtn label="Lease" variant="lease" disabled={readOnly} onClick={() => onLease(node.id)} />
           )}
-          <ActionBtn label="ATTACH" variant="accent" disabled={readOnly} onClick={() => onAttachDoc(node.id)} />
-          <ActionBtn label="DELETE" variant="danger" disabled={readOnly} onClick={() => onDelete(node.id)} />
+          <ActionBtn label="Attach" variant="accent" disabled={readOnly} onClick={() => onAttachDoc(node.id)} />
+          <span className="ml-auto">
+            <ActionBtn label="Delete" variant="danger" disabled={readOnly} onClick={() => onDelete(node.id)} />
+          </span>
         </div>
       </div>
     </div>
@@ -360,11 +376,11 @@ function RelatedDocChip({
 // ── Action button ───────────────────────────────────────
 
 const ACTION_VARIANTS = {
-  muted: 'text-ink-light hover:bg-ink-light/10',
-  primary: 'text-leather hover:bg-leather/10',
-  lease: 'text-emerald-700 hover:bg-emerald-100',
-  accent: 'text-gold hover:bg-gold/10',
-  danger: 'text-seal hover:bg-seal/10',
+  muted: 'text-ink-light hover:bg-parchment-dark',
+  primary: 'text-leather hover:bg-parchment-dark',
+  lease: 'text-tint-green-ink hover:bg-emerald-100',
+  accent: 'text-leather hover:bg-parchment-dark',
+  danger: 'text-seal hover:bg-[#f7e9e4]',
 } as const;
 
 function ActionBtn({
@@ -388,7 +404,7 @@ function ActionBtn({
         onClick();
       }}
       title={disabled ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
-      className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${ACTION_VARIANTS[variant]}`}
+      className={`rounded-[5px] px-[5px] py-[3px] text-[8px] font-bold uppercase tracking-[0.05em] transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${ACTION_VARIANTS[variant]}`}
     >
       {label}
     </button>

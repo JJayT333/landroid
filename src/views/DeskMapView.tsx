@@ -7,6 +7,7 @@
  */
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Button from '../components/shared/Button';
+import UndoRedoControls from '../components/shell/UndoRedoControls';
 import { useUIStore } from '../store/ui-store';
 import { useMapStore } from '../store/map-store';
 import { useOwnerStore } from '../store/owner-store';
@@ -421,13 +422,14 @@ function PanZoomContainer({
       onClickCapture={handleClickCapture}
       onDragStart={(e) => e.preventDefault()}
     >
-      <button
-        type="button"
-        onClick={fitToContent}
-        className="absolute right-3 top-3 z-20 rounded-md border border-ledger-line bg-parchment/95 px-3 py-1.5 text-xs font-semibold text-ink shadow-sm hover:bg-parchment-dark/80"
-      >
-        Fit
-      </button>
+      {/* Undo/Redo live on the canvas next to Fit — always visible (locked
+          decision), floating glass chrome over the dot grid. */}
+      <div className="absolute right-4 top-4 z-20 flex items-center gap-2">
+        <UndoRedoControls />
+        <Button variant="glass" size="sm" onClick={fitToContent} title="Fit the tract to the viewport">
+          Fit
+        </Button>
+      </div>
       <div
         ref={contentRef}
         style={{
@@ -615,24 +617,41 @@ function CoverageCard({
 }) {
   const value = formatAsFraction(d(fraction));
   const pct = formatCoveragePercent(fraction);
+  // HARD RULE (design handoff): a fraction never wraps mid-number. Stacked
+  // numerator-over-rule-over-denominator, each term nowrap; reconciliation-
+  // scale terms (6–10 digits) step the type down instead of breaking.
+  const [numerator, denominator] = value.includes('/')
+    ? value.split('/')
+    : [value, null];
+  const longestTerm = Math.max(numerator.length, denominator?.length ?? 0);
+  const termSize =
+    longestTerm > 9 ? 'text-[9px]' : longestTerm > 6 ? 'text-[10.5px]' : 'text-xs';
   return (
-    <div className={`rounded-md border px-2 py-1.5 ${toneClassName}`}>
-      <div className="text-[9px] font-semibold uppercase tracking-wider leading-tight">
+    <div className={`rounded-[9px] border px-1.5 py-2 text-center ${toneClassName}`}>
+      <div className="text-[8.5px] font-semibold uppercase tracking-wide leading-tight">
         {label}
       </div>
-      {/* min-w-0 + break-all so reconciliation-scale fractions
-          (1000000001/1000000000) wrap inside the card instead of bleeding
-          across siblings; title carries the full value for hover. */}
-      <div
-        className="mt-1 min-w-0 break-all text-xs font-semibold font-mono tabular-nums"
-        title={value}
-      >
-        {formula ? <FormulaTooltip content={formula}>{value}</FormulaTooltip> : value}
+      <div className="mt-1.5 inline-block align-top" title={value}>
+        {denominator ? (
+          <>
+            <div className={`${termSize} whitespace-nowrap font-mono font-semibold tabular-nums leading-tight`}>
+              {numerator}
+            </div>
+            <div className="my-[2px] h-px bg-connector" />
+            <div className={`${termSize} whitespace-nowrap font-mono font-semibold tabular-nums leading-tight`}>
+              {denominator}
+            </div>
+          </>
+        ) : (
+          <div className="whitespace-nowrap font-mono text-xs font-semibold tabular-nums">
+            {value}
+          </div>
+        )}
       </div>
-      <div className="text-[9px] mt-0.5 opacity-80 font-mono tabular-nums">
+      <div className="mt-1 text-[11px] font-bold tabular-nums">
         {formula ? <FormulaTooltip content={formula}>{pct}</FormulaTooltip> : pct}
       </div>
-      <div className="text-[9px] mt-1 opacity-80 leading-tight">
+      <div className="mt-1 text-[8.5px] leading-tight opacity-80">
         {detail}
       </div>
     </div>
@@ -1289,70 +1308,65 @@ export default function DeskMapView() {
       {/* Desk map tabs */}
       <DeskMapTabs />
 
-      <div className="flex-1 relative overflow-hidden bg-canvas-bg">
-        {/* Toolbar */}
-        <div
-          className={`absolute top-3 left-3 z-20 max-w-[calc(100%-1.5rem)] rounded-md bg-parchment/92 backdrop-blur border border-ledger-line shadow-md ${
-            toolbarCollapsed ? 'w-auto p-2' : 'w-[19.5rem] p-2.5 space-y-2.5'
-          }`}
-        >
+      <div className="flex-1 relative overflow-hidden bg-canvas-bg bg-[radial-gradient(var(--color-canvas-dot)_1px,transparent_1.5px)] [background-size:26px_26px]">
+        {/* Toolbar — floating glass card over the canvas (design handoff). */}
+        {toolbarCollapsed ? (
+          <button
+            type="button"
+            onClick={() => setToolbarCollapsed(false)}
+            title="Expand Desk Map toolbar"
+            aria-label="Expand toolbar"
+            className="absolute left-4 top-4 z-20 flex items-center gap-2 rounded-[10px] border border-ledger-line bg-parchment-light/80 px-3 py-1.5 shadow-[0_4px_14px_rgba(45,33,20,0.08)] backdrop-blur-md backdrop-saturate-150 transition-colors hover:bg-parchment-light"
+          >
+            <span className="text-[11px] text-ink-light">▸</span>
+            <span className="text-xs font-semibold text-ink">Toolbar</span>
+            <span className="font-mono text-[10px] text-ink-light">
+              {visibleCardCount} cards · found {formatCoveragePercent(coverageSummary.currentOwnership)}
+            </span>
+          </button>
+        ) : (
+        <div className="absolute top-4 left-4 z-20 w-[270px] max-w-[calc(100%-2rem)] space-y-2.5 rounded-xl border border-ledger-line bg-parchment-light/85 p-3 shadow-[0_6px_20px_rgba(45,33,20,0.08)] backdrop-blur-md backdrop-saturate-150">
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setToolbarCollapsed((prev) => !prev)}
-              className="rounded-md border border-ledger-line bg-parchment px-1.5 py-1 text-[10px] font-semibold text-ink-light hover:bg-parchment-dark/70 transition-colors"
-              title={
-                toolbarCollapsed
-                  ? 'Expand Desk Map toolbar'
-                  : 'Collapse Desk Map toolbar to free canvas space'
-              }
-              aria-label={toolbarCollapsed ? 'Expand toolbar' : 'Collapse toolbar'}
+            <Button
+              size="xs"
+              disabled={readOnly}
+              onClick={handleAddRoot}
+              title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
             >
-              {toolbarCollapsed ? '▸' : '▾'}
-            </button>
-            {!toolbarCollapsed && (
-              <button
-                type="button"
-                disabled={readOnly}
-                onClick={handleAddRoot}
-                title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
-                className="px-3 py-1.5 rounded-md text-xs font-semibold text-leather hover:bg-leather/10 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                + Add Root
-              </button>
-            )}
-            {!toolbarCollapsed && (
-              <button
-                type="button"
-                onClick={handleClearDeskMap}
-                disabled={readOnly || !activeDeskMap || visibleCardCount === 0}
-                className="rounded-md border border-seal/30 px-3 py-1.5 text-xs font-semibold text-seal transition-colors hover:bg-seal/10 disabled:cursor-not-allowed disabled:opacity-40"
-                title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : 'Clear all cards from the active Desk Map'}
-              >
-                Clear Map
-              </button>
-            )}
-            <span className="text-[10px] text-ink-light font-mono">
+              + Add Root
+            </Button>
+            <Button
+              variant="destructive-ghost"
+              size="xs"
+              onClick={handleClearDeskMap}
+              disabled={readOnly || !activeDeskMap || visibleCardCount === 0}
+              title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : 'Clear all cards from the active Desk Map'}
+            >
+              Clear
+            </Button>
+            <span
+              className="ml-auto cursor-help font-mono text-[10px] text-ink-light"
+              title="Add more than one root when title starts from separate families. Temporary coverage over 100% is okay until you reconcile farther back in title."
+            >
               {visibleCardCount} cards
             </span>
-            {!toolbarCollapsed && (
-              <span
-                className="ml-auto text-[12px] text-ink-light cursor-help"
-                title="Toolbar — add roots, search owners, and review tract coverage. Click ▾ to collapse."
-              >
-                ℹ
-              </span>
-            )}
+            <button
+              type="button"
+              onClick={() => setToolbarCollapsed(true)}
+              className="rounded-[5px] px-1.5 py-0.5 text-[11px] text-ink-light transition-colors hover:bg-parchment-dark"
+              title="Collapse Desk Map toolbar to free canvas space"
+              aria-label="Collapse toolbar"
+            >
+              ▾
+            </button>
           </div>
-          {!toolbarCollapsed && (
-          <>
           {npriCardCount > 0 && (
             <div className="flex items-center gap-2">
-              <button
-                type="button"
+              <Button
+                variant="ghost"
+                size="xs"
                 onClick={handleToggleNpris}
                 aria-pressed={hideNpris}
-                className="rounded-md border border-ledger-line px-3 py-1.5 text-xs font-semibold text-ink-light transition-colors hover:bg-parchment-dark/70"
                 title={
                   hideNpris
                     ? 'Show NPRI cards on the canvas'
@@ -1360,25 +1374,19 @@ export default function DeskMapView() {
                 }
               >
                 {hideNpris ? 'Show' : 'Hide'} NPRIs ({npriCardCount})
-              </button>
+              </Button>
               {hideNpris && (
                 <span className="text-[9px] leading-tight text-ink-light">
-                  Hidden from canvas only — totals and warnings unchanged.
+                  Hidden from canvas only — totals unchanged.
                 </span>
               )}
             </div>
           )}
-          <div className="text-[9px] leading-tight text-ink-light">
-            Add more than one root when title starts from separate families. Temporary
-            coverage over 100% is okay until you reconcile farther back in title.
-          </div>
 
           <div className="space-y-1.5">
             <label className="block">
-              <span className="text-[9px] font-semibold uppercase tracking-wider text-ink-light">
-                Find Mineral Owner
-              </span>
-              <div className="mt-1.5 flex items-center gap-2">
+              <span className="sr-only">Find mineral owner</span>
+              <div className="flex items-center gap-2">
                 <input
                   value={ownerSearchQuery}
                   onChange={(event) => setOwnerSearchQuery(event.target.value)}
@@ -1389,17 +1397,13 @@ export default function DeskMapView() {
                     event.preventDefault();
                     cycleOwnerSearchMatch(event.shiftKey ? -1 : 1);
                   }}
-                  placeholder="Type owner name..."
-                  className="min-w-0 flex-1 rounded-md border border-ledger-line bg-white px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-leather"
+                  placeholder="Find mineral owner…"
+                  className="min-w-0 flex-1 rounded-lg border border-ledger-line bg-white px-2.5 py-1.5 text-xs text-ink outline-none transition-colors placeholder:text-ink-faint focus:border-leather"
                 />
                 {ownerSearchQuery.trim().length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => setOwnerSearchQuery('')}
-                    className="rounded-md border border-ledger-line px-2.5 py-2 text-[10px] font-semibold uppercase tracking-wider text-ink-light transition-colors hover:bg-parchment-dark/70"
-                  >
+                  <Button variant="ghost" size="xs" onClick={() => setOwnerSearchQuery('')}>
                     Clear
-                  </button>
+                  </Button>
                 )}
               </div>
             </label>
@@ -1473,7 +1477,7 @@ export default function DeskMapView() {
           </div>
 
           {visibleNpriDiscrepancies.length > 0 && (
-            <div className="rounded-md border border-seal/30 bg-seal/10 px-2.5 py-2 text-[10px] leading-4 text-seal">
+            <div className="rounded-[9px] border border-seal/30 bg-seal/10 px-2.5 py-2 text-[10px] leading-4 text-seal">
               <div className="font-semibold uppercase tracking-wider">
                 NPRI title discrepancy
               </div>
@@ -1486,11 +1490,12 @@ export default function DeskMapView() {
             </div>
           )}
 
-          <div className="space-y-1.5">
-            <div className="text-[9px] font-semibold uppercase tracking-wider text-ink-light">
+          <div className="h-px bg-ledger-line" />
+          <div className="space-y-2">
+            <div className="text-[9px] font-bold uppercase tracking-[0.1em] text-ink-light">
               Mineral Coverage
             </div>
-            <div className="grid grid-cols-3 gap-1.5">
+            <div className="grid grid-cols-3 gap-2">
               <CoverageCard
                 label="Found In Chain"
                 fraction={coverageSummary.currentOwnership}
@@ -1526,7 +1531,7 @@ export default function DeskMapView() {
               />
             </div>
             {d(coverageSummary.currentOwnership).greaterThan(1) && (
-              <div className="rounded-md border border-amber-300 bg-amber-50 px-2.5 py-2 text-[10px] leading-4 text-amber-950">
+              <div className="rounded-[9px] border border-tint-amber-line bg-tint-amber px-2.5 py-2 text-[10px] leading-4 text-tint-amber-ink">
                 <div className="font-semibold uppercase tracking-wider">
                   Over 100% mineral coverage
                 </div>
@@ -1547,7 +1552,7 @@ export default function DeskMapView() {
             )}
             {coverageSummary.leaseOverlaps.length > 0 && (
               <div
-                className="rounded-md border border-amber-300 bg-amber-50 px-2.5 py-2 text-[10px] leading-4 text-amber-950"
+                className="rounded-[9px] border border-tint-amber-line bg-tint-amber px-2.5 py-2 text-[10px] leading-4 text-tint-amber-ink"
                 title="Audit M5: overlapping active leases on the same owner. Later leases are clipped by earlier ones until reconciled."
               >
                 <div className="font-semibold uppercase tracking-wider">
@@ -1574,15 +1579,14 @@ export default function DeskMapView() {
                 </div>
               </div>
             )}
-            <div className="flex flex-wrap gap-x-2 gap-y-1 text-[9px] text-ink-light font-mono">
-              <span>{coverageSummary.currentOwnerCount} present owners</span>
-              <span>{coverageSummary.linkedOwnerCount} linked</span>
-              <span>{coverageSummary.leasedOwnerCount} leased</span>
+            <div className="font-mono text-[9px] text-ink-light">
+              {coverageSummary.currentOwnerCount} present owners ·{' '}
+              {coverageSummary.linkedOwnerCount} linked ·{' '}
+              {coverageSummary.leasedOwnerCount} leased
             </div>
           </div>
-          </>
-          )}
         </div>
+        )}
 
         {visibleNodes.length === 0 ? (
           <div className="relative z-10 flex items-center justify-center h-full">

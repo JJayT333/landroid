@@ -152,7 +152,7 @@ export default function DeskMapTabs() {
     <div
       role="tablist"
       aria-label="Desk maps"
-      className="flex items-center gap-3 px-4 py-3 bg-parchment border-b border-ledger-line overflow-x-auto"
+      className="scrollbar-hidden flex items-center gap-2 overflow-x-auto border-b border-ledger-line bg-parchment-light px-4 py-[9px]"
     >
       {groups.map((group) => (
         <div
@@ -162,7 +162,7 @@ export default function DeskMapTabs() {
         >
           {/* Section header — only shown when unit grouping is present */}
           {hasMultipleGroups && (
-            <span className="text-[11px] font-bold uppercase tracking-wider text-ink/50 whitespace-nowrap mr-1">
+            <span className="mr-1 whitespace-nowrap text-[10px] font-bold uppercase tracking-[0.1em] text-ink-light">
               {group.unitName}
             </span>
           )}
@@ -180,10 +180,10 @@ export default function DeskMapTabs() {
                   setActiveDeskMap(dm.id);
                 }
               }}
-              className={`group flex items-center gap-2 px-6 py-2.5 rounded-md text-sm font-semibold whitespace-nowrap cursor-pointer transition-colors ${
+              className={`group flex cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-full px-[13px] py-[5px] text-xs transition-colors ${
                 activeDeskMapId === dm.id
-                  ? 'bg-leather text-parchment'
-                  : 'text-ink-light hover:bg-parchment-dark/70'
+                  ? 'bg-leather font-semibold text-[#fff6ec] shadow-[0_1px_3px_rgba(45,33,20,0.18)]'
+                  : 'font-medium text-ink-light hover:bg-parchment-dark hover:text-ink'
               }`}
             >
               {editingId === dm.id ? (
@@ -226,7 +226,7 @@ export default function DeskMapTabs() {
                   onClick={(e) => handleDelete(dm.id, e)}
                   aria-label={`Delete ${dm.name}`}
                   title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
-                  className="opacity-0 group-hover:opacity-100 text-parchment/60 hover:text-parchment text-xs transition-opacity disabled:cursor-not-allowed disabled:opacity-30"
+                  className="text-xs text-[#fff6ec]/70 opacity-0 transition-opacity hover:text-[#fff6ec] group-hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-30"
                 >
                   ×
                 </button>
@@ -244,10 +244,10 @@ export default function DeskMapTabs() {
         type="button"
         disabled={readOnly}
         onClick={handleCreate}
-        className="px-5 py-2.5 rounded-md text-sm font-semibold whitespace-nowrap text-leather hover:bg-leather/10 border border-dashed border-leather/40 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+        className="whitespace-nowrap rounded-full border border-dashed border-connector px-3 py-1 text-xs font-semibold text-leather transition-colors hover:bg-parchment-dark disabled:cursor-not-allowed disabled:opacity-50"
         title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : 'Add new desk map'}
       >
-        + Add Tract
+        + Add
       </button>
     </div>
   );

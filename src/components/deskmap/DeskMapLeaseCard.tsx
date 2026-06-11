@@ -31,12 +31,12 @@ function DeskMapLeaseCard({
     <div className="flex flex-col items-center">
       <div
         className={`
-          group w-72 rounded-md border-2 shadow-md cursor-pointer transition-all
-          hover:shadow-lg hover:border-emerald-500
+          group w-[208px] rounded-[10px] border transition-all
+          hover:border-tint-green-ink/60 hover:shadow-[0_4px_12px_rgba(45,33,20,0.11)]
           ${
             isActive
-              ? 'border-emerald-600 ring-2 ring-emerald-200'
-              : 'border-emerald-200 shadow-[0_8px_18px_rgba(5,150,105,0.14)]'
+              ? 'border-tint-green-ink shadow-[0_0_0_3px_var(--color-parchment-dark),0_2px_8px_rgba(45,33,20,0.07)]'
+              : 'border-tint-green-line shadow-[0_2px_8px_rgba(45,33,20,0.07)]'
           }
           bg-emerald-50 text-ink
           ${readOnly ? 'cursor-default' : 'cursor-pointer'}
@@ -47,17 +47,17 @@ function DeskMapLeaseCard({
           if (!readOnly) onEdit(node.id);
         }}
       >
-        <div className="px-3 py-1.5 border-b border-emerald-200 rounded-t-md bg-emerald-100/80">
+        <div className="rounded-t-[9px] border-b border-tint-green-line bg-emerald-100 px-[9px] py-[5px]">
           <div className="flex items-center justify-between gap-2">
-            <span className="text-[10px] font-semibold text-emerald-900 uppercase tracking-wide truncate">
+            <span className="truncate text-[8.5px] font-bold uppercase tracking-wide text-tint-green-ink">
               {node.instrument || 'Lease'}
             </span>
-            <span className="rounded-full border border-emerald-300 bg-emerald-200/70 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-emerald-900">
+            <span className="rounded-[5px] bg-[#a7e8c4] px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.06em] text-emerald-950">
               Lessee
             </span>
           </div>
           {(node.date || node.fileDate || node.docNo) && (
-            <div className="mt-0.5 text-[9px] text-emerald-900/75 font-mono">
+            <div className="mt-0.5 font-mono text-[9px] text-tint-green-ink/80">
               {[node.date || node.fileDate, node.docNo ? `Doc# ${node.docNo}` : '']
                 .filter(Boolean)
                 .join(' • ')}
@@ -65,19 +65,19 @@ function DeskMapLeaseCard({
           )}
         </div>
 
-        <div className="px-3 py-2 space-y-1.5">
-          <div className="text-[10px] text-emerald-900/75 truncate">
+        <div className="space-y-1 px-[9px] py-[7px]">
+          <div className="truncate text-[9px] text-tint-green-ink/90">
             Lessor: {node.grantor || 'Unknown lessor'}
           </div>
-          <div className="text-sm font-bold font-display text-emerald-950 truncate">
+          <div className="truncate font-display text-[12.5px] font-bold leading-snug text-ink">
             {node.grantee || 'Lessee on file'}
           </div>
           {termChips.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 pt-1">
+            <div className="flex flex-wrap gap-1 pt-0.5">
               {termChips.map((chip) => (
                 <span
                   key={chip}
-                  className="rounded-full border border-emerald-200 bg-white/80 px-2 py-0.5 text-[9px] text-emerald-900/85"
+                  className="rounded-[5px] border border-tint-green-line bg-white px-1.5 py-0.5 text-[8.5px] text-tint-green-ink"
                 >
                   {chip}
                 </span>
@@ -87,9 +87,11 @@ function DeskMapLeaseCard({
           <DeskMapDocumentChips node={node} tone="emerald" onViewDoc={onViewDoc} />
         </div>
 
-        <div className="hidden group-hover:flex px-2 py-1.5 border-t border-emerald-200 bg-emerald-100/70 rounded-b-md gap-1 justify-center">
-          <ActionBtn label="ATTACH" disabled={readOnly} onClick={() => onAttachDoc(node.id)} />
-          <ActionBtn label="DELETE" danger disabled={readOnly} onClick={() => onDelete(node.id)} />
+        <div className="hidden gap-0.5 rounded-b-[9px] border-t border-tint-green-line bg-white/70 px-2 py-[4px] group-hover:flex">
+          <ActionBtn label="Attach" disabled={readOnly} onClick={() => onAttachDoc(node.id)} />
+          <span className="ml-auto">
+            <ActionBtn label="Delete" danger disabled={readOnly} onClick={() => onDelete(node.id)} />
+          </span>
         </div>
       </div>
     </div>
@@ -117,10 +119,10 @@ function ActionBtn({
         onClick();
       }}
       title={disabled ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
-      className={`px-2 py-1 rounded text-[9px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+      className={`rounded-[5px] px-[5px] py-[3px] text-[8px] font-bold uppercase tracking-[0.05em] transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
         danger
-          ? 'text-seal hover:bg-seal/10'
-          : 'text-emerald-900 hover:bg-emerald-200/60'
+          ? 'text-seal hover:bg-[#f7e9e4]'
+          : 'text-tint-green-ink hover:bg-emerald-100'
       }`}
     >
       {label}
