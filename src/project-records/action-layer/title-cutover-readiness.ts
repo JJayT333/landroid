@@ -43,12 +43,21 @@ type OwnerSlice = Pick<OwnerWorkspaceData, 'owners' | 'leases'>;
  * projection is a set of records keyed by `recordId`, so replay-vs-adapter
  * equivalence must not depend on emission order (the live replay ordering is a
  * separate Scope-B concern). Mirrors the replay test's `sortedJson`.
+ *
+ * `lastModified` is excluded from the equivalence: the adapter envelope stamps
+ * it with the derivation instant (record-helpers `context.generatedAt`) while
+ * replayed records carry their mutation-time stamps — two different clocks by
+ * design, equal only at the instant a mutation is recorded. Comparing them
+ * keeps the gate red forever on any aged ledger; the gate certifies content,
+ * not clock agreement.
  */
 function sortedRecordsJson(records: readonly BackendSpineCoreRecord[]): string {
   return canonicalJson(
-    [...records].sort((a, b) =>
-      a.recordId < b.recordId ? -1 : a.recordId > b.recordId ? 1 : 0
-    )
+    [...records]
+      .sort((a, b) =>
+        a.recordId < b.recordId ? -1 : a.recordId > b.recordId ? 1 : 0
+      )
+      .map(({ lastModified: _lastModified, ...stable }) => stable)
   );
 }
 

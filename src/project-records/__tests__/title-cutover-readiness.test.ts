@@ -180,6 +180,50 @@ describe('computeTitleParityGates', () => {
     expect(gates).toEqual({ mathParityClean: true, landroidRoundTripClean: true });
   });
 
+  it('reports both gates clean when computed later than the recorded mutations', async () => {
+    // Production reality: the banner recomputes the gates long after the
+    // ledger entries were written, so the adapter envelope's lastModified
+    // (stamped with generatedAt) never equals the replayed records'
+    // mutation-time stamps. The gate must certify content, not clock
+    // agreement — with a pinned generatedAt === TITLE_NOW this regression is
+    // invisible, which is how it shipped red-forever.
+    const demo = await recordDemoLedger();
+    const agedGeneratedAt = new Date(
+      new Date(TITLE_NOW).getTime() + 90 * 24 * 60 * 60 * 1000
+    ).toISOString();
+    const gates = await computeTitleParityGates({
+      liveWorkspace: demo.workspace,
+      ownerData: demo.ownerData,
+      actionRecords: demo.actionRecords,
+      auditEvents: demo.auditEvents,
+      generatedAt: agedGeneratedAt,
+    });
+    expect(gates).toEqual({ mathParityClean: true, landroidRoundTripClean: true });
+  });
+
+  it('still reports not clean for content drift under an aged clock', async () => {
+    // Guard on the lastModified exclusion: a single content field drifting
+    // between ledger and live workspace must keep the round trip red even
+    // when timestamps are (correctly) ignored.
+    const demo = await recordDemoLedger();
+    const [first, ...rest] = demo.workspace.nodes;
+    const drifted: WorkspaceData = {
+      ...demo.workspace,
+      nodes: [{ ...first, grantee: `${first.grantee ?? ''} (drifted)` }, ...rest],
+    };
+    const agedGeneratedAt = new Date(
+      new Date(TITLE_NOW).getTime() + 90 * 24 * 60 * 60 * 1000
+    ).toISOString();
+    const gates = await computeTitleParityGates({
+      liveWorkspace: drifted,
+      ownerData: demo.ownerData,
+      actionRecords: demo.actionRecords,
+      auditEvents: demo.auditEvents,
+      generatedAt: agedGeneratedAt,
+    });
+    expect(gates.landroidRoundTripClean).toBe(false);
+  });
+
   it('reports not clean when the ledger does not match the live workspace', async () => {
     const { workspace, ownerData } = loadDemoWorkspace();
     // A ledger built from a different (synthetic) title fails both the math
