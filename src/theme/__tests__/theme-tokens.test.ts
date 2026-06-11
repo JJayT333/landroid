@@ -12,7 +12,7 @@ const SRC_ROOT = join(__dirname, '..', '..');
 const THEME_CSS = join(SRC_ROOT, 'theme', 'index.css');
 
 /** Brand families owned by the theme; raw Tailwind palettes are out of scope. */
-const BRAND_FAMILIES = ['parchment', 'ink', 'leather', 'gold', 'seal', 'ledger', 'canvas'];
+const BRAND_FAMILIES = ['parchment', 'ink', 'leather', 'gold', 'seal', 'ledger', 'canvas', 'line', 'connector', 'pin', 'tint'];
 const UTILITY_PREFIXES = [
   'bg',
   'text',
