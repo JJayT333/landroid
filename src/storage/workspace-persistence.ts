@@ -140,6 +140,12 @@ export interface LandroidFileData extends WorkspaceData {
    * `pdfData`-only file.
    */
   documentData?: DocumentWorkspaceData;
+  /**
+   * Set by {@link importLandroidFile} when one or more imported documents
+   * failed SHA-256 fixity verification (DA-H7). Surfaced as a dismissible
+   * startup warning; the recomputed hashes are already stored.
+   */
+  documentFixityWarning?: string;
   ownerData?: OwnerWorkspaceData;
   mapData?: MapWorkspaceData;
   researchData?: ResearchWorkspaceData;
@@ -1071,6 +1077,11 @@ async function serializeDocumentData(
     documents: await Promise.all(
       documentData.documents.map(async (doc) => ({
         ...doc,
+        // DA-H7 (cheap insurance): recompute the hash from the bytes being
+        // written so an exported `.landroid` always carries a self-consistent
+        // fixity value, even if a stored hash had drifted. The import side
+        // re-verifies on the way back in regardless.
+        contentHash: await sha256HexOfBlob(doc.blob),
         blob: await serializeBlob(doc.blob),
       }))
     ),
@@ -1096,8 +1107,24 @@ function isDocumentAttachmentRow(value: unknown): value is DocumentAttachment {
   );
 }
 
-function deserializeDocumentData(value: unknown): DocumentWorkspaceData {
-  if (!isRecord(value)) return { documents: [], attachments: [] };
+/**
+ * DA-H7: the import never trusts the file's recorded document hash. Every
+ * decoded blob is re-hashed (SHA-256) and the recomputed digest is what gets
+ * stored. A non-empty stored hash that disagrees is a fixity mismatch — the
+ * bytes don't match the claim, i.e. corruption or tampering — and the file is
+ * collected into `fixityMismatches` so the caller can warn (never block,
+ * recomputed value wins). A blank stored hash is a legacy unhashed import and
+ * is healed silently.
+ */
+async function deserializeDocumentData(value: unknown): Promise<{
+  documents: DocumentRecord[];
+  attachments: DocumentAttachment[];
+  fixityMismatches: string[];
+}> {
+  if (!isRecord(value)) {
+    return { documents: [], attachments: [], fixityMismatches: [] };
+  }
+  const fixityMismatches: string[] = [];
 
   const rawDocs = Array.isArray((value as { documents?: unknown }).documents)
     ? ((value as { documents: unknown[] }).documents)
@@ -1106,23 +1133,30 @@ function deserializeDocumentData(value: unknown): DocumentWorkspaceData {
     ? ((value as { attachments: unknown[] }).attachments)
     : [];
 
-  const documents: DocumentRecord[] = rawDocs.filter(isDocumentRecordRow).flatMap(
-    (raw) => {
+  const builtDocs = await Promise.all(
+    rawDocs.filter(isDocumentRecordRow).map(
+      async (raw): Promise<DocumentRecord | null> => {
       const fileName = typeof raw.fileName === 'string' ? raw.fileName : '';
       const blob = deserializeSerializedPdfBlob(
         raw.blob,
         `Imported document ${fileName || raw.docId}`
       );
-      if (blob.size === 0) return [];
+      if (blob.size === 0) return null;
+      const recomputedHash = await sha256HexOfBlob(blob);
+      const storedHash =
+        typeof raw.contentHash === 'string' ? raw.contentHash : '';
+      if (storedHash !== '' && storedHash !== recomputedHash) {
+        fixityMismatches.push(fileName || raw.docId);
+      }
       const now = new Date().toISOString();
-      return [
+      return (
         {
           docId: raw.docId,
           workspaceId: raw.workspaceId,
           fileName,
           mimeType: PDF_MIME_TYPE,
           byteLength: blob.size,
-          contentHash: typeof raw.contentHash === 'string' ? raw.contentHash : '',
+          contentHash: recomputedHash,
           blob,
           kind: normalizeDocumentKind(raw.kind),
           displayTitle:
@@ -1156,9 +1190,12 @@ function deserializeDocumentData(value: unknown): DocumentWorkspaceData {
           externalRefs: normalizeExternalRefs(raw.externalRefs),
           createdAt: typeof raw.createdAt === 'string' ? raw.createdAt : now,
           updatedAt: typeof raw.updatedAt === 'string' ? raw.updatedAt : now,
-        },
-      ];
-    }
+        }
+      );
+    })
+  );
+  const documents = builtDocs.filter(
+    (doc): doc is DocumentRecord => doc !== null
   );
 
   const docIdSet = new Set(documents.map((d) => d.docId));
@@ -1182,7 +1219,7 @@ function deserializeDocumentData(value: unknown): DocumentWorkspaceData {
           : new Date().toISOString(),
     }));
 
-  return { documents, attachments };
+  return { documents, attachments, fixityMismatches };
 }
 
 async function serializeMapData(
@@ -1835,17 +1872,23 @@ export async function importLandroidFile(file: File): Promise<LandroidFileData> 
       : { pdfs: [] };
 
   let documentData: DocumentWorkspaceData;
+  let documentFixityWarning: string | undefined;
   if (fileVersion >= 8) {
-    documentData = deserializeDocumentData(parsed.documentData);
+    const deserialized = await deserializeDocumentData(parsed.documentData);
+    if (deserialized.fixityMismatches.length > 0) {
+      documentFixityWarning = formatDocumentFixityWarning(
+        deserialized.fixityMismatches
+      );
+    }
     // Re-scope every doc to the file's workspaceId so callers that
     // import into a fresh workspace don't accidentally inherit a stale
     // workspaceId from the file.
     documentData = {
-      documents: documentData.documents.map((doc) => ({
+      documents: deserialized.documents.map((doc) => ({
         ...doc,
         workspaceId,
       })),
-      attachments: documentData.attachments,
+      attachments: deserialized.attachments,
     };
   } else if (pdfData.pdfs.length > 0) {
     // v7 (or earlier) inline migration: synthesize document/attachment
@@ -1905,10 +1948,28 @@ export async function importLandroidFile(file: File): Promise<LandroidFileData> 
     nodes,
     canvas: normalizeCanvasSaveData(parsed.canvas),
     documentData,
+    documentFixityWarning,
     ownerData,
     mapData,
     researchData,
     curativeData,
     actionLedger,
   };
+}
+
+/**
+ * Human-readable warning for documents whose stored hash did not match their
+ * decoded bytes on import (DA-H7). The recomputed hash is what gets stored;
+ * this only surfaces the discrepancy so the operator can review the originals.
+ */
+function formatDocumentFixityWarning(fileNames: string[]): string {
+  const shown = fileNames.slice(0, 5);
+  const more = fileNames.length - shown.length;
+  const list = shown.join(', ') + (more > 0 ? `, +${more} more` : '');
+  return (
+    `${fileNames.length} imported document${fileNames.length === 1 ? '' : 's'} `
+    + `failed fixity verification — the recorded hash did not match the file `
+    + `contents (${list}). The recomputed hashes were stored; review these `
+    + `originals before relying on them as evidence.`
+  );
 }

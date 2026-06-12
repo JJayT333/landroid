@@ -8,6 +8,7 @@ import {
 import { createBlankLease, createBlankOwner, createBlankOwnerDoc } from '../../types/owner';
 import { createBlankLeasePurchaseReport } from '../../types/lease-purchase-report';
 import { createBlankNode } from '../../types/node';
+import { sha256HexOfBlob } from '../blob-hash';
 import {
   createBlankResearchFormula,
   createBlankResearchImport,
@@ -391,6 +392,56 @@ function titleLandroidData(): LandroidFileData {
       ...ownerData,
       contacts: [],
       docs: [],
+    },
+  };
+}
+
+/**
+ * A minimal v8 `.landroid` payload carrying one node, one valid-PDF document
+ * with a caller-controlled recorded `contentHash`, and one node attachment.
+ * Used by the DA-H7 fixity tests to drive the import re-hash path.
+ */
+function v8SingleDocPayload({
+  fileName,
+  contentHash,
+}: {
+  fileName: string;
+  contentHash: string;
+}) {
+  return {
+    version: 8,
+    workspaceId: 'ws-fixity',
+    projectName: 'Fixity',
+    nodes: [createBlankNode('node-fixity')],
+    deskMaps: [],
+    activeDeskMapId: null,
+    instrumentTypes: [],
+    documentData: {
+      documents: [
+        {
+          docId: 'doc-fixity',
+          workspaceId: 'ws-fixity',
+          fileName,
+          mimeType: 'application/pdf',
+          byteLength: TEST_PDF_BODY.length,
+          contentHash,
+          blob: { base64: btoa(TEST_PDF_BODY), mimeType: 'application/pdf' },
+          kind: 'deed',
+          createdAt: '2026-05-17T00:00:00.000Z',
+          updatedAt: '2026-05-17T00:00:00.000Z',
+        },
+      ],
+      attachments: [
+        {
+          attachmentId: 'att-fixity',
+          workspaceId: 'ws-fixity',
+          docId: 'doc-fixity',
+          entityKind: 'node',
+          entityId: 'node-fixity',
+          position: 0,
+          createdAt: '2026-05-17T00:00:00.000Z',
+        },
+      ],
     },
   };
 }
@@ -830,6 +881,76 @@ describe('workspace-persistence', () => {
       position: 0,
       docId: imported.documentData?.documents[0]?.docId,
     });
+  });
+
+  it('recomputes the document hash on import and warns on a fixity mismatch (DA-H7)', async () => {
+    const realHash = await sha256HexOfBlob(
+      new Blob([TEST_PDF_BODY], { type: 'application/pdf' })
+    );
+    const payload = v8SingleDocPayload({
+      fileName: 'tampered.pdf',
+      contentHash: 'tampered-deadbeef',
+    });
+    const file = new File([JSON.stringify(payload)], 'tampered.landroid', {
+      type: 'application/json',
+    });
+
+    const imported = await importLandroidFile(file);
+
+    // Recorded hash was a lie; recomputed digest wins.
+    expect(imported.documentData?.documents[0]?.contentHash).toBe(realHash);
+    // ...and the operator is warned, with the file named.
+    expect(imported.documentFixityWarning).toBeTruthy();
+    expect(imported.documentFixityWarning).toContain('tampered.pdf');
+    expect(imported.documentFixityWarning).toContain('fixity');
+  });
+
+  it('heals a blank legacy document hash on import without warning (DA-H7)', async () => {
+    const realHash = await sha256HexOfBlob(
+      new Blob([TEST_PDF_BODY], { type: 'application/pdf' })
+    );
+    const payload = v8SingleDocPayload({ fileName: 'legacy.pdf', contentHash: '' });
+    const file = new File([JSON.stringify(payload)], 'legacy-blank.landroid', {
+      type: 'application/json',
+    });
+
+    const imported = await importLandroidFile(file);
+
+    expect(imported.documentData?.documents[0]?.contentHash).toBe(realHash);
+    // A blank hash is an unhashed legacy import, not a mismatch — no warning.
+    expect(imported.documentFixityWarning).toBeUndefined();
+  });
+
+  it('does not warn when the recorded document hash already matches (DA-H7)', async () => {
+    const realHash = await sha256HexOfBlob(
+      new Blob([TEST_PDF_BODY], { type: 'application/pdf' })
+    );
+    const payload = v8SingleDocPayload({
+      fileName: 'good.pdf',
+      contentHash: realHash,
+    });
+    const file = new File([JSON.stringify(payload)], 'good.landroid', {
+      type: 'application/json',
+    });
+
+    const imported = await importLandroidFile(file);
+
+    expect(imported.documentData?.documents[0]?.contentHash).toBe(realHash);
+    expect(imported.documentFixityWarning).toBeUndefined();
+  });
+
+  it('recomputes the document hash on export so the file is self-consistent (DA-H7)', async () => {
+    const realHash = await sha256HexOfBlob(
+      new Blob([TEST_PDF_BODY], { type: 'application/pdf' })
+    );
+    const data = buildWorkspace(null);
+    // Poison the in-memory stored hash; export must still write the real one.
+    data.documentData!.documents[0]!.contentHash = 'stale-stored-hash';
+
+    const blob = await exportLandroidFile(data);
+    const serialized = JSON.parse(await blob.text());
+
+    expect(serialized.documentData.documents[0].contentHash).toBe(realHash);
   });
 
   it('rejects v8 document blobs that claim PDF MIME without PDF bytes', async () => {
