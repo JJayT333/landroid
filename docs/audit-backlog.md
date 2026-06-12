@@ -1,6 +1,7 @@
 # LANDroid Audit Backlog
 
-Last updated: 2026-06-10 (scope-b-hardening statuses applied)
+Last updated: 2026-06-12 (DA-H6 closed via #152; Step 2 lane plan parked at
+`docs/plans/step-2-hardening-lanes.md`)
 
 ## 2026-06-10 Deep Audit (Claude) — new findings, not yet reconciled row-by-row
 
@@ -23,11 +24,17 @@ explicitly accepted, treat that report as part of this backlog. Summary:
   mutators, cascades skipped on veto, hook exceptions surfaced.
 - DA-H4/H5: ledger flush ordering/stale-chain hydration; hash chain does not
   cover ActionRecord payloads. (Open — Step 2+.)
-- DA-H6/H7: `.landroid` export omits non-node-attached documents and
-  import/undo deletes them; document hashes never re-verified (blank accepted).
+- DA-H6: FIXED (#152) — `exportDocumentWorkspaceData` is workspace-scoped:
+  every document + attachment of any entityKind exports (zero-node safe), so
+  export scope matches the restore side's delete scope. Round-trip survival
+  test for non-node/unattached docs folds into the DA-H7 lane.
+- DA-H7: document hashes never re-verified (blank accepted). Open — pinned
+  execution plan in `docs/plans/step-2-hardening-lanes.md` (Lane A).
 - DA-H8/H9: Flowchart stale-fraction snapshot; Map-mode branch card sums
   unit-wide ORRI decimals under one tract.
 - DA-H10: CSV import parses fractions via float64 + toFixed(9) before store.
+  Open — pinned execution plan in `docs/plans/step-2-hardening-lanes.md`
+  (Lane B; DA-M16 retention pruning is Lane C there).
 - DA-M14/M15: FIXED (feat/scope-b-hardening) — writer heartbeat at TTL/3 with
   visibility pause; title-ledger writes and project rename/delete/duplicate
   fenced behind the write lease; reader-tab ledger hydration is memory-only.
