@@ -62,9 +62,14 @@ Exit gate remaining: operator review + merge → Springhill soak → re-arm the
 flip (one line: `setTitleCutoverArmed(true)`) as its own reviewed change.
 
 STEP 2 — Evidence integrity + precision (parallel-safe with Step 1 review):
-- DA-H6: export ALL workspace documents (not node-joined); DA-H7: recompute
-  SHA-256 on import + verify on export + blank-hash backfill. Simpler now —
-  no legacy-file cases.
+- DA-H6: export ALL workspace documents (not node-joined); DA-H7 import/export
+  SHA-256 verification is merged. DA-H7 blank-hash backfill is implemented on
+  `fix/da-h7-content-hash-backfill`: startup runs a non-blocking,
+  self-extinguishing repair for legacy Dexie document rows with
+  `contentHash: ''`, owner-attached and unattached document round-trip coverage
+  is added, and the tracked public Springhill sample hashes were refreshed so
+  it imports with no fixity warning. Validation status: `npm run lint`,
+  targeted storage/Springhill tests, `npm test`, and `npm run build` passed.
 - DA-H10: csv-io parses fractions via Decimal + serialize (kills the float64
   round-before-store).
 - Precision policy: `src/engine/display-format.ts` (four functions, audit §3),

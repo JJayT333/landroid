@@ -104,12 +104,14 @@ describe('Springhill Dr. Elmore public sample', () => {
         type: 'application/json',
       })
     );
+    expect(imported.documentFixityWarning).toBeUndefined();
     const exported = await exportLandroidFile(imported);
     const reloaded = await importLandroidFile(
       new File([await exported.text()], 'springhill-dr-elmore-roundtrip.landroid', {
         type: 'application/json',
       })
     );
+    expect(reloaded.documentFixityWarning).toBeUndefined();
     const lctOwner = findLctOwner(reloaded.ownerData!.owners);
     const lctLease = reloaded.ownerData!.leases.find(
       (lease) => lease.ownerId === lctOwner.id && lease.docNo === LCT_OGML

@@ -43,6 +43,7 @@ import {
   initializeRollingAutoExport,
   scheduleRollingAutoExport,
 } from './storage/rolling-auto-export-runtime';
+import { backfillBlankDocumentContentHashes } from './storage/content-hash-backfill';
 import { runPostV8BackupIfNeeded } from './storage/post-v8-backup';
 import { runBackendSpineContractCheck } from './backend-spine/app-contract-check';
 import {
@@ -170,6 +171,9 @@ async function bootstrapApp() {
 
   await initializeRollingAutoExport().catch((err) => {
     console.warn('[landroid] rolling auto-export initialization failed:', err);
+  });
+  void backfillBlankDocumentContentHashes().catch((err) => {
+    console.warn('[landroid] document content-hash backfill failed:', err);
   });
 
   if (!isHostedMode()) {
