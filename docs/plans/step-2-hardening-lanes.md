@@ -1,8 +1,15 @@
-# Step 2 hardening — parked execution plan (DA-H7, DA-H10, DA-M16)
+# Step 2 hardening — parked execution plan (DA-H7 part 3, DA-H10, DA-M16)
 
 Parked 2026-06-12. Source: `docs/deep-audit-2026-06-10.md` findings, design
 session of 2026-06-11. This document is a self-contained execution prompt —
 hand it to any executor (Claude or Codex) one lane at a time.
+
+> **Amended 2026-06-12:** PR #153 (open at amend time) shipped most of DA-H7 —
+> import re-hash with a startup fixity warning (`documentFixityWarning` →
+> `setStartupWarning`), silent heal of blank hashes, and export re-hash. Lane A
+> below is reduced to what #153's own PR body defers: the one-time `''`
+> backfill, plus two small test riders #153 didn't add. Branch Lane A only
+> after #153 lands on main.
 
 ## How to execute
 
@@ -21,11 +28,10 @@ hand it to any executor (Claude or Codex) one lane at a time.
 - Anchors below were verified at `351ebfb`; PR #152 shifted
   `workspace-persistence.ts` line numbers below ~:1400 slightly — locate by
   symbol name, not line, when they disagree.
-- Executor-suitability note: Lanes B and C are bounded and mechanical —
-  Codex-safe. Lane A adds a new API variant, a UI notice, and a startup
-  backfill; the design is fully pinned below, but review its PR closely for
-  two things: import must always complete despite warnings, and the bundled
-  Springhill sample must import with zero warnings.
+- Executor-suitability note: all three lanes are now bounded and mechanical —
+  Codex-safe. The one review point on Lane A: the backfill writes outside the
+  per-workspace write fence (justification pinned below); and the bundled
+  Springhill sample must import with zero fixity warnings.
 
 ## Status
 
@@ -38,84 +44,59 @@ hand it to any executor (Claude or Codex) one lane at a time.
   optional, not correctness); (2) no export→import **round-trip** survival
   test exists yet for non-node/unattached docs — Lane A adds it since it
   extends that exact fixture.
-- DA-H7, DA-H10, DA-M16 — open; lanes below.
+- **DA-H7 parts 1–2 — IN FLIGHT** as PR #153 (import re-hash + fixity
+  mismatch warning via the existing dismissible startup banner; blank hashes
+  healed silently; export re-hash for self-consistent files; 4 unit tests,
+  negative-verified; 1,113 green at PR head). Lane A = the deferred part 3.
+- DA-H7 part 3, DA-H10, DA-M16 — open; lanes below.
 
 ---
 
-## Lane A — DA-H7: verify document hashes on import (warn, never block)
+## Lane A — DA-H7 part 3: backfill legacy blank hashes (+ two test riders)
 
-**Branch `fix/da-h7-import-hash-verification`.**
-Problem: `.landroid` import trusts the file's `contentHash` and accepts `''`
-(`deserializeDocumentData`, `src/storage/workspace-persistence.ts` ~:1125:
-`contentHash: typeof raw.contentHash === 'string' ? raw.contentHash : ''`).
-A blank hash will brick the future vault projection — `requireContentHash`
-throws on blank (`src/storage/evidence-vault.ts:312`,
-`src/storage/record-helpers.ts:78-82`).
+**Branch `fix/da-h7-content-hash-backfill`. Prereq: PR #153 merged.**
+Problem remaining after #153: documents imported *before* #153 can sit in
+Dexie with `contentHash: ''`. `requireContentHash` throws on blank
+(`src/storage/evidence-vault.ts:312`, `src/storage/record-helpers.ts:78-82`),
+so one legacy row bricks the vault projection the day it gets a live caller.
+#153 heals re-imported docs and `saveDoc` hashes new uploads — only
+already-stored rows need repair.
 
 Design (pinned):
 
-1. **Keep `deserializeDocumentData` sync.** Hashing is a discrete post-step in
-   `importLandroidFile`'s `fileVersion >= 8` branch (after the re-scope block,
-   ~:1838-1844 pre-#152) using the existing `sha256HexOfBlob`
-   (`src/storage/blob-hash.ts:15-19`) — already imported in this file for the
-   v7 migration path. Recompute per doc; **the recomputed value wins**.
-2. **Warning shape:** `{ code: 'document-hash-mismatch' |
-   'document-hash-missing', docId, fileName, message }`.
-3. **API:** add `importLandroidFileWithReport(file): Promise<{ data:
-   LandroidFileData; warnings: LandroidImportWarning[] }>` holding the
-   existing body; keep `importLandroidFile` as a thin `.data` wrapper (≈20
-   test call sites + `title-cutover-readiness.ts:178` stay untouched).
-4. **UI surface:** both import handlers in
-   `src/components/shell/Sidebar.tsx` (springhill sample ~:269, file picker
-   ~:309) switch to the report variant; after `importAndOpenWorkspace`
-   resolves, if warnings exist show the existing `useConfirmation()` alert
-   modal: title "Import notices", up to ~8 `fileName — reason` lines plus an
-   "and N more" tail. **Import always completes.**
-5. **Backfill:** new `src/storage/content-hash-backfill.ts`. `contentHash` is
-   indexed on `documents` since v8 (`src/storage/db.ts` v8 schema; current
-   v14): `db.documents.where('contentHash').equals('').primaryKeys()`, then
-   per key: `get` → `sha256HexOfBlob` → conditional `.modify()` guarded on
-   the row still having `''` (one blob in memory at a time; idempotent;
-   self-extinguishing — the indexed query returns nothing after the first
-   pass). Call fire-and-forget with `.catch(console.warn)` from
-   `bootstrapApp` in `src/main.tsx` right after `initializeRollingAutoExport`
-   (~:171-173). It writes outside the per-workspace write fence — name this
-   in the PR as value-idempotent repair (same blob → same hash; concurrent
-   tabs write identical values). Named fallback if review objects:
-   active-workspace-only backfill at project open, under the lease.
-6. **Export-side verify (deferrable slice):** in `serializeDocumentData`
-   (~:1060-1079) recompute per doc; on mismatch write the recomputed hash
-   into the serialized JSON (self-consistent files) + `console.warn` (no UI
-   channel exists at that layer; an export cannot warn-block). **If the lane
-   balloons, defer this slice** — import verify + backfill close the real
-   trust hole.
+1. New `src/storage/content-hash-backfill.ts`. `contentHash` is indexed on
+   `documents` since v8 (`src/storage/db.ts`):
+   `db.documents.where('contentHash').equals('').primaryKeys()`, then per
+   key: `get` → `sha256HexOfBlob` (`src/storage/blob-hash.ts:15-19`) →
+   conditional `.modify()` guarded on the row still having `''` (one blob in
+   memory at a time; idempotent; self-extinguishing — the indexed query
+   returns nothing after the first pass).
+2. Call fire-and-forget with `.catch(console.warn)` from `bootstrapApp` in
+   `src/main.tsx` right after `initializeRollingAutoExport` (~:171-173).
+3. It writes outside the per-workspace write fence — name this in the PR as
+   value-idempotent repair (same blob → same hash; concurrent tabs write
+   identical values; the conditional modify avoids clobbering a replaced
+   row). Named fallback if review objects: active-workspace-only backfill at
+   project open, under the lease.
 
 Tests:
-- `src/storage/__tests__/workspace-persistence.test.ts` — the round-trip
-  fixture (~:289-329) carries `contentHash: 'fixture-hash'` and the round-trip
-  assertion omits contentHash, so nothing existing breaks. Add: report variant
-  returns `document-hash-mismatch` naming the fixture file and the imported
-  doc's hash equals the SHA-256 of `TEST_PDF_BODY`; absent hash → filled +
-  `document-hash-missing`; legacy `importLandroidFile` returns corrected data.
-- **Folded H6 round-trip assertion:** extend the same fixture with an
-  owner-attached doc and an unattached doc → after export→import both
-  survive, the owner attachment keeps its entityKind, the unattached doc has
-  zero attachments.
 - New `src/storage/__tests__/content-hash-backfill.test.ts`
   (fake-indexeddb pattern like the other Dexie storage tests): only `''`
-  rows updated, correct hex, second run is a no-op.
-- Pin in `src/phase0/__tests__/springhill-sample.test.ts`: the bundled
-  `public/samples/springhill-dr-elmore.landroid` imports with **zero**
-  warnings (its hashes are real 64-hex; guards the demo from popping the
-  notice modal on every load).
-- If the export slice ships: exporting a doc with a stale hash emits the
-  recomputed value.
+  rows updated, correct hex, valid rows untouched, second run is a no-op.
+- **Rider 1 (folded H6 round-trip):** extend the round-trip fixture in
+  `src/storage/__tests__/workspace-persistence.test.ts` (~:289-329) with an
+  owner-attached doc and an unattached doc → after export→import both
+  survive, the owner attachment keeps its entityKind, the unattached doc has
+  zero attachments. (#152 tested export scope, #153 tested hashes — the
+  full-loop survival assertion is still missing.)
+- **Rider 2 (demo pin):** in `src/phase0/__tests__/springhill-sample.test.ts`,
+  assert the bundled `public/samples/springhill-dr-elmore.landroid` imports
+  with **no fixity warning** (its hashes are real 64-hex; guards the demo
+  from popping the startup banner on every load).
 
-Name in PR: import recomputes SHA-256 and the file's hash is advisory
-(recomputed wins); non-blocking "Import notices" modal; startup backfill for
-legacy `''` hashes (outside the write fence, idempotent); perf note (hashing
-is marginal next to the base64 decode imports already do); no engine/golden
-changes.
+Name in PR: one-time startup backfill for legacy `''` hashes (outside the
+write fence, value-idempotent, self-extinguishing); no engine/golden changes;
+no behavior change for documents that already carry valid hashes.
 
 ---
 

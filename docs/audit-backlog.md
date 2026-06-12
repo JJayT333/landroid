@@ -1,7 +1,7 @@
 # LANDroid Audit Backlog
 
-Last updated: 2026-06-12 (DA-H6 closed via #152; Step 2 lane plan parked at
-`docs/plans/step-2-hardening-lanes.md`)
+Last updated: 2026-06-12 (DA-H6 closed via #152; DA-H7 parts 1–2 in flight as
+#153; remaining Step 2 lane plan parked at `docs/plans/step-2-hardening-lanes.md`)
 
 ## 2026-06-10 Deep Audit (Claude) — new findings, not yet reconciled row-by-row
 
@@ -28,8 +28,10 @@ explicitly accepted, treat that report as part of this backlog. Summary:
   every document + attachment of any entityKind exports (zero-node safe), so
   export scope matches the restore side's delete scope. Round-trip survival
   test for non-node/unattached docs folds into the DA-H7 lane.
-- DA-H7: document hashes never re-verified (blank accepted). Open — pinned
-  execution plan in `docs/plans/step-2-hardening-lanes.md` (Lane A).
+- DA-H7: parts 1–2 IN FLIGHT as PR #153 (import re-hash + fixity warning via
+  startup banner, blank hashes healed silently, export re-hash). Remaining
+  part 3 (one-time `''` backfill in Dexie) + two test riders — pinned plan in
+  `docs/plans/step-2-hardening-lanes.md` (Lane A; branch after #153 merges).
 - DA-H8/H9: Flowchart stale-fraction snapshot; Map-mode branch card sums
   unit-wide ORRI decimals under one tract.
 - DA-H10: CSV import parses fractions via float64 + toFixed(9) before store.
