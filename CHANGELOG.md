@@ -3,6 +3,19 @@
 This file records meaningful project changes so `CONTINUATION-PROMPT.md` can
 stay short.
 
+## 2026-06-12
+
+- Added the DA-M16 rolling auto-export retention lane. Successful auto-export
+  writes now prune the current project's strict timestamped
+  `<project>-<timestamp>.landroid` files to the 10 newest snapshots when the
+  browser directory handle supports listing and removal. Hand-named files,
+  other project names, `.landroid.bak`-style copies, directories, and failed
+  writes are never deletion triggers. If pruning fails after a successful
+  write, LANDroid keeps the new snapshot and surfaces the pruning warning
+  through the existing storage-health warning path. Deferrals: configurable
+  retention count, old files left under previous project names, and total-byte
+  caps.
+
 ## 2026-06-10
 
 - Title undo (`feat/title-undo`, operator request from the soak): a navbar

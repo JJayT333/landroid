@@ -67,6 +67,11 @@ STEP 2 — Evidence integrity + precision (parallel-safe with Step 1 review):
   no legacy-file cases.
 - DA-H10: csv-io parses fractions via Decimal + serialize (kills the float64
   round-before-store).
+- DA-M16: implemented on `fix/da-m16-auto-export-retention`: rolling
+  auto-export keeps the 10 newest strict timestamped snapshots for the current
+  project name after a successful write; hand-named/foreign/backup files and
+  failed writes are never deletion triggers. Validation status: `npm run lint`,
+  targeted rolling-auto-export tests, `npm test`, and `npm run build` passed.
 - Precision policy: `src/engine/display-format.ts` (four functions, audit §3),
   mechanical sweep of ad-hoc formatters, ESLint guard.
 

@@ -6,6 +6,7 @@ import {
 
 export const ROLLING_AUTO_EXPORT_DEBOUNCE_MS = 5 * 60 * 1000;
 export const ROLLING_AUTO_EXPORT_OVERDUE_MS = 30 * 60 * 1000;
+export const ROLLING_AUTO_EXPORT_KEEP_LAST = 10;
 
 const HANDLE_DB_NAME = 'landroid-rolling-auto-export';
 const HANDLE_DB_VERSION = 1;
@@ -40,6 +41,8 @@ export interface RollingAutoExportDirectoryHandle {
     name: string,
     options: { create: true }
   ) => Promise<RollingAutoExportFileHandle>;
+  values?: () => AsyncIterable<{ kind: string; name: string }>;
+  removeEntry?: (name: string) => Promise<void>;
   queryPermission?: (descriptor?: PermissionDescriptor) => Promise<PermissionState>;
   requestPermission?: (descriptor?: PermissionDescriptor) => Promise<PermissionState>;
 }
@@ -71,6 +74,8 @@ export interface RollingAutoExportWriteResult {
   exportedAt: string;
   fileName: string;
   size: number;
+  prunedFileNames: string[];
+  pruneWarning?: string;
 }
 
 export class RollingAutoExportPermissionError extends Error {
@@ -167,6 +172,50 @@ export function buildRollingAutoExportFileName(
   return `${sanitizeRollingAutoExportBaseName(projectName)}-${timestamp}.landroid`;
 }
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+export function rollingAutoExportFileNamePattern(projectName: string): RegExp {
+  const baseName = escapeRegExp(sanitizeRollingAutoExportBaseName(projectName));
+  return new RegExp(
+    `^${baseName}-\\d{4}-\\d{2}-\\d{2}T\\d{2}-\\d{2}-\\d{2}-\\d{3}Z\\.landroid$`
+  );
+}
+
+export async function pruneRollingAutoExportSnapshots({
+  directoryHandle,
+  projectName,
+  keepLast = ROLLING_AUTO_EXPORT_KEEP_LAST,
+}: {
+  directoryHandle: RollingAutoExportDirectoryHandle;
+  projectName: string;
+  keepLast?: number;
+}): Promise<{ deletedFileNames: string[]; skipped: boolean }> {
+  if (!directoryHandle.values || !directoryHandle.removeEntry) {
+    return { deletedFileNames: [], skipped: true };
+  }
+
+  const pattern = rollingAutoExportFileNamePattern(projectName);
+  const matchingFileNames: string[] = [];
+  for await (const entry of directoryHandle.values()) {
+    if (entry.kind === 'file' && pattern.test(entry.name)) {
+      matchingFileNames.push(entry.name);
+    }
+  }
+
+  const keepCount = Math.max(1, Math.trunc(keepLast));
+  const deleteFileNames = matchingFileNames
+    .sort((left, right) => right.localeCompare(left))
+    .slice(keepCount);
+
+  for (const fileName of deleteFileNames) {
+    await directoryHandle.removeEntry(fileName);
+  }
+
+  return { deletedFileNames: deleteFileNames, skipped: false };
+}
+
 export async function writeRollingAutoExportSnapshot(args: {
   directoryHandle: RollingAutoExportDirectoryHandle;
   data: LandroidFileData;
@@ -195,10 +244,25 @@ export async function writeRollingAutoExportSnapshot(args: {
     throw error;
   }
 
+  let prunedFileNames: string[] = [];
+  let pruneWarning: string | undefined;
+  try {
+    const pruneResult = await pruneRollingAutoExportSnapshots({
+      directoryHandle: args.directoryHandle,
+      projectName: args.data.projectName,
+    });
+    prunedFileNames = pruneResult.deletedFileNames;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    pruneWarning = `Auto-export snapshot was written, but old snapshot pruning failed: ${message}`;
+  }
+
   return {
     exportedAt: exportedAt.toISOString(),
     fileName,
     size: blob.size,
+    prunedFileNames,
+    pruneWarning,
   };
 }
 
