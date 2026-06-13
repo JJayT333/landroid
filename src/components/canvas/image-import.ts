@@ -71,6 +71,11 @@ export function initialImageDisplaySize(
   naturalWidth: number,
   naturalHeight: number
 ): { width: number; height: number } {
+  // Guard against images that report no intrinsic size (some SVGs, decode edge
+  // cases) so we never create an invisible 0x0 node.
+  if (!(naturalWidth > 0) || !(naturalHeight > 0)) {
+    return { width: DEFAULT_IMAGE_DISPLAY, height: DEFAULT_IMAGE_DISPLAY };
+  }
   const longest = Math.max(naturalWidth, naturalHeight);
   const scale = longest > DEFAULT_IMAGE_DISPLAY ? DEFAULT_IMAGE_DISPLAY / longest : 1;
   return {

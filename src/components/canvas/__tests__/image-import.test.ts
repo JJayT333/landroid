@@ -17,6 +17,17 @@ describe('image-import', () => {
     expect(size).toEqual({ width: 120, height: 80 });
   });
 
+  it('falls back to a square default when an image reports no intrinsic size', () => {
+    expect(initialImageDisplaySize(0, 0)).toEqual({
+      width: DEFAULT_IMAGE_DISPLAY,
+      height: DEFAULT_IMAGE_DISPLAY,
+    });
+    expect(initialImageDisplaySize(0, 100)).toEqual({
+      width: DEFAULT_IMAGE_DISPLAY,
+      height: DEFAULT_IMAGE_DISPLAY,
+    });
+  });
+
   it('recognizes image blobs by mime', () => {
     expect(isImageFile(new Blob([], { type: 'image/png' }))).toBe(true);
     expect(isImageFile(new Blob([], { type: 'application/pdf' }))).toBe(false);

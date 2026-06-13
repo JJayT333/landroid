@@ -741,7 +741,7 @@ function FlowchartCanvas() {
         const fileName = file instanceof File ? file.name : undefined;
         const { contentHash } = await saveCanvasAsset(prepared.blob, workspaceId, fileName);
         const size = initialImageDisplaySize(prepared.naturalWidth, prepared.naturalHeight);
-        const aspectRatio = prepared.naturalWidth / prepared.naturalHeight;
+        const aspectRatio = size.height > 0 ? size.width / size.height : 1;
         addImageNode(contentHash, size, aspectRatio, position);
       } catch (err) {
         console.warn('[landroid] image import failed:', err);
