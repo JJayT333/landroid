@@ -46,6 +46,16 @@ export interface FrameNodeData {
   color?: string;
 }
 
+export interface ImageNodeData {
+  /** SHA-256 content hash referencing a row in the canvasAssets store. */
+  assetHash: string;
+  width: number;
+  height: number;
+  /** Natural aspect ratio (w/h) for proportional resize. */
+  aspectRatio?: number;
+  alt?: string;
+}
+
 export interface FlowEdgeData extends Record<string, unknown> {
   edgeScale?: number;
   variant?: 'primary' | 'related';

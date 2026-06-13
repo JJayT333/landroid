@@ -17,10 +17,12 @@ import {
 } from '../../engine/flowchart-metrics';
 import type {
   FrameNodeData,
+  ImageNodeData,
   NodeKind,
   OwnershipNodeData,
   ShapeNodeData,
 } from '../../types/flowchart';
+import { peekAssetUrl } from './canvas-asset-url-cache';
 
 export interface PrintNode {
   id: string;
@@ -357,6 +359,38 @@ function PrintFrame({ data }: { data: FrameNodeData }) {
   );
 }
 
+// ── Image ───────────────────────────────────────────────
+
+function PrintImage({ data }: { data: ImageNodeData }) {
+  // The on-screen image node has already resolved this hash into an object URL.
+  const url = peekAssetUrl(data.assetHash);
+  if (!url) {
+    return (
+      <div
+        style={{
+          width: data.width,
+          height: data.height,
+          border: '1px solid #d4c5a9',
+          color: '#5c3d2e',
+          fontSize: 10,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        image unavailable
+      </div>
+    );
+  }
+  return (
+    <img
+      src={url}
+      alt={data.alt ?? ''}
+      style={{ width: data.width, height: data.height, objectFit: 'fill', display: 'block' }}
+    />
+  );
+}
+
 // ── Dimensions + dispatch ───────────────────────────────
 
 /** True printed footprint of a node, by kind. */
@@ -364,8 +398,13 @@ export function getPrintNodeDimensions(node: PrintNode): {
   width: number;
   height: number;
 } {
-  if (node.type === 'shape' || node.type === 'text' || node.type === 'frame') {
-    const data = node.data as Partial<ShapeNodeData & FrameNodeData>;
+  if (
+    node.type === 'shape' ||
+    node.type === 'text' ||
+    node.type === 'frame' ||
+    node.type === 'image'
+  ) {
+    const data = node.data as Partial<ShapeNodeData & FrameNodeData & ImageNodeData>;
     return {
       width:
         node.measured?.width ??
@@ -399,6 +438,8 @@ export function renderPrintNodeBody(node: PrintNode): ReactNode {
       return <PrintText data={node.data as ShapeNodeData} />;
     case 'frame':
       return <PrintFrame data={node.data as FrameNodeData} />;
+    case 'image':
+      return <PrintImage data={node.data as ImageNodeData} />;
     case 'ownership':
       return <PrintCard data={node.data as OwnershipNodeData} />;
     default:

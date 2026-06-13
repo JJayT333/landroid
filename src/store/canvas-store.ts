@@ -19,6 +19,7 @@ import { FRAME_DEFAULTS, SHAPE_DEFAULTS } from '../engine/flowchart-metrics';
 import type {
   FlowTool,
   FrameNodeData,
+  ImageNodeData,
   PageOrientation,
   PageSizeId,
   ShapeNodeData,
@@ -99,6 +100,12 @@ interface CanvasState {
   // ── Shape creation ──
   addShapeNode: (shapeType: ShapeType, position: { x: number; y: number }) => string;
   addFrameNode: (position: { x: number; y: number }) => string;
+  addImageNode: (
+    assetHash: string,
+    size: { width: number; height: number },
+    aspectRatio: number,
+    position: { x: number; y: number }
+  ) => string;
 
   // ── Individual mutations ──
   addNodes: (nodes: Node[]) => void;
@@ -386,6 +393,35 @@ export const useCanvasStore = create<CanvasState>()((set, get) => ({
     };
     set({
       nodes: [node, ...s.nodes.map((n) => ({ ...n, selected: false }))],
+      _past: pushToPast(s._past, captureSnapshot(s)),
+      _future: [],
+    });
+    return id;
+  },
+
+  // Place an image node referencing a stored asset (by content hash). The blob
+  // already lives in the canvasAssets store; the node carries only the hash.
+  addImageNode: (assetHash, size, aspectRatio, position) => {
+    const s = get();
+    const id = `image-${Date.now()}-${Math.round(Math.random() * 1e6)}`;
+    const data: ImageNodeData = {
+      assetHash,
+      width: size.width,
+      height: size.height,
+      aspectRatio,
+    };
+    const node: Node = {
+      id,
+      type: 'image',
+      position: {
+        x: position.x - size.width / 2,
+        y: position.y - size.height / 2,
+      },
+      data: data as unknown as Record<string, unknown>,
+      selected: true,
+    };
+    set({
+      nodes: [...s.nodes.map((n) => ({ ...n, selected: false })), node],
       _past: pushToPast(s._past, captureSnapshot(s)),
       _future: [],
     });

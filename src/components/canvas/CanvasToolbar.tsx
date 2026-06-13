@@ -23,6 +23,7 @@ interface CanvasToolbarProps {
   resizeMode: boolean;
   onPrint: () => void;
   onExportPng: () => void;
+  onAddImage: () => void;
 }
 
 // Upper bound for the page-grid steppers. Generous so large printable grids
@@ -145,6 +146,7 @@ export default function CanvasToolbar({
   resizeMode,
   onPrint,
   onExportPng,
+  onAddImage,
 }: CanvasToolbarProps) {
   // Read from canvas store
   const activeTool = useCanvasStore((s) => s.activeTool);
@@ -238,6 +240,15 @@ export default function CanvasToolbar({
         title="Import active desk map to canvas"
       >
         Import Desk Map
+      </button>
+      <button
+        type="button"
+        onClick={onAddImage}
+        className="px-2.5 py-1.5 rounded-md text-sm text-ink-light hover:bg-parchment-dark transition-colors"
+        title="Add image (or paste / drag-drop onto canvas)"
+        aria-label="Add image"
+      >
+        🖼
       </button>
 
       <div className="w-px h-6 bg-ledger-line mx-1" />

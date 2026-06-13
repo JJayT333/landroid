@@ -30,6 +30,13 @@ import OwnershipNodeComponent from '../components/canvas/OwnershipNode';
 import OwnershipEdgeComponent from '../components/canvas/OwnershipEdge';
 import ShapeNodeComponent from '../components/canvas/ShapeNode';
 import FrameNodeComponent from '../components/canvas/FrameNode';
+import ImageNodeComponent from '../components/canvas/ImageNode';
+import {
+  isImageFile,
+  prepareImageForCanvas,
+  initialImageDisplaySize,
+} from '../components/canvas/image-import';
+import { saveCanvasAsset } from '../storage/canvas-assets';
 import CanvasToolbar from '../components/canvas/CanvasToolbar';
 import PageGrid from '../components/canvas/PageGrid';
 import PrintOverlay from '../components/canvas/PrintOverlay';
@@ -55,6 +62,7 @@ const nodeTypes: NodeTypes = {
   ownership: OwnershipNodeComponent,
   shape: ShapeNodeComponent,
   frame: FrameNodeComponent,
+  image: ImageNodeComponent,
 };
 
 const edgeTypes: EdgeTypes = {
@@ -413,7 +421,9 @@ function FlowchartCanvas() {
   const mergeImportGraph = useCanvasStore((s) => s.mergeImportGraph);
   const addShapeNode = useCanvasStore((s) => s.addShapeNode);
   const addFrameNode = useCanvasStore((s) => s.addFrameNode);
+  const addImageNode = useCanvasStore((s) => s.addImageNode);
   const setActiveTool = useCanvasStore((s) => s.setActiveTool);
+  const workspaceId = useWorkspaceStore((s) => s.workspaceId);
   const pushHistory = useCanvasStore((s) => s.pushHistory);
   const setHorizontalSpacingFactor = useCanvasStore((s) => s.setHorizontalSpacingFactor);
   const setVerticalSpacingFactor = useCanvasStore((s) => s.setVerticalSpacingFactor);
@@ -675,6 +685,74 @@ function FlowchartCanvas() {
     void exportCanvasToPng(getNodes());
   }, [getNodes]);
 
+  // ── Image import (file picker / paste / drop) ──────────
+  // Downscale, store the bytes in the content-addressed asset store, then drop
+  // an image node referencing the hash at the given flow position.
+  const importImageAt = useCallback(
+    async (file: File | Blob, position: { x: number; y: number }) => {
+      if (!isImageFile(file)) return;
+      try {
+        const prepared = await prepareImageForCanvas(file);
+        const fileName = file instanceof File ? file.name : undefined;
+        const { contentHash } = await saveCanvasAsset(prepared.blob, workspaceId, fileName);
+        const size = initialImageDisplaySize(prepared.naturalWidth, prepared.naturalHeight);
+        const aspectRatio = prepared.naturalWidth / prepared.naturalHeight;
+        addImageNode(contentHash, size, aspectRatio, position);
+      } catch (err) {
+        console.warn('[landroid] image import failed:', err);
+      }
+    },
+    [workspaceId, addImageNode]
+  );
+
+  const centerFlowPosition = useCallback(() => {
+    const el = document.querySelector('.react-flow');
+    const rect = el?.getBoundingClientRect();
+    return screenToFlowPosition({
+      x: (rect?.left ?? 0) + (rect?.width ?? 800) / 2,
+      y: (rect?.top ?? 0) + (rect?.height ?? 600) / 2,
+    });
+  }, [screenToFlowPosition]);
+
+  const handleAddImageFiles = useCallback(
+    (files: FileList | null) => {
+      if (!files) return;
+      const center = centerFlowPosition();
+      Array.from(files).forEach((file, i) => {
+        // Cascade multiple images slightly so they don't stack exactly.
+        void importImageAt(file, { x: center.x + i * 24, y: center.y + i * 24 });
+      });
+    },
+    [centerFlowPosition, importImageAt]
+  );
+
+  const handleCanvasDrop = useCallback(
+    (event: React.DragEvent) => {
+      const files = Array.from(event.dataTransfer?.files ?? []).filter(isImageFile);
+      if (files.length === 0) return;
+      event.preventDefault();
+      const position = screenToFlowPosition({ x: event.clientX, y: event.clientY });
+      files.forEach((file, i) =>
+        void importImageAt(file, { x: position.x + i * 24, y: position.y + i * 24 })
+      );
+    },
+    [importImageAt, screenToFlowPosition]
+  );
+
+  // ── Paste an image from the clipboard anywhere on the canvas ──
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    const onPaste = (e: ClipboardEvent) => {
+      const item = Array.from(e.clipboardData?.items ?? []).find((it) =>
+        it.type.startsWith('image/')
+      );
+      const file = item?.getAsFile();
+      if (file) void importImageAt(file, centerFlowPosition());
+    };
+    window.addEventListener('paste', onPaste);
+    return () => window.removeEventListener('paste', onPaste);
+  }, [importImageAt, centerFlowPosition]);
+
   // ── Push history before drag starts ────────────────────
   const handleNodeDragStart = useCallback(() => {
     pushHistory();
@@ -760,7 +838,26 @@ function FlowchartCanvas() {
   }));
 
   return (
-    <div className="w-full h-full relative">
+    <div
+      className="w-full h-full relative"
+      onDrop={handleCanvasDrop}
+      onDragOver={(e) => {
+        if (Array.from(e.dataTransfer?.items ?? []).some((it) => it.kind === 'file')) {
+          e.preventDefault();
+        }
+      }}
+    >
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        multiple
+        className="hidden"
+        onChange={(e) => {
+          handleAddImageFiles(e.target.files);
+          e.target.value = '';
+        }}
+      />
       <CanvasToolbar
         onImportTree={handleImportTree}
         onFitToGrid={handleFitToGrid}
@@ -770,6 +867,7 @@ function FlowchartCanvas() {
         resizeMode={resizeMode}
         onPrint={handlePrint}
         onExportPng={handleExportPng}
+        onAddImage={() => fileInputRef.current?.click()}
       />
 
       {nodes.length > 0 && (

@@ -131,13 +131,36 @@ describe('PrintOverlay', () => {
     expect(html.indexOf('BACK')).toBeLessThan(html.indexOf('TOP'));
   });
 
-  it('renders nothing for an unimplemented node kind (no bogus card)', () => {
+  it('renders an image node as a sized placeholder when the asset is missing', () => {
     const html = renderToStaticMarkup(
       <PrintOverlay
         nodes={[
           {
             id: 'img1',
             type: 'image',
+            position: { x: 20, y: 20 },
+            data: { assetHash: 'deadbeef', width: 200, height: 150 },
+          },
+        ]}
+        edges={[]}
+        cols={1}
+        rows={1}
+        orientation="landscape"
+        pageSize="ansi-a"
+      />
+    );
+    // Missing asset degrades to a sized placeholder, never a bogus card.
+    expect(html).toContain('width:200px;height:150px');
+    expect(html).not.toContain('Granted');
+  });
+
+  it('renders nothing for an unimplemented node kind (no bogus card)', () => {
+    const html = renderToStaticMarkup(
+      <PrintOverlay
+        nodes={[
+          {
+            id: 'ink1',
+            type: 'ink',
             position: { x: 40, y: 40 },
             data: { width: 100, height: 100 },
           },
