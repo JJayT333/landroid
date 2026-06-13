@@ -10,7 +10,7 @@
  *       Optional: "Remaining: 1/8" (only if grantee has conveyed some away)
  */
 import { memo } from 'react';
-import { Handle, Position } from '@xyflow/react';
+import { Handle, Position, NodeResizer } from '@xyflow/react';
 import type { NodeProps } from '@xyflow/react';
 import { formatAsFraction } from '../../engine/fraction-display';
 import { d } from '../../engine/decimal';
@@ -19,11 +19,16 @@ import {
   getOwnershipNodeDimensions,
 } from '../../engine/flowchart-metrics';
 import type { OwnershipNodeData } from '../../types/flowchart';
+import CanvasNodeToolbar from './CanvasNodeToolbar';
 
-function OwnershipNodeComponent({ data, selected }: NodeProps & { data: OwnershipNodeData }) {
+function OwnershipNodeComponent({ id, data, selected, width, height }: NodeProps & { data: OwnershipNodeData }) {
   const nodeData = data as OwnershipNodeData;
   const scale = clampNodeScale(nodeData.nodeScale ?? 1);
   const metrics = getOwnershipNodeDimensions(scale);
+  // A user-resized card carries explicit width/height; fall back to the
+  // scale-derived footprint. Print reads the same precedence so they agree.
+  const cardWidth = typeof width === 'number' ? width : metrics.width;
+  const cardHeight = typeof height === 'number' ? height : metrics.height;
   const handleSize = Math.max(4, 10 * scale);
   const handleBorderWidth = Math.max(1, 2 * scale);
   const borderRadius = 8 * scale;
@@ -53,17 +58,35 @@ function OwnershipNodeComponent({ data, selected }: NodeProps & { data: Ownershi
   return (
     <div
       style={{
-        width: metrics.width,
-        minHeight: metrics.height,
+        width: cardWidth,
+        minHeight: cardHeight,
+        height: typeof height === 'number' ? height : undefined,
         borderRadius,
         borderWidth,
       }}
       className={`
-        flex flex-col border-solid shadow-md transition-shadow
+        relative flex flex-col border-solid shadow-md transition-shadow
         ${selected ? 'border-leather shadow-lg ring-2 ring-gold/50' : 'border-ledger-line'}
-        bg-parchment text-ink
+        ${nodeData.stale ? 'border-seal bg-parchment text-ink' : 'bg-parchment text-ink'}
       `}
     >
+      {nodeData.stale && (
+        <div
+          className="absolute -top-2 left-2 z-10 rounded-sm bg-seal px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white shadow"
+          title="This box no longer matches a record in the workspace — it was deleted after the chart was built. Re-import to refresh."
+        >
+          Stale
+        </div>
+      )}
+      <CanvasNodeToolbar nodeId={id} isVisible={!!selected} />
+      <NodeResizer
+        isVisible={selected}
+        minWidth={160}
+        minHeight={96}
+        lineClassName="!border-leather"
+        handleClassName="!bg-leather !w-2 !h-2"
+      />
+
       {/* Top handle */}
       <Handle
         type="target"

@@ -35,4 +35,233 @@ describe('PrintOverlay', () => {
     expect(html).toContain('text-overflow:ellipsis');
     expect(html).toContain('white-space:nowrap');
   });
+
+  it('marks a stale ownership node so a printed chart flags out-of-date boxes', () => {
+    const html = renderToStaticMarkup(
+      <PrintOverlay
+        nodes={[
+          {
+            id: 'stale1',
+            type: 'ownership',
+            position: { x: 40, y: 40 },
+            data: {
+              label: 'Gone',
+              grantee: 'Deleted Owner',
+              grantor: '',
+              instrument: 'Deed',
+              date: '2026-03-27',
+              grantFraction: '0.5',
+              remainingFraction: '0.5',
+              relativeShare: '0.5',
+              nodeId: 'stale1',
+              stale: true,
+            },
+          },
+        ]}
+        edges={[]}
+        cols={1}
+        rows={1}
+        orientation="landscape"
+        pageSize="ansi-a"
+      />
+    );
+    expect(html).toContain('Stale');
+  });
+
+  it('renders a shape node as a shape, not a bogus ownership card', () => {
+    const html = renderToStaticMarkup(
+      <PrintOverlay
+        nodes={[
+          {
+            id: 's1',
+            type: 'shape',
+            position: { x: 40, y: 40 },
+            data: {
+              shapeType: 'note',
+              text: 'A field annotation',
+              width: 180,
+              height: 140,
+              fontSize: 14,
+              textAlign: 'center',
+            },
+          },
+        ]}
+        edges={[]}
+        cols={1}
+        rows={1}
+        orientation="landscape"
+        pageSize="ansi-a"
+      />
+    );
+
+    expect(html).toContain('A field annotation');
+    expect(html).toContain('width:180px;height:140px');
+    // The note accent border distinguishes it from an ownership card.
+    expect(html).toContain('border-left:4px solid #c9a227');
+    // No ownership-card-only labels leak through.
+    expect(html).not.toContain('Granted');
+    expect(html).not.toContain('Of Whole');
+  });
+
+  it('renders an edge label when present', () => {
+    const html = renderToStaticMarkup(
+      <PrintOverlay
+        nodes={[
+          { id: 'a', type: 'shape', position: { x: 40, y: 40 }, data: { shapeType: 'rect', text: 'A', width: 120, height: 80, fontSize: 14, textAlign: 'center' } },
+          { id: 'b', type: 'shape', position: { x: 40, y: 240 }, data: { shapeType: 'rect', text: 'B', width: 120, height: 80, fontSize: 14, textAlign: 'center' } },
+        ]}
+        edges={[{ source: 'a', target: 'b', data: { label: 'conveys' } }]}
+        cols={1}
+        rows={1}
+        orientation="landscape"
+        pageSize="ansi-a"
+      />
+    );
+
+    expect(html).toContain('conveys');
+  });
+
+  it('renders a frame as a titled border', () => {
+    const html = renderToStaticMarkup(
+      <PrintOverlay
+        nodes={[
+          {
+            id: 'f1',
+            type: 'frame',
+            position: { x: 20, y: 20 },
+            data: { title: 'Tract 1 Exhibit', width: 400, height: 300 },
+          },
+        ]}
+        edges={[]}
+        cols={1}
+        rows={1}
+        orientation="landscape"
+        pageSize="ansi-a"
+      />
+    );
+
+    expect(html).toContain('Tract 1 Exhibit');
+    expect(html).toContain('width:400px;height:300px');
+    expect(html).not.toContain('Granted');
+  });
+
+  it('paints lower z-order nodes (frames) before higher ones', () => {
+    const html = renderToStaticMarkup(
+      <PrintOverlay
+        nodes={[
+          { id: 'top', type: 'shape', zIndex: 5, position: { x: 20, y: 20 }, data: { shapeType: 'rect', text: 'TOP', width: 100, height: 60, fontSize: 14, textAlign: 'center' } },
+          { id: 'frame', type: 'frame', zIndex: -1, position: { x: 0, y: 0 }, data: { title: 'BACK', width: 300, height: 200 } },
+        ]}
+        edges={[]}
+        cols={1}
+        rows={1}
+        orientation="landscape"
+        pageSize="ansi-a"
+      />
+    );
+    // The frame (zIndex -1) appears earlier in the DOM than the shape (zIndex 5).
+    expect(html.indexOf('BACK')).toBeLessThan(html.indexOf('TOP'));
+  });
+
+  it('renders an image node as a sized placeholder when the asset is missing', () => {
+    const html = renderToStaticMarkup(
+      <PrintOverlay
+        nodes={[
+          {
+            id: 'img1',
+            type: 'image',
+            position: { x: 20, y: 20 },
+            data: { assetHash: 'deadbeef', width: 200, height: 150 },
+          },
+        ]}
+        edges={[]}
+        cols={1}
+        rows={1}
+        orientation="landscape"
+        pageSize="ansi-a"
+      />
+    );
+    // Missing asset degrades to a sized placeholder, never a bogus card.
+    expect(html).toContain('width:200px;height:150px');
+    expect(html).not.toContain('Granted');
+  });
+
+  it('prints an image at its resized node size (node.width/height win over data)', () => {
+    const html = renderToStaticMarkup(
+      <PrintOverlay
+        nodes={[
+          {
+            id: 'img-resized',
+            type: 'image',
+            position: { x: 10, y: 10 },
+            width: 400,
+            height: 90,
+            data: { assetHash: 'deadbeef', width: 200, height: 150 },
+          },
+        ]}
+        edges={[]}
+        cols={1}
+        rows={1}
+        orientation="landscape"
+        pageSize="ansi-a"
+      />
+    );
+    // The resize (node.width/height) must reach print, not the stale data size.
+    expect(html).toContain('width:400px;height:90px');
+    expect(html).not.toContain('width:200px;height:150px');
+  });
+
+  it('prints a shape at its resized node size (node.width/height win over data)', () => {
+    const html = renderToStaticMarkup(
+      <PrintOverlay
+        nodes={[
+          {
+            id: 'shape-resized',
+            type: 'shape',
+            position: { x: 10, y: 10 },
+            width: 260,
+            height: 70,
+            data: {
+              shapeType: 'rect',
+              text: 'Tract',
+              width: 120,
+              height: 60,
+              fontSize: 14,
+              textAlign: 'center',
+            },
+          },
+        ]}
+        edges={[]}
+        cols={1}
+        rows={1}
+        orientation="landscape"
+        pageSize="ansi-a"
+      />
+    );
+    expect(html).toContain('width:260px;height:70px');
+    expect(html).not.toContain('width:120px;height:60px');
+  });
+
+  it('renders nothing for an unimplemented node kind (no bogus card)', () => {
+    const html = renderToStaticMarkup(
+      <PrintOverlay
+        nodes={[
+          {
+            id: 'ink1',
+            type: 'ink',
+            position: { x: 40, y: 40 },
+            data: { width: 100, height: 100 },
+          },
+        ]}
+        edges={[]}
+        cols={1}
+        rows={1}
+        orientation="landscape"
+        pageSize="ansi-a"
+      />
+    );
+
+    expect(html).not.toContain('Granted');
+    expect(html).not.toContain('Unknown');
+  });
 });

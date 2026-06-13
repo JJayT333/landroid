@@ -10,6 +10,8 @@ import {
   type LandroidFileData,
   type LandroidFileExportOptions,
 } from '../storage/workspace-persistence';
+import { listCanvasAssets } from '../storage/canvas-assets';
+import type { ImageNodeData } from '../types/flowchart';
 
 export interface CurrentLandroidExport {
   data: LandroidFileData;
@@ -19,6 +21,19 @@ export interface CurrentLandroidExport {
 export async function buildCurrentLandroidData(): Promise<LandroidFileData> {
   const state = useWorkspaceStore.getState();
   const canvasState = useCanvasStore.getState();
+
+  // Export only the image assets the current canvas actually references, so
+  // deleted-image orphans don't bloat the file.
+  const referencedHashes = new Set(
+    canvasState.nodes
+      .filter((node) => node.type === 'image')
+      .map((node) => (node.data as unknown as ImageNodeData).assetHash)
+      .filter((hash): hash is string => typeof hash === 'string')
+  );
+  const allAssets = await listCanvasAssets(state.workspaceId);
+  const canvasAssetData = {
+    assets: allAssets.filter((asset) => referencedHashes.has(asset.contentHash)),
+  };
 
   return {
     workspaceId: state.workspaceId,
@@ -40,6 +55,7 @@ export async function buildCurrentLandroidData(): Promise<LandroidFileData> {
     mapData: await useMapStore.getState().exportWorkspaceData(),
     researchData: await useResearchStore.getState().exportWorkspaceData(),
     curativeData: await useCurativeStore.getState().exportWorkspaceData(),
+    canvasAssetData,
     canvas: {
       nodes: canvasState.nodes,
       edges: canvasState.edges,

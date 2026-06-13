@@ -1,7 +1,7 @@
 /**
  * Workspace persistence — auto-save to IndexedDB, export/import .landroid files.
  */
-import db, { type PdfAttachment, type WorkspaceRecord } from './db';
+import db, { type CanvasAssetRecord, type PdfAttachment, type WorkspaceRecord } from './db';
 import {
   deserializeBlob,
   deserializePdfBlob,
@@ -150,6 +150,17 @@ export interface LandroidFileData extends WorkspaceData {
   mapData?: MapWorkspaceData;
   researchData?: ResearchWorkspaceData;
   curativeData?: CurativeWorkspaceData;
+  /**
+   * Content-addressed image blobs referenced by flowchart image nodes (v15+).
+   * Optional and additive: older `.landroid` files lack it and import fine; a
+   * referenced-but-missing asset degrades to an "image unavailable" placeholder
+   * rather than failing the import.
+   */
+  canvasAssetData?: CanvasAssetWorkspaceData;
+}
+
+export interface CanvasAssetWorkspaceData {
+  assets: CanvasAssetRecord[];
 }
 
 export interface LandroidFileExportOptions {
@@ -357,6 +368,56 @@ function normalizeDeskMaps(
   });
 }
 
+// Transient React Flow fields that should never round-trip through storage.
+const TRANSIENT_CANVAS_NODE_FIELDS = ['selected', 'dragging', 'resizing', 'measured'];
+
+/**
+ * Validate persisted canvas nodes one element at a time, dropping any entry
+ * that isn't a well-formed node and stripping transient interaction fields
+ * (DA2-F6). One corrupt entry must not brick the whole canvas.
+ */
+function sanitizePersistedCanvasNodes(value: unknown): Record<string, unknown>[] {
+  if (!Array.isArray(value)) return [];
+  const result: Record<string, unknown>[] = [];
+  for (const entry of value) {
+    if (!isRecord(entry)) continue;
+    if (typeof entry.id !== 'string') continue;
+    if (
+      !isRecord(entry.position) ||
+      typeof entry.position.x !== 'number' ||
+      !Number.isFinite(entry.position.x) ||
+      typeof entry.position.y !== 'number' ||
+      !Number.isFinite(entry.position.y)
+    ) {
+      continue;
+    }
+    const clean: Record<string, unknown> = { ...entry };
+    for (const field of TRANSIENT_CANVAS_NODE_FIELDS) delete clean[field];
+    result.push(clean);
+  }
+  return result;
+}
+
+/** Validate persisted canvas edges one element at a time (DA2-F6). */
+function sanitizePersistedCanvasEdges(value: unknown): Record<string, unknown>[] {
+  if (!Array.isArray(value)) return [];
+  const result: Record<string, unknown>[] = [];
+  for (const entry of value) {
+    if (!isRecord(entry)) continue;
+    if (
+      typeof entry.id !== 'string' ||
+      typeof entry.source !== 'string' ||
+      typeof entry.target !== 'string'
+    ) {
+      continue;
+    }
+    const clean: Record<string, unknown> = { ...entry };
+    delete clean.selected;
+    result.push(clean);
+  }
+  return result;
+}
+
 export function normalizeCanvasSaveData(value: unknown): CanvasSaveData | null {
   if (!isRecord(value)) {
     return null;
@@ -377,8 +438,8 @@ export function normalizeCanvasSaveData(value: unknown): CanvasSaveData | null {
       : undefined;
 
   return {
-    nodes: Array.isArray(value.nodes) ? value.nodes : [],
-    edges: Array.isArray(value.edges) ? value.edges : [],
+    nodes: sanitizePersistedCanvasNodes(value.nodes) as CanvasSaveData['nodes'],
+    edges: sanitizePersistedCanvasEdges(value.edges) as CanvasSaveData['edges'],
     viewport,
     gridCols:
       typeof value.gridCols === 'number' && Number.isFinite(value.gridCols)
@@ -1246,6 +1307,84 @@ async function serializeMapData(
   };
 }
 
+interface SerializedCanvasAsset {
+  contentHash: string;
+  workspaceId: string;
+  mimeType: string;
+  byteLength: number;
+  fileName?: string;
+  createdAt: string;
+  blob: SerializedBlob;
+}
+
+async function serializeCanvasAssetData(
+  canvasAssetData: CanvasAssetWorkspaceData | undefined
+): Promise<undefined | { assets: SerializedCanvasAsset[] }> {
+  if (!canvasAssetData) return undefined;
+  return {
+    assets: await Promise.all(
+      canvasAssetData.assets.map(async (asset) => ({
+        // Recompute the hash from the bytes being written so the exported file
+        // is always self-consistent (mirrors the document vault's DA-H7).
+        contentHash: await sha256HexOfBlob(asset.blob),
+        workspaceId: asset.workspaceId,
+        mimeType: asset.mimeType,
+        byteLength: asset.byteLength,
+        fileName: asset.fileName,
+        createdAt: asset.createdAt,
+        blob: await serializeBlob(asset.blob),
+      }))
+    ),
+  };
+}
+
+/**
+ * Decode canvas image assets from an imported file. Each blob is re-hashed and
+ * the recomputed digest becomes the canonical content hash (these are
+ * illustrative images, not evidence, so a drift is healed silently rather than
+ * surfaced as a fixity warning). A blob that is corrupt or over the per-blob
+ * cap is skipped individually so one bad image never aborts the whole import.
+ */
+async function deserializeCanvasAssetData(
+  value: unknown,
+  workspaceId: string
+): Promise<CanvasAssetWorkspaceData> {
+  if (!isRecord(value) || !Array.isArray((value as { assets?: unknown }).assets)) {
+    return { assets: [] };
+  }
+  const rawAssets = (value as { assets: unknown[] }).assets;
+  const built = await Promise.all(
+    rawAssets
+      .filter((raw): raw is Record<string, unknown> => isRecord(raw) && isRecord(raw.blob))
+      .map(async (raw): Promise<CanvasAssetRecord | null> => {
+        let blob: Blob;
+        try {
+          blob = deserializeSerializedBlob(raw.blob);
+        } catch (error) {
+          console.warn('[landroid] Skipping unreadable canvas image asset:', error);
+          return null;
+        }
+        if (blob.size === 0) return null;
+        const contentHash = await sha256HexOfBlob(blob);
+        return {
+          id: contentHash, // re-scoped on write by replaceCanvasAssetWorkspaceData
+          workspaceId:
+            typeof raw.workspaceId === 'string' ? raw.workspaceId : workspaceId,
+          contentHash,
+          mimeType:
+            blob.type ||
+            (typeof raw.mimeType === 'string' ? raw.mimeType : 'application/octet-stream'),
+          byteLength: blob.size,
+          fileName: typeof raw.fileName === 'string' ? raw.fileName : undefined,
+          createdAt:
+            typeof raw.createdAt === 'string' ? raw.createdAt : new Date().toISOString(),
+          blob,
+        };
+      })
+  );
+  return { assets: built.filter((asset): asset is CanvasAssetRecord => asset !== null) };
+}
+
 async function serializeResearchData(
   researchData: ResearchWorkspaceData | undefined
 ): Promise<
@@ -1342,6 +1481,7 @@ export async function exportLandroidFile(
     ownerData: await serializeOwnerData(data.ownerData),
     mapData: await serializeMapData(data.mapData),
     researchData: await serializeResearchData(data.researchData),
+    canvasAssetData: await serializeCanvasAssetData(data.canvasAssetData),
   };
   const actionRecords = options.actionRecords ?? [];
   const auditEvents = options.auditEvents ?? [];
@@ -1943,6 +2083,10 @@ export async function importLandroidFile(file: File): Promise<LandroidFileData> 
     parsed.actionLedger === undefined
       ? undefined
       : await validateImportedActionLedger(parsed.actionLedger);
+  const canvasAssetData = await deserializeCanvasAssetData(
+    parsed.canvasAssetData,
+    workspaceId
+  );
   return {
     ...core,
     nodes,
@@ -1953,6 +2097,7 @@ export async function importLandroidFile(file: File): Promise<LandroidFileData> 
     mapData,
     researchData,
     curativeData,
+    canvasAssetData,
     actionLedger,
   };
 }

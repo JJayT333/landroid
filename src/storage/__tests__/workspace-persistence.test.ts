@@ -707,6 +707,54 @@ describe('workspace-persistence', () => {
     expect(await imported.mapData?.mapAssets[0]?.blob.text()).toContain('FeatureCollection');
   });
 
+  it('round-trips canvas image assets (bytes + content hash) through export/import', async () => {
+    const imageBytes = new Blob([new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8])], {
+      type: 'image/png',
+    });
+    const contentHash = await sha256HexOfBlob(imageBytes);
+    const original = buildWorkspace(buildCanvas());
+    original.canvasAssetData = {
+      assets: [
+        {
+          id: contentHash,
+          workspaceId: 'ws-1',
+          contentHash,
+          mimeType: 'image/png',
+          byteLength: imageBytes.size,
+          fileName: 'seal.png',
+          createdAt: '2026-04-01T00:00:00.000Z',
+          blob: imageBytes,
+        },
+      ],
+    };
+
+    const blob = await exportLandroidFile(original);
+    const file = new File([await blob.text()], 'audit.landroid', {
+      type: 'application/json',
+    });
+    const imported = await importLandroidFile(file);
+
+    expect(imported.canvasAssetData?.assets).toHaveLength(1);
+    const asset = imported.canvasAssetData?.assets[0];
+    expect(asset?.contentHash).toBe(contentHash);
+    expect(asset?.mimeType).toBe('image/png');
+    expect(asset?.fileName).toBe('seal.png');
+    expect(new Uint8Array(await asset!.blob.arrayBuffer())).toEqual(
+      new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8])
+    );
+  });
+
+  it('imports a .landroid that lacks canvasAssetData as an empty asset set', async () => {
+    const original = buildWorkspace(buildCanvas());
+    const payload = JSON.parse(await (await exportLandroidFile(original)).text());
+    delete payload.canvasAssetData;
+    const file = new File([JSON.stringify(payload)], 'legacy.landroid', {
+      type: 'application/json',
+    });
+    const imported = await importLandroidFile(file);
+    expect(imported.canvasAssetData).toEqual({ assets: [] });
+  });
+
   it('round-trips a v9 action ledger without making it authoritative', async () => {
     const original = titleLandroidData();
     const ledger = await buildSyntheticTitleLedger();

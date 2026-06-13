@@ -12,6 +12,7 @@ import {
 } from '../../engine/flowchart-metrics';
 import { useCanvasStore } from '../../store/canvas-store';
 import type { FlowTool } from '../../types/flowchart';
+import { CANVAS_TEMPLATES } from './flowchart-templates';
 import { useConfirmation } from '../shared/ConfirmationProvider';
 
 interface CanvasToolbarProps {
@@ -22,7 +23,15 @@ interface CanvasToolbarProps {
   onVerticalSpacingChange: (value: number) => void;
   resizeMode: boolean;
   onPrint: () => void;
+  onExportPng: () => void;
+  onAddImage: () => void;
+  onInsertTemplate: (templateId: string) => void;
 }
+
+// Upper bound for the page-grid steppers. Generous so large printable grids
+// (e.g. 10×10 → 100 pages) are possible; the multi-page print pipeline is a
+// signature feature and must not be fenced in (DA2-F11).
+const MAX_GRID_DIMENSION = 100;
 
 const tools: { id: FlowTool; label: string; icon: string }[] = [
   { id: 'select', label: 'Select', icon: '↖' },
@@ -33,6 +42,7 @@ const tools: { id: FlowTool; label: string; icon: string }[] = [
   { id: 'draw-ellipse', label: 'Ellipse', icon: '◯' },
   { id: 'draw-diamond', label: 'Diamond', icon: '◇' },
   { id: 'draw-note', label: 'Note', icon: '📝' },
+  { id: 'draw-frame', label: 'Frame', icon: '⛶' },
 ];
 
 function StepperButton({
@@ -137,6 +147,9 @@ export default function CanvasToolbar({
   onVerticalSpacingChange,
   resizeMode,
   onPrint,
+  onExportPng,
+  onAddImage,
+  onInsertTemplate,
 }: CanvasToolbarProps) {
   // Read from canvas store
   const activeTool = useCanvasStore((s) => s.activeTool);
@@ -153,6 +166,8 @@ export default function CanvasToolbar({
   const verticalSpacingFactor = useCanvasStore((s) => s.verticalSpacingFactor);
   const snapToGrid = useCanvasStore((s) => s.snapToGrid);
   const setSnapToGrid = useCanvasStore((s) => s.setSnapToGrid);
+  const virtualize = useCanvasStore((s) => s.virtualize);
+  const setVirtualize = useCanvasStore((s) => s.setVirtualize);
   const selectAll = useCanvasStore((s) => s.selectAll);
   const clearCanvas = useCanvasStore((s) => s.clearCanvas);
   const undo = useCanvasStore((s) => s.undo);
@@ -229,6 +244,34 @@ export default function CanvasToolbar({
       >
         Import Desk Map
       </button>
+      <button
+        type="button"
+        onClick={onAddImage}
+        className="px-2.5 py-1.5 rounded-md text-sm text-ink-light hover:bg-parchment-dark transition-colors"
+        title="Add image (or paste / drag-drop onto canvas)"
+        aria-label="Add image"
+      >
+        🖼
+      </button>
+      <label className="flex items-center gap-1 text-[10px] uppercase tracking-wider text-ink-light">
+        <span className="sr-only">Insert template</span>
+        <select
+          value=""
+          onChange={(e) => {
+            if (e.target.value) onInsertTemplate(e.target.value);
+            e.target.value = '';
+          }}
+          className="rounded-md border border-ledger-line bg-parchment px-2 py-1 text-[11px] font-medium text-ink outline-none"
+          title="Insert a template exhibit"
+        >
+          <option value="">Template…</option>
+          {CANVAS_TEMPLATES.map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.label}
+            </option>
+          ))}
+        </select>
+      </label>
 
       <div className="w-px h-6 bg-ledger-line mx-1" />
 
@@ -246,6 +289,23 @@ export default function CanvasToolbar({
         title={`Snap to grid (${snapToGrid ? 'on' : 'off'})`}
       >
         ⊞
+      </button>
+
+      {/* Virtualization toggle — speeds up huge trees; off by default so a
+          full-canvas PNG export still captures off-screen nodes. */}
+      <button
+        type="button"
+        onClick={() => setVirtualize(!virtualize)}
+        aria-label="Fast render large canvases"
+        aria-pressed={virtualize}
+        className={`px-2 py-1.5 rounded-md text-xs font-medium transition-colors ${
+          virtualize
+            ? 'bg-leather/20 text-leather font-semibold'
+            : 'text-ink-light hover:bg-parchment-dark'
+        }`}
+        title={`Fast render for large trees (${virtualize ? 'on' : 'off'}) — turn off before PNG export`}
+      >
+        ⚡
       </button>
 
       <div className="w-px h-6 bg-ledger-line mx-1" />
@@ -270,14 +330,14 @@ export default function CanvasToolbar({
         label="Col"
         value={gridCols}
         min={1}
-        max={26}
+        max={MAX_GRID_DIMENSION}
         onChange={setGridCols}
       />
       <StepperButton
         label="Row"
         value={gridRows}
         min={1}
-        max={26}
+        max={MAX_GRID_DIMENSION}
         onChange={setGridRows}
       />
 
@@ -343,6 +403,16 @@ export default function CanvasToolbar({
       </button>
 
       <div className="w-px h-6 bg-ledger-line mx-1" />
+
+      {/* Export PNG */}
+      <button
+        type="button"
+        onClick={onExportPng}
+        className="px-3 py-1.5 rounded-md text-xs font-semibold text-leather hover:bg-leather/10 transition-colors"
+        title="Export the whole canvas as a PNG image"
+      >
+        Export PNG
+      </button>
 
       {/* Print */}
       <button

@@ -178,6 +178,41 @@ function createOwnershipNodeData(
   };
 }
 
+/**
+ * The derived interest fields a flowchart ownership node displays, recomputed
+ * from the live workspace nodes. Used by the canvas to overlay current
+ * fractions onto already-placed nodes (DA-H8) so a printed chart can never
+ * disagree with the workspace after a title edit. Positions are untouched —
+ * this is purely the math the import baked in, recomputed.
+ */
+export interface LiveOwnershipFractions {
+  grantFraction: string;
+  remainingFraction: string;
+  relativeShare: string;
+}
+
+/**
+ * Map each ownership node id to its current fraction fields, using the SAME
+ * relative-share computation the importer uses (so the overlay can't drift from
+ * a fresh import). Parent linkage is resolved within the given node set; a node
+ * whose parent is absent is treated as a root (relative = absolute).
+ */
+export function computeLiveOwnershipFractions(
+  nodes: OwnershipNode[],
+): Map<string, LiveOwnershipFractions> {
+  const byId = new Map(nodes.map((node) => [node.id, node]));
+  const result = new Map<string, LiveOwnershipFractions>();
+  for (const node of nodes) {
+    const parent = node.parentId ? byId.get(node.parentId) ?? null : null;
+    result.set(node.id, {
+      grantFraction: node.initialFraction,
+      remainingFraction: node.fraction,
+      relativeShare: computeRelativeShare(node, parent ? parent.initialFraction : null),
+    });
+  }
+  return result;
+}
+
 function positionNodes(
   tree: TreeNode,
   centerX: number,

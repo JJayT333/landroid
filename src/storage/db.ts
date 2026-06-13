@@ -79,6 +79,25 @@ export interface CanvasRecord {
   savedAt: string;
 }
 
+/**
+ * Content-addressed binary asset referenced by a flowchart image node.
+ *
+ * Deliberately separate from the `documents` evidence vault: these are
+ * illustrative canvas images (logos, map snippets, seals), NOT fixity-checked
+ * evidence, so they must not co-mingle with chain-of-custody documents. Keyed
+ * by SHA-256 so identical images dedupe to one blob within a workspace.
+ */
+export interface CanvasAssetRecord {
+  id: string;
+  workspaceId: string;
+  contentHash: string;
+  mimeType: string;
+  byteLength: number;
+  blob: Blob;
+  fileName?: string;
+  createdAt: string;
+}
+
 export interface SavedProjectRecord {
   id: string;
   indexDbKey: string;
@@ -99,6 +118,7 @@ const db = new Dexie('landroid-v2') as Dexie & {
   document_attachments: EntityTable<DbScoped<DocumentAttachment>, 'attachmentId'>;
   workspaces: EntityTable<WorkspaceRecord, 'id'>;
   canvases: EntityTable<CanvasRecord, 'id'>;
+  canvasAssets: EntityTable<DbScoped<CanvasAssetRecord>, 'id'>;
   owners: EntityTable<DbScoped<Owner>, 'id'>;
   leases: EntityTable<DbScoped<Lease>, 'id'>;
   leasePurchaseReports: EntityTable<DbScoped<LeasePurchaseReport>, 'id'>;
@@ -549,6 +569,19 @@ db.version(13)
 db.version(14).stores({
   leasePurchaseReports:
     'id, dbKey, workspaceId, ownerId, [dbKey+workspaceId], [dbKey+workspaceId+ownerId], [workspaceId+ownerId]',
+});
+
+/**
+ * v15 (Flowchart image nodes).
+ *
+ * Adds `canvasAssets` — a content-addressed binary store for illustrative
+ * flowchart images, kept separate from the `documents` evidence vault. Additive
+ * and non-destructive: a new empty table, no data migration. Dexie merges this
+ * delta with the prior schema, so unchanged tables carry forward.
+ */
+db.version(15).stores({
+  canvasAssets:
+    'id, dbKey, workspaceId, contentHash, [dbKey+workspaceId], [dbKey+workspaceId+contentHash]',
 });
 
 

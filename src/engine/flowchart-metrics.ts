@@ -19,6 +19,24 @@ export const MAX_NODE_SCALE = 3;
 export const MIN_TREE_SPACING_FACTOR = 0.25;
 export const MAX_TREE_SPACING_FACTOR = 3;
 
+/**
+ * Default footprint and text settings for each freeform shape, used when a
+ * draw-* tool creates a node by clicking the pane.
+ */
+export const SHAPE_DEFAULTS: Record<
+  import('../types/flowchart').ShapeType,
+  { width: number; height: number; fontSize: number }
+> = {
+  rect: { width: 160, height: 90, fontSize: 14 },
+  roundRect: { width: 160, height: 90, fontSize: 14 },
+  ellipse: { width: 120, height: 120, fontSize: 14 },
+  diamond: { width: 120, height: 120, fontSize: 14 },
+  note: { width: 180, height: 140, fontSize: 14 },
+};
+
+/** Default footprint for a new frame/section container. */
+export const FRAME_DEFAULTS = { width: 640, height: 440 };
+
 export function clampNodeScale(scale: number): number {
   if (!Number.isFinite(scale)) return 1;
   return Math.min(MAX_NODE_SCALE, Math.max(MIN_NODE_SCALE, scale));

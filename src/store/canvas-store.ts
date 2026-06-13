@@ -15,7 +15,18 @@ import type {
   Viewport,
 } from '@xyflow/react';
 import { DEFAULT_PAGE_SIZE } from '../engine/flowchart-pages';
-import type { FlowTool, PageOrientation, PageSizeId } from '../types/flowchart';
+import { FRAME_DEFAULTS, SHAPE_DEFAULTS } from '../engine/flowchart-metrics';
+import type {
+  FlowTool,
+  FrameNodeData,
+  ImageNodeData,
+  OwnershipNodeData,
+  PageOrientation,
+  PageSizeId,
+  ShapeNodeData,
+  ShapeType,
+} from '../types/flowchart';
+import type { LiveOwnershipFractions } from '../engine/tree-layout';
 import {
   addCanvasEdge,
   applyCanvasEdgeChanges,
@@ -59,12 +70,19 @@ interface CanvasState {
   snapToGrid: boolean;
   gridSize: number;
 
+  // Performance: only render on-screen nodes. Opt-in (default off) because it
+  // omits off-screen nodes from the DOM, which a full-canvas PNG export needs.
+  virtualize: boolean;
+
   // Viewport (for persistence)
   viewport: Viewport;
 
   // History
   _past: Snapshot[];
   _future: Snapshot[];
+
+  // Clipboard (session-only; never persisted)
+  _clipboard: { nodes: Node[]; edges: Edge[] } | null;
 
   // Lifecycle
   _hydrated: boolean;
@@ -78,14 +96,41 @@ interface CanvasState {
   setNodes: (nodes: Node[]) => void;
   setEdges: (edges: Edge[]) => void;
   importGraph: (nodes: Node[], edges: Edge[]) => void;
+  mergeImportGraph: (ownershipNodes: Node[], ownershipEdges: Edge[]) => void;
   clearCanvas: () => void;
+
+  // ── Shape creation ──
+  addShapeNode: (shapeType: ShapeType, position: { x: number; y: number }) => string;
+  addFrameNode: (position: { x: number; y: number }) => string;
+  addImageNode: (
+    assetHash: string,
+    size: { width: number; height: number },
+    aspectRatio: number,
+    position: { x: number; y: number }
+  ) => string;
 
   // ── Individual mutations ──
   addNodes: (nodes: Node[]) => void;
   removeElements: (nodeIds: string[], edgeIds: string[]) => void;
   updateNodeData: (id: string, data: Record<string, unknown>) => void;
+  updateEdgeData: (id: string, data: Record<string, unknown>) => void;
   selectAll: () => void;
   deselectAll: () => void;
+
+  // ── Templates ──
+  insertElements: (nodes: Node[], edges: Edge[]) => void;
+
+  // ── Live fraction overlay (DA-H8) ──
+  syncOwnershipFractions: (byId: Map<string, LiveOwnershipFractions>) => void;
+
+  // ── Clipboard / duplication ──
+  copySelection: () => void;
+  paste: () => void;
+  duplicateSelection: () => void;
+
+  // ── Z-order ──
+  bringToFront: (ids: string[]) => void;
+  sendToBack: (ids: string[]) => void;
 
   // ── Tool ──
   setActiveTool: (tool: FlowTool) => void;
@@ -100,6 +145,9 @@ interface CanvasState {
 
   // ── Snap ──
   setSnapToGrid: (snap: boolean) => void;
+
+  // ── Performance ──
+  setVirtualize: (virtualize: boolean) => void;
 
   // ── Viewport ──
   setViewport: (viewport: Viewport) => void;
@@ -149,6 +197,60 @@ function pushToPast(past: Snapshot[], snapshot: Snapshot): Snapshot[] {
   return next;
 }
 
+// ── Clone helpers (copy/paste/duplicate) ─────────────────
+
+const PASTE_OFFSET = 24;
+
+let cloneCounter = 0;
+
+/**
+ * Deep-ish clone a set of nodes (and the edges among them) with fresh ids and a
+ * position offset, remapping edge endpoints to the new node ids. The clones are
+ * selected so the paste/duplicate result is immediately actionable.
+ */
+function cloneWithFreshIds(
+  nodes: Node[],
+  edges: Edge[],
+  offset: number
+): { nodes: Node[]; edges: Edge[] } {
+  const stamp = `${Date.now()}-${cloneCounter++}`;
+  const idMap = new Map<string, string>();
+
+  const clonedNodes = nodes.map((n, i) => {
+    const newId = `${n.id}-copy-${stamp}-${i}`;
+    idMap.set(n.id, newId);
+    return {
+      ...n,
+      id: newId,
+      position: { x: n.position.x + offset, y: n.position.y + offset },
+      data: { ...n.data },
+      selected: true,
+      // Drop any parent link the original had unless its parent is also cloned;
+      // resolved below once the full id map exists.
+    } as Node;
+  });
+
+  // Re-point parentId for clones whose parent was also cloned.
+  for (const node of clonedNodes) {
+    if (node.parentId && idMap.has(node.parentId)) {
+      node.parentId = idMap.get(node.parentId);
+    } else if (node.parentId) {
+      delete node.parentId;
+    }
+  }
+
+  const clonedEdges = edges.map((e, i) => ({
+    ...e,
+    id: `${e.id}-copy-${stamp}-${i}`,
+    source: idMap.get(e.source) ?? e.source,
+    target: idMap.get(e.target) ?? e.target,
+    data: { ...e.data },
+    selected: false,
+  })) as Edge[];
+
+  return { nodes: clonedNodes, edges: clonedEdges };
+}
+
 // ── Store ────────────────────────────────────────────────
 
 export const useCanvasStore = create<CanvasState>()((set, get) => ({
@@ -163,9 +265,11 @@ export const useCanvasStore = create<CanvasState>()((set, get) => ({
   verticalSpacingFactor: 1,
   snapToGrid: false,
   gridSize: 20,
+  virtualize: false,
   viewport: { x: 0, y: 0, zoom: 1 },
   _past: [],
   _future: [],
+  _clipboard: null,
   _hydrated: false,
 
   // ── React Flow change handlers ─────────────────────────
@@ -203,6 +307,34 @@ export const useCanvasStore = create<CanvasState>()((set, get) => ({
     });
   },
 
+  // Merge an ownership tree into the canvas WITHOUT discarding user drawings.
+  // Ownership nodes/edges are replaced wholesale (they are derived from the
+  // desk map); every other node kind (shape/text/image/frame) and any edge not
+  // touching an ownership node is preserved. Mirrors the preserve policy that
+  // applySpacingFactors already uses, so re-import no longer wipes annotations.
+  mergeImportGraph: (ownershipNodes, ownershipEdges) => {
+    const s = get();
+    const incomingNodeIds = new Set(ownershipNodes.map((n) => n.id));
+    const preservedNodes = s.nodes.filter(
+      (n) => n.type !== 'ownership' && !incomingNodeIds.has(n.id)
+    );
+    const preservedEdges = s.edges.filter((e) => {
+      const node = (id: string) =>
+        s.nodes.find((n) => n.id === id) ?? ownershipNodes.find((n) => n.id === id);
+      const src = node(e.source);
+      const tgt = node(e.target);
+      // Drop edges that are part of the ownership tree being replaced; keep
+      // edges the user drew between their own (non-ownership) elements.
+      return src?.type !== 'ownership' && tgt?.type !== 'ownership';
+    });
+    set({
+      nodes: [...ownershipNodes, ...preservedNodes],
+      edges: [...ownershipEdges, ...preservedEdges],
+      _past: pushToPast(s._past, captureSnapshot(s)),
+      _future: [],
+    });
+  },
+
   clearCanvas: () => {
     const s = get();
     if (s.nodes.length === 0 && s.edges.length === 0) return;
@@ -212,6 +344,106 @@ export const useCanvasStore = create<CanvasState>()((set, get) => ({
       _past: pushToPast(s._past, captureSnapshot(s)),
       _future: [],
     });
+  },
+
+  // Create a freeform shape node at a flow-space position (used by the
+  // pane-click handler when a draw-* tool is active). Pushes one history entry
+  // and returns the new node id so the caller can select it for editing.
+  addShapeNode: (shapeType, position) => {
+    const s = get();
+    const defaults = SHAPE_DEFAULTS[shapeType];
+    const id = `shape-${Date.now()}-${Math.round(Math.random() * 1e6)}`;
+    const data: ShapeNodeData = {
+      shapeType,
+      text: '',
+      width: defaults.width,
+      height: defaults.height,
+      fontSize: defaults.fontSize,
+      textAlign: 'center',
+    };
+    const node: Node = {
+      id,
+      type: 'shape',
+      position: {
+        x: position.x - defaults.width / 2,
+        y: position.y - defaults.height / 2,
+      },
+      // Top-level width/height are the live size NodeResizer drives; data
+      // width/height stay as the initial/fallback footprint.
+      width: defaults.width,
+      height: defaults.height,
+      data: data as unknown as Record<string, unknown>,
+      selected: true,
+    };
+    set({
+      nodes: [...s.nodes.map((n) => ({ ...n, selected: false })), node],
+      _past: pushToPast(s._past, captureSnapshot(s)),
+      _future: [],
+    });
+    return id;
+  },
+
+  // Create a titled frame/section container. Frames sit behind other content
+  // (negative zIndex) and are a purely visual grouping aid; they print as a
+  // labeled border without altering the page-grid print pipeline.
+  addFrameNode: (position) => {
+    const s = get();
+    const id = `frame-${Date.now()}-${Math.round(Math.random() * 1e6)}`;
+    const data: FrameNodeData = {
+      title: 'Frame',
+      width: FRAME_DEFAULTS.width,
+      height: FRAME_DEFAULTS.height,
+    };
+    const minZ = s.nodes.reduce((m, n) => Math.min(m, n.zIndex ?? 0), 0);
+    const node: Node = {
+      id,
+      type: 'frame',
+      position,
+      width: FRAME_DEFAULTS.width,
+      height: FRAME_DEFAULTS.height,
+      data: data as unknown as Record<string, unknown>,
+      selected: true,
+      zIndex: minZ - 1,
+    };
+    set({
+      nodes: [node, ...s.nodes.map((n) => ({ ...n, selected: false }))],
+      _past: pushToPast(s._past, captureSnapshot(s)),
+      _future: [],
+    });
+    return id;
+  },
+
+  // Place an image node referencing a stored asset (by content hash). The blob
+  // already lives in the canvasAssets store; the node carries only the hash.
+  addImageNode: (assetHash, size, aspectRatio, position) => {
+    const s = get();
+    const id = `image-${Date.now()}-${Math.round(Math.random() * 1e6)}`;
+    const data: ImageNodeData = {
+      assetHash,
+      width: size.width,
+      height: size.height,
+      aspectRatio,
+    };
+    const node: Node = {
+      id,
+      type: 'image',
+      position: {
+        x: position.x - size.width / 2,
+        y: position.y - size.height / 2,
+      },
+      // Top-level width/height are the live size React Flow's NodeResizer drives
+      // (data.width/height stay as the initial/fallback footprint).
+      width: size.width,
+      height: size.height,
+      data: data as unknown as Record<string, unknown>,
+      selected: true,
+    };
+    set({
+      nodes: [...s.nodes.map((n) => ({ ...n, selected: false })), node],
+      _past: pushToPast(s._past, captureSnapshot(s)),
+      _future: [],
+    });
+    return id;
   },
 
   // ── Individual mutations ───────────────────────────────
@@ -241,6 +473,157 @@ export const useCanvasStore = create<CanvasState>()((set, get) => ({
       ),
     })),
 
+  updateEdgeData: (id, data) =>
+    set((s) => ({
+      edges: s.edges.map((e) =>
+        e.id === id ? { ...e, data: { ...e.data, ...data } } : e
+      ),
+    })),
+
+  // ── Templates ──────────────────────────────────────────
+
+  insertElements: (newNodes, newEdges) => {
+    const s = get();
+    set({
+      nodes: [...s.nodes.map((n) => ({ ...n, selected: false })), ...newNodes],
+      edges: [...s.edges, ...newEdges],
+      _past: pushToPast(s._past, captureSnapshot(s)),
+      _future: [],
+    });
+  },
+
+  // Overlay live workspace fractions onto placed ownership nodes (DA-H8).
+  // Derived sync, not a user edit: it patches node data in place WITHOUT
+  // touching undo history, but the new nodes still autosave so the persisted /
+  // printed chart stays consistent with the workspace. Nodes whose workspace
+  // source was deleted are flagged `stale`. No-ops when nothing changed.
+  syncOwnershipFractions: (byId) => {
+    const s = get();
+    let changed = false;
+    const nodes = s.nodes.map((n) => {
+      if (n.type !== 'ownership') return n;
+      const data = n.data as unknown as OwnershipNodeData;
+      const live = byId.get(data.nodeId);
+      if (!live) {
+        if (data.stale) return n;
+        changed = true;
+        return { ...n, data: { ...data, stale: true } };
+      }
+      if (
+        data.grantFraction === live.grantFraction &&
+        data.remainingFraction === live.remainingFraction &&
+        data.relativeShare === live.relativeShare &&
+        !data.stale
+      ) {
+        return n;
+      }
+      changed = true;
+      return {
+        ...n,
+        data: {
+          ...data,
+          grantFraction: live.grantFraction,
+          remainingFraction: live.remainingFraction,
+          relativeShare: live.relativeShare,
+          stale: false,
+        },
+      };
+    });
+    if (changed) set({ nodes });
+  },
+
+  // ── Clipboard / duplication ────────────────────────────
+
+  copySelection: () => {
+    const s = get();
+    const selectedNodes = s.nodes.filter((n) => n.selected);
+    if (selectedNodes.length === 0) return;
+    const idSet = new Set(selectedNodes.map((n) => n.id));
+    // Only copy edges whose endpoints are both in the selection.
+    const selectedEdges = s.edges.filter(
+      (e) => idSet.has(e.source) && idSet.has(e.target)
+    );
+    set({
+      _clipboard: {
+        nodes: selectedNodes.map((n) => ({ ...n, data: { ...n.data }, selected: false })),
+        edges: selectedEdges.map((e) => ({ ...e, data: { ...e.data }, selected: false })),
+      },
+    });
+  },
+
+  paste: () => {
+    const s = get();
+    if (!s._clipboard || s._clipboard.nodes.length === 0) return;
+    const { nodes: pasted, edges: pastedEdges } = cloneWithFreshIds(
+      s._clipboard.nodes,
+      s._clipboard.edges,
+      PASTE_OFFSET
+    );
+    set({
+      nodes: [
+        ...s.nodes.map((n) => ({ ...n, selected: false })),
+        ...pasted,
+      ],
+      edges: [...s.edges, ...pastedEdges],
+      _past: pushToPast(s._past, captureSnapshot(s)),
+      _future: [],
+    });
+  },
+
+  duplicateSelection: () => {
+    const s = get();
+    const selectedNodes = s.nodes.filter((n) => n.selected);
+    if (selectedNodes.length === 0) return;
+    const idSet = new Set(selectedNodes.map((n) => n.id));
+    const selectedEdges = s.edges.filter(
+      (e) => idSet.has(e.source) && idSet.has(e.target)
+    );
+    const { nodes: dup, edges: dupEdges } = cloneWithFreshIds(
+      selectedNodes,
+      selectedEdges,
+      PASTE_OFFSET
+    );
+    set({
+      nodes: [
+        ...s.nodes.map((n) => ({ ...n, selected: false })),
+        ...dup,
+      ],
+      edges: [...s.edges, ...dupEdges],
+      _past: pushToPast(s._past, captureSnapshot(s)),
+      _future: [],
+    });
+  },
+
+  // ── Z-order ────────────────────────────────────────────
+
+  bringToFront: (ids) => {
+    const s = get();
+    if (ids.length === 0) return;
+    const idSet = new Set(ids);
+    const maxZ = s.nodes.reduce((m, n) => Math.max(m, n.zIndex ?? 0), 0);
+    set({
+      nodes: s.nodes.map((n) =>
+        idSet.has(n.id) ? { ...n, zIndex: maxZ + 1 } : n
+      ),
+      _past: pushToPast(s._past, captureSnapshot(s)),
+      _future: [],
+    });
+  },
+
+  sendToBack: (ids) => {
+    const s = get();
+    if (ids.length === 0) return;
+    const idSet = new Set(ids);
+    const minZ = s.nodes.reduce((m, n) => Math.min(m, n.zIndex ?? 0), 0);
+    set({
+      nodes: s.nodes.map((n) =>
+        idSet.has(n.id) ? { ...n, zIndex: minZ - 1 } : n
+      ),
+      _past: pushToPast(s._past, captureSnapshot(s)),
+      _future: [],
+    });
+  },
+
   selectAll: () =>
     set((s) => ({
       nodes: s.nodes.map((n) => ({ ...n, selected: true })),
@@ -269,6 +652,10 @@ export const useCanvasStore = create<CanvasState>()((set, get) => ({
   // ── Snap ───────────────────────────────────────────────
 
   setSnapToGrid: (snapToGrid) => set({ snapToGrid }),
+
+  // ── Performance ────────────────────────────────────────
+
+  setVirtualize: (virtualize) => set({ virtualize }),
 
   // ── Viewport ───────────────────────────────────────────
 

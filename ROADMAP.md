@@ -34,8 +34,13 @@ those two files win.
    derived interest shows, percent only as a gloss), mechanical sweep of the
    ad-hoc formatters, ESLint guard; plus the csv-io Decimal parse fix (DA-H10).
    Report §3 is the spec.
-4. Display-correctness fixes — live Flowchart fractions or a stale banner
-   gating Print (DA-H8); per-tract ORRI on the Map-mode branch card (DA-H9);
+4. Display-correctness fixes — DA-H8 (live Flowchart fractions) DONE on the
+   flowchart branch: a reactive overlay recomputes interest from the live title
+   nodes onto placed canvas nodes (positions untouched, same relative-share math
+   the importer uses), deleted nodes get a "Stale" badge on screen and in print,
+   and an added-node count surfaces a non-blocking "Re-import" hint — so a
+   printed chart can no longer silently disagree with the workspace. Remaining:
+   per-tract ORRI on the Map-mode branch card (DA-H9);
    formula tooltips render the summary's own staged intermediates and the
    engine fraction formatter (DA-M6/M7).
 5. Research-workspace hardening, before the title-math catalog lands there
@@ -48,10 +53,21 @@ those two files win.
    comes out of the burdened lessor's royalty to its extent; excess to WI with
    a warning flag," then a deliberate golden-master update. This is a
    correctness decision and precedes any Phase 7 math expansion.
-7. Flowchart wiring sprint (F-Phase 1, Part 2 §3 — parallel-safe Codex lane,
-   touches no math files): activate the built-but-dead shape tools (DA2-F1),
-   fix the select-tool lasso (DA2-F2), merge-import that preserves
-   annotations (DA2-F3), restore the saved viewport (DA2-F7), PNG export.
+7. Flowchart Miro-class rebuild — DONE on `claude/flowchart-rebuild-plan-cumi48`
+   (F-Phase 1/2/3, Part 2 §3; parallel-safe, touched no math files). Shipped:
+   pane-click shape creation (DA2-F1), lasso fix (DA2-F2), merge-import (DA2-F3),
+   viewport restore (DA2-F7), PNG export, persistence hardening (DA2-F6/F8),
+   raised page-grid cap to 100; print-renderer registry (DA2-F4), edge labels,
+   copy/paste/duplicate, z-order, NodeToolbar; frames, opt-in virtualization,
+   image nodes (new content-addressed `canvasAssets` store, separate from the
+   PDF evidence vault), alignment guides, templates, ownership-card resize.
+   Freehand ink left as a stubbed seam by choice. Print goldens per element
+   kind. The `.landroid` round-trip for `canvasAssets` is now DONE too: image
+   blobs export/import through the file format (additive, optional field, older
+   files import fine) and the side-store rollback path, deduped by content hash,
+   each blob re-hashed on import; a missing asset still degrades to a placeholder
+   rather than failing the import. DA-H8 (live flowchart fractions) also landed
+   here — see item 4.
 8. Carry-overs still active: make batch graft/attach operations atomic; harden
    `.landroid` and CSV import validation (includes the non-numeric
    future-version gate bypass DA-L8 and the lease-jurisdiction whole-file
@@ -91,10 +107,11 @@ those two files win.
   scope, curative-instrument/evidence document links (DA2-C1, design-first);
   printable requirement report via the Audit-Sheet pattern (DA2-C3); dirty-form
   guard (DA2-C4).
-- Flowchart F-Phase 2/3 (Part 2 §3): print-renderer registry for new element
-  kinds, edge labels, copy/paste, z-order, frames-as-pages via React Flow
-  groups, image nodes routed through the hashed document vault, virtualization
-  for 1k+ node trees. Print goldens per new element kind.
+- Flowchart F-Phase 2/3 — DONE (see Now #7), including the `.landroid`
+  `canvasAssets` round-trip. Remaining (optional): frames-as-print-pages (frames
+  today are visual/labeling containers and print as titled borders — they do NOT
+  redesign the page-grid print pipeline, which stays the signature multi-page
+  output); freehand ink whenever a concrete markup need appears (seam is in).
 - ArcGIS interchange increments (Part 2 §4): hash map assets (DA2-M2); export
   per-tract status/decimal attributes as CSV/GeoJSON keyed `LAND_TRACT_ID` for
   ArcGIS Pro joins (DA2-M3); GeoJSON feature→tract matcher writing the existing

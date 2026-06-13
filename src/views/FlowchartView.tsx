@@ -7,7 +7,7 @@
  * State lives in canvas-store (Zustand) for undo/redo, persistence,
  * and keyboard shortcuts. React Flow is a controlled component.
  */
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   ReactFlow,
@@ -22,6 +22,7 @@ import {
   type Edge,
   type EdgeTypes,
   type NodeTypes,
+  type NodeChange,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
@@ -29,12 +30,21 @@ import Button from '../components/shared/Button';
 import OwnershipNodeComponent from '../components/canvas/OwnershipNode';
 import OwnershipEdgeComponent from '../components/canvas/OwnershipEdge';
 import ShapeNodeComponent from '../components/canvas/ShapeNode';
+import FrameNodeComponent from '../components/canvas/FrameNode';
+import ImageNodeComponent from '../components/canvas/ImageNode';
+import {
+  isImageFile,
+  prepareImageForCanvas,
+  initialImageDisplaySize,
+} from '../components/canvas/image-import';
+import { saveCanvasAsset } from '../storage/canvas-assets';
 import CanvasToolbar from '../components/canvas/CanvasToolbar';
 import PageGrid from '../components/canvas/PageGrid';
 import PrintOverlay from '../components/canvas/PrintOverlay';
 import { getPageDimensions } from '../engine/flowchart-pages';
 import { useWorkspaceStore } from '../store/workspace-store';
 import { useCanvasStore } from '../store/canvas-store';
+import { useConfirmation } from '../components/shared/ConfirmationProvider';
 import {
   BASE_NODE_HEIGHT,
   BASE_NODE_WIDTH,
@@ -43,14 +53,23 @@ import {
   getOwnershipNodeDimensions,
   MIN_NODE_SCALE,
 } from '../engine/flowchart-metrics';
-import { layoutOwnershipTreeWithElk } from '../engine/tree-layout';
+import {
+  layoutOwnershipTreeWithElk,
+  computeLiveOwnershipFractions,
+} from '../engine/tree-layout';
 import useCanvasKeyboardShortcuts from '../hooks/useCanvasKeyboardShortcuts';
+import { exportCanvasToPng } from '../components/canvas/canvas-export';
+import { DRAW_TOOL_SHAPE } from '../types/flowchart';
+import { computeAlignmentSnap } from '../components/canvas/alignment-guides';
+import { CANVAS_TEMPLATES } from '../components/canvas/flowchart-templates';
 import type { FlowEdgeData, OwnershipNodeData } from '../types/flowchart';
 import type { OwnershipNode } from '../types/node';
 
 const nodeTypes: NodeTypes = {
   ownership: OwnershipNodeComponent,
   shape: ShapeNodeComponent,
+  frame: FrameNodeComponent,
+  image: ImageNodeComponent,
 };
 
 const edgeTypes: EdgeTypes = {
@@ -386,8 +405,52 @@ function ResizeOverlay({
   );
 }
 
+// ── Alignment guide lines ─────────────────────────────────
+// Renders snap guide lines (flow-space coords) mapped to screen via viewport.
+function GuideLines({ v, h }: { v: number[]; h: number[] }) {
+  const viewport = useViewport();
+  if (v.length === 0 && h.length === 0) return null;
+  return (
+    <div className="absolute inset-0 z-20 pointer-events-none">
+      {v.map((x, i) => (
+        <div
+          key={`v-${i}`}
+          style={{
+            position: 'absolute',
+            left: x * viewport.zoom + viewport.x,
+            top: 0,
+            bottom: 0,
+            width: 1,
+            background: 'var(--color-leather)',
+            opacity: 0.7,
+          }}
+        />
+      ))}
+      {h.map((y, i) => (
+        <div
+          key={`h-${i}`}
+          style={{
+            position: 'absolute',
+            top: y * viewport.zoom + viewport.y,
+            left: 0,
+            right: 0,
+            height: 1,
+            background: 'var(--color-leather)',
+            opacity: 0.7,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
 function FlowchartCanvas() {
   const getActiveDeskMapNodes = useWorkspaceStore((s) => s.getActiveDeskMapNodes);
+  // Reactive workspace subscriptions so the live-fraction overlay (DA-H8) re-runs
+  // whenever the underlying title nodes change — not just on count changes.
+  const wsNodes = useWorkspaceStore((s) => s.nodes);
+  const wsDeskMaps = useWorkspaceStore((s) => s.deskMaps);
+  const wsActiveDeskMapId = useWorkspaceStore((s) => s.activeDeskMapId);
 
   // ── Canvas store ───────────────────────────────────────
   const nodes = useCanvasStore((s) => s.nodes);
@@ -401,17 +464,32 @@ function FlowchartCanvas() {
   const verticalSpacingFactor = useCanvasStore((s) => s.verticalSpacingFactor);
   const snapToGrid = useCanvasStore((s) => s.snapToGrid);
   const gridSize = useCanvasStore((s) => s.gridSize);
+  const virtualize = useCanvasStore((s) => s.virtualize);
+  const viewport = useCanvasStore((s) => s.viewport);
   const onNodesChange = useCanvasStore((s) => s.onNodesChange);
   const onEdgesChange = useCanvasStore((s) => s.onEdgesChange);
   const onConnect = useCanvasStore((s) => s.onConnect);
-  const importGraph = useCanvasStore((s) => s.importGraph);
+  const mergeImportGraph = useCanvasStore((s) => s.mergeImportGraph);
+  const addShapeNode = useCanvasStore((s) => s.addShapeNode);
+  const addFrameNode = useCanvasStore((s) => s.addFrameNode);
+  const addImageNode = useCanvasStore((s) => s.addImageNode);
+  const insertElements = useCanvasStore((s) => s.insertElements);
+  const syncOwnershipFractions = useCanvasStore((s) => s.syncOwnershipFractions);
+  const setActiveTool = useCanvasStore((s) => s.setActiveTool);
+  const workspaceId = useWorkspaceStore((s) => s.workspaceId);
+  const { alert } = useConfirmation();
   const pushHistory = useCanvasStore((s) => s.pushHistory);
   const setHorizontalSpacingFactor = useCanvasStore((s) => s.setHorizontalSpacingFactor);
   const setVerticalSpacingFactor = useCanvasStore((s) => s.setVerticalSpacingFactor);
   const setViewport = useCanvasStore((s) => s.setViewport);
 
-  const { fitView } = useReactFlow();
+  const { fitView, screenToFlowPosition, getNodes } = useReactFlow();
   const spacingRequestIdRef = useRef(0);
+  // First render restores the saved viewport via defaultViewport; only the
+  // very first import (no saved viewport, empty canvas) should auto-fit.
+  const hasSavedViewport = useRef(
+    viewport.x !== 0 || viewport.y !== 0 || viewport.zoom !== 1
+  );
 
   // ── Keyboard shortcuts ─────────────────────────────────
   useCanvasKeyboardShortcuts();
@@ -451,14 +529,15 @@ function FlowchartCanvas() {
         rootIds,
         { x: gridCenterX, y: 40 }
       );
-      importGraph(centeredFlowNodes, flowEdges);
+      // Merge so user drawings/annotations survive a re-import (DA2-F3).
+      mergeImportGraph(centeredFlowNodes, flowEdges);
       setTimeout(() => fitView({ padding: 0.1, duration: 300 }), 50);
     })();
   }, [
     getFlowchartDeskMapNodes,
     gridCols,
     horizontalSpacingFactor,
-    importGraph,
+    mergeImportGraph,
     fitView,
     orientation,
     pageSize,
@@ -631,15 +710,185 @@ function FlowchartCanvas() {
     setTimeout(() => fitView({ padding: 0.05, duration: 300 }), 50);
   }, [nodes, pushHistory, fitView, gridCols, gridRows, orientation, pageSize]);
 
+  // ── Pane-click shape creation (DA2-F1) ─────────────────
+  // When a draw-* tool is active, clicking empty canvas drops the shape at the
+  // pointer (converted to flow space) and returns to the select tool.
+  const handlePaneClick = useCallback(
+    (event: React.MouseEvent) => {
+      const position = screenToFlowPosition({ x: event.clientX, y: event.clientY });
+      if (activeTool === 'draw-frame') {
+        addFrameNode(position);
+        setActiveTool('select');
+        return;
+      }
+      const shapeType = DRAW_TOOL_SHAPE[activeTool];
+      if (!shapeType) return;
+      addShapeNode(shapeType, position);
+      setActiveTool('select');
+    },
+    [activeTool, screenToFlowPosition, addShapeNode, addFrameNode, setActiveTool]
+  );
+
   // ── Print ──────────────────────────────────────────────
   const handlePrint = useCallback(() => {
     requestAnimationFrame(() => window.print());
   }, []);
 
+  // ── PNG export ─────────────────────────────────────────
+  const handleExportPng = useCallback(() => {
+    void exportCanvasToPng(getNodes());
+  }, [getNodes]);
+
+  // ── Image import (file picker / paste / drop) ──────────
+  // Downscale, store the bytes in the content-addressed asset store, then drop
+  // an image node referencing the hash at the given flow position.
+  const importImageAt = useCallback(
+    async (file: File | Blob, position: { x: number; y: number }) => {
+      if (!isImageFile(file)) return;
+      try {
+        const prepared = await prepareImageForCanvas(file);
+        const fileName = file instanceof File ? file.name : undefined;
+        const { contentHash } = await saveCanvasAsset(prepared.blob, workspaceId, fileName);
+        const size = initialImageDisplaySize(prepared.naturalWidth, prepared.naturalHeight);
+        const aspectRatio = size.height > 0 ? size.width / size.height : 1;
+        addImageNode(contentHash, size, aspectRatio, position);
+      } catch (err) {
+        console.warn('[landroid] image import failed:', err);
+        void alert({
+          title: 'Could not add image',
+          message:
+            err instanceof Error
+              ? err.message
+              : 'The image could not be read. Try a PNG or JPEG under 8 MB.',
+        });
+      }
+    },
+    [workspaceId, addImageNode, alert]
+  );
+
+  const centerFlowPosition = useCallback(() => {
+    const el = document.querySelector('.react-flow');
+    const rect = el?.getBoundingClientRect();
+    return screenToFlowPosition({
+      x: (rect?.left ?? 0) + (rect?.width ?? 800) / 2,
+      y: (rect?.top ?? 0) + (rect?.height ?? 600) / 2,
+    });
+  }, [screenToFlowPosition]);
+
+  const handleInsertTemplate = useCallback(
+    (templateId: string) => {
+      const template = CANVAS_TEMPLATES.find((t) => t.id === templateId);
+      if (!template) return;
+      const { nodes: tplNodes, edges: tplEdges } = template.build(centerFlowPosition());
+      insertElements(tplNodes, tplEdges);
+      setTimeout(() => fitView({ padding: 0.2, duration: 300 }), 50);
+    },
+    [centerFlowPosition, insertElements, fitView]
+  );
+
+  const handleAddImageFiles = useCallback(
+    (files: FileList | null) => {
+      if (!files) return;
+      const center = centerFlowPosition();
+      Array.from(files).forEach((file, i) => {
+        // Cascade multiple images slightly so they don't stack exactly.
+        void importImageAt(file, { x: center.x + i * 24, y: center.y + i * 24 });
+      });
+    },
+    [centerFlowPosition, importImageAt]
+  );
+
+  const handleCanvasDrop = useCallback(
+    (event: React.DragEvent) => {
+      const files = Array.from(event.dataTransfer?.files ?? []).filter(isImageFile);
+      if (files.length === 0) return;
+      event.preventDefault();
+      const position = screenToFlowPosition({ x: event.clientX, y: event.clientY });
+      files.forEach((file, i) =>
+        void importImageAt(file, { x: position.x + i * 24, y: position.y + i * 24 })
+      );
+    },
+    [importImageAt, screenToFlowPosition]
+  );
+
+  // ── Paste an image from the clipboard anywhere on the canvas ──
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    const onPaste = (e: ClipboardEvent) => {
+      const item = Array.from(e.clipboardData?.items ?? []).find((it) =>
+        it.type.startsWith('image/')
+      );
+      const file = item?.getAsFile();
+      if (file) void importImageAt(file, centerFlowPosition());
+    };
+    window.addEventListener('paste', onPaste);
+    return () => window.removeEventListener('paste', onPaste);
+  }, [importImageAt, centerFlowPosition]);
+
   // ── Push history before drag starts ────────────────────
   const handleNodeDragStart = useCallback(() => {
     pushHistory();
   }, [pushHistory]);
+
+  // ── Alignment guides while dragging ────────────────────
+  // Snap is applied INSIDE the changes stream (not onNodeDrag) so React Flow's
+  // pointer-delta drag controller doesn't overwrite it each frame. Only a
+  // single-node drag snaps; group drags pass through untouched so the group
+  // moves rigidly.
+  const [guides, setGuides] = useState<{ v: number[]; h: number[] }>({ v: [], h: [] });
+
+  const handleNodesChange = useCallback(
+    (changes: NodeChange[]) => {
+      const dragChanges = changes.filter(
+        (change): change is Extract<NodeChange, { type: 'position' }> =>
+          change.type === 'position' && change.dragging === true && !!change.position
+      );
+      if (dragChanges.length !== 1) {
+        if (guides.v.length || guides.h.length) setGuides({ v: [], h: [] });
+        onNodesChange(changes);
+        return;
+      }
+
+      const dragChange = dragChanges[0];
+      const all = useCanvasStore.getState().nodes;
+      const draggedNode = all.find((n) => n.id === dragChange.id);
+      const position = dragChange.position;
+      if (!draggedNode || !position) {
+        onNodesChange(changes);
+        return;
+      }
+
+      const dims = getNodeDimensions(draggedNode);
+      const dragged = {
+        id: dragChange.id,
+        x: position.x,
+        y: position.y,
+        width: dims.width,
+        height: dims.height,
+      };
+      const others = all
+        .filter((n) => n.id !== dragChange.id && n.type !== 'frame')
+        .map((n) => {
+          const d = getNodeDimensions(n);
+          return { id: n.id, x: n.position.x, y: n.position.y, width: d.width, height: d.height };
+        });
+      const snap = computeAlignmentSnap(dragged, others);
+      setGuides({ v: snap.verticalLines, h: snap.horizontalLines });
+
+      onNodesChange(
+        changes.map((change) =>
+          change === dragChange
+            ? { ...change, position: { x: snap.x, y: snap.y } }
+            : change
+        )
+      );
+    },
+    [onNodesChange, guides.v.length, guides.h.length]
+  );
+
+  const handleNodeDragStopGuides = useCallback(() => {
+    setGuides({ v: [], h: [] });
+  }, []);
 
   // ── Persist viewport on move ───────────────────────────
   const handleMoveEnd = useCallback(
@@ -656,6 +905,43 @@ function FlowchartCanvas() {
       handleImportTree();
     }
   }, [deskMapNodes.length]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── DA-H8: keep flowchart fractions live with the workspace ──
+  // Recompute current fractions from the live title nodes and overlay them onto
+  // already-placed canvas nodes (positions untouched); orphaned nodes are
+  // flagged stale. This closes the gap where a printed chart could disagree
+  // with the workspace after any title edit.
+  const liveFractionsById = useMemo(
+    () =>
+      computeLiveOwnershipFractions(
+        getActiveDeskMapNodes().filter((node) => node.type !== 'related')
+      ),
+    // Recompute when the underlying title state changes; getActiveDeskMapNodes
+    // reads current state so these deps drive the refresh.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [wsNodes, wsDeskMaps, wsActiveDeskMapId, getActiveDeskMapNodes]
+  );
+  useEffect(() => {
+    syncOwnershipFractions(liveFractionsById);
+  }, [liveFractionsById, syncOwnershipFractions]);
+
+  // Count workspace title nodes that aren't on the canvas yet (added after the
+  // last import). The overlay can refresh fractions and flag deletions in place,
+  // but new boxes need a re-layout — surface a non-blocking re-import hint so a
+  // printed chart never silently omits them.
+  const missingNodeCount = useMemo(() => {
+    const placed = new Set(
+      nodes
+        .filter((n) => n.type === 'ownership')
+        .map((n) => (n.data as unknown as { nodeId?: string }).nodeId)
+    );
+    if (placed.size === 0) return 0; // not imported yet — auto-import handles it
+    let missing = 0;
+    for (const id of liveFractionsById.keys()) {
+      if (!placed.has(id)) missing += 1;
+    }
+    return missing;
+  }, [liveFractionsById, nodes]);
 
   // ── Resize mode ──────────────────────────────────────────
   const [resizeMode, setResizeMode] = useState(false);
@@ -704,9 +990,13 @@ function FlowchartCanvas() {
   // ── Print data ─────────────────────────────────────────
   const printNodes = nodes.map((n) => ({
     id: n.id,
+    type: n.type,
     position: n.position,
-    data: n.data as unknown as OwnershipNodeData,
+    data: n.data,
     measured: n.measured,
+    width: typeof n.width === 'number' ? n.width : undefined,
+    height: typeof n.height === 'number' ? n.height : undefined,
+    zIndex: n.zIndex,
   }));
   const printEdges = edges.map((e) => ({
     source: e.source,
@@ -719,7 +1009,26 @@ function FlowchartCanvas() {
   }));
 
   return (
-    <div className="w-full h-full relative">
+    <div
+      className="w-full h-full relative"
+      onDrop={handleCanvasDrop}
+      onDragOver={(e) => {
+        if (Array.from(e.dataTransfer?.items ?? []).some((it) => it.kind === 'file')) {
+          e.preventDefault();
+        }
+      }}
+    >
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        multiple
+        className="hidden"
+        onChange={(e) => {
+          handleAddImageFiles(e.target.files);
+          e.target.value = '';
+        }}
+      />
       <CanvasToolbar
         onImportTree={handleImportTree}
         onFitToGrid={handleFitToGrid}
@@ -728,6 +1037,9 @@ function FlowchartCanvas() {
         onVerticalSpacingChange={handleVerticalSpacingChange}
         resizeMode={resizeMode}
         onPrint={handlePrint}
+        onExportPng={handleExportPng}
+        onAddImage={() => fileInputRef.current?.click()}
+        onInsertTemplate={handleInsertTemplate}
       />
 
       {nodes.length > 0 && (
@@ -736,29 +1048,53 @@ function FlowchartCanvas() {
         </div>
       )}
 
+      {missingNodeCount > 0 && (
+        <div className="no-print absolute top-3 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 px-3 py-1.5 rounded-md bg-seal/10 border border-seal/40 shadow text-xs text-seal">
+          <span>
+            Tree changed: {missingNodeCount} new {missingNodeCount === 1 ? 'box' : 'boxes'} not on
+            the chart.
+          </span>
+          <button
+            type="button"
+            onClick={handleImportTree}
+            className="rounded bg-seal px-2 py-0.5 font-semibold text-white hover:bg-seal-light transition-colors"
+          >
+            Re-import
+          </button>
+        </div>
+      )}
+
       <ReactFlow
         nodes={nodes}
         edges={edges}
-        onNodesChange={onNodesChange}
+        onNodesChange={handleNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         onNodeDragStart={handleNodeDragStart}
+        onNodeDragStop={handleNodeDragStopGuides}
         onMoveEnd={handleMoveEnd}
+        onPaneClick={handlePaneClick}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
-        fitView
+        // Restore the persisted viewport (DA2-F7); only auto-fit when there is
+        // none saved (first visit) — handled by the import effect.
+        defaultViewport={viewport}
+        fitView={!hasSavedViewport.current}
         fitViewOptions={{ padding: 0.1 }}
         defaultEdgeOptions={{
           type: 'ownership',
           data: { edgeScale: 1, variant: 'primary' },
           style: { stroke: '#8b4513', strokeWidth: 2 },
         }}
-        panOnDrag={!resizeMode}
+        // Miro-style (DA2-F2): with the select tool, left-drag lassos and
+        // middle/right-drag pans. The explicit pan tool pans on left-drag.
+        panOnDrag={resizeMode ? false : activeTool === 'pan' ? true : [1, 2]}
         selectionOnDrag={!resizeMode && activeTool === 'select'}
         nodesDraggable={!resizeMode}
         nodesConnectable={activeTool === 'connect'}
         snapToGrid={snapToGrid}
         snapGrid={[gridSize, gridSize]}
+        onlyRenderVisibleElements={virtualize}
         deleteKeyCode={null}
         minZoom={0.02}
         maxZoom={4}
@@ -783,6 +1119,7 @@ function FlowchartCanvas() {
           pannable
           zoomable
         />
+        <GuideLines v={guides.v} h={guides.h} />
       </ReactFlow>
 
       {resizeMode && resizeOriginals.current && (

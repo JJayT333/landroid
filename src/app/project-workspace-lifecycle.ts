@@ -63,6 +63,7 @@ export type ImportedWorkspaceData = Omit<WorkspaceData, 'instrumentTypes'>
     | 'mapData'
     | 'researchData'
     | 'curativeData'
+    | 'canvasAssetData'
     | 'actionLedger'
   >>;
 
@@ -84,6 +85,7 @@ function sideStoreDataFromImport(
     mapData: data.mapData,
     researchData: data.researchData,
     curativeData: data.curativeData,
+    canvasAssetData: data.canvasAssetData,
   };
 }
 
