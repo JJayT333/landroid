@@ -44,6 +44,7 @@ import PrintOverlay from '../components/canvas/PrintOverlay';
 import { getPageDimensions } from '../engine/flowchart-pages';
 import { useWorkspaceStore } from '../store/workspace-store';
 import { useCanvasStore } from '../store/canvas-store';
+import { useConfirmation } from '../components/shared/ConfirmationProvider';
 import {
   BASE_NODE_HEIGHT,
   BASE_NODE_WIDTH,
@@ -467,6 +468,7 @@ function FlowchartCanvas() {
   const insertElements = useCanvasStore((s) => s.insertElements);
   const setActiveTool = useCanvasStore((s) => s.setActiveTool);
   const workspaceId = useWorkspaceStore((s) => s.workspaceId);
+  const { alert } = useConfirmation();
   const pushHistory = useCanvasStore((s) => s.pushHistory);
   const setHorizontalSpacingFactor = useCanvasStore((s) => s.setHorizontalSpacingFactor);
   const setVerticalSpacingFactor = useCanvasStore((s) => s.setVerticalSpacingFactor);
@@ -743,9 +745,16 @@ function FlowchartCanvas() {
         addImageNode(contentHash, size, aspectRatio, position);
       } catch (err) {
         console.warn('[landroid] image import failed:', err);
+        void alert({
+          title: 'Could not add image',
+          message:
+            err instanceof Error
+              ? err.message
+              : 'The image could not be read. Try a PNG or JPEG under 8 MB.',
+        });
       }
     },
-    [workspaceId, addImageNode]
+    [workspaceId, addImageNode, alert]
   );
 
   const centerFlowPosition = useCallback(() => {
