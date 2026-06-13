@@ -53,4 +53,23 @@ export type FlowTool =
   | 'draw-round'
   | 'draw-ellipse'
   | 'draw-diamond'
-  | 'draw-note';
+  | 'draw-note'
+  // Reserved seam for a future freehand pen tool. No capture/render is wired
+  // yet; it exists so the tool enum and the node-kind/print registries already
+  // account for ink and a later implementation drops in without a refactor.
+  | 'draw-pen';
+
+/**
+ * Element kinds a canvas node can be. Used as the key for the print-renderer
+ * registry and node-type dispatch. `'ink'` is a reserved seam (see draw-pen).
+ */
+export type NodeKind = 'ownership' | 'shape' | 'text' | 'image' | 'frame' | 'ink';
+
+/** Map of a draw-* tool to the shape it creates on pane click. */
+export const DRAW_TOOL_SHAPE: Partial<Record<FlowTool, ShapeType>> = {
+  'draw-rect': 'rect',
+  'draw-round': 'roundRect',
+  'draw-ellipse': 'ellipse',
+  'draw-diamond': 'diamond',
+  'draw-note': 'note',
+};

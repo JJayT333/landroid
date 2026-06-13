@@ -138,13 +138,46 @@ export function captureCanvasAutosaveSnapshot(
   };
 }
 
+/**
+ * True when the only difference between two node arrays is selection or drag
+ * state (transient UI flags). Used to skip autosaving on pure selection toggles
+ * so clicking around the canvas doesn't queue full IndexedDB rewrites (DA2-F8).
+ *
+ * Returns false (i.e. "a real change") for any add/remove/reorder or change to
+ * a persisted field (position, data, type, size, parent, z-order).
+ */
+export function isSelectionOrDragOnlyNodeChange(
+  prev: Node[],
+  next: Node[]
+): boolean {
+  if (prev.length !== next.length) return false;
+  for (let i = 0; i < prev.length; i++) {
+    const a = prev[i];
+    const b = next[i];
+    if (a === b) continue;
+    if (
+      a.id !== b.id ||
+      a.position !== b.position ||
+      a.data !== b.data ||
+      a.type !== b.type ||
+      a.width !== b.width ||
+      a.height !== b.height ||
+      a.hidden !== b.hidden ||
+      a.parentId !== b.parentId ||
+      a.zIndex !== b.zIndex
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
 export function canvasAutosaveStateChanged(
   previous: CanvasAutosaveSnapshot | null,
   state: CanvasAutosaveState
 ): boolean {
   if (!previous) return true;
-  return (
-    previous.nodes !== state.nodes ||
+  if (
     previous.edges !== state.edges ||
     previous.viewport !== state.viewport ||
     previous.gridCols !== state.gridCols ||
@@ -155,15 +188,38 @@ export function canvasAutosaveStateChanged(
     previous.verticalSpacingFactor !== state.verticalSpacingFactor ||
     previous.snapToGrid !== state.snapToGrid ||
     previous.gridSize !== state.gridSize
-  );
+  ) {
+    return true;
+  }
+  // Nodes changed by reference, but ignore pure selection/drag toggles (F8).
+  if (previous.nodes !== state.nodes) {
+    return !isSelectionOrDragOnlyNodeChange(previous.nodes, state.nodes);
+  }
+  return false;
+}
+
+// Transient React Flow fields that must never be persisted — they describe the
+// live interaction, not the saved diagram (DA2-F6).
+const TRANSIENT_NODE_FIELDS = ['selected', 'dragging', 'resizing', 'measured'] as const;
+
+function stripTransientNodeFields(node: Node): Node {
+  const next = { ...node } as Record<string, unknown>;
+  for (const field of TRANSIENT_NODE_FIELDS) delete next[field];
+  return next as Node;
+}
+
+function stripTransientEdgeFields(edge: Edge): Edge {
+  const next = { ...edge } as Record<string, unknown>;
+  delete next.selected;
+  return next as Edge;
 }
 
 export function buildCanvasAutosavePayload(
   state: CanvasAutosaveState
 ): CanvasSaveData {
   return {
-    nodes: state.nodes,
-    edges: state.edges,
+    nodes: state.nodes.map(stripTransientNodeFields),
+    edges: state.edges.map(stripTransientEdgeFields),
     viewport: state.viewport,
     gridCols: state.gridCols,
     gridRows: state.gridRows,

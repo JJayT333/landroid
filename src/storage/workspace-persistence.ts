@@ -357,6 +357,56 @@ function normalizeDeskMaps(
   });
 }
 
+// Transient React Flow fields that should never round-trip through storage.
+const TRANSIENT_CANVAS_NODE_FIELDS = ['selected', 'dragging', 'resizing', 'measured'];
+
+/**
+ * Validate persisted canvas nodes one element at a time, dropping any entry
+ * that isn't a well-formed node and stripping transient interaction fields
+ * (DA2-F6). One corrupt entry must not brick the whole canvas.
+ */
+function sanitizePersistedCanvasNodes(value: unknown): Record<string, unknown>[] {
+  if (!Array.isArray(value)) return [];
+  const result: Record<string, unknown>[] = [];
+  for (const entry of value) {
+    if (!isRecord(entry)) continue;
+    if (typeof entry.id !== 'string') continue;
+    if (
+      !isRecord(entry.position) ||
+      typeof entry.position.x !== 'number' ||
+      !Number.isFinite(entry.position.x) ||
+      typeof entry.position.y !== 'number' ||
+      !Number.isFinite(entry.position.y)
+    ) {
+      continue;
+    }
+    const clean: Record<string, unknown> = { ...entry };
+    for (const field of TRANSIENT_CANVAS_NODE_FIELDS) delete clean[field];
+    result.push(clean);
+  }
+  return result;
+}
+
+/** Validate persisted canvas edges one element at a time (DA2-F6). */
+function sanitizePersistedCanvasEdges(value: unknown): Record<string, unknown>[] {
+  if (!Array.isArray(value)) return [];
+  const result: Record<string, unknown>[] = [];
+  for (const entry of value) {
+    if (!isRecord(entry)) continue;
+    if (
+      typeof entry.id !== 'string' ||
+      typeof entry.source !== 'string' ||
+      typeof entry.target !== 'string'
+    ) {
+      continue;
+    }
+    const clean: Record<string, unknown> = { ...entry };
+    delete clean.selected;
+    result.push(clean);
+  }
+  return result;
+}
+
 export function normalizeCanvasSaveData(value: unknown): CanvasSaveData | null {
   if (!isRecord(value)) {
     return null;
@@ -377,8 +427,8 @@ export function normalizeCanvasSaveData(value: unknown): CanvasSaveData | null {
       : undefined;
 
   return {
-    nodes: Array.isArray(value.nodes) ? value.nodes : [],
-    edges: Array.isArray(value.edges) ? value.edges : [],
+    nodes: sanitizePersistedCanvasNodes(value.nodes) as CanvasSaveData['nodes'],
+    edges: sanitizePersistedCanvasEdges(value.edges) as CanvasSaveData['edges'],
     viewport,
     gridCols:
       typeof value.gridCols === 'number' && Number.isFinite(value.gridCols)

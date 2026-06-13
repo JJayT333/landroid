@@ -15,7 +15,14 @@ import type {
   Viewport,
 } from '@xyflow/react';
 import { DEFAULT_PAGE_SIZE } from '../engine/flowchart-pages';
-import type { FlowTool, PageOrientation, PageSizeId } from '../types/flowchart';
+import { SHAPE_DEFAULTS } from '../engine/flowchart-metrics';
+import type {
+  FlowTool,
+  PageOrientation,
+  PageSizeId,
+  ShapeNodeData,
+  ShapeType,
+} from '../types/flowchart';
 import {
   addCanvasEdge,
   applyCanvasEdgeChanges,
@@ -78,7 +85,11 @@ interface CanvasState {
   setNodes: (nodes: Node[]) => void;
   setEdges: (edges: Edge[]) => void;
   importGraph: (nodes: Node[], edges: Edge[]) => void;
+  mergeImportGraph: (ownershipNodes: Node[], ownershipEdges: Edge[]) => void;
   clearCanvas: () => void;
+
+  // ── Shape creation ──
+  addShapeNode: (shapeType: ShapeType, position: { x: number; y: number }) => string;
 
   // ── Individual mutations ──
   addNodes: (nodes: Node[]) => void;
@@ -203,6 +214,34 @@ export const useCanvasStore = create<CanvasState>()((set, get) => ({
     });
   },
 
+  // Merge an ownership tree into the canvas WITHOUT discarding user drawings.
+  // Ownership nodes/edges are replaced wholesale (they are derived from the
+  // desk map); every other node kind (shape/text/image/frame) and any edge not
+  // touching an ownership node is preserved. Mirrors the preserve policy that
+  // applySpacingFactors already uses, so re-import no longer wipes annotations.
+  mergeImportGraph: (ownershipNodes, ownershipEdges) => {
+    const s = get();
+    const incomingNodeIds = new Set(ownershipNodes.map((n) => n.id));
+    const preservedNodes = s.nodes.filter(
+      (n) => n.type !== 'ownership' && !incomingNodeIds.has(n.id)
+    );
+    const preservedEdges = s.edges.filter((e) => {
+      const node = (id: string) =>
+        s.nodes.find((n) => n.id === id) ?? ownershipNodes.find((n) => n.id === id);
+      const src = node(e.source);
+      const tgt = node(e.target);
+      // Drop edges that are part of the ownership tree being replaced; keep
+      // edges the user drew between their own (non-ownership) elements.
+      return src?.type !== 'ownership' && tgt?.type !== 'ownership';
+    });
+    set({
+      nodes: [...ownershipNodes, ...preservedNodes],
+      edges: [...ownershipEdges, ...preservedEdges],
+      _past: pushToPast(s._past, captureSnapshot(s)),
+      _future: [],
+    });
+  },
+
   clearCanvas: () => {
     const s = get();
     if (s.nodes.length === 0 && s.edges.length === 0) return;
@@ -212,6 +251,39 @@ export const useCanvasStore = create<CanvasState>()((set, get) => ({
       _past: pushToPast(s._past, captureSnapshot(s)),
       _future: [],
     });
+  },
+
+  // Create a freeform shape node at a flow-space position (used by the
+  // pane-click handler when a draw-* tool is active). Pushes one history entry
+  // and returns the new node id so the caller can select it for editing.
+  addShapeNode: (shapeType, position) => {
+    const s = get();
+    const defaults = SHAPE_DEFAULTS[shapeType];
+    const id = `shape-${Date.now()}-${Math.round(Math.random() * 1e6)}`;
+    const data: ShapeNodeData = {
+      shapeType,
+      text: '',
+      width: defaults.width,
+      height: defaults.height,
+      fontSize: defaults.fontSize,
+      textAlign: 'center',
+    };
+    const node: Node = {
+      id,
+      type: 'shape',
+      position: {
+        x: position.x - defaults.width / 2,
+        y: position.y - defaults.height / 2,
+      },
+      data: data as unknown as Record<string, unknown>,
+      selected: true,
+    };
+    set({
+      nodes: [...s.nodes.map((n) => ({ ...n, selected: false })), node],
+      _past: pushToPast(s._past, captureSnapshot(s)),
+      _future: [],
+    });
+    return id;
   },
 
   // ── Individual mutations ───────────────────────────────

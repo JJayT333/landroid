@@ -22,7 +22,13 @@ interface CanvasToolbarProps {
   onVerticalSpacingChange: (value: number) => void;
   resizeMode: boolean;
   onPrint: () => void;
+  onExportPng: () => void;
 }
+
+// Upper bound for the page-grid steppers. Generous so large printable grids
+// (e.g. 10×10 → 100 pages) are possible; the multi-page print pipeline is a
+// signature feature and must not be fenced in (DA2-F11).
+const MAX_GRID_DIMENSION = 100;
 
 const tools: { id: FlowTool; label: string; icon: string }[] = [
   { id: 'select', label: 'Select', icon: '↖' },
@@ -137,6 +143,7 @@ export default function CanvasToolbar({
   onVerticalSpacingChange,
   resizeMode,
   onPrint,
+  onExportPng,
 }: CanvasToolbarProps) {
   // Read from canvas store
   const activeTool = useCanvasStore((s) => s.activeTool);
@@ -270,14 +277,14 @@ export default function CanvasToolbar({
         label="Col"
         value={gridCols}
         min={1}
-        max={26}
+        max={MAX_GRID_DIMENSION}
         onChange={setGridCols}
       />
       <StepperButton
         label="Row"
         value={gridRows}
         min={1}
-        max={26}
+        max={MAX_GRID_DIMENSION}
         onChange={setGridRows}
       />
 
@@ -343,6 +350,16 @@ export default function CanvasToolbar({
       </button>
 
       <div className="w-px h-6 bg-ledger-line mx-1" />
+
+      {/* Export PNG */}
+      <button
+        type="button"
+        onClick={onExportPng}
+        className="px-3 py-1.5 rounded-md text-xs font-semibold text-leather hover:bg-leather/10 transition-colors"
+        title="Export the whole canvas as a PNG image"
+      >
+        Export PNG
+      </button>
 
       {/* Print */}
       <button

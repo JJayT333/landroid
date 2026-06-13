@@ -161,12 +161,67 @@ describe('autosave-change-detection', () => {
         viewport: { x: 10, y: 0, zoom: 1 },
       })
     ).toBe(true);
+    // A new array with identical persisted content is NOT a change (DA2-F8):
+    // selection/drag-only churn must not queue an IndexedDB rewrite.
     expect(
       canvasAutosaveStateChanged(snapshot, {
         ...state,
         nodes: [...nodes],
       })
+    ).toBe(false);
+    // Toggling only the `selected` flag is also skipped.
+    expect(
+      canvasAutosaveStateChanged(snapshot, {
+        ...state,
+        nodes: [{ ...nodes[0], selected: true }],
+      })
+    ).toBe(false);
+    // But moving a node (new position) is a real change.
+    expect(
+      canvasAutosaveStateChanged(snapshot, {
+        ...state,
+        nodes: [{ ...nodes[0], position: { x: 50, y: 0 } }],
+      })
     ).toBe(true);
     expect(buildCanvasAutosavePayload(state)).toEqual(state);
+  });
+
+  it('strips transient React Flow fields from the canvas autosave payload', () => {
+    const nodes: Node[] = [
+      {
+        id: 'n1',
+        type: 'shape',
+        position: { x: 0, y: 0 },
+        data: { text: 'hi' },
+        selected: true,
+        dragging: false,
+        measured: { width: 100, height: 50 },
+      } as Node,
+    ];
+    const edges: Edge[] = [
+      { id: 'e1', source: 'n1', target: 'n1', selected: true } as Edge,
+    ];
+    const state = {
+      nodes,
+      edges,
+      viewport: { x: 0, y: 0, zoom: 1 },
+      gridCols: 4,
+      gridRows: 2,
+      orientation: 'landscape' as const,
+      pageSize: 'ansi-a' as const,
+      horizontalSpacingFactor: 1,
+      verticalSpacingFactor: 1,
+      snapToGrid: false,
+      gridSize: 20,
+    };
+
+    const payload = buildCanvasAutosavePayload(state);
+    expect(payload.nodes[0]).not.toHaveProperty('selected');
+    expect(payload.nodes[0]).not.toHaveProperty('dragging');
+    expect(payload.nodes[0]).not.toHaveProperty('measured');
+    expect(payload.edges?.[0]).not.toHaveProperty('selected');
+    // Persisted fields survive.
+    expect(payload.nodes[0].id).toBe('n1');
+    expect(payload.nodes[0].position).toEqual({ x: 0, y: 0 });
   });
 });

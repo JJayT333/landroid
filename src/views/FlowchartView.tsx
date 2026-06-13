@@ -45,6 +45,8 @@ import {
 } from '../engine/flowchart-metrics';
 import { layoutOwnershipTreeWithElk } from '../engine/tree-layout';
 import useCanvasKeyboardShortcuts from '../hooks/useCanvasKeyboardShortcuts';
+import { exportCanvasToPng } from '../components/canvas/canvas-export';
+import { DRAW_TOOL_SHAPE } from '../types/flowchart';
 import type { FlowEdgeData, OwnershipNodeData } from '../types/flowchart';
 import type { OwnershipNode } from '../types/node';
 
@@ -401,17 +403,25 @@ function FlowchartCanvas() {
   const verticalSpacingFactor = useCanvasStore((s) => s.verticalSpacingFactor);
   const snapToGrid = useCanvasStore((s) => s.snapToGrid);
   const gridSize = useCanvasStore((s) => s.gridSize);
+  const viewport = useCanvasStore((s) => s.viewport);
   const onNodesChange = useCanvasStore((s) => s.onNodesChange);
   const onEdgesChange = useCanvasStore((s) => s.onEdgesChange);
   const onConnect = useCanvasStore((s) => s.onConnect);
-  const importGraph = useCanvasStore((s) => s.importGraph);
+  const mergeImportGraph = useCanvasStore((s) => s.mergeImportGraph);
+  const addShapeNode = useCanvasStore((s) => s.addShapeNode);
+  const setActiveTool = useCanvasStore((s) => s.setActiveTool);
   const pushHistory = useCanvasStore((s) => s.pushHistory);
   const setHorizontalSpacingFactor = useCanvasStore((s) => s.setHorizontalSpacingFactor);
   const setVerticalSpacingFactor = useCanvasStore((s) => s.setVerticalSpacingFactor);
   const setViewport = useCanvasStore((s) => s.setViewport);
 
-  const { fitView } = useReactFlow();
+  const { fitView, screenToFlowPosition, getNodes } = useReactFlow();
   const spacingRequestIdRef = useRef(0);
+  // First render restores the saved viewport via defaultViewport; only the
+  // very first import (no saved viewport, empty canvas) should auto-fit.
+  const hasSavedViewport = useRef(
+    viewport.x !== 0 || viewport.y !== 0 || viewport.zoom !== 1
+  );
 
   // ── Keyboard shortcuts ─────────────────────────────────
   useCanvasKeyboardShortcuts();
@@ -451,14 +461,15 @@ function FlowchartCanvas() {
         rootIds,
         { x: gridCenterX, y: 40 }
       );
-      importGraph(centeredFlowNodes, flowEdges);
+      // Merge so user drawings/annotations survive a re-import (DA2-F3).
+      mergeImportGraph(centeredFlowNodes, flowEdges);
       setTimeout(() => fitView({ padding: 0.1, duration: 300 }), 50);
     })();
   }, [
     getFlowchartDeskMapNodes,
     gridCols,
     horizontalSpacingFactor,
-    importGraph,
+    mergeImportGraph,
     fitView,
     orientation,
     pageSize,
@@ -631,10 +642,29 @@ function FlowchartCanvas() {
     setTimeout(() => fitView({ padding: 0.05, duration: 300 }), 50);
   }, [nodes, pushHistory, fitView, gridCols, gridRows, orientation, pageSize]);
 
+  // ── Pane-click shape creation (DA2-F1) ─────────────────
+  // When a draw-* tool is active, clicking empty canvas drops the shape at the
+  // pointer (converted to flow space) and returns to the select tool.
+  const handlePaneClick = useCallback(
+    (event: React.MouseEvent) => {
+      const shapeType = DRAW_TOOL_SHAPE[activeTool];
+      if (!shapeType) return;
+      const position = screenToFlowPosition({ x: event.clientX, y: event.clientY });
+      addShapeNode(shapeType, position);
+      setActiveTool('select');
+    },
+    [activeTool, screenToFlowPosition, addShapeNode, setActiveTool]
+  );
+
   // ── Print ──────────────────────────────────────────────
   const handlePrint = useCallback(() => {
     requestAnimationFrame(() => window.print());
   }, []);
+
+  // ── PNG export ─────────────────────────────────────────
+  const handleExportPng = useCallback(() => {
+    void exportCanvasToPng(getNodes());
+  }, [getNodes]);
 
   // ── Push history before drag starts ────────────────────
   const handleNodeDragStart = useCallback(() => {
@@ -728,6 +758,7 @@ function FlowchartCanvas() {
         onVerticalSpacingChange={handleVerticalSpacingChange}
         resizeMode={resizeMode}
         onPrint={handlePrint}
+        onExportPng={handleExportPng}
       />
 
       {nodes.length > 0 && (
@@ -744,16 +775,22 @@ function FlowchartCanvas() {
         onConnect={onConnect}
         onNodeDragStart={handleNodeDragStart}
         onMoveEnd={handleMoveEnd}
+        onPaneClick={handlePaneClick}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
-        fitView
+        // Restore the persisted viewport (DA2-F7); only auto-fit when there is
+        // none saved (first visit) — handled by the import effect.
+        defaultViewport={viewport}
+        fitView={!hasSavedViewport.current}
         fitViewOptions={{ padding: 0.1 }}
         defaultEdgeOptions={{
           type: 'ownership',
           data: { edgeScale: 1, variant: 'primary' },
           style: { stroke: '#8b4513', strokeWidth: 2 },
         }}
-        panOnDrag={!resizeMode}
+        // Miro-style (DA2-F2): with the select tool, left-drag lassos and
+        // middle/right-drag pans. The explicit pan tool pans on left-drag.
+        panOnDrag={resizeMode ? false : activeTool === 'pan' ? true : [1, 2]}
         selectionOnDrag={!resizeMode && activeTool === 'select'}
         nodesDraggable={!resizeMode}
         nodesConnectable={activeTool === 'connect'}
