@@ -65,8 +65,12 @@ STEP 2 — Evidence integrity + precision (parallel-safe with Step 1 review):
 - DA-H6: export ALL workspace documents (not node-joined); DA-H7: recompute
   SHA-256 on import + verify on export + blank-hash backfill. Simpler now —
   no legacy-file cases.
-- DA-H10: csv-io parses fractions via Decimal + serialize (kills the float64
-  round-before-store).
+- DA-H10: implemented on `fix/da-h10-csv-exact-fractions`: csv-io parses
+  fractions via the strict Decimal interest parser + `serialize`, so `1/3`
+  stores at 24 significant digits while `1/2` remains byte-identical. CSV
+  fractions greater than 1 and `Number()` artifacts such as `0x10` now reject.
+  Validation status: `npm run lint`, targeted CSV tests, `npm test`, and
+  `npm run build` passed.
 - DA-M16: implemented on `fix/da-m16-auto-export-retention`: rolling
   auto-export keeps the 10 newest strict timestamped snapshots for the current
   project name after a successful write; hand-named/foreign/backup files and

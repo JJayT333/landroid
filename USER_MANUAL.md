@@ -648,6 +648,7 @@ These are the main workspace snapshot files. They now include:
 
 ### `.csv` import
 CSV import loads workspace data, resets the flowchart canvas, and starts a fresh empty owner/document/curative/maps/research side workspace so you can re-import and relink cleanly. It also clears pending AI approvals, the AI action/result journal, and the last AI undo snapshot. `.landroid` export/import carries node document attachments and registry metadata, including multiple PDFs on the same title card. Older v7 `.landroid` files are migrated into the current multi-document attachment shape during import.
+CSV fraction cells accept decimals or simple fractions from 0 through 1. LANDroid stores repeating fractions such as `1/3` with Decimal storage precision instead of rounding them to nine places during import. Empty, malformed, negative, or greater-than-1 fraction cells stop the import with an error so the source file can be corrected.
 When PDF payloads are present, LANDroid preserves the stored filenames so Desk Map can show exactly what is attached instead of only saying that a PDF exists.
 Newer `.landroid` schema versions are rejected by older app builds. When a
 `.landroid` import replaces side stores, LANDroid first switches to the

@@ -15,6 +15,15 @@ stay short.
   through the existing storage-health warning path. Deferrals: configurable
   retention count, old files left under previous project names, and total-byte
   caps.
+- Added the DA-H10 CSV precision lane. CSV import now parses ownership
+  fraction cells through the existing strict Decimal interest parser and
+  storage serializer, so non-terminating values such as `1/3` store at 24
+  significant digits instead of being rounded through float64 and
+  `toFixed(9)`. Halves, quarters, and other <=9-decimal values remain
+  byte-identical. Empty cells still report an explicit empty-cell error;
+  malformed values, `Number()` artifacts such as `0x10`, and fractions greater
+  than 1 now fail import with an error. No engine, math, or Phase 0 golden
+  files changed.
 
 ## 2026-06-10
 
