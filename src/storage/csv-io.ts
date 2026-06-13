@@ -7,6 +7,7 @@
 import Papa from 'papaparse';
 import type { OwnershipNode, DeskMap } from '../types/node';
 import { createBlankNode, normalizeDeskMap } from '../types/node';
+import { serialize } from '../engine/decimal';
 import {
   type LeaseholdAssignment,
   createBlankLeaseholdUnit,
@@ -16,6 +17,7 @@ import {
 } from '../types/leasehold';
 import { createWorkspaceId } from '../utils/workspace-id';
 import { validateOwnershipGraph } from '../engine/math-engine';
+import { parseStrictInterestString } from '../utils/interest-string';
 
 // ── CSV column names ────────────────────────────────────────
 
@@ -90,10 +92,11 @@ function parseCSVText(text: string): Papa.ParseResult<Record<string, string>> {
  *
  * The legacy `toDecimalString` coerced every unparseable value to `0`, which
  * silently converted bad imports into broken workspaces. Now we accept:
- *   - numeric literals (including "0.5", "1", "0")
- *   - simple fractions "1/2" (numerator/denominator, both finite, denom != 0)
- * and throw on anything else — including negative numbers, NaN, Infinity,
- * empty strings, or garbage.
+ *   - numeric literals in the [0, 1] range (including "0.5", "1", "0")
+ *   - simple fractions "1/2" in the [0, 1] range
+ * and throw on anything else — including out-of-range values, NaN, Infinity,
+ * empty strings, or garbage. Parsed values are serialized through the Decimal
+ * storage serializer so non-terminating fractions keep storage precision.
  */
 function parseStrictDecimalString(
   value: unknown,
@@ -106,20 +109,11 @@ function parseStrictDecimalString(
   if (raw === '') {
     throw new Error(`CSV row for node "${nodeId}" has empty ${column}.`);
   }
-  let num: number;
-  if (raw.includes('/')) {
-    const [n, d] = raw.split('/').map((s) => Number(s.trim()));
-    if (!Number.isFinite(n) || !Number.isFinite(d) || d === 0) {
-      throw new Error(`CSV row for node "${nodeId}" has invalid ${column}: "${raw}".`);
-    }
-    num = n / d;
-  } else {
-    num = Number(raw);
-  }
-  if (!Number.isFinite(num) || num < 0) {
+  const parsed = parseStrictInterestString(raw);
+  if (parsed === null) {
     throw new Error(`CSV row for node "${nodeId}" has invalid ${column}: "${raw}".`);
   }
-  return num.toFixed(9);
+  return serialize(parsed);
 }
 
 function rawNodeToOwnership(raw: RawNode): OwnershipNode {

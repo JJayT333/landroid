@@ -16,6 +16,25 @@ stay short.
   without a document fixity warning; the tracked public Springhill sample's
   document hashes were refreshed through the app serializer to make that demo
   pin true. No engine, math, or Phase 0 golden files changed.
+- Added the DA-M16 rolling auto-export retention lane. Successful auto-export
+  writes now prune the current project's strict timestamped
+  `<project>-<timestamp>.landroid` files to the 10 newest snapshots when the
+  browser directory handle supports listing and removal. Hand-named files,
+  other project names, `.landroid.bak`-style copies, directories, and failed
+  writes are never deletion triggers. If pruning fails after a successful
+  write, LANDroid keeps the new snapshot and surfaces the pruning warning
+  through the existing storage-health warning path. Deferrals: configurable
+  retention count, old files left under previous project names, and total-byte
+  caps.
+- Added the DA-H10 CSV precision lane. CSV import now parses ownership
+  fraction cells through the existing strict Decimal interest parser and
+  storage serializer, so non-terminating values such as `1/3` store at 24
+  significant digits instead of being rounded through float64 and
+  `toFixed(9)`. Halves, quarters, and other <=9-decimal values remain
+  byte-identical. Empty cells still report an explicit empty-cell error;
+  malformed values, `Number()` artifacts such as `0x10`, and fractions greater
+  than 1 now fail import with an error. No engine, math, or Phase 0 golden
+  files changed.
 
 ## 2026-06-10
 

@@ -137,4 +137,85 @@ describe('csv-io', () => {
     const result = importCSV(csv);
     expect(result.nodes[0]?.fraction).toBe('0.500000000');
   });
+
+  it('stores non-terminating fraction literals at Decimal storage precision (DA-H10)', () => {
+    const csv = buildCsvFromNodes([
+      {
+        id: 'root-1',
+        parentId: null,
+        type: 'conveyance',
+        fraction: '1/3',
+        initialFraction: '1/3',
+        instrument: 'Patent',
+        grantee: 'Third Owner',
+      },
+    ]);
+
+    const result = importCSV(csv);
+
+    expect(result.nodes[0]?.fraction).toBe('0.333333333333333333333333');
+    expect(result.nodes[0]?.initialFraction).toBe(
+      '0.333333333333333333333333'
+    );
+  });
+
+  it('rejects fractions greater than one (DA-H10)', () => {
+    const decimalCsv = buildCsvFromNodes([
+      {
+        id: 'root-1',
+        parentId: null,
+        type: 'conveyance',
+        fraction: '1.5',
+        initialFraction: 1,
+        instrument: 'Patent',
+        grantee: 'Excess Decimal',
+      },
+    ]);
+    const fractionCsv = buildCsvFromNodes([
+      {
+        id: 'root-1',
+        parentId: null,
+        type: 'conveyance',
+        fraction: '5/4',
+        initialFraction: 1,
+        instrument: 'Patent',
+        grantee: 'Excess Fraction',
+      },
+    ]);
+
+    expect(() => importCSV(decimalCsv)).toThrow(/invalid fraction/i);
+    expect(() => importCSV(fractionCsv)).toThrow(/invalid fraction/i);
+  });
+
+  it('rejects non-decimal Number artifacts such as hex literals (DA-H10)', () => {
+    const csv = buildCsvFromNodes([
+      {
+        id: 'root-1',
+        parentId: null,
+        type: 'conveyance',
+        fraction: '0x10',
+        initialFraction: 1,
+        instrument: 'Patent',
+        grantee: 'Hex Owner',
+      },
+    ]);
+
+    expect(() => importCSV(csv)).toThrow(/invalid fraction/i);
+  });
+
+  it('keeps empty fraction cells as explicit empty-cell errors (DA-H10)', () => {
+    const csv = buildCsvFromNodes([
+      {
+        id: 'root-1',
+        parentId: null,
+        type: 'conveyance',
+        fraction: '',
+        initialFraction: 1,
+        instrument: 'Patent',
+        grantee: 'Missing Fraction',
+      },
+    ]);
+
+    expect(() => importCSV(csv)).toThrow(/empty fraction/i);
+  });
 });

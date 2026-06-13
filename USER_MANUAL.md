@@ -648,6 +648,7 @@ These are the main workspace snapshot files. They now include:
 
 ### `.csv` import
 CSV import loads workspace data, resets the flowchart canvas, and starts a fresh empty owner/document/curative/maps/research side workspace so you can re-import and relink cleanly. It also clears pending AI approvals, the AI action/result journal, and the last AI undo snapshot. `.landroid` export/import carries node document attachments and registry metadata, including multiple PDFs on the same title card. Older v7 `.landroid` files are migrated into the current multi-document attachment shape during import.
+CSV fraction cells accept decimals or simple fractions from 0 through 1. LANDroid stores repeating fractions such as `1/3` with Decimal storage precision instead of rounding them to nine places during import. Empty, malformed, negative, or greater-than-1 fraction cells stop the import with an error so the source file can be corrected.
 When PDF payloads are present, LANDroid preserves the stored filenames so Desk Map can show exactly what is attached instead of only saying that a PDF exists.
 Newer `.landroid` schema versions are rejected by older app builds. When a
 `.landroid` import replaces side stores, LANDroid first switches to the
@@ -664,9 +665,12 @@ When the browser supports the File System Access API, `Auto Export` lets you
 choose a local folder for rolling timestamped `.landroid` snapshots. LANDroid
 stores the folder handle in browser IndexedDB where the platform allows it,
 writes an immediate snapshot after selection, and queues later snapshots after
-successful local autosaves. If permission is revoked or the API is unavailable,
-the storage panel switches to a manual-backup warning and `Backup Now` remains
-the fallback.
+successful local autosaves. When the browser exposes folder listing and file
+removal, LANDroid keeps the 10 newest auto-export snapshots for the current
+project name and leaves hand-named files, other project snapshots, and backup
+copies alone. If permission is revoked or the API is unavailable, the storage
+panel switches to a manual-backup warning and `Backup Now` remains the
+fallback.
 
 ### Recommended backup habit
 - Save a `.landroid` file before major edits
