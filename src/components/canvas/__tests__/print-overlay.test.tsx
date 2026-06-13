@@ -154,6 +154,31 @@ describe('PrintOverlay', () => {
     expect(html).not.toContain('Granted');
   });
 
+  it('prints an image at its resized node size (node.width/height win over data)', () => {
+    const html = renderToStaticMarkup(
+      <PrintOverlay
+        nodes={[
+          {
+            id: 'img-resized',
+            type: 'image',
+            position: { x: 10, y: 10 },
+            width: 400,
+            height: 90,
+            data: { assetHash: 'deadbeef', width: 200, height: 150 },
+          },
+        ]}
+        edges={[]}
+        cols={1}
+        rows={1}
+        orientation="landscape"
+        pageSize="ansi-a"
+      />
+    );
+    // The resize (node.width/height) must reach print, not the stale data size.
+    expect(html).toContain('width:400px;height:90px');
+    expect(html).not.toContain('width:200px;height:150px');
+  });
+
   it('renders nothing for an unimplemented node kind (no bogus card)', () => {
     const html = renderToStaticMarkup(
       <PrintOverlay

@@ -420,6 +420,10 @@ export const useCanvasStore = create<CanvasState>()((set, get) => ({
         x: position.x - size.width / 2,
         y: position.y - size.height / 2,
       },
+      // Top-level width/height are the live size React Flow's NodeResizer drives
+      // (data.width/height stay as the initial/fallback footprint).
+      width: size.width,
+      height: size.height,
       data: data as unknown as Record<string, unknown>,
       selected: true,
     };

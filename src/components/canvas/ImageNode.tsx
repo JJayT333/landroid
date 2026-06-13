@@ -10,13 +10,16 @@ import type { ImageNodeData } from '../../types/flowchart';
 import { useCanvasAssetUrl } from './canvas-asset-url-cache';
 import CanvasNodeToolbar from './CanvasNodeToolbar';
 
-function ImageNodeComponent({ id, data, selected }: NodeProps & { data: ImageNodeData }) {
+function ImageNodeComponent({ id, data, selected, width, height }: NodeProps & { data: ImageNodeData }) {
   const imageData = data as ImageNodeData;
-  const { assetHash, width, height, aspectRatio, alt } = imageData;
+  const { assetHash, aspectRatio, alt } = imageData;
   const url = useCanvasAssetUrl(assetHash);
+  // NodeResizer drives node.width/height; fall back to the initial data size.
+  const w = typeof width === 'number' ? width : imageData.width;
+  const h = typeof height === 'number' ? height : imageData.height;
 
   return (
-    <div style={{ width, height }} className="relative">
+    <div style={{ width: w, height: h }} className="relative">
       <CanvasNodeToolbar nodeId={id} isVisible={!!selected} />
       <NodeResizer
         isVisible={selected}
