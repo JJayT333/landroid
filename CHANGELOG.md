@@ -5,6 +5,17 @@ stay short.
 
 ## 2026-06-12
 
+- Added the DA-H7 legacy document content-hash backfill lane. Startup now runs
+  a non-blocking, self-extinguishing repair for existing Dexie document rows
+  whose `contentHash` is still blank, hashing one blob at a time and only
+  writing rows that remain blank at update time. The repair is outside the
+  per-workspace write fence by design because it is value-idempotent
+  (`same blob -> same hash`) and does not alter rows that already carry valid
+  hashes. Added tests for the repair helper, owner-attached and unattached
+  document `.landroid` round-trip survival, and the Springhill sample importing
+  without a document fixity warning; the tracked public Springhill sample's
+  document hashes were refreshed through the app serializer to make that demo
+  pin true. No engine, math, or Phase 0 golden files changed.
 - Added the DA-M16 rolling auto-export retention lane. Successful auto-export
   writes now prune the current project's strict timestamped
   `<project>-<timestamp>.landroid` files to the 10 newest snapshots when the
