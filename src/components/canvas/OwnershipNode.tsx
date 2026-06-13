@@ -19,8 +19,9 @@ import {
   getOwnershipNodeDimensions,
 } from '../../engine/flowchart-metrics';
 import type { OwnershipNodeData } from '../../types/flowchart';
+import CanvasNodeToolbar from './CanvasNodeToolbar';
 
-function OwnershipNodeComponent({ data, selected }: NodeProps & { data: OwnershipNodeData }) {
+function OwnershipNodeComponent({ id, data, selected }: NodeProps & { data: OwnershipNodeData }) {
   const nodeData = data as OwnershipNodeData;
   const scale = clampNodeScale(nodeData.nodeScale ?? 1);
   const metrics = getOwnershipNodeDimensions(scale);
@@ -64,6 +65,8 @@ function OwnershipNodeComponent({ data, selected }: NodeProps & { data: Ownershi
         bg-parchment text-ink
       `}
     >
+      <CanvasNodeToolbar nodeId={id} isVisible={!!selected} />
+
       {/* Top handle */}
       <Handle
         type="target"

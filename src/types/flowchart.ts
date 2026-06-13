@@ -42,6 +42,7 @@ export interface ShapeNodeData {
 export interface FlowEdgeData extends Record<string, unknown> {
   edgeScale?: number;
   variant?: 'primary' | 'related';
+  label?: string;
 }
 
 export type FlowTool =

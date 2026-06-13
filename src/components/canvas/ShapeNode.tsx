@@ -9,6 +9,7 @@ import { Handle, Position, NodeResizer } from '@xyflow/react';
 import type { NodeProps } from '@xyflow/react';
 import type { ShapeNodeData } from '../../types/flowchart';
 import { useCanvasStore } from '../../store/canvas-store';
+import CanvasNodeToolbar from './CanvasNodeToolbar';
 
 function ShapeNodeComponent({ id, data, selected }: NodeProps & { data: ShapeNodeData }) {
   const shapeData = data as ShapeNodeData;
@@ -74,6 +75,7 @@ function ShapeNodeComponent({ id, data, selected }: NodeProps & { data: ShapeNod
 
   return (
     <div style={{ width, height }} className="relative" onDoubleClick={handleDoubleClick}>
+      <CanvasNodeToolbar nodeId={id} isVisible={!!selected && !editing} showColors />
       <NodeResizer
         isVisible={selected}
         minWidth={60}

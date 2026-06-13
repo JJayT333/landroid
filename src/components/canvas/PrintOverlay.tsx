@@ -5,28 +5,20 @@
  * each tile clips to its rectangle of the canvas, producing one
  * letter-size sheet per tile.
  *
- * Nodes are rendered as lightweight cards (no React Flow dependency).
- * Edges are rendered as SVG paths.
+ * Nodes are rendered by kind through the print-renderer registry
+ * (print-renderers.tsx); edges are rendered as SVG paths.
  */
-import { formatAsFraction } from '../../engine/fraction-display';
-import { d } from '../../engine/decimal';
-import {
-  clampNodeScale,
-  getOwnershipNodeDimensions,
-} from '../../engine/flowchart-metrics';
 import { getPageDimensions, getPrintPageSize } from '../../engine/flowchart-pages';
-import type { FlowEdgeData, OwnershipNodeData } from '../../types/flowchart';
+import type { FlowEdgeData } from '../../types/flowchart';
 import { getOwnershipEdgeGeometry } from './ownership-edge-geometry';
+import {
+  getPrintNodeDimensions,
+  renderPrintNodeBody,
+  type PrintNode,
+} from './print-renderers';
 import type { PageOrientation, PageSizeId } from '../../types/flowchart';
 
 // ── Types ───────────────────────────────────────────────
-
-interface PrintNode {
-  id: string;
-  position: { x: number; y: number };
-  data: OwnershipNodeData;
-  measured?: { width?: number; height?: number };
-}
 
 interface PrintEdge {
   source: string;
@@ -47,222 +39,6 @@ interface PrintOverlayProps {
   pageSize: PageSizeId;
 }
 
-// ── Lightweight card (no React Flow context) ────────────
-
-function PrintCard({ data }: { data: OwnershipNodeData }) {
-  const scale = clampNodeScale(data.nodeScale ?? 1);
-  const metrics = getOwnershipNodeDimensions(scale);
-  const borderRadius = 8 * scale;
-  const borderWidth = Math.max(1, 2 * scale);
-  const headerPaddingX = 12 * scale;
-  const headerPaddingY = 6 * scale;
-  const bodyPaddingX = 12 * scale;
-  const bodyPaddingY = 8 * scale;
-  const footerPaddingX = 12 * scale;
-  const footerPaddingY = 8 * scale;
-  const headerLabelSize = 10 * scale;
-  const dateSize = 10 * scale;
-  const fromSize = 10 * scale;
-  const nameSize = 14 * scale;
-  const fractionLabelSize = 10 * scale;
-  const fractionValueSize = 14 * scale;
-  const relShare = d(data.relativeShare);
-  const absInterest = d(data.grantFraction);
-  const remaining = d(data.remainingFraction);
-  const hasConveyedSome =
-    absInterest.greaterThan(0) && remaining.lessThan(absInterest);
-  const isFullyConveyed =
-    absInterest.greaterThan(0) && remaining.isZero();
-
-  const grantedFrac = formatAsFraction(relShare);
-  const ofWholeFrac = formatAsFraction(absInterest);
-  const remainingFrac = formatAsFraction(remaining);
-
-  return (
-    <div
-      style={{
-        width: metrics.width,
-        height: metrics.height,
-        borderRadius,
-        border: `${borderWidth}px solid #d4c5a9`,
-        background: '#faf3e8',
-        color: '#2c1810',
-        display: 'flex',
-        flexDirection: 'column',
-        overflow: 'hidden',
-      }}
-    >
-      {/* Header */}
-      <div
-        style={{
-          padding: `${headerPaddingY}px ${headerPaddingX}px`,
-          borderBottom: '1px solid #d4c5a9',
-          background: '#f0e6d3',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          }}
-        >
-        <span
-          style={{
-            display: 'block',
-            minWidth: 0,
-            flex: 1,
-            fontSize: headerLabelSize,
-            fontWeight: 600,
-            color: '#5c3d2e',
-            textTransform: 'uppercase',
-            letterSpacing: `${0.05 * scale}em`,
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-          }}
-        >
-          {data.instrument || 'Document'}
-        </span>
-        {data.date && (
-          <span
-            style={{
-              fontSize: dateSize,
-              color: '#5c3d2e',
-              fontFamily: '"Courier Prime", monospace',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {data.date}
-          </span>
-        )}
-      </div>
-
-      {/* Body */}
-      <div
-        style={{
-          padding: `${bodyPaddingY}px ${bodyPaddingX}px`,
-          flex: 1,
-          overflow: 'hidden',
-        }}
-      >
-        {data.grantor && (
-          <div
-            style={{
-              fontSize: fromSize,
-              color: '#5c3d2e',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            From: {data.grantor}
-          </div>
-        )}
-        <div
-          style={{
-            fontSize: nameSize,
-            lineHeight: 1.2,
-            fontWeight: 700,
-            fontFamily: '"Playfair Display", Georgia, serif',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-          }}
-        >
-          {data.grantee || 'Unknown'}
-        </div>
-      </div>
-
-      {/* Fractions */}
-      <div
-        style={{
-          padding: `${footerPaddingY}px ${footerPaddingX}px`,
-          borderTop: '1px solid #d4c5a9',
-          background: '#f5f0e1',
-        }}
-      >
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            marginBottom: 2,
-          }}
-        >
-          <span
-            style={{
-              fontSize: fractionLabelSize,
-              color: '#5c3d2e',
-              textTransform: 'uppercase',
-              letterSpacing: `${0.05 * scale}em`,
-            }}
-          >
-            Granted
-          </span>
-          <span
-            style={{
-              fontSize: fractionValueSize,
-              fontFamily: '"Courier Prime", monospace',
-              fontWeight: 600,
-              color: '#8b4513',
-            }}
-          >
-            {grantedFrac}
-          </span>
-        </div>
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            marginBottom: 2,
-          }}
-        >
-          <span
-            style={{
-              fontSize: fractionLabelSize,
-              color: '#5c3d2e',
-              textTransform: 'uppercase',
-              letterSpacing: `${0.05 * scale}em`,
-            }}
-          >
-            Of Whole
-          </span>
-          <span
-            style={{
-              fontSize: fractionValueSize,
-              fontFamily: '"Courier Prime", monospace',
-              fontWeight: 600,
-              color: '#2c1810',
-            }}
-          >
-            {ofWholeFrac}
-          </span>
-        </div>
-        {hasConveyedSome && (
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <span
-              style={{
-                fontSize: fractionLabelSize,
-                color: '#5c3d2e',
-                textTransform: 'uppercase',
-                letterSpacing: `${0.05 * scale}em`,
-              }}
-            >
-              {isFullyConveyed ? 'Conveyed All' : 'Remaining'}
-            </span>
-            <span
-              style={{
-                fontSize: fractionValueSize,
-                fontFamily: '"Courier Prime", monospace',
-                fontWeight: 600,
-                color: isFullyConveyed ? '#5c3d2e' : '#b22222',
-              }}
-            >
-              {isFullyConveyed ? '\u2014' : remainingFrac}
-            </span>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
 // ── Edge rendering ──────────────────────────────────────
 
 function renderEdges(
@@ -281,11 +57,11 @@ function renderEdges(
       const tgt = nodeMap.get(edge.target);
       if (!src || !tgt) return null;
 
-      const srcDims = getOwnershipNodeDimensions(src.data.nodeScale ?? 1);
-      const tgtDims = getOwnershipNodeDimensions(tgt.data.nodeScale ?? 1);
-      const srcW = src.measured?.width ?? srcDims.width;
-      const srcH = src.measured?.height ?? srcDims.height;
-      const tgtW = tgt.measured?.width ?? tgtDims.width;
+      const srcDims = getPrintNodeDimensions(src);
+      const tgtDims = getPrintNodeDimensions(tgt);
+      const srcW = srcDims.width;
+      const srcH = srcDims.height;
+      const tgtW = tgtDims.width;
 
       // Source bottom center → target top center
       const x1 = src.position.x + srcW / 2 - offsetX;
@@ -316,6 +92,62 @@ function renderEdges(
           stroke={edge.style?.stroke ?? '#8b4513'}
           strokeWidth={geometry.strokeWidth}
         />
+      );
+    })
+    .filter(Boolean);
+}
+
+// ── Edge label (DA2-F4 / edge labels) ──────────────────
+
+function renderEdgeLabels(
+  nodes: PrintNode[],
+  edges: PrintEdge[],
+  offsetX: number,
+  offsetY: number,
+  pw: number,
+  ph: number,
+) {
+  const nodeMap = new Map(nodes.map((n) => [n.id, n]));
+
+  return edges
+    .map((edge, i) => {
+      const label = edge.data?.label;
+      if (!label) return null;
+      const src = nodeMap.get(edge.source);
+      const tgt = nodeMap.get(edge.target);
+      if (!src || !tgt) return null;
+
+      const srcDims = getPrintNodeDimensions(src);
+      const tgtDims = getPrintNodeDimensions(tgt);
+      const x1 = src.position.x + srcDims.width / 2 - offsetX;
+      const y1 = src.position.y + srcDims.height - offsetY;
+      const x2 = tgt.position.x + tgtDims.width / 2 - offsetX;
+      const y2 = tgt.position.y - offsetY;
+      const cx = (x1 + x2) / 2;
+      const cy = (y1 + y2) / 2;
+
+      if (cx < 0 || cx > pw || cy < 0 || cy > ph) return null;
+
+      return (
+        <div
+          key={`label-${i}`}
+          style={{
+            position: 'absolute',
+            left: cx,
+            top: cy,
+            transform: 'translate(-50%, -50%)',
+            fontSize: 10,
+            fontFamily: '"Courier Prime", monospace',
+            color: '#2c1810',
+            background: '#faf3e8',
+            border: '1px solid #d4c5a9',
+            borderRadius: 3,
+            padding: '1px 4px',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {label}
+        </div>
       );
     })
     .filter(Boolean);
@@ -380,13 +212,16 @@ export default function PrintOverlay({
               {renderEdges(nodes, edges, offsetX, offsetY, pw, ph)}
             </svg>
 
-            {/* Node cards */}
+            {/* Edge labels (HTML, above the SVG) */}
+            {renderEdgeLabels(nodes, edges, offsetX, offsetY, pw, ph)}
+
+            {/* Nodes, dispatched by kind */}
             {nodes.map((node) => {
-              const dims = getOwnershipNodeDimensions(node.data.nodeScale ?? 1);
+              const dims = getPrintNodeDimensions(node);
               const nx = node.position.x - offsetX;
               const ny = node.position.y - offsetY;
-              const nw = node.measured?.width ?? dims.width;
-              const nh = node.measured?.height ?? dims.height;
+              const nw = dims.width;
+              const nh = dims.height;
 
               // Skip nodes entirely outside this page
               if (nx + nw < 0 || nx > pw) return null;
@@ -401,7 +236,7 @@ export default function PrintOverlay({
                     top: ny,
                   }}
                 >
-                  <PrintCard data={node.data} />
+                  {renderPrintNodeBody(node)}
                 </div>
               );
             })}

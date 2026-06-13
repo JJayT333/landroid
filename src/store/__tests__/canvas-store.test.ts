@@ -94,3 +94,69 @@ describe('canvas-store: mergeImportGraph', () => {
     expect(edges.find((e) => e.id === 'user-edge')).toBeDefined();
   });
 });
+
+describe('canvas-store: copy / paste / duplicate', () => {
+  beforeEach(resetStore);
+
+  it('pastes selected nodes and their internal edges with fresh ids and offset', () => {
+    const a: Node = { id: 'a', type: 'shape', position: { x: 0, y: 0 }, data: {}, selected: true };
+    const b: Node = { id: 'b', type: 'shape', position: { x: 50, y: 0 }, data: {}, selected: true };
+    const edge: Edge = { id: 'a-b', source: 'a', target: 'b', selected: true };
+    useCanvasStore.setState({ nodes: [a, b], edges: [edge] });
+
+    useCanvasStore.getState().copySelection();
+    useCanvasStore.getState().paste();
+
+    const { nodes, edges } = useCanvasStore.getState();
+    expect(nodes).toHaveLength(4);
+    expect(edges).toHaveLength(2);
+
+    // Originals deselected, clones selected.
+    const clones = nodes.filter((n) => n.selected);
+    expect(clones).toHaveLength(2);
+    // Clone ids differ from originals, positions offset.
+    for (const clone of clones) {
+      expect(clone.id).not.toBe('a');
+      expect(clone.id).not.toBe('b');
+    }
+    // The pasted edge re-points at the cloned node ids (not the originals).
+    const pastedEdge = edges.find((e) => e.id !== 'a-b')!;
+    const cloneIds = new Set(clones.map((n) => n.id));
+    expect(cloneIds.has(pastedEdge.source)).toBe(true);
+    expect(cloneIds.has(pastedEdge.target)).toBe(true);
+  });
+
+  it('does not copy edges that cross the selection boundary', () => {
+    const a: Node = { id: 'a', type: 'shape', position: { x: 0, y: 0 }, data: {}, selected: true };
+    const b: Node = { id: 'b', type: 'shape', position: { x: 50, y: 0 }, data: {}, selected: false };
+    const edge: Edge = { id: 'a-b', source: 'a', target: 'b' };
+    useCanvasStore.setState({ nodes: [a, b], edges: [edge] });
+
+    useCanvasStore.getState().duplicateSelection();
+    const { nodes, edges } = useCanvasStore.getState();
+    expect(nodes).toHaveLength(3); // a, b, + one clone of a
+    expect(edges).toHaveLength(1); // no cloned edge (b wasn't selected)
+  });
+});
+
+describe('canvas-store: z-order', () => {
+  beforeEach(resetStore);
+
+  it('bringToFront raises zIndex above the max; sendToBack lowers below the min', () => {
+    useCanvasStore.setState({
+      nodes: [
+        { id: 'a', type: 'shape', position: { x: 0, y: 0 }, data: {}, zIndex: 0 },
+        { id: 'b', type: 'shape', position: { x: 0, y: 0 }, data: {}, zIndex: 5 },
+        { id: 'c', type: 'shape', position: { x: 0, y: 0 }, data: {}, zIndex: 2 },
+      ],
+    });
+
+    useCanvasStore.getState().bringToFront(['a']);
+    let nodes = useCanvasStore.getState().nodes;
+    expect(nodes.find((n) => n.id === 'a')?.zIndex).toBe(6);
+
+    useCanvasStore.getState().sendToBack(['b']);
+    nodes = useCanvasStore.getState().nodes;
+    expect(nodes.find((n) => n.id === 'b')?.zIndex).toBeLessThan(0);
+  });
+});

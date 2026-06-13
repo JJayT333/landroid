@@ -73,6 +73,9 @@ interface CanvasState {
   _past: Snapshot[];
   _future: Snapshot[];
 
+  // Clipboard (session-only; never persisted)
+  _clipboard: { nodes: Node[]; edges: Edge[] } | null;
+
   // Lifecycle
   _hydrated: boolean;
 
@@ -95,8 +98,18 @@ interface CanvasState {
   addNodes: (nodes: Node[]) => void;
   removeElements: (nodeIds: string[], edgeIds: string[]) => void;
   updateNodeData: (id: string, data: Record<string, unknown>) => void;
+  updateEdgeData: (id: string, data: Record<string, unknown>) => void;
   selectAll: () => void;
   deselectAll: () => void;
+
+  // ── Clipboard / duplication ──
+  copySelection: () => void;
+  paste: () => void;
+  duplicateSelection: () => void;
+
+  // ── Z-order ──
+  bringToFront: (ids: string[]) => void;
+  sendToBack: (ids: string[]) => void;
 
   // ── Tool ──
   setActiveTool: (tool: FlowTool) => void;
@@ -160,6 +173,60 @@ function pushToPast(past: Snapshot[], snapshot: Snapshot): Snapshot[] {
   return next;
 }
 
+// ── Clone helpers (copy/paste/duplicate) ─────────────────
+
+const PASTE_OFFSET = 24;
+
+let cloneCounter = 0;
+
+/**
+ * Deep-ish clone a set of nodes (and the edges among them) with fresh ids and a
+ * position offset, remapping edge endpoints to the new node ids. The clones are
+ * selected so the paste/duplicate result is immediately actionable.
+ */
+function cloneWithFreshIds(
+  nodes: Node[],
+  edges: Edge[],
+  offset: number
+): { nodes: Node[]; edges: Edge[] } {
+  const stamp = `${Date.now()}-${cloneCounter++}`;
+  const idMap = new Map<string, string>();
+
+  const clonedNodes = nodes.map((n, i) => {
+    const newId = `${n.id}-copy-${stamp}-${i}`;
+    idMap.set(n.id, newId);
+    return {
+      ...n,
+      id: newId,
+      position: { x: n.position.x + offset, y: n.position.y + offset },
+      data: { ...n.data },
+      selected: true,
+      // Drop any parent link the original had unless its parent is also cloned;
+      // resolved below once the full id map exists.
+    } as Node;
+  });
+
+  // Re-point parentId for clones whose parent was also cloned.
+  for (const node of clonedNodes) {
+    if (node.parentId && idMap.has(node.parentId)) {
+      node.parentId = idMap.get(node.parentId);
+    } else if (node.parentId) {
+      delete node.parentId;
+    }
+  }
+
+  const clonedEdges = edges.map((e, i) => ({
+    ...e,
+    id: `${e.id}-copy-${stamp}-${i}`,
+    source: idMap.get(e.source) ?? e.source,
+    target: idMap.get(e.target) ?? e.target,
+    data: { ...e.data },
+    selected: false,
+  })) as Edge[];
+
+  return { nodes: clonedNodes, edges: clonedEdges };
+}
+
 // ── Store ────────────────────────────────────────────────
 
 export const useCanvasStore = create<CanvasState>()((set, get) => ({
@@ -177,6 +244,7 @@ export const useCanvasStore = create<CanvasState>()((set, get) => ({
   viewport: { x: 0, y: 0, zoom: 1 },
   _past: [],
   _future: [],
+  _clipboard: null,
   _hydrated: false,
 
   // ── React Flow change handlers ─────────────────────────
@@ -312,6 +380,105 @@ export const useCanvasStore = create<CanvasState>()((set, get) => ({
         n.id === id ? { ...n, data: { ...n.data, ...data } } : n
       ),
     })),
+
+  updateEdgeData: (id, data) =>
+    set((s) => ({
+      edges: s.edges.map((e) =>
+        e.id === id ? { ...e, data: { ...e.data, ...data } } : e
+      ),
+    })),
+
+  // ── Clipboard / duplication ────────────────────────────
+
+  copySelection: () => {
+    const s = get();
+    const selectedNodes = s.nodes.filter((n) => n.selected);
+    if (selectedNodes.length === 0) return;
+    const idSet = new Set(selectedNodes.map((n) => n.id));
+    // Only copy edges whose endpoints are both in the selection.
+    const selectedEdges = s.edges.filter(
+      (e) => idSet.has(e.source) && idSet.has(e.target)
+    );
+    set({
+      _clipboard: {
+        nodes: selectedNodes.map((n) => ({ ...n, data: { ...n.data }, selected: false })),
+        edges: selectedEdges.map((e) => ({ ...e, data: { ...e.data }, selected: false })),
+      },
+    });
+  },
+
+  paste: () => {
+    const s = get();
+    if (!s._clipboard || s._clipboard.nodes.length === 0) return;
+    const { nodes: pasted, edges: pastedEdges } = cloneWithFreshIds(
+      s._clipboard.nodes,
+      s._clipboard.edges,
+      PASTE_OFFSET
+    );
+    set({
+      nodes: [
+        ...s.nodes.map((n) => ({ ...n, selected: false })),
+        ...pasted,
+      ],
+      edges: [...s.edges, ...pastedEdges],
+      _past: pushToPast(s._past, captureSnapshot(s)),
+      _future: [],
+    });
+  },
+
+  duplicateSelection: () => {
+    const s = get();
+    const selectedNodes = s.nodes.filter((n) => n.selected);
+    if (selectedNodes.length === 0) return;
+    const idSet = new Set(selectedNodes.map((n) => n.id));
+    const selectedEdges = s.edges.filter(
+      (e) => idSet.has(e.source) && idSet.has(e.target)
+    );
+    const { nodes: dup, edges: dupEdges } = cloneWithFreshIds(
+      selectedNodes,
+      selectedEdges,
+      PASTE_OFFSET
+    );
+    set({
+      nodes: [
+        ...s.nodes.map((n) => ({ ...n, selected: false })),
+        ...dup,
+      ],
+      edges: [...s.edges, ...dupEdges],
+      _past: pushToPast(s._past, captureSnapshot(s)),
+      _future: [],
+    });
+  },
+
+  // ── Z-order ────────────────────────────────────────────
+
+  bringToFront: (ids) => {
+    const s = get();
+    if (ids.length === 0) return;
+    const idSet = new Set(ids);
+    const maxZ = s.nodes.reduce((m, n) => Math.max(m, n.zIndex ?? 0), 0);
+    set({
+      nodes: s.nodes.map((n) =>
+        idSet.has(n.id) ? { ...n, zIndex: maxZ + 1 } : n
+      ),
+      _past: pushToPast(s._past, captureSnapshot(s)),
+      _future: [],
+    });
+  },
+
+  sendToBack: (ids) => {
+    const s = get();
+    if (ids.length === 0) return;
+    const idSet = new Set(ids);
+    const minZ = s.nodes.reduce((m, n) => Math.min(m, n.zIndex ?? 0), 0);
+    set({
+      nodes: s.nodes.map((n) =>
+        idSet.has(n.id) ? { ...n, zIndex: minZ - 1 } : n
+      ),
+      _past: pushToPast(s._past, captureSnapshot(s)),
+      _future: [],
+    });
+  },
 
   selectAll: () =>
     set((s) => ({

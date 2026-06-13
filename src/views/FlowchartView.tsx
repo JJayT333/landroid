@@ -734,8 +734,9 @@ function FlowchartCanvas() {
   // ── Print data ─────────────────────────────────────────
   const printNodes = nodes.map((n) => ({
     id: n.id,
+    type: n.type,
     position: n.position,
-    data: n.data as unknown as OwnershipNodeData,
+    data: n.data,
     measured: n.measured,
   }));
   const printEdges = edges.map((e) => ({

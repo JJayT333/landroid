@@ -35,4 +35,80 @@ describe('PrintOverlay', () => {
     expect(html).toContain('text-overflow:ellipsis');
     expect(html).toContain('white-space:nowrap');
   });
+
+  it('renders a shape node as a shape, not a bogus ownership card', () => {
+    const html = renderToStaticMarkup(
+      <PrintOverlay
+        nodes={[
+          {
+            id: 's1',
+            type: 'shape',
+            position: { x: 40, y: 40 },
+            data: {
+              shapeType: 'note',
+              text: 'A field annotation',
+              width: 180,
+              height: 140,
+              fontSize: 14,
+              textAlign: 'center',
+            },
+          },
+        ]}
+        edges={[]}
+        cols={1}
+        rows={1}
+        orientation="landscape"
+        pageSize="ansi-a"
+      />
+    );
+
+    expect(html).toContain('A field annotation');
+    expect(html).toContain('width:180px;height:140px');
+    // The note accent border distinguishes it from an ownership card.
+    expect(html).toContain('border-left:4px solid #c9a227');
+    // No ownership-card-only labels leak through.
+    expect(html).not.toContain('Granted');
+    expect(html).not.toContain('Of Whole');
+  });
+
+  it('renders an edge label when present', () => {
+    const html = renderToStaticMarkup(
+      <PrintOverlay
+        nodes={[
+          { id: 'a', type: 'shape', position: { x: 40, y: 40 }, data: { shapeType: 'rect', text: 'A', width: 120, height: 80, fontSize: 14, textAlign: 'center' } },
+          { id: 'b', type: 'shape', position: { x: 40, y: 240 }, data: { shapeType: 'rect', text: 'B', width: 120, height: 80, fontSize: 14, textAlign: 'center' } },
+        ]}
+        edges={[{ source: 'a', target: 'b', data: { label: 'conveys' } }]}
+        cols={1}
+        rows={1}
+        orientation="landscape"
+        pageSize="ansi-a"
+      />
+    );
+
+    expect(html).toContain('conveys');
+  });
+
+  it('renders nothing for an unimplemented node kind (no bogus card)', () => {
+    const html = renderToStaticMarkup(
+      <PrintOverlay
+        nodes={[
+          {
+            id: 'img1',
+            type: 'image',
+            position: { x: 40, y: 40 },
+            data: { width: 100, height: 100 },
+          },
+        ]}
+        edges={[]}
+        cols={1}
+        rows={1}
+        orientation="landscape"
+        pageSize="ansi-a"
+      />
+    );
+
+    expect(html).not.toContain('Granted');
+    expect(html).not.toContain('Unknown');
+  });
 });

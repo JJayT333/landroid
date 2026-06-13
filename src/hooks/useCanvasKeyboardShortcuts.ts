@@ -57,6 +57,37 @@ export default function useCanvasKeyboardShortcuts() {
         return;
       }
 
+      // Ctrl+C — Copy selection
+      if (meta && e.key === 'c') {
+        s.copySelection();
+        return;
+      }
+
+      // Ctrl+V — Paste
+      if (meta && e.key === 'v') {
+        e.preventDefault();
+        s.paste();
+        return;
+      }
+
+      // Ctrl+D — Duplicate selection in place
+      if (meta && e.key === 'd') {
+        e.preventDefault();
+        s.duplicateSelection();
+        return;
+      }
+
+      // Ctrl+] / Ctrl+[ — Bring to front / send to back
+      if (meta && (e.key === ']' || e.key === '[')) {
+        e.preventDefault();
+        const ids = s.nodes.filter((n) => n.selected).map((n) => n.id);
+        if (ids.length > 0) {
+          if (e.key === ']') s.bringToFront(ids);
+          else s.sendToBack(ids);
+        }
+        return;
+      }
+
       // Escape — Deselect, reset tool
       if (e.key === 'Escape') {
         s.deselectAll();
