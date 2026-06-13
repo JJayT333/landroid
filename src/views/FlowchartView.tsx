@@ -22,6 +22,7 @@ import {
   type Edge,
   type EdgeTypes,
   type NodeTypes,
+  type NodeChange,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
@@ -812,36 +813,59 @@ function FlowchartCanvas() {
   }, [pushHistory]);
 
   // ── Alignment guides while dragging ────────────────────
+  // Snap is applied INSIDE the changes stream (not onNodeDrag) so React Flow's
+  // pointer-delta drag controller doesn't overwrite it each frame. Only a
+  // single-node drag snaps; group drags pass through untouched so the group
+  // moves rigidly.
   const [guides, setGuides] = useState<{ v: number[]; h: number[] }>({ v: [], h: [] });
 
-  const handleNodeDrag = useCallback(
-    (_event: unknown, node: Node) => {
-      const store = useCanvasStore.getState();
-      const dims = getNodeDimensions(node);
+  const handleNodesChange = useCallback(
+    (changes: NodeChange[]) => {
+      const dragChanges = changes.filter(
+        (change): change is Extract<NodeChange, { type: 'position' }> =>
+          change.type === 'position' && change.dragging === true && !!change.position
+      );
+      if (dragChanges.length !== 1) {
+        if (guides.v.length || guides.h.length) setGuides({ v: [], h: [] });
+        onNodesChange(changes);
+        return;
+      }
+
+      const dragChange = dragChanges[0];
+      const all = useCanvasStore.getState().nodes;
+      const draggedNode = all.find((n) => n.id === dragChange.id);
+      const position = dragChange.position;
+      if (!draggedNode || !position) {
+        onNodesChange(changes);
+        return;
+      }
+
+      const dims = getNodeDimensions(draggedNode);
       const dragged = {
-        id: node.id,
-        x: node.position.x,
-        y: node.position.y,
+        id: dragChange.id,
+        x: position.x,
+        y: position.y,
         width: dims.width,
         height: dims.height,
       };
-      const others = store.nodes
-        .filter((n) => n.id !== node.id && n.type !== 'frame')
+      const others = all
+        .filter((n) => n.id !== dragChange.id && n.type !== 'frame')
         .map((n) => {
           const d = getNodeDimensions(n);
           return { id: n.id, x: n.position.x, y: n.position.y, width: d.width, height: d.height };
         });
       const snap = computeAlignmentSnap(dragged, others);
-      if (snap.x !== dragged.x || snap.y !== dragged.y) {
-        store.setNodes(
-          store.nodes.map((n) =>
-            n.id === node.id ? { ...n, position: { x: snap.x, y: snap.y } } : n
-          )
-        );
-      }
       setGuides({ v: snap.verticalLines, h: snap.horizontalLines });
+
+      onNodesChange(
+        changes.map((change) =>
+          change === dragChange
+            ? { ...change, position: { x: snap.x, y: snap.y } }
+            : change
+        )
+      );
     },
-    []
+    [onNodesChange, guides.v.length, guides.h.length]
   );
 
   const handleNodeDragStopGuides = useCallback(() => {
@@ -972,11 +996,10 @@ function FlowchartCanvas() {
       <ReactFlow
         nodes={nodes}
         edges={edges}
-        onNodesChange={onNodesChange}
+        onNodesChange={handleNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         onNodeDragStart={handleNodeDragStart}
-        onNodeDrag={handleNodeDrag}
         onNodeDragStop={handleNodeDragStopGuides}
         onMoveEnd={handleMoveEnd}
         onPaneClick={handlePaneClick}
