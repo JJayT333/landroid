@@ -137,4 +137,53 @@ describe('csv-io', () => {
     const result = importCSV(csv);
     expect(result.nodes[0]?.fraction).toBe('0.500000000');
   });
+
+  it('parses "1/3" to full decimal precision, not lossy float64 (DA-H10)', () => {
+    const csv = buildCsvFromNodes([
+      {
+        id: 'root-1',
+        parentId: null,
+        type: 'conveyance',
+        fraction: '1/3',
+        initialFraction: '1/3',
+        instrument: 'Patent',
+        grantee: 'Third Owner',
+      },
+    ]);
+    const result = importCSV(csv);
+    // Full storage precision (24 sig digits) via serialize(), not the old
+    // num.toFixed(9) = "0.333333333".
+    expect(result.nodes[0]?.fraction).toBe('0.333333333333333333333333');
+    expect(result.nodes[0]?.initialFraction).toBe('0.333333333333333333333333');
+  });
+
+  it('rejects out-of-range fractions like "5/4" (DA-H10 strict parser)', () => {
+    const csv = buildCsvFromNodes([
+      {
+        id: 'root-1',
+        parentId: null,
+        type: 'conveyance',
+        fraction: '5/4',
+        initialFraction: 1,
+        instrument: 'Patent',
+        grantee: 'Over Owner',
+      },
+    ]);
+    expect(() => importCSV(csv)).toThrow(/invalid fraction/i);
+  });
+
+  it('rejects malformed multi-slash fractions like "1/2/3" (DA-H10)', () => {
+    const csv = buildCsvFromNodes([
+      {
+        id: 'root-1',
+        parentId: null,
+        type: 'conveyance',
+        fraction: '1/2/3',
+        initialFraction: 1,
+        instrument: 'Patent',
+        grantee: 'Garbage Owner',
+      },
+    ]);
+    expect(() => importCSV(csv)).toThrow(/invalid fraction/i);
+  });
 });
