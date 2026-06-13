@@ -11,9 +11,12 @@ import type { FrameNodeData } from '../../types/flowchart';
 import { useCanvasStore } from '../../store/canvas-store';
 import CanvasNodeToolbar from './CanvasNodeToolbar';
 
-function FrameNodeComponent({ id, data, selected }: NodeProps & { data: FrameNodeData }) {
+function FrameNodeComponent({ id, data, selected, width, height }: NodeProps & { data: FrameNodeData }) {
   const frameData = data as FrameNodeData;
-  const { title, width, height } = frameData;
+  const { title } = frameData;
+  // NodeResizer drives node.width/height; fall back to the initial data size.
+  const w = typeof width === 'number' ? width : frameData.width;
+  const h = typeof height === 'number' ? height : frameData.height;
 
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
   const pushHistory = useCanvasStore((s) => s.pushHistory);
@@ -37,7 +40,7 @@ function FrameNodeComponent({ id, data, selected }: NodeProps & { data: FrameNod
   }, [draft, title, id, pushHistory, updateNodeData]);
 
   return (
-    <div style={{ width, height }} className="relative">
+    <div style={{ width: w, height: h }} className="relative">
       <CanvasNodeToolbar nodeId={id} isVisible={!!selected && !editing} />
       <NodeResizer
         isVisible={selected}

@@ -11,9 +11,12 @@ import type { ShapeNodeData } from '../../types/flowchart';
 import { useCanvasStore } from '../../store/canvas-store';
 import CanvasNodeToolbar from './CanvasNodeToolbar';
 
-function ShapeNodeComponent({ id, data, selected }: NodeProps & { data: ShapeNodeData }) {
+function ShapeNodeComponent({ id, data, selected, width, height }: NodeProps & { data: ShapeNodeData }) {
   const shapeData = data as ShapeNodeData;
-  const { shapeType, text, width, height, fontSize, textAlign, color } = shapeData;
+  const { shapeType, text, fontSize, textAlign, color } = shapeData;
+  // NodeResizer drives node.width/height; fall back to the initial data size.
+  const w = typeof width === 'number' ? width : shapeData.width;
+  const h = typeof height === 'number' ? height : shapeData.height;
 
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
   const pushHistory = useCanvasStore((s) => s.pushHistory);
@@ -74,7 +77,7 @@ function ShapeNodeComponent({ id, data, selected }: NodeProps & { data: ShapeNod
   })();
 
   return (
-    <div style={{ width, height }} className="relative" onDoubleClick={handleDoubleClick}>
+    <div style={{ width: w, height: h }} className="relative" onDoubleClick={handleDoubleClick}>
       <CanvasNodeToolbar nodeId={id} isVisible={!!selected && !editing} showColors />
       <NodeResizer
         isVisible={selected}

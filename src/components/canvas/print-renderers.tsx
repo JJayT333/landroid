@@ -263,8 +263,16 @@ function PrintCard({
 
 // ── Freeform shape ──────────────────────────────────────
 
-function PrintShape({ data }: { data: ShapeNodeData }) {
-  const { shapeType, text, width, height, fontSize, textAlign } = data;
+function PrintShape({
+  data,
+  width,
+  height,
+}: {
+  data: ShapeNodeData;
+  width: number;
+  height: number;
+}) {
+  const { shapeType, text, fontSize, textAlign } = data;
 
   const style: CSSProperties = {
     width,
@@ -339,12 +347,20 @@ function PrintText({ data }: { data: ShapeNodeData }) {
 
 // ── Frame / section container ───────────────────────────
 
-function PrintFrame({ data }: { data: FrameNodeData }) {
+function PrintFrame({
+  data,
+  width,
+  height,
+}: {
+  data: FrameNodeData;
+  width: number;
+  height: number;
+}) {
   return (
     <div
       style={{
-        width: data.width,
-        height: data.height,
+        width,
+        height,
         boxSizing: 'border-box',
         border: '2px solid #d4c5a9',
         borderRadius: 6,
@@ -418,10 +434,17 @@ export function getPrintNodeDimensions(node: PrintNode): {
   width: number;
   height: number;
 } {
-  if (node.type === 'image') {
-    // Images are resizable: the explicit node size wins, then measured, then
-    // the initial data footprint (matches ImageNode's on-screen precedence).
-    const data = node.data as Partial<ImageNodeData>;
+  if (
+    node.type === 'shape' ||
+    node.type === 'text' ||
+    node.type === 'frame' ||
+    node.type === 'image'
+  ) {
+    // shape/frame/image are resizable via NodeResizer: the explicit node size
+    // wins, then the measured box, then the initial data footprint (matches
+    // each node component's on-screen precedence). 'text' never sets node.width,
+    // so it falls through to measured/data unchanged.
+    const data = node.data as Partial<ShapeNodeData & FrameNodeData & ImageNodeData>;
     return {
       width:
         node.width ??
@@ -429,17 +452,6 @@ export function getPrintNodeDimensions(node: PrintNode): {
         (typeof data.width === 'number' ? data.width : BASE_NODE_WIDTH),
       height:
         node.height ??
-        node.measured?.height ??
-        (typeof data.height === 'number' ? data.height : BASE_NODE_HEIGHT),
-    };
-  }
-  if (node.type === 'shape' || node.type === 'text' || node.type === 'frame') {
-    const data = node.data as Partial<ShapeNodeData & FrameNodeData>;
-    return {
-      width:
-        node.measured?.width ??
-        (typeof data.width === 'number' ? data.width : BASE_NODE_WIDTH),
-      height:
         node.measured?.height ??
         (typeof data.height === 'number' ? data.height : BASE_NODE_HEIGHT),
     };
@@ -462,33 +474,26 @@ export function getPrintNodeDimensions(node: PrintNode): {
  */
 export function renderPrintNodeBody(node: PrintNode): ReactNode {
   const kind = (node.type ?? 'ownership') as NodeKind;
+  const dims = getPrintNodeDimensions(node);
   switch (kind) {
     case 'shape':
-      return <PrintShape data={node.data as ShapeNodeData} />;
+      return (
+        <PrintShape data={node.data as ShapeNodeData} width={dims.width} height={dims.height} />
+      );
     case 'text':
       return <PrintText data={node.data as ShapeNodeData} />;
     case 'frame':
-      return <PrintFrame data={node.data as FrameNodeData} />;
-    case 'image': {
-      const dims = getPrintNodeDimensions(node);
       return (
-        <PrintImage
-          data={node.data as ImageNodeData}
-          width={dims.width}
-          height={dims.height}
-        />
+        <PrintFrame data={node.data as FrameNodeData} width={dims.width} height={dims.height} />
       );
-    }
-    case 'ownership': {
-      const dims = getPrintNodeDimensions(node);
+    case 'image':
       return (
-        <PrintCard
-          data={node.data as OwnershipNodeData}
-          width={dims.width}
-          height={dims.height}
-        />
+        <PrintImage data={node.data as ImageNodeData} width={dims.width} height={dims.height} />
       );
-    }
+    case 'ownership':
+      return (
+        <PrintCard data={node.data as OwnershipNodeData} width={dims.width} height={dims.height} />
+      );
     default:
       return null;
   }

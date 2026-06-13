@@ -24,6 +24,8 @@ function frame(id: string, x: number, y: number, title: string, width: number, h
     id,
     type: 'frame',
     position: { x, y },
+    width,
+    height,
     data: data as unknown as Record<string, unknown>,
     zIndex: -1,
   };
@@ -50,6 +52,8 @@ function shape(
     id,
     type: 'shape',
     position: { x, y },
+    width,
+    height,
     data: data as unknown as Record<string, unknown>,
   };
 }

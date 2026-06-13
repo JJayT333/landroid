@@ -179,6 +179,37 @@ describe('PrintOverlay', () => {
     expect(html).not.toContain('width:200px;height:150px');
   });
 
+  it('prints a shape at its resized node size (node.width/height win over data)', () => {
+    const html = renderToStaticMarkup(
+      <PrintOverlay
+        nodes={[
+          {
+            id: 'shape-resized',
+            type: 'shape',
+            position: { x: 10, y: 10 },
+            width: 260,
+            height: 70,
+            data: {
+              shapeType: 'rect',
+              text: 'Tract',
+              width: 120,
+              height: 60,
+              fontSize: 14,
+              textAlign: 'center',
+            },
+          },
+        ]}
+        edges={[]}
+        cols={1}
+        rows={1}
+        orientation="landscape"
+        pageSize="ansi-a"
+      />
+    );
+    expect(html).toContain('width:260px;height:70px');
+    expect(html).not.toContain('width:120px;height:60px');
+  });
+
   it('renders nothing for an unimplemented node kind (no bogus card)', () => {
     const html = renderToStaticMarkup(
       <PrintOverlay

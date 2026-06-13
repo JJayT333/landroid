@@ -363,6 +363,10 @@ export const useCanvasStore = create<CanvasState>()((set, get) => ({
         x: position.x - defaults.width / 2,
         y: position.y - defaults.height / 2,
       },
+      // Top-level width/height are the live size NodeResizer drives; data
+      // width/height stay as the initial/fallback footprint.
+      width: defaults.width,
+      height: defaults.height,
       data: data as unknown as Record<string, unknown>,
       selected: true,
     };
@@ -390,6 +394,8 @@ export const useCanvasStore = create<CanvasState>()((set, get) => ({
       id,
       type: 'frame',
       position,
+      width: FRAME_DEFAULTS.width,
+      height: FRAME_DEFAULTS.height,
       data: data as unknown as Record<string, unknown>,
       selected: true,
       zIndex: minZ - 1,
