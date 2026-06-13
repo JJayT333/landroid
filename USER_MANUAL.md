@@ -665,9 +665,12 @@ When the browser supports the File System Access API, `Auto Export` lets you
 choose a local folder for rolling timestamped `.landroid` snapshots. LANDroid
 stores the folder handle in browser IndexedDB where the platform allows it,
 writes an immediate snapshot after selection, and queues later snapshots after
-successful local autosaves. If permission is revoked or the API is unavailable,
-the storage panel switches to a manual-backup warning and `Backup Now` remains
-the fallback.
+successful local autosaves. When the browser exposes folder listing and file
+removal, LANDroid keeps the 10 newest auto-export snapshots for the current
+project name and leaves hand-named files, other project snapshots, and backup
+copies alone. If permission is revoked or the API is unavailable, the storage
+panel switches to a manual-backup warning and `Backup Now` remains the
+fallback.
 
 ### Recommended backup habit
 - Save a `.landroid` file before major edits

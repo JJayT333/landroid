@@ -166,6 +166,11 @@ export async function runRollingAutoExportNow(): Promise<void> {
       exportedAt: result.exportedAt,
       fileName: result.fileName,
     });
+    if (result.pruneWarning) {
+      useStorageHealthStore.getState().recordRollingAutoExportWarning(
+        result.pruneWarning
+      );
+    }
   } catch (error) {
     useStorageHealthStore.getState().recordRollingAutoExportError(
       warningFromError(error),

@@ -293,8 +293,13 @@ The rolling auto-export surface is opt-in local file output, not a new storage
 authority. It persists only a browser folder handle where the File System
 Access API and IndexedDB support that handle, then writes timestamped
 `.landroid` blobs through the same `exportLandroidFile` serializer used by
-manual backup/export. Revoked permission or unsupported browsers degrade to
-the existing manual `Backup Now` path with a visible warning.
+manual backup/export. After a successful write, browsers that expose directory
+iteration and removal self-prune the current project name's timestamped
+auto-export files to the 10 most recent snapshots; hand-named files, other
+project names, backup suffixes, and failed writes are never deletion triggers.
+Revoked permission, unsupported browsers, or handles without prune support
+degrade to the existing manual `Backup Now` path with a visible warning when
+needed.
 
 Document originals, checksums, and source metadata are canonical. OCR text,
 embeddings, FTS rows, page images, and packet exports are derived artifacts that

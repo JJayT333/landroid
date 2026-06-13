@@ -5,6 +5,16 @@ stay short.
 
 ## 2026-06-12
 
+- Added the DA-M16 rolling auto-export retention lane. Successful auto-export
+  writes now prune the current project's strict timestamped
+  `<project>-<timestamp>.landroid` files to the 10 newest snapshots when the
+  browser directory handle supports listing and removal. Hand-named files,
+  other project names, `.landroid.bak`-style copies, directories, and failed
+  writes are never deletion triggers. If pruning fails after a successful
+  write, LANDroid keeps the new snapshot and surfaces the pruning warning
+  through the existing storage-health warning path. Deferrals: configurable
+  retention count, old files left under previous project names, and total-byte
+  caps.
 - Added the DA-H10 CSV precision lane. CSV import now parses ownership
   fraction cells through the existing strict Decimal interest parser and
   storage serializer, so non-terminating values such as `1/3` store at 24
