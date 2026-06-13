@@ -4,6 +4,20 @@ Use this file to resume the active workstream in a new chat. Read it with
 `AGENTS.md`, `PROJECT_CONTEXT.md`, and `docs/README.md` before touching code.
 Keep long history in `CHANGELOG.md`.
 
+## Active Handoff - 2026-06-13 (Step 2 + display-correctness merge session)
+
+All Step 2 hardening lanes and the display-correctness fixes are now MERGED to
+`main`: DA-H7 part-3 backfill (#155), DA-H10 CSV Decimal precision (#156),
+DA-M16 auto-export retention (#157), DA-H9 Map-mode ORRI branch-card (#158), and
+the Flowchart Miro-class rebuild incl. DA-H8 (#159). DA-U1 broken-token bugs are
+already fixed (tokens added, `text-gold-950` gone, `theme-tokens.test.ts` CI
+guard). Integration verified on the combined tree: `tsc --noEmit` clean, full
+vitest suite green (154 files / 1158 tests). NEXT candidates: the DA-U1 §5
+aesthetics consolidation (Button/focus standard, mono+tabular numeric
+typography, pill/tab + table kit), the `display-format` precision-policy sweep
+(DA-M6/M7 tooltips), and the Research-workspace hardening lane (DA2-R1/R2)
+before the title-math catalog import. See ROADMAP "Now" items 3–5.
+
 ## Active Handoff - 2026-06-10 (post-soak features session)
 
 Scope B is DONE end-to-end: #141 hardening + review fixes, #142/#143 soak
