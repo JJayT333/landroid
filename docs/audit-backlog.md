@@ -1,7 +1,8 @@
 # LANDroid Audit Backlog
 
-Last updated: 2026-06-12 (DA-H6 closed via #152; DA-H7 parts 1–2 in flight as
-#153; remaining Step 2 lane plan parked at `docs/plans/step-2-hardening-lanes.md`)
+Last updated: 2026-06-13 (Step 2 hardening lanes all landed: DA-H7 #155,
+DA-H10 #156, DA-M16 #157; plus DA-H9 #158 and the Flowchart Miro-class rebuild
+#159 — incl. DA-H8. DA-H6 closed via #152, DA-H7 parts 1–2 via #153.)
 
 ## 2026-06-10 Deep Audit (Claude) — new findings, not yet reconciled row-by-row
 
@@ -28,22 +29,36 @@ explicitly accepted, treat that report as part of this backlog. Summary:
   every document + attachment of any entityKind exports (zero-node safe), so
   export scope matches the restore side's delete scope. Round-trip survival
   test for non-node/unattached docs folds into the DA-H7 lane.
-- DA-H7: parts 1–2 IN FLIGHT as PR #153 (import re-hash + fixity warning via
-  startup banner, blank hashes healed silently, export re-hash). Remaining
-  part 3 (one-time `''` backfill in Dexie) + two test riders — pinned plan in
-  `docs/plans/step-2-hardening-lanes.md` (Lane A; branch after #153 merges).
-- DA-H8/H9: Flowchart stale-fraction snapshot; Map-mode branch card sums
-  unit-wide ORRI decimals under one tract.
-- DA-H10: CSV import parses fractions via float64 + toFixed(9) before store.
-  Open — pinned execution plan in `docs/plans/step-2-hardening-lanes.md`
-  (Lane B; DA-M16 retention pruning is Lane C there).
+- DA-H7: FIXED. Parts 1–2 via #153 (import re-hash + fixity warning, blank
+  hashes healed, export re-hash); part 3 (one-time `''` backfill in Dexie +
+  two test riders) via #155 — startup runs a non-blocking, self-extinguishing,
+  value-idempotent backfill of legacy blank `contentHash` rows.
+- DA-H8: FIXED (#159, Flowchart rebuild) — a reactive overlay recomputes
+  interest from the live title nodes onto placed canvas nodes; deleted nodes
+  get a "Stale" badge on screen and in print.
+- DA-H9: FIXED (#158) — the Map-mode ORRI branch-card "Total" now uses the
+  tract's own `unitOrriDecimal` (`unitParticipation × totalOrriBurdenRate`)
+  instead of summing unit-wide ORRI decimals, which double-counted unit-scope
+  ORRIs spanning multiple tracts. Display-layer fix; no math/golden change.
+- DA-H10: FIXED (#156) — CSV import parses fractions via the strict Decimal
+  interest parser + `serialize`, so non-terminating values (e.g. `1/3`) store
+  at full precision instead of float64 + `toFixed(9)`; out-of-range/malformed
+  values now reject.
 - DA-M14/M15: FIXED (feat/scope-b-hardening) — writer heartbeat at TTL/3 with
   visibility pause; title-ledger writes and project rename/delete/duplicate
   fenced behind the write lease; reader-tab ledger hydration is memory-only.
-- DA-M1..M13, DA-M16, DA-L1..L10, DA-U1..U6: see report §1-2 (incl. silent
+- DA-M16: FIXED (#157) — rolling auto-export self-prunes to the 10 newest
+  strict timestamped snapshots for the current project after a successful
+  write; hand-named/foreign/backup files, directories, and failed writes are
+  never deletion triggers.
+- DA-U1 (broken Tailwind tokens): FIXED — the missing `leather-dark` /
+  `parchment-light` tokens now exist, `text-gold-950` has zero references, and
+  `src/theme/__tests__/theme-tokens.test.ts` is a CI guard that fails on any
+  brand-color utility class with no backing `--color-*` token. The broader §5
+  aesthetics consolidation (button standard, type kit) remains its own lane.
+- DA-M1..M13, DA-L1..L10, DA-U2..U6: see report §1-2 (incl. silent
   over-conveyance cap, addNode validation bypass = LLA-H03, provenance
-  flattening = ACT-M01, unbounded rolling-export retention, broken Tailwind
-  tokens).
+  flattening = ACT-M01).
 - Status updates to existing rows: ACT-H01 = Fixed (`ensureTitleBaseline`,
   Scope A); ACT-H05 = Partial (banner exists; no auto-revert, console-only in
   shadow); ACT-M01 = Open (confirmed live); LLA-H02 = Fixed

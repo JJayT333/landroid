@@ -26,21 +26,24 @@ those two files win.
    until the coverage test is green. Closes the remaining halves of ACT-H05,
    ACT-M01 (origin threading), and LLA-H02.
 2. Evidence integrity — export ALL workspace documents (not just node-attached)
-   so import/undo/reset cannot destroy originals (DA-H6); recompute SHA-256 on
-   `.landroid` import and verify on export, with a one-time blank-hash backfill
-   (DA-H7); quota-error surfacing in storage health (DA-M11); rolling
-   auto-export keep-last-N retention (DA-M16).
+   so import/undo/reset cannot destroy originals (DA-H6, #152); recompute
+   SHA-256 on `.landroid` import and verify on export (DA-H7 parts 1–2, #153),
+   with a one-time blank-hash backfill (DA-H7 part 3, #155 — MERGED); rolling
+   auto-export keep-last-N retention (DA-M16, #157 — MERGED). Remaining:
+   quota-error surfacing in storage health (DA-M11).
 3. Precision policy — one `display-format` module (9-dp decimal everywhere a
    derived interest shows, percent only as a gloss), mechanical sweep of the
-   ad-hoc formatters, ESLint guard; plus the csv-io Decimal parse fix (DA-H10).
-   Report §3 is the spec.
-4. Display-correctness fixes — DA-H8 (live Flowchart fractions) DONE on the
-   flowchart branch: a reactive overlay recomputes interest from the live title
-   nodes onto placed canvas nodes (positions untouched, same relative-share math
-   the importer uses), deleted nodes get a "Stale" badge on screen and in print,
-   and an added-node count surfaces a non-blocking "Re-import" hint — so a
-   printed chart can no longer silently disagree with the workspace. Remaining:
-   per-tract ORRI on the Map-mode branch card (DA-H9);
+   ad-hoc formatters, ESLint guard. The csv-io Decimal parse fix (DA-H10) is
+   DONE (#156 — MERGED); the display-format module sweep remains. Report §3 is
+   the spec.
+4. Display-correctness fixes — DA-H8 (live Flowchart fractions) and DA-H9
+   (per-tract ORRI on the Map-mode branch card) are both DONE and MERGED
+   (DA-H8 in #159; DA-H9 in #158). DA-H8: a reactive overlay recomputes interest
+   from the live title nodes onto placed canvas nodes (positions untouched, same
+   relative-share math the importer uses), deleted nodes get a "Stale" badge on
+   screen and in print, and an added-node count surfaces a non-blocking
+   "Re-import" hint. DA-H9: the branch-card "Total" now equals the tract's own
+   `unitOrriDecimal` instead of summing unit-wide ORRI decimals. Remaining:
    formula tooltips render the summary's own staged intermediates and the
    engine fraction formatter (DA-M6/M7).
 5. Research-workspace hardening, before the title-math catalog lands there
@@ -53,8 +56,8 @@ those two files win.
    comes out of the burdened lessor's royalty to its extent; excess to WI with
    a warning flag," then a deliberate golden-master update. This is a
    correctness decision and precedes any Phase 7 math expansion.
-7. Flowchart Miro-class rebuild — DONE on `claude/flowchart-rebuild-plan-cumi48`
-   (F-Phase 1/2/3, Part 2 §3; parallel-safe, touched no math files). Shipped:
+7. Flowchart Miro-class rebuild — DONE and MERGED (#159; F-Phase 1/2/3,
+   Part 2 §3; parallel-safe, touched no math files). Shipped:
    pane-click shape creation (DA2-F1), lasso fix (DA2-F2), merge-import (DA2-F3),
    viewport restore (DA2-F7), PNG export, persistence hardening (DA2-F6/F8),
    raised page-grid cap to 100; print-renderer registry (DA2-F4), edge labels,
@@ -107,8 +110,8 @@ those two files win.
   scope, curative-instrument/evidence document links (DA2-C1, design-first);
   printable requirement report via the Audit-Sheet pattern (DA2-C3); dirty-form
   guard (DA2-C4).
-- Flowchart F-Phase 2/3 — DONE (see Now #7), including the `.landroid`
-  `canvasAssets` round-trip. Remaining (optional): frames-as-print-pages (frames
+- Flowchart F-Phase 2/3 — DONE and MERGED (#159; see Now #7), including the
+  `.landroid` `canvasAssets` round-trip. Remaining (optional): frames-as-print-pages (frames
   today are visual/labeling containers and print as titled borders — they do NOT
   redesign the page-grid print pipeline, which stays the signature multi-page
   output); freehand ink whenever a concrete markup need appears (seam is in).
@@ -129,9 +132,10 @@ those two files win.
   membership links, serial validation + NM-realistic seed (DA2-FED3/4/9).
   Phase 2 math design doc anchored on the real 60k-acre CA documents, with
   worked examples from the research supplement as its golden fixtures.
-- Aesthetics consolidation ("lean professional", audit §5): fix the broken
-  token references (DA-U1), add the two missing tokens, one shared
-  Button/focus/radius standard, numeric typography rule (mono + tabular
+- Aesthetics consolidation ("lean professional", audit §5): the DA-U1 broken
+  token references are already FIXED (missing tokens added, `text-gold-950`
+  gone, `theme-tokens.test.ts` CI guard added). Remaining consolidation: one
+  shared Button/focus/radius standard, numeric typography rule (mono + tabular
   figures for every derived decimal), one pill/tab component, table kit,
   skeleton loading states, SVG icon module.
 - AI deepening: deterministic math tools the model must call instead of doing

@@ -1,5 +1,9 @@
 # Step 2 hardening — parked execution plan (DA-H7 part 3, DA-H10, DA-M16)
 
+> **CLOSED 2026-06-13 — all three lanes landed on `main`:** Lane A (DA-H7 part 3)
+> via #155, Lane B (DA-H10) via #156, Lane C (DA-M16) via #157. Kept for
+> historical reference; no remaining work in this plan.
+
 Parked 2026-06-12. Source: `docs/deep-audit-2026-06-10.md` findings, design
 session of 2026-06-11. This document is a self-contained execution prompt —
 hand it to any executor (Claude or Codex) one lane at a time.
