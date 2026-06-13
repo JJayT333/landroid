@@ -15,9 +15,10 @@ import type {
   Viewport,
 } from '@xyflow/react';
 import { DEFAULT_PAGE_SIZE } from '../engine/flowchart-pages';
-import { SHAPE_DEFAULTS } from '../engine/flowchart-metrics';
+import { FRAME_DEFAULTS, SHAPE_DEFAULTS } from '../engine/flowchart-metrics';
 import type {
   FlowTool,
+  FrameNodeData,
   PageOrientation,
   PageSizeId,
   ShapeNodeData,
@@ -66,6 +67,10 @@ interface CanvasState {
   snapToGrid: boolean;
   gridSize: number;
 
+  // Performance: only render on-screen nodes. Opt-in (default off) because it
+  // omits off-screen nodes from the DOM, which a full-canvas PNG export needs.
+  virtualize: boolean;
+
   // Viewport (for persistence)
   viewport: Viewport;
 
@@ -93,6 +98,7 @@ interface CanvasState {
 
   // ── Shape creation ──
   addShapeNode: (shapeType: ShapeType, position: { x: number; y: number }) => string;
+  addFrameNode: (position: { x: number; y: number }) => string;
 
   // ── Individual mutations ──
   addNodes: (nodes: Node[]) => void;
@@ -124,6 +130,9 @@ interface CanvasState {
 
   // ── Snap ──
   setSnapToGrid: (snap: boolean) => void;
+
+  // ── Performance ──
+  setVirtualize: (virtualize: boolean) => void;
 
   // ── Viewport ──
   setViewport: (viewport: Viewport) => void;
@@ -241,6 +250,7 @@ export const useCanvasStore = create<CanvasState>()((set, get) => ({
   verticalSpacingFactor: 1,
   snapToGrid: false,
   gridSize: 20,
+  virtualize: false,
   viewport: { x: 0, y: 0, zoom: 1 },
   _past: [],
   _future: [],
@@ -348,6 +358,34 @@ export const useCanvasStore = create<CanvasState>()((set, get) => ({
     };
     set({
       nodes: [...s.nodes.map((n) => ({ ...n, selected: false })), node],
+      _past: pushToPast(s._past, captureSnapshot(s)),
+      _future: [],
+    });
+    return id;
+  },
+
+  // Create a titled frame/section container. Frames sit behind other content
+  // (negative zIndex) and are a purely visual grouping aid; they print as a
+  // labeled border without altering the page-grid print pipeline.
+  addFrameNode: (position) => {
+    const s = get();
+    const id = `frame-${Date.now()}-${Math.round(Math.random() * 1e6)}`;
+    const data: FrameNodeData = {
+      title: 'Frame',
+      width: FRAME_DEFAULTS.width,
+      height: FRAME_DEFAULTS.height,
+    };
+    const minZ = s.nodes.reduce((m, n) => Math.min(m, n.zIndex ?? 0), 0);
+    const node: Node = {
+      id,
+      type: 'frame',
+      position,
+      data: data as unknown as Record<string, unknown>,
+      selected: true,
+      zIndex: minZ - 1,
+    };
+    set({
+      nodes: [node, ...s.nodes.map((n) => ({ ...n, selected: false }))],
       _past: pushToPast(s._past, captureSnapshot(s)),
       _future: [],
     });
@@ -508,6 +546,10 @@ export const useCanvasStore = create<CanvasState>()((set, get) => ({
   // ── Snap ───────────────────────────────────────────────
 
   setSnapToGrid: (snapToGrid) => set({ snapToGrid }),
+
+  // ── Performance ────────────────────────────────────────
+
+  setVirtualize: (virtualize) => set({ virtualize }),
 
   // ── Viewport ───────────────────────────────────────────
 

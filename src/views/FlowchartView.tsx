@@ -29,6 +29,7 @@ import Button from '../components/shared/Button';
 import OwnershipNodeComponent from '../components/canvas/OwnershipNode';
 import OwnershipEdgeComponent from '../components/canvas/OwnershipEdge';
 import ShapeNodeComponent from '../components/canvas/ShapeNode';
+import FrameNodeComponent from '../components/canvas/FrameNode';
 import CanvasToolbar from '../components/canvas/CanvasToolbar';
 import PageGrid from '../components/canvas/PageGrid';
 import PrintOverlay from '../components/canvas/PrintOverlay';
@@ -53,6 +54,7 @@ import type { OwnershipNode } from '../types/node';
 const nodeTypes: NodeTypes = {
   ownership: OwnershipNodeComponent,
   shape: ShapeNodeComponent,
+  frame: FrameNodeComponent,
 };
 
 const edgeTypes: EdgeTypes = {
@@ -403,12 +405,14 @@ function FlowchartCanvas() {
   const verticalSpacingFactor = useCanvasStore((s) => s.verticalSpacingFactor);
   const snapToGrid = useCanvasStore((s) => s.snapToGrid);
   const gridSize = useCanvasStore((s) => s.gridSize);
+  const virtualize = useCanvasStore((s) => s.virtualize);
   const viewport = useCanvasStore((s) => s.viewport);
   const onNodesChange = useCanvasStore((s) => s.onNodesChange);
   const onEdgesChange = useCanvasStore((s) => s.onEdgesChange);
   const onConnect = useCanvasStore((s) => s.onConnect);
   const mergeImportGraph = useCanvasStore((s) => s.mergeImportGraph);
   const addShapeNode = useCanvasStore((s) => s.addShapeNode);
+  const addFrameNode = useCanvasStore((s) => s.addFrameNode);
   const setActiveTool = useCanvasStore((s) => s.setActiveTool);
   const pushHistory = useCanvasStore((s) => s.pushHistory);
   const setHorizontalSpacingFactor = useCanvasStore((s) => s.setHorizontalSpacingFactor);
@@ -647,13 +651,18 @@ function FlowchartCanvas() {
   // pointer (converted to flow space) and returns to the select tool.
   const handlePaneClick = useCallback(
     (event: React.MouseEvent) => {
+      const position = screenToFlowPosition({ x: event.clientX, y: event.clientY });
+      if (activeTool === 'draw-frame') {
+        addFrameNode(position);
+        setActiveTool('select');
+        return;
+      }
       const shapeType = DRAW_TOOL_SHAPE[activeTool];
       if (!shapeType) return;
-      const position = screenToFlowPosition({ x: event.clientX, y: event.clientY });
       addShapeNode(shapeType, position);
       setActiveTool('select');
     },
-    [activeTool, screenToFlowPosition, addShapeNode, setActiveTool]
+    [activeTool, screenToFlowPosition, addShapeNode, addFrameNode, setActiveTool]
   );
 
   // ── Print ──────────────────────────────────────────────
@@ -738,6 +747,7 @@ function FlowchartCanvas() {
     position: n.position,
     data: n.data,
     measured: n.measured,
+    zIndex: n.zIndex,
   }));
   const printEdges = edges.map((e) => ({
     source: e.source,
@@ -797,6 +807,7 @@ function FlowchartCanvas() {
         nodesConnectable={activeTool === 'connect'}
         snapToGrid={snapToGrid}
         snapGrid={[gridSize, gridSize]}
+        onlyRenderVisibleElements={virtualize}
         deleteKeyCode={null}
         minZoom={0.02}
         maxZoom={4}

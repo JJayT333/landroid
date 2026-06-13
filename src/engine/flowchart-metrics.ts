@@ -34,6 +34,9 @@ export const SHAPE_DEFAULTS: Record<
   note: { width: 180, height: 140, fontSize: 14 },
 };
 
+/** Default footprint for a new frame/section container. */
+export const FRAME_DEFAULTS = { width: 640, height: 440 };
+
 export function clampNodeScale(scale: number): number {
   if (!Number.isFinite(scale)) return 1;
   return Math.min(MAX_NODE_SCALE, Math.max(MIN_NODE_SCALE, scale));

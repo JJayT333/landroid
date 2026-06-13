@@ -39,6 +39,7 @@ const tools: { id: FlowTool; label: string; icon: string }[] = [
   { id: 'draw-ellipse', label: 'Ellipse', icon: '◯' },
   { id: 'draw-diamond', label: 'Diamond', icon: '◇' },
   { id: 'draw-note', label: 'Note', icon: '📝' },
+  { id: 'draw-frame', label: 'Frame', icon: '⛶' },
 ];
 
 function StepperButton({
@@ -160,6 +161,8 @@ export default function CanvasToolbar({
   const verticalSpacingFactor = useCanvasStore((s) => s.verticalSpacingFactor);
   const snapToGrid = useCanvasStore((s) => s.snapToGrid);
   const setSnapToGrid = useCanvasStore((s) => s.setSnapToGrid);
+  const virtualize = useCanvasStore((s) => s.virtualize);
+  const setVirtualize = useCanvasStore((s) => s.setVirtualize);
   const selectAll = useCanvasStore((s) => s.selectAll);
   const clearCanvas = useCanvasStore((s) => s.clearCanvas);
   const undo = useCanvasStore((s) => s.undo);
@@ -253,6 +256,23 @@ export default function CanvasToolbar({
         title={`Snap to grid (${snapToGrid ? 'on' : 'off'})`}
       >
         ⊞
+      </button>
+
+      {/* Virtualization toggle — speeds up huge trees; off by default so a
+          full-canvas PNG export still captures off-screen nodes. */}
+      <button
+        type="button"
+        onClick={() => setVirtualize(!virtualize)}
+        aria-label="Fast render large canvases"
+        aria-pressed={virtualize}
+        className={`px-2 py-1.5 rounded-md text-xs font-medium transition-colors ${
+          virtualize
+            ? 'bg-leather/20 text-leather font-semibold'
+            : 'text-ink-light hover:bg-parchment-dark'
+        }`}
+        title={`Fast render for large trees (${virtualize ? 'on' : 'off'}) — turn off before PNG export`}
+      >
+        ⚡
       </button>
 
       <div className="w-px h-6 bg-ledger-line mx-1" />

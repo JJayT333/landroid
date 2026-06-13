@@ -89,6 +89,48 @@ describe('PrintOverlay', () => {
     expect(html).toContain('conveys');
   });
 
+  it('renders a frame as a titled border', () => {
+    const html = renderToStaticMarkup(
+      <PrintOverlay
+        nodes={[
+          {
+            id: 'f1',
+            type: 'frame',
+            position: { x: 20, y: 20 },
+            data: { title: 'Tract 1 Exhibit', width: 400, height: 300 },
+          },
+        ]}
+        edges={[]}
+        cols={1}
+        rows={1}
+        orientation="landscape"
+        pageSize="ansi-a"
+      />
+    );
+
+    expect(html).toContain('Tract 1 Exhibit');
+    expect(html).toContain('width:400px;height:300px');
+    expect(html).not.toContain('Granted');
+  });
+
+  it('paints lower z-order nodes (frames) before higher ones', () => {
+    const html = renderToStaticMarkup(
+      <PrintOverlay
+        nodes={[
+          { id: 'top', type: 'shape', zIndex: 5, position: { x: 20, y: 20 }, data: { shapeType: 'rect', text: 'TOP', width: 100, height: 60, fontSize: 14, textAlign: 'center' } },
+          { id: 'frame', type: 'frame', zIndex: -1, position: { x: 0, y: 0 }, data: { title: 'BACK', width: 300, height: 200 } },
+        ]}
+        edges={[]}
+        cols={1}
+        rows={1}
+        orientation="landscape"
+        pageSize="ansi-a"
+      />
+    );
+    // The frame (zIndex -1) appears earlier in the DOM than the shape (zIndex 5).
+    expect(html.indexOf('BACK')).toBeLessThan(html.indexOf('TOP'));
+  });
+
   it('renders nothing for an unimplemented node kind (no bogus card)', () => {
     const html = renderToStaticMarkup(
       <PrintOverlay

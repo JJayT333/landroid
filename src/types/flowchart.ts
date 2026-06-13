@@ -39,6 +39,13 @@ export interface ShapeNodeData {
   color?: string;
 }
 
+export interface FrameNodeData {
+  title: string;
+  width: number;
+  height: number;
+  color?: string;
+}
+
 export interface FlowEdgeData extends Record<string, unknown> {
   edgeScale?: number;
   variant?: 'primary' | 'related';
@@ -55,6 +62,7 @@ export type FlowTool =
   | 'draw-ellipse'
   | 'draw-diamond'
   | 'draw-note'
+  | 'draw-frame'
   // Reserved seam for a future freehand pen tool. No capture/render is wired
   // yet; it exists so the tool enum and the node-kind/print registries already
   // account for ink and a later implementation drops in without a refactor.

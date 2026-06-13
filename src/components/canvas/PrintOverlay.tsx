@@ -215,8 +215,11 @@ export default function PrintOverlay({
             {/* Edge labels (HTML, above the SVG) */}
             {renderEdgeLabels(nodes, edges, offsetX, offsetY, pw, ph)}
 
-            {/* Nodes, dispatched by kind */}
-            {nodes.map((node) => {
+            {/* Nodes, dispatched by kind, painted back-to-front by z-order
+                so frames (negative z) sit behind content. */}
+            {[...nodes]
+              .sort((a, b) => (a.zIndex ?? 0) - (b.zIndex ?? 0))
+              .map((node) => {
               const dims = getPrintNodeDimensions(node);
               const nx = node.position.x - offsetX;
               const ny = node.position.y - offsetY;

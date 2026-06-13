@@ -16,6 +16,7 @@ import {
   getOwnershipNodeDimensions,
 } from '../../engine/flowchart-metrics';
 import type {
+  FrameNodeData,
   NodeKind,
   OwnershipNodeData,
   ShapeNodeData,
@@ -27,6 +28,7 @@ export interface PrintNode {
   position: { x: number; y: number };
   data: unknown;
   measured?: { width?: number; height?: number };
+  zIndex?: number;
 }
 
 // ── Ownership card (moved verbatim from PrintOverlay; markup is golden) ──
@@ -321,6 +323,40 @@ function PrintText({ data }: { data: ShapeNodeData }) {
   );
 }
 
+// ── Frame / section container ───────────────────────────
+
+function PrintFrame({ data }: { data: FrameNodeData }) {
+  return (
+    <div
+      style={{
+        width: data.width,
+        height: data.height,
+        boxSizing: 'border-box',
+        border: '2px solid #d4c5a9',
+        borderRadius: 6,
+        background: 'transparent',
+        position: 'relative',
+      }}
+    >
+      <div
+        style={{
+          display: 'inline-block',
+          padding: '1px 8px',
+          borderRight: '1px solid #d4c5a9',
+          borderBottom: '1px solid #d4c5a9',
+          borderBottomRightRadius: 6,
+          background: '#f0e6d3',
+          color: '#5c3d2e',
+          fontSize: 11,
+          fontWeight: 600,
+        }}
+      >
+        {data.title || 'Frame'}
+      </div>
+    </div>
+  );
+}
+
 // ── Dimensions + dispatch ───────────────────────────────
 
 /** True printed footprint of a node, by kind. */
@@ -328,8 +364,8 @@ export function getPrintNodeDimensions(node: PrintNode): {
   width: number;
   height: number;
 } {
-  if (node.type === 'shape' || node.type === 'text') {
-    const data = node.data as Partial<ShapeNodeData>;
+  if (node.type === 'shape' || node.type === 'text' || node.type === 'frame') {
+    const data = node.data as Partial<ShapeNodeData & FrameNodeData>;
     return {
       width:
         node.measured?.width ??
@@ -361,6 +397,8 @@ export function renderPrintNodeBody(node: PrintNode): ReactNode {
       return <PrintShape data={node.data as ShapeNodeData} />;
     case 'text':
       return <PrintText data={node.data as ShapeNodeData} />;
+    case 'frame':
+      return <PrintFrame data={node.data as FrameNodeData} />;
     case 'ownership':
       return <PrintCard data={node.data as OwnershipNodeData} />;
     default:
