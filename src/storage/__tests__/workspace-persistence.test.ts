@@ -315,6 +315,36 @@ function buildWorkspace(canvas: CanvasSaveData | null): LandroidFileData {
           createdAt: '2026-04-01T00:00:00.000Z',
           updatedAt: '2026-04-01T00:00:00.000Z',
         },
+        {
+          docId: 'doc-owner-attached',
+          workspaceId: 'ws-1',
+          fileName: 'owner-summary.pdf',
+          mimeType: 'application/pdf',
+          byteLength: TEST_PDF_BODY.length,
+          contentHash: 'fixture-owner-hash',
+          blob: new Blob([`${TEST_PDF_BODY}owner attachment\n`], {
+            type: 'application/pdf',
+          }),
+          kind: 'other',
+          displayTitle: 'Owner Summary',
+          createdAt: '2026-04-02T00:00:00.000Z',
+          updatedAt: '2026-04-02T00:00:00.000Z',
+        },
+        {
+          docId: 'doc-unattached',
+          workspaceId: 'ws-1',
+          fileName: 'unattached-source.pdf',
+          mimeType: 'application/pdf',
+          byteLength: TEST_PDF_BODY.length,
+          contentHash: 'fixture-unattached-hash',
+          blob: new Blob([`${TEST_PDF_BODY}unattached document\n`], {
+            type: 'application/pdf',
+          }),
+          kind: 'other',
+          displayTitle: 'Unattached Source',
+          createdAt: '2026-04-03T00:00:00.000Z',
+          updatedAt: '2026-04-03T00:00:00.000Z',
+        },
       ],
       attachments: [
         {
@@ -325,6 +355,15 @@ function buildWorkspace(canvas: CanvasSaveData | null): LandroidFileData {
           entityId: 'node-1',
           position: 0,
           createdAt: '2026-04-01T00:00:00.000Z',
+        },
+        {
+          attachmentId: 'att-owner-fixture',
+          workspaceId: 'ws-1',
+          docId: 'doc-owner-attached',
+          entityKind: 'owner',
+          entityId: 'owner-1',
+          position: 0,
+          createdAt: '2026-04-02T00:00:00.000Z',
         },
       ],
     },
@@ -569,8 +608,17 @@ describe('workspace-persistence', () => {
       original.leaseholdTransferOrderEntries
     );
     expect(imported.canvas).toEqual(original.canvas);
-    expect(imported.documentData?.documents[0]?.fileName).toBe('20260001.pdf');
-    expect(imported.documentData?.documents[0]).toMatchObject({
+    const importedDocumentsById = new Map(
+      imported.documentData?.documents.map((document) => [document.docId, document])
+    );
+    const importedAttachments = imported.documentData?.attachments ?? [];
+    expect([...importedDocumentsById.keys()].sort()).toEqual([
+      'doc-fixture-1',
+      'doc-owner-attached',
+      'doc-unattached',
+    ]);
+    expect(importedDocumentsById.get('doc-fixture-1')?.fileName).toBe('20260001.pdf');
+    expect(importedDocumentsById.get('doc-fixture-1')).toMatchObject({
       displayTitle: 'Recorded Mineral Deed',
       documentArea: 'runsheet_mineral_title',
       instrumentType: 'Mineral Deed',
@@ -586,15 +634,28 @@ describe('workspace-persistence', () => {
       sourceReference: 'TORS packet A',
       ocrStatus: 'not_needed',
     });
-    expect(await imported.documentData?.documents[0]?.blob.text()).toBe(TEST_PDF_BODY);
-    expect(imported.documentData?.attachments[0]).toMatchObject({
+    expect(await importedDocumentsById.get('doc-fixture-1')?.blob.text()).toBe(
+      TEST_PDF_BODY
+    );
+    expect(importedAttachments).toContainEqual(expect.objectContaining({
       attachmentId: 'att-fixture-1',
       workspaceId: 'ws-1',
       docId: 'doc-fixture-1',
       entityKind: 'node',
       entityId: 'node-1',
       position: 0,
-    });
+    }));
+    expect(importedAttachments).toContainEqual(expect.objectContaining({
+      attachmentId: 'att-owner-fixture',
+      workspaceId: 'ws-1',
+      docId: 'doc-owner-attached',
+      entityKind: 'owner',
+      entityId: 'owner-1',
+      position: 0,
+    }));
+    expect(
+      importedAttachments.filter((attachment) => attachment.docId === 'doc-unattached')
+    ).toHaveLength(0);
     expect(imported.ownerData?.owners).toEqual(original.ownerData?.owners);
     expect(imported.ownerData?.docs[0]?.fileName).toBe('owner-notes.txt');
     expect(await imported.ownerData?.docs[0]?.blob.text()).toBe('owner-doc-body');

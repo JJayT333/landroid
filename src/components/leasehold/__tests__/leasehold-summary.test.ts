@@ -399,6 +399,26 @@ describe('leasehold-summary', () => {
       { category: 'retained_wi', rowCount: 1, totalDecimal: '0.1153125' },
       { category: 'assigned_wi', rowCount: 2, totalDecimal: '0.3459375' },
     ]);
+
+    // DA-H9: the Map-mode ORRI branch-card Total is this tract's own unit-level
+    // ORRI burden (unitParticipation × totalOrriBurdenRate), NOT the sum of each
+    // ORRI's unitDecimal. Unit-scope ORRIs are aggregated across every scoped
+    // tract, so summing them under one tract double-counts the unit burden.
+    const dm1BranchTotal = d(summary.tracts[0]?.unitOrriDecimal ?? '0');
+    expect(dm1BranchTotal.toNumber()).toBeCloseTo(0.035, 12);
+    expect(dm1BranchTotal.toNumber()).toBeCloseTo(
+      d(summary.tracts[0]?.unitParticipation ?? '0')
+        .times(summary.tracts[0]?.totalOrriBurdenRate ?? '0')
+        .toNumber(),
+      12
+    );
+    // The old branch card summed unit-scope ORRI unitDecimals (0.0625 + 0.0125),
+    // which over-counts and must not equal the corrected per-tract total.
+    const naiveUnitOrriSum = summary.orris
+      .filter((o) => o.scope === 'unit' && o.includedInMath)
+      .reduce((sum, o) => sum.plus(o.unitDecimal), d(0));
+    expect(naiveUnitOrriSum.toNumber()).toBeCloseTo(0.075, 12);
+    expect(naiveUnitOrriSum.toNumber()).not.toBeCloseTo(0.035, 12);
   });
 
   it('excludes ORRI and WI rows scoped to a different unit when a tract is focused', () => {
