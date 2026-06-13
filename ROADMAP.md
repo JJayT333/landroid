@@ -48,10 +48,19 @@ those two files win.
    comes out of the burdened lessor's royalty to its extent; excess to WI with
    a warning flag," then a deliberate golden-master update. This is a
    correctness decision and precedes any Phase 7 math expansion.
-7. Flowchart wiring sprint (F-Phase 1, Part 2 §3 — parallel-safe Codex lane,
-   touches no math files): activate the built-but-dead shape tools (DA2-F1),
-   fix the select-tool lasso (DA2-F2), merge-import that preserves
-   annotations (DA2-F3), restore the saved viewport (DA2-F7), PNG export.
+7. Flowchart Miro-class rebuild — DONE on `claude/flowchart-rebuild-plan-cumi48`
+   (F-Phase 1/2/3, Part 2 §3; parallel-safe, touched no math files). Shipped:
+   pane-click shape creation (DA2-F1), lasso fix (DA2-F2), merge-import (DA2-F3),
+   viewport restore (DA2-F7), PNG export, persistence hardening (DA2-F6/F8),
+   raised page-grid cap to 100; print-renderer registry (DA2-F4), edge labels,
+   copy/paste/duplicate, z-order, NodeToolbar; frames, opt-in virtualization,
+   image nodes (new content-addressed `canvasAssets` store, separate from the
+   PDF evidence vault), alignment guides, templates, ownership-card resize.
+   Freehand ink left as a stubbed seam by choice. Print goldens per element
+   kind. REMAINING FOLLOW-UP: `.landroid` round-trip for `canvasAssets` (export/
+   import the asset blobs through the protected file format + rollback path —
+   its own tested pass; in-app IndexedDB persistence already covers reload/edit-
+   over-weeks, and a missing asset degrades to a placeholder, never a crash).
 8. Carry-overs still active: make batch graft/attach operations atomic; harden
    `.landroid` and CSV import validation (includes the non-numeric
    future-version gate bypass DA-L8 and the lease-jurisdiction whole-file
@@ -91,10 +100,11 @@ those two files win.
   scope, curative-instrument/evidence document links (DA2-C1, design-first);
   printable requirement report via the Audit-Sheet pattern (DA2-C3); dirty-form
   guard (DA2-C4).
-- Flowchart F-Phase 2/3 (Part 2 §3): print-renderer registry for new element
-  kinds, edge labels, copy/paste, z-order, frames-as-pages via React Flow
-  groups, image nodes routed through the hashed document vault, virtualization
-  for 1k+ node trees. Print goldens per new element kind.
+- Flowchart F-Phase 2/3 — DONE (see Now #7). Remaining: `.landroid` round-trip
+  for the new `canvasAssets` blobs; optional frames-as-print-pages (frames today
+  are visual/labeling containers and print as titled borders — they do NOT
+  redesign the page-grid print pipeline, which stays the signature multi-page
+  output); freehand ink whenever a concrete markup need appears (seam is in).
 - ArcGIS interchange increments (Part 2 §4): hash map assets (DA2-M2); export
   per-tract status/decimal attributes as CSV/GeoJSON keyed `LAND_TRACT_ID` for
   ArcGIS Pro joins (DA2-M3); GeoJSON feature→tract matcher writing the existing
