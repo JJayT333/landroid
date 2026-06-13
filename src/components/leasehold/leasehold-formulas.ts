@@ -894,35 +894,7 @@ export function unitSummaryRetainedWiFormula(
   };
 }
 
-// ── 23. ORRI Branch total (Map view) ────────────────────
-
-export function orriBranchTotalFormula(
-  orris: LeaseholdOrriSummary[]
-): FormulaContent {
-  const steps = orris.length > 0
-    ? orris.map((o) => ({
-        label: o.payee || `ORRI ${o.id}`,
-        expression: dec(o.unitDecimal),
-        value: `= ${decAndPct(o.unitDecimal)}`,
-      }))
-    : [{ label: 'No ORRIs', expression: '0', value: '= 0%' }];
-  const total = orris.reduce(
-    (sum, o) => sum.plus(new Decimal(o.unitDecimal)),
-    new Decimal(0)
-  );
-  return {
-    title: 'Tract ORRI Total',
-    description: 'Sum of every ORRI\'s unit-decimal contribution on this tract.',
-    inputs: [{ label: 'ORRI count', value: String(orris.length) }],
-    steps,
-    result: {
-      label: 'ORRI Total',
-      value: decAndPct(total.toString()),
-    },
-  };
-}
-
-// ── 24. Transfer-order aggregates ───────────────────────
+// ── 23. Transfer-order aggregates ───────────────────────
 
 export function transferOrderTotalFormula(
   totalDecimal: string,

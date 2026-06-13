@@ -73,7 +73,6 @@ import {
   netPooledAcresFormula,
   npriTractBurdenRateFormula,
   npriUnitDecimalFormula,
-  orriBranchTotalFormula,
   orriUnitDecimalFormula,
   ownerLeasedFractionFormula,
   ownerMineralFractionFormula,
@@ -1637,7 +1636,11 @@ function LeaseholdGraphOrriBranchCard({
   tract: LeaseholdTractSummary;
   orris: LeaseholdOrriSummary[];
 }) {
-  const totalDecimal = orris.reduce((sum, orri) => sum.plus(orri.unitDecimal), d(0));
+  // DA-H9: the branch Total is this tract's own unit-level ORRI burden, which
+  // the tract chip already shows as `unitOrriDecimal`. Summing each ORRI's
+  // `unitDecimal` double-counts unit-scope ORRIs — those are aggregated across
+  // every scoped tract, not per tract.
+  const totalDecimal = d(tract.unitOrriDecimal);
 
   return (
     <div className="w-72 rounded-md border-2 border-amber-300 bg-amber-50 text-amber-950 shadow-[0_8px_18px_rgba(217,119,6,0.14)]">
@@ -1658,7 +1661,7 @@ function LeaseholdGraphOrriBranchCard({
         <div className="flex flex-wrap gap-1.5">
           <span className="rounded-full border border-amber-300 bg-white/80 px-2 py-0.5 text-[10px] text-amber-900">
             Total{' '}
-            <FormulaTooltip content={orriBranchTotalFormula(orris)}>
+            <FormulaTooltip content={tractUnitOrriFormula(tract)}>
               {formatPercent(totalDecimal.toString())}
             </FormulaTooltip>
           </span>
