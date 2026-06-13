@@ -1,7 +1,7 @@
 /**
  * Workspace persistence — auto-save to IndexedDB, export/import .landroid files.
  */
-import db, { type PdfAttachment, type WorkspaceRecord } from './db';
+import db, { type CanvasAssetRecord, type PdfAttachment, type WorkspaceRecord } from './db';
 import {
   deserializeBlob,
   deserializePdfBlob,
@@ -150,6 +150,17 @@ export interface LandroidFileData extends WorkspaceData {
   mapData?: MapWorkspaceData;
   researchData?: ResearchWorkspaceData;
   curativeData?: CurativeWorkspaceData;
+  /**
+   * Content-addressed image blobs referenced by flowchart image nodes (v15+).
+   * Optional and additive: older `.landroid` files lack it and import fine; a
+   * referenced-but-missing asset degrades to an "image unavailable" placeholder
+   * rather than failing the import.
+   */
+  canvasAssetData?: CanvasAssetWorkspaceData;
+}
+
+export interface CanvasAssetWorkspaceData {
+  assets: CanvasAssetRecord[];
 }
 
 export interface LandroidFileExportOptions {
@@ -1296,6 +1307,84 @@ async function serializeMapData(
   };
 }
 
+interface SerializedCanvasAsset {
+  contentHash: string;
+  workspaceId: string;
+  mimeType: string;
+  byteLength: number;
+  fileName?: string;
+  createdAt: string;
+  blob: SerializedBlob;
+}
+
+async function serializeCanvasAssetData(
+  canvasAssetData: CanvasAssetWorkspaceData | undefined
+): Promise<undefined | { assets: SerializedCanvasAsset[] }> {
+  if (!canvasAssetData) return undefined;
+  return {
+    assets: await Promise.all(
+      canvasAssetData.assets.map(async (asset) => ({
+        // Recompute the hash from the bytes being written so the exported file
+        // is always self-consistent (mirrors the document vault's DA-H7).
+        contentHash: await sha256HexOfBlob(asset.blob),
+        workspaceId: asset.workspaceId,
+        mimeType: asset.mimeType,
+        byteLength: asset.byteLength,
+        fileName: asset.fileName,
+        createdAt: asset.createdAt,
+        blob: await serializeBlob(asset.blob),
+      }))
+    ),
+  };
+}
+
+/**
+ * Decode canvas image assets from an imported file. Each blob is re-hashed and
+ * the recomputed digest becomes the canonical content hash (these are
+ * illustrative images, not evidence, so a drift is healed silently rather than
+ * surfaced as a fixity warning). A blob that is corrupt or over the per-blob
+ * cap is skipped individually so one bad image never aborts the whole import.
+ */
+async function deserializeCanvasAssetData(
+  value: unknown,
+  workspaceId: string
+): Promise<CanvasAssetWorkspaceData> {
+  if (!isRecord(value) || !Array.isArray((value as { assets?: unknown }).assets)) {
+    return { assets: [] };
+  }
+  const rawAssets = (value as { assets: unknown[] }).assets;
+  const built = await Promise.all(
+    rawAssets
+      .filter((raw): raw is Record<string, unknown> => isRecord(raw) && isRecord(raw.blob))
+      .map(async (raw): Promise<CanvasAssetRecord | null> => {
+        let blob: Blob;
+        try {
+          blob = deserializeSerializedBlob(raw.blob);
+        } catch (error) {
+          console.warn('[landroid] Skipping unreadable canvas image asset:', error);
+          return null;
+        }
+        if (blob.size === 0) return null;
+        const contentHash = await sha256HexOfBlob(blob);
+        return {
+          id: contentHash, // re-scoped on write by replaceCanvasAssetWorkspaceData
+          workspaceId:
+            typeof raw.workspaceId === 'string' ? raw.workspaceId : workspaceId,
+          contentHash,
+          mimeType:
+            blob.type ||
+            (typeof raw.mimeType === 'string' ? raw.mimeType : 'application/octet-stream'),
+          byteLength: blob.size,
+          fileName: typeof raw.fileName === 'string' ? raw.fileName : undefined,
+          createdAt:
+            typeof raw.createdAt === 'string' ? raw.createdAt : new Date().toISOString(),
+          blob,
+        };
+      })
+  );
+  return { assets: built.filter((asset): asset is CanvasAssetRecord => asset !== null) };
+}
+
 async function serializeResearchData(
   researchData: ResearchWorkspaceData | undefined
 ): Promise<
@@ -1392,6 +1481,7 @@ export async function exportLandroidFile(
     ownerData: await serializeOwnerData(data.ownerData),
     mapData: await serializeMapData(data.mapData),
     researchData: await serializeResearchData(data.researchData),
+    canvasAssetData: await serializeCanvasAssetData(data.canvasAssetData),
   };
   const actionRecords = options.actionRecords ?? [];
   const auditEvents = options.auditEvents ?? [];
@@ -1993,6 +2083,10 @@ export async function importLandroidFile(file: File): Promise<LandroidFileData> 
     parsed.actionLedger === undefined
       ? undefined
       : await validateImportedActionLedger(parsed.actionLedger);
+  const canvasAssetData = await deserializeCanvasAssetData(
+    parsed.canvasAssetData,
+    workspaceId
+  );
   return {
     ...core,
     nodes,
@@ -2003,6 +2097,7 @@ export async function importLandroidFile(file: File): Promise<LandroidFileData> 
     mapData,
     researchData,
     curativeData,
+    canvasAssetData,
     actionLedger,
   };
 }

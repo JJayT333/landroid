@@ -57,10 +57,11 @@ those two files win.
    image nodes (new content-addressed `canvasAssets` store, separate from the
    PDF evidence vault), alignment guides, templates, ownership-card resize.
    Freehand ink left as a stubbed seam by choice. Print goldens per element
-   kind. REMAINING FOLLOW-UP: `.landroid` round-trip for `canvasAssets` (export/
-   import the asset blobs through the protected file format + rollback path —
-   its own tested pass; in-app IndexedDB persistence already covers reload/edit-
-   over-weeks, and a missing asset degrades to a placeholder, never a crash).
+   kind. The `.landroid` round-trip for `canvasAssets` is now DONE too: image
+   blobs export/import through the file format (additive, optional field, older
+   files import fine) and the side-store rollback path, deduped by content hash,
+   each blob re-hashed on import; a missing asset still degrades to a placeholder
+   rather than failing the import.
 8. Carry-overs still active: make batch graft/attach operations atomic; harden
    `.landroid` and CSV import validation (includes the non-numeric
    future-version gate bypass DA-L8 and the lease-jurisdiction whole-file
@@ -100,9 +101,9 @@ those two files win.
   scope, curative-instrument/evidence document links (DA2-C1, design-first);
   printable requirement report via the Audit-Sheet pattern (DA2-C3); dirty-form
   guard (DA2-C4).
-- Flowchart F-Phase 2/3 — DONE (see Now #7). Remaining: `.landroid` round-trip
-  for the new `canvasAssets` blobs; optional frames-as-print-pages (frames today
-  are visual/labeling containers and print as titled borders — they do NOT
+- Flowchart F-Phase 2/3 — DONE (see Now #7), including the `.landroid`
+  `canvasAssets` round-trip. Remaining (optional): frames-as-print-pages (frames
+  today are visual/labeling containers and print as titled borders — they do NOT
   redesign the page-grid print pipeline, which stays the signature multi-page
   output); freehand ink whenever a concrete markup need appears (seam is in).
 - ArcGIS interchange increments (Part 2 §4): hash map assets (DA2-M2); export

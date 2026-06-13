@@ -15,8 +15,13 @@ import {
   clearWorkspaceShardsForActiveKey,
   exportDocumentWorkspaceData,
   replaceDocumentWorkspaceData,
+  type CanvasAssetWorkspaceData,
   type DocumentWorkspaceData,
 } from './workspace-persistence';
+import {
+  listCanvasAssets,
+  replaceCanvasAssetWorkspaceData,
+} from './canvas-assets';
 
 const EMPTY_OWNER_DATA: OwnerWorkspaceData = {
   owners: [],
@@ -48,12 +53,17 @@ const EMPTY_CURATIVE_DATA: CurativeWorkspaceData = {
   titleIssues: [],
 };
 
+const EMPTY_CANVAS_ASSET_DATA: CanvasAssetWorkspaceData = {
+  assets: [],
+};
+
 export interface WorkspaceSideStoreData {
   ownerData?: OwnerWorkspaceData;
   documentData?: DocumentWorkspaceData;
   mapData?: MapWorkspaceData;
   researchData?: ResearchWorkspaceData;
   curativeData?: CurativeWorkspaceData;
+  canvasAssetData?: CanvasAssetWorkspaceData;
 }
 
 interface ReplaceWorkspaceSideStoresWithRollbackOptions {
@@ -84,6 +94,10 @@ function sideStoreReplacementPromises(
     useCurativeStore
       .getState()
       .replaceWorkspaceData(workspaceId, data.curativeData ?? EMPTY_CURATIVE_DATA),
+    replaceCanvasAssetWorkspaceData(
+      workspaceId,
+      data.canvasAssetData ?? EMPTY_CANVAS_ASSET_DATA
+    ),
   ];
 }
 
@@ -137,13 +151,14 @@ async function exportActiveWorkspaceSideStores(
   workspaceId: string,
   nodes: OwnershipNode[]
 ): Promise<Required<WorkspaceSideStoreData>> {
-  const [ownerData, documentData, mapData, researchData, curativeData] =
+  const [ownerData, documentData, mapData, researchData, curativeData, canvasAssets] =
     await Promise.all([
       useOwnerStore.getState().exportWorkspaceData(),
       exportDocumentWorkspaceData(workspaceId, nodes),
       useMapStore.getState().exportWorkspaceData(),
       useResearchStore.getState().exportWorkspaceData(),
       useCurativeStore.getState().exportWorkspaceData(),
+      listCanvasAssets(workspaceId),
     ]);
   return {
     ownerData,
@@ -151,6 +166,7 @@ async function exportActiveWorkspaceSideStores(
     mapData,
     researchData,
     curativeData,
+    canvasAssetData: { assets: canvasAssets },
   };
 }
 

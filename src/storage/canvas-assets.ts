@@ -101,3 +101,41 @@ export async function putImportedCanvasAsset(
     stampActiveDbKeyWithStorageId({ ...record, id: record.contentHash }, 'id')
   );
 }
+
+/**
+ * Replace every canvas asset for a workspace with the given set (used by
+ * `.landroid` import and the side-store rollback path). Mirrors
+ * replaceDocumentWorkspaceData: drop the workspace's existing rows, then write
+ * the incoming set, deduped by content hash. Empty blobs are dropped.
+ */
+export async function replaceCanvasAssetWorkspaceData(
+  workspaceId: string,
+  data: { assets: CanvasAssetRecord[] }
+): Promise<void> {
+  const seen = new Set<string>();
+  const incoming = data.assets.filter((asset) => {
+    if (asset.blob.size === 0 || seen.has(asset.contentHash)) return false;
+    seen.add(asset.contentHash);
+    return true;
+  });
+
+  await ensureWorkspaceWriteFence(workspaceId);
+  await db.transaction('rw', db.workspaceWriteLeases, db.canvasAssets, async () => {
+    await assertWorkspaceWriteFence(workspaceId);
+    const existing = await db.canvasAssets
+      .where('[dbKey+workspaceId]')
+      .equals(activeWorkspaceScope(workspaceId))
+      .primaryKeys();
+    if (existing.length > 0) await db.canvasAssets.bulkDelete(existing);
+    if (incoming.length > 0) {
+      await db.canvasAssets.bulkAdd(
+        incoming.map((asset) =>
+          stampActiveDbKeyWithStorageId(
+            { ...asset, workspaceId, id: asset.contentHash },
+            'id'
+          )
+        )
+      );
+    }
+  });
+}

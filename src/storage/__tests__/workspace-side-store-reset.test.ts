@@ -16,6 +16,10 @@ const mocks = vi.hoisted(() => ({
   replaceCurativeWorkspaceData: vi.fn(
     async (_workspaceId: string, _data: unknown) => undefined
   ),
+  replaceCanvasAssetWorkspaceData: vi.fn(
+    async (_workspaceId: string, _data: unknown) => undefined
+  ),
+  listCanvasAssets: vi.fn(async (_workspaceId: string) => [] as unknown[]),
   exportOwnerWorkspaceData: vi.fn(),
   exportDocumentWorkspaceData: vi.fn(),
   exportMapWorkspaceData: vi.fn(),
@@ -98,6 +102,11 @@ vi.mock('../title-ledger-persistence', () => ({
   clearTitleLedgerRowsForActiveKey: mocks.clearTitleLedgerRowsForActiveKey,
 }));
 
+vi.mock('../canvas-assets', () => ({
+  listCanvasAssets: mocks.listCanvasAssets,
+  replaceCanvasAssetWorkspaceData: mocks.replaceCanvasAssetWorkspaceData,
+}));
+
 import {
   replaceWorkspaceSideStores,
   replaceWorkspaceSideStoresWithRollback,
@@ -139,6 +148,10 @@ function emptyCurativeData() {
   return { titleIssues: [] };
 }
 
+function emptyCanvasAssetData() {
+  return { assets: [] };
+}
+
 function emptySideStoreData() {
   return {
     ownerData: emptyOwnerData(),
@@ -146,6 +159,7 @@ function emptySideStoreData() {
     mapData: emptyMapData(),
     researchData: emptyResearchData(),
     curativeData: emptyCurativeData(),
+    canvasAssetData: emptyCanvasAssetData(),
   };
 }
 
@@ -157,6 +171,7 @@ function mockExportedSideStores(data: SideStoreDataFixture) {
   mocks.exportMapWorkspaceData.mockResolvedValue(data.mapData);
   mocks.exportResearchWorkspaceData.mockResolvedValue(data.researchData);
   mocks.exportCurativeWorkspaceData.mockResolvedValue(data.curativeData);
+  mocks.listCanvasAssets.mockResolvedValue(data.canvasAssetData.assets);
 }
 
 function expectSideStoreWrites(
@@ -183,6 +198,10 @@ function expectSideStoreWrites(
     workspaceId,
     data.curativeData
   );
+  expect(mocks.replaceCanvasAssetWorkspaceData).toHaveBeenCalledWith(
+    workspaceId,
+    data.canvasAssetData
+  );
 }
 
 function expectFinalStoresCleared() {
@@ -201,6 +220,8 @@ describe('replaceWorkspaceSideStores', () => {
     mocks.replaceMapWorkspaceData.mockResolvedValue(undefined);
     mocks.replaceResearchWorkspaceData.mockResolvedValue(undefined);
     mocks.replaceCurativeWorkspaceData.mockResolvedValue(undefined);
+    mocks.replaceCanvasAssetWorkspaceData.mockResolvedValue(undefined);
+    mocks.listCanvasAssets.mockResolvedValue([]);
   });
 
   it('clears every side store when no side data is supplied', async () => {
@@ -225,6 +246,10 @@ describe('replaceWorkspaceSideStores', () => {
     expect(mocks.replaceCurativeWorkspaceData).toHaveBeenCalledWith(
       'ws-reset',
       emptyCurativeData()
+    );
+    expect(mocks.replaceCanvasAssetWorkspaceData).toHaveBeenCalledWith(
+      'ws-reset',
+      emptyCanvasAssetData()
     );
     expectFinalStoresCleared();
   });
