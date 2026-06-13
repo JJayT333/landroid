@@ -36,6 +36,38 @@ describe('PrintOverlay', () => {
     expect(html).toContain('white-space:nowrap');
   });
 
+  it('marks a stale ownership node so a printed chart flags out-of-date boxes', () => {
+    const html = renderToStaticMarkup(
+      <PrintOverlay
+        nodes={[
+          {
+            id: 'stale1',
+            type: 'ownership',
+            position: { x: 40, y: 40 },
+            data: {
+              label: 'Gone',
+              grantee: 'Deleted Owner',
+              grantor: '',
+              instrument: 'Deed',
+              date: '2026-03-27',
+              grantFraction: '0.5',
+              remainingFraction: '0.5',
+              relativeShare: '0.5',
+              nodeId: 'stale1',
+              stale: true,
+            },
+          },
+        ]}
+        edges={[]}
+        cols={1}
+        rows={1}
+        orientation="landscape"
+        pageSize="ansi-a"
+      />
+    );
+    expect(html).toContain('Stale');
+  });
+
   it('renders a shape node as a shape, not a bogus ownership card', () => {
     const html = renderToStaticMarkup(
       <PrintOverlay

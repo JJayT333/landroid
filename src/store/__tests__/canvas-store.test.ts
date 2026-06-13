@@ -160,3 +160,71 @@ describe('canvas-store: z-order', () => {
     expect(nodes.find((n) => n.id === 'b')?.zIndex).toBeLessThan(0);
   });
 });
+
+describe('canvas-store: syncOwnershipFractions (DA-H8 overlay)', () => {
+  beforeEach(resetStore);
+
+  function ownershipWithFractions(
+    id: string,
+    grant: string,
+    remaining: string,
+    relative: string
+  ): Node {
+    return {
+      id,
+      type: 'ownership',
+      position: { x: 0, y: 0 },
+      data: {
+        nodeId: id,
+        label: id,
+        grantee: '',
+        grantor: '',
+        instrument: '',
+        date: '',
+        grantFraction: grant,
+        remainingFraction: remaining,
+        relativeShare: relative,
+      },
+    };
+  }
+
+  it('overlays current fractions onto placed ownership nodes', () => {
+    useCanvasStore.setState({
+      nodes: [ownershipWithFractions('n1', '0.5', '0.5', '0.5')],
+    });
+    useCanvasStore.getState().syncOwnershipFractions(
+      new Map([['n1', { grantFraction: '0.25', remainingFraction: '0.1', relativeShare: '0.25' }]])
+    );
+    const data = useCanvasStore.getState().nodes[0].data as Record<string, unknown>;
+    expect(data.grantFraction).toBe('0.25');
+    expect(data.remainingFraction).toBe('0.1');
+    expect(data.relativeShare).toBe('0.25');
+    expect(data.stale).toBe(false);
+  });
+
+  it('flags a node whose workspace source was deleted as stale', () => {
+    useCanvasStore.setState({
+      nodes: [ownershipWithFractions('gone', '0.5', '0.5', '0.5')],
+    });
+    useCanvasStore.getState().syncOwnershipFractions(new Map());
+    expect((useCanvasStore.getState().nodes[0].data as Record<string, unknown>).stale).toBe(true);
+  });
+
+  it('does not touch undo history (derived sync, not a user edit)', () => {
+    useCanvasStore.setState({
+      nodes: [ownershipWithFractions('n1', '0.5', '0.5', '0.5')],
+      _past: [],
+    });
+    useCanvasStore.getState().syncOwnershipFractions(
+      new Map([['n1', { grantFraction: '0.25', remainingFraction: '0.25', relativeShare: '0.25' }]])
+    );
+    expect(useCanvasStore.getState()._past).toHaveLength(0);
+  });
+
+  it('leaves non-ownership nodes untouched', () => {
+    const shapeId = useCanvasStore.getState().addShapeNode('rect', { x: 0, y: 0 });
+    useCanvasStore.getState().syncOwnershipFractions(new Map());
+    const shape = useCanvasStore.getState().nodes.find((n) => n.id === shapeId)!;
+    expect((shape.data as Record<string, unknown>).stale).toBeUndefined();
+  });
+});

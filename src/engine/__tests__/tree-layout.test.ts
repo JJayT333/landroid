@@ -6,7 +6,11 @@
  * on a single canvas — no pages, no sheets.
  */
 import { describe, it, expect } from 'vitest';
-import { layoutOwnershipTree, layoutOwnershipTreeWithElk } from '../tree-layout';
+import {
+  layoutOwnershipTree,
+  layoutOwnershipTreeWithElk,
+  computeLiveOwnershipFractions,
+} from '../tree-layout';
 import { createBlankNode } from '../../types/node';
 import type { OwnershipNode } from '../../types/node';
 
@@ -490,5 +494,31 @@ describe('layoutOwnershipTreeWithElk', () => {
       expect(elkNode).toBeTruthy();
       expect(elkNode!.position.x).toBe(node.position.x);
     }
+  });
+});
+
+describe('computeLiveOwnershipFractions (DA-H8 overlay)', () => {
+  it('mirrors the importer: grant=absolute, remaining=fraction, relative=share of parent', () => {
+    // Root holds 1/1; child granted 1/2 of whole (= 1/2 of parent), retains all of it.
+    const root = makeNode('root', null, '1', '0.5');
+    const child = makeNode('child', 'root', '0.5', '0.5');
+    const map = computeLiveOwnershipFractions([root, child]);
+
+    expect(map.get('root')).toMatchObject({
+      grantFraction: '1',
+      remainingFraction: '0.5',
+      relativeShare: '1', // root: relative == absolute
+    });
+    const c = map.get('child')!;
+    expect(c.grantFraction).toBe('0.5');
+    expect(c.remainingFraction).toBe('0.5');
+    // relative share = child.initial / parent.initial = 0.5 / 1 = 0.5
+    expect(Number(c.relativeShare)).toBeCloseTo(0.5, 12);
+  });
+
+  it('treats a node whose parent is absent as a root (relative == absolute)', () => {
+    const orphan = makeNode('orphan', 'missing-parent', '0.25', '0.25');
+    const map = computeLiveOwnershipFractions([orphan]);
+    expect(map.get('orphan')!.relativeShare).toBe('0.25');
   });
 });

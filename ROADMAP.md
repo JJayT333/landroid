@@ -34,8 +34,13 @@ those two files win.
    derived interest shows, percent only as a gloss), mechanical sweep of the
    ad-hoc formatters, ESLint guard; plus the csv-io Decimal parse fix (DA-H10).
    Report §3 is the spec.
-4. Display-correctness fixes — live Flowchart fractions or a stale banner
-   gating Print (DA-H8); per-tract ORRI on the Map-mode branch card (DA-H9);
+4. Display-correctness fixes — DA-H8 (live Flowchart fractions) DONE on the
+   flowchart branch: a reactive overlay recomputes interest from the live title
+   nodes onto placed canvas nodes (positions untouched, same relative-share math
+   the importer uses), deleted nodes get a "Stale" badge on screen and in print,
+   and an added-node count surfaces a non-blocking "Re-import" hint — so a
+   printed chart can no longer silently disagree with the workspace. Remaining:
+   per-tract ORRI on the Map-mode branch card (DA-H9);
    formula tooltips render the summary's own staged intermediates and the
    engine fraction formatter (DA-M6/M7).
 5. Research-workspace hardening, before the title-math catalog lands there
@@ -61,7 +66,8 @@ those two files win.
    blobs export/import through the file format (additive, optional field, older
    files import fine) and the side-store rollback path, deduped by content hash,
    each blob re-hashed on import; a missing asset still degrades to a placeholder
-   rather than failing the import.
+   rather than failing the import. DA-H8 (live flowchart fractions) also landed
+   here — see item 4.
 8. Carry-overs still active: make batch graft/attach operations atomic; harden
    `.landroid` and CSV import validation (includes the non-numeric
    future-version gate bypass DA-L8 and the lease-jurisdiction whole-file

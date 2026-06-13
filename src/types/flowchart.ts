@@ -27,6 +27,13 @@ export interface OwnershipNodeData {
   nodeId: string;               // Reference to OwnershipNode.id
   color?: string;
   nodeScale?: number;           // 0.2–3.0, chart-wide proportional scale
+  /**
+   * Set when the referenced OwnershipNode no longer exists in the workspace
+   * (deleted after this node was placed on the canvas). The live-fraction
+   * overlay (DA-H8) flags these so a stale node is visibly marked on screen and
+   * in print instead of silently showing baked-in numbers.
+   */
+  stale?: boolean;
 }
 
 export interface ShapeNodeData {

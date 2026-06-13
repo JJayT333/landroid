@@ -7,7 +7,7 @@
  * State lives in canvas-store (Zustand) for undo/redo, persistence,
  * and keyboard shortcuts. React Flow is a controlled component.
  */
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   ReactFlow,
@@ -53,7 +53,10 @@ import {
   getOwnershipNodeDimensions,
   MIN_NODE_SCALE,
 } from '../engine/flowchart-metrics';
-import { layoutOwnershipTreeWithElk } from '../engine/tree-layout';
+import {
+  layoutOwnershipTreeWithElk,
+  computeLiveOwnershipFractions,
+} from '../engine/tree-layout';
 import useCanvasKeyboardShortcuts from '../hooks/useCanvasKeyboardShortcuts';
 import { exportCanvasToPng } from '../components/canvas/canvas-export';
 import { DRAW_TOOL_SHAPE } from '../types/flowchart';
@@ -443,6 +446,11 @@ function GuideLines({ v, h }: { v: number[]; h: number[] }) {
 
 function FlowchartCanvas() {
   const getActiveDeskMapNodes = useWorkspaceStore((s) => s.getActiveDeskMapNodes);
+  // Reactive workspace subscriptions so the live-fraction overlay (DA-H8) re-runs
+  // whenever the underlying title nodes change — not just on count changes.
+  const wsNodes = useWorkspaceStore((s) => s.nodes);
+  const wsDeskMaps = useWorkspaceStore((s) => s.deskMaps);
+  const wsActiveDeskMapId = useWorkspaceStore((s) => s.activeDeskMapId);
 
   // ── Canvas store ───────────────────────────────────────
   const nodes = useCanvasStore((s) => s.nodes);
@@ -466,6 +474,7 @@ function FlowchartCanvas() {
   const addFrameNode = useCanvasStore((s) => s.addFrameNode);
   const addImageNode = useCanvasStore((s) => s.addImageNode);
   const insertElements = useCanvasStore((s) => s.insertElements);
+  const syncOwnershipFractions = useCanvasStore((s) => s.syncOwnershipFractions);
   const setActiveTool = useCanvasStore((s) => s.setActiveTool);
   const workspaceId = useWorkspaceStore((s) => s.workspaceId);
   const { alert } = useConfirmation();
@@ -897,6 +906,43 @@ function FlowchartCanvas() {
     }
   }, [deskMapNodes.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── DA-H8: keep flowchart fractions live with the workspace ──
+  // Recompute current fractions from the live title nodes and overlay them onto
+  // already-placed canvas nodes (positions untouched); orphaned nodes are
+  // flagged stale. This closes the gap where a printed chart could disagree
+  // with the workspace after any title edit.
+  const liveFractionsById = useMemo(
+    () =>
+      computeLiveOwnershipFractions(
+        getActiveDeskMapNodes().filter((node) => node.type !== 'related')
+      ),
+    // Recompute when the underlying title state changes; getActiveDeskMapNodes
+    // reads current state so these deps drive the refresh.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [wsNodes, wsDeskMaps, wsActiveDeskMapId, getActiveDeskMapNodes]
+  );
+  useEffect(() => {
+    syncOwnershipFractions(liveFractionsById);
+  }, [liveFractionsById, syncOwnershipFractions]);
+
+  // Count workspace title nodes that aren't on the canvas yet (added after the
+  // last import). The overlay can refresh fractions and flag deletions in place,
+  // but new boxes need a re-layout — surface a non-blocking re-import hint so a
+  // printed chart never silently omits them.
+  const missingNodeCount = useMemo(() => {
+    const placed = new Set(
+      nodes
+        .filter((n) => n.type === 'ownership')
+        .map((n) => (n.data as unknown as { nodeId?: string }).nodeId)
+    );
+    if (placed.size === 0) return 0; // not imported yet — auto-import handles it
+    let missing = 0;
+    for (const id of liveFractionsById.keys()) {
+      if (!placed.has(id)) missing += 1;
+    }
+    return missing;
+  }, [liveFractionsById, nodes]);
+
   // ── Resize mode ──────────────────────────────────────────
   const [resizeMode, setResizeMode] = useState(false);
   const resizeOriginals = useRef<{
@@ -999,6 +1045,22 @@ function FlowchartCanvas() {
       {nodes.length > 0 && (
         <div className="no-print absolute bottom-3 left-3 z-10 px-3 py-1.5 rounded-md bg-parchment border border-ledger-line shadow text-xs font-mono text-ink-light">
           {nodes.length} nodes on canvas
+        </div>
+      )}
+
+      {missingNodeCount > 0 && (
+        <div className="no-print absolute top-3 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 px-3 py-1.5 rounded-md bg-seal/10 border border-seal/40 shadow text-xs text-seal">
+          <span>
+            Tree changed: {missingNodeCount} new {missingNodeCount === 1 ? 'box' : 'boxes'} not on
+            the chart.
+          </span>
+          <button
+            type="button"
+            onClick={handleImportTree}
+            className="rounded bg-seal px-2 py-0.5 font-semibold text-white hover:bg-seal-light transition-colors"
+          >
+            Re-import
+          </button>
         </div>
       )}
 

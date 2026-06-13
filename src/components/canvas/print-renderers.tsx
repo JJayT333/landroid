@@ -79,10 +79,11 @@ function PrintCard({
   return (
     <div
       style={{
+        position: 'relative',
         width: cardWidth,
         height: cardHeight,
         borderRadius,
-        border: `${borderWidth}px solid #d4c5a9`,
+        border: `${borderWidth}px solid ${data.stale ? '#9b2c2c' : '#d4c5a9'}`,
         background: '#faf3e8',
         color: '#2c1810',
         display: 'flex',
@@ -90,6 +91,26 @@ function PrintCard({
         overflow: 'hidden',
       }}
     >
+      {data.stale && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 2,
+            right: 2,
+            zIndex: 1,
+            background: '#9b2c2c',
+            color: '#fff',
+            fontSize: 8,
+            fontWeight: 700,
+            textTransform: 'uppercase',
+            letterSpacing: '0.05em',
+            padding: '1px 4px',
+            borderRadius: 2,
+          }}
+        >
+          Stale
+        </div>
+      )}
       {/* Header */}
       <div
         style={{

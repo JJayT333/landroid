@@ -20,11 +20,13 @@ import type {
   FlowTool,
   FrameNodeData,
   ImageNodeData,
+  OwnershipNodeData,
   PageOrientation,
   PageSizeId,
   ShapeNodeData,
   ShapeType,
 } from '../types/flowchart';
+import type { LiveOwnershipFractions } from '../engine/tree-layout';
 import {
   addCanvasEdge,
   applyCanvasEdgeChanges,
@@ -117,6 +119,9 @@ interface CanvasState {
 
   // ── Templates ──
   insertElements: (nodes: Node[], edges: Edge[]) => void;
+
+  // ── Live fraction overlay (DA-H8) ──
+  syncOwnershipFractions: (byId: Map<string, LiveOwnershipFractions>) => void;
 
   // ── Clipboard / duplication ──
   copySelection: () => void;
@@ -485,6 +490,46 @@ export const useCanvasStore = create<CanvasState>()((set, get) => ({
       _past: pushToPast(s._past, captureSnapshot(s)),
       _future: [],
     });
+  },
+
+  // Overlay live workspace fractions onto placed ownership nodes (DA-H8).
+  // Derived sync, not a user edit: it patches node data in place WITHOUT
+  // touching undo history, but the new nodes still autosave so the persisted /
+  // printed chart stays consistent with the workspace. Nodes whose workspace
+  // source was deleted are flagged `stale`. No-ops when nothing changed.
+  syncOwnershipFractions: (byId) => {
+    const s = get();
+    let changed = false;
+    const nodes = s.nodes.map((n) => {
+      if (n.type !== 'ownership') return n;
+      const data = n.data as unknown as OwnershipNodeData;
+      const live = byId.get(data.nodeId);
+      if (!live) {
+        if (data.stale) return n;
+        changed = true;
+        return { ...n, data: { ...data, stale: true } };
+      }
+      if (
+        data.grantFraction === live.grantFraction &&
+        data.remainingFraction === live.remainingFraction &&
+        data.relativeShare === live.relativeShare &&
+        !data.stale
+      ) {
+        return n;
+      }
+      changed = true;
+      return {
+        ...n,
+        data: {
+          ...data,
+          grantFraction: live.grantFraction,
+          remainingFraction: live.remainingFraction,
+          relativeShare: live.relativeShare,
+          stale: false,
+        },
+      };
+    });
+    if (changed) set({ nodes });
   },
 
   // ── Clipboard / duplication ────────────────────────────

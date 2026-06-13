@@ -65,11 +65,19 @@ function OwnershipNodeComponent({ id, data, selected, width, height }: NodeProps
         borderWidth,
       }}
       className={`
-        flex flex-col border-solid shadow-md transition-shadow
+        relative flex flex-col border-solid shadow-md transition-shadow
         ${selected ? 'border-leather shadow-lg ring-2 ring-gold/50' : 'border-ledger-line'}
-        bg-parchment text-ink
+        ${nodeData.stale ? 'border-seal bg-parchment text-ink' : 'bg-parchment text-ink'}
       `}
     >
+      {nodeData.stale && (
+        <div
+          className="absolute -top-2 left-2 z-10 rounded-sm bg-seal px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white shadow"
+          title="This box no longer matches a record in the workspace — it was deleted after the chart was built. Re-import to refresh."
+        >
+          Stale
+        </div>
+      )}
       <CanvasNodeToolbar nodeId={id} isVisible={!!selected} />
       <NodeResizer
         isVisible={selected}
