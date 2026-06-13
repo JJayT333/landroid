@@ -10,7 +10,7 @@
  *       Optional: "Remaining: 1/8" (only if grantee has conveyed some away)
  */
 import { memo } from 'react';
-import { Handle, Position } from '@xyflow/react';
+import { Handle, Position, NodeResizer } from '@xyflow/react';
 import type { NodeProps } from '@xyflow/react';
 import { formatAsFraction } from '../../engine/fraction-display';
 import { d } from '../../engine/decimal';
@@ -21,10 +21,14 @@ import {
 import type { OwnershipNodeData } from '../../types/flowchart';
 import CanvasNodeToolbar from './CanvasNodeToolbar';
 
-function OwnershipNodeComponent({ id, data, selected }: NodeProps & { data: OwnershipNodeData }) {
+function OwnershipNodeComponent({ id, data, selected, width, height }: NodeProps & { data: OwnershipNodeData }) {
   const nodeData = data as OwnershipNodeData;
   const scale = clampNodeScale(nodeData.nodeScale ?? 1);
   const metrics = getOwnershipNodeDimensions(scale);
+  // A user-resized card carries explicit width/height; fall back to the
+  // scale-derived footprint. Print reads the same precedence so they agree.
+  const cardWidth = typeof width === 'number' ? width : metrics.width;
+  const cardHeight = typeof height === 'number' ? height : metrics.height;
   const handleSize = Math.max(4, 10 * scale);
   const handleBorderWidth = Math.max(1, 2 * scale);
   const borderRadius = 8 * scale;
@@ -54,8 +58,9 @@ function OwnershipNodeComponent({ id, data, selected }: NodeProps & { data: Owne
   return (
     <div
       style={{
-        width: metrics.width,
-        minHeight: metrics.height,
+        width: cardWidth,
+        minHeight: cardHeight,
+        height: typeof height === 'number' ? height : undefined,
         borderRadius,
         borderWidth,
       }}
@@ -66,6 +71,13 @@ function OwnershipNodeComponent({ id, data, selected }: NodeProps & { data: Owne
       `}
     >
       <CanvasNodeToolbar nodeId={id} isVisible={!!selected} />
+      <NodeResizer
+        isVisible={selected}
+        minWidth={160}
+        minHeight={96}
+        lineClassName="!border-leather"
+        handleClassName="!bg-leather !w-2 !h-2"
+      />
 
       {/* Top handle */}
       <Handle

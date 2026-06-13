@@ -115,6 +115,9 @@ interface CanvasState {
   selectAll: () => void;
   deselectAll: () => void;
 
+  // ── Templates ──
+  insertElements: (nodes: Node[], edges: Edge[]) => void;
+
   // ── Clipboard / duplication ──
   copySelection: () => void;
   paste: () => void;
@@ -461,6 +464,18 @@ export const useCanvasStore = create<CanvasState>()((set, get) => ({
         e.id === id ? { ...e, data: { ...e.data, ...data } } : e
       ),
     })),
+
+  // ── Templates ──────────────────────────────────────────
+
+  insertElements: (newNodes, newEdges) => {
+    const s = get();
+    set({
+      nodes: [...s.nodes.map((n) => ({ ...n, selected: false })), ...newNodes],
+      edges: [...s.edges, ...newEdges],
+      _past: pushToPast(s._past, captureSnapshot(s)),
+      _future: [],
+    });
+  },
 
   // ── Clipboard / duplication ────────────────────────────
 

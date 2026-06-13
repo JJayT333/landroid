@@ -55,6 +55,8 @@ import { layoutOwnershipTreeWithElk } from '../engine/tree-layout';
 import useCanvasKeyboardShortcuts from '../hooks/useCanvasKeyboardShortcuts';
 import { exportCanvasToPng } from '../components/canvas/canvas-export';
 import { DRAW_TOOL_SHAPE } from '../types/flowchart';
+import { computeAlignmentSnap } from '../components/canvas/alignment-guides';
+import { CANVAS_TEMPLATES } from '../components/canvas/flowchart-templates';
 import type { FlowEdgeData, OwnershipNodeData } from '../types/flowchart';
 import type { OwnershipNode } from '../types/node';
 
@@ -398,6 +400,45 @@ function ResizeOverlay({
   );
 }
 
+// ── Alignment guide lines ─────────────────────────────────
+// Renders snap guide lines (flow-space coords) mapped to screen via viewport.
+function GuideLines({ v, h }: { v: number[]; h: number[] }) {
+  const viewport = useViewport();
+  if (v.length === 0 && h.length === 0) return null;
+  return (
+    <div className="absolute inset-0 z-20 pointer-events-none">
+      {v.map((x, i) => (
+        <div
+          key={`v-${i}`}
+          style={{
+            position: 'absolute',
+            left: x * viewport.zoom + viewport.x,
+            top: 0,
+            bottom: 0,
+            width: 1,
+            background: 'var(--color-leather)',
+            opacity: 0.7,
+          }}
+        />
+      ))}
+      {h.map((y, i) => (
+        <div
+          key={`h-${i}`}
+          style={{
+            position: 'absolute',
+            top: y * viewport.zoom + viewport.y,
+            left: 0,
+            right: 0,
+            height: 1,
+            background: 'var(--color-leather)',
+            opacity: 0.7,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
 function FlowchartCanvas() {
   const getActiveDeskMapNodes = useWorkspaceStore((s) => s.getActiveDeskMapNodes);
 
@@ -422,6 +463,7 @@ function FlowchartCanvas() {
   const addShapeNode = useCanvasStore((s) => s.addShapeNode);
   const addFrameNode = useCanvasStore((s) => s.addFrameNode);
   const addImageNode = useCanvasStore((s) => s.addImageNode);
+  const insertElements = useCanvasStore((s) => s.insertElements);
   const setActiveTool = useCanvasStore((s) => s.setActiveTool);
   const workspaceId = useWorkspaceStore((s) => s.workspaceId);
   const pushHistory = useCanvasStore((s) => s.pushHistory);
@@ -714,6 +756,17 @@ function FlowchartCanvas() {
     });
   }, [screenToFlowPosition]);
 
+  const handleInsertTemplate = useCallback(
+    (templateId: string) => {
+      const template = CANVAS_TEMPLATES.find((t) => t.id === templateId);
+      if (!template) return;
+      const { nodes: tplNodes, edges: tplEdges } = template.build(centerFlowPosition());
+      insertElements(tplNodes, tplEdges);
+      setTimeout(() => fitView({ padding: 0.2, duration: 300 }), 50);
+    },
+    [centerFlowPosition, insertElements, fitView]
+  );
+
   const handleAddImageFiles = useCallback(
     (files: FileList | null) => {
       if (!files) return;
@@ -757,6 +810,43 @@ function FlowchartCanvas() {
   const handleNodeDragStart = useCallback(() => {
     pushHistory();
   }, [pushHistory]);
+
+  // ── Alignment guides while dragging ────────────────────
+  const [guides, setGuides] = useState<{ v: number[]; h: number[] }>({ v: [], h: [] });
+
+  const handleNodeDrag = useCallback(
+    (_event: unknown, node: Node) => {
+      const store = useCanvasStore.getState();
+      const dims = getNodeDimensions(node);
+      const dragged = {
+        id: node.id,
+        x: node.position.x,
+        y: node.position.y,
+        width: dims.width,
+        height: dims.height,
+      };
+      const others = store.nodes
+        .filter((n) => n.id !== node.id && n.type !== 'frame')
+        .map((n) => {
+          const d = getNodeDimensions(n);
+          return { id: n.id, x: n.position.x, y: n.position.y, width: d.width, height: d.height };
+        });
+      const snap = computeAlignmentSnap(dragged, others);
+      if (snap.x !== dragged.x || snap.y !== dragged.y) {
+        store.setNodes(
+          store.nodes.map((n) =>
+            n.id === node.id ? { ...n, position: { x: snap.x, y: snap.y } } : n
+          )
+        );
+      }
+      setGuides({ v: snap.verticalLines, h: snap.horizontalLines });
+    },
+    []
+  );
+
+  const handleNodeDragStopGuides = useCallback(() => {
+    setGuides({ v: [], h: [] });
+  }, []);
 
   // ── Persist viewport on move ───────────────────────────
   const handleMoveEnd = useCallback(
@@ -825,6 +915,8 @@ function FlowchartCanvas() {
     position: n.position,
     data: n.data,
     measured: n.measured,
+    width: typeof n.width === 'number' ? n.width : undefined,
+    height: typeof n.height === 'number' ? n.height : undefined,
     zIndex: n.zIndex,
   }));
   const printEdges = edges.map((e) => ({
@@ -868,6 +960,7 @@ function FlowchartCanvas() {
         onPrint={handlePrint}
         onExportPng={handleExportPng}
         onAddImage={() => fileInputRef.current?.click()}
+        onInsertTemplate={handleInsertTemplate}
       />
 
       {nodes.length > 0 && (
@@ -883,6 +976,8 @@ function FlowchartCanvas() {
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         onNodeDragStart={handleNodeDragStart}
+        onNodeDrag={handleNodeDrag}
+        onNodeDragStop={handleNodeDragStopGuides}
         onMoveEnd={handleMoveEnd}
         onPaneClick={handlePaneClick}
         nodeTypes={nodeTypes}
@@ -930,6 +1025,7 @@ function FlowchartCanvas() {
           pannable
           zoomable
         />
+        <GuideLines v={guides.v} h={guides.h} />
       </ReactFlow>
 
       {resizeMode && resizeOriginals.current && (

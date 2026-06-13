@@ -12,6 +12,7 @@ import {
 } from '../../engine/flowchart-metrics';
 import { useCanvasStore } from '../../store/canvas-store';
 import type { FlowTool } from '../../types/flowchart';
+import { CANVAS_TEMPLATES } from './flowchart-templates';
 import { useConfirmation } from '../shared/ConfirmationProvider';
 
 interface CanvasToolbarProps {
@@ -24,6 +25,7 @@ interface CanvasToolbarProps {
   onPrint: () => void;
   onExportPng: () => void;
   onAddImage: () => void;
+  onInsertTemplate: (templateId: string) => void;
 }
 
 // Upper bound for the page-grid steppers. Generous so large printable grids
@@ -147,6 +149,7 @@ export default function CanvasToolbar({
   onPrint,
   onExportPng,
   onAddImage,
+  onInsertTemplate,
 }: CanvasToolbarProps) {
   // Read from canvas store
   const activeTool = useCanvasStore((s) => s.activeTool);
@@ -250,6 +253,25 @@ export default function CanvasToolbar({
       >
         🖼
       </button>
+      <label className="flex items-center gap-1 text-[10px] uppercase tracking-wider text-ink-light">
+        <span className="sr-only">Insert template</span>
+        <select
+          value=""
+          onChange={(e) => {
+            if (e.target.value) onInsertTemplate(e.target.value);
+            e.target.value = '';
+          }}
+          className="rounded-md border border-ledger-line bg-parchment px-2 py-1 text-[11px] font-medium text-ink outline-none"
+          title="Insert a template exhibit"
+        >
+          <option value="">Template…</option>
+          {CANVAS_TEMPLATES.map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.label}
+            </option>
+          ))}
+        </select>
+      </label>
 
       <div className="w-px h-6 bg-ledger-line mx-1" />
 

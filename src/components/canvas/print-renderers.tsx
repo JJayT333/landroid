@@ -30,14 +30,26 @@ export interface PrintNode {
   position: { x: number; y: number };
   data: unknown;
   measured?: { width?: number; height?: number };
+  width?: number;
+  height?: number;
   zIndex?: number;
 }
 
 // ── Ownership card (moved verbatim from PrintOverlay; markup is golden) ──
 
-function PrintCard({ data }: { data: OwnershipNodeData }) {
+function PrintCard({
+  data,
+  width,
+  height,
+}: {
+  data: OwnershipNodeData;
+  width?: number;
+  height?: number;
+}) {
   const scale = clampNodeScale(data.nodeScale ?? 1);
   const metrics = getOwnershipNodeDimensions(scale);
+  const cardWidth = typeof width === 'number' ? width : metrics.width;
+  const cardHeight = typeof height === 'number' ? height : metrics.height;
   const borderRadius = 8 * scale;
   const borderWidth = Math.max(1, 2 * scale);
   const headerPaddingX = 12 * scale;
@@ -67,8 +79,8 @@ function PrintCard({ data }: { data: OwnershipNodeData }) {
   return (
     <div
       style={{
-        width: metrics.width,
-        height: metrics.height,
+        width: cardWidth,
+        height: cardHeight,
         borderRadius,
         border: `${borderWidth}px solid #d4c5a9`,
         background: '#faf3e8',
@@ -414,13 +426,14 @@ export function getPrintNodeDimensions(node: PrintNode): {
         (typeof data.height === 'number' ? data.height : BASE_NODE_HEIGHT),
     };
   }
-  // Ownership (and untyped legacy nodes) keep their scale-based footprint.
+  // Ownership (and untyped legacy nodes): an explicit resize wins, then the
+  // measured box, then the scale-based footprint.
   const dims = getOwnershipNodeDimensions(
     (node.data as OwnershipNodeData).nodeScale ?? 1
   );
   return {
-    width: node.measured?.width ?? dims.width,
-    height: node.measured?.height ?? dims.height,
+    width: node.width ?? node.measured?.width ?? dims.width,
+    height: node.height ?? node.measured?.height ?? dims.height,
   };
 }
 
@@ -440,8 +453,16 @@ export function renderPrintNodeBody(node: PrintNode): ReactNode {
       return <PrintFrame data={node.data as FrameNodeData} />;
     case 'image':
       return <PrintImage data={node.data as ImageNodeData} />;
-    case 'ownership':
-      return <PrintCard data={node.data as OwnershipNodeData} />;
+    case 'ownership': {
+      const dims = getPrintNodeDimensions(node);
+      return (
+        <PrintCard
+          data={node.data as OwnershipNodeData}
+          width={dims.width}
+          height={dims.height}
+        />
+      );
+    }
     default:
       return null;
   }
