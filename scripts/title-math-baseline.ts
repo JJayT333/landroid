@@ -17,7 +17,11 @@ import { join } from 'node:path';
 
 import { canonicalJson } from '../src/project-records/action-layer/canonical-json';
 import { captureWorkspaceNumbers, type CapturedNumbers } from '../src/title-math/__diff__/capture';
-import { oldEngineBundle } from '../src/title-math/__diff__/engine-bundle';
+import {
+  newEngineBundle,
+  oldEngineBundle,
+  type EngineBundle,
+} from '../src/title-math/__diff__/engine-bundle';
 import { diffCaptured, summarizeDivergences } from '../src/title-math/__diff__/numbers-diff';
 import { PROJECT_LOADERS } from '../src/title-math/__diff__/projects';
 
@@ -43,8 +47,14 @@ async function writeBaselines(): Promise<void> {
   }
 }
 
-async function checkBaselines(): Promise<void> {
+async function checkBaselines(bundle: EngineBundle, engineLabel: string): Promise<void> {
+  // The frozen baselines are always the live (old) engine -- the oracle. With
+  // the old bundle this is a reproducibility check (expect zero divergence);
+  // with the new bundle it is the real differential: Springhill must stay
+  // oracle-clean (no value/structural divergence); demo 'value'/'structural'
+  // divergences are signals to investigate.
   let failed = false;
+  console.log(`checking ${engineLabel} engine against frozen baselines:`);
   for (const loader of PROJECT_LOADERS) {
     const path = baselinePath(loader.id);
     if (!existsSync(path)) {
@@ -53,39 +63,52 @@ async function checkBaselines(): Promise<void> {
       continue;
     }
     const frozen = JSON.parse(await readFile(path, 'utf8')) as CapturedNumbers;
-    const fresh = captureWorkspaceNumbers(loader.load(), oldEngineBundle);
+    const fresh = captureWorkspaceNumbers(loader.load(), bundle);
     const divergences = diffCaptured(frozen, fresh);
     const summary = summarizeDivergences(divergences);
     const status =
-      summary.total === 0 ? 'OK' : loader.oracle ? 'ORACLE DRIFT' : 'CHANGED';
+      summary.total === 0
+        ? 'OK'
+        : loader.oracle
+          ? summary.oracleClean
+            ? 'ORACLE BYTE-ONLY'
+            : 'ORACLE DRIFT'
+          : 'CHANGED';
     console.log(
-      `${loader.id}: ${status} (byte=${summary.byte} value=${summary.value} structural=${summary.structural})`
+      `  ${loader.id}: ${status} (byte=${summary.byte} value=${summary.value} structural=${summary.structural})`
     );
     for (const divergence of divergences.slice(0, 25)) {
       console.log(
-        `  [${divergence.kind}] ${divergence.path}: ${JSON.stringify(divergence.a)} -> ${JSON.stringify(divergence.b)}`
+        `    [${divergence.kind}] ${divergence.path}: ${JSON.stringify(divergence.a)} -> ${JSON.stringify(divergence.b)}`
       );
     }
     if (divergences.length > 25) {
-      console.log(`  ... and ${divergences.length - 25} more`);
+      console.log(`    ... and ${divergences.length - 25} more`);
     }
-    if (summary.total > 0) {
+    // Oracle: any non-clean is a hard failure. Demos: only a real (value/
+    // structural) divergence fails; benign byte-only residue is informational.
+    if (loader.oracle ? summary.total > 0 : !summary.oracleClean) {
       failed = true;
     }
   }
   if (failed) {
     process.exitCode = 1;
   } else {
-    console.log('all baselines reproduce exactly.');
+    console.log('done.');
   }
 }
 
 async function main(): Promise<void> {
-  const mode = process.argv[2] ?? '--check';
+  const args = process.argv.slice(2);
+  const mode = args.find((arg) => arg === '--write' || arg === '--check') ?? '--check';
+  const useNew = args.includes('new') || args.includes('--engine=new') || args.includes('--new');
   if (mode === '--write') {
     await writeBaselines();
   } else {
-    await checkBaselines();
+    await checkBaselines(
+      useNew ? newEngineBundle : oldEngineBundle,
+      useNew ? 'NEW (title-math)' : 'OLD (oracle)'
+    );
   }
 }
 

@@ -27,6 +27,7 @@ import {
   validateOwnershipGraph,
 } from '../../engine/math-engine';
 import { computeLiveOwnershipFractions } from '../../engine/tree-layout';
+import * as titleMath from '../index';
 
 export interface EngineBundle {
   buildLeaseholdUnitSummary: typeof buildLeaseholdUnitSummary;
@@ -50,6 +51,25 @@ export const oldEngineBundle: EngineBundle = {
   validateOwnershipGraph,
   findNpriBranchDiscrepancies,
   rootOwnershipTotal,
+  computeLiveOwnershipFractions,
+  formatAsFraction,
+  dualDisplay,
+};
+
+/**
+ * The unified engine under construction. Leasehold, coverage, and ownership come
+ * from src/title-math; `computeLiveOwnershipFractions` is still the live
+ * tree-layout implementation until Phase E ports it; the display formatters are
+ * the shared fraction-display module (not part of the rewrite).
+ */
+export const newEngineBundle: EngineBundle = {
+  buildLeaseholdUnitSummary: titleMath.buildLeaseholdUnitSummary,
+  buildLeaseholdDecimalRows: titleMath.buildLeaseholdDecimalRows,
+  buildLeaseholdTransferOrderReview: titleMath.buildLeaseholdTransferOrderReview,
+  calculateDeskMapCoverageSummary: titleMath.calculateDeskMapCoverageSummary,
+  validateOwnershipGraph: titleMath.validateOwnershipGraph,
+  findNpriBranchDiscrepancies: titleMath.findNpriBranchDiscrepancies,
+  rootOwnershipTotal: titleMath.rootOwnershipTotal,
   computeLiveOwnershipFractions,
   formatAsFraction,
   dualDisplay,

@@ -55,3 +55,4 @@ export type {
   LeaseCoverageResult,
   LeaseScopeIndex,
 } from './calculators/coverage';
+export * from './calculators/leasehold';
