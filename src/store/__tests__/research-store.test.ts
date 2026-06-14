@@ -57,6 +57,7 @@ describe('research-store', () => {
       formulas: [],
       projectRecords: [],
       questions: [],
+      lastError: null,
       _hydrated: false,
     });
   });
@@ -263,5 +264,46 @@ describe('research-store', () => {
     await useResearchStore.getState().removeProjectRecord('project-1');
     expect(useResearchStore.getState().projectRecords).toEqual([]);
     expect(useResearchStore.getState().questions[0]?.projectRecordIds).toEqual([]);
+  });
+
+  it('reverts an optimistic update and surfaces lastError when persistence fails (DA2-R1)', async () => {
+    const source = createBlankResearchSource('ws-active', {
+      id: 'source-1',
+      title: 'Original title',
+    });
+    useResearchStore.setState({ workspaceId: 'ws-active', sources: [source] });
+    mocks.saveResearchSource.mockRejectedValueOnce(new Error('QuotaExceededError'));
+
+    await useResearchStore.getState().updateSource('source-1', { title: 'Edited title' });
+
+    // The optimistic edit is rolled back to the persisted value — memory and
+    // Dexie do not diverge.
+    expect(useResearchStore.getState().sources[0]?.title).toBe('Original title');
+    expect(useResearchStore.getState().lastError).toMatch(/QuotaExceededError/);
+    expect(useResearchStore.getState().lastError).toMatch(/reverted/i);
+  });
+
+  it('keeps the update and clears a prior lastError when persistence succeeds', async () => {
+    const source = createBlankResearchSource('ws-active', {
+      id: 'source-1',
+      title: 'Original title',
+    });
+    useResearchStore.setState({
+      workspaceId: 'ws-active',
+      sources: [source],
+      lastError: 'previous storage failure',
+    });
+    mocks.saveResearchSource.mockResolvedValueOnce(undefined);
+
+    await useResearchStore.getState().updateSource('source-1', { title: 'Edited title' });
+
+    expect(useResearchStore.getState().sources[0]?.title).toBe('Edited title');
+    expect(useResearchStore.getState().lastError).toBeNull();
+  });
+
+  it('clearLastError resets the surfaced error', () => {
+    useResearchStore.setState({ lastError: 'boom' });
+    useResearchStore.getState().clearLastError();
+    expect(useResearchStore.getState().lastError).toBeNull();
   });
 });
