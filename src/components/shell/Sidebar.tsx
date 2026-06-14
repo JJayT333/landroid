@@ -36,6 +36,7 @@ import { seedVulcanMesaData } from '../../storage/seed-vulcan-mesa';
 import { useConfirmation } from '../shared/ConfirmationProvider';
 import { shouldShowDemoDataMenu } from '../shared/navbar-policy';
 import { LedgerStatusChip } from '../shared/TitleLedgerStatusBanner';
+import { StorageHealthChip } from './StorageHealthChip';
 import ProjectMenu from './ProjectMenu';
 import { CollapseIcon, DotsIcon, ExpandIcon, ShellIcon, type ShellIconName } from './icons';
 
@@ -582,7 +583,10 @@ export default function Sidebar({ onOpenProjectPicker }: SidebarProps) {
           <div className="truncate text-[10px] text-ink-light" title={statusLine}>
             {statusLine}
           </div>
-          <LedgerStatusChip />
+          <div className="flex shrink-0 items-center gap-1.5">
+            <StorageHealthChip />
+            <LedgerStatusChip />
+          </div>
         </div>
       </div>
       <input
