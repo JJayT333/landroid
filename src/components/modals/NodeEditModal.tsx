@@ -14,6 +14,7 @@ import AttachmentsSection from '../shared/AttachmentsSection';
 import { useWorkspaceStore } from '../../store/workspace-store';
 import { formatAsFraction } from '../../engine/fraction-display';
 import { d } from '../../engine/decimal';
+import { formatInterestDecimal } from '../../engine/display-format';
 import { getInterestClass, type OwnershipNode } from '../../types/node';
 import type { OwnerLinkOption } from '../owners/owner-link-options';
 
@@ -305,7 +306,7 @@ export default function NodeEditModal({
                   const oldD = d(node.initialFraction);
                   const newD = d(form.initialFraction);
                   if (oldD.isZero()) return 'N/A';
-                  return newD.div(oldD).toFixed(6);
+                  return formatInterestDecimal(newD.div(oldD));
                 })()}
               </div>
             )}
