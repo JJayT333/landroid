@@ -50,6 +50,8 @@ interface ResearchState {
   formulas: ResearchFormula[];
   projectRecords: ResearchProjectRecord[];
   questions: ResearchQuestion[];
+  /** Last persistence failure surfaced to the user (DA2-R1); null when clear. */
+  lastError: string | null;
   _hydrated: boolean;
   setWorkspace: (workspaceId: string) => Promise<void>;
   replaceWorkspaceData: (
@@ -75,6 +77,36 @@ interface ResearchState {
   addQuestion: (question: ResearchQuestion) => Promise<void>;
   updateQuestion: (id: string, fields: Partial<ResearchQuestion>) => Promise<void>;
   removeQuestion: (id: string) => Promise<void>;
+  clearLastError: () => void;
+}
+
+type ResearchSliceKey = 'imports' | 'sources' | 'formulas' | 'projectRecords' | 'questions';
+
+/**
+ * Persist an already-applied optimistic update. On failure, revert the affected
+ * slice to its pre-update value and record a user-facing error so the in-memory
+ * store and Dexie never silently diverge (deep audit DA2-R1). A successful save
+ * clears any prior error (storage recovered).
+ */
+async function persistOrRevert<E>(
+  set: (partial: Partial<ResearchState>) => void,
+  sliceKey: ResearchSliceKey,
+  previousSlice: E[],
+  entity: E | null,
+  save: (entity: E) => Promise<unknown>,
+  label: string
+): Promise<void> {
+  if (!entity) return;
+  try {
+    await save(entity);
+    set({ lastError: null });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    set({
+      [sliceKey]: previousSlice,
+      lastError: `Couldn't save the ${label}: ${message}. The change was reverted and is not stored — check storage space and try again.`,
+    } as Partial<ResearchState>);
+  }
 }
 
 export const useResearchStore = create<ResearchState>()((set, get) => ({
@@ -84,6 +116,7 @@ export const useResearchStore = create<ResearchState>()((set, get) => ({
   formulas: [],
   projectRecords: [],
   questions: [],
+  lastError: null,
   _hydrated: false,
 
   setWorkspace: async (workspaceId) => {
@@ -132,6 +165,7 @@ export const useResearchStore = create<ResearchState>()((set, get) => ({
   },
 
   updateImport: async (id, fields) => {
+    const previous = get().imports;
     let next: ResearchImport | null = null;
     set((state) => ({
       imports: state.imports.map((researchImport) => {
@@ -144,9 +178,7 @@ export const useResearchStore = create<ResearchState>()((set, get) => ({
         return next;
       }),
     }));
-    if (next) {
-      await saveResearchImport(next);
-    }
+    await persistOrRevert(set, 'imports', previous, next, saveResearchImport, 'data import');
   },
 
   removeImport: async (id) => {
@@ -198,6 +230,7 @@ export const useResearchStore = create<ResearchState>()((set, get) => ({
   },
 
   updateSource: async (id, fields) => {
+    const previous = get().sources;
     let next: ResearchSource | null = null;
     set((state) => ({
       sources: state.sources.map((source) => {
@@ -210,9 +243,7 @@ export const useResearchStore = create<ResearchState>()((set, get) => ({
         return next;
       }),
     }));
-    if (next) {
-      await saveResearchSource(next);
-    }
+    await persistOrRevert(set, 'sources', previous, next, saveResearchSource, 'research source');
   },
 
   removeSource: async (id) => {
@@ -269,6 +300,7 @@ export const useResearchStore = create<ResearchState>()((set, get) => ({
   },
 
   updateFormula: async (id, fields) => {
+    const previous = get().formulas;
     let next: ResearchFormula | null = null;
     set((state) => ({
       formulas: state.formulas.map((formula) => {
@@ -281,9 +313,7 @@ export const useResearchStore = create<ResearchState>()((set, get) => ({
         return next;
       }),
     }));
-    if (next) {
-      await saveResearchFormula(next);
-    }
+    await persistOrRevert(set, 'formulas', previous, next, saveResearchFormula, 'formula');
   },
 
   removeFormula: async (id) => {
@@ -314,6 +344,7 @@ export const useResearchStore = create<ResearchState>()((set, get) => ({
   },
 
   updateProjectRecord: async (id, fields) => {
+    const previous = get().projectRecords;
     let next: ResearchProjectRecord | null = null;
     set((state) => ({
       projectRecords: state.projectRecords.map((projectRecord) => {
@@ -330,9 +361,14 @@ export const useResearchStore = create<ResearchState>()((set, get) => ({
         return next;
       }),
     }));
-    if (next) {
-      await saveResearchProjectRecord(next);
-    }
+    await persistOrRevert(
+      set,
+      'projectRecords',
+      previous,
+      next,
+      saveResearchProjectRecord,
+      'project record'
+    );
   },
 
   removeProjectRecord: async (id) => {
@@ -365,6 +401,7 @@ export const useResearchStore = create<ResearchState>()((set, get) => ({
   },
 
   updateQuestion: async (id, fields) => {
+    const previous = get().questions;
     let next: ResearchQuestion | null = null;
     set((state) => ({
       questions: state.questions.map((question) => {
@@ -377,9 +414,7 @@ export const useResearchStore = create<ResearchState>()((set, get) => ({
         return next;
       }),
     }));
-    if (next) {
-      await saveResearchQuestion(next);
-    }
+    await persistOrRevert(set, 'questions', previous, next, saveResearchQuestion, 'question');
   },
 
   removeQuestion: async (id) => {
@@ -388,4 +423,6 @@ export const useResearchStore = create<ResearchState>()((set, get) => ({
       questions: state.questions.filter((question) => question.id !== id),
     }));
   },
+
+  clearLastError: () => set({ lastError: null }),
 }));

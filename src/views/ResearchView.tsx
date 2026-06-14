@@ -5,6 +5,7 @@ import HorizontalDrillingDecoderPanel from '../components/research/HorizontalDri
 import PendingDrillingDecoderPanel from '../components/research/PendingDrillingDecoderPanel';
 import RrcDelimitedPreviewTable from '../components/research/RrcDelimitedPreviewTable';
 import Button from '../components/shared/Button';
+import Notice from '../components/shared/Notice';
 import UndoRedoControls from '../components/shell/UndoRedoControls';
 import { useConfirmation } from '../components/shared/ConfirmationProvider';
 import FormField from '../components/shared/FormField';
@@ -354,6 +355,8 @@ export default function ResearchView() {
   const formulas = useResearchStore((state) => state.formulas);
   const projectRecords = useResearchStore((state) => state.projectRecords);
   const questions = useResearchStore((state) => state.questions);
+  const lastError = useResearchStore((state) => state.lastError);
+  const clearLastError = useResearchStore((state) => state.clearLastError);
   const addImportToStore = useResearchStore((state) => state.addImport);
   const updateImportToStore = useResearchStore((state) => state.updateImport);
   const removeImportToStore = useResearchStore((state) => state.removeImport);
@@ -1328,6 +1331,25 @@ export default function ResearchView() {
           <UndoRedoControls variant="secondary" />
         </div>
       </header>
+
+      {lastError && (
+        <Notice
+          tone="error"
+          frame="banner"
+          title="Research save failed"
+          actions={
+            <button
+              type="button"
+              onClick={clearLastError}
+              className="text-xs font-semibold underline underline-offset-2"
+            >
+              Dismiss
+            </button>
+          }
+        >
+          {lastError}
+        </Notice>
+      )}
 
       <div className="flex min-h-0 flex-1">
       <aside className="flex w-[296px] shrink-0 flex-col border-r border-ledger-line bg-parchment-light">
