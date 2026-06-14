@@ -137,10 +137,15 @@ export interface ValidationResult {
   issues: ValidationIssue[];
 }
 
-export function validateCalcGraph(nodes: CalcNode[]): ValidationResult {
-  const issues: ValidationIssue[] = [];
-  const byId = new Map<string, CalcNode>();
-
+/**
+ * Pass 1: node identity. Builds the `byId` index (used by later passes) and
+ * flags missing ids, duplicate ids, and non-finite / negative fractions.
+ */
+function validateNodeIdentity(
+  nodes: CalcNode[],
+  byId: Map<string, CalcNode>,
+  issues: ValidationIssue[]
+): void {
   for (const node of nodes) {
     if (!node.id) {
       issues.push({ code: 'invalid_node', message: 'Node missing id' });
@@ -164,7 +169,14 @@ export function validateCalcGraph(nodes: CalcNode[]): ValidationResult {
       issues.push({ code: 'negative_initial_fraction', nodeId: node.id, message: `Negative initialFraction at ${node.id}` });
     }
   }
+}
 
+/** Pass 2: parent links. Flags missing parents and self-parent cycles. */
+function validateParentLinks(
+  nodes: CalcNode[],
+  byId: Map<string, CalcNode>,
+  issues: ValidationIssue[]
+): void {
   for (const node of nodes) {
     if (!node.id || node.parentId == null || node.parentId === 'unlinked') continue;
     if (!byId.has(node.parentId)) {
@@ -174,7 +186,14 @@ export function validateCalcGraph(nodes: CalcNode[]): ValidationResult {
       issues.push({ code: 'self_parent', nodeId: node.id, message: `Self-parent cycle at ${node.id}` });
     }
   }
+}
 
+/** Pass 3: cycle detection by walking each node's ancestry. */
+function validateCycles(
+  nodes: CalcNode[],
+  byId: Map<string, CalcNode>,
+  issues: ValidationIssue[]
+): void {
   for (const node of nodes) {
     if (!node.id) continue;
     const visited = new Set([node.id]);
@@ -190,7 +209,14 @@ export function validateCalcGraph(nodes: CalcNode[]): ValidationResult {
       cursor = next;
     }
   }
+}
 
+/**
+ * Pass 4: branch allocation invariant. For each non-related node,
+ * remaining + sum(allocating-child initialFractions) must equal initialFraction
+ * within EPSILON; flags over- and under-allocated branches.
+ */
+function validateBranchAllocation(nodes: CalcNode[], issues: ValidationIssue[]): void {
   for (const node of nodes) {
     if (!node.id || node.type === 'related') continue;
     const initial = clamp(node.initialFraction);
@@ -232,7 +258,10 @@ export function validateCalcGraph(nodes: CalcNode[]): ValidationResult {
       });
     }
   }
+}
 
+/** Pass 5: related (document/lease) nodes must carry zero ownership fractions. */
+function validateRelatedNodes(nodes: CalcNode[], issues: ValidationIssue[]): void {
   for (const node of nodes) {
     if (node.type !== 'related') continue;
     if (!clamp(node.initialFraction).isZero() || !clamp(node.fraction).isZero()) {
@@ -247,6 +276,21 @@ export function validateCalcGraph(nodes: CalcNode[]): ValidationResult {
       });
     }
   }
+}
+
+/**
+ * Validate the ownership graph. Composes five named passes in a fixed order so
+ * the returned issue array is identical to the historical single-function form.
+ */
+export function validateCalcGraph(nodes: CalcNode[]): ValidationResult {
+  const issues: ValidationIssue[] = [];
+  const byId = new Map<string, CalcNode>();
+
+  validateNodeIdentity(nodes, byId, issues);
+  validateParentLinks(nodes, byId, issues);
+  validateCycles(nodes, byId, issues);
+  validateBranchAllocation(nodes, issues);
+  validateRelatedNodes(nodes, issues);
 
   return { valid: issues.length === 0, issues };
 }
