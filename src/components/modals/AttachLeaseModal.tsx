@@ -674,6 +674,7 @@ export default function AttachLeaseModal({
   return (
     <Modal
       open
+      wide
       onClose={onClose}
       title={
         isEditingExistingLease
