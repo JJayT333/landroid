@@ -66,6 +66,51 @@ export function fromCalc(node: CalcNode): OwnershipNode {
   } as OwnershipNode;
 }
 
+interface RoyaltyMeta {
+  royaltyKind: OwnershipNode['royaltyKind'];
+  fixedRoyaltyBasis: OwnershipNode['fixedRoyaltyBasis'];
+}
+
+/**
+ * Royalty metadata for a node with no parent to inherit from (createNpri,
+ * createRootNode): when NPRI, default the kind to 'fixed' and, for fixed kind,
+ * default the basis to 'burdened_branch'; otherwise both null.
+ */
+export function deriveDefaultRoyaltyMeta(
+  form: Partial<OwnershipNode>,
+  isNpri: boolean
+): RoyaltyMeta {
+  const royaltyKind = isNpri
+    ? (form.royaltyKind as OwnershipNode['royaltyKind'] | undefined) ?? 'fixed'
+    : null;
+  const fixedRoyaltyBasis =
+    isNpri && royaltyKind === 'fixed'
+      ? (form.fixedRoyaltyBasis as OwnershipNode['fixedRoyaltyBasis'] | undefined) ?? 'burdened_branch'
+      : null;
+  return { royaltyKind, fixedRoyaltyBasis };
+}
+
+/**
+ * Royalty metadata inherited from a reference node (predecessorInsert,
+ * attachConveyance): kind/basis fall back to the reference node's. The basis is
+ * kept only when an (inherited or form) basis exists AND the kind is fixed. This
+ * is the algebraic simplification of the historical nested ternary -- the old
+ * `?? 'burdened_branch'` fallback was unreachable (the `&&` guard already
+ * requires a truthy basis), so the result is byte-identical.
+ */
+export function deriveInheritedRoyaltyMeta(
+  form: Partial<OwnershipNode>,
+  inheritFrom: CalcNode
+): RoyaltyMeta {
+  const royaltyKind =
+    (form.royaltyKind as OwnershipNode['royaltyKind'] | undefined) ?? getCalcRoyaltyKind(inheritFrom);
+  const inheritedBasis =
+    (form.fixedRoyaltyBasis as OwnershipNode['fixedRoyaltyBasis'] | undefined)
+    ?? getCalcFixedRoyaltyBasis(inheritFrom);
+  const fixedRoyaltyBasis = inheritedBasis && royaltyKind === 'fixed' ? inheritedBasis : null;
+  return { royaltyKind, fixedRoyaltyBasis };
+}
+
 /** The top-level CalcNode fields that must never leak into `rest`. */
 const CALC_NODE_RESERVED_KEYS = [
   'fraction',

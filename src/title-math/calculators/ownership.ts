@@ -22,6 +22,8 @@ import type {
 import type { Audit, Result } from '../../types/result';
 import {
   allocatesAgainstParent,
+  deriveDefaultRoyaltyMeta,
+  deriveInheritedRoyaltyMeta,
   fromCalc,
   getCalcFixedRoyaltyBasis,
   getCalcInterestClass,
@@ -258,15 +260,7 @@ export function executeCreateNpri(params: CreateNpriParams): Result<OwnershipNod
   if (!parsedShare) return err('invalid_input', 'share must be a finite number');
   const shareAmt = parsedShare;
   if (shareAmt.lessThanOrEqualTo(0)) return err('invalid_input', 'share must be greater than zero');
-  const royaltyKind =
-    (form.royaltyKind as OwnershipNode['royaltyKind'] | undefined) ?? 'fixed';
-  const fixedRoyaltyBasis =
-    royaltyKind === 'fixed'
-      ? (
-          (form.fixedRoyaltyBasis as OwnershipNode['fixedRoyaltyBasis'] | undefined)
-          ?? 'burdened_branch'
-        )
-      : null;
+  const { royaltyKind, fixedRoyaltyBasis } = deriveDefaultRoyaltyMeta(form, true);
 
   const newNode = makeCalcNode({
     id: newNodeId,
@@ -327,15 +321,10 @@ export function executeCreateRootNode(
 
   const interestClass =
     (form.interestClass as InterestClass | undefined) ?? 'mineral';
-  const royaltyKind =
+  const { royaltyKind, fixedRoyaltyBasis } = deriveDefaultRoyaltyMeta(
+    form,
     interestClass === 'npri'
-      ? (form.royaltyKind as OwnershipNode['royaltyKind'] | undefined) ?? 'fixed'
-      : null;
-  const fixedRoyaltyBasis =
-    interestClass === 'npri' && royaltyKind === 'fixed'
-      ? (form.fixedRoyaltyBasis as OwnershipNode['fixedRoyaltyBasis'] | undefined)
-        ?? 'burdened_branch'
-      : null;
+  );
 
   const newNode = makeCalcNode({
     id: newNodeId,
@@ -509,23 +498,7 @@ export function executePredecessorInsert(params: PredecessorInsertParams): Resul
       ...(form ?? {}),
       interestClass:
         (form.interestClass as InterestClass | undefined) ?? getCalcInterestClass(activeNode),
-      royaltyKind:
-        (form.royaltyKind as OwnershipNode['royaltyKind'] | undefined) ?? getCalcRoyaltyKind(activeNode),
-      fixedRoyaltyBasis:
-        (
-          (form.fixedRoyaltyBasis as OwnershipNode['fixedRoyaltyBasis'] | undefined)
-          ?? getCalcFixedRoyaltyBasis(activeNode)
-        )
-        && (
-          ((form.royaltyKind as OwnershipNode['royaltyKind'] | undefined) ?? getCalcRoyaltyKind(activeNode))
-            === 'fixed'
-        )
-          ? (
-              (form.fixedRoyaltyBasis as OwnershipNode['fixedRoyaltyBasis'] | undefined)
-              ?? getCalcFixedRoyaltyBasis(activeNode)
-              ?? 'burdened_branch'
-            )
-          : null,
+      ...deriveInheritedRoyaltyMeta(form, activeNode),
     },
   });
 
@@ -633,23 +606,7 @@ export function executeAttachConveyance(params: AttachConveyanceParams): Result<
           ...next.rest,
           ...(form ?? {}),
           interestClass: getCalcInterestClass(sourceRoot),
-          royaltyKind:
-            (form.royaltyKind as OwnershipNode['royaltyKind'] | undefined) ?? getCalcRoyaltyKind(sourceRoot),
-          fixedRoyaltyBasis:
-            (
-              (form.fixedRoyaltyBasis as OwnershipNode['fixedRoyaltyBasis'] | undefined)
-              ?? getCalcFixedRoyaltyBasis(sourceRoot)
-            )
-            && (
-              ((form.royaltyKind as OwnershipNode['royaltyKind'] | undefined) ?? getCalcRoyaltyKind(sourceRoot))
-                === 'fixed'
-            )
-              ? (
-                  (form.fixedRoyaltyBasis as OwnershipNode['fixedRoyaltyBasis'] | undefined)
-                  ?? getCalcFixedRoyaltyBasis(sourceRoot)
-                  ?? 'burdened_branch'
-                )
-              : null,
+          ...deriveInheritedRoyaltyMeta(form, sourceRoot),
         },
       });
     }
