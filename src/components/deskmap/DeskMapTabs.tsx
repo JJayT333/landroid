@@ -18,6 +18,7 @@ import {
 import type { DeskMap, DeskMapUnitCode } from '../../types/node';
 import type { Lease } from '../../types/owner';
 import { useConfirmation } from '../shared/ConfirmationProvider';
+import { CloseIcon } from '../shell/icons';
 import {
   calculateDeskMapCoverageSummary,
   getActiveLeases,
@@ -226,9 +227,9 @@ export default function DeskMapTabs() {
                   onClick={(e) => handleDelete(dm.id, e)}
                   aria-label={`Delete ${dm.name}`}
                   title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
-                  className="text-xs text-[#fff6ec]/70 opacity-0 transition-opacity hover:text-[#fff6ec] group-hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-30"
+                  className="inline-flex items-center text-[#fff6ec]/70 opacity-0 transition-opacity hover:text-[#fff6ec] group-hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-30"
                 >
-                  ×
+                  <CloseIcon size={12} />
                 </button>
               )}
             </div>

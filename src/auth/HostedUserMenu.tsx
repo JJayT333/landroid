@@ -6,6 +6,7 @@
  * `isHostedMode()` before rendering.
  */
 import { useEffect, useRef, useState } from 'react';
+import { ChevronDownIcon } from '../components/shell/icons';
 import { useAuth } from './AuthProvider';
 
 export default function HostedUserMenu() {
@@ -43,7 +44,9 @@ export default function HostedUserMenu() {
         className="flex w-full items-center justify-between rounded-[7px] px-2.5 py-1.5 text-left text-[12.5px] text-ink transition-colors hover:bg-parchment-dark"
       >
         <span className="truncate">{label}</span>
-        <span className="text-ink-light">▾</span>
+        <span className="flex shrink-0 text-ink-light">
+          <ChevronDownIcon size={12} />
+        </span>
       </button>
       {open && (
         <div

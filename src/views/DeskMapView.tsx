@@ -8,6 +8,7 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Button from '../components/shared/Button';
 import UndoRedoControls from '../components/shell/UndoRedoControls';
+import { ChevronDownIcon, ChevronRightIcon } from '../components/shell/icons';
 import { useUIStore } from '../store/ui-store';
 import { useMapStore } from '../store/map-store';
 import { useOwnerStore } from '../store/owner-store';
@@ -17,6 +18,7 @@ import {
   useWorkspaceReadOnly,
 } from '../store/write-lease-store';
 import { d } from '../engine/decimal';
+import { formatInterestPercent } from '../engine/display-format';
 import { formatAsFraction } from '../engine/fraction-display';
 import {
   findNpriBranchDiscrepancies,
@@ -434,10 +436,6 @@ function PanZoomContainer({
   );
 }
 
-function formatCoveragePercent(value: string) {
-  return `${d(value).times(100).toFixed(2)}%`;
-}
-
 // Per-browser display preference for the NPRI card toggle. Deliberately plain
 // localStorage: this never touches the workspace store, autosave, or the
 // .landroid format.
@@ -606,7 +604,7 @@ function CoverageCard({
   formula?: import('../components/leasehold/FormulaTooltip').FormulaContent;
 }) {
   const value = formatAsFraction(d(fraction));
-  const pct = formatCoveragePercent(fraction);
+  const pct = formatInterestPercent(fraction);
   // HARD RULE (design handoff): a fraction never wraps mid-number. Stacked
   // numerator-over-rule-over-denominator, each term nowrap; reconciliation-
   // scale terms (6–10 digits) step the type down instead of breaking.
@@ -1302,10 +1300,12 @@ export default function DeskMapView() {
             aria-label="Expand toolbar"
             className="absolute left-4 top-4 z-20 flex items-center gap-2 rounded-[10px] border border-ledger-line bg-parchment-light/80 px-3 py-1.5 shadow-[0_4px_14px_rgba(45,33,20,0.08)] backdrop-blur-md backdrop-saturate-150 transition-colors hover:bg-parchment-light"
           >
-            <span className="text-[11px] text-ink-light">▸</span>
+            <span className="flex text-ink-light">
+              <ChevronRightIcon size={12} />
+            </span>
             <span className="text-xs font-semibold text-ink">Toolbar</span>
             <span className="font-mono text-[10px] text-ink-light">
-              {visibleCardCount} cards · found {formatCoveragePercent(coverageSummary.currentOwnership)}
+              {visibleCardCount} cards · found {formatInterestPercent(coverageSummary.currentOwnership)}
             </span>
           </button>
         ) : (
@@ -1337,11 +1337,11 @@ export default function DeskMapView() {
             <button
               type="button"
               onClick={() => setToolbarCollapsed(true)}
-              className="rounded-[5px] px-1.5 py-0.5 text-[11px] text-ink-light transition-colors hover:bg-parchment-dark"
+              className="inline-flex items-center rounded-[5px] px-1.5 py-0.5 text-ink-light transition-colors hover:bg-parchment-dark"
               title="Collapse Desk Map toolbar to free canvas space"
               aria-label="Collapse toolbar"
             >
-              ▾
+              <ChevronDownIcon size={12} />
             </button>
           </div>
           {npriCardCount > 0 && (

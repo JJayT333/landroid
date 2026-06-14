@@ -22,6 +22,7 @@
  * `NodeEditModal`.
  */
 import { useState } from 'react';
+import { ArrowDownIcon, ArrowUpIcon } from '../shell/icons';
 import { useWorkspaceStore } from '../../store/workspace-store';
 import { assertFileSize, FILE_SIZE_LIMITS } from '../../utils/file-validation';
 import type { NodeAttachmentSummary, OwnershipNode } from '../../types/node';
@@ -206,18 +207,18 @@ export default function AttachmentsSection({
                   aria-label="Move up"
                   disabled={isFirst}
                   onClick={() => handleMove(attachment, -1)}
-                  className="rounded border border-ledger-line px-1.5 py-0.5 text-[10px] font-semibold text-ink-light hover:bg-leather/5 disabled:cursor-not-allowed disabled:opacity-40"
+                  className="inline-flex items-center rounded border border-ledger-line px-1.5 py-0.5 text-[10px] font-semibold text-ink-light hover:bg-leather/5 disabled:cursor-not-allowed disabled:opacity-40"
                 >
-                  ↑
+                  <ArrowUpIcon size={12} />
                 </button>
                 <button
                   type="button"
                   aria-label="Move down"
                   disabled={isLast}
                   onClick={() => handleMove(attachment, 1)}
-                  className="rounded border border-ledger-line px-1.5 py-0.5 text-[10px] font-semibold text-ink-light hover:bg-leather/5 disabled:cursor-not-allowed disabled:opacity-40"
+                  className="inline-flex items-center rounded border border-ledger-line px-1.5 py-0.5 text-[10px] font-semibold text-ink-light hover:bg-leather/5 disabled:cursor-not-allowed disabled:opacity-40"
                 >
-                  ↓
+                  <ArrowDownIcon size={12} />
                 </button>
                 <button
                   type="button"

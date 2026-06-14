@@ -38,16 +38,16 @@ const TONE_CLASSNAMES = {
   leather:
     'border-leather/25 bg-leather/5 text-leather hover:bg-leather/10',
   emerald:
-    'border-emerald-300 bg-white/80 text-emerald-900 hover:bg-emerald-100',
-  amber: 'border-amber-300 bg-white/80 text-amber-900 hover:bg-amber-100',
+    'border-tint-green-line bg-white/80 text-tint-green-ink hover:bg-tint-green-line/30',
+  amber: 'border-tint-amber-line bg-white/80 text-tint-amber-ink hover:bg-tint-amber/70',
 } as const;
 
 const OVERFLOW_CLASSNAMES = {
   leather:
     'border-leather/40 bg-leather/15 text-leather hover:bg-leather/25',
   emerald:
-    'border-emerald-400 bg-emerald-100 text-emerald-900 hover:bg-emerald-200',
-  amber: 'border-amber-400 bg-amber-100 text-amber-900 hover:bg-amber-200',
+    'border-tint-green-line bg-tint-green-line/40 text-tint-green-ink hover:bg-tint-green-line/55',
+  amber: 'border-tint-amber-line bg-tint-amber text-tint-amber-ink hover:bg-tint-amber/80',
 } as const;
 
 export interface DeskMapDocumentChipsProps {

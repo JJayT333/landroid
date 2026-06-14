@@ -4,6 +4,7 @@
  * cannot overwrite the active writer; the user may explicitly take over.
  */
 import { useState } from 'react';
+import Notice from './Notice';
 import { useConfirmation } from './ConfirmationProvider';
 import { useWorkspaceStore } from '../../store/workspace-store';
 import { isWorkspaceReadOnly, useWriteLeaseStore } from '../../store/write-lease-store';
@@ -38,22 +39,23 @@ export default function WriteLeaseBanner() {
   };
 
   return (
-    <div className="border-b border-amber-300 bg-amber-100 px-4 py-3 text-sm text-amber-900">
-      <div className="mx-auto flex max-w-6xl items-start justify-between gap-4">
-        <p className="leading-6">
-          This workspace is open and being edited in another tab or window.
-          You&rsquo;re in read-only mode here so your changes don&rsquo;t overwrite
-          the other tab.
-        </p>
+    <Notice
+      frame="banner"
+      tone="warn"
+      actions={
         <button
           type="button"
-          className="shrink-0 rounded border border-amber-400 px-2 py-1 text-xs font-semibold uppercase tracking-wide hover:bg-amber-200 disabled:opacity-60"
+          className="shrink-0 rounded-sm border border-tint-amber-ink/40 px-2 py-1 text-xs font-semibold uppercase tracking-wide hover:bg-tint-amber-line/60 disabled:opacity-60"
           onClick={() => void handleTakeover()}
           disabled={takingOver}
         >
           {takingOver ? 'Taking over…' : 'Take over editing here'}
         </button>
-      </div>
-    </div>
+      }
+    >
+      This workspace is open and being edited in another tab or window.
+      You&rsquo;re in read-only mode here so your changes don&rsquo;t overwrite
+      the other tab.
+    </Notice>
   );
 }

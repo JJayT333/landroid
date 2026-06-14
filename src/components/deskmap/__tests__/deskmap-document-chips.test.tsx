@@ -154,9 +154,9 @@ describe('DeskMapDocumentChips render output', () => {
     );
 
     expect(leather).toContain('text-leather');
-    expect(leather).not.toContain('text-emerald-900');
-    expect(emerald).toContain('text-emerald-900');
-    expect(amber).toContain('text-amber-900');
+    expect(leather).not.toContain('text-tint-green-ink');
+    expect(emerald).toContain('text-tint-green-ink');
+    expect(amber).toContain('text-tint-amber-ink');
   });
 
   it('singularizes "more PDF" in the overflow tooltip when N === 1', () => {
