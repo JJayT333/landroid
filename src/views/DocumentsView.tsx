@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import PdfViewerModal from '../components/modals/PdfViewerModal';
 import Button from '../components/shared/Button';
+import Skeleton from '../components/shared/Skeleton';
 import UndoRedoControls from '../components/shell/UndoRedoControls';
 import {
   DOCUMENT_AREA_LABELS,
@@ -522,13 +523,14 @@ export default function DocumentsView() {
               </tr>
             </thead>
             <tbody>
-              {loading && (
-                <tr>
-                  <td colSpan={7} className="px-3 py-8 text-center text-sm text-ink-light">
-                    Loading documents...
-                  </td>
-                </tr>
-              )}
+              {loading
+                && Array.from({ length: 3 }).map((_, index) => (
+                  <tr key={`doc-skeleton-${index}`} className="border-b border-[#f1eada]">
+                    <td colSpan={7} className="px-3 py-2.5">
+                      <Skeleton className="h-4 w-full" />
+                    </td>
+                  </tr>
+                ))}
               {!loading && filteredRows.length === 0 && (
                 <tr>
                   <td colSpan={7} className="px-3 py-8 text-center text-sm text-ink-light">
