@@ -1139,6 +1139,58 @@ describe('workspace-persistence', () => {
     );
   });
 
+  it('rejects a non-numeric version that carries v8+ document data (DA-L8 bypass)', async () => {
+    const payload = {
+      version: '99',
+      workspaceId: 'ws-bypass',
+      projectName: 'Bypass',
+      nodes: [createBlankNode('node-a')],
+      deskMaps: [],
+      activeDeskMapId: null,
+      instrumentTypes: [],
+      documentData: { documents: [], attachments: [] },
+    };
+    const file = new File([JSON.stringify(payload)], 'bypass.landroid', {
+      type: 'application/json',
+    });
+
+    await expect(importLandroidFile(file)).rejects.toThrow(/numeric version/);
+  });
+
+  it('rejects a missing version that carries an action ledger (DA-L8 bypass)', async () => {
+    const payload = {
+      workspaceId: 'ws-bypass-2',
+      projectName: 'Bypass 2',
+      nodes: [createBlankNode('node-a')],
+      deskMaps: [],
+      activeDeskMapId: null,
+      instrumentTypes: [],
+      actionLedger: { records: [], auditEvents: [] },
+    };
+    const file = new File([JSON.stringify(payload)], 'bypass-2.landroid', {
+      type: 'application/json',
+    });
+
+    await expect(importLandroidFile(file)).rejects.toThrow(/numeric version/);
+  });
+
+  it('still imports a genuine version-less legacy file with no v8+ markers (DA-L8)', async () => {
+    const payload = {
+      workspaceId: 'ws-legacy-noversion',
+      projectName: 'Legacy No Version',
+      nodes: [createBlankNode('node-legacy')],
+      deskMaps: [],
+      activeDeskMapId: null,
+      instrumentTypes: [],
+    };
+    const file = new File([JSON.stringify(payload)], 'legacy-noversion.landroid', {
+      type: 'application/json',
+    });
+
+    const imported = await importLandroidFile(file);
+    expect(imported.workspaceId).toBe('ws-legacy-noversion');
+  });
+
   it('normalizes legacy imported leases that predate royalty and leased-interest fields', async () => {
     const legacyPayload = {
       version: 3,
