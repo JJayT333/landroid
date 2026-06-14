@@ -17,6 +17,7 @@ import {
   useWorkspaceReadOnly,
 } from '../store/write-lease-store';
 import { d } from '../engine/decimal';
+import { formatInterestPercent } from '../engine/display-format';
 import { formatAsFraction } from '../engine/fraction-display';
 import {
   findNpriBranchDiscrepancies,
@@ -434,10 +435,6 @@ function PanZoomContainer({
   );
 }
 
-function formatCoveragePercent(value: string) {
-  return `${d(value).times(100).toFixed(2)}%`;
-}
-
 // Per-browser display preference for the NPRI card toggle. Deliberately plain
 // localStorage: this never touches the workspace store, autosave, or the
 // .landroid format.
@@ -606,7 +603,7 @@ function CoverageCard({
   formula?: import('../components/leasehold/FormulaTooltip').FormulaContent;
 }) {
   const value = formatAsFraction(d(fraction));
-  const pct = formatCoveragePercent(fraction);
+  const pct = formatInterestPercent(fraction);
   // HARD RULE (design handoff): a fraction never wraps mid-number. Stacked
   // numerator-over-rule-over-denominator, each term nowrap; reconciliation-
   // scale terms (6–10 digits) step the type down instead of breaking.
@@ -1305,7 +1302,7 @@ export default function DeskMapView() {
             <span className="text-[11px] text-ink-light">▸</span>
             <span className="text-xs font-semibold text-ink">Toolbar</span>
             <span className="font-mono text-[10px] text-ink-light">
-              {visibleCardCount} cards · found {formatCoveragePercent(coverageSummary.currentOwnership)}
+              {visibleCardCount} cards · found {formatInterestPercent(coverageSummary.currentOwnership)}
             </span>
           </button>
         ) : (

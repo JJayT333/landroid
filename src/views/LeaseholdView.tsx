@@ -8,6 +8,11 @@ import {
   type ReactNode,
 } from 'react';
 import { d } from '../engine/decimal';
+import {
+  formatAcres,
+  formatInterestDecimal,
+  formatInterestPercent,
+} from '../engine/display-format';
 import { formatAsFraction } from '../engine/fraction-display';
 import { isNpriNode } from '../types/node';
 import {
@@ -98,22 +103,6 @@ import {
   unitSummaryTotalPooledAcresFormula,
   unitSummaryTotalRoyaltyFormula,
 } from '../components/leasehold/leasehold-formulas';
-
-function formatAcres(value: string) {
-  const acres = d(value);
-  if (!acres.greaterThan(0)) {
-    return '—';
-  }
-  return acres.decimalPlaces() === 0 ? acres.toFixed(0) : acres.toFixed(3);
-}
-
-function formatPercent(value: string) {
-  return `${d(value).times(100).toFixed(2)}%`;
-}
-
-function formatDecimalValue(value: string) {
-  return d(value).toFixed(8);
-}
 
 function parseVisibleLeaseholdFraction(value: string) {
   return parseStrictInterestString(value) ?? d(0);
@@ -359,7 +348,7 @@ function SummaryCard({
       <div className="text-[9px] font-bold uppercase tracking-[0.1em] text-ink-light">
         {label}
       </div>
-      <div className="mt-1 truncate font-display text-2xl font-bold text-ink" title={value}>
+      <div className="mt-1 truncate font-mono text-xl font-bold tabular-nums text-ink" title={value}>
         {formula ? <FormulaTooltip content={formula}>{value}</FormulaTooltip> : value}
       </div>
       <div className="mt-0.5 text-[9.5px] leading-[1.4] text-ink-light">{detail}</div>
@@ -456,14 +445,14 @@ function LeaseholdOverrideOverview({
   const rows = [
     {
       label: 'NPRI branches',
-      value: formatPercent(summary.totalNpriDecimal),
+      value: formatInterestPercent(summary.totalNpriDecimal),
       count: `${summary.includedNpriCount}/${summary.trackedNpriCount} in payout math`,
       detail: 'Mineral-side royalty burdens from Desk Map title branches.',
       tone: 'border-tint-sky-line bg-sky-50 text-tint-sky-ink',
     },
     {
       label: 'ORRI overrides',
-      value: formatPercent(summary.totalOrriDecimal),
+      value: formatInterestPercent(summary.totalOrriDecimal),
       count:
         orriUnitAssignmentWarningCount > 0
           ? `${summary.includedOrriCount}/${summary.trackedOrriCount} in payout math; ${orriUnitAssignmentWarningCount} need unit`
@@ -473,7 +462,7 @@ function LeaseholdOverrideOverview({
     },
     {
       label: 'WI assignments',
-      value: formatPercent(summary.totalAssignedWorkingInterestDecimal),
+      value: formatInterestPercent(summary.totalAssignedWorkingInterestDecimal),
       count:
         wiUnitAssignmentWarningCount > 0
           ? `${summary.includedAssignmentCount}/${summary.trackedAssignmentCount} in payout math; ${wiUnitAssignmentWarningCount} need unit`
@@ -483,7 +472,7 @@ function LeaseholdOverrideOverview({
     },
     {
       label: 'Retained WI',
-      value: formatPercent(summary.retainedWorkingInterestDecimal),
+      value: formatInterestPercent(summary.retainedWorkingInterestDecimal),
       count:
         summary.overAssignedTractCount > 0
           ? `${summary.overAssignedTractCount} over-assigned tract${summary.overAssignedTractCount === 1 ? '' : 's'}`
@@ -630,10 +619,10 @@ function LeaseholdTractCard({
             </span>
           </div>
           <p className="mt-1 text-sm text-ink-light">
-            Participation {formatPercent(tract.unitParticipation)} from{' '}
+            Participation {formatInterestPercent(tract.unitParticipation)} from{' '}
             {formatAcres(tract.pooledAcres)} pooled acres. Tract royalty total{' '}
-            {formatPercent(tract.weightedRoyaltyRate)}. Current mineral coverage{' '}
-            {formatPercent(tract.currentOwnership)}.
+            {formatInterestPercent(tract.weightedRoyaltyRate)}. Current mineral coverage{' '}
+            {formatInterestPercent(tract.currentOwnership)}.
           </p>
         </div>
         <div className="flex flex-wrap gap-2 text-xs">
@@ -641,10 +630,10 @@ function LeaseholdTractCard({
             {tract.currentOwnerCount} present owners
           </span>
           <span className="rounded-full bg-emerald-50 px-3 py-1.5 font-medium text-emerald-800">
-            Leased {formatPercent(tract.leasedOwnership)}
+            Leased {formatInterestPercent(tract.leasedOwnership)}
           </span>
           <span className="rounded-full bg-gold/10 px-3 py-1.5 font-medium text-ink">
-            Unit royalty decimal {formatPercent(tract.unitRoyaltyDecimal)}
+            Unit royalty decimal {formatInterestPercent(tract.unitRoyaltyDecimal)}
           </span>
           <span className="rounded-full bg-sky-50 px-3 py-1.5 font-medium text-sky-900">
             NPRIs {tract.trackedNpriCount}
@@ -720,44 +709,44 @@ function LeaseholdTractCard({
       <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-xs text-ink-light">
         <span>Gross acres {formatAcres(tract.grossAcres)}</span>
         <span>Pooled acres {formatAcres(tract.pooledAcres)}</span>
-        <span>NRI before ORRI {formatPercent(tract.nriBeforeOrriRate)}</span>
+        <span>NRI before ORRI {formatInterestPercent(tract.nriBeforeOrriRate)}</span>
         <span>
           Unit royalty decimal{' '}
           <FormulaTooltip content={tractUnitRoyaltyFormula(tract)}>
-            {formatPercent(tract.unitRoyaltyDecimal)}
+            {formatInterestPercent(tract.unitRoyaltyDecimal)}
           </FormulaTooltip>
         </span>
-        <span>Floating NPRI burden {formatPercent(tract.floatingNpriBurdenRate)}</span>
-        <span>Fixed NPRI burden {formatPercent(tract.fixedNpriBurdenRate)}</span>
+        <span>Floating NPRI burden {formatInterestPercent(tract.floatingNpriBurdenRate)}</span>
+        <span>Fixed NPRI burden {formatInterestPercent(tract.fixedNpriBurdenRate)}</span>
         <span>
           Unit NPRI decimal{' '}
           <FormulaTooltip content={tractUnitNpriFormula(tract)}>
-            {formatPercent(tract.unitNpriDecimal)}
+            {formatInterestPercent(tract.unitNpriDecimal)}
           </FormulaTooltip>
         </span>
         {orriBurdenDetails.map((item) => (
           <span key={item.label}>
-            {item.label} {formatPercent(item.value)}
+            {item.label} {formatInterestPercent(item.value)}
           </span>
         ))}
-        <span>Total ORRI burden {formatPercent(tract.totalOrriBurdenRate)}</span>
+        <span>Total ORRI burden {formatInterestPercent(tract.totalOrriBurdenRate)}</span>
         <span>
           Unit ORRI decimal{' '}
           <FormulaTooltip content={tractUnitOrriFormula(tract)}>
-            {formatPercent(tract.unitOrriDecimal)}
+            {formatInterestPercent(tract.unitOrriDecimal)}
           </FormulaTooltip>
         </span>
         <span>
           Pre-assignment NRI{' '}
           <FormulaTooltip content={preWorkingInterestFormula(tract)}>
-            {formatPercent(tract.preWorkingInterestDecimal)}
+            {formatInterestPercent(tract.preWorkingInterestDecimal)}
           </FormulaTooltip>
         </span>
-        <span>Assigned WI {formatPercent(tract.assignedWorkingInterestDecimal)}</span>
+        <span>Assigned WI {formatInterestPercent(tract.assignedWorkingInterestDecimal)}</span>
         <span>
           Retained WI{' '}
           <FormulaTooltip content={retainedWorkingInterestFormula(tract)}>
-            {formatPercent(tract.retainedWorkingInterestDecimal)}
+            {formatInterestPercent(tract.retainedWorkingInterestDecimal)}
           </FormulaTooltip>
         </span>
         <span>
@@ -840,22 +829,22 @@ function LeaseholdTractCard({
                 </td>
                 <td className="px-3 py-2 font-mono text-xs text-ink">
                   <FormulaTooltip content={ownerTractRoyaltyFormula(owner)}>
-                    {formatPercent(owner.ownerTractRoyalty)}
+                    {formatInterestPercent(owner.ownerTractRoyalty)}
                   </FormulaTooltip>
                 </td>
                 <td className="px-3 py-2 font-mono text-xs text-ink">
-                  <div>{formatPercent(owner.totalNpriUnitDecimal)}</div>
+                  <div>{formatInterestPercent(owner.totalNpriUnitDecimal)}</div>
                   {(d(owner.fixedNpriUnitDecimal).greaterThan(0)
                     || d(owner.floatingNpriUnitDecimal).greaterThan(0)) && (
                     <div className="text-[11px] text-ink-light">
-                      Fixed {formatPercent(owner.fixedNpriUnitDecimal)} • Floating{' '}
-                      {formatPercent(owner.floatingNpriUnitDecimal)}
+                      Fixed {formatInterestPercent(owner.fixedNpriUnitDecimal)} • Floating{' '}
+                      {formatInterestPercent(owner.floatingNpriUnitDecimal)}
                     </div>
                   )}
                 </td>
                 <td className="px-3 py-2 font-mono text-xs text-ink">
                   <FormulaTooltip content={ownerNetUnitRoyaltyFormula(owner)}>
-                    {formatPercent(owner.netOwnerUnitRoyaltyDecimal)}
+                    {formatInterestPercent(owner.netOwnerUnitRoyaltyDecimal)}
                   </FormulaTooltip>
                 </td>
               </tr>
@@ -1188,13 +1177,13 @@ function LeaseholdGraphUnitCard({
           <span className="rounded-full border border-emerald-200 bg-white/80 px-2 py-0.5 text-[10px] text-emerald-900">
             Royalty{' '}
             <FormulaTooltip content={unitSummaryTotalRoyaltyFormula(unitSummary)}>
-              {formatPercent(unitSummary.totalRoyaltyDecimal)}
+              {formatInterestPercent(unitSummary.totalRoyaltyDecimal)}
             </FormulaTooltip>
           </span>
           <span className="rounded-full border border-emerald-200 bg-white/80 px-2 py-0.5 text-[10px] text-emerald-900">
             NPRI{' '}
             <FormulaTooltip content={unitSummaryTotalNpriFormula(unitSummary)}>
-              {formatPercent(unitSummary.totalNpriDecimal)}
+              {formatInterestPercent(unitSummary.totalNpriDecimal)}
             </FormulaTooltip>
           </span>
           {unitSummary.inputWarningCount > 0 && (
@@ -1267,7 +1256,7 @@ function LeaseholdGraphOverviewTractCard({
             <div className="font-semibold uppercase tracking-wide text-ink/70">TPF</div>
             <div className="mt-1 text-sm font-semibold text-ink">
               <FormulaTooltip content={unitParticipationFormula(tract)}>
-                {formatPercent(tract.unitParticipation)}
+                {formatInterestPercent(tract.unitParticipation)}
               </FormulaTooltip>
             </div>
           </div>
@@ -1275,7 +1264,7 @@ function LeaseholdGraphOverviewTractCard({
             <div className="font-semibold uppercase tracking-wide text-ink/70">Leased</div>
             <div className="mt-1 text-sm font-semibold text-ink">
               <FormulaTooltip content={leasedOwnershipFormula(tract)}>
-                {formatPercent(tract.leasedOwnership)}
+                {formatInterestPercent(tract.leasedOwnership)}
               </FormulaTooltip>
             </div>
           </div>
@@ -1283,7 +1272,7 @@ function LeaseholdGraphOverviewTractCard({
             <div className="font-semibold uppercase tracking-wide text-ink/70">Royalty</div>
             <div className="mt-1 text-sm font-semibold text-ink">
               <FormulaTooltip content={tractUnitRoyaltyFormula(tract)}>
-                {formatPercent(tract.unitRoyaltyDecimal)}
+                {formatInterestPercent(tract.unitRoyaltyDecimal)}
               </FormulaTooltip>
             </div>
           </div>
@@ -1358,13 +1347,13 @@ function LeaseholdGraphTractRootCard({
           <span className="rounded-full border border-ledger-line bg-white/80 px-2 py-0.5 text-[10px] text-ink">
             TPF{' '}
             <FormulaTooltip content={unitParticipationFormula(tract)}>
-              {formatPercent(tract.unitParticipation)}
+              {formatInterestPercent(tract.unitParticipation)}
             </FormulaTooltip>
           </span>
           <span className="rounded-full border border-ledger-line bg-white/80 px-2 py-0.5 text-[10px] text-ink">
             Leased{' '}
             <FormulaTooltip content={leasedOwnershipFormula(tract)}>
-              {formatPercent(tract.leasedOwnership)}
+              {formatInterestPercent(tract.leasedOwnership)}
             </FormulaTooltip>
           </span>
         </div>
@@ -1400,19 +1389,19 @@ function LeaseholdGraphOwnerBranchCard({
           <span className="rounded-full border border-ledger-line bg-white/80 px-2 py-0.5 text-[10px] text-ink">
             Mineral{' '}
             <FormulaTooltip content={ownerMineralFractionFormula(owner)}>
-              {formatPercent(owner.fraction)}
+              {formatInterestPercent(owner.fraction)}
             </FormulaTooltip>
           </span>
           <span className="rounded-full border border-ledger-line bg-white/80 px-2 py-0.5 text-[10px] text-ink">
             Leased{' '}
             <FormulaTooltip content={ownerLeasedFractionFormula(owner)}>
-              {formatPercent(owner.leasedFraction)}
+              {formatInterestPercent(owner.leasedFraction)}
             </FormulaTooltip>
           </span>
           <span className="rounded-full border border-ledger-line bg-white/80 px-2 py-0.5 text-[10px] text-ink">
             Net royalty{' '}
             <FormulaTooltip content={ownerNetUnitRoyaltyFormula(owner)}>
-              {formatPercent(owner.netOwnerUnitRoyaltyDecimal)}
+              {formatInterestPercent(owner.netOwnerUnitRoyaltyDecimal)}
             </FormulaTooltip>
           </span>
           {npris.length > 0 && (
@@ -1466,7 +1455,7 @@ function LeaseholdGraphLeaseSliceCard({
           <span className="rounded-full border border-emerald-200 bg-white/80 px-2 py-0.5 text-[10px] text-emerald-900">
             Leased{' '}
             <FormulaTooltip content={leaseSliceLeasedFractionFormula(leaseSlice, owner)}>
-              {formatPercent(leaseSlice.leasedFraction)}
+              {formatInterestPercent(leaseSlice.leasedFraction)}
             </FormulaTooltip>
           </span>
         </div>
@@ -1475,7 +1464,7 @@ function LeaseholdGraphLeaseSliceCard({
             <div className="font-semibold uppercase tracking-wide">Owner royalty</div>
             <div className="mt-1 text-sm font-semibold text-emerald-950">
               <FormulaTooltip content={leaseSliceOwnerRoyaltyFormula(leaseSlice)}>
-                {formatPercent(leaseSlice.ownerTractRoyalty)}
+                {formatInterestPercent(leaseSlice.ownerTractRoyalty)}
               </FormulaTooltip>
             </div>
           </div>
@@ -1483,7 +1472,7 @@ function LeaseholdGraphLeaseSliceCard({
             <div className="font-semibold uppercase tracking-wide">Net after floating NPRI</div>
             <div className="mt-1 text-sm font-semibold text-emerald-950">
               <FormulaTooltip content={leaseSliceNetOwnerTractRoyaltyFormula(leaseSlice)}>
-                {formatPercent(leaseSlice.netOwnerTractRoyalty)}
+                {formatInterestPercent(leaseSlice.netOwnerTractRoyalty)}
               </FormulaTooltip>
             </div>
           </div>
@@ -1552,13 +1541,13 @@ function LeaseholdGraphNpriLeafCard({
               <span className="rounded-full border border-current/20 bg-white/70 px-2 py-0.5 text-[10px]">
                 Tract burden{' '}
                 <FormulaTooltip content={npriTractBurdenRateFormula(npri)}>
-                  {formatPercent(npri.tractBurdenRate)}
+                  {formatInterestPercent(npri.tractBurdenRate)}
                 </FormulaTooltip>
               </span>
               <span className="rounded-full border border-current/20 bg-white/70 px-2 py-0.5 text-[10px]">
                 Unit dec{' '}
                 <FormulaTooltip content={npriUnitDecimalFormula(npri, tract)}>
-                  {formatPercent(npri.unitDecimal)}
+                  {formatInterestPercent(npri.unitDecimal)}
                 </FormulaTooltip>
               </span>
             </>
@@ -1662,13 +1651,13 @@ function LeaseholdGraphOrriBranchCard({
           <span className="rounded-full border border-amber-300 bg-white/80 px-2 py-0.5 text-[10px] text-amber-900">
             Total{' '}
             <FormulaTooltip content={tractUnitOrriFormula(tract)}>
-              {formatPercent(totalDecimal.toString())}
+              {formatInterestPercent(totalDecimal.toString())}
             </FormulaTooltip>
           </span>
           <span className="rounded-full border border-amber-300 bg-white/80 px-2 py-0.5 text-[10px] text-amber-900">
             Pre-WI base{' '}
             <FormulaTooltip content={preWorkingInterestFormula(tract)}>
-              {formatPercent(tract.npriAdjustedNriBeforeOrriRate)}
+              {formatInterestPercent(tract.npriAdjustedNriBeforeOrriRate)}
             </FormulaTooltip>
           </span>
         </div>
@@ -1703,7 +1692,7 @@ function LeaseholdGraphOrriLeafCard({
         </div>
         <span className="rounded-full border border-amber-200 bg-white/80 px-2 py-0.5 text-[10px] text-amber-900">
           <FormulaTooltip content={orriUnitDecimalFormula(orri, tract)}>
-            {formatPercent(orri.unitDecimal)}
+            {formatInterestPercent(orri.unitDecimal)}
           </FormulaTooltip>
         </span>
       </div>
@@ -1787,13 +1776,13 @@ function LeaseholdGraphWorkingInterestBranchCard({
           <span className="rounded-full border border-leather/20 bg-white/80 px-2 py-0.5 text-[10px] text-leather">
             Pre-WI{' '}
             <FormulaTooltip content={preWorkingInterestFormula(tract)}>
-              {formatPercent(tract.preWorkingInterestDecimal)}
+              {formatInterestPercent(tract.preWorkingInterestDecimal)}
             </FormulaTooltip>
           </span>
           <span className="rounded-full border border-leather/20 bg-white/80 px-2 py-0.5 text-[10px] text-leather">
             Retained{' '}
             <FormulaTooltip content={retainedWorkingInterestFormula(tract)}>
-              {formatPercent(tract.retainedWorkingInterestDecimal)}
+              {formatInterestPercent(tract.retainedWorkingInterestDecimal)}
             </FormulaTooltip>
           </span>
         </div>
@@ -1818,17 +1807,17 @@ function LeaseholdGraphRetainedWorkingInterestLeafCard({
       </div>
       <div className="mt-2 text-lg font-display font-bold text-ink">
         <FormulaTooltip content={retainedWorkingInterestFormula(tract)}>
-          {formatPercent(tract.retainedWorkingInterestDecimal)}
+          {formatInterestPercent(tract.retainedWorkingInterestDecimal)}
         </FormulaTooltip>
       </div>
       <div className="mt-2 text-[11px] leading-5 text-ink-light">
         Assigned{' '}
         <FormulaTooltip content={assignedWorkingInterestFormula(tract)}>
-          {formatPercent(tract.assignedWorkingInterestDecimal)}
+          {formatInterestPercent(tract.assignedWorkingInterestDecimal)}
         </FormulaTooltip>{' '}
         from a pre-WI base of{' '}
         <FormulaTooltip content={preWorkingInterestFormula(tract)}>
-          {formatPercent(tract.preWorkingInterestDecimal)}
+          {formatInterestPercent(tract.preWorkingInterestDecimal)}
         </FormulaTooltip>
         .
       </div>
@@ -1858,7 +1847,7 @@ function LeaseholdGraphAssignmentLeafCard({
         </div>
         <span className="rounded-full border border-leather/20 bg-white/80 px-2 py-0.5 text-[10px] text-leather">
           <FormulaTooltip content={assignmentUnitDecimalFormula(assignment, tract)}>
-            {formatPercent(assignment.unitDecimal)}
+            {formatInterestPercent(assignment.unitDecimal)}
           </FormulaTooltip>
         </span>
       </div>
@@ -1997,25 +1986,25 @@ function LeaseholdGraphMode({
               <span className="rounded-full border border-leather/20 bg-leather/10 px-2 py-0.5 text-[10px] text-leather">
                 Royalty{' '}
                 <FormulaTooltip content={tractUnitRoyaltyFormula(focusedTract)}>
-                  {formatPercent(focusedTract.unitRoyaltyDecimal)}
+                  {formatInterestPercent(focusedTract.unitRoyaltyDecimal)}
                 </FormulaTooltip>
               </span>
               <span className="rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] text-sky-900">
                 NPRI{' '}
                 <FormulaTooltip content={tractUnitNpriFormula(focusedTract)}>
-                  {formatPercent(focusedTract.unitNpriDecimal)}
+                  {formatInterestPercent(focusedTract.unitNpriDecimal)}
                 </FormulaTooltip>
               </span>
               <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] text-amber-900">
                 ORRI{' '}
                 <FormulaTooltip content={tractUnitOrriFormula(focusedTract)}>
-                  {formatPercent(focusedTract.unitOrriDecimal)}
+                  {formatInterestPercent(focusedTract.unitOrriDecimal)}
                 </FormulaTooltip>
               </span>
               <span className="rounded-full border border-ledger-line bg-white/80 px-2 py-0.5 text-[10px] text-ink">
                 WI{' '}
                 <FormulaTooltip content={retainedWorkingInterestFormula(focusedTract)}>
-                  {formatPercent(focusedTract.retainedWorkingInterestDecimal)}
+                  {formatInterestPercent(focusedTract.retainedWorkingInterestDecimal)}
                 </FormulaTooltip>
               </span>
             </>
@@ -2032,7 +2021,7 @@ function LeaseholdGraphMode({
                 ac
               </span>
               <span className="rounded-full border border-ledger-line bg-white/80 px-2 py-0.5 text-[10px] text-ink">
-                Royalty {formatPercent(unitSummary.totalRoyaltyDecimal)}
+                Royalty {formatInterestPercent(unitSummary.totalRoyaltyDecimal)}
               </span>
             </>
           )}
@@ -2087,13 +2076,13 @@ function LeaseholdGraphMode({
               <span className="rounded-full border border-ledger-line bg-white/80 px-2 py-0.5 text-[10px] text-ink">
                 TPF{' '}
                 <FormulaTooltip content={unitParticipationFormula(focusedTract, unitSummary)}>
-                  {formatPercent(focusedTract.unitParticipation)}
+                  {formatInterestPercent(focusedTract.unitParticipation)}
                 </FormulaTooltip>
               </span>
               <span className="rounded-full border border-ledger-line bg-white/80 px-2 py-0.5 text-[10px] text-ink">
                 Leased{' '}
                 <FormulaTooltip content={leasedOwnershipFormula(focusedTract)}>
-                  {formatPercent(focusedTract.leasedOwnership)}
+                  {formatInterestPercent(focusedTract.leasedOwnership)}
                 </FormulaTooltip>
               </span>
             </div>
@@ -2230,26 +2219,26 @@ function LeaseholdDeckLesseeCard({
           <span className="rounded-full border border-emerald-200 bg-white/80 px-2 py-0.5 text-[9px] text-emerald-900/85">
             Unit royalty{' '}
             {royaltyFormula ? (
-              <FormulaTooltip content={royaltyFormula}>{formatPercent(royaltyDecimal)}</FormulaTooltip>
-            ) : formatPercent(royaltyDecimal)}
+              <FormulaTooltip content={royaltyFormula}>{formatInterestPercent(royaltyDecimal)}</FormulaTooltip>
+            ) : formatInterestPercent(royaltyDecimal)}
           </span>
           <span className="rounded-full border border-sky-200 bg-white/80 px-2 py-0.5 text-[9px] text-sky-900/85">
             NPRI decimal{' '}
             {npriFormula ? (
-              <FormulaTooltip content={npriFormula}>{formatPercent(npriDecimal)}</FormulaTooltip>
-            ) : formatPercent(npriDecimal)}
+              <FormulaTooltip content={npriFormula}>{formatInterestPercent(npriDecimal)}</FormulaTooltip>
+            ) : formatInterestPercent(npriDecimal)}
           </span>
           <span className="rounded-full border border-emerald-200 bg-white/80 px-2 py-0.5 text-[9px] text-emerald-900/85">
             ORRI decimal{' '}
             {orriFormula ? (
-              <FormulaTooltip content={orriFormula}>{formatPercent(orriDecimal)}</FormulaTooltip>
-            ) : formatPercent(orriDecimal)}
+              <FormulaTooltip content={orriFormula}>{formatInterestPercent(orriDecimal)}</FormulaTooltip>
+            ) : formatInterestPercent(orriDecimal)}
           </span>
           <span className="rounded-full border border-emerald-200 bg-white/80 px-2 py-0.5 text-[9px] text-emerald-900/85">
             Pre-assignment NRI{' '}
             {preWiFormula ? (
-              <FormulaTooltip content={preWiFormula}>{formatPercent(preWorkingInterestDecimal)}</FormulaTooltip>
-            ) : formatPercent(preWorkingInterestDecimal)}
+              <FormulaTooltip content={preWiFormula}>{formatInterestPercent(preWorkingInterestDecimal)}</FormulaTooltip>
+            ) : formatInterestPercent(preWorkingInterestDecimal)}
           </span>
         </div>
       </div>
@@ -2338,13 +2327,13 @@ function LeaseholdNpriDeckCard({
               <span className="rounded-full border border-sky-200 bg-white/80 px-2 py-0.5 text-[9px] text-sky-900/85">
                 Tract burden{' '}
                 <FormulaTooltip content={npriTractBurdenRateFormula(summary)}>
-                  {formatPercent(summary.tractBurdenRate)}
+                  {formatInterestPercent(summary.tractBurdenRate)}
                 </FormulaTooltip>
               </span>
               <span className="rounded-full border border-sky-200 bg-white/80 px-2 py-0.5 text-[9px] text-sky-900/85">
                 Unit decimal{' '}
                 <FormulaTooltip content={npriUnitDecimalFormula(summary)}>
-                  {formatPercent(summary.unitDecimal)}
+                  {formatInterestPercent(summary.unitDecimal)}
                 </FormulaTooltip>
               </span>
             </>
@@ -2647,7 +2636,7 @@ function LeaseholdOrriDeckCard({
             <span className="rounded-full border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-emerald-800">
               Unit decimal{' '}
               <FormulaTooltip content={orriUnitDecimalFormula(summary)}>
-                {formatPercent(summary.unitDecimal)}
+                {formatInterestPercent(summary.unitDecimal)}
               </FormulaTooltip>
             </span>
           ) : (
@@ -2717,14 +2706,14 @@ function LeaseholdDeckRetainedCard({
           <span className="rounded-full border border-ledger-line bg-white/80 px-2 py-0.5 text-[9px] text-ink">
             Retained{' '}
             {retainedFormula ? (
-              <FormulaTooltip content={retainedFormula}>{formatPercent(retainedDecimal)}</FormulaTooltip>
-            ) : formatPercent(retainedDecimal)}
+              <FormulaTooltip content={retainedFormula}>{formatInterestPercent(retainedDecimal)}</FormulaTooltip>
+            ) : formatInterestPercent(retainedDecimal)}
           </span>
           <span className="rounded-full border border-ledger-line bg-white/80 px-2 py-0.5 text-[9px] text-ink">
             Assigned{' '}
             {assignedFormula ? (
-              <FormulaTooltip content={assignedFormula}>{formatPercent(assignedDecimal)}</FormulaTooltip>
-            ) : formatPercent(assignedDecimal)}
+              <FormulaTooltip content={assignedFormula}>{formatInterestPercent(assignedDecimal)}</FormulaTooltip>
+            ) : formatInterestPercent(assignedDecimal)}
           </span>
           {overAssigned && (
             <span className="rounded-full border border-seal/30 bg-seal/10 px-2 py-0.5 text-[9px] text-seal">
@@ -3050,12 +3039,12 @@ function LeaseholdAssignmentDeckCard({
               <span className="rounded-full border border-leather/30 bg-white/80 px-2 py-0.5 text-leather">
                 Unit decimal{' '}
                 <FormulaTooltip content={assignmentUnitDecimalFormula(summary)}>
-                  {formatPercent(summary.unitDecimal)}
+                  {formatInterestPercent(summary.unitDecimal)}
                 </FormulaTooltip>
               </span>
               {focusDetail && (
                 <span className="rounded-full border border-leather/30 bg-white/80 px-2 py-0.5 text-leather">
-                  {focusDetail.label} {formatPercent(focusDetail.decimal)}
+                  {focusDetail.label} {formatInterestPercent(focusDetail.decimal)}
                 </span>
               )}
             </>
@@ -3409,7 +3398,7 @@ function LeaseholdDecimalLedger({
           <span className="rounded-full bg-leather/10 px-3 py-1.5 font-medium text-leather">
             Visible total{' '}
             <FormulaTooltip content={transferOrderTotalFormula(review.totalDecimal, review.rows.length)}>
-              {formatDecimalValue(review.totalDecimal)}
+              {formatInterestDecimal(review.totalDecimal)}
             </FormulaTooltip>
           </span>
           {editable && (
@@ -3440,19 +3429,19 @@ function LeaseholdDecimalLedger({
       <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
         <TransferOrderMetricCard
           label="Focus Total"
-          value={formatDecimalValue(review.totalDecimal)}
+          value={formatInterestDecimal(review.totalDecimal)}
           detail="Sum of the visible decimal rows in this focus."
           formula={transferOrderTotalFormula(review.totalDecimal, review.rows.length)}
         />
         <TransferOrderMetricCard
           label="Expected Coverage"
-          value={formatDecimalValue(review.expectedDecimal)}
+          value={formatInterestDecimal(review.expectedDecimal)}
           detail={focusCoverageDetail}
           formula={transferOrderExpectedFormula(review.expectedDecimal, focusCoverageDetail)}
         />
         <TransferOrderMetricCard
           label="Variance"
-          value={formatDecimalValue(review.varianceDecimal)}
+          value={formatInterestDecimal(review.varianceDecimal)}
           detail={
             d(review.varianceDecimal).greaterThan(0)
               ? 'Review this mismatch before payout entry.'
@@ -3547,9 +3536,9 @@ function LeaseholdDecimalLedger({
               <li key={overlap.leaseId}>
                 <span className="font-semibold">{overlap.leaseName || 'Unnamed lease'}</span>
                 {overlap.lessee ? ` — ${overlap.lessee}` : ''}: requested{' '}
-                {formatDecimalValue(overlap.requestedFraction)}, allocated{' '}
-                {formatDecimalValue(overlap.allocatedFraction)}, clipped{' '}
-                {formatDecimalValue(overlap.clippedFraction)}.
+                {formatInterestDecimal(overlap.requestedFraction)}, allocated{' '}
+                {formatInterestDecimal(overlap.allocatedFraction)}, clipped{' '}
+                {formatInterestDecimal(overlap.clippedFraction)}.
               </li>
             ))}
           </ul>
@@ -3576,7 +3565,7 @@ function LeaseholdDecimalLedger({
               <span>
                 {summary.rowCount} row{summary.rowCount === 1 ? '' : 's'}
               </span>
-              <span className="font-mono">{formatDecimalValue(summary.totalDecimal)}</span>
+              <span className="font-mono">{formatInterestDecimal(summary.totalDecimal)}</span>
             </span>
           ))}
         </div>
@@ -3657,7 +3646,7 @@ function LeaseholdDecimalLedger({
                     </td>
                     <td className="px-3 py-2 text-right font-mono text-xs text-ink">
                       <FormulaTooltip content={transferOrderRowFormula(row)}>
-                        {formatDecimalValue(row.decimal)}
+                        {formatInterestDecimal(row.decimal)}
                       </FormulaTooltip>
                     </td>
                   </tr>
@@ -3829,7 +3818,7 @@ function LeaseholdDeck({
   const activeUnitAssignmentWarnings = unitSummary.unitAssignmentWarnings;
   const activeRetainedHolder = activeLessees[0] || unit.operator;
   const focusCoverageDetail = focusedTract
-    ? `${formatPercent(focusedTract.unitParticipation)} participation x ${formatPercent(focusedTract.leasedOwnership)} leased ownership for ${focusedTract.code}.`
+    ? `${formatInterestPercent(focusedTract.unitParticipation)} participation x ${formatInterestPercent(focusedTract.leasedOwnership)} leased ownership for ${focusedTract.code}.`
     : 'Sum of each tract participation multiplied by current leased ownership.';
   // Pick the right formula formatter based on focus mode. In tract focus we
   // use the per-tract derivation; in unit focus we use the across-tracts sum.
@@ -3913,37 +3902,37 @@ function LeaseholdDeck({
           />
           <SummaryCard
             label="Unit Royalty"
-            value={formatPercent(activeRoyaltyDecimal)}
+            value={formatInterestPercent(activeRoyaltyDecimal)}
             detail="Current unit royalty decimal from active leases"
             formula={activeRoyaltyFormula}
           />
           <SummaryCard
             label="NPRI Decimal"
-            value={formatPercent(activeNpriDecimal)}
+            value={formatInterestPercent(activeNpriDecimal)}
             detail={`${activeTrackedNpriCount} NPRI branch${activeTrackedNpriCount === 1 ? '' : 'es'} in focus`}
             formula={activeNpriFormula}
           />
           <SummaryCard
             label="ORRI Decimal"
-            value={formatPercent(activeOrriDecimal)}
+            value={formatInterestPercent(activeOrriDecimal)}
             detail={`${activeTrackedOrriCount} ORRI card${activeTrackedOrriCount === 1 ? '' : 's'} in focus`}
             formula={activeOrriFormula}
           />
           <SummaryCard
             label="Pre-Assign NRI"
-            value={formatPercent(activePreWorkingInterestDecimal)}
+            value={formatInterestPercent(activePreWorkingInterestDecimal)}
             detail="Net revenue remaining before WI splits and assignments"
             formula={activePreWiFormula}
           />
           <SummaryCard
             label="Assigned WI"
-            value={formatPercent(activeAssignedWorkingInterestDecimal)}
+            value={formatInterestPercent(activeAssignedWorkingInterestDecimal)}
             detail={`${activeTrackedAssignmentCount} assignment card${activeTrackedAssignmentCount === 1 ? '' : 's'} in focus`}
             formula={activeAssignedWiFormula}
           />
           <SummaryCard
             label="Retained WI"
-            value={formatPercent(activeRetainedWorkingInterestDecimal)}
+            value={formatInterestPercent(activeRetainedWorkingInterestDecimal)}
             detail={activeOverAssigned ? 'At least one focused tract is over-assigned' : 'Remaining WI after assignments'}
             formula={activeRetainedWiFormula}
           />
@@ -4424,12 +4413,12 @@ export default function LeaseholdView() {
               />
               <SummaryCard
                 label="Unit Royalty"
-                value={formatPercent(summary.totalRoyaltyDecimal)}
+                value={formatInterestPercent(summary.totalRoyaltyDecimal)}
                 detail="Total unit royalty decimal from all active owner leases"
               />
               <SummaryCard
                 label="Unit NPRI"
-                value={formatPercent(summary.totalNpriDecimal)}
+                value={formatInterestPercent(summary.totalNpriDecimal)}
                 detail={`${summary.includedNpriCount}/${summary.trackedNpriCount} NPRI branches currently in payout math`}
               />
               <SummaryCard
