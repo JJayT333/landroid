@@ -37,9 +37,15 @@ function toBase64(bytes: Uint8Array) {
     return BufferCtor.from(bytes).toString('base64');
   }
 
+  // Browser fallback (no Buffer): convert in fixed-size windows. Building the
+  // binary string one char at a time allocates a multi-hundred-MB intermediate
+  // near the .landroid size cap and is quadratic in some engines; chunked
+  // `String.fromCharCode(...window)` is linear. Output is byte-identical
+  // (DA-L7). 0x8000 keeps the spread argument count well within engine limits.
+  const CHUNK_SIZE = 0x8000;
   let binary = '';
-  for (let index = 0; index < bytes.length; index += 1) {
-    binary += String.fromCharCode(bytes[index]);
+  for (let index = 0; index < bytes.length; index += CHUNK_SIZE) {
+    binary += String.fromCharCode(...bytes.subarray(index, index + CHUNK_SIZE));
   }
   return btoa(binary);
 }
