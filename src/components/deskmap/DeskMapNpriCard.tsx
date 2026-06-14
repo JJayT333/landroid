@@ -6,6 +6,7 @@ import { READ_ONLY_WORKSPACE_EDIT_TITLE } from '../../store/write-lease-store';
 import type { OwnershipNode } from '../../types/node';
 import type { NpriBranchDiscrepancy } from '../../engine/math-engine';
 import DeskMapDocumentChips from './DeskMapDocumentChips';
+import Chip from '../shared/Chip';
 import { FormulaTooltip } from '../leasehold/FormulaTooltip';
 import {
   npriDiscrepancyFormula,
@@ -79,21 +80,21 @@ function DeskMapNpriCard({
               {node.instrument || 'Royalty Deed'}
             </span>
             <div className="flex items-center gap-1.5">
-              <span className="rounded-full border border-amber-300 bg-amber-200/70 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-amber-950">
+              <Chip tone="amber" variant="solid" shape="pill">
                 NPRI
-              </span>
-              <span className="rounded-full border border-amber-300 bg-white/80 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-amber-900">
+              </Chip>
+              <Chip tone="amber" shape="pill">
                 {isFloating ? 'Floating' : 'Fixed'}
-              </span>
+              </Chip>
               {!isFloating && (
-                <span className="rounded border border-amber-300 bg-white/80 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-amber-900">
+                <Chip tone="amber">
                   {node.fixedRoyaltyBasis === 'whole_tract' ? 'Whole tract' : 'Branch'}
-                </span>
+                </Chip>
               )}
               {hasDiscrepancy && (
-                <span className="rounded-full border border-seal/25 bg-white/80 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-seal">
+                <Chip tone="seal" shape="pill">
                   Review
-                </span>
+                </Chip>
               )}
             </div>
           </div>

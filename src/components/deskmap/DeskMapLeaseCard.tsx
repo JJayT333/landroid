@@ -3,6 +3,7 @@ import { useWorkspaceStore } from '../../store/workspace-store';
 import { READ_ONLY_WORKSPACE_EDIT_TITLE } from '../../store/write-lease-store';
 import type { OwnershipNode } from '../../types/node';
 import DeskMapDocumentChips from './DeskMapDocumentChips';
+import Chip from '../shared/Chip';
 
 interface DeskMapLeaseCardProps {
   node: OwnershipNode;
@@ -48,9 +49,9 @@ function DeskMapLeaseCard({
             <span className="truncate text-[8.5px] font-bold uppercase tracking-wide text-tint-green-ink">
               {node.instrument || 'Lease'}
             </span>
-            <span className="rounded-[5px] bg-[#a7e8c4] px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.06em] text-emerald-950">
+            <Chip tone="green" variant="solid" size="xs">
               Lessee
-            </span>
+            </Chip>
           </div>
           {(node.date || node.fileDate || node.docNo) && (
             <div className="mt-0.5 font-mono text-[9px] text-tint-green-ink/80">
@@ -71,12 +72,9 @@ function DeskMapLeaseCard({
           {termChips.length > 0 && (
             <div className="flex flex-wrap gap-1 pt-0.5">
               {termChips.map((chip) => (
-                <span
-                  key={chip}
-                  className="rounded-[5px] border border-tint-green-line bg-white px-1.5 py-0.5 text-[8.5px] text-tint-green-ink"
-                >
+                <Chip key={chip} tone="green" uppercase={false}>
                   {chip}
-                </span>
+                </Chip>
               ))}
             </div>
           )}

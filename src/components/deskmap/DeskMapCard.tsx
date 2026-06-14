@@ -17,6 +17,7 @@ import type { OwnershipNode } from '../../types/node';
 import { isNpriNode } from '../../types/node';
 import type { DeskMapPrimaryLeaseSummary } from './deskmap-coverage';
 import DeskMapDocumentChips from './DeskMapDocumentChips';
+import Chip from '../shared/Chip';
 import { isLeaseNode } from './deskmap-lease-node';
 import { FormulaTooltip } from '../leasehold/FormulaTooltip';
 import {
@@ -166,9 +167,9 @@ function DeskMapCard({
             </div>
             <div className="flex items-center gap-1.5 ml-2 shrink-0">
               {hasNpriDiscrepancy && (
-                <span className="rounded-full border border-seal/25 bg-seal/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-seal">
+                <Chip tone="seal" shape="pill">
                   NPRI Issue
-                </span>
+                </Chip>
               )}
               {(node.date || node.fileDate) && (
                 <span className={`font-mono text-[9px] ${mutedInk}`}>
