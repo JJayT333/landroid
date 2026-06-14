@@ -31,10 +31,10 @@ import {
 } from '../model/calc-node';
 import {
   applyBranchScale,
-  calcRootMineralTotal,
   collectAllocatingDescendantIds,
   collectDescendantIds,
   EPSILON,
+  rootMineralInitialTotal,
   validateCalcGraph,
   type ValidationIssue,
   type ValidationResult,
@@ -119,8 +119,8 @@ function assertRootTotalNotWorsened(
   before: CalcNode[],
   after: CalcNode[]
 ): Result<OwnershipNode[]> | null {
-  const beforeTotal = calcRootMineralTotal(before);
-  const afterTotal = calcRootMineralTotal(after);
+  const beforeTotal = rootMineralInitialTotal(before);
+  const afterTotal = rootMineralInitialTotal(after);
   const overByAfter = afterTotal.minus(1);
   if (overByAfter.lessThanOrEqualTo(EPSILON)) return null;
   if (afterTotal.greaterThan(beforeTotal.plus(EPSILON))) {
@@ -773,9 +773,10 @@ export function validateOwnershipGraph(nodes: OwnershipNode[]): ValidationResult
 }
 
 /**
- * Sum of the remaining `fraction` across mineral root nodes. Diagnostic/test
+ * Sum of the REMAINING `fraction` across mineral root nodes. Diagnostic/test
  * helper -- normally ~1.0 but legitimately diverges under deliberate over- or
- * under-conveyance. The production over-100 guard is `calcRootMineralTotal`.
+ * under-conveyance. Contrast `rootMineralInitialTotal` (model/graph-ops.ts),
+ * which sums INITIAL fractions and is the production over-100 guard input.
  */
 export function rootOwnershipTotal(nodes: OwnershipNode[]): Decimal {
   let total = new Decimal(0);

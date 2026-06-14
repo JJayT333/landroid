@@ -101,10 +101,16 @@ export function applyBranchScale(
 // ── Root mineral total (the over-100 guard input) ───────────
 
 /**
- * Sum of root mineral INITIAL fractions -- a root's ownership budget is the
- * amount granted, not the residue after descendants took shares.
+ * Sum of root mineral INITIAL fractions -- the over-100 guard input. A root's
+ * ownership budget is the amount it was granted, not the residue after
+ * descendants took shares, so this sums `initialFraction`.
+ *
+ * Contrast `rootOwnershipTotal` (calculators/ownership.ts), the diagnostic that
+ * sums the REMAINING `fraction` across mineral roots. The two have deliberately
+ * opposite inputs: this one guards that a mutation cannot push granted ownership
+ * over 1; the other reports how much of the granted ownership is still unconveyed.
  */
-export function calcRootMineralTotal(nodes: CalcNode[]): Decimal {
+export function rootMineralInitialTotal(nodes: CalcNode[]): Decimal {
   let total = new Decimal(0);
   for (const node of nodes) {
     if (node.type === 'related' || node.parentId === 'unlinked') continue;
