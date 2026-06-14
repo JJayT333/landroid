@@ -20,6 +20,7 @@ import type {
 } from '../../types/node';
 import InstrumentSelect from '../../components/shared/InstrumentSelect';
 import { assertFileSize, FILE_SIZE_LIMITS } from '../../utils/file-validation';
+import { isHostedMode } from '../../utils/deploy-env';
 import {
   buildStagedImportRows,
   stagedImportRowNeedsQuestion,
@@ -145,13 +146,17 @@ export default function WizardPanel() {
             >
               Review rows
             </button>
-            <button
-              type="button"
-              onClick={handleAnalyze}
-              className="rounded border border-leather/40 px-3 py-1.5 text-xs font-semibold text-ink hover:bg-leather/10"
-            >
-              Analyze with AI
-            </button>
+            {/* Hosted proxy rejects generateObject's response_format/non-stream
+                call (always 400s), so only offer AI analyze in local mode. */}
+            {!isHostedMode() && (
+              <button
+                type="button"
+                onClick={handleAnalyze}
+                className="rounded border border-leather/40 px-3 py-1.5 text-xs font-semibold text-ink hover:bg-leather/10"
+              >
+                Analyze with AI
+              </button>
+            )}
             <button
               type="button"
               onClick={handleReset}

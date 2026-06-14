@@ -1223,7 +1223,13 @@ export function validateOwnershipGraph(nodes: OwnershipNode[]): ValidationResult
 // Aggregate helpers
 // ---------------------------------------------------------------------------
 
-/** Sum of all root-level node fractions (should equal 1.0 for a complete tree). */
+/**
+ * Sum of the remaining `fraction` across mineral root nodes. A diagnostic/test
+ * helper — it is normally ~1.0 but legitimately diverges under deliberate
+ * over- or under-conveyance (which this app warns on rather than blocks). The
+ * production over-100 guard is `calcRootMineralTotal` (which sums
+ * `initialFraction`, not remaining `fraction`); see `assertRootTotalNotWorsened`.
+ */
 export function rootOwnershipTotal(nodes: OwnershipNode[]): Decimal {
   let total = new Decimal(0);
   for (const node of nodes) {
