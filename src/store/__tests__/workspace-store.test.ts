@@ -817,4 +817,61 @@ describe('workspace-store', () => {
     expect(ok).toBe(true);
     expect(state.deskMaps[0]?.nodeIds).toEqual(['root-y']);
   });
+
+  it('createRootNode rejects a duplicate node id (DA-M2 — Add Root validation)', () => {
+    useWorkspaceStore.setState({
+      nodes: [{ ...createBlankNode('root-dup', null), initialFraction: '1', fraction: '1' }],
+    });
+
+    const ok = useWorkspaceStore.getState().createRootNode(
+      'root-dup',
+      '1',
+      { grantee: 'Dup', instrument: 'Patent' }
+    );
+
+    const state = useWorkspaceStore.getState();
+    expect(ok).toBe(false);
+    expect(state.lastError).toBeTruthy();
+    expect(state.nodes).toHaveLength(1);
+  });
+
+  it('createRootNode rejects a non-positive or over-1 initial fraction (DA-M2)', () => {
+    const zero = useWorkspaceStore.getState().createRootNode('root-zero', '0', {});
+    expect(zero).toBe(false);
+
+    const over = useWorkspaceStore.getState().createRootNode('root-over', '1.5', {});
+    expect(over).toBe(false);
+
+    expect(useWorkspaceStore.getState().nodes).toHaveLength(0);
+  });
+
+  it('createRootNode allows a second independent root even at 100% total (DA-M2 — multi-tract working state stays editable)', () => {
+    useWorkspaceStore.setState({
+      nodes: [{ ...createBlankNode('root-1', null), initialFraction: '1', fraction: '1' }],
+      deskMaps: [
+        {
+          id: 'dm-1',
+          name: 'Tract 1',
+          code: 'T1',
+          tractId: 'T1',
+          grossAcres: '',
+          pooledAcres: '',
+          description: '',
+          nodeIds: ['root-1'],
+        },
+      ],
+      activeDeskMapId: 'dm-1',
+    });
+
+    const ok = useWorkspaceStore.getState().createRootNode(
+      'root-2',
+      '1',
+      { grantee: 'Second Tract Owner', instrument: 'Patent' }
+    );
+
+    const state = useWorkspaceStore.getState();
+    expect(ok).toBe(true);
+    expect(state.nodes).toHaveLength(2);
+    expect(state.deskMaps.find((dm) => dm.id === 'dm-1')?.nodeIds).toContain('root-2');
+  });
 });

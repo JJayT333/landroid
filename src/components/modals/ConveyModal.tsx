@@ -12,7 +12,7 @@ import InstrumentSelect from '../shared/InstrumentSelect';
 import { useWorkspaceStore } from '../../store/workspace-store';
 import { calculateShare } from '../../engine/math-engine';
 import { formatAsFraction } from '../../engine/fraction-display';
-import { d, serialize } from '../../engine/decimal';
+import { d, serialize, Decimal } from '../../engine/decimal';
 import {
   getInterestClass,
   type OwnershipNode,
@@ -23,6 +23,17 @@ import {
 interface ConveyModalProps {
   parentNode: OwnershipNode;
   onClose: () => void;
+}
+
+/**
+ * DA-M1: detect over-conveyance. `calculateShare` no longer silently caps the
+ * requested share at the grantor's remaining fraction, so the modal decides
+ * whether the (uncapped) share exceeds what the grantor actually holds. A small
+ * epsilon tolerates 9-decimal rounding so an exact-remainder conveyance does not
+ * trip the warning.
+ */
+export function isOverConveyance(share: Decimal, parentFraction: string): boolean {
+  return share.greaterThan(d(parentFraction).plus('1e-9'));
 }
 
 export default function ConveyModal({ parentNode, onClose }: ConveyModalProps) {
@@ -64,6 +75,10 @@ export default function ConveyModal({ parentNode, onClose }: ConveyModalProps) {
   });
   const previewFrac = formatAsFraction(previewShare);
   const parentRemaining = formatAsFraction(d(parentNode.fraction));
+  // DA-M1: the engine no longer silently caps the share at the grantor's
+  // remainder. Detect over-conveyance up front so the operator sees it (rather
+  // than a generic engine rejection on save) and can convey the remainder.
+  const overConveys = isOverConveyance(previewShare, parentNode.fraction);
   const fixedNpriLabel =
     parentNode.fixedRoyaltyBasis === 'whole_tract'
       ? 'Grantor remaining whole-tract fixed burden'
@@ -74,11 +89,25 @@ export default function ConveyModal({ parentNode, onClose }: ConveyModalProps) {
       : fixedNpriLabel
     : 'Grantor remaining';
 
+  // DA-M1: "Convey remainder instead" — switch to All Remaining mode, which
+  // conveys exactly the grantor's remaining fraction.
+  const handleConveyRemainder = () => {
+    setForm((f) => ({ ...f, conveyanceMode: 'all' }));
+  };
+
   const handleSave = () => {
     setError(null);
 
     if (!form.grantee.trim()) {
       setError('Grantee is required');
+      return;
+    }
+
+    if (overConveys) {
+      setError(
+        `Requested ${previewFrac} exceeds ${parentRemainingLabel.toLowerCase()} of ${parentRemaining}. ` +
+          'Reduce the amount or use "Convey remainder instead".'
+      );
       return;
     }
 
@@ -228,6 +257,26 @@ export default function ConveyModal({ parentNode, onClose }: ConveyModalProps) {
             </div>
           </div>
         </fieldset>
+
+        {overConveys && (
+          <div
+            className="border border-tint-amber-line bg-tint-amber rounded-md p-3 text-sm text-tint-amber-ink"
+            role="alert"
+          >
+            <p>
+              Requested <span className="font-mono font-semibold">{previewFrac}</span> exceeds{' '}
+              {parentRemainingLabel.toLowerCase()} of{' '}
+              <span className="font-mono font-semibold">{parentRemaining}</span>.
+            </p>
+            <button
+              type="button"
+              onClick={handleConveyRemainder}
+              className="mt-2 rounded border border-tint-amber-line bg-white/60 px-2 py-1 text-xs font-semibold hover:bg-white"
+            >
+              Convey remainder ({parentRemaining}) instead
+            </button>
+          </div>
+        )}
 
         {error && (
           <div className="bg-seal/10 border border-seal/30 rounded-md p-3 text-sm text-seal">
