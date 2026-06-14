@@ -40,3 +40,18 @@ export type {
   ValidationIssue,
   ValidationResult,
 } from './model/graph-ops';
+export {
+  allocateLeaseCoverage,
+  buildLeaseScopeIndex,
+  calculateDeskMapCoverageSummary,
+  getActiveLeases,
+  getLeasesForOwnerNode,
+  isLeaseActive,
+} from './calculators/coverage';
+export type {
+  DeskMapCoverageSummary,
+  LeaseCoverageAllocation,
+  LeaseCoverageOverlap,
+  LeaseCoverageResult,
+  LeaseScopeIndex,
+} from './calculators/coverage';
