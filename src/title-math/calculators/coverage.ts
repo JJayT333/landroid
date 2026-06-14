@@ -18,9 +18,10 @@ import type Decimal from 'decimal.js';
 
 import { isLeaseNode } from '../../components/deskmap/deskmap-lease-node';
 import { d } from '../../engine/decimal';
-import { isNpriNode, type OwnershipNode } from '../../types/node';
+import type { OwnershipNode } from '../../types/node';
 import { isInactiveLeaseStatus, isTexasMathLease, type Lease } from '../../types/owner';
 import { parseStrictInterestString } from '../../utils/interest-string';
+import { isTitleCountedNode } from '../model/node-predicates';
 import { emitRate } from '../precision/emit';
 
 export interface DeskMapCoverageSummary {
@@ -216,7 +217,7 @@ export function calculateDeskMapCoverageSummary(
   const leaseOverlaps: DeskMapCoverageSummary['leaseOverlaps'] = [];
 
   nodes.forEach((node) => {
-    if (node.type === 'related' || isNpriNode(node)) return;
+    if (!isTitleCountedNode(node)) return;
     const remaining = d(node.fraction);
     if (!remaining.greaterThan(0)) return;
 
@@ -270,7 +271,7 @@ export function calculateDeskMapCoverageSummary(
     leasedOwnerCount,
     currentOwnershipContributors: nodes
       .filter((node) => {
-        if (node.type === 'related' || isNpriNode(node)) return false;
+        if (!isTitleCountedNode(node)) return false;
         return d(node.fraction).greaterThan(0);
       })
       .map((node) => ({

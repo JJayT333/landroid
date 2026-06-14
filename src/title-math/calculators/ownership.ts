@@ -42,6 +42,7 @@ import {
   type ValidationIssue,
   type ValidationResult,
 } from '../model/graph-ops';
+import { isTitleCountedNode } from '../model/node-predicates';
 import { emitNodeFraction, emitScaleFactor } from '../precision/emit';
 
 // ── Result constructors ─────────────────────────────────────
@@ -701,7 +702,25 @@ export function executeDeleteBranch(params: DeleteBranchParams): Result<Ownershi
 // ── Public validation / aggregates ──────────────────────────
 
 export function validateOwnershipGraph(nodes: OwnershipNode[]): ValidationResult {
-  return validateCalcGraph(nodes.map(toCalc));
+  const { issues } = validateCalcGraph(nodes.map(toCalc));
+  // DA-L2: a stored fraction string that fails strict parsing is silently
+  // coerced to 0 by d() inside toCalc, so validateCalcGraph (which sees the
+  // already-parsed 0) cannot flag it. Surface it here from the original strings
+  // so corrupt data is visible rather than masked. Well-formed serialized
+  // decimals and blank (absent) values are unaffected.
+  for (const node of nodes) {
+    for (const field of ['fraction', 'initialFraction'] as const) {
+      const raw = node[field];
+      if (typeof raw === 'string' && raw.trim() !== '' && parseStrictDecimal(raw) === null) {
+        issues.push({
+          code: 'malformed_fraction',
+          nodeId: node.id,
+          message: `Malformed ${field} "${raw}" at ${node.id} (coerced to 0)`,
+        });
+      }
+    }
+  }
+  return { valid: issues.length === 0, issues };
 }
 
 /**
@@ -713,11 +732,7 @@ export function validateOwnershipGraph(nodes: OwnershipNode[]): ValidationResult
 export function rootOwnershipTotal(nodes: OwnershipNode[]): Decimal {
   let total = new Decimal(0);
   for (const node of nodes) {
-    if (
-      node.type === 'related' ||
-      node.parentId === 'unlinked' ||
-      ((node.interestClass ?? 'mineral') !== 'mineral')
-    ) continue;
+    if (!isTitleCountedNode(node)) continue;
     if (node.parentId == null) {
       total = total.plus(d(node.fraction));
     }

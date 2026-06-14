@@ -20,6 +20,7 @@ import {
   toCalc,
   type CalcNode,
 } from './calc-node';
+import { isTitleCountedNode } from './node-predicates';
 
 export const EPSILON = new Decimal('0.000000001');
 
@@ -113,9 +114,13 @@ export function applyBranchScale(
 export function rootMineralInitialTotal(nodes: CalcNode[]): Decimal {
   let total = new Decimal(0);
   for (const node of nodes) {
-    if (node.type === 'related' || node.parentId === 'unlinked') continue;
-    const interestClass = getCalcInterestClass(node);
-    if (interestClass !== 'mineral') continue;
+    if (
+      !isTitleCountedNode({
+        type: node.type,
+        interestClass: getCalcInterestClass(node),
+        parentId: node.parentId,
+      })
+    ) continue;
     if (node.parentId == null) {
       total = total.plus(node.initialFraction);
     }
