@@ -294,9 +294,12 @@ function findLatestAppliedIndex(
 ): number {
   for (let index = entries.length - 1; index >= 0; index -= 1) {
     const entry = entries[index];
+    // Match only the entry created with this exact undo label (latest wins on a
+    // label collision). A label-less or differently-labelled applied entry must
+    // not be undone in its place (deep-audit DA-L6).
     if (
       entry.status === 'applied'
-      && (!undoLabel || !entry.undoLabel || entry.undoLabel === undoLabel)
+      && (!undoLabel || entry.undoLabel === undoLabel)
     ) {
       return index;
     }
