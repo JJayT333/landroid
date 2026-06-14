@@ -4,6 +4,7 @@ import { createBlankNode, type DeskMap } from '../../types/node';
 import { LANDROID_FILE_VERSION, type WorkspaceData } from '../workspace-persistence';
 import {
   runV10ToV11DbKeyBackfill,
+  runV9DocumentAttachmentBackfill,
   runV9ToV10WorkspaceShardMigration,
   type WorkspaceRecord,
 } from '../db';
@@ -206,6 +207,30 @@ describe('v9 to v10 workspace shard Dexie migration', () => {
       expect.stringContaining('Workspace row corrupt-row could not be sharded')
     );
     warnSpy.mockRestore();
+  });
+
+  it('stamps workspaceId on valid attachments and deletes dangling ones (DA-M10)', async () => {
+    const { tx, tables } = buildTx([]);
+    await tables.documents.put({ docId: 'doc-1', workspaceId: 'ws-1' });
+    // Valid attachment → should be stamped with its document's workspaceId.
+    await tables.document_attachments.put({
+      attachmentId: 'att-valid',
+      docId: 'doc-1',
+    });
+    // Dangling attachment → its docId has no document; previously left with no
+    // workspaceId (invisible forever), now removed.
+    await tables.document_attachments.put({
+      attachmentId: 'att-dangling',
+      docId: 'doc-missing',
+    });
+
+    await runV9DocumentAttachmentBackfill(tx);
+
+    expect(tables.document_attachments.rows.get('att-valid')).toEqual(
+      expect.objectContaining({ attachmentId: 'att-valid', workspaceId: 'ws-1' })
+    );
+    expect(tables.document_attachments.rows.has('att-dangling')).toBe(false);
+    expect(tables.document_attachments.rows.size).toBe(1);
   });
 
   it('backfills dbKey onto v10 shard and side-store rows', async () => {
