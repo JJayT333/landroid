@@ -1,4 +1,5 @@
 import db from './db';
+import { withQuotaErrorReporting } from '../store/storage-health-store';
 import {
   activeStorageScopedId,
   activeWorkspaceScope,
@@ -299,10 +300,12 @@ export async function saveContact(contact: ContactLog) {
 
 export async function saveOwnerDoc(doc: OwnerDoc) {
   await ensureWorkspaceWriteFence(doc.workspaceId);
-  return db.transaction('rw', db.workspaceWriteLeases, db.ownerDocs, async () => {
-    await assertWorkspaceWriteFence(doc.workspaceId);
-    return db.ownerDocs.put(stampActiveDbKeyWithStorageId(doc, 'id'));
-  });
+  return withQuotaErrorReporting('Owner document save', () =>
+    db.transaction('rw', db.workspaceWriteLeases, db.ownerDocs, async () => {
+      await assertWorkspaceWriteFence(doc.workspaceId);
+      return db.ownerDocs.put(stampActiveDbKeyWithStorageId(doc, 'id'));
+    })
+  );
 }
 
 /**
