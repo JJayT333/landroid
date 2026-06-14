@@ -8,6 +8,7 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Button from '../components/shared/Button';
 import UndoRedoControls from '../components/shell/UndoRedoControls';
+import { ChevronDownIcon, ChevronRightIcon } from '../components/shell/icons';
 import { useUIStore } from '../store/ui-store';
 import { useMapStore } from '../store/map-store';
 import { useOwnerStore } from '../store/owner-store';
@@ -1299,7 +1300,9 @@ export default function DeskMapView() {
             aria-label="Expand toolbar"
             className="absolute left-4 top-4 z-20 flex items-center gap-2 rounded-[10px] border border-ledger-line bg-parchment-light/80 px-3 py-1.5 shadow-[0_4px_14px_rgba(45,33,20,0.08)] backdrop-blur-md backdrop-saturate-150 transition-colors hover:bg-parchment-light"
           >
-            <span className="text-[11px] text-ink-light">▸</span>
+            <span className="flex text-ink-light">
+              <ChevronRightIcon size={12} />
+            </span>
             <span className="text-xs font-semibold text-ink">Toolbar</span>
             <span className="font-mono text-[10px] text-ink-light">
               {visibleCardCount} cards · found {formatInterestPercent(coverageSummary.currentOwnership)}
@@ -1334,11 +1337,11 @@ export default function DeskMapView() {
             <button
               type="button"
               onClick={() => setToolbarCollapsed(true)}
-              className="rounded-[5px] px-1.5 py-0.5 text-[11px] text-ink-light transition-colors hover:bg-parchment-dark"
+              className="inline-flex items-center rounded-[5px] px-1.5 py-0.5 text-ink-light transition-colors hover:bg-parchment-dark"
               title="Collapse Desk Map toolbar to free canvas space"
               aria-label="Collapse toolbar"
             >
-              ▾
+              <ChevronDownIcon size={12} />
             </button>
           </div>
           {npriCardCount > 0 && (

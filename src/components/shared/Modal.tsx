@@ -8,6 +8,7 @@
  * element opened the dialog.
  */
 import { useEffect, useRef, type ReactNode } from 'react';
+import { CloseIcon } from '../shell/icons';
 
 interface ModalProps {
   open: boolean;
@@ -154,10 +155,10 @@ export default function Modal({ open, onClose, title, children, wide, headerActi
             {headerActions}
             <button
               onClick={onClose}
-              className="text-ink-light hover:text-ink text-2xl leading-none px-1"
+              className="flex items-center rounded-sm px-1 text-ink-light hover:text-ink"
               aria-label="Close"
             >
-              &times;
+              <CloseIcon size={18} />
             </button>
           </div>
         </div>

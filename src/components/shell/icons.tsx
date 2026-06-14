@@ -136,6 +136,52 @@ export function DotsIcon({ size = 15 }: { size?: number }) {
   );
 }
 
+export function ChevronDownIcon({ size = 14 }: { size?: number }) {
+  return <Stroke size={size}><path d="m6 9 6 6 6-6" /></Stroke>;
+}
+
+export function ChevronUpIcon({ size = 14 }: { size?: number }) {
+  return <Stroke size={size}><path d="m6 15 6-6 6 6" /></Stroke>;
+}
+
+export function ChevronRightIcon({ size = 14 }: { size?: number }) {
+  return <Stroke size={size}><path d="m9 6 6 6-6 6" /></Stroke>;
+}
+
+export function ChevronLeftIcon({ size = 14 }: { size?: number }) {
+  return <Stroke size={size}><path d="m15 6-6 6 6 6" /></Stroke>;
+}
+
+export function CloseIcon({ size = 14 }: { size?: number }) {
+  return <Stroke size={size}><path d="M6 6l12 12M18 6 6 18" /></Stroke>;
+}
+
+export function ArrowUpIcon({ size = 14 }: { size?: number }) {
+  return <Stroke size={size}><path d="M12 19V5M6 11l6-6 6 6" /></Stroke>;
+}
+
+export function ArrowDownIcon({ size = 14 }: { size?: number }) {
+  return <Stroke size={size}><path d="M12 5v14M6 13l6 6 6-6" /></Stroke>;
+}
+
+export function GearIcon({ size = 15 }: { size?: number }) {
+  return (
+    <Stroke size={size}>
+      <circle cx="12" cy="12" r="3" />
+      <path d="M12 2v3m0 14v3M4.2 4.2l2.1 2.1m11.4 11.4 2.1 2.1M2 12h3m14 0h3M4.2 19.8l2.1-2.1m11.4-11.4 2.1-2.1" />
+    </Stroke>
+  );
+}
+
+export function WarningIcon({ size = 14 }: { size?: number }) {
+  return (
+    <Stroke size={size}>
+      <path d="M12 3 2 20h20L12 3z" />
+      <path d="M12 10v4M12 17h.01" />
+    </Stroke>
+  );
+}
+
 export function UndoIcon({ size = 13 }: { size?: number }) {
   return (
     <Stroke size={size}>

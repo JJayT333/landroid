@@ -6,6 +6,7 @@
  * everything deterministic still lives in the Zustand stores the tools read.
  */
 import { useRef, useState } from 'react';
+import { CloseIcon, GearIcon, WarningIcon } from '../components/shell/icons';
 import { runChatTurn, type ChatTurnResult } from './runChat';
 import {
   useAISettingsStore,
@@ -262,19 +263,19 @@ export default function AIPanel({ onClose }: { onClose: () => void }) {
             <button
               type="button"
               onClick={() => setShowSettings((s) => !s)}
-              className="rounded px-2 py-0.5 text-xs text-parchment/70 hover:bg-ink-light/40 hover:text-parchment"
+              className="inline-flex items-center rounded px-2 py-0.5 text-xs text-parchment/70 hover:bg-ink-light/40 hover:text-parchment"
               aria-label="Toggle AI settings"
             >
-              ⚙
+              <GearIcon size={14} />
             </button>
           )}
           <button
             type="button"
             onClick={onClose}
-            className="rounded px-2 py-0.5 text-xs text-parchment/70 hover:bg-ink-light/40 hover:text-parchment"
+            className="inline-flex items-center rounded px-2 py-0.5 text-xs text-parchment/70 hover:bg-ink-light/40 hover:text-parchment"
             aria-label="Close AI panel"
           >
-            ✕
+            <CloseIcon size={13} />
           </button>
         </div>
       </header>
@@ -833,8 +834,8 @@ function ToolCallTrace({ calls }: { calls: ToolCall[] }) {
       {/* Validation issues — prominent, not hidden behind a disclosure */}
       {validationIssues.length > 0 && (
         <div className="rounded border border-amber-400 bg-amber-50 p-2 text-amber-900">
-          <div className="mb-1 font-semibold uppercase tracking-wide">
-            ⚠ Graph validation issues after this turn
+          <div className="mb-1 flex items-center gap-1 font-semibold uppercase tracking-wide">
+            <WarningIcon size={13} /> Graph validation issues after this turn
           </div>
           <ul className="space-y-0.5">
             {validationIssues[validationIssues.length - 1].v.issues.map((issue, i) => (
