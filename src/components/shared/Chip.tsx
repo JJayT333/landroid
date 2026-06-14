@@ -50,6 +50,15 @@ export interface ChipProps {
   variant?: ChipVariant;
   /** Uppercase + tracking (default). Pass false for numeric/mixed-case chips. */
   uppercase?: boolean;
+  /**
+   * Allow long chip text to wrap inside its container instead of forcing a
+   * single nowrap line. Opt-in (default false keeps the short-tag look) for
+   * chips that can carry free text, e.g. a lease's Notes term on a fixed-width
+   * desk-map card where nowrap text would bleed past the card edge.
+   */
+  wrap?: boolean;
+  /** Native title (tooltip) — useful when wrapped/long text is shown. */
+  title?: string;
   className?: string;
   children?: ReactNode;
 }
@@ -60,15 +69,23 @@ export default function Chip({
   shape = 'tag',
   variant = 'soft',
   uppercase = true,
+  wrap = false,
+  title,
   className = '',
   children,
 }: ChipProps) {
   const toneClass = variant === 'solid' ? SOLID[tone] : SOFT[tone];
   const shapeClass = shape === 'pill' ? 'rounded-full' : 'rounded-sm';
   const caseClass = uppercase ? 'uppercase tracking-wide' : '';
+  // wrap: let long free text break within the chip and never exceed the parent
+  // width; default: the original single-line tag.
+  const wrapClass = wrap
+    ? 'max-w-full whitespace-normal break-words text-left'
+    : 'whitespace-nowrap';
   return (
     <span
-      className={`inline-flex items-center border font-semibold whitespace-nowrap ${shapeClass} ${SIZES[size]} ${toneClass} ${caseClass} ${className}`
+      title={title}
+      className={`inline-flex items-center border font-semibold ${wrapClass} ${shapeClass} ${SIZES[size]} ${toneClass} ${caseClass} ${className}`
         .replace(/\s+/g, ' ')
         .trim()}
     >
