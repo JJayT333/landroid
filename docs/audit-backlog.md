@@ -59,6 +59,17 @@ explicitly accepted, treat that report as part of this backlog. Summary:
 - DA-M1..M13, DA-L1..L10, DA-U2..U6: see report §1-2 (incl. silent
   over-conveyance cap, addNode validation bypass = LLA-H03, provenance
   flattening = ACT-M01).
+- 2026-06-14 reconciliation (knock-out sprint):
+  - DA-U5 = Fixed — `normalizeInterestString` now carries a doc-comment
+    warning it uses the lenient parser and must never gate a save.
+  - DA-L3 = partially stale: the `runChat.ts` "fallback snapshot" is no longer
+    dead — the snapshot is assigned and committed on real mutations
+    (`runChat.ts` ~:119-120) after the approval/undo refactor; the proxy
+    `max_tokens` clamp (`request-policy.ts`) is intentional defense-in-depth.
+    Remaining genuine dead code is engine-file only (`display()` in
+    `decimal.ts`) — routed to the math-engine workstream.
+  - LLA-L03 = verified no-op: root-level docs (incl. `CONTINUATION-PROMPT.md`)
+    are all actively referenced; no stale handoff material to archive.
 - Status updates to existing rows: ACT-H01 = Fixed (`ensureTitleBaseline`,
   Scope A); ACT-H05 = Partial (banner exists; no auto-revert, console-only in
   shadow); ACT-M01 = Open (confirmed live); LLA-H02 = Fixed
