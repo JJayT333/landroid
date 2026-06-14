@@ -43,6 +43,7 @@ import {
 import { deriveCounty } from '../../utils/land';
 import { parseStrictInterestString } from '../../utils/interest-string';
 import { serialize } from '../../engine/decimal';
+import { formatAcres } from '../../engine/display-format';
 import { assertFileSize, FILE_SIZE_LIMITS } from '../../utils/file-validation';
 import Button from '../shared/Button';
 import FormField from '../shared/FormField';
@@ -858,7 +859,7 @@ export default function AttachLeaseModal({
                           Net Mineral Acres
                         </label>
                         <div className="px-3 py-2 rounded-md border border-ledger-line bg-ledger text-sm text-ink-light">
-                          {netAcres || '—'}
+                          {netAcres ? formatAcres(netAcres) : '—'}
                         </div>
                       </div>
                       <div>

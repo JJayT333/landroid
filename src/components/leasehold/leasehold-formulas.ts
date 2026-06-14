@@ -6,6 +6,7 @@
  * can verify the math by hand. Keep these in sync with the math file.
  */
 import Decimal from 'decimal.js';
+import { formatAsFraction } from '../../engine/fraction-display';
 import type { FormulaContent } from './FormulaTooltip';
 import type {
   LeaseholdAssignmentSummary,
@@ -41,22 +42,6 @@ function decAndPct(value: string | Decimal): string {
   return `${dec(value)} (${pct(value)})`;
 }
 
-/** Convert a clean decimal to a friendly fraction (1/2, 1/4, 3/16…), or
- *  fall back to the raw decimal if it doesn't reduce cleanly. */
-function asFraction(value: string | Decimal): string {
-  const d = new Decimal(value);
-  if (d.isZero()) return '0';
-  for (const den of [2, 4, 5, 8, 10, 16, 20, 32, 64, 100, 128]) {
-    const num = d.times(den);
-    if (num.minus(num.round()).abs().lessThan(1e-9)) {
-      const n = num.round().toNumber();
-      if (n === den) return '1';
-      return `${n}/${den}`;
-    }
-  }
-  return dec(d, 7);
-}
-
 // ── 1. Owner Tract Royalty (per lease slice) ────────────
 // Computed at leasehold-summary.ts:461 as: leasedFraction × leaseRoyaltyRate
 
@@ -77,11 +62,11 @@ export function ownerTractRoyaltyFormula(
     };
   }
   const inputs: { label: string; value: string }[] = [
-    { label: 'Owner mineral fraction', value: `${asFraction(owner.fraction)} (${dec(owner.fraction)})` },
+    { label: 'Owner mineral fraction', value: `${formatAsFraction(owner.fraction)} (${dec(owner.fraction)})` },
   ];
   const steps = slices.map((s) => ({
     label: `Lease: ${s.leaseName || s.lessee || s.leaseId}`,
-    expression: `${asFraction(s.leasedFraction)} × ${s.leaseRoyaltyRate || '0'}`,
+    expression: `${formatAsFraction(s.leasedFraction)} × ${s.leaseRoyaltyRate || '0'}`,
     value: `= ${decAndPct(s.ownerTractRoyalty)}`,
   }));
   return {
@@ -148,13 +133,13 @@ export function netPooledAcresFormula(
       { label: 'Tract pooled acres', value: acres(tract.pooledAcres) },
       {
         label: 'Owner mineral fraction',
-        value: `${asFraction(owner.fraction)} (${dec(owner.fraction)})`,
+        value: `${formatAsFraction(owner.fraction)} (${dec(owner.fraction)})`,
       },
     ],
     steps: [
       {
         label: 'Pooled acres × Owner fraction',
-        expression: `${acres(tract.pooledAcres)} × ${asFraction(owner.fraction)}`,
+        expression: `${acres(tract.pooledAcres)} × ${formatAsFraction(owner.fraction)}`,
         value: `= ${acres(owner.netPooledAcres)}`,
       },
     ],
@@ -405,14 +390,14 @@ export function leaseSliceOwnerRoyaltyFormula(
     inputs: [
       {
         label: 'Leased fraction',
-        value: `${asFraction(slice.leasedFraction)} (${dec(slice.leasedFraction)})`,
+        value: `${formatAsFraction(slice.leasedFraction)} (${dec(slice.leasedFraction)})`,
       },
       { label: 'Lease royalty rate', value: slice.leaseRoyaltyRate || '—' },
     ],
     steps: [
       {
         label: 'Leased fraction × Royalty rate',
-        expression: `${asFraction(slice.leasedFraction)} × ${slice.leaseRoyaltyRate || '0'}`,
+        expression: `${formatAsFraction(slice.leasedFraction)} × ${slice.leaseRoyaltyRate || '0'}`,
         value: `= ${decAndPct(slice.ownerTractRoyalty)}`,
       },
     ],
@@ -461,8 +446,8 @@ export function leaseSliceLeasedFractionFormula(
     title: 'Leased Fraction (this slice)',
     description: 'Portion of the owner\'s undivided mineral interest covered by this lease.',
     inputs: [
-      { label: 'Owner mineral fraction', value: `${asFraction(owner.fraction)} (${dec(owner.fraction)})` },
-      { label: 'Slice leased fraction', value: `${asFraction(slice.leasedFraction)} (${dec(slice.leasedFraction)})` },
+      { label: 'Owner mineral fraction', value: `${formatAsFraction(owner.fraction)} (${dec(owner.fraction)})` },
+      { label: 'Slice leased fraction', value: `${formatAsFraction(slice.leasedFraction)} (${dec(slice.leasedFraction)})` },
     ],
     steps: [
       {
@@ -710,13 +695,13 @@ export function ownerMineralFractionFormula(
     steps: [
       {
         label: 'From the title chain',
-        expression: asFraction(owner.fraction),
+        expression: formatAsFraction(owner.fraction),
         value: `= ${decAndPct(owner.fraction)}`,
       },
     ],
     result: {
       label: 'Mineral Fraction',
-      value: `${asFraction(owner.fraction)} (${pct(owner.fraction)})`,
+      value: `${formatAsFraction(owner.fraction)} (${pct(owner.fraction)})`,
     },
   };
 }
@@ -738,7 +723,7 @@ export function ownerLeasedFractionFormula(
     title: 'Owner Leased Fraction',
     description: "Portion of the owner's mineral interest currently under lease (summed across all their leases on this tract).",
     inputs: [
-      { label: 'Owner mineral fraction', value: `${asFraction(owner.fraction)} (${pct(owner.fraction)})` },
+      { label: 'Owner mineral fraction', value: `${formatAsFraction(owner.fraction)} (${pct(owner.fraction)})` },
       { label: 'Active leases', value: String(owner.activeLeaseCount) },
     ],
     steps,
