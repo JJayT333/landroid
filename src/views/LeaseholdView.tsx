@@ -104,10 +104,6 @@ import {
   unitSummaryTotalRoyaltyFormula,
 } from '../components/leasehold/leasehold-formulas';
 
-function parseVisibleLeaseholdFraction(value: string) {
-  return parseStrictInterestString(value) ?? d(0);
-}
-
 function normalizeGrossAcreInput(value: string) {
   const trimmed = value.trim();
   if (!trimmed) {
@@ -4114,8 +4110,10 @@ function LeaseholdDeck({
                     focusedTract && assignment.scope === 'unit'
                       ? {
                           label: 'This tract',
+                          // Reuse the summary's once-parsed WI fraction so this card,
+                          // the decimal ledger, and the summary all agree (DA-M7).
                           decimal: d(focusedTract.preWorkingInterestDecimal)
-                            .times(parseVisibleLeaseholdFraction(assignment.workingInterestFraction))
+                            .times(d(summary?.workingInterestFractionDecimal ?? '0'))
                             .toString(),
                         }
                       : null

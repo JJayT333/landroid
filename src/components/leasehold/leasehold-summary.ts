@@ -1,7 +1,7 @@
 // Depth severance is not yet modeled; this module assumes
 // `depthRange: 'all_depths'` on every node, lease, ORRI, and WI assignment.
 // See `src/types/depth-range.ts` for the Phase 8 attachment point.
-import { d } from '../../engine/decimal';
+import { d, type Decimal } from '../../engine/decimal';
 import {
   isNpriNode,
   type DeskMap,
@@ -222,6 +222,12 @@ export interface LeaseholdAssignmentSummary {
   deskMapId: string | null;
   tractName: string;
   workingInterestFraction: string;
+  /**
+   * `workingInterestFraction` parsed once (with the warning sink) and gated by
+   * `includedInMath`. Per-tract WI rows reuse this instead of re-parsing the raw
+   * string, so the decimal ledger and the assignment cards agree (DA-M7).
+   */
+  workingInterestFractionDecimal: string;
   effectiveDate: string;
   sourceDocNo: string;
   notes: string;
@@ -281,6 +287,14 @@ export interface LeaseholdUnitSummary {
   npris: LeaseholdNpriSummary[];
   orris: LeaseholdOrriSummary[];
   tracts: LeaseholdTractSummary[];
+  /**
+   * Per-tract (`deskMapId` → ORRI id → burden rate) map of the sequential ORRI
+   * carve computed once in the summary builder. Exposed so consumers — notably
+   * `buildLeaseholdDecimalRows` — reuse it instead of recomputing the stack with
+   * a divergent filter/parser (DA-M7). Only `includedInMath` ORRIs contribute to
+   * the basis, matching the focused-decimal-row filter.
+   */
+  orriBurdenRateByTractId: Map<string, Map<string, Decimal>>;
 }
 
 export type LeaseholdDecimalRowKind =
@@ -819,6 +833,30 @@ export function buildLeaseholdUnitSummary({
     inputWarningsByTractId.set(context.deskMapId, tractWarnings);
   };
 
+  // Mirror the ORRI-summary `includedInMath` rule (see the `orris` build below)
+  // so the sequential burden stack is computed from the same record set the
+  // focused decimal rows filter on (`summaryRecordAppliesToFocusedTract`).
+  // Tract-scoped ORRIs are included iff they resolve to a real desk map;
+  // unit-scoped ORRIs iff at least one desk map in their unit has positive
+  // participation (i.e. positive pooled acres). Excluded unit ORRIs only ever
+  // apply to zero-participation tracts, whose ORRI decimals are 0 regardless, so
+  // dropping them from the basis is golden-safe while removing the divergence
+  // that DA-M7 flagged between the builder and `buildLeaseholdDecimalRows`.
+  const orriIncludedInMath = (orri: LeaseholdOrri): boolean =>
+    orri.scope === 'tract'
+      ? orri.deskMapId != null && deskMapById.has(orri.deskMapId)
+      : totalPooledAcres.greaterThan(0) &&
+        deskMaps.some(
+          (deskMap) =>
+            unitRecordAppliesToDeskMap(orri.unitCode, deskMap) &&
+            d(deskMap.pooledAcres).greaterThan(0)
+        );
+  // The predicate is the same for every tract, so resolve it once here rather
+  // than re-scanning `deskMaps` for each tract's `relevantOrris` filter below.
+  const includedOrriIds = new Set(
+    leaseholdOrris.filter(orriIncludedInMath).map((orri) => orri.id)
+  );
+
   const tracts = deskMaps.map((deskMap) => {
     const nodeIds = new Set(deskMap.nodeIds);
     const tractNodes = nodes.filter((node) => nodeIds.has(node.id));
@@ -1071,6 +1109,9 @@ export function buildLeaseholdUnitSummary({
     const relevantOrris = leaseholdOrris.filter((orri) =>
       orriAppliesToDeskMap(orri, deskMap)
     );
+    // Only `includedInMath` ORRIs drive the burden stack (see `includedOrriIds`),
+    // matching the focused-decimal-row filter so the exposed map needs no recompute.
+    const includedOrris = relevantOrris.filter((orri) => includedOrriIds.has(orri.id));
     const {
       nriBeforeOrriRate,
       npriAdjustedNriBeforeOrriRate,
@@ -1084,7 +1125,7 @@ export function buildLeaseholdUnitSummary({
       leasedOwnership,
       weightedRoyaltyRate,
       fixedNpriBurdenRate,
-      orris: relevantOrris,
+      orris: includedOrris,
       parseBurdenFraction: (orri) =>
         parseLeaseholdMathInterest(
           orri.burdenFraction,
@@ -1272,6 +1313,7 @@ export function buildLeaseholdUnitSummary({
             ?? 'Unassigned tract'
           : unitScopedName(assignment.unitCode, tracts, deskMapById),
       workingInterestFraction: assignment.workingInterestFraction,
+      workingInterestFractionDecimal: workingInterestFraction.toString(),
       effectiveDate: assignment.effectiveDate,
       sourceDocNo: assignment.sourceDocNo,
       notes: assignment.notes,
@@ -1401,6 +1443,7 @@ export function buildLeaseholdUnitSummary({
     npris,
     orris,
     tracts,
+    orriBurdenRateByTractId,
   };
 }
 
@@ -1417,15 +1460,11 @@ export function buildLeaseholdDecimalRows({
   const focusedTract = focusedDeskMapId
     ? unitSummary.tracts.find((tract) => tract.deskMapId === focusedDeskMapId) ?? null
     : null;
+  // Reuse the burden stack the summary already computed for this tract instead
+  // of recomputing it with a divergent filter/parser (DA-M7). The builder's map
+  // is keyed on the same `includedInMath` ORRI set this view filters on.
   const focusedOrriBurdenRateById = focusedTract
-    ? calculateOrriBasisRates({
-        leasedOwnership: d(focusedTract.leasedOwnership),
-        weightedRoyaltyRate: d(focusedTract.weightedRoyaltyRate),
-        fixedNpriBurdenRate: d(focusedTract.fixedNpriBurdenRate),
-        orris: unitSummary.orris.filter(
-          (orri) => summaryRecordAppliesToFocusedTract(orri, focusedTract)
-        ),
-      }).orriBurdenRateById
+    ? unitSummary.orriBurdenRateByTractId.get(focusedTract.deskMapId) ?? null
     : null;
 
   const pushRow = (row: LeaseholdDecimalRow) => {
@@ -1519,7 +1558,9 @@ export function buildLeaseholdDecimalRows({
         const decimal =
           assignment.scope === 'unit'
             ? d(focusedTract.preWorkingInterestDecimal)
-                .times(parseLeaseholdMathInterest(assignment.workingInterestFraction))
+                // Reuse the once-parsed WI fraction (warning sink already fired in
+                // the summary builder) instead of re-parsing the raw string (DA-M7).
+                .times(d(assignment.workingInterestFractionDecimal))
                 .toString()
             : assignment.unitDecimal;
         pushRow({
