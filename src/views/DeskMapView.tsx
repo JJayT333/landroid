@@ -879,10 +879,9 @@ export default function DeskMapView() {
   const setActiveNode = useWorkspaceStore((s) => s.setActiveNode);
   const setActiveDeskMap = useWorkspaceStore((s) => s.setActiveDeskMap);
   const removeNode = useWorkspaceStore((s) => s.removeNode);
-  const addNode = useWorkspaceStore((s) => s.addNode);
+  const createRootNode = useWorkspaceStore((s) => s.createRootNode);
   const createDeskMap = useWorkspaceStore((s) => s.createDeskMap);
   const clearDeskMapNodes = useWorkspaceStore((s) => s.clearDeskMapNodes);
-  const addNodeToActiveDeskMap = useWorkspaceStore((s) => s.addNodeToActiveDeskMap);
   const activeDeskMapId = useWorkspaceStore((s) => s.activeDeskMapId);
 
   const [editorRoute, setEditorRoute] = useState<NodeEditorRoute | null>(null);
@@ -1222,22 +1221,24 @@ export default function DeskMapView() {
   const handleAddRoot = useCallback(() => {
     if (readOnly) return;
     const id = `node-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-    const root = {
+    const form = {
       ...createBlankNode(id, null),
       grantee: 'New Owner',
       instrument: 'Patent',
-      initialFraction: '1',
-      fraction: '1',
     };
-    addNode(root);
+    // createRootNode wires the node into the active desk map but does not create
+    // one — make sure a map exists first (it becomes active).
     if (deskMaps.length === 0) {
-      createDeskMap('Tract 1', 'T1', [id]);
-    } else {
-      addNodeToActiveDeskMap(id);
+      createDeskMap('Tract 1', 'T1', []);
     }
+    // DA-M2: route through the validated engine op. Raw `addNode` bypassed all
+    // engine validation (dup ids, cycles, negative fractions); createRootNode
+    // runs a pre/post-diff graph check that still tolerates pre-existing issues
+    // and allows legitimate multi-root / over-100% working state.
+    if (!createRootNode(id, '1', form)) return;
     setActiveNode(id);
     setEditorRoute({ kind: 'node', nodeId: id });
-  }, [addNode, addNodeToActiveDeskMap, createDeskMap, deskMaps.length, readOnly, setActiveNode]);
+  }, [createDeskMap, createRootNode, deskMaps.length, readOnly, setActiveNode]);
 
   const handleClearDeskMap = useCallback(async () => {
     if (readOnly) return;

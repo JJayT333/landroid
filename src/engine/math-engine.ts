@@ -213,8 +213,13 @@ export function calculateShare(params: ShareParams): Decimal {
     else if (params.splitBasis === 'remaining') base = parentFrac;
     else base = parentInitial;
 
-    const raw = clamp(base.mul(ratio));
-    return Decimal.min(raw, clamp(parentFrac));
+    // DA-M1: return the raw requested share UNCAPPED. Silently clamping to the
+    // parent's remaining fraction (the old `Decimal.min(raw, parentFrac)`) hid
+    // over-conveyance / Duhig situations — a deed reciting "3/4 of the whole"
+    // against a grantor holding 1/2 became "convey 1/2" with no signal. The
+    // caller (ConveyModal) now warns before save, and `executeConveyance`
+    // rejects oversize shares loudly (math-engine.ts ~:326).
+    return clamp(base.mul(ratio));
   }
 
   return new Decimal(0);

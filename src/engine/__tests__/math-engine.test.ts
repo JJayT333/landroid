@@ -125,7 +125,7 @@ describe('calculateShare', () => {
     expect(share.toFixed(9)).toBe('0.750000000');
   });
 
-  it('caps at parent remaining when share would exceed', () => {
+  it('does NOT cap at parent remaining — returns the raw over-conveyance (DA-M1)', () => {
     const share = calculateShare({
       conveyanceMode: 'fraction',
       splitBasis: 'initial',
@@ -135,8 +135,10 @@ describe('calculateShare', () => {
       parentFraction: '0.5',
       parentInitialFraction: '1.0',
     });
-    // 3/4 of 1.0 = 0.75, but parent only has 0.5 remaining → capped to 0.5
-    expect(share.toFixed(9)).toBe('0.500000000');
+    // 3/4 of initial 1.0 = 0.75; the parent only has 0.5 remaining. The old
+    // engine silently clamped this to 0.5; now it returns the raw 0.75 so the
+    // caller can warn, and executeConveyance rejects it loudly (see below).
+    expect(share.toFixed(9)).toBe('0.750000000');
   });
 
   it('zero denominator → 0', () => {
@@ -246,6 +248,23 @@ describe('executeConveyance', () => {
       form: createBlankNode('child-invalid', 'root'),
     });
     expect(invalidShare.ok).toBe(false);
+  });
+
+  it('rejects an over-conveyance instead of silently capping (DA-M1)', () => {
+    // Parent holds 0.5 remaining; calculateShare now returns the raw 0.75 for
+    // "3/4 of the whole", and the engine must reject it rather than clamp.
+    const root = makeNode('root', null, '1.000000000', '0.500000000');
+    const result = executeConveyance({
+      allNodes: [root],
+      parentId: 'root',
+      newNodeId: 'child-over',
+      share: '0.750000000',
+      form: createBlankNode('child-over', 'root'),
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.code).toBe('invalid_input');
+    expect(result.error.message).toBe('share exceeds parent remaining fraction');
   });
 });
 
