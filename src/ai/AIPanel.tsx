@@ -5,7 +5,7 @@
  * model made, and inline settings. Keeps zero workspace state of its own —
  * everything deterministic still lives in the Zustand stores the tools read.
  */
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { CloseIcon, GearIcon, WarningIcon } from '../components/shell/icons';
 import { runChatTurn, type ChatTurnResult } from './runChat';
 import {
@@ -35,6 +35,7 @@ import WizardPanel from './wizard/WizardPanel';
 import { HOSTED_MODEL_ID } from './client';
 import { isHostedMode } from '../utils/deploy-env';
 import { useWorkspaceStore } from '../store/workspace-store';
+import { useOwnerStore } from '../store/owner-store';
 
 interface ChatEntry {
   role: 'user' | 'assistant';
@@ -65,10 +66,30 @@ export default function AIPanel({ onClose }: { onClose: () => void }) {
   const clearSnapshot = useAIUndoStore((s) => s.clear);
   const approvalProposals = useAIApprovalStore((s) => s.proposals);
   const removeApprovalProposal = useAIApprovalStore((s) => s.remove);
+  const refreshApprovalPreviews = useAIApprovalStore((s) => s.refreshPreviews);
   const actionJournalEntries = useAIActionJournalStore((s) => s.entries);
   const [undoing, setUndoing] = useState(false);
   const [approvingId, setApprovingId] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+
+  // Keep queued approval cards live: recompute each proposal's preview from the
+  // current workspace/owner state whenever the graph the previews read changes,
+  // so the displayed numbers and the Approve gate never lag behind edits made
+  // after the proposal was queued (DA-M12).
+  useEffect(() => {
+    const refreshIfPending = () => {
+      if (useAIApprovalStore.getState().proposals.length > 0) {
+        refreshApprovalPreviews();
+      }
+    };
+    refreshIfPending();
+    const unsubscribeWorkspace = useWorkspaceStore.subscribe(refreshIfPending);
+    const unsubscribeOwners = useOwnerStore.subscribe(refreshIfPending);
+    return () => {
+      unsubscribeWorkspace();
+      unsubscribeOwners();
+    };
+  }, [refreshApprovalPreviews]);
 
   const onUndo = async () => {
     if (!undoSnapshot || undoing) return;
