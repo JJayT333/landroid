@@ -23,11 +23,14 @@ export async function getIdToken(): Promise<string | null> {
 
 function readStoredOidcIdToken(): string | null {
   if (typeof window === 'undefined') return null;
+  // oidc-client-ts defaults to per-tab sessionStorage (no userStore override in
+  // cognito-config.ts), so the fallback must scan sessionStorage — scanning
+  // localStorage never matched and was dead (deep-audit DA-L10).
   try {
-    for (let i = 0; i < window.localStorage.length; i += 1) {
-      const key = window.localStorage.key(i);
+    for (let i = 0; i < window.sessionStorage.length; i += 1) {
+      const key = window.sessionStorage.key(i);
       if (!key?.startsWith('oidc.user:')) continue;
-      const raw = window.localStorage.getItem(key);
+      const raw = window.sessionStorage.getItem(key);
       if (!raw) continue;
       const parsed = JSON.parse(raw) as { id_token?: unknown; expired?: unknown };
       if (parsed.expired === true) continue;

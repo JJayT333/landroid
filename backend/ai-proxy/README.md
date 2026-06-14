@@ -53,9 +53,12 @@ SDK.
 ## Local test
 
 ```bash
-# Cognito JWT needed. Easiest: sign in on the staging site and copy the id_token from localStorage.
+# Cognito JWT needed. Easiest: sign in on the staging site and copy the id_token
+# from sessionStorage (oidc-client-ts default store; key prefix `oidc.user:`).
+# `model` is required by the request gate even though the proxy overrides it with
+# the hardcoded model — omitting it returns 400 invalid_model.
 curl -N -X POST "$LAMBDA_URL/chat/completions" \
   -H "authorization: Bearer $ID_TOKEN" \
   -H "content-type: application/json" \
-  -d '{"messages":[{"role":"user","content":"hello"}],"stream":true}'
+  -d '{"model":"gpt-4o-mini","messages":[{"role":"user","content":"hello"}],"stream":true}'
 ```
