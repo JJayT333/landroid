@@ -70,7 +70,7 @@ export const newEngineBundle: EngineBundle = {
   validateOwnershipGraph: titleMath.validateOwnershipGraph,
   findNpriBranchDiscrepancies: titleMath.findNpriBranchDiscrepancies,
   rootOwnershipTotal: titleMath.rootOwnershipTotal,
-  computeLiveOwnershipFractions,
+  computeLiveOwnershipFractions: titleMath.computeLiveOwnershipFractions,
   formatAsFraction,
   dualDisplay,
 };

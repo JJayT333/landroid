@@ -56,3 +56,8 @@ export type {
   LeaseScopeIndex,
 } from './calculators/coverage';
 export * from './calculators/leasehold';
+export {
+  computeLiveOwnershipFractions,
+  computeRelativeShare,
+} from './calculators/tree-share';
+export type { LiveOwnershipFractions } from './calculators/tree-share';
