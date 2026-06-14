@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import PdfViewerModal from '../components/modals/PdfViewerModal';
 import Button from '../components/shared/Button';
+import Pill from '../components/shared/Pill';
 import Skeleton from '../components/shared/Skeleton';
 import UndoRedoControls from '../components/shell/UndoRedoControls';
 import {
@@ -432,19 +433,13 @@ export default function DocumentsView() {
         <div className="border-b border-ledger-line bg-parchment-light px-5 pb-3 pt-2.5">
           <div className="scrollbar-hidden flex gap-1.5 overflow-x-auto">
             {DOCUMENT_REGISTRY_VIEWS.map((view) => (
-              <button
+              <Pill
                 key={view.id}
-                type="button"
+                active={viewFilter === view.id}
                 onClick={() => setViewFilter(view.id)}
-                aria-pressed={viewFilter === view.id}
-                className={`shrink-0 rounded-full border px-3 py-1 text-[11.5px] font-semibold transition-colors ${
-                  viewFilter === view.id
-                    ? 'border-leather bg-leather text-[#fff6ec]'
-                    : 'border-ledger-line text-ink-light hover:bg-parchment-dark hover:text-ink'
-                }`}
               >
                 {view.label}
-              </button>
+              </Pill>
             ))}
           </div>
 

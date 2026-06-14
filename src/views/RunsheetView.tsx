@@ -11,6 +11,7 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Button from '../components/shared/Button';
+import Pill from '../components/shared/Pill';
 import UndoRedoControls from '../components/shell/UndoRedoControls';
 import { isLeaseNode } from '../components/deskmap/deskmap-lease-node';
 import { ofWholeFractionFormula } from '../components/deskmap/deskmap-formulas';
@@ -315,20 +316,14 @@ export default function RunsheetView() {
               if (chip.id !== 'all' && count === 0) return null;
               const active = kindFilter === chip.id;
               return (
-                <button
+                <Pill
                   key={chip.id}
-                  type="button"
+                  active={active}
                   onClick={() => setKindFilter(chip.id)}
-                  aria-pressed={active}
-                  className={`flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-[11.5px] font-semibold transition-colors ${
-                    active
-                      ? 'border-leather bg-leather text-[#fff6ec]'
-                      : 'border-ledger-line text-ink-light hover:bg-parchment-dark hover:text-ink'
-                  }`}
                 >
                   {chip.label}
                   <span className="font-mono text-[9.5px] opacity-75">{count}</span>
-                </button>
+                </Pill>
               );
             })}
           </div>

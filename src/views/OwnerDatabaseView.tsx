@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import OwnerDetailPanel from '../components/owners/OwnerDetailPanel';
 import { getOwnerLeaseDeskMapTargets } from '../components/owners/owner-lease-deskmap';
 import Button from '../components/shared/Button';
+import Pill from '../components/shared/Pill';
 import UndoRedoControls from '../components/shell/UndoRedoControls';
 import UnitFocusSelector from '../components/shared/UnitFocusSelector';
 import { useOwnerStore } from '../store/owner-store';
@@ -413,19 +414,14 @@ export default function OwnerDatabaseView() {
                 { id: 'leased', label: 'Leased' },
                 { id: 'unleased', label: 'Unleased' },
               ] as const).map((chip) => (
-                <button
+                <Pill
                   key={chip.id}
-                  type="button"
+                  size="sm"
+                  active={leaseChip === chip.id}
                   onClick={() => setLeaseChip(chip.id)}
-                  aria-pressed={leaseChip === chip.id}
-                  className={`whitespace-nowrap rounded-full border px-2.5 py-[3px] text-[10.5px] font-bold transition-colors ${
-                    leaseChip === chip.id
-                      ? 'border-leather bg-leather text-[#fff6ec]'
-                      : 'border-ledger-line text-ink-light hover:bg-parchment-dark hover:text-ink'
-                  }`}
                 >
                   {chip.label}
-                </button>
+                </Pill>
               ))}
             </div>
             <div className="mx-0.5 mb-1.5 mt-2 flex items-center gap-2">
