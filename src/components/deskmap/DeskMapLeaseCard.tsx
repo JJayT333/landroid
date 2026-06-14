@@ -70,9 +70,9 @@ function DeskMapLeaseCard({
             {node.grantee || 'Lessee on file'}
           </div>
           {termChips.length > 0 && (
-            <div className="flex flex-wrap gap-1 pt-0.5">
+            <div className="flex min-w-0 flex-wrap gap-1 pt-0.5">
               {termChips.map((chip) => (
-                <Chip key={chip} tone="green" uppercase={false}>
+                <Chip key={chip} tone="green" uppercase={false} wrap title={chip}>
                   {chip}
                 </Chip>
               ))}

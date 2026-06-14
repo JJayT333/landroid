@@ -497,6 +497,69 @@ describe('layoutOwnershipTreeWithElk', () => {
   });
 });
 
+describe('orphaned nodes (parent deleted after the chart was built)', () => {
+  it('sync layout keeps an orphaned node instead of dropping it, and it does not collapse onto the root', () => {
+    const nodes = [
+      makeNode('root', null, '1.0', '0.5'),
+      makeNode('a', 'root', '0.5', '0.5'),
+      // parent 'ghost' is not in the node set (deleted) → orphan
+      makeNode('orphan', 'ghost', '0.25', '0.25'),
+    ];
+    const result = layoutOwnershipTree(nodes);
+    const orphan = result.flowNodes.find((n) => n.id === 'orphan');
+    expect(orphan).toBeTruthy(); // not silently dropped
+    const root = result.flowNodes.find((n) => n.id === 'root')!;
+    // laid out as its own root tree, side by side — not stacked on the root
+    expect(Math.abs(orphan!.position.x - root.position.x)).toBeGreaterThan(100);
+  });
+
+  it('lays out an orphaned subtree (deleted parent) together with its surviving children', () => {
+    const nodes = [
+      makeNode('root', null, '1.0', '0.5'),
+      makeNode('orphan', 'ghost', '0.5', '0.5'),
+      makeNode('orphanChild', 'orphan', '0.25', '0.25'),
+    ];
+    const result = layoutOwnershipTree(nodes);
+    expect(result.flowNodes.map((n) => n.id).sort()).toEqual([
+      'orphan',
+      'orphanChild',
+      'root',
+    ]);
+    const orphan = result.flowNodes.find((n) => n.id === 'orphan')!;
+    const child = result.flowNodes.find((n) => n.id === 'orphanChild')!;
+    expect(child.position.y).toBeGreaterThan(orphan.position.y);
+  });
+
+  it('elk layout places orphaned nodes with no overlap and no dangling edges', async () => {
+    const nodes = [
+      makeNode('root', null, '1.0', '0.5'),
+      makeNode('a', 'root', '0.5', '0.5'),
+      makeNode('orphan1', 'ghost1', '0.25', '0.25'),
+      makeNode('orphan2', 'ghost2', '0.25', '0.25'),
+    ];
+    const result = await layoutOwnershipTreeWithElk(nodes);
+    expect(result.flowNodes).toHaveLength(4); // all present, none dropped
+
+    // No edge points at a parent that is not on the canvas.
+    for (const edge of result.flowEdges) {
+      expect(result.flowNodes.some((n) => n.id === edge.source)).toBe(true);
+    }
+
+    // No two nodes occupy overlapping bounding boxes (the reported symptom).
+    const NODE_W = 288;
+    const NODE_H = 160;
+    for (let i = 0; i < result.flowNodes.length; i++) {
+      for (let j = i + 1; j < result.flowNodes.length; j++) {
+        const a = result.flowNodes[i].position;
+        const b = result.flowNodes[j].position;
+        const overlapX = a.x < b.x + NODE_W && a.x + NODE_W > b.x;
+        const overlapY = a.y < b.y + NODE_H && a.y + NODE_H > b.y;
+        expect(overlapX && overlapY).toBe(false);
+      }
+    }
+  });
+});
+
 describe('computeLiveOwnershipFractions (DA-H8 overlay)', () => {
   it('mirrors the importer: grant=absolute, remaining=fraction, relative=share of parent', () => {
     // Root holds 1/1; child granted 1/2 of whole (= 1/2 of parent), retains all of it.
