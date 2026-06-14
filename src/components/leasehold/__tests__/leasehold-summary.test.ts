@@ -1367,6 +1367,167 @@ describe('leasehold-summary', () => {
     );
   });
 
+  it('exposes the parsed WI fraction and reuses it in the focused decimal row (DA-M7)', () => {
+    const unit = {
+      name: 'Audit Unit',
+      description: '',
+      operator: 'Operator A',
+      effectiveDate: '2024-01-01',
+      jurisdiction: 'tx_fee' as const,
+    };
+    const summary = buildLeaseholdUnitSummary({
+      deskMaps: [
+        {
+          id: 'dm-1',
+          name: 'Tract 1',
+          code: 'T1',
+          tractId: 'T1',
+          grossAcres: '100',
+          pooledAcres: '100',
+          description: '',
+          nodeIds: ['n1', 'l1'],
+        },
+      ],
+      nodes: [
+        {
+          ...createBlankNode('n1', null),
+          grantee: 'A Owner',
+          linkedOwnerId: 'owner-1',
+          fraction: '1',
+          initialFraction: '1',
+        },
+        {
+          ...createBlankNode('l1', 'n1'),
+          type: 'related' as const,
+          relatedKind: 'lease' as const,
+        },
+      ],
+      owners: [createBlankOwner('ws-1', { id: 'owner-1', name: 'A Owner' })],
+      leases: [
+        createBlankLease('ws-1', 'owner-1', {
+          id: 'lease-1',
+          leaseName: 'Base Lease',
+          lessee: 'Operator A',
+          royaltyRate: '1/8',
+          leasedInterest: '1',
+        }),
+      ],
+      leaseholdAssignments: [
+        {
+          id: 'asn-1',
+          assignor: 'Operator A',
+          assignee: 'WI Partner',
+          scope: 'unit',
+          deskMapId: null,
+          workingInterestFraction: '1/4',
+          effectiveDate: '2024-03-01',
+          sourceDocNo: 'ASG-1',
+          notes: '',
+          depthRange: 'all_depths',
+        },
+      ],
+      leaseholdOrris: [],
+    });
+
+    // The fraction is parsed once in the builder and exposed for downstream reuse.
+    const assignment = summary.assignments.find((a) => a.id === 'asn-1');
+    expect(assignment?.workingInterestFractionDecimal).toBe('0.25');
+
+    // The focused decimal row must reuse that fraction (preWI × 0.25), not re-parse.
+    const rows = buildLeaseholdDecimalRows({
+      unit,
+      unitSummary: summary,
+      focusedDeskMapId: 'dm-1',
+    });
+    const wiRow = rows.find((row) => row.id === 'assignment-dm-1-asn-1');
+    const expected = d(summary.tracts[0]?.preWorkingInterestDecimal ?? '0')
+      .times('0.25')
+      .toString();
+    expect(wiRow?.decimal).toBe(expected);
+    expect(expected).toBe('0.21875');
+  });
+
+  it('excludes non-participating unit ORRIs from the burden stack so included rates are unperturbed (DA-M7)', () => {
+    // A zero-pooled-acres tract carries a tract-scoped NRI ORRI (always included)
+    // and a unit-scoped NRI ORRI that earlier-dates it. The unit ORRI has no
+    // participating tract, so it must be excluded from the sequential carve;
+    // otherwise it would shift the tract ORRI's rate (0.04375 → 0.04265625).
+    const summary = buildLeaseholdUnitSummary({
+      deskMaps: [
+        {
+          id: 'dm-z',
+          name: 'Tract Z',
+          code: 'TZ',
+          tractId: 'TZ',
+          grossAcres: '100',
+          pooledAcres: '0',
+          description: '',
+          nodeIds: ['n1', 'l1'],
+        },
+      ],
+      nodes: [
+        {
+          ...createBlankNode('n1', null),
+          grantee: 'A Owner',
+          linkedOwnerId: 'owner-1',
+          fraction: '1',
+          initialFraction: '1',
+        },
+        {
+          ...createBlankNode('l1', 'n1'),
+          type: 'related' as const,
+          relatedKind: 'lease' as const,
+        },
+      ],
+      owners: [createBlankOwner('ws-1', { id: 'owner-1', name: 'A Owner' })],
+      leases: [
+        createBlankLease('ws-1', 'owner-1', {
+          id: 'lease-1',
+          leaseName: 'Base Lease',
+          lessee: 'Operator A',
+          royaltyRate: '1/8',
+          leasedInterest: '1',
+        }),
+      ],
+      leaseholdAssignments: [],
+      leaseholdOrris: [
+        {
+          id: 'orri-unit-excluded',
+          payee: 'Excluded Unit ORRI',
+          scope: 'unit',
+          deskMapId: null,
+          burdenFraction: '1/40',
+          burdenBasis: 'net_revenue_interest',
+          effectiveDate: '2024-01-01',
+          sourceDocNo: 'ORRI-UX',
+          notes: '',
+          depthRange: 'all_depths',
+        },
+        {
+          id: 'orri-tract',
+          payee: 'Tract ORRI',
+          scope: 'tract',
+          deskMapId: 'dm-z',
+          burdenFraction: '1/20',
+          burdenBasis: 'net_revenue_interest',
+          effectiveDate: '2024-01-02',
+          sourceDocNo: 'ORRI-TR',
+          notes: '',
+          depthRange: 'all_depths',
+        },
+      ],
+    });
+
+    const excluded = summary.orris.find((orri) => orri.id === 'orri-unit-excluded');
+    expect(excluded?.includedInMath).toBe(false);
+
+    const burdenByTract = summary.orriBurdenRateByTractId.get('dm-z');
+    // The excluded ORRI never entered the basis...
+    expect(burdenByTract?.has('orri-unit-excluded')).toBe(false);
+    // ...so the included tract ORRI keeps its unperturbed rate.
+    expect(burdenByTract?.get('orri-tract')?.toString()).toBe('0.04375');
+  });
+
   it('splits fixed and floating NPRIs into separate payout rows and keeps total coverage in balance', () => {
     const unit = {
       name: 'Audit Unit',
