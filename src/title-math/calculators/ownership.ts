@@ -26,6 +26,7 @@ import {
   getCalcFixedRoyaltyBasis,
   getCalcInterestClass,
   getCalcRoyaltyKind,
+  makeCalcNode,
   toCalc,
   type CalcNode,
 } from '../model/calc-node';
@@ -200,7 +201,7 @@ export function executeConveyance(params: ConveyanceParams): Result<OwnershipNod
         )
       : null;
 
-  const newNode: CalcNode = {
+  const newNode = makeCalcNode({
     id: newNodeId,
     type: 'conveyance',
     parentId,
@@ -211,13 +212,8 @@ export function executeConveyance(params: ConveyanceParams): Result<OwnershipNod
       interestClass: childInterestClass,
       royaltyKind,
       fixedRoyaltyBasis,
-    } as Record<string, unknown>,
-  };
-  delete newNode.rest.fraction;
-  delete newNode.rest.initialFraction;
-  delete newNode.rest.id;
-  delete newNode.rest.type;
-  delete newNode.rest.parentId;
+    },
+  });
 
   updatedNodes.push(newNode);
 
@@ -272,7 +268,7 @@ export function executeCreateNpri(params: CreateNpriParams): Result<OwnershipNod
         )
       : null;
 
-  const newNode: CalcNode = {
+  const newNode = makeCalcNode({
     id: newNodeId,
     type: 'conveyance',
     parentId,
@@ -283,13 +279,8 @@ export function executeCreateNpri(params: CreateNpriParams): Result<OwnershipNod
       interestClass: 'npri',
       royaltyKind,
       fixedRoyaltyBasis,
-    } as Record<string, unknown>,
-  };
-  delete newNode.rest.fraction;
-  delete newNode.rest.initialFraction;
-  delete newNode.rest.id;
-  delete newNode.rest.type;
-  delete newNode.rest.parentId;
+    },
+  });
 
   const updatedNodes = [...nodes, newNode];
   const validation = validateCalcGraph(updatedNodes);
@@ -346,7 +337,7 @@ export function executeCreateRootNode(
         ?? 'burdened_branch'
       : null;
 
-  const newNode: CalcNode = {
+  const newNode = makeCalcNode({
     id: newNodeId,
     type: 'conveyance',
     parentId: null,
@@ -357,13 +348,8 @@ export function executeCreateRootNode(
       interestClass,
       royaltyKind,
       fixedRoyaltyBasis,
-    } as Record<string, unknown>,
-  };
-  delete newNode.rest.fraction;
-  delete newNode.rest.initialFraction;
-  delete newNode.rest.id;
-  delete newNode.rest.type;
-  delete newNode.rest.parentId;
+    },
+  });
 
   const updatedNodes = [...nodes, newNode];
 
@@ -513,7 +499,7 @@ export function executePredecessorInsert(params: PredecessorInsertParams): Resul
     return n;
   });
 
-  const predNode: CalcNode = {
+  const predNode = makeCalcNode({
     id: newPredecessorId,
     type: 'conveyance',
     parentId: activeNodeParentId,
@@ -540,13 +526,8 @@ export function executePredecessorInsert(params: PredecessorInsertParams): Resul
               ?? 'burdened_branch'
             )
           : null,
-    } as Record<string, unknown>,
-  };
-  delete predNode.rest.fraction;
-  delete predNode.rest.initialFraction;
-  delete predNode.rest.id;
-  delete predNode.rest.type;
-  delete predNode.rest.parentId;
+    },
+  });
 
   nodes.push(predNode);
 
@@ -642,10 +623,10 @@ export function executeAttachConveyance(params: AttachConveyanceParams): Result<
     }
 
     if (next.id === activeNodeId) {
-      const updated: CalcNode = {
-        ...next,
-        parentId: attachParentId,
+      return makeCalcNode({
+        id: next.id,
         type: 'conveyance',
+        parentId: attachParentId,
         fraction: clamp(next.fraction.mul(scaleFactor)),
         initialFraction: newRootFraction,
         rest: {
@@ -669,14 +650,8 @@ export function executeAttachConveyance(params: AttachConveyanceParams): Result<
                   ?? 'burdened_branch'
                 )
               : null,
-        } as Record<string, unknown>,
-      };
-      delete updated.rest.fraction;
-      delete updated.rest.initialFraction;
-      delete updated.rest.id;
-      delete updated.rest.type;
-      delete updated.rest.parentId;
-      return updated;
+        },
+      });
     }
     if (descendants.has(next.id)) {
       return {

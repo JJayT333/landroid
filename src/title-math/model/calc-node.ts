@@ -65,3 +65,37 @@ export function fromCalc(node: CalcNode): OwnershipNode {
     initialFraction: emitNodeFraction(node.initialFraction),
   } as OwnershipNode;
 }
+
+/** The top-level CalcNode fields that must never leak into `rest`. */
+const CALC_NODE_RESERVED_KEYS = [
+  'fraction',
+  'initialFraction',
+  'id',
+  'type',
+  'parentId',
+] as const;
+
+/**
+ * Build a CalcNode, stripping the reserved top-level fields out of `rest` so the
+ * pass-through bag never shadows the structural fields. Collapses the five
+ * repeated `delete newNode.rest.X` statements the ownership ops used to inline.
+ */
+export function makeCalcNode(params: {
+  id: string;
+  type: string;
+  parentId: string | null;
+  fraction: Decimal;
+  initialFraction: Decimal;
+  rest: Record<string, unknown>;
+}): CalcNode {
+  const rest = { ...params.rest };
+  for (const key of CALC_NODE_RESERVED_KEYS) delete rest[key];
+  return {
+    id: params.id,
+    type: params.type,
+    parentId: params.parentId,
+    fraction: params.fraction,
+    initialFraction: params.initialFraction,
+    rest,
+  };
+}
