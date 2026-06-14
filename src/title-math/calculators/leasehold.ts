@@ -167,6 +167,14 @@ export interface LeaseholdTractSummary {
    */
   overFloatingNpriBurdened: boolean;
   /**
+   * DA-H1 warning flag: a fixed NPRI on this tract exceeds the burdened lessor's
+   * royalty (after floating), so the excess is charged to the working interest.
+   * Warning-only; the wording recommends counsel sign-off before payout reliance
+   * (the excess allocation rests on treatise consensus, not on-point SCOTX
+   * authority).
+   */
+  fixedNpriExceedsRoyalty: boolean;
+  /**
    * Aggregated lease-overlap warnings surfaced from this tract's owners. Each
    * entry is a lease that was silently clipped by `allocateLeaseCoverage`
    * because an earlier lease already claimed the owner's share.
@@ -270,6 +278,8 @@ export interface LeaseholdUnitSummary {
   overBurdenedTractCount: number;
   /** Number of tracts with floating NPRIs that over-carve the lease royalty. */
   overFloatingNpriBurdenedTractCount: number;
+  /** DA-H1: number of tracts whose fixed NPRI exceeds the lessor royalty. */
+  fixedNpriExceedsRoyaltyTractCount: number;
   /**
    * Number of tracts that have at least one lease-overlap warning. Warning-only;
    * affected tracts still roll up their clipped allocations and the leasehold
@@ -554,13 +564,14 @@ function compareOrriStackingOrder(left: OrriBurdenRecord, right: OrriBurdenRecor
 function calculateOrriBasisRates<T extends OrriBurdenRecord>({
   leasedOwnership,
   weightedRoyaltyRate,
-  fixedNpriBurdenRate,
+  fixedNpriExcessRate,
   orris,
   parseBurdenFraction,
 }: {
   leasedOwnership: ReturnType<typeof d>;
   weightedRoyaltyRate: ReturnType<typeof d>;
-  fixedNpriBurdenRate: ReturnType<typeof d>;
+  /** DA-H1: only the fixed-NPRI EXCESS over the lessor royalty burdens the WI. */
+  fixedNpriExcessRate: ReturnType<typeof d>;
   orris: T[];
   parseBurdenFraction?: (orri: T) => ReturnType<typeof d>;
 }) {
@@ -577,11 +588,14 @@ function calculateOrriBasisRates<T extends OrriBurdenRecord>({
   const safeNriBeforeOrriRate = nriBeforeOrriRate.greaterThan(0)
     ? nriBeforeOrriRate
     : d(0);
-  // DA-H1 FROZEN: a fixed NPRI is deducted here from the lessee's NRI, not from
-  // the burdened lessor's royalty. This is the documented known-wrong behavior
-  // held pending attorney sign-off (LANDMAN-MATH-REFERENCE.md s7). Reproduced
-  // verbatim so Springhill stays byte-identical; do NOT "fix" it here.
-  const npriAdjustedNriBeforeOrriRate = safeNriBeforeOrriRate.minus(fixedNpriBurdenRate);
+  // DA-H1: a fixed NPRI is satisfied out of the burdened lessor's royalty first
+  // (handled per-slice in the owner net-royalty fold); only the EXCESS over that
+  // royalty burdens the working interest. So the WI's NRI is reduced by the
+  // fixed-NPRI excess, not the full fixed burden (decision of record:
+  // CONTINUATION-PROMPT.md; LANDMAN-MATH-REFERENCE.md s7). The per-slice/tract
+  // `fixedNpriExceedsRoyalty` warning recommends counsel sign-off before payout
+  // reliance.
+  const npriAdjustedNriBeforeOrriRate = safeNriBeforeOrriRate.minus(fixedNpriExcessRate);
   const safeNpriAdjustedNriBeforeOrriRate = npriAdjustedNriBeforeOrriRate.greaterThan(0)
     ? npriAdjustedNriBeforeOrriRate
     : d(0);
@@ -1056,13 +1070,45 @@ export function buildLeaseholdUnitSummary({
     });
     npriSummariesByTractId.set(deskMap.id, nprisForTract);
 
+    // DA-H1: a fixed NPRI is satisfied first out of the burdened lessor's
+    // royalty (after floating NPRIs have already netted), and only the EXCESS
+    // (if the fixed burden is larger than the remaining royalty) is charged to
+    // the working interest. We accumulate the per-slice excess so the WI-side
+    // deduction below uses excess, not the full fixed burden.
+    let tractFixedNpriExcessRate = d(0);
+    let tractFixedNpriExceedsRoyalty = false;
     ownersForTract.forEach((owner) => {
       owner.leaseSlices = owner.leaseSlices.map((leaseSlice) => {
-        const netOwnerTractRoyalty = d(leaseSlice.ownerTractRoyalty).minus(
+        const royaltyAfterFloating = d(leaseSlice.ownerTractRoyalty).minus(
           d(leaseSlice.floatingNpriBurdenRate)
         );
-        const netOwnerUnitRoyaltyDecimal = d(leaseSlice.unitRoyaltyDecimal).minus(
+        const safeRoyaltyAfterFloating = royaltyAfterFloating.greaterThan(0)
+          ? royaltyAfterFloating
+          : d(0);
+        const fixedBurden = d(leaseSlice.fixedNpriBurdenRate);
+        const fixedCoveredByRoyalty = fixedBurden.greaterThan(safeRoyaltyAfterFloating)
+          ? safeRoyaltyAfterFloating
+          : fixedBurden;
+        const fixedExcess = fixedBurden.minus(fixedCoveredByRoyalty);
+        if (fixedExcess.greaterThan(0)) {
+          tractFixedNpriExceedsRoyalty = true;
+        }
+        tractFixedNpriExcessRate = tractFixedNpriExcessRate.plus(fixedExcess);
+
+        const unitRoyaltyAfterFloating = d(leaseSlice.unitRoyaltyDecimal).minus(
           d(leaseSlice.floatingNpriUnitDecimal)
+        );
+        const safeUnitRoyaltyAfterFloating = unitRoyaltyAfterFloating.greaterThan(0)
+          ? unitRoyaltyAfterFloating
+          : d(0);
+        const fixedUnitBurden = d(leaseSlice.fixedNpriUnitDecimal);
+        const fixedCoveredByUnitRoyalty = fixedUnitBurden.greaterThan(safeUnitRoyaltyAfterFloating)
+          ? safeUnitRoyaltyAfterFloating
+          : fixedUnitBurden;
+
+        const netOwnerTractRoyalty = safeRoyaltyAfterFloating.minus(fixedCoveredByRoyalty);
+        const netOwnerUnitRoyaltyDecimal = safeUnitRoyaltyAfterFloating.minus(
+          fixedCoveredByUnitRoyalty
         );
 
         return {
@@ -1140,7 +1186,7 @@ export function buildLeaseholdUnitSummary({
     } = calculateOrriBasisRates({
       leasedOwnership,
       weightedRoyaltyRate,
-      fixedNpriBurdenRate,
+      fixedNpriExcessRate: tractFixedNpriExcessRate,
       orris: includedOrris,
       parseBurdenFraction: (orri) =>
         parseLeaseholdMathInterest(
@@ -1254,6 +1300,7 @@ export function buildLeaseholdUnitSummary({
       overAssigned: assignmentShare.greaterThan(1),
       overBurdened,
       overFloatingNpriBurdened,
+      fixedNpriExceedsRoyalty: tractFixedNpriExceedsRoyalty,
       leaseOverlaps: tractLeaseOverlaps,
       inputWarnings: inputWarningsByTractId.get(deskMap.id) ?? [],
       currentOwnerCount: ownersForTract.length,
@@ -1443,6 +1490,9 @@ export function buildLeaseholdUnitSummary({
     overBurdenedTractCount: tracts.filter((tract) => tract.overBurdened).length,
     overFloatingNpriBurdenedTractCount: tracts.filter(
       (tract) => tract.overFloatingNpriBurdened
+    ).length,
+    fixedNpriExceedsRoyaltyTractCount: tracts.filter(
+      (tract) => tract.fixedNpriExceedsRoyalty
     ).length,
     leaseOverlapTractCount: tracts.filter((tract) => tract.leaseOverlaps.length > 0).length,
     leaseOverlapWarningCount: tracts.reduce(

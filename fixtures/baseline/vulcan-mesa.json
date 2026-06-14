@@ -588,39 +588,6 @@
     ],
     "VM3": [
       {
-        "category": "royalty",
-        "decimal": "0.00925925925925925925925925925925925925926",
-        "effectiveDate": "2024-01-01",
-        "id": "royalty-dm-vulcan-mesa-3-1779555600000-vm-18-lease-vm-24",
-        "payee": "Vulcan Spur Holdings, LLC",
-        "sourceDocNo": "VM3-OGL-001",
-        "sourceLabel": "VM3 — Mercury Cutoff — Vulcan Spur Holdings, LLC Lease • Royalty 1/4",
-        "tractCode": "VM3",
-        "tractName": "VM3 — Mercury Cutoff"
-      },
-      {
-        "category": "royalty",
-        "decimal": "0.00462962962962962962962962962962962962963",
-        "effectiveDate": "2024-02-01",
-        "id": "royalty-dm-vulcan-mesa-3-1779555600000-vm-19-lease-vm-25",
-        "payee": "Mavis \"Sword-Eater\" Toomey",
-        "sourceDocNo": "VM3-OGL-002",
-        "sourceLabel": "VM3 — Mercury Cutoff — Mavis \"Sword-Eater\" Toomey Lease • Royalty 1/4",
-        "tractCode": "VM3",
-        "tractName": "VM3 — Mercury Cutoff"
-      },
-      {
-        "category": "royalty",
-        "decimal": "0.002314814814814814814814814814814814814815",
-        "effectiveDate": "2024-03-01",
-        "id": "royalty-dm-vulcan-mesa-3-1779555600000-vm-20-lease-vm-26",
-        "payee": "Beauregard Plumstead",
-        "sourceDocNo": "VM3-OGL-003",
-        "sourceLabel": "VM3 — Mercury Cutoff — Beauregard Plumstead Lease • Royalty 1/4",
-        "tractCode": "VM3",
-        "tractName": "VM3 — Mercury Cutoff"
-      },
-      {
         "category": "npri",
         "decimal": "0.03240740740740740740740740740740740740741",
         "effectiveDate": "1965-04-30",
@@ -661,6 +628,28 @@
         "payee": "Vulcan Mesa Petroleum, LLC",
         "sourceDocNo": "",
         "sourceLabel": "VM3 retained WI",
+        "tractCode": "VM3",
+        "tractName": "VM3 — Mercury Cutoff"
+      },
+      {
+        "category": "assigned_wi",
+        "decimal": "0.008506944444444444444444444444444444444444",
+        "effectiveDate": "2024-03-01",
+        "id": "assignment-dm-vulcan-mesa-3-1779555600000-vm-asg-1-unit-a-60",
+        "payee": "Praetor Brothers Operating, LLC",
+        "sourceDocNo": "VM-ASG-1",
+        "sourceLabel": "Vulcan Mesa Petroleum, LLC assignment",
+        "tractCode": "VM3",
+        "tractName": "VM3 — Mercury Cutoff"
+      },
+      {
+        "category": "assigned_wi",
+        "decimal": "0.00708912037037037037037037037037037037037",
+        "effectiveDate": "2024-04-01",
+        "id": "assignment-dm-vulcan-mesa-3-1779555600000-vm-asg-2-unit-a-50",
+        "payee": "Minerva Draw Production Co.",
+        "sourceDocNo": "VM-ASG-2",
+        "sourceLabel": "Vulcan Mesa Petroleum, LLC assignment",
         "tractCode": "VM3",
         "tractName": "VM3 — Mercury Cutoff"
       }
@@ -1067,7 +1056,7 @@
         "sourceDocNo": "VM-ASG-1",
         "tractName": "Jupiter Flats Unit",
         "unitCode": "A",
-        "unitDecimal": "0.1905715811965811965811965811965811965811",
+        "unitDecimal": "0.1990785256410256410256410256410256410256",
         "workingInterestFraction": "3/5",
         "workingInterestFractionDecimal": "0.6"
       },
@@ -1084,7 +1073,7 @@
         "sourceDocNo": "VM-ASG-2",
         "tractName": "Jupiter Flats Unit",
         "unitCode": "A",
-        "unitDecimal": "0.158809650997150997150997150997150997151",
+        "unitDecimal": "0.1658987713675213675213675213675213675213",
         "workingInterestFraction": "1/2",
         "workingInterestFractionDecimal": "0.5"
       },
@@ -1112,6 +1101,7 @@
     "excludedAssignmentCount": 0,
     "excludedNpriCount": 0,
     "excludedOrriCount": 0,
+    "fixedNpriExceedsRoyaltyTractCount": 1,
     "fullyLeasedTractCount": 8,
     "includedAssignmentCount": 3,
     "includedNpriCount": 2,
@@ -1270,11 +1260,11 @@
       }
     ],
     "overAssignedTractCount": 5,
-    "overBurdenedTractCount": 1,
+    "overBurdenedTractCount": 0,
     "overFloatingNpriBurdenedTractCount": 0,
-    "preWorkingInterestDecimal": "0.6904057603276353276353276353276353276352",
+    "preWorkingInterestDecimal": "0.7045840010683760683760683760683760683759",
     "retainedWorkingInterestDecimal": "0.3458984375",
-    "totalAssignedWorkingInterestDecimal": "0.3762692530270655270655270655270655270654",
+    "totalAssignedWorkingInterestDecimal": "0.3918653178418803418803418803418803418802",
     "totalGrossAcres": "2160",
     "totalNpriDecimal": "0.04861111111111111111111111111111111111112",
     "totalOrriDecimal": "0.02310474537037037037037037037037037037038",
@@ -1294,6 +1284,7 @@
         "description": "Two-owner tract with a clean 1/2 + 1/4 + 1/4 split — Buster and Minerva both land here.",
         "deskMapId": "dm-vulcan-mesa-1-1779555600000",
         "fixedNpriBurdenRate": "0",
+        "fixedNpriExceedsRoyalty": false,
         "floatingNpriBurdenRate": "0",
         "grossAcres": "160",
         "grossOrriBurdenRate": "0.03125",
@@ -1481,6 +1472,7 @@
         "description": "Trust + Minerva + rodeo-Olympus tract. Planted: an over-conveyance on the patent root that sums past 100%.",
         "deskMapId": "dm-vulcan-mesa-2-1779555600000",
         "fixedNpriBurdenRate": "0",
+        "fixedNpriExceedsRoyalty": false,
         "floatingNpriBurdenRate": "0",
         "grossAcres": "240",
         "grossOrriBurdenRate": "0.03125",
@@ -1710,7 +1702,7 @@
         "workingInterestOrriBurdenRate": "0"
       },
       {
-        "assignedWorkingInterestDecimal": "0",
+        "assignedWorkingInterestDecimal": "0.01559606481481481481481481481481481481481",
         "assignmentShare": "1.1",
         "code": "VM3",
         "currentOwnerCount": 4,
@@ -1718,6 +1710,7 @@
         "description": "LLC + small owners. Planted: fixed NPRIs that stack above the available NRI for the over-burden warning.",
         "deskMapId": "dm-vulcan-mesa-3-1779555600000",
         "fixedNpriBurdenRate": "0.65625",
+        "fixedNpriExceedsRoyalty": true,
         "floatingNpriBurdenRate": "0",
         "grossAcres": "160",
         "grossOrriBurdenRate": "0.02734375",
@@ -1737,12 +1730,12 @@
         ],
         "leasedOwnership": "0.875",
         "name": "VM3 — Mercury Cutoff",
-        "netRevenueInterestBaseRate": "0",
+        "netRevenueInterestBaseRate": "0.19140625",
         "netRevenueInterestOrriBurdenRate": "0",
-        "npriAdjustedNriBeforeOrriRate": "0",
+        "npriAdjustedNriBeforeOrriRate": "0.21875",
         "nriBeforeOrriRate": "0.65625",
         "overAssigned": true,
-        "overBurdened": true,
+        "overBurdened": false,
         "overFloatingNpriBurdened": false,
         "owners": [
           {
@@ -1767,8 +1760,8 @@
                 "leasedFraction": "0.5",
                 "leasedPooledAcres": "80",
                 "lessee": "Vulcan Mesa Petroleum, LLC",
-                "netOwnerTractRoyalty": "0.125",
-                "netOwnerUnitRoyaltyDecimal": "0.00925925925925925925925925925925925925926",
+                "netOwnerTractRoyalty": "0",
+                "netOwnerUnitRoyaltyDecimal": "0",
                 "ownerTractRoyalty": "0.125",
                 "unitRoyaltyDecimal": "0.00925925925925925925925925925925925925926"
               }
@@ -1779,8 +1772,8 @@
               "Vulcan Mesa Petroleum, LLC"
             ],
             "netMineralAcres": "80",
-            "netOwnerTractRoyalty": "0.125",
-            "netOwnerUnitRoyaltyDecimal": "0.00925925925925925925925925925925925925926",
+            "netOwnerTractRoyalty": "0",
+            "netOwnerUnitRoyaltyDecimal": "0",
             "netPooledAcres": "80",
             "nodeId": "vm-18",
             "overFloatingNpriBurdened": false,
@@ -1813,8 +1806,8 @@
                 "leasedFraction": "0.25",
                 "leasedPooledAcres": "40",
                 "lessee": "Vulcan Mesa Petroleum, LLC",
-                "netOwnerTractRoyalty": "0.0625",
-                "netOwnerUnitRoyaltyDecimal": "0.00462962962962962962962962962962962962963",
+                "netOwnerTractRoyalty": "0",
+                "netOwnerUnitRoyaltyDecimal": "0",
                 "ownerTractRoyalty": "0.0625",
                 "unitRoyaltyDecimal": "0.00462962962962962962962962962962962962963"
               }
@@ -1825,8 +1818,8 @@
               "Vulcan Mesa Petroleum, LLC"
             ],
             "netMineralAcres": "40",
-            "netOwnerTractRoyalty": "0.0625",
-            "netOwnerUnitRoyaltyDecimal": "0.00462962962962962962962962962962962962963",
+            "netOwnerTractRoyalty": "0",
+            "netOwnerUnitRoyaltyDecimal": "0",
             "netPooledAcres": "40",
             "nodeId": "vm-19",
             "overFloatingNpriBurdened": false,
@@ -1868,8 +1861,8 @@
                 "leasedFraction": "0.125",
                 "leasedPooledAcres": "20",
                 "lessee": "Vulcan Mesa Petroleum, LLC",
-                "netOwnerTractRoyalty": "0.03125",
-                "netOwnerUnitRoyaltyDecimal": "0.002314814814814814814814814814814814814815",
+                "netOwnerTractRoyalty": "0",
+                "netOwnerUnitRoyaltyDecimal": "0",
                 "ownerTractRoyalty": "0.03125",
                 "unitRoyaltyDecimal": "0.002314814814814814814814814814814814814815"
               }
@@ -1880,8 +1873,8 @@
               "Vulcan Mesa Petroleum, LLC"
             ],
             "netMineralAcres": "20",
-            "netOwnerTractRoyalty": "0.03125",
-            "netOwnerUnitRoyaltyDecimal": "0.002314814814814814814814814814814814814815",
+            "netOwnerTractRoyalty": "0",
+            "netOwnerUnitRoyaltyDecimal": "0",
             "netPooledAcres": "20",
             "nodeId": "vm-20",
             "overFloatingNpriBurdened": false,
@@ -1919,7 +1912,7 @@
           }
         ],
         "pooledAcres": "160",
-        "preWorkingInterestDecimal": "0",
+        "preWorkingInterestDecimal": "0.01417824074074074074074074074074074074074",
         "retainedWorkingInterestDecimal": "0",
         "totalNpriBurdenRate": "0.65625",
         "totalOrriBurdenRate": "0.02734375",
@@ -1948,6 +1941,7 @@
         "description": "Buster + locals. Planted: one lease has a malformed royalty (1/6.5) for the Leasehold Input Error warning.",
         "deskMapId": "dm-vulcan-mesa-4-1779555600000",
         "fixedNpriBurdenRate": "0",
+        "fixedNpriExceedsRoyalty": false,
         "floatingNpriBurdenRate": "0",
         "grossAcres": "200",
         "grossOrriBurdenRate": "0.03125",
@@ -2135,6 +2129,7 @@
         "description": "Trust + LLC + locals at 3/16 royalty so the leasehold math hits a different decimal track from the other tracts.",
         "deskMapId": "dm-vulcan-mesa-5-1779555600000",
         "fixedNpriBurdenRate": "0",
+        "fixedNpriExceedsRoyalty": false,
         "floatingNpriBurdenRate": "0",
         "grossAcres": "320",
         "grossOrriBurdenRate": "0.03125",
@@ -2379,6 +2374,7 @@
         "description": "Trust + Pickled-egg vendor at 1/2 each. Smallest-and-cleanest tract.",
         "deskMapId": "dm-vulcan-mesa-6-1779555600000",
         "fixedNpriBurdenRate": "0",
+        "fixedNpriExceedsRoyalty": false,
         "floatingNpriBurdenRate": "0",
         "grossAcres": "160",
         "grossOrriBurdenRate": "0",
@@ -2520,6 +2516,7 @@
         "description": "Buster + LLC tract at 1/5 royalty (atypical decimal). Planted: a top-lease that overlaps Buster's original lease — should trigger the lease-overlap warning.",
         "deskMapId": "dm-vulcan-mesa-7-1779555600000",
         "fixedNpriBurdenRate": "0",
+        "fixedNpriExceedsRoyalty": false,
         "floatingNpriBurdenRate": "0",
         "grossAcres": "240",
         "grossOrriBurdenRate": "0",
@@ -2725,6 +2722,7 @@
         "description": "LLC + Minerva + an estate. Round-number splits exercise the average tract path.",
         "deskMapId": "dm-vulcan-mesa-8-1779555600000",
         "fixedNpriBurdenRate": "0",
+        "fixedNpriExceedsRoyalty": false,
         "floatingNpriBurdenRate": "0",
         "grossAcres": "200",
         "grossOrriBurdenRate": "0",
@@ -2912,6 +2910,7 @@
         "description": "Trust + Minerva majority + a small local. Two bridges meet here.",
         "deskMapId": "dm-vulcan-mesa-9-1779555600000",
         "fixedNpriBurdenRate": "0",
+        "fixedNpriExceedsRoyalty": false,
         "floatingNpriBurdenRate": "0",
         "grossAcres": "160",
         "grossOrriBurdenRate": "0",
@@ -3099,6 +3098,7 @@
         "description": "Buster + LLC + two locals. Biggest Unit-B tract.",
         "deskMapId": "dm-vulcan-mesa-10-1779555600000",
         "fixedNpriBurdenRate": "0",
+        "fixedNpriExceedsRoyalty": false,
         "floatingNpriBurdenRate": "0",
         "grossAcres": "320",
         "grossOrriBurdenRate": "0",
@@ -4323,8 +4323,8 @@
     "categorySummaries": [
       {
         "category": "royalty",
-        "rowCount": 31,
-        "totalDecimal": "0.2306445868945868945868945868945868945867"
+        "rowCount": 28,
+        "totalDecimal": "0.214440883190883190883190883190883190883"
       },
       {
         "category": "npri",
@@ -4344,11 +4344,11 @@
       {
         "category": "assigned_wi",
         "rowCount": 3,
-        "totalDecimal": "0.3762692530270655270655270655270655270654"
+        "totalDecimal": "0.3918653178418803418803418803418803418802"
       }
     ],
     "expectedDecimal": "0.9907407407407407407407407407407407407407",
-    "reviewableRowCount": 39,
+    "reviewableRowCount": 36,
     "rows": [
       {
         "category": "royalty",
@@ -4459,17 +4459,6 @@
         "sourceLabel": "VM6 • VM6 — Jupiter Spur — The Jupiter Flats Family Mineral Trust Lease • Royalty 1/4",
         "tractCode": "VM6",
         "tractName": "VM6 — Jupiter Spur"
-      },
-      {
-        "category": "royalty",
-        "decimal": "0.00925925925925925925925925925925925925926",
-        "effectiveDate": "2024-01-01",
-        "id": "royalty-dm-vulcan-mesa-3-1779555600000-vm-18-lease-vm-24",
-        "payee": "Vulcan Spur Holdings, LLC",
-        "sourceDocNo": "VM3-OGL-001",
-        "sourceLabel": "VM3 • VM3 — Mercury Cutoff — Vulcan Spur Holdings, LLC Lease • Royalty 1/4",
-        "tractCode": "VM3",
-        "tractName": "VM3 — Mercury Cutoff"
       },
       {
         "category": "royalty",
@@ -4629,17 +4618,6 @@
         "category": "royalty",
         "decimal": "0.00462962962962962962962962962962962962963",
         "effectiveDate": "2024-02-01",
-        "id": "royalty-dm-vulcan-mesa-3-1779555600000-vm-19-lease-vm-25",
-        "payee": "Mavis \"Sword-Eater\" Toomey",
-        "sourceDocNo": "VM3-OGL-002",
-        "sourceLabel": "VM3 • VM3 — Mercury Cutoff — Mavis \"Sword-Eater\" Toomey Lease • Royalty 1/4",
-        "tractCode": "VM3",
-        "tractName": "VM3 — Mercury Cutoff"
-      },
-      {
-        "category": "royalty",
-        "decimal": "0.00462962962962962962962962962962962962963",
-        "effectiveDate": "2024-02-01",
         "id": "royalty-dm-vulcan-mesa-1-1779555600000-vm-3-lease-vm-6",
         "payee": "Minerva 'Minnie' Pickens",
         "sourceDocNo": "VM1-OGL-002",
@@ -4679,17 +4657,6 @@
         "sourceLabel": "VM4 • VM4 — Vulcan Gulch — Buster 'Janus' McGraw Lease • Royalty 1/6.5",
         "tractCode": "VM4",
         "tractName": "VM4 — Vulcan Gulch"
-      },
-      {
-        "category": "royalty",
-        "decimal": "0.002314814814814814814814814814814814814815",
-        "effectiveDate": "2024-03-01",
-        "id": "royalty-dm-vulcan-mesa-3-1779555600000-vm-20-lease-vm-26",
-        "payee": "Beauregard Plumstead",
-        "sourceDocNo": "VM3-OGL-003",
-        "sourceLabel": "VM3 • VM3 — Mercury Cutoff — Beauregard Plumstead Lease • Royalty 1/4",
-        "tractCode": "VM3",
-        "tractName": "VM3 — Mercury Cutoff"
       },
       {
         "category": "npri",
@@ -4759,7 +4726,7 @@
       },
       {
         "category": "assigned_wi",
-        "decimal": "0.1905715811965811965811965811965811965811",
+        "decimal": "0.1990785256410256410256410256410256410256",
         "effectiveDate": "2024-03-01",
         "id": "assignment-vm-asg-1-unit-a-60",
         "payee": "Praetor Brothers Operating, LLC",
@@ -4770,7 +4737,7 @@
       },
       {
         "category": "assigned_wi",
-        "decimal": "0.158809650997150997150997150997150997151",
+        "decimal": "0.1658987713675213675213675213675213675213",
         "effectiveDate": "2024-04-01",
         "id": "assignment-vm-asg-2-unit-a-50",
         "payee": "Minerva Draw Production Co.",
@@ -4793,10 +4760,10 @@
     ],
     "rowsMissingEffectiveDate": 0,
     "rowsMissingSourceDocNo": 0,
-    "rowsWithCompleteSource": 39,
+    "rowsWithCompleteSource": 36,
     "rowsWithSourceGap": 0,
-    "totalDecimal": "1.024528133903133903133903133903133903134",
-    "varianceDecimal": "0.0337873931623931623931623931623931623933"
+    "totalDecimal": "1.023920495014245014245014245014245014245",
+    "varianceDecimal": "0.0331797542735042735042735042735042735043"
   },
   "unitRows": [
     {
@@ -4908,17 +4875,6 @@
       "sourceLabel": "VM6 • VM6 — Jupiter Spur — The Jupiter Flats Family Mineral Trust Lease • Royalty 1/4",
       "tractCode": "VM6",
       "tractName": "VM6 — Jupiter Spur"
-    },
-    {
-      "category": "royalty",
-      "decimal": "0.00925925925925925925925925925925925925926",
-      "effectiveDate": "2024-01-01",
-      "id": "royalty-dm-vulcan-mesa-3-1779555600000-vm-18-lease-vm-24",
-      "payee": "Vulcan Spur Holdings, LLC",
-      "sourceDocNo": "VM3-OGL-001",
-      "sourceLabel": "VM3 • VM3 — Mercury Cutoff — Vulcan Spur Holdings, LLC Lease • Royalty 1/4",
-      "tractCode": "VM3",
-      "tractName": "VM3 — Mercury Cutoff"
     },
     {
       "category": "royalty",
@@ -5078,17 +5034,6 @@
       "category": "royalty",
       "decimal": "0.00462962962962962962962962962962962962963",
       "effectiveDate": "2024-02-01",
-      "id": "royalty-dm-vulcan-mesa-3-1779555600000-vm-19-lease-vm-25",
-      "payee": "Mavis \"Sword-Eater\" Toomey",
-      "sourceDocNo": "VM3-OGL-002",
-      "sourceLabel": "VM3 • VM3 — Mercury Cutoff — Mavis \"Sword-Eater\" Toomey Lease • Royalty 1/4",
-      "tractCode": "VM3",
-      "tractName": "VM3 — Mercury Cutoff"
-    },
-    {
-      "category": "royalty",
-      "decimal": "0.00462962962962962962962962962962962962963",
-      "effectiveDate": "2024-02-01",
       "id": "royalty-dm-vulcan-mesa-1-1779555600000-vm-3-lease-vm-6",
       "payee": "Minerva 'Minnie' Pickens",
       "sourceDocNo": "VM1-OGL-002",
@@ -5128,17 +5073,6 @@
       "sourceLabel": "VM4 • VM4 — Vulcan Gulch — Buster 'Janus' McGraw Lease • Royalty 1/6.5",
       "tractCode": "VM4",
       "tractName": "VM4 — Vulcan Gulch"
-    },
-    {
-      "category": "royalty",
-      "decimal": "0.002314814814814814814814814814814814814815",
-      "effectiveDate": "2024-03-01",
-      "id": "royalty-dm-vulcan-mesa-3-1779555600000-vm-20-lease-vm-26",
-      "payee": "Beauregard Plumstead",
-      "sourceDocNo": "VM3-OGL-003",
-      "sourceLabel": "VM3 • VM3 — Mercury Cutoff — Beauregard Plumstead Lease • Royalty 1/4",
-      "tractCode": "VM3",
-      "tractName": "VM3 — Mercury Cutoff"
     },
     {
       "category": "npri",
@@ -5208,7 +5142,7 @@
     },
     {
       "category": "assigned_wi",
-      "decimal": "0.1905715811965811965811965811965811965811",
+      "decimal": "0.1990785256410256410256410256410256410256",
       "effectiveDate": "2024-03-01",
       "id": "assignment-vm-asg-1-unit-a-60",
       "payee": "Praetor Brothers Operating, LLC",
@@ -5219,7 +5153,7 @@
     },
     {
       "category": "assigned_wi",
-      "decimal": "0.158809650997150997150997150997150997151",
+      "decimal": "0.1658987713675213675213675213675213675213",
       "effectiveDate": "2024-04-01",
       "id": "assignment-vm-asg-2-unit-a-50",
       "payee": "Minerva Draw Production Co.",

@@ -112,17 +112,6 @@
       "decimal": "0.00925925925925925925925925925925925925926"
     },
     {
-      "id": "royalty-dm-vulcan-mesa-3-1779555600000-vm-18-lease-vm-24",
-      "category": "royalty",
-      "payee": "Vulcan Spur Holdings, LLC",
-      "tractName": "VM3 — Mercury Cutoff",
-      "tractCode": "VM3",
-      "sourceLabel": "VM3 • VM3 — Mercury Cutoff — Vulcan Spur Holdings, LLC Lease • Royalty 1/4",
-      "effectiveDate": "2024-01-01",
-      "sourceDocNo": "VM3-OGL-001",
-      "decimal": "0.00925925925925925925925925925925925925926"
-    },
-    {
       "id": "royalty-dm-vulcan-mesa-10-1779555600000-vm-73-lease-vm-77",
       "category": "royalty",
       "payee": "Vulcan Spur Holdings, LLC",
@@ -277,17 +266,6 @@
       "decimal": "0.00462962962962962962962962962962962962963"
     },
     {
-      "id": "royalty-dm-vulcan-mesa-3-1779555600000-vm-19-lease-vm-25",
-      "category": "royalty",
-      "payee": "Mavis \"Sword-Eater\" Toomey",
-      "tractName": "VM3 — Mercury Cutoff",
-      "tractCode": "VM3",
-      "sourceLabel": "VM3 • VM3 — Mercury Cutoff — Mavis \"Sword-Eater\" Toomey Lease • Royalty 1/4",
-      "effectiveDate": "2024-02-01",
-      "sourceDocNo": "VM3-OGL-002",
-      "decimal": "0.00462962962962962962962962962962962962963"
-    },
-    {
       "id": "royalty-dm-vulcan-mesa-1-1779555600000-vm-3-lease-vm-6",
       "category": "royalty",
       "payee": "Minerva 'Minnie' Pickens",
@@ -330,17 +308,6 @@
       "effectiveDate": "2024-01-01",
       "sourceDocNo": "VM4-OGL-001",
       "decimal": "0.00356125356125356125356125356125356125356"
-    },
-    {
-      "id": "royalty-dm-vulcan-mesa-3-1779555600000-vm-20-lease-vm-26",
-      "category": "royalty",
-      "payee": "Beauregard Plumstead",
-      "tractName": "VM3 — Mercury Cutoff",
-      "tractCode": "VM3",
-      "sourceLabel": "VM3 • VM3 — Mercury Cutoff — Beauregard Plumstead Lease • Royalty 1/4",
-      "effectiveDate": "2024-03-01",
-      "sourceDocNo": "VM3-OGL-003",
-      "decimal": "0.002314814814814814814814814814814814814815"
     },
     {
       "id": "npri-vm-22",
@@ -417,7 +384,7 @@
       "sourceLabel": "Vulcan Mesa Petroleum, LLC assignment",
       "effectiveDate": "2024-03-01",
       "sourceDocNo": "VM-ASG-1",
-      "decimal": "0.1905715811965811965811965811965811965811"
+      "decimal": "0.1990785256410256410256410256410256410256"
     },
     {
       "id": "assignment-vm-asg-2-unit-a-50",
@@ -428,7 +395,7 @@
       "sourceLabel": "Vulcan Mesa Petroleum, LLC assignment",
       "effectiveDate": "2024-04-01",
       "sourceDocNo": "VM-ASG-2",
-      "decimal": "0.158809650997150997150997150997150997151"
+      "decimal": "0.1658987713675213675213675213675213675213"
     },
     {
       "id": "assignment-vm-asg-3-vm10-25",
@@ -603,39 +570,6 @@
     ],
     "VM3": [
       {
-        "id": "royalty-dm-vulcan-mesa-3-1779555600000-vm-18-lease-vm-24",
-        "category": "royalty",
-        "payee": "Vulcan Spur Holdings, LLC",
-        "tractName": "VM3 — Mercury Cutoff",
-        "tractCode": "VM3",
-        "sourceLabel": "VM3 — Mercury Cutoff — Vulcan Spur Holdings, LLC Lease • Royalty 1/4",
-        "effectiveDate": "2024-01-01",
-        "sourceDocNo": "VM3-OGL-001",
-        "decimal": "0.00925925925925925925925925925925925925926"
-      },
-      {
-        "id": "royalty-dm-vulcan-mesa-3-1779555600000-vm-19-lease-vm-25",
-        "category": "royalty",
-        "payee": "Mavis \"Sword-Eater\" Toomey",
-        "tractName": "VM3 — Mercury Cutoff",
-        "tractCode": "VM3",
-        "sourceLabel": "VM3 — Mercury Cutoff — Mavis \"Sword-Eater\" Toomey Lease • Royalty 1/4",
-        "effectiveDate": "2024-02-01",
-        "sourceDocNo": "VM3-OGL-002",
-        "decimal": "0.00462962962962962962962962962962962962963"
-      },
-      {
-        "id": "royalty-dm-vulcan-mesa-3-1779555600000-vm-20-lease-vm-26",
-        "category": "royalty",
-        "payee": "Beauregard Plumstead",
-        "tractName": "VM3 — Mercury Cutoff",
-        "tractCode": "VM3",
-        "sourceLabel": "VM3 — Mercury Cutoff — Beauregard Plumstead Lease • Royalty 1/4",
-        "effectiveDate": "2024-03-01",
-        "sourceDocNo": "VM3-OGL-003",
-        "decimal": "0.002314814814814814814814814814814814814815"
-      },
-      {
         "id": "npri-dm-vulcan-mesa-3-1779555600000-vm-22",
         "category": "npri",
         "payee": "Annie Boggs",
@@ -678,6 +612,28 @@
         "effectiveDate": "2024-01-01",
         "sourceDocNo": "",
         "decimal": "0"
+      },
+      {
+        "id": "assignment-dm-vulcan-mesa-3-1779555600000-vm-asg-1-unit-a-60",
+        "category": "assigned_wi",
+        "payee": "Praetor Brothers Operating, LLC",
+        "tractName": "VM3 — Mercury Cutoff",
+        "tractCode": "VM3",
+        "sourceLabel": "Vulcan Mesa Petroleum, LLC assignment",
+        "effectiveDate": "2024-03-01",
+        "sourceDocNo": "VM-ASG-1",
+        "decimal": "0.008506944444444444444444444444444444444444"
+      },
+      {
+        "id": "assignment-dm-vulcan-mesa-3-1779555600000-vm-asg-2-unit-a-50",
+        "category": "assigned_wi",
+        "payee": "Minerva Draw Production Co.",
+        "tractName": "VM3 — Mercury Cutoff",
+        "tractCode": "VM3",
+        "sourceLabel": "Vulcan Mesa Petroleum, LLC assignment",
+        "effectiveDate": "2024-04-01",
+        "sourceDocNo": "VM-ASG-2",
+        "decimal": "0.00708912037037037037037037037037037037037"
       }
     ],
     "VM4": [
@@ -1270,17 +1226,6 @@
         "decimal": "0.00925925925925925925925925925925925925926"
       },
       {
-        "id": "royalty-dm-vulcan-mesa-3-1779555600000-vm-18-lease-vm-24",
-        "category": "royalty",
-        "payee": "Vulcan Spur Holdings, LLC",
-        "tractName": "VM3 — Mercury Cutoff",
-        "tractCode": "VM3",
-        "sourceLabel": "VM3 • VM3 — Mercury Cutoff — Vulcan Spur Holdings, LLC Lease • Royalty 1/4",
-        "effectiveDate": "2024-01-01",
-        "sourceDocNo": "VM3-OGL-001",
-        "decimal": "0.00925925925925925925925925925925925925926"
-      },
-      {
         "id": "royalty-dm-vulcan-mesa-10-1779555600000-vm-73-lease-vm-77",
         "category": "royalty",
         "payee": "Vulcan Spur Holdings, LLC",
@@ -1435,17 +1380,6 @@
         "decimal": "0.00462962962962962962962962962962962962963"
       },
       {
-        "id": "royalty-dm-vulcan-mesa-3-1779555600000-vm-19-lease-vm-25",
-        "category": "royalty",
-        "payee": "Mavis \"Sword-Eater\" Toomey",
-        "tractName": "VM3 — Mercury Cutoff",
-        "tractCode": "VM3",
-        "sourceLabel": "VM3 • VM3 — Mercury Cutoff — Mavis \"Sword-Eater\" Toomey Lease • Royalty 1/4",
-        "effectiveDate": "2024-02-01",
-        "sourceDocNo": "VM3-OGL-002",
-        "decimal": "0.00462962962962962962962962962962962962963"
-      },
-      {
         "id": "royalty-dm-vulcan-mesa-1-1779555600000-vm-3-lease-vm-6",
         "category": "royalty",
         "payee": "Minerva 'Minnie' Pickens",
@@ -1488,17 +1422,6 @@
         "effectiveDate": "2024-01-01",
         "sourceDocNo": "VM4-OGL-001",
         "decimal": "0.00356125356125356125356125356125356125356"
-      },
-      {
-        "id": "royalty-dm-vulcan-mesa-3-1779555600000-vm-20-lease-vm-26",
-        "category": "royalty",
-        "payee": "Beauregard Plumstead",
-        "tractName": "VM3 — Mercury Cutoff",
-        "tractCode": "VM3",
-        "sourceLabel": "VM3 • VM3 — Mercury Cutoff — Beauregard Plumstead Lease • Royalty 1/4",
-        "effectiveDate": "2024-03-01",
-        "sourceDocNo": "VM3-OGL-003",
-        "decimal": "0.002314814814814814814814814814814814814815"
       },
       {
         "id": "npri-vm-22",
@@ -1575,7 +1498,7 @@
         "sourceLabel": "Vulcan Mesa Petroleum, LLC assignment",
         "effectiveDate": "2024-03-01",
         "sourceDocNo": "VM-ASG-1",
-        "decimal": "0.1905715811965811965811965811965811965811"
+        "decimal": "0.1990785256410256410256410256410256410256"
       },
       {
         "id": "assignment-vm-asg-2-unit-a-50",
@@ -1586,7 +1509,7 @@
         "sourceLabel": "Vulcan Mesa Petroleum, LLC assignment",
         "effectiveDate": "2024-04-01",
         "sourceDocNo": "VM-ASG-2",
-        "decimal": "0.158809650997150997150997150997150997151"
+        "decimal": "0.1658987713675213675213675213675213675213"
       },
       {
         "id": "assignment-vm-asg-3-vm10-25",
@@ -1600,14 +1523,14 @@
         "decimal": "0.02688802083333333333333333333333333333333"
       }
     ],
-    "totalDecimal": "1.024528133903133903133903133903133903134",
+    "totalDecimal": "1.023920495014245014245014245014245014245",
     "expectedDecimal": "0.9907407407407407407407407407407407407407",
-    "varianceDecimal": "0.0337873931623931623931623931623931623933",
+    "varianceDecimal": "0.0331797542735042735042735042735042735043",
     "categorySummaries": [
       {
         "category": "royalty",
-        "rowCount": 31,
-        "totalDecimal": "0.2306445868945868945868945868945868945867"
+        "rowCount": 28,
+        "totalDecimal": "0.214440883190883190883190883190883190883"
       },
       {
         "category": "npri",
@@ -1627,11 +1550,11 @@
       {
         "category": "assigned_wi",
         "rowCount": 3,
-        "totalDecimal": "0.3762692530270655270655270655270655270654"
+        "totalDecimal": "0.3918653178418803418803418803418803418802"
       }
     ],
-    "reviewableRowCount": 39,
-    "rowsWithCompleteSource": 39,
+    "reviewableRowCount": 36,
+    "rowsWithCompleteSource": 36,
     "rowsWithSourceGap": 0,
     "rowsMissingEffectiveDate": 0,
     "rowsMissingSourceDocNo": 0

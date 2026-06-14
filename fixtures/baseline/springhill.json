@@ -713,7 +713,7 @@
     "TR2": [
       {
         "category": "royalty",
-        "decimal": "0.01556621021664368162432783237530131652142",
+        "decimal": "0.01435010004346839399742722047098090116818",
         "effectiveDate": "2025-11-06",
         "id": "royalty-dm-tr2-tr2c-1-lease-4",
         "payee": "Elmore Family Partners, Ltd.",
@@ -724,7 +724,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.01556620944748980159465974411273873539774",
+        "decimal": "0.01435009933440466084507695160393102169479",
         "effectiveDate": "2025-10-27",
         "id": "royalty-dm-tr2-tr2c-32-lease-13",
         "payee": "John A. Few, Sr.",
@@ -735,7 +735,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.005646566151014625440385685147413313554608",
+        "decimal": "0.005205428170466607827855553495271648433154",
         "effectiveDate": "2025-10-27",
         "id": "royalty-dm-tr2-tr2c-22-lease-10",
         "payee": "Rigby Owen, Jr.",
@@ -746,7 +746,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.005646566151014625440385685147413313554608",
+        "decimal": "0.005205428170466607827855553495271648433154",
         "effectiveDate": "2025-10-27",
         "id": "royalty-dm-tr2-tr2c-26-lease-12",
         "payee": "Sandra Owen Powell",
@@ -757,7 +757,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.005646566151014625440385685147413313554608",
+        "decimal": "0.005205428170466607827855553495271648433154",
         "effectiveDate": "2025-10-27",
         "id": "royalty-dm-tr2-tr2c-24-lease-11",
         "payee": "Stephen J. Owen",
@@ -768,7 +768,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.002594368266886762933432226960875208603746",
+        "decimal": "0.002391683246036234579257834229556832931579",
         "effectiveDate": "2025-10-30",
         "id": "royalty-dm-tr2-tr2c-35-lease-14",
         "payee": "Benita Trapp Downey",
@@ -779,7 +779,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.002594368266886762933432226960875208603746",
+        "decimal": "0.002391683246036234579257834229556832931579",
         "effectiveDate": "2025-10-30",
         "id": "royalty-dm-tr2-tr2c-37-lease-15",
         "payee": "Robert Hill Trapp",
@@ -790,7 +790,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.002161973555738969111193522467396007169789",
+        "decimal": "0.001959288534888440757019129736077631497622",
         "effectiveDate": "2025-10-30",
         "id": "royalty-dm-tr2-tr2c-51-lease-18",
         "payee": "Pete McClanahan",
@@ -801,7 +801,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.001716861372315675412571852401260893751159",
+        "decimal": "0.00158273157760351327096467643241238642685",
         "effectiveDate": "2025-12-10",
         "id": "royalty-dm-tr2-tr2c-54-lease-19",
         "payee": "Peter Hill Kraft",
@@ -812,7 +812,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.000864789396657124976821806044872983497126",
+        "decimal": "0.000797227725043287088007602447617281661413",
         "effectiveDate": "2025-10-31",
         "id": "royalty-dm-tr2-tr2c-47-lease-17",
         "payee": "Rebecca Hamblen Drapak",
@@ -823,7 +823,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.000864789396657124976821806044872983497126",
+        "decimal": "0.000797227725043287088007602447617281661413",
         "effectiveDate": "2025-10-30",
         "id": "royalty-dm-tr2-tr2c-42-lease-16",
         "payee": "Tinabeth McCune Keasling",
@@ -834,7 +834,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.0004697545020816915445948451696643797515298",
+        "decimal": "0.0004330549316065593926733728907843500834415",
         "effectiveDate": "2025-12-03",
         "id": "royalty-dm-tr2-tr2c-5-lease-5",
         "payee": "Jerry and Kristin Broussard",
@@ -845,7 +845,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.00008619346051160068607454107175968848507324",
+        "decimal": "0.00007945959640913188247496755052846282217689",
         "effectiveDate": "2025-12-03",
         "id": "royalty-dm-tr2-tr2c-19-lease-9",
         "payee": "Candy Lynne Deloach",
@@ -856,7 +856,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.00008619346051160068607454107175968848507324",
+        "decimal": "0.00007945959640913188247496755052846282217689",
         "effectiveDate": "2025-12-03",
         "id": "royalty-dm-tr2-tr2c-14-lease-7",
         "payee": "Raigan Gwen Mayo & Heather Ann Henson",
@@ -1153,7 +1153,7 @@
       },
       {
         "category": "retained_wi",
-        "decimal": "0.2387698897420379433071033438407812596576",
+        "decimal": "0.2434529994691139172620565238889919030842",
         "id": "retained-wi-dm-tr2",
         "payee": "Magnolia Petroleum Company, LLC",
         "sourceDocNo": "",
@@ -1165,7 +1165,7 @@
     "TR3": [
       {
         "category": "royalty",
-        "decimal": "0.004137161045364795800111255330984609679214",
+        "decimal": "0.003813945338695671128227563508251437048025",
         "effectiveDate": "2025-11-06",
         "id": "royalty-dm-tr3-tr3c-1-lease-20",
         "payee": "Elmore Family Partners, Ltd.",
@@ -1176,7 +1176,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.001581855681189736695716669757092527350269",
+        "decimal": "0.001458273206096788516363804932319673651029",
         "effectiveDate": "2025-10-27",
         "id": "royalty-dm-tr3-tr3c-14-lease-24",
         "payee": "John A. Few, Sr.",
@@ -1187,7 +1187,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.001500734875977830057481921008715000927128",
+        "decimal": "0.001383489963792062084241145929909141479696",
         "effectiveDate": "2025-10-27",
         "id": "royalty-dm-tr3-tr3c-4-lease-21",
         "payee": "Rigby Owen, Jr.",
@@ -1198,7 +1198,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.001500734875977830057481921008715000927128",
+        "decimal": "0.001383489963792062084241145929909141479696",
         "effectiveDate": "2025-10-27",
         "id": "royalty-dm-tr3-tr3c-8-lease-23",
         "payee": "Sandra Owen Powell",
@@ -1209,7 +1209,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.001500734875977830057481921008715000927128",
+        "decimal": "0.001383489963792062084241145929909141479696",
         "effectiveDate": "2025-10-27",
         "id": "royalty-dm-tr3-tr3c-6-lease-22",
         "payee": "Stephen J. Owen",
@@ -1220,7 +1220,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.0008112080521190663823474874837752642314113",
+        "decimal": "0.0007351572972329039090024105321713332097165",
         "effectiveDate": "2025-12-12",
         "id": "royalty-dm-tr3-tr3c-42-lease-30",
         "payee": "Donald Harman",
@@ -1231,7 +1231,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.0006895268443012064249953643612089745966994",
+        "decimal": "0.0006356575595901746730426015204895234563322",
         "effectiveDate": "2025-10-30",
         "id": "royalty-dm-tr3-tr3c-26-lease-26",
         "payee": "Benita Trapp Downey",
@@ -1242,7 +1242,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.0006895268443012064249953643612089745966994",
+        "decimal": "0.0006356575595901746730426015204895234563322",
         "effectiveDate": "2025-10-30",
         "id": "royalty-dm-tr3-tr3c-28-lease-27",
         "payee": "Robert Hill Trapp",
@@ -1253,7 +1253,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.0005746057035843386874961369676741454972496",
+        "decimal": "0.0005207364188733069355433741269546943568824",
         "effectiveDate": "2025-10-30",
         "id": "royalty-dm-tr3-tr3c-46-lease-32",
         "payee": "Pete McClanahan",
@@ -1264,7 +1264,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.0004563045344275855275356944186908956054144",
+        "decimal": "0.0004206557426754304081969682922306693862414",
         "effectiveDate": "2025-12-10",
         "id": "royalty-dm-tr3-tr3c-49-lease-33",
         "payee": "Peter Hill Kraft",
@@ -1275,7 +1275,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.0004484561069898642482152790654552197292786",
+        "decimal": "0.0004110847647407088941973391433339514185054",
         "effectiveDate": "2025-12-03",
         "id": "royalty-dm-tr3-tr3c-22-lease-25",
         "payee": "Old Hickory Hill, LLC",
@@ -1286,7 +1286,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.0002298422746195878917114778416465788985722",
+        "decimal": "0.0002118858469149325876715186352679399221212",
         "effectiveDate": "2025-10-31",
         "id": "royalty-dm-tr3-tr3c-38-lease-29",
         "payee": "Rebecca Hamblen Drapak",
@@ -1297,7 +1297,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.0002298422746195878917114778416465788985722",
+        "decimal": "0.0002118858469149325876715186352679399221212",
         "effectiveDate": "2025-10-30",
         "id": "royalty-dm-tr3-tr3c-33-lease-28",
         "payee": "Tinabeth McCune Keasling",
@@ -1308,7 +1308,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.0002028020130297665955868718709438160578529",
+        "decimal": "0.0001837893243082259772506026330428333024292",
         "effectiveDate": "2025-12-12",
         "id": "royalty-dm-tr3-tr3c-44-lease-31",
         "payee": "Claude Lester Harman, Jr.",
@@ -1605,7 +1605,7 @@
       },
       {
         "category": "retained_wi",
-        "decimal": "0.05878730794217992785304252425984300636628",
+        "decimal": "0.05995144514765072405297762531676865072007",
         "id": "retained-wi-dm-tr3",
         "payee": "Magnolia Petroleum Company, LLC",
         "sourceDocNo": "",
@@ -1617,7 +1617,7 @@
     "TR4": [
       {
         "category": "royalty",
-        "decimal": "0.005302011867235305025032449471537177823104",
+        "decimal": "0.003645133158724272204709809011681809753383",
         "effectiveDate": "2025-11-06",
         "id": "royalty-dm-tr4-tr4c-1-lease-34",
         "payee": "Elmore Family Partners, Ltd.",
@@ -1738,7 +1738,7 @@
       },
       {
         "category": "retained_wi",
-        "decimal": "0.0195511687604301872798071574262933432227",
+        "decimal": "0.02120804746894122010012979788614871129242",
         "id": "retained-wi-dm-tr4",
         "payee": "Magnolia Petroleum Company, LLC",
         "sourceDocNo": "",
@@ -1750,7 +1750,7 @@
     "TR5": [
       {
         "category": "royalty",
-        "decimal": "0.001237205082746152419803448915260522900056",
+        "decimal": "0.001140548435656609262006304468755794548489",
         "effectiveDate": "2025-11-06",
         "id": "royalty-dm-tr5-tr5c-1-lease-35",
         "payee": "Elmore Family Partners, Ltd.",
@@ -1761,7 +1761,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.0004487900773572223252364175783422955683294",
+        "decimal": "0.0004137283525636893310773224550343037270537",
         "effectiveDate": "2025-10-27",
         "id": "royalty-dm-tr5-tr5c-4-lease-36",
         "payee": "Rigby Owen, Jr.",
@@ -1772,7 +1772,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.0004487900773572223252364175783422955683294",
+        "decimal": "0.0004137283525636893310773224550343037270537",
         "effectiveDate": "2025-10-27",
         "id": "royalty-dm-tr5-tr5c-8-lease-38",
         "payee": "Sandra Owen Powell",
@@ -1783,7 +1783,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.0004487900773572223252364175783422955683294",
+        "decimal": "0.0004137283525636893310773224550343037270537",
         "effectiveDate": "2025-10-27",
         "id": "royalty-dm-tr5-tr5c-6-lease-37",
         "payee": "Stephen J. Owen",
@@ -1794,7 +1794,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.000242589234308362692379009827554236973855",
+        "decimal": "0.0002198464935919536899684776562210272575561",
         "effectiveDate": "2025-12-12",
         "id": "royalty-dm-tr5-tr5c-28-lease-43",
         "payee": "Donald Harman",
@@ -1805,7 +1805,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.0002062008491621082885221583534211014277768",
+        "decimal": "0.0001900914078213185784813647320600778787317",
         "effectiveDate": "2025-10-30",
         "id": "royalty-dm-tr5-tr5c-12-lease-39",
         "payee": "Benita Trapp Downey",
@@ -1816,7 +1816,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.0002062008491621082885221583534211014277768",
+        "decimal": "0.0001900914078213185784813647320600778787317",
         "effectiveDate": "2025-10-30",
         "id": "royalty-dm-tr5-tr5c-14-lease-40",
         "payee": "Robert Hill Trapp",
@@ -1827,7 +1827,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.0001718340409684235737684652945175845231474",
+        "decimal": "0.0001557245996276338637276716731565609741023",
         "effectiveDate": "2025-10-30",
         "id": "royalty-dm-tr5-tr5c-32-lease-45",
         "payee": "Pete McClanahan",
@@ -1838,7 +1838,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.000136456445826766178379380678657519006119",
+        "decimal": "0.000125795785996550070693491563137400333766",
         "effectiveDate": "2025-12-10",
         "id": "royalty-dm-tr5-tr5c-35-lease-46",
         "payee": "Peter Hill Kraft",
@@ -1849,7 +1849,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.00006873361434961987761913591692935286482478",
+        "decimal": "0.00006336380072855582468014092341924717226034",
         "effectiveDate": "2025-10-31",
         "id": "royalty-dm-tr5-tr5c-24-lease-42",
         "payee": "Rebecca Hamblen Drapak",
@@ -1860,7 +1860,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.00006873361434961987761913591692935286482478",
+        "decimal": "0.00006336380072855582468014092341924717226034",
         "effectiveDate": "2025-10-30",
         "id": "royalty-dm-tr5-tr5c-19-lease-41",
         "payee": "Tinabeth McCune Keasling",
@@ -1871,7 +1871,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.00006064730857709067309475245688855924346376",
+        "decimal": "0.00005496162339798842249211941405525681438904",
         "effectiveDate": "2025-12-12",
         "id": "royalty-dm-tr5-tr5c-30-lease-44",
         "payee": "Claude Lester Harman, Jr.",
@@ -2168,7 +2168,7 @@
       },
       {
         "category": "retained_wi",
-        "decimal": "0.01515495681148118558393596637616663576241",
+        "decimal": "0.01545495566994155232090982137338525248779",
         "id": "retained-wi-dm-tr5",
         "payee": "Magnolia Petroleum Company, LLC",
         "sourceDocNo": "",
@@ -2180,7 +2180,7 @@
     "TR6": [
       {
         "category": "royalty",
-        "decimal": "0.006241875548390274429816428703875394029298",
+        "decimal": "0.005754229021172284239987020211385128870759",
         "effectiveDate": "2025-11-06",
         "id": "royalty-dm-tr6-tr6c-1-lease-47",
         "payee": "Elmore Family Partners, Ltd.",
@@ -2191,7 +2191,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.006241875548390274429816428703875394029298",
+        "decimal": "0.005754229021172284239987020211385128870759",
         "effectiveDate": "2025-10-27",
         "id": "royalty-dm-tr6-tr6c-15-lease-51",
         "payee": "John A. Few, Sr.",
@@ -2202,7 +2202,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.00226420974928292462451325792694233265344",
+        "decimal": "0.00208731836262019613822315965139996291489",
         "effectiveDate": "2025-10-27",
         "id": "royalty-dm-tr6-tr6c-5-lease-48",
         "payee": "Rigby Owen, Jr.",
@@ -2213,7 +2213,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.00226420974928292462451325792694233265344",
+        "decimal": "0.00208731836262019613822315965139996291489",
         "effectiveDate": "2025-10-27",
         "id": "royalty-dm-tr6-tr6c-9-lease-50",
         "payee": "Sandra Owen Powell",
@@ -2224,7 +2224,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.00226420974928292462451325792694233265344",
+        "decimal": "0.00208731836262019613822315965139996291489",
         "effectiveDate": "2025-10-27",
         "id": "royalty-dm-tr6-tr6c-7-lease-49",
         "payee": "Stephen J. Owen",
@@ -2235,7 +2235,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.001223897178446017986278509178564806230299",
+        "decimal": "0.001109156817966703800064898943074355646209",
         "effectiveDate": "2025-12-12",
         "id": "royalty-dm-tr6-tr6c-34-lease-56",
         "payee": "Donald Harman",
@@ -2246,7 +2246,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.001040312601679115288336732801780085295754",
+        "decimal": "0.0009590381796729344064354255516410161320233",
         "effectiveDate": "2025-10-30",
         "id": "royalty-dm-tr6-tr6c-18-lease-52",
         "payee": "Benita Trapp Downey",
@@ -2257,7 +2257,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.001040312601679115288336732801780085295754",
+        "decimal": "0.0009590381796729344064354255516410161320233",
         "effectiveDate": "2025-10-30",
         "id": "royalty-dm-tr6-tr6c-20-lease-53",
         "payee": "Robert Hill Trapp",
@@ -2268,7 +2268,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.0008669271680659294069472773348167377464617",
+        "decimal": "0.000785652746059748525045970084677668582731",
         "effectiveDate": "2025-10-30",
         "id": "royalty-dm-tr6-tr6c-38-lease-58",
         "payee": "Pete McClanahan",
@@ -2279,7 +2279,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.000688442170586437279807157426293343222696",
+        "decimal": "0.0006346576260093718673222232523641757834229",
         "effectiveDate": "2025-12-10",
         "id": "royalty-dm-tr6-tr6c-41-lease-59",
         "payee": "Peter Hill Kraft",
@@ -2290,7 +2290,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.0003467708569456355460782495827925088077138",
+        "decimal": "0.0003196793837467577690408863341368440571112",
         "effectiveDate": "2025-10-31",
         "id": "royalty-dm-tr6-tr6c-30-lease-55",
         "payee": "Rebecca Hamblen Drapak",
@@ -2301,7 +2301,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.0003467708569456355460782495827925088077138",
+        "decimal": "0.0003196793837467577690408863341368440571112",
         "effectiveDate": "2025-10-30",
         "id": "royalty-dm-tr6-tr6c-25-lease-54",
         "payee": "Tinabeth McCune Keasling",
@@ -2312,7 +2312,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.0003059742946115044965696272946412015575747",
+        "decimal": "0.0002772892044916759500162247357685889115521",
         "effectiveDate": "2025-12-12",
         "id": "royalty-dm-tr6-tr6c-36-lease-57",
         "payee": "Claude Lester Harman, Jr.",
@@ -2609,7 +2609,7 @@
       },
       {
         "category": "retained_wi",
-        "decimal": "0.1009387675134616339926563755485505902713",
+        "decimal": "0.1029399509354783061762160825761789974658",
         "id": "retained-wi-dm-tr6",
         "payee": "Magnolia Petroleum Company, LLC",
         "sourceDocNo": "",
@@ -2621,7 +2621,7 @@
     "TR7": [
       {
         "category": "royalty",
-        "decimal": "0.0111613868672353050250324494715371778231",
+        "decimal": "0.007673453471224272204709809011681809753378",
         "effectiveDate": "2025-11-06",
         "id": "royalty-dm-tr7-tr7c-1-lease-60",
         "payee": "Elmore Family Partners, Ltd.",
@@ -2742,7 +2742,7 @@
       },
       {
         "category": "retained_wi",
-        "decimal": "0.04115761407293018727980715742629334322269",
+        "decimal": "0.04464554746894122010012979788614871129241",
         "id": "retained-wi-dm-tr7",
         "payee": "Magnolia Petroleum Company, LLC",
         "sourceDocNo": "",
@@ -2760,6 +2760,7 @@
     "excludedAssignmentCount": 0,
     "excludedNpriCount": 0,
     "excludedOrriCount": 0,
+    "fixedNpriExceedsRoyaltyTractCount": 1,
     "fullyLeasedTractCount": 1,
     "includedAssignmentCount": 0,
     "includedNpriCount": 124,
@@ -5015,8 +5016,8 @@
     "overAssignedTractCount": 0,
     "overBurdenedTractCount": 0,
     "overFloatingNpriBurdenedTractCount": 0,
-    "preWorkingInterestDecimal": "0.6301379561636781207385924655417516533779",
-    "retainedWorkingInterestDecimal": "0.6301379561636781207385924655417516533779",
+    "preWorkingInterestDecimal": "0.6434311974812239954546595895914457012176",
+    "retainedWorkingInterestDecimal": "0.6434311974812239954546595895914457012176",
     "totalAssignedWorkingInterestDecimal": "0",
     "totalGrossAcres": "276.1216",
     "totalNpriDecimal": "0.01334475539265184704854672723901353606527",
@@ -5037,6 +5038,7 @@
         "description": "Dr. Elmore #1 Unit, Tract 1. Present-day mineral ownership (8 owners); totals 100%. San Jacinto County, TX.",
         "deskMapId": "dm-tr1",
         "fixedNpriBurdenRate": "0",
+        "fixedNpriExceedsRoyalty": false,
         "floatingNpriBurdenRate": "0",
         "grossAcres": "55.5016",
         "grossOrriBurdenRate": "0",
@@ -5224,6 +5226,7 @@
         "description": "Dr. Elmore #1 Unit, Tract 2. Present-day mineral ownership (90 owners); totals 100%. San Jacinto County, TX.",
         "deskMapId": "dm-tr2",
         "fixedNpriBurdenRate": "0.01231125246875",
+        "fixedNpriExceedsRoyalty": true,
         "floatingNpriBurdenRate": "0",
         "grossAcres": "106.19",
         "grossOrriBurdenRate": "0",
@@ -5234,9 +5237,9 @@
         "leaseOverlaps": [],
         "leasedOwnership": "0.787920158",
         "name": "Tract 2 — 106.19 ac. (DOTO Unit Tr. 1)",
-        "netRevenueInterestBaseRate": "0.6208637723645833333333333333333333333333",
+        "netRevenueInterestBaseRate": "0.6330410748489583333333333333333333333333",
         "netRevenueInterestOrriBurdenRate": "0",
-        "npriAdjustedNriBeforeOrriRate": "0.6208637723645833333333333333333333333333",
+        "npriAdjustedNriBeforeOrriRate": "0.6330410748489583333333333333333333333333",
         "nriBeforeOrriRate": "0.6331750248333333333333333333333333333333",
         "overAssigned": false,
         "overBurdened": false,
@@ -5264,8 +5267,8 @@
                 "leasedFraction": "0.202380962",
                 "leasedPooledAcres": "21.49083435478",
                 "lessee": "Magnolia Petroleum Company, LLC",
-                "netOwnerTractRoyalty": "0.0404761924",
-                "netOwnerUnitRoyaltyDecimal": "0.01556621021664368162432783237530131652142",
+                "netOwnerTractRoyalty": "0.03731398986875",
+                "netOwnerUnitRoyaltyDecimal": "0.01435010004346839399742722047098090116818",
                 "ownerTractRoyalty": "0.0404761924",
                 "unitRoyaltyDecimal": "0.01556621021664368162432783237530131652142"
               }
@@ -5276,8 +5279,8 @@
               "Magnolia Petroleum Company, LLC"
             ],
             "netMineralAcres": "21.49083435478",
-            "netOwnerTractRoyalty": "0.0404761924",
-            "netOwnerUnitRoyaltyDecimal": "0.01556621021664368162432783237530131652142",
+            "netOwnerTractRoyalty": "0.03731398986875",
+            "netOwnerUnitRoyaltyDecimal": "0.01435010004346839399742722047098090116818",
             "netPooledAcres": "21.49083435478",
             "nodeId": "tr2c-1",
             "overFloatingNpriBurdened": false,
@@ -5310,8 +5313,8 @@
                 "leasedFraction": "0.202380952",
                 "leasedPooledAcres": "21.49083329288",
                 "lessee": "Magnolia Petroleum Company, LLC",
-                "netOwnerTractRoyalty": "0.0404761904",
-                "netOwnerUnitRoyaltyDecimal": "0.01556620944748980159465974411273873539774",
+                "netOwnerTractRoyalty": "0.037313988025",
+                "netOwnerUnitRoyaltyDecimal": "0.01435009933440466084507695160393102169479",
                 "ownerTractRoyalty": "0.0404761904",
                 "unitRoyaltyDecimal": "0.01556620944748980159465974411273873539774"
               }
@@ -5322,8 +5325,8 @@
               "Magnolia Petroleum Company, LLC"
             ],
             "netMineralAcres": "21.49083329288",
-            "netOwnerTractRoyalty": "0.0404761904",
-            "netOwnerUnitRoyaltyDecimal": "0.01556620944748980159465974411273873539774",
+            "netOwnerTractRoyalty": "0.037313988025",
+            "netOwnerUnitRoyaltyDecimal": "0.01435009933440466084507695160393102169479",
             "netPooledAcres": "21.49083329288",
             "nodeId": "tr2c-32",
             "overFloatingNpriBurdened": false,
@@ -5356,8 +5359,8 @@
                 "leasedFraction": "0.073412698",
                 "leasedPooledAcres": "7.79569440062",
                 "lessee": "Magnolia Petroleum Company, LLC",
-                "netOwnerTractRoyalty": "0.0146825396",
-                "netOwnerUnitRoyaltyDecimal": "0.005646566151014625440385685147413313554608",
+                "netOwnerTractRoyalty": "0.01353546619375",
+                "netOwnerUnitRoyaltyDecimal": "0.005205428170466607827855553495271648433154",
                 "ownerTractRoyalty": "0.0146825396",
                 "unitRoyaltyDecimal": "0.005646566151014625440385685147413313554608"
               }
@@ -5368,8 +5371,8 @@
               "Magnolia Petroleum Company, LLC"
             ],
             "netMineralAcres": "7.79569440062",
-            "netOwnerTractRoyalty": "0.0146825396",
-            "netOwnerUnitRoyaltyDecimal": "0.005646566151014625440385685147413313554608",
+            "netOwnerTractRoyalty": "0.01353546619375",
+            "netOwnerUnitRoyaltyDecimal": "0.005205428170466607827855553495271648433154",
             "netPooledAcres": "7.79569440062",
             "nodeId": "tr2c-22",
             "overFloatingNpriBurdened": false,
@@ -5402,8 +5405,8 @@
                 "leasedFraction": "0.073412698",
                 "leasedPooledAcres": "7.79569440062",
                 "lessee": "Magnolia Petroleum Company, LLC",
-                "netOwnerTractRoyalty": "0.0146825396",
-                "netOwnerUnitRoyaltyDecimal": "0.005646566151014625440385685147413313554608",
+                "netOwnerTractRoyalty": "0.01353546619375",
+                "netOwnerUnitRoyaltyDecimal": "0.005205428170466607827855553495271648433154",
                 "ownerTractRoyalty": "0.0146825396",
                 "unitRoyaltyDecimal": "0.005646566151014625440385685147413313554608"
               }
@@ -5414,8 +5417,8 @@
               "Magnolia Petroleum Company, LLC"
             ],
             "netMineralAcres": "7.79569440062",
-            "netOwnerTractRoyalty": "0.0146825396",
-            "netOwnerUnitRoyaltyDecimal": "0.005646566151014625440385685147413313554608",
+            "netOwnerTractRoyalty": "0.01353546619375",
+            "netOwnerUnitRoyaltyDecimal": "0.005205428170466607827855553495271648433154",
             "netPooledAcres": "7.79569440062",
             "nodeId": "tr2c-26",
             "overFloatingNpriBurdened": false,
@@ -5448,8 +5451,8 @@
                 "leasedFraction": "0.073412698",
                 "leasedPooledAcres": "7.79569440062",
                 "lessee": "Magnolia Petroleum Company, LLC",
-                "netOwnerTractRoyalty": "0.0146825396",
-                "netOwnerUnitRoyaltyDecimal": "0.005646566151014625440385685147413313554608",
+                "netOwnerTractRoyalty": "0.01353546619375",
+                "netOwnerUnitRoyaltyDecimal": "0.005205428170466607827855553495271648433154",
                 "ownerTractRoyalty": "0.0146825396",
                 "unitRoyaltyDecimal": "0.005646566151014625440385685147413313554608"
               }
@@ -5460,8 +5463,8 @@
               "Magnolia Petroleum Company, LLC"
             ],
             "netMineralAcres": "7.79569440062",
-            "netOwnerTractRoyalty": "0.0146825396",
-            "netOwnerUnitRoyaltyDecimal": "0.005646566151014625440385685147413313554608",
+            "netOwnerTractRoyalty": "0.01353546619375",
+            "netOwnerUnitRoyaltyDecimal": "0.005205428170466607827855553495271648433154",
             "netPooledAcres": "7.79569440062",
             "nodeId": "tr2c-24",
             "overFloatingNpriBurdened": false,
@@ -5519,8 +5522,8 @@
                 "leasedFraction": "0.033730159",
                 "leasedPooledAcres": "3.58180558421",
                 "lessee": "Magnolia Petroleum Company, LLC",
-                "netOwnerTractRoyalty": "0.0067460318",
-                "netOwnerUnitRoyaltyDecimal": "0.002594368266886762933432226960875208603746",
+                "netOwnerTractRoyalty": "0.006218998065625",
+                "netOwnerUnitRoyaltyDecimal": "0.002391683246036234579257834229556832931579",
                 "ownerTractRoyalty": "0.0067460318",
                 "unitRoyaltyDecimal": "0.002594368266886762933432226960875208603746"
               }
@@ -5531,8 +5534,8 @@
               "Magnolia Petroleum Company, LLC"
             ],
             "netMineralAcres": "3.58180558421",
-            "netOwnerTractRoyalty": "0.0067460318",
-            "netOwnerUnitRoyaltyDecimal": "0.002594368266886762933432226960875208603746",
+            "netOwnerTractRoyalty": "0.006218998065625",
+            "netOwnerUnitRoyaltyDecimal": "0.002391683246036234579257834229556832931579",
             "netPooledAcres": "3.58180558421",
             "nodeId": "tr2c-35",
             "overFloatingNpriBurdened": false,
@@ -5590,8 +5593,8 @@
                 "leasedFraction": "0.033730159",
                 "leasedPooledAcres": "3.58180558421",
                 "lessee": "Magnolia Petroleum Company, LLC",
-                "netOwnerTractRoyalty": "0.005621693166666666666666666666666666666668",
-                "netOwnerUnitRoyaltyDecimal": "0.002161973555738969111193522467396007169789",
+                "netOwnerTractRoyalty": "0.005094659432291666666666666666666666666668",
+                "netOwnerUnitRoyaltyDecimal": "0.001959288534888440757019129736077631497622",
                 "ownerTractRoyalty": "0.005621693166666666666666666666666666666668",
                 "unitRoyaltyDecimal": "0.002161973555738969111193522467396007169789"
               }
@@ -5602,8 +5605,8 @@
               "Magnolia Petroleum Company, LLC"
             ],
             "netMineralAcres": "3.58180558421",
-            "netOwnerTractRoyalty": "0.005621693166666666666666666666666666666668",
-            "netOwnerUnitRoyaltyDecimal": "0.002161973555738969111193522467396007169789",
+            "netOwnerTractRoyalty": "0.005094659432291666666666666666666666666668",
+            "netOwnerUnitRoyaltyDecimal": "0.001959288534888440757019129736077631497622",
             "netPooledAcres": "3.58180558421",
             "nodeId": "tr2c-51",
             "overFloatingNpriBurdened": false,
@@ -5636,8 +5639,8 @@
                 "leasedFraction": "0.033730159",
                 "leasedPooledAcres": "3.58180558421",
                 "lessee": "Magnolia Petroleum Company, LLC",
-                "netOwnerTractRoyalty": "0.0067460318",
-                "netOwnerUnitRoyaltyDecimal": "0.002594368266886762933432226960875208603746",
+                "netOwnerTractRoyalty": "0.006218998065625",
+                "netOwnerUnitRoyaltyDecimal": "0.002391683246036234579257834229556832931579",
                 "ownerTractRoyalty": "0.0067460318",
                 "unitRoyaltyDecimal": "0.002594368266886762933432226960875208603746"
               }
@@ -5648,8 +5651,8 @@
               "Magnolia Petroleum Company, LLC"
             ],
             "netMineralAcres": "3.58180558421",
-            "netOwnerTractRoyalty": "0.0067460318",
-            "netOwnerUnitRoyaltyDecimal": "0.002594368266886762933432226960875208603746",
+            "netOwnerTractRoyalty": "0.006218998065625",
+            "netOwnerUnitRoyaltyDecimal": "0.002391683246036234579257834229556832931579",
             "netPooledAcres": "3.58180558421",
             "nodeId": "tr2c-37",
             "overFloatingNpriBurdened": false,
@@ -5732,8 +5735,8 @@
                 "leasedFraction": "0.022321429",
                 "leasedPooledAcres": "2.37031254551",
                 "lessee": "Magnolia Petroleum Company, LLC",
-                "netOwnerTractRoyalty": "0.0044642858",
-                "netOwnerUnitRoyaltyDecimal": "0.001716861372315675412571852401260893751159",
+                "netOwnerTractRoyalty": "0.004115513471875",
+                "netOwnerUnitRoyaltyDecimal": "0.00158273157760351327096467643241238642685",
                 "ownerTractRoyalty": "0.0044642858",
                 "unitRoyaltyDecimal": "0.001716861372315675412571852401260893751159"
               }
@@ -5744,8 +5747,8 @@
               "Magnolia Petroleum Company, LLC"
             ],
             "netMineralAcres": "2.37031254551",
-            "netOwnerTractRoyalty": "0.0044642858",
-            "netOwnerUnitRoyaltyDecimal": "0.001716861372315675412571852401260893751159",
+            "netOwnerTractRoyalty": "0.004115513471875",
+            "netOwnerUnitRoyaltyDecimal": "0.00158273157760351327096467643241238642685",
             "netPooledAcres": "2.37031254551",
             "nodeId": "tr2c-54",
             "overFloatingNpriBurdened": false,
@@ -5853,8 +5856,8 @@
                 "leasedFraction": "0.011243386",
                 "leasedPooledAcres": "1.19393515934",
                 "lessee": "Magnolia Petroleum Company, LLC",
-                "netOwnerTractRoyalty": "0.0022486772",
-                "netOwnerUnitRoyaltyDecimal": "0.000864789396657124976821806044872983497126",
+                "netOwnerTractRoyalty": "0.00207299929375",
+                "netOwnerUnitRoyaltyDecimal": "0.000797227725043287088007602447617281661413",
                 "ownerTractRoyalty": "0.0022486772",
                 "unitRoyaltyDecimal": "0.000864789396657124976821806044872983497126"
               }
@@ -5865,8 +5868,8 @@
               "Magnolia Petroleum Company, LLC"
             ],
             "netMineralAcres": "1.19393515934",
-            "netOwnerTractRoyalty": "0.0022486772",
-            "netOwnerUnitRoyaltyDecimal": "0.000864789396657124976821806044872983497126",
+            "netOwnerTractRoyalty": "0.00207299929375",
+            "netOwnerUnitRoyaltyDecimal": "0.000797227725043287088007602447617281661413",
             "netPooledAcres": "1.19393515934",
             "nodeId": "tr2c-47",
             "overFloatingNpriBurdened": false,
@@ -5949,8 +5952,8 @@
                 "leasedFraction": "0.011243386",
                 "leasedPooledAcres": "1.19393515934",
                 "lessee": "Magnolia Petroleum Company, LLC",
-                "netOwnerTractRoyalty": "0.0022486772",
-                "netOwnerUnitRoyaltyDecimal": "0.000864789396657124976821806044872983497126",
+                "netOwnerTractRoyalty": "0.00207299929375",
+                "netOwnerUnitRoyaltyDecimal": "0.000797227725043287088007602447617281661413",
                 "ownerTractRoyalty": "0.0022486772",
                 "unitRoyaltyDecimal": "0.000864789396657124976821806044872983497126"
               }
@@ -5961,8 +5964,8 @@
               "Magnolia Petroleum Company, LLC"
             ],
             "netMineralAcres": "1.19393515934",
-            "netOwnerTractRoyalty": "0.0022486772",
-            "netOwnerUnitRoyaltyDecimal": "0.000864789396657124976821806044872983497126",
+            "netOwnerTractRoyalty": "0.00207299929375",
+            "netOwnerUnitRoyaltyDecimal": "0.000797227725043287088007602447617281661413",
             "netPooledAcres": "1.19393515934",
             "nodeId": "tr2c-42",
             "overFloatingNpriBurdened": false,
@@ -6020,8 +6023,8 @@
                 "leasedFraction": "0.006107419",
                 "leasedPooledAcres": "0.64854682361",
                 "lessee": "Magnolia Petroleum Company, LLC",
-                "netOwnerTractRoyalty": "0.0012214838",
-                "netOwnerUnitRoyaltyDecimal": "0.0004697545020816915445948451696643797515298",
+                "netOwnerTractRoyalty": "0.001126055378125",
+                "netOwnerUnitRoyaltyDecimal": "0.0004330549316065593926733728907843500834415",
                 "ownerTractRoyalty": "0.0012214838",
                 "unitRoyaltyDecimal": "0.0004697545020816915445948451696643797515298"
               }
@@ -6032,8 +6035,8 @@
               "Magnolia Petroleum Company, LLC"
             ],
             "netMineralAcres": "0.64854682361",
-            "netOwnerTractRoyalty": "0.0012214838",
-            "netOwnerUnitRoyaltyDecimal": "0.0004697545020816915445948451696643797515298",
+            "netOwnerTractRoyalty": "0.001126055378125",
+            "netOwnerUnitRoyaltyDecimal": "0.0004330549316065593926733728907843500834415",
             "netPooledAcres": "0.64854682361",
             "nodeId": "tr2c-5",
             "overFloatingNpriBurdened": false,
@@ -6283,8 +6286,8 @@
                 "leasedFraction": "0.001120627",
                 "leasedPooledAcres": "0.11899938113",
                 "lessee": "Magnolia Petroleum Company, LLC",
-                "netOwnerTractRoyalty": "0.0002241254",
-                "netOwnerUnitRoyaltyDecimal": "0.00008619346051160068607454107175968848507324",
+                "netOwnerTractRoyalty": "0.000206615603125",
+                "netOwnerUnitRoyaltyDecimal": "0.00007945959640913188247496755052846282217689",
                 "ownerTractRoyalty": "0.0002241254",
                 "unitRoyaltyDecimal": "0.00008619346051160068607454107175968848507324"
               }
@@ -6295,8 +6298,8 @@
               "Magnolia Petroleum Company, LLC"
             ],
             "netMineralAcres": "0.11899938113",
-            "netOwnerTractRoyalty": "0.0002241254",
-            "netOwnerUnitRoyaltyDecimal": "0.00008619346051160068607454107175968848507324",
+            "netOwnerTractRoyalty": "0.000206615603125",
+            "netOwnerUnitRoyaltyDecimal": "0.00007945959640913188247496755052846282217689",
             "netPooledAcres": "0.11899938113",
             "nodeId": "tr2c-19",
             "overFloatingNpriBurdened": false,
@@ -6329,8 +6332,8 @@
                 "leasedFraction": "0.001120627",
                 "leasedPooledAcres": "0.11899938113",
                 "lessee": "Magnolia Petroleum Company, LLC",
-                "netOwnerTractRoyalty": "0.0002241254",
-                "netOwnerUnitRoyaltyDecimal": "0.00008619346051160068607454107175968848507324",
+                "netOwnerTractRoyalty": "0.000206615603125",
+                "netOwnerUnitRoyaltyDecimal": "0.00007945959640913188247496755052846282217689",
                 "ownerTractRoyalty": "0.0002241254",
                 "unitRoyaltyDecimal": "0.00008619346051160068607454107175968848507324"
               }
@@ -6341,8 +6344,8 @@
               "Magnolia Petroleum Company, LLC"
             ],
             "netMineralAcres": "0.11899938113",
-            "netOwnerTractRoyalty": "0.0002241254",
-            "netOwnerUnitRoyaltyDecimal": "0.00008619346051160068607454107175968848507324",
+            "netOwnerTractRoyalty": "0.000206615603125",
+            "netOwnerUnitRoyaltyDecimal": "0.00007945959640913188247496755052846282217689",
             "netPooledAcres": "0.11899938113",
             "nodeId": "tr2c-14",
             "overFloatingNpriBurdened": false,
@@ -6355,8 +6358,8 @@
           }
         ],
         "pooledAcres": "106.19",
-        "preWorkingInterestDecimal": "0.2387698897420379433071033438407812596576",
-        "retainedWorkingInterestDecimal": "0.2387698897420379433071033438407812596576",
+        "preWorkingInterestDecimal": "0.2434529994691139172620565238889919030842",
+        "retainedWorkingInterestDecimal": "0.2434529994691139172620565238889919030842",
         "totalNpriBurdenRate": "0.01231125246875",
         "totalOrriBurdenRate": "0",
         "trackedAssignmentCount": 0,
@@ -6384,6 +6387,7 @@
         "description": "Dr. Elmore #1 Unit, Tract 3. Present-day mineral ownership (85 owners); totals 100%. San Jacinto County, TX.",
         "deskMapId": "dm-tr3",
         "fixedNpriBurdenRate": "0.011389413875",
+        "fixedNpriExceedsRoyalty": false,
         "floatingNpriBurdenRate": "0",
         "grossAcres": "28.223",
         "grossOrriBurdenRate": "0",
@@ -6394,9 +6398,9 @@
         "leaseOverlaps": [],
         "leasedOwnership": "0.728922488",
         "name": "Tract 3 — 28.223 ac. (DOTO Unit Tr. 5)",
-        "netRevenueInterestBaseRate": "0.5751495421708333333333333333333333333333",
+        "netRevenueInterestBaseRate": "0.5865389560458333333333333333333333333333",
         "netRevenueInterestOrriBurdenRate": "0",
-        "npriAdjustedNriBeforeOrriRate": "0.5751495421708333333333333333333333333333",
+        "npriAdjustedNriBeforeOrriRate": "0.5865389560458333333333333333333333333333",
         "nriBeforeOrriRate": "0.5865389560458333333333333333333333333333",
         "overAssigned": false,
         "overBurdened": false,
@@ -6424,8 +6428,8 @@
                 "leasedFraction": "0.202380953",
                 "leasedPooledAcres": "5.711797636519",
                 "lessee": "Magnolia Petroleum Company, LLC",
-                "netOwnerTractRoyalty": "0.0404761906",
-                "netOwnerUnitRoyaltyDecimal": "0.004137161045364795800111255330984609679214",
+                "netOwnerTractRoyalty": "0.037313988209375",
+                "netOwnerUnitRoyaltyDecimal": "0.003813945338695671128227563508251437048025",
                 "ownerTractRoyalty": "0.0404761906",
                 "unitRoyaltyDecimal": "0.004137161045364795800111255330984609679214"
               }
@@ -6436,8 +6440,8 @@
               "Magnolia Petroleum Company, LLC"
             ],
             "netMineralAcres": "5.711797636519",
-            "netOwnerTractRoyalty": "0.0404761906",
-            "netOwnerUnitRoyaltyDecimal": "0.004137161045364795800111255330984609679214",
+            "netOwnerTractRoyalty": "0.037313988209375",
+            "netOwnerUnitRoyaltyDecimal": "0.003813945338695671128227563508251437048025",
             "netPooledAcres": "5.711797636519",
             "nodeId": "tr3c-1",
             "overFloatingNpriBurdened": false,
@@ -6495,8 +6499,8 @@
                 "leasedFraction": "0.077380952",
                 "leasedPooledAcres": "2.183922608296",
                 "lessee": "Magnolia Petroleum Company, LLC",
-                "netOwnerTractRoyalty": "0.0154761904",
-                "netOwnerUnitRoyaltyDecimal": "0.001581855681189736695716669757092527350269",
+                "netOwnerTractRoyalty": "0.014267113025",
+                "netOwnerUnitRoyaltyDecimal": "0.001458273206096788516363804932319673651029",
                 "ownerTractRoyalty": "0.0154761904",
                 "unitRoyaltyDecimal": "0.001581855681189736695716669757092527350269"
               }
@@ -6507,8 +6511,8 @@
               "Magnolia Petroleum Company, LLC"
             ],
             "netMineralAcres": "2.183922608296",
-            "netOwnerTractRoyalty": "0.0154761904",
-            "netOwnerUnitRoyaltyDecimal": "0.001581855681189736695716669757092527350269",
+            "netOwnerTractRoyalty": "0.014267113025",
+            "netOwnerUnitRoyaltyDecimal": "0.001458273206096788516363804932319673651029",
             "netPooledAcres": "2.183922608296",
             "nodeId": "tr3c-14",
             "overFloatingNpriBurdened": false,
@@ -6541,8 +6545,8 @@
                 "leasedFraction": "0.073412698",
                 "leasedPooledAcres": "2.071926575654",
                 "lessee": "Magnolia Petroleum Company, LLC",
-                "netOwnerTractRoyalty": "0.0146825396",
-                "netOwnerUnitRoyaltyDecimal": "0.001500734875977830057481921008715000927128",
+                "netOwnerTractRoyalty": "0.01353546619375",
+                "netOwnerUnitRoyaltyDecimal": "0.001383489963792062084241145929909141479696",
                 "ownerTractRoyalty": "0.0146825396",
                 "unitRoyaltyDecimal": "0.001500734875977830057481921008715000927128"
               }
@@ -6553,8 +6557,8 @@
               "Magnolia Petroleum Company, LLC"
             ],
             "netMineralAcres": "2.071926575654",
-            "netOwnerTractRoyalty": "0.0146825396",
-            "netOwnerUnitRoyaltyDecimal": "0.001500734875977830057481921008715000927128",
+            "netOwnerTractRoyalty": "0.01353546619375",
+            "netOwnerUnitRoyaltyDecimal": "0.001383489963792062084241145929909141479696",
             "netPooledAcres": "2.071926575654",
             "nodeId": "tr3c-4",
             "overFloatingNpriBurdened": false,
@@ -6587,8 +6591,8 @@
                 "leasedFraction": "0.073412698",
                 "leasedPooledAcres": "2.071926575654",
                 "lessee": "Magnolia Petroleum Company, LLC",
-                "netOwnerTractRoyalty": "0.0146825396",
-                "netOwnerUnitRoyaltyDecimal": "0.001500734875977830057481921008715000927128",
+                "netOwnerTractRoyalty": "0.01353546619375",
+                "netOwnerUnitRoyaltyDecimal": "0.001383489963792062084241145929909141479696",
                 "ownerTractRoyalty": "0.0146825396",
                 "unitRoyaltyDecimal": "0.001500734875977830057481921008715000927128"
               }
@@ -6599,8 +6603,8 @@
               "Magnolia Petroleum Company, LLC"
             ],
             "netMineralAcres": "2.071926575654",
-            "netOwnerTractRoyalty": "0.0146825396",
-            "netOwnerUnitRoyaltyDecimal": "0.001500734875977830057481921008715000927128",
+            "netOwnerTractRoyalty": "0.01353546619375",
+            "netOwnerUnitRoyaltyDecimal": "0.001383489963792062084241145929909141479696",
             "netPooledAcres": "2.071926575654",
             "nodeId": "tr3c-8",
             "overFloatingNpriBurdened": false,
@@ -6633,8 +6637,8 @@
                 "leasedFraction": "0.073412698",
                 "leasedPooledAcres": "2.071926575654",
                 "lessee": "Magnolia Petroleum Company, LLC",
-                "netOwnerTractRoyalty": "0.0146825396",
-                "netOwnerUnitRoyaltyDecimal": "0.001500734875977830057481921008715000927128",
+                "netOwnerTractRoyalty": "0.01353546619375",
+                "netOwnerUnitRoyaltyDecimal": "0.001383489963792062084241145929909141479696",
                 "ownerTractRoyalty": "0.0146825396",
                 "unitRoyaltyDecimal": "0.001500734875977830057481921008715000927128"
               }
@@ -6645,8 +6649,8 @@
               "Magnolia Petroleum Company, LLC"
             ],
             "netMineralAcres": "2.071926575654",
-            "netOwnerTractRoyalty": "0.0146825396",
-            "netOwnerUnitRoyaltyDecimal": "0.001500734875977830057481921008715000927128",
+            "netOwnerTractRoyalty": "0.01353546619375",
+            "netOwnerUnitRoyaltyDecimal": "0.001383489963792062084241145929909141479696",
             "netPooledAcres": "2.071926575654",
             "nodeId": "tr3c-6",
             "overFloatingNpriBurdened": false,
@@ -6679,8 +6683,8 @@
                 "leasedFraction": "0.047619048",
                 "leasedPooledAcres": "1.343952391704",
                 "lessee": "Magnolia Petroleum Company, LLC",
-                "netOwnerTractRoyalty": "0.007936508000000000000000000000000000000002",
-                "netOwnerUnitRoyaltyDecimal": "0.0008112080521190663823474874837752642314113",
+                "netOwnerTractRoyalty": "0.007192460375000000000000000000000000000002",
+                "netOwnerUnitRoyaltyDecimal": "0.0007351572972329039090024105321713332097165",
                 "ownerTractRoyalty": "0.007936508000000000000000000000000000000002",
                 "unitRoyaltyDecimal": "0.0008112080521190663823474874837752642314113"
               }
@@ -6691,8 +6695,8 @@
               "Magnolia Petroleum Company, LLC"
             ],
             "netMineralAcres": "1.343952391704",
-            "netOwnerTractRoyalty": "0.007936508000000000000000000000000000000002",
-            "netOwnerUnitRoyaltyDecimal": "0.0008112080521190663823474874837752642314113",
+            "netOwnerTractRoyalty": "0.007192460375000000000000000000000000000002",
+            "netOwnerUnitRoyaltyDecimal": "0.0007351572972329039090024105321713332097165",
             "netPooledAcres": "1.343952391704",
             "nodeId": "tr3c-42",
             "overFloatingNpriBurdened": false,
@@ -6725,8 +6729,8 @@
                 "leasedFraction": "0.033730159",
                 "leasedPooledAcres": "0.951966277457",
                 "lessee": "Magnolia Petroleum Company, LLC",
-                "netOwnerTractRoyalty": "0.0067460318",
-                "netOwnerUnitRoyaltyDecimal": "0.0006895268443012064249953643612089745966994",
+                "netOwnerTractRoyalty": "0.006218998065625",
+                "netOwnerUnitRoyaltyDecimal": "0.0006356575595901746730426015204895234563322",
                 "ownerTractRoyalty": "0.0067460318",
                 "unitRoyaltyDecimal": "0.0006895268443012064249953643612089745966994"
               }
@@ -6737,8 +6741,8 @@
               "Magnolia Petroleum Company, LLC"
             ],
             "netMineralAcres": "0.951966277457",
-            "netOwnerTractRoyalty": "0.0067460318",
-            "netOwnerUnitRoyaltyDecimal": "0.0006895268443012064249953643612089745966994",
+            "netOwnerTractRoyalty": "0.006218998065625",
+            "netOwnerUnitRoyaltyDecimal": "0.0006356575595901746730426015204895234563322",
             "netPooledAcres": "0.951966277457",
             "nodeId": "tr3c-26",
             "overFloatingNpriBurdened": false,
@@ -6796,8 +6800,8 @@
                 "leasedFraction": "0.033730159",
                 "leasedPooledAcres": "0.951966277457",
                 "lessee": "Magnolia Petroleum Company, LLC",
-                "netOwnerTractRoyalty": "0.005621693166666666666666666666666666666668",
-                "netOwnerUnitRoyaltyDecimal": "0.0005746057035843386874961369676741454972496",
+                "netOwnerTractRoyalty": "0.005094659432291666666666666666666666666668",
+                "netOwnerUnitRoyaltyDecimal": "0.0005207364188733069355433741269546943568824",
                 "ownerTractRoyalty": "0.005621693166666666666666666666666666666668",
                 "unitRoyaltyDecimal": "0.0005746057035843386874961369676741454972496"
               }
@@ -6808,8 +6812,8 @@
               "Magnolia Petroleum Company, LLC"
             ],
             "netMineralAcres": "0.951966277457",
-            "netOwnerTractRoyalty": "0.005621693166666666666666666666666666666668",
-            "netOwnerUnitRoyaltyDecimal": "0.0005746057035843386874961369676741454972496",
+            "netOwnerTractRoyalty": "0.005094659432291666666666666666666666666668",
+            "netOwnerUnitRoyaltyDecimal": "0.0005207364188733069355433741269546943568824",
             "netPooledAcres": "0.951966277457",
             "nodeId": "tr3c-46",
             "overFloatingNpriBurdened": false,
@@ -6842,8 +6846,8 @@
                 "leasedFraction": "0.033730159",
                 "leasedPooledAcres": "0.951966277457",
                 "lessee": "Magnolia Petroleum Company, LLC",
-                "netOwnerTractRoyalty": "0.0067460318",
-                "netOwnerUnitRoyaltyDecimal": "0.0006895268443012064249953643612089745966994",
+                "netOwnerTractRoyalty": "0.006218998065625",
+                "netOwnerUnitRoyaltyDecimal": "0.0006356575595901746730426015204895234563322",
                 "ownerTractRoyalty": "0.0067460318",
                 "unitRoyaltyDecimal": "0.0006895268443012064249953643612089745966994"
               }
@@ -6854,8 +6858,8 @@
               "Magnolia Petroleum Company, LLC"
             ],
             "netMineralAcres": "0.951966277457",
-            "netOwnerTractRoyalty": "0.0067460318",
-            "netOwnerUnitRoyaltyDecimal": "0.0006895268443012064249953643612089745966994",
+            "netOwnerTractRoyalty": "0.006218998065625",
+            "netOwnerUnitRoyaltyDecimal": "0.0006356575595901746730426015204895234563322",
             "netPooledAcres": "0.951966277457",
             "nodeId": "tr3c-28",
             "overFloatingNpriBurdened": false,
@@ -6913,8 +6917,8 @@
                 "leasedFraction": "0.023400001",
                 "leasedPooledAcres": "0.660418228223",
                 "lessee": "Magnolia Petroleum Company, LLC",
-                "netOwnerTractRoyalty": "0.0043875001875",
-                "netOwnerUnitRoyaltyDecimal": "0.0004484561069898642482152790654552197292786",
+                "netOwnerTractRoyalty": "0.004021875171875",
+                "netOwnerUnitRoyaltyDecimal": "0.0004110847647407088941973391433339514185054",
                 "ownerTractRoyalty": "0.0043875001875",
                 "unitRoyaltyDecimal": "0.0004484561069898642482152790654552197292786"
               }
@@ -6925,8 +6929,8 @@
               "Magnolia Petroleum Company, LLC"
             ],
             "netMineralAcres": "0.660418228223",
-            "netOwnerTractRoyalty": "0.0043875001875",
-            "netOwnerUnitRoyaltyDecimal": "0.0004484561069898642482152790654552197292786",
+            "netOwnerTractRoyalty": "0.004021875171875",
+            "netOwnerUnitRoyaltyDecimal": "0.0004110847647407088941973391433339514185054",
             "netPooledAcres": "0.660418228223",
             "nodeId": "tr3c-22",
             "overFloatingNpriBurdened": false,
@@ -7009,8 +7013,8 @@
                 "leasedFraction": "0.022321429",
                 "leasedPooledAcres": "0.629977690667",
                 "lessee": "Magnolia Petroleum Company, LLC",
-                "netOwnerTractRoyalty": "0.0044642858",
-                "netOwnerUnitRoyaltyDecimal": "0.0004563045344275855275356944186908956054144",
+                "netOwnerTractRoyalty": "0.004115513471875",
+                "netOwnerUnitRoyaltyDecimal": "0.0004206557426754304081969682922306693862414",
                 "ownerTractRoyalty": "0.0044642858",
                 "unitRoyaltyDecimal": "0.0004563045344275855275356944186908956054144"
               }
@@ -7021,8 +7025,8 @@
               "Magnolia Petroleum Company, LLC"
             ],
             "netMineralAcres": "0.629977690667",
-            "netOwnerTractRoyalty": "0.0044642858",
-            "netOwnerUnitRoyaltyDecimal": "0.0004563045344275855275356944186908956054144",
+            "netOwnerTractRoyalty": "0.004115513471875",
+            "netOwnerUnitRoyaltyDecimal": "0.0004206557426754304081969682922306693862414",
             "netPooledAcres": "0.629977690667",
             "nodeId": "tr3c-49",
             "overFloatingNpriBurdened": false,
@@ -7080,8 +7084,8 @@
                 "leasedFraction": "0.011904762",
                 "leasedPooledAcres": "0.335988097926",
                 "lessee": "Magnolia Petroleum Company, LLC",
-                "netOwnerTractRoyalty": "0.001984127",
-                "netOwnerUnitRoyaltyDecimal": "0.0002028020130297665955868718709438160578529",
+                "netOwnerTractRoyalty": "0.00179811509375",
+                "netOwnerUnitRoyaltyDecimal": "0.0001837893243082259772506026330428333024292",
                 "ownerTractRoyalty": "0.001984127",
                 "unitRoyaltyDecimal": "0.0002028020130297665955868718709438160578529"
               }
@@ -7092,8 +7096,8 @@
               "Magnolia Petroleum Company, LLC"
             ],
             "netMineralAcres": "0.335988097926",
-            "netOwnerTractRoyalty": "0.001984127",
-            "netOwnerUnitRoyaltyDecimal": "0.0002028020130297665955868718709438160578529",
+            "netOwnerTractRoyalty": "0.00179811509375",
+            "netOwnerUnitRoyaltyDecimal": "0.0001837893243082259772506026330428333024292",
             "netPooledAcres": "0.335988097926",
             "nodeId": "tr3c-44",
             "overFloatingNpriBurdened": false,
@@ -7176,8 +7180,8 @@
                 "leasedFraction": "0.011243386",
                 "leasedPooledAcres": "0.317322083078",
                 "lessee": "Magnolia Petroleum Company, LLC",
-                "netOwnerTractRoyalty": "0.0022486772",
-                "netOwnerUnitRoyaltyDecimal": "0.0002298422746195878917114778416465788985722",
+                "netOwnerTractRoyalty": "0.00207299929375",
+                "netOwnerUnitRoyaltyDecimal": "0.0002118858469149325876715186352679399221212",
                 "ownerTractRoyalty": "0.0022486772",
                 "unitRoyaltyDecimal": "0.0002298422746195878917114778416465788985722"
               }
@@ -7188,8 +7192,8 @@
               "Magnolia Petroleum Company, LLC"
             ],
             "netMineralAcres": "0.317322083078",
-            "netOwnerTractRoyalty": "0.0022486772",
-            "netOwnerUnitRoyaltyDecimal": "0.0002298422746195878917114778416465788985722",
+            "netOwnerTractRoyalty": "0.00207299929375",
+            "netOwnerUnitRoyaltyDecimal": "0.0002118858469149325876715186352679399221212",
             "netPooledAcres": "0.317322083078",
             "nodeId": "tr3c-38",
             "overFloatingNpriBurdened": false,
@@ -7272,8 +7276,8 @@
                 "leasedFraction": "0.011243386",
                 "leasedPooledAcres": "0.317322083078",
                 "lessee": "Magnolia Petroleum Company, LLC",
-                "netOwnerTractRoyalty": "0.0022486772",
-                "netOwnerUnitRoyaltyDecimal": "0.0002298422746195878917114778416465788985722",
+                "netOwnerTractRoyalty": "0.00207299929375",
+                "netOwnerUnitRoyaltyDecimal": "0.0002118858469149325876715186352679399221212",
                 "ownerTractRoyalty": "0.0022486772",
                 "unitRoyaltyDecimal": "0.0002298422746195878917114778416465788985722"
               }
@@ -7284,8 +7288,8 @@
               "Magnolia Petroleum Company, LLC"
             ],
             "netMineralAcres": "0.317322083078",
-            "netOwnerTractRoyalty": "0.0022486772",
-            "netOwnerUnitRoyaltyDecimal": "0.0002298422746195878917114778416465788985722",
+            "netOwnerTractRoyalty": "0.00207299929375",
+            "netOwnerUnitRoyaltyDecimal": "0.0002118858469149325876715186352679399221212",
             "netPooledAcres": "0.317322083078",
             "nodeId": "tr3c-33",
             "overFloatingNpriBurdened": false,
@@ -7398,8 +7402,8 @@
           }
         ],
         "pooledAcres": "28.223",
-        "preWorkingInterestDecimal": "0.05878730794217992785304252425984300636628",
-        "retainedWorkingInterestDecimal": "0.05878730794217992785304252425984300636628",
+        "preWorkingInterestDecimal": "0.05995144514765072405297762531676865072007",
+        "retainedWorkingInterestDecimal": "0.05995144514765072405297762531676865072007",
         "totalNpriBurdenRate": "0.011389413875",
         "totalOrriBurdenRate": "0",
         "trackedAssignmentCount": 0,
@@ -7427,6 +7431,7 @@
         "description": "Dr. Elmore #1 Unit, Tract 4. Present-day mineral ownership (14 owners); totals 100%. San Jacinto County, TX.",
         "deskMapId": "dm-tr4",
         "fixedNpriBurdenRate": "0.03125",
+        "fixedNpriExceedsRoyalty": false,
         "floatingNpriBurdenRate": "0",
         "grossAcres": "14.64",
         "grossOrriBurdenRate": "0",
@@ -7437,9 +7442,9 @@
         "leaseOverlaps": [],
         "leasedOwnership": "0.5",
         "name": "Tract 4 — 14.64 ac. (DOTO Unit Tr. 3)",
-        "netRevenueInterestBaseRate": "0.36875",
+        "netRevenueInterestBaseRate": "0.4",
         "netRevenueInterestOrriBurdenRate": "0",
-        "npriAdjustedNriBeforeOrriRate": "0.36875",
+        "npriAdjustedNriBeforeOrriRate": "0.4",
         "nriBeforeOrriRate": "0.4",
         "overAssigned": false,
         "overBurdened": false,
@@ -7467,8 +7472,8 @@
                 "leasedFraction": "0.5",
                 "leasedPooledAcres": "7.32",
                 "lessee": "Magnolia Petroleum Company, LLC",
-                "netOwnerTractRoyalty": "0.1",
-                "netOwnerUnitRoyaltyDecimal": "0.005302011867235305025032449471537177823104",
+                "netOwnerTractRoyalty": "0.06875",
+                "netOwnerUnitRoyaltyDecimal": "0.003645133158724272204709809011681809753383",
                 "ownerTractRoyalty": "0.1",
                 "unitRoyaltyDecimal": "0.005302011867235305025032449471537177823104"
               }
@@ -7479,8 +7484,8 @@
               "Magnolia Petroleum Company, LLC"
             ],
             "netMineralAcres": "7.32",
-            "netOwnerTractRoyalty": "0.1",
-            "netOwnerUnitRoyaltyDecimal": "0.005302011867235305025032449471537177823104",
+            "netOwnerTractRoyalty": "0.06875",
+            "netOwnerUnitRoyaltyDecimal": "0.003645133158724272204709809011681809753383",
             "netPooledAcres": "7.32",
             "nodeId": "tr4c-1",
             "overFloatingNpriBurdened": false,
@@ -7518,8 +7523,8 @@
           }
         ],
         "pooledAcres": "14.64",
-        "preWorkingInterestDecimal": "0.0195511687604301872798071574262933432227",
-        "retainedWorkingInterestDecimal": "0.0195511687604301872798071574262933432227",
+        "preWorkingInterestDecimal": "0.02120804746894122010012979788614871129242",
+        "retainedWorkingInterestDecimal": "0.02120804746894122010012979788614871129242",
         "totalNpriBurdenRate": "0.03125",
         "totalOrriBurdenRate": "0",
         "trackedAssignmentCount": 0,
@@ -7547,6 +7552,7 @@
         "description": "Dr. Elmore #1 Unit, Tract 5. Present-day mineral ownership (71 owners); totals 100%. San Jacinto County, TX.",
         "deskMapId": "dm-tr5",
         "fixedNpriBurdenRate": "0.00981471146875",
+        "fixedNpriExceedsRoyalty": false,
         "floatingNpriBurdenRate": "0",
         "grossAcres": "8.44",
         "grossOrriBurdenRate": "0",
@@ -7557,9 +7563,9 @@
         "leaseOverlaps": [],
         "leasedOwnership": "0.628141534",
         "name": "Tract 5 — 8.44 ac. (DOTO Unit Tr. 4)",
-        "netRevenueInterestBaseRate": "0.4958069813645833333333333333333333333333",
+        "netRevenueInterestBaseRate": "0.5056216928333333333333333333333333333333",
         "netRevenueInterestOrriBurdenRate": "0",
-        "npriAdjustedNriBeforeOrriRate": "0.4958069813645833333333333333333333333333",
+        "npriAdjustedNriBeforeOrriRate": "0.5056216928333333333333333333333333333333",
         "nriBeforeOrriRate": "0.5056216928333333333333333333333333333333",
         "overAssigned": false,
         "overBurdened": false,
@@ -7587,8 +7593,8 @@
                 "leasedFraction": "0.202380952",
                 "leasedPooledAcres": "1.70809523488",
                 "lessee": "Magnolia Petroleum Company, LLC",
-                "netOwnerTractRoyalty": "0.0404761904",
-                "netOwnerUnitRoyaltyDecimal": "0.001237205082746152419803448915260522900056",
+                "netOwnerTractRoyalty": "0.037313988025",
+                "netOwnerUnitRoyaltyDecimal": "0.001140548435656609262006304468755794548489",
                 "ownerTractRoyalty": "0.0404761904",
                 "unitRoyaltyDecimal": "0.001237205082746152419803448915260522900056"
               }
@@ -7599,8 +7605,8 @@
               "Magnolia Petroleum Company, LLC"
             ],
             "netMineralAcres": "1.70809523488",
-            "netOwnerTractRoyalty": "0.0404761904",
-            "netOwnerUnitRoyaltyDecimal": "0.001237205082746152419803448915260522900056",
+            "netOwnerTractRoyalty": "0.037313988025",
+            "netOwnerUnitRoyaltyDecimal": "0.001140548435656609262006304468755794548489",
             "netPooledAcres": "1.70809523488",
             "nodeId": "tr5c-1",
             "overFloatingNpriBurdened": false,
@@ -7658,8 +7664,8 @@
                 "leasedFraction": "0.073412698",
                 "leasedPooledAcres": "0.61960317112",
                 "lessee": "Magnolia Petroleum Company, LLC",
-                "netOwnerTractRoyalty": "0.0146825396",
-                "netOwnerUnitRoyaltyDecimal": "0.0004487900773572223252364175783422955683294",
+                "netOwnerTractRoyalty": "0.01353546619375",
+                "netOwnerUnitRoyaltyDecimal": "0.0004137283525636893310773224550343037270537",
                 "ownerTractRoyalty": "0.0146825396",
                 "unitRoyaltyDecimal": "0.0004487900773572223252364175783422955683294"
               }
@@ -7670,8 +7676,8 @@
               "Magnolia Petroleum Company, LLC"
             ],
             "netMineralAcres": "0.61960317112",
-            "netOwnerTractRoyalty": "0.0146825396",
-            "netOwnerUnitRoyaltyDecimal": "0.0004487900773572223252364175783422955683294",
+            "netOwnerTractRoyalty": "0.01353546619375",
+            "netOwnerUnitRoyaltyDecimal": "0.0004137283525636893310773224550343037270537",
             "netPooledAcres": "0.61960317112",
             "nodeId": "tr5c-4",
             "overFloatingNpriBurdened": false,
@@ -7704,8 +7710,8 @@
                 "leasedFraction": "0.073412698",
                 "leasedPooledAcres": "0.61960317112",
                 "lessee": "Magnolia Petroleum Company, LLC",
-                "netOwnerTractRoyalty": "0.0146825396",
-                "netOwnerUnitRoyaltyDecimal": "0.0004487900773572223252364175783422955683294",
+                "netOwnerTractRoyalty": "0.01353546619375",
+                "netOwnerUnitRoyaltyDecimal": "0.0004137283525636893310773224550343037270537",
                 "ownerTractRoyalty": "0.0146825396",
                 "unitRoyaltyDecimal": "0.0004487900773572223252364175783422955683294"
               }
@@ -7716,8 +7722,8 @@
               "Magnolia Petroleum Company, LLC"
             ],
             "netMineralAcres": "0.61960317112",
-            "netOwnerTractRoyalty": "0.0146825396",
-            "netOwnerUnitRoyaltyDecimal": "0.0004487900773572223252364175783422955683294",
+            "netOwnerTractRoyalty": "0.01353546619375",
+            "netOwnerUnitRoyaltyDecimal": "0.0004137283525636893310773224550343037270537",
             "netPooledAcres": "0.61960317112",
             "nodeId": "tr5c-8",
             "overFloatingNpriBurdened": false,
@@ -7750,8 +7756,8 @@
                 "leasedFraction": "0.073412698",
                 "leasedPooledAcres": "0.61960317112",
                 "lessee": "Magnolia Petroleum Company, LLC",
-                "netOwnerTractRoyalty": "0.0146825396",
-                "netOwnerUnitRoyaltyDecimal": "0.0004487900773572223252364175783422955683294",
+                "netOwnerTractRoyalty": "0.01353546619375",
+                "netOwnerUnitRoyaltyDecimal": "0.0004137283525636893310773224550343037270537",
                 "ownerTractRoyalty": "0.0146825396",
                 "unitRoyaltyDecimal": "0.0004487900773572223252364175783422955683294"
               }
@@ -7762,8 +7768,8 @@
               "Magnolia Petroleum Company, LLC"
             ],
             "netMineralAcres": "0.61960317112",
-            "netOwnerTractRoyalty": "0.0146825396",
-            "netOwnerUnitRoyaltyDecimal": "0.0004487900773572223252364175783422955683294",
+            "netOwnerTractRoyalty": "0.01353546619375",
+            "netOwnerUnitRoyaltyDecimal": "0.0004137283525636893310773224550343037270537",
             "netPooledAcres": "0.61960317112",
             "nodeId": "tr5c-6",
             "overFloatingNpriBurdened": false,
@@ -7796,8 +7802,8 @@
                 "leasedFraction": "0.047619048",
                 "leasedPooledAcres": "0.40190476512",
                 "lessee": "Magnolia Petroleum Company, LLC",
-                "netOwnerTractRoyalty": "0.007936508000000000000000000000000000000002",
-                "netOwnerUnitRoyaltyDecimal": "0.000242589234308362692379009827554236973855",
+                "netOwnerTractRoyalty": "0.007192460375000000000000000000000000000002",
+                "netOwnerUnitRoyaltyDecimal": "0.0002198464935919536899684776562210272575561",
                 "ownerTractRoyalty": "0.007936508000000000000000000000000000000002",
                 "unitRoyaltyDecimal": "0.000242589234308362692379009827554236973855"
               }
@@ -7808,8 +7814,8 @@
               "Magnolia Petroleum Company, LLC"
             ],
             "netMineralAcres": "0.40190476512",
-            "netOwnerTractRoyalty": "0.007936508000000000000000000000000000000002",
-            "netOwnerUnitRoyaltyDecimal": "0.000242589234308362692379009827554236973855",
+            "netOwnerTractRoyalty": "0.007192460375000000000000000000000000000002",
+            "netOwnerUnitRoyaltyDecimal": "0.0002198464935919536899684776562210272575561",
             "netPooledAcres": "0.40190476512",
             "nodeId": "tr5c-28",
             "overFloatingNpriBurdened": false,
@@ -7842,8 +7848,8 @@
                 "leasedFraction": "0.033730159",
                 "leasedPooledAcres": "0.28468254196",
                 "lessee": "Magnolia Petroleum Company, LLC",
-                "netOwnerTractRoyalty": "0.0067460318",
-                "netOwnerUnitRoyaltyDecimal": "0.0002062008491621082885221583534211014277768",
+                "netOwnerTractRoyalty": "0.006218998065625",
+                "netOwnerUnitRoyaltyDecimal": "0.0001900914078213185784813647320600778787317",
                 "ownerTractRoyalty": "0.0067460318",
                 "unitRoyaltyDecimal": "0.0002062008491621082885221583534211014277768"
               }
@@ -7854,8 +7860,8 @@
               "Magnolia Petroleum Company, LLC"
             ],
             "netMineralAcres": "0.28468254196",
-            "netOwnerTractRoyalty": "0.0067460318",
-            "netOwnerUnitRoyaltyDecimal": "0.0002062008491621082885221583534211014277768",
+            "netOwnerTractRoyalty": "0.006218998065625",
+            "netOwnerUnitRoyaltyDecimal": "0.0001900914078213185784813647320600778787317",
             "netPooledAcres": "0.28468254196",
             "nodeId": "tr5c-12",
             "overFloatingNpriBurdened": false,
@@ -7913,8 +7919,8 @@
                 "leasedFraction": "0.033730159",
                 "leasedPooledAcres": "0.28468254196",
                 "lessee": "Magnolia Petroleum Company, LLC",
-                "netOwnerTractRoyalty": "0.005621693166666666666666666666666666666668",
-                "netOwnerUnitRoyaltyDecimal": "0.0001718340409684235737684652945175845231474",
+                "netOwnerTractRoyalty": "0.005094659432291666666666666666666666666668",
+                "netOwnerUnitRoyaltyDecimal": "0.0001557245996276338637276716731565609741023",
                 "ownerTractRoyalty": "0.005621693166666666666666666666666666666668",
                 "unitRoyaltyDecimal": "0.0001718340409684235737684652945175845231474"
               }
@@ -7925,8 +7931,8 @@
               "Magnolia Petroleum Company, LLC"
             ],
             "netMineralAcres": "0.28468254196",
-            "netOwnerTractRoyalty": "0.005621693166666666666666666666666666666668",
-            "netOwnerUnitRoyaltyDecimal": "0.0001718340409684235737684652945175845231474",
+            "netOwnerTractRoyalty": "0.005094659432291666666666666666666666666668",
+            "netOwnerUnitRoyaltyDecimal": "0.0001557245996276338637276716731565609741023",
             "netPooledAcres": "0.28468254196",
             "nodeId": "tr5c-32",
             "overFloatingNpriBurdened": false,
@@ -7959,8 +7965,8 @@
                 "leasedFraction": "0.033730159",
                 "leasedPooledAcres": "0.28468254196",
                 "lessee": "Magnolia Petroleum Company, LLC",
-                "netOwnerTractRoyalty": "0.0067460318",
-                "netOwnerUnitRoyaltyDecimal": "0.0002062008491621082885221583534211014277768",
+                "netOwnerTractRoyalty": "0.006218998065625",
+                "netOwnerUnitRoyaltyDecimal": "0.0001900914078213185784813647320600778787317",
                 "ownerTractRoyalty": "0.0067460318",
                 "unitRoyaltyDecimal": "0.0002062008491621082885221583534211014277768"
               }
@@ -7971,8 +7977,8 @@
               "Magnolia Petroleum Company, LLC"
             ],
             "netMineralAcres": "0.28468254196",
-            "netOwnerTractRoyalty": "0.0067460318",
-            "netOwnerUnitRoyaltyDecimal": "0.0002062008491621082885221583534211014277768",
+            "netOwnerTractRoyalty": "0.006218998065625",
+            "netOwnerUnitRoyaltyDecimal": "0.0001900914078213185784813647320600778787317",
             "netPooledAcres": "0.28468254196",
             "nodeId": "tr5c-14",
             "overFloatingNpriBurdened": false,
@@ -8055,8 +8061,8 @@
                 "leasedFraction": "0.022321429",
                 "leasedPooledAcres": "0.18839286076",
                 "lessee": "Magnolia Petroleum Company, LLC",
-                "netOwnerTractRoyalty": "0.0044642858",
-                "netOwnerUnitRoyaltyDecimal": "0.000136456445826766178379380678657519006119",
+                "netOwnerTractRoyalty": "0.004115513471875",
+                "netOwnerUnitRoyaltyDecimal": "0.000125795785996550070693491563137400333766",
                 "ownerTractRoyalty": "0.0044642858",
                 "unitRoyaltyDecimal": "0.000136456445826766178379380678657519006119"
               }
@@ -8067,8 +8073,8 @@
               "Magnolia Petroleum Company, LLC"
             ],
             "netMineralAcres": "0.18839286076",
-            "netOwnerTractRoyalty": "0.0044642858",
-            "netOwnerUnitRoyaltyDecimal": "0.000136456445826766178379380678657519006119",
+            "netOwnerTractRoyalty": "0.004115513471875",
+            "netOwnerUnitRoyaltyDecimal": "0.000125795785996550070693491563137400333766",
             "netPooledAcres": "0.18839286076",
             "nodeId": "tr5c-35",
             "overFloatingNpriBurdened": false,
@@ -8126,8 +8132,8 @@
                 "leasedFraction": "0.011904762",
                 "leasedPooledAcres": "0.10047619128",
                 "lessee": "Magnolia Petroleum Company, LLC",
-                "netOwnerTractRoyalty": "0.001984127",
-                "netOwnerUnitRoyaltyDecimal": "0.00006064730857709067309475245688855924346376",
+                "netOwnerTractRoyalty": "0.00179811509375",
+                "netOwnerUnitRoyaltyDecimal": "0.00005496162339798842249211941405525681438904",
                 "ownerTractRoyalty": "0.001984127",
                 "unitRoyaltyDecimal": "0.00006064730857709067309475245688855924346376"
               }
@@ -8138,8 +8144,8 @@
               "Magnolia Petroleum Company, LLC"
             ],
             "netMineralAcres": "0.10047619128",
-            "netOwnerTractRoyalty": "0.001984127",
-            "netOwnerUnitRoyaltyDecimal": "0.00006064730857709067309475245688855924346376",
+            "netOwnerTractRoyalty": "0.00179811509375",
+            "netOwnerUnitRoyaltyDecimal": "0.00005496162339798842249211941405525681438904",
             "netPooledAcres": "0.10047619128",
             "nodeId": "tr5c-30",
             "overFloatingNpriBurdened": false,
@@ -8222,8 +8228,8 @@
                 "leasedFraction": "0.011243386",
                 "leasedPooledAcres": "0.09489417784",
                 "lessee": "Magnolia Petroleum Company, LLC",
-                "netOwnerTractRoyalty": "0.0022486772",
-                "netOwnerUnitRoyaltyDecimal": "0.00006873361434961987761913591692935286482478",
+                "netOwnerTractRoyalty": "0.00207299929375",
+                "netOwnerUnitRoyaltyDecimal": "0.00006336380072855582468014092341924717226034",
                 "ownerTractRoyalty": "0.0022486772",
                 "unitRoyaltyDecimal": "0.00006873361434961987761913591692935286482478"
               }
@@ -8234,8 +8240,8 @@
               "Magnolia Petroleum Company, LLC"
             ],
             "netMineralAcres": "0.09489417784",
-            "netOwnerTractRoyalty": "0.0022486772",
-            "netOwnerUnitRoyaltyDecimal": "0.00006873361434961987761913591692935286482478",
+            "netOwnerTractRoyalty": "0.00207299929375",
+            "netOwnerUnitRoyaltyDecimal": "0.00006336380072855582468014092341924717226034",
             "netPooledAcres": "0.09489417784",
             "nodeId": "tr5c-24",
             "overFloatingNpriBurdened": false,
@@ -8318,8 +8324,8 @@
                 "leasedFraction": "0.011243386",
                 "leasedPooledAcres": "0.09489417784",
                 "lessee": "Magnolia Petroleum Company, LLC",
-                "netOwnerTractRoyalty": "0.0022486772",
-                "netOwnerUnitRoyaltyDecimal": "0.00006873361434961987761913591692935286482478",
+                "netOwnerTractRoyalty": "0.00207299929375",
+                "netOwnerUnitRoyaltyDecimal": "0.00006336380072855582468014092341924717226034",
                 "ownerTractRoyalty": "0.0022486772",
                 "unitRoyaltyDecimal": "0.00006873361434961987761913591692935286482478"
               }
@@ -8330,8 +8336,8 @@
               "Magnolia Petroleum Company, LLC"
             ],
             "netMineralAcres": "0.09489417784",
-            "netOwnerTractRoyalty": "0.0022486772",
-            "netOwnerUnitRoyaltyDecimal": "0.00006873361434961987761913591692935286482478",
+            "netOwnerTractRoyalty": "0.00207299929375",
+            "netOwnerUnitRoyaltyDecimal": "0.00006336380072855582468014092341924717226034",
             "netPooledAcres": "0.09489417784",
             "nodeId": "tr5c-19",
             "overFloatingNpriBurdened": false,
@@ -8444,8 +8450,8 @@
           }
         ],
         "pooledAcres": "8.44",
-        "preWorkingInterestDecimal": "0.01515495681148118558393596637616663576241",
-        "retainedWorkingInterestDecimal": "0.01515495681148118558393596637616663576241",
+        "preWorkingInterestDecimal": "0.01545495566994155232090982137338525248779",
+        "retainedWorkingInterestDecimal": "0.01545495566994155232090982137338525248779",
         "totalNpriBurdenRate": "0.00981471146875",
         "totalOrriBurdenRate": "0",
         "trackedAssignmentCount": 0,
@@ -8473,6 +8479,7 @@
         "description": "Dr. Elmore #1 Unit, Tract 6. Present-day mineral ownership (73 owners); totals 100%. San Jacinto County, TX.",
         "deskMapId": "dm-tr6",
         "fixedNpriBurdenRate": "0.01297691384375",
+        "fixedNpriExceedsRoyalty": false,
         "floatingNpriBurdenRate": "0",
         "grossAcres": "42.581",
         "grossOrriBurdenRate": "0",
@@ -8483,9 +8490,9 @@
         "leaseOverlaps": [],
         "leasedOwnership": "0.830522486",
         "name": "Tract 6 — 42.581 ac. (DOTO Unit Tr. 2)",
-        "netRevenueInterestBaseRate": "0.6545495405895833333333333333333333333333",
+        "netRevenueInterestBaseRate": "0.6675264544333333333333333333333333333333",
         "netRevenueInterestOrriBurdenRate": "0",
-        "npriAdjustedNriBeforeOrriRate": "0.6545495405895833333333333333333333333333",
+        "npriAdjustedNriBeforeOrriRate": "0.6675264544333333333333333333333333333333",
         "nriBeforeOrriRate": "0.6675264544333333333333333333333333333333",
         "overAssigned": false,
         "overBurdened": false,
@@ -8513,8 +8520,8 @@
                 "leasedFraction": "0.202380952",
                 "leasedPooledAcres": "8.617583317112",
                 "lessee": "Magnolia Petroleum Company, LLC",
-                "netOwnerTractRoyalty": "0.0404761904",
-                "netOwnerUnitRoyaltyDecimal": "0.006241875548390274429816428703875394029298",
+                "netOwnerTractRoyalty": "0.037313988025",
+                "netOwnerUnitRoyaltyDecimal": "0.005754229021172284239987020211385128870759",
                 "ownerTractRoyalty": "0.0404761904",
                 "unitRoyaltyDecimal": "0.006241875548390274429816428703875394029298"
               }
@@ -8525,8 +8532,8 @@
               "Magnolia Petroleum Company, LLC"
             ],
             "netMineralAcres": "8.617583317112",
-            "netOwnerTractRoyalty": "0.0404761904",
-            "netOwnerUnitRoyaltyDecimal": "0.006241875548390274429816428703875394029298",
+            "netOwnerTractRoyalty": "0.037313988025",
+            "netOwnerUnitRoyaltyDecimal": "0.005754229021172284239987020211385128870759",
             "netPooledAcres": "8.617583317112",
             "nodeId": "tr6c-1",
             "overFloatingNpriBurdened": false,
@@ -8559,8 +8566,8 @@
                 "leasedFraction": "0.202380952",
                 "leasedPooledAcres": "8.617583317112",
                 "lessee": "Magnolia Petroleum Company, LLC",
-                "netOwnerTractRoyalty": "0.0404761904",
-                "netOwnerUnitRoyaltyDecimal": "0.006241875548390274429816428703875394029298",
+                "netOwnerTractRoyalty": "0.037313988025",
+                "netOwnerUnitRoyaltyDecimal": "0.005754229021172284239987020211385128870759",
                 "ownerTractRoyalty": "0.0404761904",
                 "unitRoyaltyDecimal": "0.006241875548390274429816428703875394029298"
               }
@@ -8571,8 +8578,8 @@
               "Magnolia Petroleum Company, LLC"
             ],
             "netMineralAcres": "8.617583317112",
-            "netOwnerTractRoyalty": "0.0404761904",
-            "netOwnerUnitRoyaltyDecimal": "0.006241875548390274429816428703875394029298",
+            "netOwnerTractRoyalty": "0.037313988025",
+            "netOwnerUnitRoyaltyDecimal": "0.005754229021172284239987020211385128870759",
             "netPooledAcres": "8.617583317112",
             "nodeId": "tr6c-15",
             "overFloatingNpriBurdened": false,
@@ -8605,8 +8612,8 @@
                 "leasedFraction": "0.073412698",
                 "leasedPooledAcres": "3.125986093538",
                 "lessee": "Magnolia Petroleum Company, LLC",
-                "netOwnerTractRoyalty": "0.0146825396",
-                "netOwnerUnitRoyaltyDecimal": "0.00226420974928292462451325792694233265344",
+                "netOwnerTractRoyalty": "0.01353546619375",
+                "netOwnerUnitRoyaltyDecimal": "0.00208731836262019613822315965139996291489",
                 "ownerTractRoyalty": "0.0146825396",
                 "unitRoyaltyDecimal": "0.00226420974928292462451325792694233265344"
               }
@@ -8617,8 +8624,8 @@
               "Magnolia Petroleum Company, LLC"
             ],
             "netMineralAcres": "3.125986093538",
-            "netOwnerTractRoyalty": "0.0146825396",
-            "netOwnerUnitRoyaltyDecimal": "0.00226420974928292462451325792694233265344",
+            "netOwnerTractRoyalty": "0.01353546619375",
+            "netOwnerUnitRoyaltyDecimal": "0.00208731836262019613822315965139996291489",
             "netPooledAcres": "3.125986093538",
             "nodeId": "tr6c-5",
             "overFloatingNpriBurdened": false,
@@ -8651,8 +8658,8 @@
                 "leasedFraction": "0.073412698",
                 "leasedPooledAcres": "3.125986093538",
                 "lessee": "Magnolia Petroleum Company, LLC",
-                "netOwnerTractRoyalty": "0.0146825396",
-                "netOwnerUnitRoyaltyDecimal": "0.00226420974928292462451325792694233265344",
+                "netOwnerTractRoyalty": "0.01353546619375",
+                "netOwnerUnitRoyaltyDecimal": "0.00208731836262019613822315965139996291489",
                 "ownerTractRoyalty": "0.0146825396",
                 "unitRoyaltyDecimal": "0.00226420974928292462451325792694233265344"
               }
@@ -8663,8 +8670,8 @@
               "Magnolia Petroleum Company, LLC"
             ],
             "netMineralAcres": "3.125986093538",
-            "netOwnerTractRoyalty": "0.0146825396",
-            "netOwnerUnitRoyaltyDecimal": "0.00226420974928292462451325792694233265344",
+            "netOwnerTractRoyalty": "0.01353546619375",
+            "netOwnerUnitRoyaltyDecimal": "0.00208731836262019613822315965139996291489",
             "netPooledAcres": "3.125986093538",
             "nodeId": "tr6c-9",
             "overFloatingNpriBurdened": false,
@@ -8697,8 +8704,8 @@
                 "leasedFraction": "0.073412698",
                 "leasedPooledAcres": "3.125986093538",
                 "lessee": "Magnolia Petroleum Company, LLC",
-                "netOwnerTractRoyalty": "0.0146825396",
-                "netOwnerUnitRoyaltyDecimal": "0.00226420974928292462451325792694233265344",
+                "netOwnerTractRoyalty": "0.01353546619375",
+                "netOwnerUnitRoyaltyDecimal": "0.00208731836262019613822315965139996291489",
                 "ownerTractRoyalty": "0.0146825396",
                 "unitRoyaltyDecimal": "0.00226420974928292462451325792694233265344"
               }
@@ -8709,8 +8716,8 @@
               "Magnolia Petroleum Company, LLC"
             ],
             "netMineralAcres": "3.125986093538",
-            "netOwnerTractRoyalty": "0.0146825396",
-            "netOwnerUnitRoyaltyDecimal": "0.00226420974928292462451325792694233265344",
+            "netOwnerTractRoyalty": "0.01353546619375",
+            "netOwnerUnitRoyaltyDecimal": "0.00208731836262019613822315965139996291489",
             "netPooledAcres": "3.125986093538",
             "nodeId": "tr6c-7",
             "overFloatingNpriBurdened": false,
@@ -8743,8 +8750,8 @@
                 "leasedFraction": "0.047619048",
                 "leasedPooledAcres": "2.027666682888",
                 "lessee": "Magnolia Petroleum Company, LLC",
-                "netOwnerTractRoyalty": "0.007936508000000000000000000000000000000002",
-                "netOwnerUnitRoyaltyDecimal": "0.001223897178446017986278509178564806230299",
+                "netOwnerTractRoyalty": "0.007192460375000000000000000000000000000002",
+                "netOwnerUnitRoyaltyDecimal": "0.001109156817966703800064898943074355646209",
                 "ownerTractRoyalty": "0.007936508000000000000000000000000000000002",
                 "unitRoyaltyDecimal": "0.001223897178446017986278509178564806230299"
               }
@@ -8755,8 +8762,8 @@
               "Magnolia Petroleum Company, LLC"
             ],
             "netMineralAcres": "2.027666682888",
-            "netOwnerTractRoyalty": "0.007936508000000000000000000000000000000002",
-            "netOwnerUnitRoyaltyDecimal": "0.001223897178446017986278509178564806230299",
+            "netOwnerTractRoyalty": "0.007192460375000000000000000000000000000002",
+            "netOwnerUnitRoyaltyDecimal": "0.001109156817966703800064898943074355646209",
             "netPooledAcres": "2.027666682888",
             "nodeId": "tr6c-34",
             "overFloatingNpriBurdened": false,
@@ -8789,8 +8796,8 @@
                 "leasedFraction": "0.033730159",
                 "leasedPooledAcres": "1.436263900379",
                 "lessee": "Magnolia Petroleum Company, LLC",
-                "netOwnerTractRoyalty": "0.0067460318",
-                "netOwnerUnitRoyaltyDecimal": "0.001040312601679115288336732801780085295754",
+                "netOwnerTractRoyalty": "0.006218998065625",
+                "netOwnerUnitRoyaltyDecimal": "0.0009590381796729344064354255516410161320233",
                 "ownerTractRoyalty": "0.0067460318",
                 "unitRoyaltyDecimal": "0.001040312601679115288336732801780085295754"
               }
@@ -8801,8 +8808,8 @@
               "Magnolia Petroleum Company, LLC"
             ],
             "netMineralAcres": "1.436263900379",
-            "netOwnerTractRoyalty": "0.0067460318",
-            "netOwnerUnitRoyaltyDecimal": "0.001040312601679115288336732801780085295754",
+            "netOwnerTractRoyalty": "0.006218998065625",
+            "netOwnerUnitRoyaltyDecimal": "0.0009590381796729344064354255516410161320233",
             "netPooledAcres": "1.436263900379",
             "nodeId": "tr6c-18",
             "overFloatingNpriBurdened": false,
@@ -8860,8 +8867,8 @@
                 "leasedFraction": "0.033730159",
                 "leasedPooledAcres": "1.436263900379",
                 "lessee": "Magnolia Petroleum Company, LLC",
-                "netOwnerTractRoyalty": "0.005621693166666666666666666666666666666668",
-                "netOwnerUnitRoyaltyDecimal": "0.0008669271680659294069472773348167377464617",
+                "netOwnerTractRoyalty": "0.005094659432291666666666666666666666666668",
+                "netOwnerUnitRoyaltyDecimal": "0.000785652746059748525045970084677668582731",
                 "ownerTractRoyalty": "0.005621693166666666666666666666666666666668",
                 "unitRoyaltyDecimal": "0.0008669271680659294069472773348167377464617"
               }
@@ -8872,8 +8879,8 @@
               "Magnolia Petroleum Company, LLC"
             ],
             "netMineralAcres": "1.436263900379",
-            "netOwnerTractRoyalty": "0.005621693166666666666666666666666666666668",
-            "netOwnerUnitRoyaltyDecimal": "0.0008669271680659294069472773348167377464617",
+            "netOwnerTractRoyalty": "0.005094659432291666666666666666666666666668",
+            "netOwnerUnitRoyaltyDecimal": "0.000785652746059748525045970084677668582731",
             "netPooledAcres": "1.436263900379",
             "nodeId": "tr6c-38",
             "overFloatingNpriBurdened": false,
@@ -8906,8 +8913,8 @@
                 "leasedFraction": "0.033730159",
                 "leasedPooledAcres": "1.436263900379",
                 "lessee": "Magnolia Petroleum Company, LLC",
-                "netOwnerTractRoyalty": "0.0067460318",
-                "netOwnerUnitRoyaltyDecimal": "0.001040312601679115288336732801780085295754",
+                "netOwnerTractRoyalty": "0.006218998065625",
+                "netOwnerUnitRoyaltyDecimal": "0.0009590381796729344064354255516410161320233",
                 "ownerTractRoyalty": "0.0067460318",
                 "unitRoyaltyDecimal": "0.001040312601679115288336732801780085295754"
               }
@@ -8918,8 +8925,8 @@
               "Magnolia Petroleum Company, LLC"
             ],
             "netMineralAcres": "1.436263900379",
-            "netOwnerTractRoyalty": "0.0067460318",
-            "netOwnerUnitRoyaltyDecimal": "0.001040312601679115288336732801780085295754",
+            "netOwnerTractRoyalty": "0.006218998065625",
+            "netOwnerUnitRoyaltyDecimal": "0.0009590381796729344064354255516410161320233",
             "netPooledAcres": "1.436263900379",
             "nodeId": "tr6c-20",
             "overFloatingNpriBurdened": false,
@@ -9027,8 +9034,8 @@
                 "leasedFraction": "0.022321429",
                 "leasedPooledAcres": "0.950468768249",
                 "lessee": "Magnolia Petroleum Company, LLC",
-                "netOwnerTractRoyalty": "0.0044642858",
-                "netOwnerUnitRoyaltyDecimal": "0.000688442170586437279807157426293343222696",
+                "netOwnerTractRoyalty": "0.004115513471875",
+                "netOwnerUnitRoyaltyDecimal": "0.0006346576260093718673222232523641757834229",
                 "ownerTractRoyalty": "0.0044642858",
                 "unitRoyaltyDecimal": "0.000688442170586437279807157426293343222696"
               }
@@ -9039,8 +9046,8 @@
               "Magnolia Petroleum Company, LLC"
             ],
             "netMineralAcres": "0.950468768249",
-            "netOwnerTractRoyalty": "0.0044642858",
-            "netOwnerUnitRoyaltyDecimal": "0.000688442170586437279807157426293343222696",
+            "netOwnerTractRoyalty": "0.004115513471875",
+            "netOwnerUnitRoyaltyDecimal": "0.0006346576260093718673222232523641757834229",
             "netPooledAcres": "0.950468768249",
             "nodeId": "tr6c-41",
             "overFloatingNpriBurdened": false,
@@ -9098,8 +9105,8 @@
                 "leasedFraction": "0.011904762",
                 "leasedPooledAcres": "0.506916670722",
                 "lessee": "Magnolia Petroleum Company, LLC",
-                "netOwnerTractRoyalty": "0.001984127",
-                "netOwnerUnitRoyaltyDecimal": "0.0003059742946115044965696272946412015575747",
+                "netOwnerTractRoyalty": "0.00179811509375",
+                "netOwnerUnitRoyaltyDecimal": "0.0002772892044916759500162247357685889115521",
                 "ownerTractRoyalty": "0.001984127",
                 "unitRoyaltyDecimal": "0.0003059742946115044965696272946412015575747"
               }
@@ -9110,8 +9117,8 @@
               "Magnolia Petroleum Company, LLC"
             ],
             "netMineralAcres": "0.506916670722",
-            "netOwnerTractRoyalty": "0.001984127",
-            "netOwnerUnitRoyaltyDecimal": "0.0003059742946115044965696272946412015575747",
+            "netOwnerTractRoyalty": "0.00179811509375",
+            "netOwnerUnitRoyaltyDecimal": "0.0002772892044916759500162247357685889115521",
             "netPooledAcres": "0.506916670722",
             "nodeId": "tr6c-36",
             "overFloatingNpriBurdened": false,
@@ -9194,8 +9201,8 @@
                 "leasedFraction": "0.011243386",
                 "leasedPooledAcres": "0.478754619266",
                 "lessee": "Magnolia Petroleum Company, LLC",
-                "netOwnerTractRoyalty": "0.0022486772",
-                "netOwnerUnitRoyaltyDecimal": "0.0003467708569456355460782495827925088077138",
+                "netOwnerTractRoyalty": "0.00207299929375",
+                "netOwnerUnitRoyaltyDecimal": "0.0003196793837467577690408863341368440571112",
                 "ownerTractRoyalty": "0.0022486772",
                 "unitRoyaltyDecimal": "0.0003467708569456355460782495827925088077138"
               }
@@ -9206,8 +9213,8 @@
               "Magnolia Petroleum Company, LLC"
             ],
             "netMineralAcres": "0.478754619266",
-            "netOwnerTractRoyalty": "0.0022486772",
-            "netOwnerUnitRoyaltyDecimal": "0.0003467708569456355460782495827925088077138",
+            "netOwnerTractRoyalty": "0.00207299929375",
+            "netOwnerUnitRoyaltyDecimal": "0.0003196793837467577690408863341368440571112",
             "netPooledAcres": "0.478754619266",
             "nodeId": "tr6c-30",
             "overFloatingNpriBurdened": false,
@@ -9290,8 +9297,8 @@
                 "leasedFraction": "0.011243386",
                 "leasedPooledAcres": "0.478754619266",
                 "lessee": "Magnolia Petroleum Company, LLC",
-                "netOwnerTractRoyalty": "0.0022486772",
-                "netOwnerUnitRoyaltyDecimal": "0.0003467708569456355460782495827925088077138",
+                "netOwnerTractRoyalty": "0.00207299929375",
+                "netOwnerUnitRoyaltyDecimal": "0.0003196793837467577690408863341368440571112",
                 "ownerTractRoyalty": "0.0022486772",
                 "unitRoyaltyDecimal": "0.0003467708569456355460782495827925088077138"
               }
@@ -9302,8 +9309,8 @@
               "Magnolia Petroleum Company, LLC"
             ],
             "netMineralAcres": "0.478754619266",
-            "netOwnerTractRoyalty": "0.0022486772",
-            "netOwnerUnitRoyaltyDecimal": "0.0003467708569456355460782495827925088077138",
+            "netOwnerTractRoyalty": "0.00207299929375",
+            "netOwnerUnitRoyaltyDecimal": "0.0003196793837467577690408863341368440571112",
             "netPooledAcres": "0.478754619266",
             "nodeId": "tr6c-25",
             "overFloatingNpriBurdened": false,
@@ -9316,8 +9323,8 @@
           }
         ],
         "pooledAcres": "42.581",
-        "preWorkingInterestDecimal": "0.1009387675134616339926563755485505902713",
-        "retainedWorkingInterestDecimal": "0.1009387675134616339926563755485505902713",
+        "preWorkingInterestDecimal": "0.1029399509354783061762160825761789974658",
+        "retainedWorkingInterestDecimal": "0.1029399509354783061762160825761789974658",
         "totalNpriBurdenRate": "0.01297691384375",
         "totalOrriBurdenRate": "0",
         "trackedAssignmentCount": 0,
@@ -9345,6 +9352,7 @@
         "description": "Dr. Elmore #1 Unit, Tract 7. Present-day mineral ownership (17 owners); totals 100%. San Jacinto County, TX.",
         "deskMapId": "dm-tr7",
         "fixedNpriBurdenRate": "0.046875",
+        "fixedNpriExceedsRoyalty": false,
         "floatingNpriBurdenRate": "0",
         "grossAcres": "20.546",
         "grossOrriBurdenRate": "0",
@@ -9355,9 +9363,9 @@
         "leaseOverlaps": [],
         "leasedOwnership": "0.75",
         "name": "Tract 7 — 20.546 ac. (DOTO Unit Tr. 7)",
-        "netRevenueInterestBaseRate": "0.553125",
+        "netRevenueInterestBaseRate": "0.6",
         "netRevenueInterestOrriBurdenRate": "0",
-        "npriAdjustedNriBeforeOrriRate": "0.553125",
+        "npriAdjustedNriBeforeOrriRate": "0.6",
         "nriBeforeOrriRate": "0.6",
         "overAssigned": false,
         "overBurdened": false,
@@ -9385,8 +9393,8 @@
                 "leasedFraction": "0.75",
                 "leasedPooledAcres": "15.4095",
                 "lessee": "Magnolia Petroleum Company, LLC",
-                "netOwnerTractRoyalty": "0.15",
-                "netOwnerUnitRoyaltyDecimal": "0.0111613868672353050250324494715371778231",
+                "netOwnerTractRoyalty": "0.103125",
+                "netOwnerUnitRoyaltyDecimal": "0.007673453471224272204709809011681809753378",
                 "ownerTractRoyalty": "0.15",
                 "unitRoyaltyDecimal": "0.0111613868672353050250324494715371778231"
               }
@@ -9397,8 +9405,8 @@
               "Magnolia Petroleum Company, LLC"
             ],
             "netMineralAcres": "15.4095",
-            "netOwnerTractRoyalty": "0.15",
-            "netOwnerUnitRoyaltyDecimal": "0.0111613868672353050250324494715371778231",
+            "netOwnerTractRoyalty": "0.103125",
+            "netOwnerUnitRoyaltyDecimal": "0.007673453471224272204709809011681809753378",
             "netPooledAcres": "15.4095",
             "nodeId": "tr7c-1",
             "overFloatingNpriBurdened": false,
@@ -9436,8 +9444,8 @@
           }
         ],
         "pooledAcres": "20.546",
-        "preWorkingInterestDecimal": "0.04115761407293018727980715742629334322269",
-        "retainedWorkingInterestDecimal": "0.04115761407293018727980715742629334322269",
+        "preWorkingInterestDecimal": "0.04464554746894122010012979788614871129241",
+        "retainedWorkingInterestDecimal": "0.04464554746894122010012979788614871129241",
         "totalNpriBurdenRate": "0.046875",
         "totalOrriBurdenRate": "0",
         "trackedAssignmentCount": 0,
@@ -13780,7 +13788,7 @@
       {
         "category": "royalty",
         "rowCount": 58,
-        "totalDecimal": "0.1646348478094349705588648865813709129117"
+        "totalDecimal": "0.1513416064918890958427977625316768650721"
       },
       {
         "category": "npri",
@@ -13790,7 +13798,7 @@
       {
         "category": "retained_wi",
         "rowCount": 1,
-        "totalDecimal": "0.6301379561636781207385924655417516533779"
+        "totalDecimal": "0.6434311974812239954546595895914457012176"
       }
     ],
     "expectedDecimal": "0.8081175593657649383460040793621361023549",
@@ -13809,7 +13817,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.01556621021664368162432783237530131652142",
+        "decimal": "0.01435010004346839399742722047098090116818",
         "effectiveDate": "2025-11-06",
         "id": "royalty-dm-tr2-tr2c-1-lease-4",
         "payee": "Elmore Family Partners, Ltd.",
@@ -13820,7 +13828,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.01556620944748980159465974411273873539774",
+        "decimal": "0.01435009933440466084507695160393102169479",
         "effectiveDate": "2025-10-27",
         "id": "royalty-dm-tr2-tr2c-32-lease-13",
         "payee": "John A. Few, Sr.",
@@ -13853,7 +13861,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.0111613868672353050250324494715371778231",
+        "decimal": "0.007673453471224272204709809011681809753378",
         "effectiveDate": "2025-11-06",
         "id": "royalty-dm-tr7-tr7c-1-lease-60",
         "payee": "Elmore Family Partners, Ltd.",
@@ -13864,7 +13872,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.006241875548390274429816428703875394029298",
+        "decimal": "0.005754229021172284239987020211385128870759",
         "effectiveDate": "2025-11-06",
         "id": "royalty-dm-tr6-tr6c-1-lease-47",
         "payee": "Elmore Family Partners, Ltd.",
@@ -13875,7 +13883,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.006241875548390274429816428703875394029298",
+        "decimal": "0.005754229021172284239987020211385128870759",
         "effectiveDate": "2025-10-27",
         "id": "royalty-dm-tr6-tr6c-15-lease-51",
         "payee": "John A. Few, Sr.",
@@ -13886,7 +13894,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.005646566151014625440385685147413313554608",
+        "decimal": "0.005205428170466607827855553495271648433154",
         "effectiveDate": "2025-10-27",
         "id": "royalty-dm-tr2-tr2c-22-lease-10",
         "payee": "Rigby Owen, Jr.",
@@ -13897,7 +13905,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.005646566151014625440385685147413313554608",
+        "decimal": "0.005205428170466607827855553495271648433154",
         "effectiveDate": "2025-10-27",
         "id": "royalty-dm-tr2-tr2c-26-lease-12",
         "payee": "Sandra Owen Powell",
@@ -13908,7 +13916,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.005646566151014625440385685147413313554608",
+        "decimal": "0.005205428170466607827855553495271648433154",
         "effectiveDate": "2025-10-27",
         "id": "royalty-dm-tr2-tr2c-24-lease-11",
         "payee": "Stephen J. Owen",
@@ -13919,18 +13927,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.005302011867235305025032449471537177823104",
-        "effectiveDate": "2025-11-06",
-        "id": "royalty-dm-tr4-tr4c-1-lease-34",
-        "payee": "Elmore Family Partners, Ltd.",
-        "sourceDocNo": "OGML-ElmoreFamilyPartners",
-        "sourceLabel": "TR4 • OGML — Elmore Family Partners, Ltd. • Royalty 1/5",
-        "tractCode": "TR4",
-        "tractName": "Tract 4 — 14.64 ac. (DOTO Unit Tr. 3)"
-      },
-      {
-        "category": "royalty",
-        "decimal": "0.004137161045364795800111255330984609679214",
+        "decimal": "0.003813945338695671128227563508251437048025",
         "effectiveDate": "2025-11-06",
         "id": "royalty-dm-tr3-tr3c-1-lease-20",
         "payee": "Elmore Family Partners, Ltd.",
@@ -13941,7 +13938,18 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.002594368266886762933432226960875208603746",
+        "decimal": "0.003645133158724272204709809011681809753383",
+        "effectiveDate": "2025-11-06",
+        "id": "royalty-dm-tr4-tr4c-1-lease-34",
+        "payee": "Elmore Family Partners, Ltd.",
+        "sourceDocNo": "OGML-ElmoreFamilyPartners",
+        "sourceLabel": "TR4 • OGML — Elmore Family Partners, Ltd. • Royalty 1/5",
+        "tractCode": "TR4",
+        "tractName": "Tract 4 — 14.64 ac. (DOTO Unit Tr. 3)"
+      },
+      {
+        "category": "royalty",
+        "decimal": "0.002391683246036234579257834229556832931579",
         "effectiveDate": "2025-10-30",
         "id": "royalty-dm-tr2-tr2c-35-lease-14",
         "payee": "Benita Trapp Downey",
@@ -13952,7 +13960,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.002594368266886762933432226960875208603746",
+        "decimal": "0.002391683246036234579257834229556832931579",
         "effectiveDate": "2025-10-30",
         "id": "royalty-dm-tr2-tr2c-37-lease-15",
         "payee": "Robert Hill Trapp",
@@ -13963,7 +13971,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.00226420974928292462451325792694233265344",
+        "decimal": "0.00208731836262019613822315965139996291489",
         "effectiveDate": "2025-10-27",
         "id": "royalty-dm-tr6-tr6c-5-lease-48",
         "payee": "Rigby Owen, Jr.",
@@ -13974,7 +13982,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.00226420974928292462451325792694233265344",
+        "decimal": "0.00208731836262019613822315965139996291489",
         "effectiveDate": "2025-10-27",
         "id": "royalty-dm-tr6-tr6c-9-lease-50",
         "payee": "Sandra Owen Powell",
@@ -13985,7 +13993,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.00226420974928292462451325792694233265344",
+        "decimal": "0.00208731836262019613822315965139996291489",
         "effectiveDate": "2025-10-27",
         "id": "royalty-dm-tr6-tr6c-7-lease-49",
         "payee": "Stephen J. Owen",
@@ -13996,7 +14004,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.002161973555738969111193522467396007169789",
+        "decimal": "0.001959288534888440757019129736077631497622",
         "effectiveDate": "2025-10-30",
         "id": "royalty-dm-tr2-tr2c-51-lease-18",
         "payee": "Pete McClanahan",
@@ -14007,7 +14015,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.001716861372315675412571852401260893751159",
+        "decimal": "0.00158273157760351327096467643241238642685",
         "effectiveDate": "2025-12-10",
         "id": "royalty-dm-tr2-tr2c-54-lease-19",
         "payee": "Peter Hill Kraft",
@@ -14018,7 +14026,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.001581855681189736695716669757092527350269",
+        "decimal": "0.001458273206096788516363804932319673651029",
         "effectiveDate": "2025-10-27",
         "id": "royalty-dm-tr3-tr3c-14-lease-24",
         "payee": "John A. Few, Sr.",
@@ -14029,7 +14037,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.001500734875977830057481921008715000927128",
+        "decimal": "0.001383489963792062084241145929909141479696",
         "effectiveDate": "2025-10-27",
         "id": "royalty-dm-tr3-tr3c-4-lease-21",
         "payee": "Rigby Owen, Jr.",
@@ -14040,7 +14048,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.001500734875977830057481921008715000927128",
+        "decimal": "0.001383489963792062084241145929909141479696",
         "effectiveDate": "2025-10-27",
         "id": "royalty-dm-tr3-tr3c-8-lease-23",
         "payee": "Sandra Owen Powell",
@@ -14051,7 +14059,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.001500734875977830057481921008715000927128",
+        "decimal": "0.001383489963792062084241145929909141479696",
         "effectiveDate": "2025-10-27",
         "id": "royalty-dm-tr3-tr3c-6-lease-22",
         "payee": "Stephen J. Owen",
@@ -14062,7 +14070,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.001237205082746152419803448915260522900056",
+        "decimal": "0.001140548435656609262006304468755794548489",
         "effectiveDate": "2025-11-06",
         "id": "royalty-dm-tr5-tr5c-1-lease-35",
         "payee": "Elmore Family Partners, Ltd.",
@@ -14073,7 +14081,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.001223897178446017986278509178564806230299",
+        "decimal": "0.001109156817966703800064898943074355646209",
         "effectiveDate": "2025-12-12",
         "id": "royalty-dm-tr6-tr6c-34-lease-56",
         "payee": "Donald Harman",
@@ -14084,7 +14092,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.001040312601679115288336732801780085295754",
+        "decimal": "0.0009590381796729344064354255516410161320233",
         "effectiveDate": "2025-10-30",
         "id": "royalty-dm-tr6-tr6c-18-lease-52",
         "payee": "Benita Trapp Downey",
@@ -14095,7 +14103,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.001040312601679115288336732801780085295754",
+        "decimal": "0.0009590381796729344064354255516410161320233",
         "effectiveDate": "2025-10-30",
         "id": "royalty-dm-tr6-tr6c-20-lease-53",
         "payee": "Robert Hill Trapp",
@@ -14106,18 +14114,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.0008669271680659294069472773348167377464617",
-        "effectiveDate": "2025-10-30",
-        "id": "royalty-dm-tr6-tr6c-38-lease-58",
-        "payee": "Pete McClanahan",
-        "sourceDocNo": "OGML_McClanahan",
-        "sourceLabel": "TR6 • OGML — Pete McClanahan • Royalty 1/6",
-        "tractCode": "TR6",
-        "tractName": "Tract 6 — 42.581 ac. (DOTO Unit Tr. 2)"
-      },
-      {
-        "category": "royalty",
-        "decimal": "0.000864789396657124976821806044872983497126",
+        "decimal": "0.000797227725043287088007602447617281661413",
         "effectiveDate": "2025-10-31",
         "id": "royalty-dm-tr2-tr2c-47-lease-17",
         "payee": "Rebecca Hamblen Drapak",
@@ -14128,7 +14125,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.000864789396657124976821806044872983497126",
+        "decimal": "0.000797227725043287088007602447617281661413",
         "effectiveDate": "2025-10-30",
         "id": "royalty-dm-tr2-tr2c-42-lease-16",
         "payee": "Tinabeth McCune Keasling",
@@ -14139,7 +14136,18 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.0008112080521190663823474874837752642314113",
+        "decimal": "0.000785652746059748525045970084677668582731",
+        "effectiveDate": "2025-10-30",
+        "id": "royalty-dm-tr6-tr6c-38-lease-58",
+        "payee": "Pete McClanahan",
+        "sourceDocNo": "OGML_McClanahan",
+        "sourceLabel": "TR6 • OGML — Pete McClanahan • Royalty 1/6",
+        "tractCode": "TR6",
+        "tractName": "Tract 6 — 42.581 ac. (DOTO Unit Tr. 2)"
+      },
+      {
+        "category": "royalty",
+        "decimal": "0.0007351572972329039090024105321713332097165",
         "effectiveDate": "2025-12-12",
         "id": "royalty-dm-tr3-tr3c-42-lease-30",
         "payee": "Donald Harman",
@@ -14150,7 +14158,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.0006895268443012064249953643612089745966994",
+        "decimal": "0.0006356575595901746730426015204895234563322",
         "effectiveDate": "2025-10-30",
         "id": "royalty-dm-tr3-tr3c-26-lease-26",
         "payee": "Benita Trapp Downey",
@@ -14161,7 +14169,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.0006895268443012064249953643612089745966994",
+        "decimal": "0.0006356575595901746730426015204895234563322",
         "effectiveDate": "2025-10-30",
         "id": "royalty-dm-tr3-tr3c-28-lease-27",
         "payee": "Robert Hill Trapp",
@@ -14172,7 +14180,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.000688442170586437279807157426293343222696",
+        "decimal": "0.0006346576260093718673222232523641757834229",
         "effectiveDate": "2025-12-10",
         "id": "royalty-dm-tr6-tr6c-41-lease-59",
         "payee": "Peter Hill Kraft",
@@ -14183,7 +14191,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.0005746057035843386874961369676741454972496",
+        "decimal": "0.0005207364188733069355433741269546943568824",
         "effectiveDate": "2025-10-30",
         "id": "royalty-dm-tr3-tr3c-46-lease-32",
         "payee": "Pete McClanahan",
@@ -14194,7 +14202,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.0004697545020816915445948451696643797515298",
+        "decimal": "0.0004330549316065593926733728907843500834415",
         "effectiveDate": "2025-12-03",
         "id": "royalty-dm-tr2-tr2c-5-lease-5",
         "payee": "Jerry and Kristin Broussard",
@@ -14205,7 +14213,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.0004563045344275855275356944186908956054144",
+        "decimal": "0.0004206557426754304081969682922306693862414",
         "effectiveDate": "2025-12-10",
         "id": "royalty-dm-tr3-tr3c-49-lease-33",
         "payee": "Peter Hill Kraft",
@@ -14216,7 +14224,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.0004487900773572223252364175783422955683294",
+        "decimal": "0.0004137283525636893310773224550343037270537",
         "effectiveDate": "2025-10-27",
         "id": "royalty-dm-tr5-tr5c-4-lease-36",
         "payee": "Rigby Owen, Jr.",
@@ -14227,7 +14235,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.0004487900773572223252364175783422955683294",
+        "decimal": "0.0004137283525636893310773224550343037270537",
         "effectiveDate": "2025-10-27",
         "id": "royalty-dm-tr5-tr5c-8-lease-38",
         "payee": "Sandra Owen Powell",
@@ -14238,7 +14246,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.0004487900773572223252364175783422955683294",
+        "decimal": "0.0004137283525636893310773224550343037270537",
         "effectiveDate": "2025-10-27",
         "id": "royalty-dm-tr5-tr5c-6-lease-37",
         "payee": "Stephen J. Owen",
@@ -14249,7 +14257,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.0004484561069898642482152790654552197292786",
+        "decimal": "0.0004110847647407088941973391433339514185054",
         "effectiveDate": "2025-12-03",
         "id": "royalty-dm-tr3-tr3c-22-lease-25",
         "payee": "Old Hickory Hill, LLC",
@@ -14260,7 +14268,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.0003467708569456355460782495827925088077138",
+        "decimal": "0.0003196793837467577690408863341368440571112",
         "effectiveDate": "2025-10-31",
         "id": "royalty-dm-tr6-tr6c-30-lease-55",
         "payee": "Rebecca Hamblen Drapak",
@@ -14271,7 +14279,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.0003467708569456355460782495827925088077138",
+        "decimal": "0.0003196793837467577690408863341368440571112",
         "effectiveDate": "2025-10-30",
         "id": "royalty-dm-tr6-tr6c-25-lease-54",
         "payee": "Tinabeth McCune Keasling",
@@ -14282,7 +14290,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.0003059742946115044965696272946412015575747",
+        "decimal": "0.0002772892044916759500162247357685889115521",
         "effectiveDate": "2025-12-12",
         "id": "royalty-dm-tr6-tr6c-36-lease-57",
         "payee": "Claude Lester Harman, Jr.",
@@ -14293,7 +14301,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.000242589234308362692379009827554236973855",
+        "decimal": "0.0002198464935919536899684776562210272575561",
         "effectiveDate": "2025-12-12",
         "id": "royalty-dm-tr5-tr5c-28-lease-43",
         "payee": "Donald Harman",
@@ -14304,7 +14312,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.0002298422746195878917114778416465788985722",
+        "decimal": "0.0002118858469149325876715186352679399221212",
         "effectiveDate": "2025-10-31",
         "id": "royalty-dm-tr3-tr3c-38-lease-29",
         "payee": "Rebecca Hamblen Drapak",
@@ -14315,7 +14323,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.0002298422746195878917114778416465788985722",
+        "decimal": "0.0002118858469149325876715186352679399221212",
         "effectiveDate": "2025-10-30",
         "id": "royalty-dm-tr3-tr3c-33-lease-28",
         "payee": "Tinabeth McCune Keasling",
@@ -14326,7 +14334,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.0002062008491621082885221583534211014277768",
+        "decimal": "0.0001900914078213185784813647320600778787317",
         "effectiveDate": "2025-10-30",
         "id": "royalty-dm-tr5-tr5c-12-lease-39",
         "payee": "Benita Trapp Downey",
@@ -14337,7 +14345,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.0002062008491621082885221583534211014277768",
+        "decimal": "0.0001900914078213185784813647320600778787317",
         "effectiveDate": "2025-10-30",
         "id": "royalty-dm-tr5-tr5c-14-lease-40",
         "payee": "Robert Hill Trapp",
@@ -14348,7 +14356,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.0002028020130297665955868718709438160578529",
+        "decimal": "0.0001837893243082259772506026330428333024292",
         "effectiveDate": "2025-12-12",
         "id": "royalty-dm-tr3-tr3c-44-lease-31",
         "payee": "Claude Lester Harman, Jr.",
@@ -14359,7 +14367,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.0001718340409684235737684652945175845231474",
+        "decimal": "0.0001557245996276338637276716731565609741023",
         "effectiveDate": "2025-10-30",
         "id": "royalty-dm-tr5-tr5c-32-lease-45",
         "payee": "Pete McClanahan",
@@ -14370,7 +14378,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.000136456445826766178379380678657519006119",
+        "decimal": "0.000125795785996550070693491563137400333766",
         "effectiveDate": "2025-12-10",
         "id": "royalty-dm-tr5-tr5c-35-lease-46",
         "payee": "Peter Hill Kraft",
@@ -14381,7 +14389,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.00008619346051160068607454107175968848507324",
+        "decimal": "0.00007945959640913188247496755052846282217689",
         "effectiveDate": "2025-12-03",
         "id": "royalty-dm-tr2-tr2c-19-lease-9",
         "payee": "Candy Lynne Deloach",
@@ -14392,7 +14400,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.00008619346051160068607454107175968848507324",
+        "decimal": "0.00007945959640913188247496755052846282217689",
         "effectiveDate": "2025-12-03",
         "id": "royalty-dm-tr2-tr2c-14-lease-7",
         "payee": "Raigan Gwen Mayo & Heather Ann Henson",
@@ -14403,7 +14411,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.00006873361434961987761913591692935286482478",
+        "decimal": "0.00006336380072855582468014092341924717226034",
         "effectiveDate": "2025-10-31",
         "id": "royalty-dm-tr5-tr5c-24-lease-42",
         "payee": "Rebecca Hamblen Drapak",
@@ -14414,7 +14422,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.00006873361434961987761913591692935286482478",
+        "decimal": "0.00006336380072855582468014092341924717226034",
         "effectiveDate": "2025-10-30",
         "id": "royalty-dm-tr5-tr5c-19-lease-41",
         "payee": "Tinabeth McCune Keasling",
@@ -14425,7 +14433,7 @@
       },
       {
         "category": "royalty",
-        "decimal": "0.00006064730857709067309475245688855924346376",
+        "decimal": "0.00005496162339798842249211941405525681438904",
         "effectiveDate": "2025-12-12",
         "id": "royalty-dm-tr5-tr5c-30-lease-44",
         "payee": "Claude Lester Harman, Jr.",
@@ -15800,7 +15808,7 @@
       },
       {
         "category": "retained_wi",
-        "decimal": "0.6301379561636781207385924655417516533779",
+        "decimal": "0.6434311974812239954546595895914457012176",
         "id": "retained-wi-unit",
         "payee": "Magnolia Petroleum Company, LLC",
         "sourceDocNo": "",
@@ -15813,8 +15821,8 @@
     "rowsMissingSourceDocNo": 0,
     "rowsWithCompleteSource": 182,
     "rowsWithSourceGap": 0,
-    "totalDecimal": "0.8081175593657649383460040793621361023544",
-    "varianceDecimal": "5e-40"
+    "totalDecimal": "0.8081175593657649383460040793621361023545",
+    "varianceDecimal": "4e-40"
   },
   "unitRows": [
     {
@@ -15830,7 +15838,7 @@
     },
     {
       "category": "royalty",
-      "decimal": "0.01556621021664368162432783237530131652142",
+      "decimal": "0.01435010004346839399742722047098090116818",
       "effectiveDate": "2025-11-06",
       "id": "royalty-dm-tr2-tr2c-1-lease-4",
       "payee": "Elmore Family Partners, Ltd.",
@@ -15841,7 +15849,7 @@
     },
     {
       "category": "royalty",
-      "decimal": "0.01556620944748980159465974411273873539774",
+      "decimal": "0.01435009933440466084507695160393102169479",
       "effectiveDate": "2025-10-27",
       "id": "royalty-dm-tr2-tr2c-32-lease-13",
       "payee": "John A. Few, Sr.",
@@ -15874,7 +15882,7 @@
     },
     {
       "category": "royalty",
-      "decimal": "0.0111613868672353050250324494715371778231",
+      "decimal": "0.007673453471224272204709809011681809753378",
       "effectiveDate": "2025-11-06",
       "id": "royalty-dm-tr7-tr7c-1-lease-60",
       "payee": "Elmore Family Partners, Ltd.",
@@ -15885,7 +15893,7 @@
     },
     {
       "category": "royalty",
-      "decimal": "0.006241875548390274429816428703875394029298",
+      "decimal": "0.005754229021172284239987020211385128870759",
       "effectiveDate": "2025-11-06",
       "id": "royalty-dm-tr6-tr6c-1-lease-47",
       "payee": "Elmore Family Partners, Ltd.",
@@ -15896,7 +15904,7 @@
     },
     {
       "category": "royalty",
-      "decimal": "0.006241875548390274429816428703875394029298",
+      "decimal": "0.005754229021172284239987020211385128870759",
       "effectiveDate": "2025-10-27",
       "id": "royalty-dm-tr6-tr6c-15-lease-51",
       "payee": "John A. Few, Sr.",
@@ -15907,7 +15915,7 @@
     },
     {
       "category": "royalty",
-      "decimal": "0.005646566151014625440385685147413313554608",
+      "decimal": "0.005205428170466607827855553495271648433154",
       "effectiveDate": "2025-10-27",
       "id": "royalty-dm-tr2-tr2c-22-lease-10",
       "payee": "Rigby Owen, Jr.",
@@ -15918,7 +15926,7 @@
     },
     {
       "category": "royalty",
-      "decimal": "0.005646566151014625440385685147413313554608",
+      "decimal": "0.005205428170466607827855553495271648433154",
       "effectiveDate": "2025-10-27",
       "id": "royalty-dm-tr2-tr2c-26-lease-12",
       "payee": "Sandra Owen Powell",
@@ -15929,7 +15937,7 @@
     },
     {
       "category": "royalty",
-      "decimal": "0.005646566151014625440385685147413313554608",
+      "decimal": "0.005205428170466607827855553495271648433154",
       "effectiveDate": "2025-10-27",
       "id": "royalty-dm-tr2-tr2c-24-lease-11",
       "payee": "Stephen J. Owen",
@@ -15940,18 +15948,7 @@
     },
     {
       "category": "royalty",
-      "decimal": "0.005302011867235305025032449471537177823104",
-      "effectiveDate": "2025-11-06",
-      "id": "royalty-dm-tr4-tr4c-1-lease-34",
-      "payee": "Elmore Family Partners, Ltd.",
-      "sourceDocNo": "OGML-ElmoreFamilyPartners",
-      "sourceLabel": "TR4 • OGML — Elmore Family Partners, Ltd. • Royalty 1/5",
-      "tractCode": "TR4",
-      "tractName": "Tract 4 — 14.64 ac. (DOTO Unit Tr. 3)"
-    },
-    {
-      "category": "royalty",
-      "decimal": "0.004137161045364795800111255330984609679214",
+      "decimal": "0.003813945338695671128227563508251437048025",
       "effectiveDate": "2025-11-06",
       "id": "royalty-dm-tr3-tr3c-1-lease-20",
       "payee": "Elmore Family Partners, Ltd.",
@@ -15962,7 +15959,18 @@
     },
     {
       "category": "royalty",
-      "decimal": "0.002594368266886762933432226960875208603746",
+      "decimal": "0.003645133158724272204709809011681809753383",
+      "effectiveDate": "2025-11-06",
+      "id": "royalty-dm-tr4-tr4c-1-lease-34",
+      "payee": "Elmore Family Partners, Ltd.",
+      "sourceDocNo": "OGML-ElmoreFamilyPartners",
+      "sourceLabel": "TR4 • OGML — Elmore Family Partners, Ltd. • Royalty 1/5",
+      "tractCode": "TR4",
+      "tractName": "Tract 4 — 14.64 ac. (DOTO Unit Tr. 3)"
+    },
+    {
+      "category": "royalty",
+      "decimal": "0.002391683246036234579257834229556832931579",
       "effectiveDate": "2025-10-30",
       "id": "royalty-dm-tr2-tr2c-35-lease-14",
       "payee": "Benita Trapp Downey",
@@ -15973,7 +15981,7 @@
     },
     {
       "category": "royalty",
-      "decimal": "0.002594368266886762933432226960875208603746",
+      "decimal": "0.002391683246036234579257834229556832931579",
       "effectiveDate": "2025-10-30",
       "id": "royalty-dm-tr2-tr2c-37-lease-15",
       "payee": "Robert Hill Trapp",
@@ -15984,7 +15992,7 @@
     },
     {
       "category": "royalty",
-      "decimal": "0.00226420974928292462451325792694233265344",
+      "decimal": "0.00208731836262019613822315965139996291489",
       "effectiveDate": "2025-10-27",
       "id": "royalty-dm-tr6-tr6c-5-lease-48",
       "payee": "Rigby Owen, Jr.",
@@ -15995,7 +16003,7 @@
     },
     {
       "category": "royalty",
-      "decimal": "0.00226420974928292462451325792694233265344",
+      "decimal": "0.00208731836262019613822315965139996291489",
       "effectiveDate": "2025-10-27",
       "id": "royalty-dm-tr6-tr6c-9-lease-50",
       "payee": "Sandra Owen Powell",
@@ -16006,7 +16014,7 @@
     },
     {
       "category": "royalty",
-      "decimal": "0.00226420974928292462451325792694233265344",
+      "decimal": "0.00208731836262019613822315965139996291489",
       "effectiveDate": "2025-10-27",
       "id": "royalty-dm-tr6-tr6c-7-lease-49",
       "payee": "Stephen J. Owen",
@@ -16017,7 +16025,7 @@
     },
     {
       "category": "royalty",
-      "decimal": "0.002161973555738969111193522467396007169789",
+      "decimal": "0.001959288534888440757019129736077631497622",
       "effectiveDate": "2025-10-30",
       "id": "royalty-dm-tr2-tr2c-51-lease-18",
       "payee": "Pete McClanahan",
@@ -16028,7 +16036,7 @@
     },
     {
       "category": "royalty",
-      "decimal": "0.001716861372315675412571852401260893751159",
+      "decimal": "0.00158273157760351327096467643241238642685",
       "effectiveDate": "2025-12-10",
       "id": "royalty-dm-tr2-tr2c-54-lease-19",
       "payee": "Peter Hill Kraft",
@@ -16039,7 +16047,7 @@
     },
     {
       "category": "royalty",
-      "decimal": "0.001581855681189736695716669757092527350269",
+      "decimal": "0.001458273206096788516363804932319673651029",
       "effectiveDate": "2025-10-27",
       "id": "royalty-dm-tr3-tr3c-14-lease-24",
       "payee": "John A. Few, Sr.",
@@ -16050,7 +16058,7 @@
     },
     {
       "category": "royalty",
-      "decimal": "0.001500734875977830057481921008715000927128",
+      "decimal": "0.001383489963792062084241145929909141479696",
       "effectiveDate": "2025-10-27",
       "id": "royalty-dm-tr3-tr3c-4-lease-21",
       "payee": "Rigby Owen, Jr.",
@@ -16061,7 +16069,7 @@
     },
     {
       "category": "royalty",
-      "decimal": "0.001500734875977830057481921008715000927128",
+      "decimal": "0.001383489963792062084241145929909141479696",
       "effectiveDate": "2025-10-27",
       "id": "royalty-dm-tr3-tr3c-8-lease-23",
       "payee": "Sandra Owen Powell",
@@ -16072,7 +16080,7 @@
     },
     {
       "category": "royalty",
-      "decimal": "0.001500734875977830057481921008715000927128",
+      "decimal": "0.001383489963792062084241145929909141479696",
       "effectiveDate": "2025-10-27",
       "id": "royalty-dm-tr3-tr3c-6-lease-22",
       "payee": "Stephen J. Owen",
@@ -16083,7 +16091,7 @@
     },
     {
       "category": "royalty",
-      "decimal": "0.001237205082746152419803448915260522900056",
+      "decimal": "0.001140548435656609262006304468755794548489",
       "effectiveDate": "2025-11-06",
       "id": "royalty-dm-tr5-tr5c-1-lease-35",
       "payee": "Elmore Family Partners, Ltd.",
@@ -16094,7 +16102,7 @@
     },
     {
       "category": "royalty",
-      "decimal": "0.001223897178446017986278509178564806230299",
+      "decimal": "0.001109156817966703800064898943074355646209",
       "effectiveDate": "2025-12-12",
       "id": "royalty-dm-tr6-tr6c-34-lease-56",
       "payee": "Donald Harman",
@@ -16105,7 +16113,7 @@
     },
     {
       "category": "royalty",
-      "decimal": "0.001040312601679115288336732801780085295754",
+      "decimal": "0.0009590381796729344064354255516410161320233",
       "effectiveDate": "2025-10-30",
       "id": "royalty-dm-tr6-tr6c-18-lease-52",
       "payee": "Benita Trapp Downey",
@@ -16116,7 +16124,7 @@
     },
     {
       "category": "royalty",
-      "decimal": "0.001040312601679115288336732801780085295754",
+      "decimal": "0.0009590381796729344064354255516410161320233",
       "effectiveDate": "2025-10-30",
       "id": "royalty-dm-tr6-tr6c-20-lease-53",
       "payee": "Robert Hill Trapp",
@@ -16127,18 +16135,7 @@
     },
     {
       "category": "royalty",
-      "decimal": "0.0008669271680659294069472773348167377464617",
-      "effectiveDate": "2025-10-30",
-      "id": "royalty-dm-tr6-tr6c-38-lease-58",
-      "payee": "Pete McClanahan",
-      "sourceDocNo": "OGML_McClanahan",
-      "sourceLabel": "TR6 • OGML — Pete McClanahan • Royalty 1/6",
-      "tractCode": "TR6",
-      "tractName": "Tract 6 — 42.581 ac. (DOTO Unit Tr. 2)"
-    },
-    {
-      "category": "royalty",
-      "decimal": "0.000864789396657124976821806044872983497126",
+      "decimal": "0.000797227725043287088007602447617281661413",
       "effectiveDate": "2025-10-31",
       "id": "royalty-dm-tr2-tr2c-47-lease-17",
       "payee": "Rebecca Hamblen Drapak",
@@ -16149,7 +16146,7 @@
     },
     {
       "category": "royalty",
-      "decimal": "0.000864789396657124976821806044872983497126",
+      "decimal": "0.000797227725043287088007602447617281661413",
       "effectiveDate": "2025-10-30",
       "id": "royalty-dm-tr2-tr2c-42-lease-16",
       "payee": "Tinabeth McCune Keasling",
@@ -16160,7 +16157,18 @@
     },
     {
       "category": "royalty",
-      "decimal": "0.0008112080521190663823474874837752642314113",
+      "decimal": "0.000785652746059748525045970084677668582731",
+      "effectiveDate": "2025-10-30",
+      "id": "royalty-dm-tr6-tr6c-38-lease-58",
+      "payee": "Pete McClanahan",
+      "sourceDocNo": "OGML_McClanahan",
+      "sourceLabel": "TR6 • OGML — Pete McClanahan • Royalty 1/6",
+      "tractCode": "TR6",
+      "tractName": "Tract 6 — 42.581 ac. (DOTO Unit Tr. 2)"
+    },
+    {
+      "category": "royalty",
+      "decimal": "0.0007351572972329039090024105321713332097165",
       "effectiveDate": "2025-12-12",
       "id": "royalty-dm-tr3-tr3c-42-lease-30",
       "payee": "Donald Harman",
@@ -16171,7 +16179,7 @@
     },
     {
       "category": "royalty",
-      "decimal": "0.0006895268443012064249953643612089745966994",
+      "decimal": "0.0006356575595901746730426015204895234563322",
       "effectiveDate": "2025-10-30",
       "id": "royalty-dm-tr3-tr3c-26-lease-26",
       "payee": "Benita Trapp Downey",
@@ -16182,7 +16190,7 @@
     },
     {
       "category": "royalty",
-      "decimal": "0.0006895268443012064249953643612089745966994",
+      "decimal": "0.0006356575595901746730426015204895234563322",
       "effectiveDate": "2025-10-30",
       "id": "royalty-dm-tr3-tr3c-28-lease-27",
       "payee": "Robert Hill Trapp",
@@ -16193,7 +16201,7 @@
     },
     {
       "category": "royalty",
-      "decimal": "0.000688442170586437279807157426293343222696",
+      "decimal": "0.0006346576260093718673222232523641757834229",
       "effectiveDate": "2025-12-10",
       "id": "royalty-dm-tr6-tr6c-41-lease-59",
       "payee": "Peter Hill Kraft",
@@ -16204,7 +16212,7 @@
     },
     {
       "category": "royalty",
-      "decimal": "0.0005746057035843386874961369676741454972496",
+      "decimal": "0.0005207364188733069355433741269546943568824",
       "effectiveDate": "2025-10-30",
       "id": "royalty-dm-tr3-tr3c-46-lease-32",
       "payee": "Pete McClanahan",
@@ -16215,7 +16223,7 @@
     },
     {
       "category": "royalty",
-      "decimal": "0.0004697545020816915445948451696643797515298",
+      "decimal": "0.0004330549316065593926733728907843500834415",
       "effectiveDate": "2025-12-03",
       "id": "royalty-dm-tr2-tr2c-5-lease-5",
       "payee": "Jerry and Kristin Broussard",
@@ -16226,7 +16234,7 @@
     },
     {
       "category": "royalty",
-      "decimal": "0.0004563045344275855275356944186908956054144",
+      "decimal": "0.0004206557426754304081969682922306693862414",
       "effectiveDate": "2025-12-10",
       "id": "royalty-dm-tr3-tr3c-49-lease-33",
       "payee": "Peter Hill Kraft",
@@ -16237,7 +16245,7 @@
     },
     {
       "category": "royalty",
-      "decimal": "0.0004487900773572223252364175783422955683294",
+      "decimal": "0.0004137283525636893310773224550343037270537",
       "effectiveDate": "2025-10-27",
       "id": "royalty-dm-tr5-tr5c-4-lease-36",
       "payee": "Rigby Owen, Jr.",
@@ -16248,7 +16256,7 @@
     },
     {
       "category": "royalty",
-      "decimal": "0.0004487900773572223252364175783422955683294",
+      "decimal": "0.0004137283525636893310773224550343037270537",
       "effectiveDate": "2025-10-27",
       "id": "royalty-dm-tr5-tr5c-8-lease-38",
       "payee": "Sandra Owen Powell",
@@ -16259,7 +16267,7 @@
     },
     {
       "category": "royalty",
-      "decimal": "0.0004487900773572223252364175783422955683294",
+      "decimal": "0.0004137283525636893310773224550343037270537",
       "effectiveDate": "2025-10-27",
       "id": "royalty-dm-tr5-tr5c-6-lease-37",
       "payee": "Stephen J. Owen",
@@ -16270,7 +16278,7 @@
     },
     {
       "category": "royalty",
-      "decimal": "0.0004484561069898642482152790654552197292786",
+      "decimal": "0.0004110847647407088941973391433339514185054",
       "effectiveDate": "2025-12-03",
       "id": "royalty-dm-tr3-tr3c-22-lease-25",
       "payee": "Old Hickory Hill, LLC",
@@ -16281,7 +16289,7 @@
     },
     {
       "category": "royalty",
-      "decimal": "0.0003467708569456355460782495827925088077138",
+      "decimal": "0.0003196793837467577690408863341368440571112",
       "effectiveDate": "2025-10-31",
       "id": "royalty-dm-tr6-tr6c-30-lease-55",
       "payee": "Rebecca Hamblen Drapak",
@@ -16292,7 +16300,7 @@
     },
     {
       "category": "royalty",
-      "decimal": "0.0003467708569456355460782495827925088077138",
+      "decimal": "0.0003196793837467577690408863341368440571112",
       "effectiveDate": "2025-10-30",
       "id": "royalty-dm-tr6-tr6c-25-lease-54",
       "payee": "Tinabeth McCune Keasling",
@@ -16303,7 +16311,7 @@
     },
     {
       "category": "royalty",
-      "decimal": "0.0003059742946115044965696272946412015575747",
+      "decimal": "0.0002772892044916759500162247357685889115521",
       "effectiveDate": "2025-12-12",
       "id": "royalty-dm-tr6-tr6c-36-lease-57",
       "payee": "Claude Lester Harman, Jr.",
@@ -16314,7 +16322,7 @@
     },
     {
       "category": "royalty",
-      "decimal": "0.000242589234308362692379009827554236973855",
+      "decimal": "0.0002198464935919536899684776562210272575561",
       "effectiveDate": "2025-12-12",
       "id": "royalty-dm-tr5-tr5c-28-lease-43",
       "payee": "Donald Harman",
@@ -16325,7 +16333,7 @@
     },
     {
       "category": "royalty",
-      "decimal": "0.0002298422746195878917114778416465788985722",
+      "decimal": "0.0002118858469149325876715186352679399221212",
       "effectiveDate": "2025-10-31",
       "id": "royalty-dm-tr3-tr3c-38-lease-29",
       "payee": "Rebecca Hamblen Drapak",
@@ -16336,7 +16344,7 @@
     },
     {
       "category": "royalty",
-      "decimal": "0.0002298422746195878917114778416465788985722",
+      "decimal": "0.0002118858469149325876715186352679399221212",
       "effectiveDate": "2025-10-30",
       "id": "royalty-dm-tr3-tr3c-33-lease-28",
       "payee": "Tinabeth McCune Keasling",
@@ -16347,7 +16355,7 @@
     },
     {
       "category": "royalty",
-      "decimal": "0.0002062008491621082885221583534211014277768",
+      "decimal": "0.0001900914078213185784813647320600778787317",
       "effectiveDate": "2025-10-30",
       "id": "royalty-dm-tr5-tr5c-12-lease-39",
       "payee": "Benita Trapp Downey",
@@ -16358,7 +16366,7 @@
     },
     {
       "category": "royalty",
-      "decimal": "0.0002062008491621082885221583534211014277768",
+      "decimal": "0.0001900914078213185784813647320600778787317",
       "effectiveDate": "2025-10-30",
       "id": "royalty-dm-tr5-tr5c-14-lease-40",
       "payee": "Robert Hill Trapp",
@@ -16369,7 +16377,7 @@
     },
     {
       "category": "royalty",
-      "decimal": "0.0002028020130297665955868718709438160578529",
+      "decimal": "0.0001837893243082259772506026330428333024292",
       "effectiveDate": "2025-12-12",
       "id": "royalty-dm-tr3-tr3c-44-lease-31",
       "payee": "Claude Lester Harman, Jr.",
@@ -16380,7 +16388,7 @@
     },
     {
       "category": "royalty",
-      "decimal": "0.0001718340409684235737684652945175845231474",
+      "decimal": "0.0001557245996276338637276716731565609741023",
       "effectiveDate": "2025-10-30",
       "id": "royalty-dm-tr5-tr5c-32-lease-45",
       "payee": "Pete McClanahan",
@@ -16391,7 +16399,7 @@
     },
     {
       "category": "royalty",
-      "decimal": "0.000136456445826766178379380678657519006119",
+      "decimal": "0.000125795785996550070693491563137400333766",
       "effectiveDate": "2025-12-10",
       "id": "royalty-dm-tr5-tr5c-35-lease-46",
       "payee": "Peter Hill Kraft",
@@ -16402,7 +16410,7 @@
     },
     {
       "category": "royalty",
-      "decimal": "0.00008619346051160068607454107175968848507324",
+      "decimal": "0.00007945959640913188247496755052846282217689",
       "effectiveDate": "2025-12-03",
       "id": "royalty-dm-tr2-tr2c-19-lease-9",
       "payee": "Candy Lynne Deloach",
@@ -16413,7 +16421,7 @@
     },
     {
       "category": "royalty",
-      "decimal": "0.00008619346051160068607454107175968848507324",
+      "decimal": "0.00007945959640913188247496755052846282217689",
       "effectiveDate": "2025-12-03",
       "id": "royalty-dm-tr2-tr2c-14-lease-7",
       "payee": "Raigan Gwen Mayo & Heather Ann Henson",
@@ -16424,7 +16432,7 @@
     },
     {
       "category": "royalty",
-      "decimal": "0.00006873361434961987761913591692935286482478",
+      "decimal": "0.00006336380072855582468014092341924717226034",
       "effectiveDate": "2025-10-31",
       "id": "royalty-dm-tr5-tr5c-24-lease-42",
       "payee": "Rebecca Hamblen Drapak",
@@ -16435,7 +16443,7 @@
     },
     {
       "category": "royalty",
-      "decimal": "0.00006873361434961987761913591692935286482478",
+      "decimal": "0.00006336380072855582468014092341924717226034",
       "effectiveDate": "2025-10-30",
       "id": "royalty-dm-tr5-tr5c-19-lease-41",
       "payee": "Tinabeth McCune Keasling",
@@ -16446,7 +16454,7 @@
     },
     {
       "category": "royalty",
-      "decimal": "0.00006064730857709067309475245688855924346376",
+      "decimal": "0.00005496162339798842249211941405525681438904",
       "effectiveDate": "2025-12-12",
       "id": "royalty-dm-tr5-tr5c-30-lease-44",
       "payee": "Claude Lester Harman, Jr.",
@@ -17821,7 +17829,7 @@
     },
     {
       "category": "retained_wi",
-      "decimal": "0.6301379561636781207385924655417516533779",
+      "decimal": "0.6434311974812239954546595895914457012176",
       "id": "retained-wi-unit",
       "payee": "Magnolia Petroleum Company, LLC",
       "sourceDocNo": "",
