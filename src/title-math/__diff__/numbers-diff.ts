@@ -14,9 +14,16 @@
  *   - 'value'      — differ at 9 dp. A real numeric regression.
  * Non-numeric leaves and key/length mismatches are 'structural'.
  *
- * Springhill (the oracle) must produce ZERO divergences of any kind during the
- * faithful-transcription phases. Vulcan Mesa / Raven Forest 'byte' divergences
- * are benign; 'value' / 'structural' there must be investigated.
+ * KNOWN LIMITS (do not over-trust a clean result):
+ *   - The 9dp 'byte' tolerance is BLIND below the 9th decimal: a final-output
+ *     error < 1e-9 quantizes to the same string and reads as no divergence at
+ *     all. This is the harness's main false-negative window.
+ *   - Numbers stored as JSON NUMBERS (not strings) -- e.g. the count fields like
+ *     npriRatificationHoldCount -- fall through to 'structural', so a changed
+ *     count shows as structural, not value. Intended; just know it.
+ *   - The numeric-string regex now also accepts exponential notation
+ *     (decimal.js stringifies values < 1e-7 as e-notation), so tiny residues
+ *     classify at the two tolerances instead of always landing in 'structural'.
  *
  * Test/diagnostic-only; never imported by app code.
  */
@@ -32,7 +39,10 @@ export interface Divergence {
   b: unknown;
 }
 
-const NUMERIC_STRING = /^-?\d+(?:\.\d+)?$/;
+// Accepts plain decimals AND exponential notation (decimal.js emits e-notation
+// for magnitudes < 1e-7), so tiny residues are classified at the two tolerances
+// rather than misclassified 'structural'.
+const NUMERIC_STRING = /^-?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?$/;
 
 function isNumericString(value: unknown): value is string {
   return typeof value === 'string' && NUMERIC_STRING.test(value);

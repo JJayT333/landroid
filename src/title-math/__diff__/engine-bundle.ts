@@ -3,11 +3,17 @@
  * title-math rewrite).
  *
  * The "engine bundle" is the dependency-injection surface the characterization
- * harness reads through. Today there is exactly one implementation,
- * `oldEngineBundle`, wired to the live (pre-rewrite) math surfaces. As the
- * unified engine under `src/title-math/` is built, a second bundle backed by the
- * new code is fed through the SAME `captureWorkspaceNumbers` routine so old and
- * new outputs can be diffed number-for-number.
+ * harness reads through. During the port it had two genuinely distinct
+ * implementations: `oldEngineBundle` (the real pre-rewrite modules) and
+ * `newEngineBundle` (src/title-math), and old-vs-new outputs were diffed
+ * number-for-number to verify the port.
+ *
+ * NOTE (post-cutover): rewrite Phase F turned the four old modules into shims
+ * that re-export src/title-math, so `oldEngineBundle` now resolves to the SAME
+ * code as `newEngineBundle` -- they are no longer independent. The two-bundle
+ * shape is kept for history/structure, but a diff between them today is a
+ * self-consistency check, not an old-vs-new differential. See
+ * scripts/title-math-baseline.ts for the full "what this does/doesn't prove".
  *
  * Bundle members are typed with `typeof` the live functions so the new engine is
  * forced to match the exact public signatures it must preserve.

@@ -1,15 +1,33 @@
 /**
- * Characterization-baseline CLI for the unified title-math rewrite.
+ * Characterization-baseline CLI for the unified title-math engine.
  *
  *   npx tsx scripts/title-math-baseline.ts --write   # freeze baselines
  *   npx tsx scripts/title-math-baseline.ts --check    # diff fresh vs frozen (default)
  *
- * `--write` captures every derived number for Springhill (oracle), Vulcan Mesa,
- * and Raven Forest and freezes them under fixtures/baseline/. `--check`
- * re-captures and diffs against the frozen files using the two-tolerance
- * classifier. During Phase A both sides use the live engine, so ANY divergence
- * is a reproducibility failure. In later phases this same script runs the new
- * engine against the frozen (old) baseline to surface real divergence.
+ * WHAT THIS DOES AND DOES NOT PROVE (read before citing a green result):
+ *
+ * This is now a REPRODUCIBILITY / SELF-CONSISTENCY lock, NOT an old-vs-new
+ * differential. It froze its value as a true old-vs-new check during the port
+ * (rewrite Phases A-E): the Phase-A baselines were captured from the REAL
+ * pre-rewrite modules (before the Phase-F cutover), and the unified engine was
+ * verified byte-identical against them then. That history is real.
+ *
+ * AFTER the Phase-F cutover the four old modules became shims re-exporting
+ * src/title-math, so `oldEngineBundle` and `newEngineBundle` resolve to the SAME
+ * code, and every feature commit re-froze the baselines from the new engine. So
+ * a green `--check` today proves the engine still reproduces a frozen snapshot of
+ * ITSELF -- it does NOT prove old == new, and it cannot fail for a uniform math
+ * change. Do not cite green here as evidence the math is correct.
+ *
+ * It is genuinely useful as a regression LOCK on the read path: an accidental
+ * change to a captured leasehold/coverage/node-display number will diverge from
+ * the frozen value and be caught. It is BLIND to: (1) any final-output error
+ * below the 9th decimal (quantized to the same string); (2) the mutation ops
+ * (executeConveyance/Rebalance/etc.) and calculateShare, which the capture never
+ * invokes -- those are guarded ONLY by src/engine/__tests__/math-engine.test.ts;
+ * (3) the over-conveyance/double-fraction/statedFraction features, which no
+ * fixture exercises -- guarded only by their unit tests. Correctness of the new
+ * features rests on those unit tests + hand audit, not on a green baseline.
  */
 import { existsSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
@@ -48,11 +66,13 @@ async function writeBaselines(): Promise<void> {
 }
 
 async function checkBaselines(bundle: EngineBundle, engineLabel: string): Promise<void> {
-  // The frozen baselines are always the live (old) engine -- the oracle. With
-  // the old bundle this is a reproducibility check (expect zero divergence);
-  // with the new bundle it is the real differential: Springhill must stay
-  // oracle-clean (no value/structural divergence); demo 'value'/'structural'
-  // divergences are signals to investigate.
+  // The frozen baselines were re-captured from the unified engine at each feature
+  // commit, so post-cutover BOTH bundles resolve to that same engine: this is a
+  // self-consistency reproducibility check, not an old-vs-new differential (see
+  // the file header). Springhill staying clean here means "still reproduces its
+  // frozen snapshot," not "matches the pre-rewrite engine." A value/structural
+  // divergence still means a genuine, unintended change to a captured number --
+  // investigate it -- but a green result is not a correctness proof.
   let failed = false;
   console.log(`checking ${engineLabel} engine against frozen baselines:`);
   for (const loader of PROJECT_LOADERS) {
