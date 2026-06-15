@@ -4,6 +4,20 @@ Final external research deliverable (Parts 7-9) from the prompts at
 `docs/title-math-research-prompt.md` + `docs/title-math-research-supplement.md`.
 Reference, not authority — attorney check required before any formula lands.
 
+> **COUNSEL APPROVAL — 2026-06-15.** The operator's attorney reviewed and
+> APPROVED the rules behind the shipped (#180) attorney-nuanced math: the DA-H1
+> excess-allocation rule (a fixed NPRI is satisfied from the burdened lessor's
+> royalty first; the excess is charged to the WI) and the Van Dyke double-fraction
+> **presumption reading** (an antique "1/2 of 1/8" is presumptively 1/2 of the
+> estate; the engine captures the verbatim clause and never auto-multiplies).
+> Those two formulas are now counsel-approved for payout reliance; the in-app
+> warnings were softened from "pending sign-off" to "counsel-approved" accordingly.
+> The remaining specific-citation `[UNVERIFIED]` flags below (e.g. the Eastland
+> remand pin cite, the riverbed statute codification, PBEX II status, the
+> highway-ROW fraction) are NOT yet resolved — they are independent
+> source-verification items that gate no shipped feature and stay as STOP-AND-ASK
+> per the Stage-4 directive until specifically confirmed.
+
 **INTAKE NOTES:**
 1. REDACTION: one acreage figure describing the operator's future project was
    redacted at intake per project confidentiality (marked `[scale redacted]`).

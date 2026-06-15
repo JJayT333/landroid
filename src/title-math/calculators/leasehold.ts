@@ -174,11 +174,11 @@ export interface LeaseholdTractSummary {
    */
   overFloatingNpriBurdened: boolean;
   /**
-   * DA-H1 warning flag: a fixed NPRI on this tract exceeds the burdened lessor's
-   * royalty (after floating), so the excess is charged to the working interest.
-   * Warning-only; the wording recommends counsel sign-off before payout reliance
-   * (the excess allocation rests on treatise consensus, not on-point SCOTX
-   * authority).
+   * DA-H1 flag: a fixed NPRI on this tract exceeds the burdened lessor's royalty
+   * (after floating), so the excess is charged to the working interest. The
+   * excess-allocation rule (treatise consensus, not on-point SCOTX) is
+   * COUNSEL-APPROVED (2026-06-15); the flag stays so the operator can still see
+   * and review the unusual condition.
    */
   fixedNpriExceedsRoyalty: boolean;
   /**
@@ -629,9 +629,9 @@ function calculateOrriBasisRates<T extends OrriBurdenRecord>({
   // (handled per-slice in the owner net-royalty fold); only the EXCESS over that
   // royalty burdens the working interest. So the WI's NRI is reduced by the
   // fixed-NPRI excess, not the full fixed burden (decision of record:
-  // CONTINUATION-PROMPT.md; LANDMAN-MATH-REFERENCE.md s7). The per-slice/tract
-  // `fixedNpriExceedsRoyalty` warning recommends counsel sign-off before payout
-  // reliance.
+  // CONTINUATION-PROMPT.md; LANDMAN-MATH-REFERENCE.md s7; counsel-approved
+  // 2026-06-15). The per-slice/tract `fixedNpriExceedsRoyalty` flag surfaces the
+  // condition for operator review.
   const npriAdjustedNriBeforeOrriRate = safeNriBeforeOrriRate.minus(fixedNpriExcessRate);
   const safeNpriAdjustedNriBeforeOrriRate = npriAdjustedNriBeforeOrriRate.greaterThan(0)
     ? npriAdjustedNriBeforeOrriRate
@@ -1861,16 +1861,18 @@ export function buildLeaseholdTransferOrderHoldReasons(
   >
 ): string[] {
   const reasons: string[] = [];
-  // DA-H1 decision of record: where a fixed NPRI exceeds the burdened lessor's
-  // royalty, the excess is charged to the WI on treatise consensus (not on-point
-  // SCOTX authority), so the sheet must recommend counsel sign-off before payout
-  // reliance. The flag is computed per tract; surface it here so it is visible.
+  // DA-H1: where a fixed NPRI exceeds the burdened lessor's royalty, the excess
+  // is charged to the WI. That excess-allocation rule (treatise consensus, not
+  // on-point SCOTX) was reviewed and COUNSEL-APPROVED 2026-06-15, so this no
+  // longer reads as "pending sign-off"; the tract is still surfaced so the
+  // operator sees the unusual condition and can review the allocation.
   if (unitSummary.fixedNpriExceedsRoyaltyTractCount > 0) {
     reasons.push(
       `${unitSummary.fixedNpriExceedsRoyaltyTractCount} tract${
         unitSummary.fixedNpriExceedsRoyaltyTractCount === 1 ? '' : 's'
-      } where a fixed NPRI exceeds the lessor royalty (excess charged to WI) — `
-      + `recommend counsel sign-off before payout reliance.`
+      } where a fixed NPRI exceeds the lessor royalty — the excess is charged to `
+      + `the WI per the counsel-approved rule (2026-06-15); review the `
+      + `burdened-branch allocation.`
     );
   }
   // Deliberate readiness gate: a null-unit ORRI/WI record is not transfer-order
