@@ -2,12 +2,12 @@ import { createHash } from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import { calculateDeskMapCoverageSummary } from '../src/components/deskmap/deskmap-coverage';
+import { calculateDeskMapCoverageSummary } from '../src/title-math';
 import {
   buildLeaseholdDecimalRows,
   buildLeaseholdTransferOrderReview,
   buildLeaseholdUnitSummary,
-} from '../src/components/leasehold/leasehold-summary';
+} from '../src/title-math';
 import {
   buildDocumentRegistryRows,
   buildPacketManifest,

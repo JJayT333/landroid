@@ -20,55 +20,29 @@
  *
  * This module is test/diagnostic-only and is never imported by app code.
  */
-import { calculateDeskMapCoverageSummary } from '../../components/deskmap/deskmap-coverage';
-import {
-  buildLeaseholdDecimalRows,
-  buildLeaseholdTransferOrderReview,
-  buildLeaseholdUnitSummary,
-} from '../../components/leasehold/leasehold-summary';
 import { dualDisplay, formatAsFraction } from '../../engine/fraction-display';
-import {
-  findNpriBranchDiscrepancies,
-  rootOwnershipTotal,
-  validateOwnershipGraph,
-} from '../../engine/math-engine';
-import { computeLiveOwnershipFractions } from '../../engine/tree-layout';
 import * as titleMath from '../index';
 
 export interface EngineBundle {
-  buildLeaseholdUnitSummary: typeof buildLeaseholdUnitSummary;
-  buildLeaseholdDecimalRows: typeof buildLeaseholdDecimalRows;
-  buildLeaseholdTransferOrderReview: typeof buildLeaseholdTransferOrderReview;
-  calculateDeskMapCoverageSummary: typeof calculateDeskMapCoverageSummary;
-  validateOwnershipGraph: typeof validateOwnershipGraph;
-  findNpriBranchDiscrepancies: typeof findNpriBranchDiscrepancies;
-  rootOwnershipTotal: typeof rootOwnershipTotal;
-  computeLiveOwnershipFractions: typeof computeLiveOwnershipFractions;
+  buildLeaseholdUnitSummary: typeof titleMath.buildLeaseholdUnitSummary;
+  buildLeaseholdDecimalRows: typeof titleMath.buildLeaseholdDecimalRows;
+  buildLeaseholdTransferOrderReview: typeof titleMath.buildLeaseholdTransferOrderReview;
+  calculateDeskMapCoverageSummary: typeof titleMath.calculateDeskMapCoverageSummary;
+  validateOwnershipGraph: typeof titleMath.validateOwnershipGraph;
+  findNpriBranchDiscrepancies: typeof titleMath.findNpriBranchDiscrepancies;
+  rootOwnershipTotal: typeof titleMath.rootOwnershipTotal;
+  computeLiveOwnershipFractions: typeof titleMath.computeLiveOwnershipFractions;
   formatAsFraction: typeof formatAsFraction;
   dualDisplay: typeof dualDisplay;
 }
 
-/** The live pre-rewrite math, bundled as the baseline oracle. */
-export const oldEngineBundle: EngineBundle = {
-  buildLeaseholdUnitSummary,
-  buildLeaseholdDecimalRows,
-  buildLeaseholdTransferOrderReview,
-  calculateDeskMapCoverageSummary,
-  validateOwnershipGraph,
-  findNpriBranchDiscrepancies,
-  rootOwnershipTotal,
-  computeLiveOwnershipFractions,
-  formatAsFraction,
-  dualDisplay,
-};
-
 /**
- * The unified engine under construction. Leasehold, coverage, and ownership come
- * from src/title-math; `computeLiveOwnershipFractions` is still the live
- * tree-layout implementation until Phase E ports it; the display formatters are
- * the shared fraction-display module (not part of the rewrite).
+ * The unified engine bundled for the harness. Post-cutover (Stage G) the old
+ * compatibility shims are deleted, so there is one implementation — src/title-math.
+ * `oldEngineBundle` and `newEngineBundle` are kept as two names for the harness's
+ * structure but are the SAME bundle (see the header note + scripts/title-math-baseline.ts).
  */
-export const newEngineBundle: EngineBundle = {
+const titleMathBundle: EngineBundle = {
   buildLeaseholdUnitSummary: titleMath.buildLeaseholdUnitSummary,
   buildLeaseholdDecimalRows: titleMath.buildLeaseholdDecimalRows,
   buildLeaseholdTransferOrderReview: titleMath.buildLeaseholdTransferOrderReview,
@@ -80,3 +54,6 @@ export const newEngineBundle: EngineBundle = {
   formatAsFraction,
   dualDisplay,
 };
+
+export const oldEngineBundle: EngineBundle = titleMathBundle;
+export const newEngineBundle: EngineBundle = titleMathBundle;

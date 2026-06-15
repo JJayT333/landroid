@@ -10,7 +10,7 @@ import Modal from '../shared/Modal';
 import FormField from '../shared/FormField';
 import InstrumentSelect from '../shared/InstrumentSelect';
 import { useWorkspaceStore } from '../../store/workspace-store';
-import { calculateShare } from '../../engine/math-engine';
+import { calculateShare } from '../../title-math';
 import { formatAsFraction } from '../../engine/fraction-display';
 import { d, serialize, Decimal } from '../../engine/decimal';
 import {

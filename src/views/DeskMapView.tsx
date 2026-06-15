@@ -23,7 +23,7 @@ import { formatAsFraction } from '../engine/fraction-display';
 import {
   findNpriBranchDiscrepancies,
   type NpriBranchDiscrepancy,
-} from '../engine/math-engine';
+} from '../title-math';
 import DeskMapCard from '../components/deskmap/DeskMapCard';
 import DeskMapLeaseCard from '../components/deskmap/DeskMapLeaseCard';
 import DeskMapNpriCard from '../components/deskmap/DeskMapNpriCard';
@@ -49,14 +49,16 @@ import {
 import DeskMapTabs from '../components/deskmap/DeskMapTabs';
 import {
   buildLeaseScopeIndex,
-  canOwnerNodeHoldLease,
   getActiveLeases,
   calculateDeskMapCoverageSummary,
   getLeasesForOwnerNode,
+} from '../title-math';
+import {
+  canOwnerNodeHoldLease,
   pickPrimaryLease,
   toDeskMapPrimaryLeaseSummary,
   type DeskMapPrimaryLeaseSummary,
-} from '../components/deskmap/deskmap-coverage';
+} from '../components/deskmap/lease-helpers';
 import ConveyModal from '../components/modals/ConveyModal';
 import PredecessorModal from '../components/modals/PredecessorModal';
 import { useConfirmation } from '../components/shared/ConfirmationProvider';

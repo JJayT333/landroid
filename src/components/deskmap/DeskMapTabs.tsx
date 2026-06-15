@@ -22,7 +22,7 @@ import { CloseIcon } from '../shell/icons';
 import {
   calculateDeskMapCoverageSummary,
   getActiveLeases,
-} from './deskmap-coverage';
+} from '../../title-math';
 import { hasDeskMapWarningDot } from './deskmap-warning-dots';
 
 interface UnitGroup {

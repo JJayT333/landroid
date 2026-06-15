@@ -20,7 +20,7 @@ import {
   findNpriBranchDiscrepancies,
   validateOwnershipGraph,
   rootOwnershipTotal,
-} from '../math-engine';
+} from '../../title-math';
 import { createBlankNode } from '../../types/node';
 import type { OwnershipNode } from '../../types/node';
 

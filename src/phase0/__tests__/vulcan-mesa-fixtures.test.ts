@@ -3,13 +3,13 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-import { calculateDeskMapCoverageSummary } from '../../components/deskmap/deskmap-coverage';
+import { calculateDeskMapCoverageSummary } from '../../title-math';
 import { hasDeskMapWarningDot } from '../../components/deskmap/deskmap-warning-dots';
 import {
   buildLeaseholdDecimalRows,
   buildLeaseholdTransferOrderReview,
   buildLeaseholdUnitSummary,
-} from '../../components/leasehold/leasehold-summary';
+} from '../../title-math';
 import {
   buildDocumentRegistryRows,
   buildPacketManifest,

@@ -1,30 +1,10 @@
-// Compatibility shim + UI helpers.
-//
-// The lease-coverage math (the lease-scope index, owner-node lease resolution,
-// first-effective-wins allocation, and the per-tract coverage summary) now lives
-// in the unified title-math engine; it is re-exported here so existing consumers
-// keep their import path. Implementation: src/title-math/calculators/coverage.ts.
-// The view-only helpers below (primary-lease selection / formatting and the
-// lease-eligibility predicate) are not title math and remain here.
-import { getActiveLeases } from '../../title-math/calculators/coverage';
+// View-only lease helpers: primary-lease selection / formatting and the
+// lease-eligibility predicate. These are NOT title math (the lease-coverage
+// math lives in `src/title-math/calculators/coverage`). They were extracted
+// here when the `deskmap-coverage` compatibility shim was retired (Stage G).
+import { getActiveLeases } from '../../title-math';
 import { isNpriNode, type OwnershipNode } from '../../types/node';
 import type { Lease } from '../../types/owner';
-
-export {
-  allocateLeaseCoverage,
-  buildLeaseScopeIndex,
-  calculateDeskMapCoverageSummary,
-  getActiveLeases,
-  getLeasesForOwnerNode,
-  isLeaseActive,
-} from '../../title-math/calculators/coverage';
-export type {
-  DeskMapCoverageSummary,
-  LeaseCoverageAllocation,
-  LeaseCoverageOverlap,
-  LeaseCoverageResult,
-  LeaseScopeIndex,
-} from '../../title-math/calculators/coverage';
 
 export interface DeskMapPrimaryLeaseSummary {
   id: string;

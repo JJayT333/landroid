@@ -3,8 +3,8 @@ import { buildLeaseNode, isLeaseNode } from '../deskmap/deskmap-lease-node';
 import {
   buildLeaseScopeIndex,
   getLeasesForOwnerNode,
-  pickPrimaryLease,
-} from '../deskmap/deskmap-coverage';
+} from '../../title-math';
+import { pickPrimaryLease } from '../deskmap/lease-helpers';
 import {
   planTractReconcile,
   seedTractDrafts,

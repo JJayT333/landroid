@@ -2,9 +2,9 @@ import {
   findNpriBranchDiscrepancies,
   validateOwnershipGraph,
   type ValidationIssue,
-} from '../../engine/math-engine';
+} from '../../title-math';
 import type { DeskMap, OwnershipNode } from '../../types/node';
-import type { DeskMapCoverageSummary } from './deskmap-coverage';
+import type { DeskMapCoverageSummary } from '../../title-math';
 
 export interface DeskMapWarningDotState {
   hasWarning: boolean;

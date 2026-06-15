@@ -7,7 +7,7 @@ import {
   buildLeaseholdTransferOrderHoldReasons,
   buildLeaseholdTransferOrderReview,
   buildLeaseholdUnitSummary,
-} from '../leasehold-summary';
+} from '../../../title-math';
 import { getTransferOrderEntryDisplayStatus } from '../../../views/LeaseholdView';
 
 describe('leasehold-summary', () => {

@@ -8,7 +8,7 @@ import {
   executePredecessorInsert,
   validateOwnershipGraph,
   type ValidationIssue,
-} from '../engine/math-engine';
+} from '../title-math';
 import { useOwnerStore } from '../store/owner-store';
 import { useWorkspaceStore } from '../store/workspace-store';
 import {

@@ -11,7 +11,7 @@ import {
   toggleAttachment,
 } from '../lease-purchase-report';
 import { computeNetAcres, createBlankLease, normalizeLease } from '../owner';
-import { calculateDeskMapCoverageSummary } from '../../components/deskmap/deskmap-coverage';
+import { calculateDeskMapCoverageSummary } from '../../title-math';
 import { createBlankNode } from '../node';
 import type { Lease } from '../owner';
 

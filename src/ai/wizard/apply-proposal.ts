@@ -7,7 +7,7 @@
 import {
   validateOwnershipGraph,
   type ValidationIssue,
-} from '../../engine/math-engine';
+} from '../../title-math';
 import type { DeskMap, OwnershipNode } from '../../types/node';
 import type { WorkspaceImportProposal } from './schemas';
 

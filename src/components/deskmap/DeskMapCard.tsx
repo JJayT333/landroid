@@ -15,7 +15,7 @@ import { useWorkspaceStore } from '../../store/workspace-store';
 import { READ_ONLY_WORKSPACE_EDIT_TITLE } from '../../store/write-lease-store';
 import type { OwnershipNode } from '../../types/node';
 import { isNpriNode } from '../../types/node';
-import type { DeskMapPrimaryLeaseSummary } from './deskmap-coverage';
+import type { DeskMapPrimaryLeaseSummary } from './lease-helpers';
 import DeskMapDocumentChips from './DeskMapDocumentChips';
 import Chip from '../shared/Chip';
 import { CloseIcon } from '../shell/icons';

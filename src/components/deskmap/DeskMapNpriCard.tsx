@@ -4,7 +4,7 @@ import { d } from '../../engine/decimal';
 import { useWorkspaceStore } from '../../store/workspace-store';
 import { READ_ONLY_WORKSPACE_EDIT_TITLE } from '../../store/write-lease-store';
 import type { OwnershipNode } from '../../types/node';
-import type { NpriBranchDiscrepancy } from '../../engine/math-engine';
+import type { NpriBranchDiscrepancy } from '../../title-math';
 import DeskMapDocumentChips from './DeskMapDocumentChips';
 import Chip from '../shared/Chip';
 import { FormulaTooltip } from '../leasehold/FormulaTooltip';

@@ -9,8 +9,8 @@ import Decimal from 'decimal.js';
 import { formatAsFraction } from '../../engine/fraction-display';
 import type { FormulaContent } from '../leasehold/FormulaTooltip';
 import type { OwnershipNode } from '../../types/node';
-import type { DeskMapCoverageSummary, LeaseCoverageOverlap } from './deskmap-coverage';
-import type { NpriBranchDiscrepancy } from '../../engine/math-engine';
+import type { DeskMapCoverageSummary, LeaseCoverageOverlap } from '../../title-math';
+import type { NpriBranchDiscrepancy } from '../../title-math';
 
 // ── Helpers ─────────────────────────────────────────────
 
