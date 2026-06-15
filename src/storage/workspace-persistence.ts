@@ -1728,13 +1728,27 @@ export async function importLandroidFile(file: File): Promise<LandroidFileData> 
     throw new Error('Invalid .landroid file: root payload must be an object');
   }
 
-  if (
-    typeof parsed.version === 'number'
-    && Number.isFinite(parsed.version)
-    && parsed.version > LANDROID_FILE_VERSION
-  ) {
+  const versionIsValidNumber =
+    typeof parsed.version === 'number' && Number.isFinite(parsed.version);
+
+  if (versionIsValidNumber && (parsed.version as number) > LANDROID_FILE_VERSION) {
     throw new Error(
       `Unsupported .landroid file version ${parsed.version}. This LANDroid build supports up to version ${LANDROID_FILE_VERSION}.`
+    );
+  }
+
+  // DA-L8: the future-version gate above only fires for numeric versions, so a
+  // crafted file could dodge it with a non-numeric version (e.g. `"99"`) or no
+  // version at all and fall through to the legacy v0/v7 path. A genuine pre-v8
+  // legacy file predates the version field — but it also predates the
+  // `documentData` (v8) and `actionLedger` (v9) structures. A file that carries
+  // either of those yet has no valid numeric version is malformed or a bypass
+  // attempt; reject it instead of silently importing it as legacy.
+  const hasV8PlusMarkers =
+    isRecord(parsed.documentData) || isRecord(parsed.actionLedger);
+  if (!versionIsValidNumber && hasV8PlusMarkers) {
+    throw new Error(
+      'Invalid .landroid file: document/ledger data requires a numeric version field.'
     );
   }
 
