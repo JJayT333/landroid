@@ -893,6 +893,242 @@ describe('leasehold-summary', () => {
     expect(Number.isFinite(Number(summary.tracts[0]?.preWorkingInterestDecimal))).toBe(true);
   });
 
+  it('adds a cost-bearing unleased mineral row so the sheet balances to full ownership', () => {
+    // Owner holds 1.0 minerals but leases only 0.5 — the remaining 0.5 is an
+    // unleased mineral interest that must appear on the transfer-order sheet so
+    // it accounts for 100% of the tract (deep-audit §4 row 11).
+    const summary = buildLeaseholdUnitSummary({
+      deskMaps: [
+        {
+          id: 'dm-1',
+          name: 'Tract 1',
+          code: 'T1',
+          tractId: 'T1',
+          grossAcres: '100',
+          pooledAcres: '100',
+          description: '',
+          nodeIds: ['n1', 'l1'],
+        },
+      ],
+      nodes: [
+        {
+          ...createBlankNode('n1', null),
+          grantee: 'A Owner',
+          linkedOwnerId: 'owner-1',
+          fraction: '1',
+          initialFraction: '1',
+        },
+        {
+          ...createBlankNode('l1', 'n1'),
+          type: 'related' as const,
+          relatedKind: 'lease' as const,
+        },
+      ],
+      owners: [createBlankOwner('ws-1', { id: 'owner-1', name: 'A Owner' })],
+      leases: [
+        createBlankLease('ws-1', 'owner-1', {
+          id: 'lease-1',
+          leaseName: 'Half Lease',
+          lessee: 'Operator A',
+          royaltyRate: '0.2',
+          leasedInterest: '0.5',
+        }),
+      ],
+      leaseholdAssignments: [],
+      leaseholdOrris: [],
+    });
+
+    expect(summary.tracts[0]?.leasedOwnership).toBe('0.5');
+    expect(summary.tracts[0]?.currentOwnership).toBe('1');
+
+    const unit = {
+      name: 'Half Unit',
+      description: '',
+      operator: 'Operator A',
+      effectiveDate: '2024-01-01',
+      jurisdiction: 'tx_fee' as const,
+    };
+    const review = buildLeaseholdTransferOrderReview({
+      unit,
+      unitSummary: summary,
+      focusedDeskMapId: null,
+    });
+
+    const unleasedRows = review.rows.filter((row) => row.category === 'unleased');
+    expect(unleasedRows).toHaveLength(1);
+    expect(unleasedRows[0]?.payee).toBe('A Owner');
+    expect(unleasedRows[0]?.decimal).toBe('0.5');
+    // royalty 0.1 + retained WI 0.4 + unleased 0.5 = 1.0, balanced against 100%.
+    expect(review.expectedDecimal).toBe('1');
+    expect(review.totalDecimal).toBe('1');
+    expect(review.varianceDecimal).toBe('0');
+    // Unleased rows are derived (no source instrument) and excluded from the
+    // source-completeness review counts.
+    expect(unleasedRows[0]?.sourceDocNo).toBe('');
+    expect(review.reviewableRowCount).toBe(
+      review.rows.filter((row) => row.category !== 'retained_wi' && row.category !== 'unleased').length
+    );
+  });
+
+  it('emits no unleased row when the owner is fully leased', () => {
+    const summary = buildLeaseholdUnitSummary({
+      deskMaps: [
+        {
+          id: 'dm-1',
+          name: 'Tract 1',
+          code: 'T1',
+          tractId: 'T1',
+          grossAcres: '100',
+          pooledAcres: '100',
+          description: '',
+          nodeIds: ['n1', 'l1'],
+        },
+      ],
+      nodes: [
+        {
+          ...createBlankNode('n1', null),
+          grantee: 'A Owner',
+          linkedOwnerId: 'owner-1',
+          fraction: '1',
+          initialFraction: '1',
+        },
+        {
+          ...createBlankNode('l1', 'n1'),
+          type: 'related' as const,
+          relatedKind: 'lease' as const,
+        },
+      ],
+      owners: [createBlankOwner('ws-1', { id: 'owner-1', name: 'A Owner' })],
+      leases: [
+        createBlankLease('ws-1', 'owner-1', {
+          id: 'lease-1',
+          leaseName: 'Full Lease',
+          lessee: 'Operator A',
+          royaltyRate: '0.25',
+          leasedInterest: '1',
+        }),
+      ],
+      leaseholdAssignments: [],
+      leaseholdOrris: [],
+    });
+
+    const review = buildLeaseholdTransferOrderReview({
+      unit: {
+        name: 'Full Unit',
+        description: '',
+        operator: 'Operator A',
+        effectiveDate: '2024-01-01',
+        jurisdiction: 'tx_fee' as const,
+      },
+      unitSummary: summary,
+      focusedDeskMapId: null,
+    });
+
+    expect(review.rows.some((row) => row.category === 'unleased')).toBe(false);
+    expect(review.expectedDecimal).toBe('1');
+    expect(review.varianceDecimal).toBe('0');
+  });
+
+  it('flags NPRIs with unconfirmed ratification and holds the transfer order (DA-M5)', () => {
+    const buildWith = (ratificationStatus?: 'ratified' | 'unratified' | 'unknown') =>
+      buildLeaseholdUnitSummary({
+        deskMaps: [
+          {
+            id: 'dm-1',
+            name: 'Tract 1',
+            code: 'T1',
+            tractId: 'T1',
+            grossAcres: '100',
+            pooledAcres: '100',
+            description: '',
+            nodeIds: ['n1', 'l1', 'npri-1'],
+          },
+        ],
+        nodes: [
+          {
+            ...createBlankNode('n1', null),
+            grantee: 'Mineral Owner',
+            linkedOwnerId: 'owner-1',
+            fraction: '1',
+            initialFraction: '1',
+          },
+          {
+            ...createBlankNode('l1', 'n1'),
+            type: 'related' as const,
+            relatedKind: 'lease' as const,
+          },
+          {
+            ...createBlankNode('npri-1', 'n1'),
+            grantee: 'NPRI Owner',
+            linkedOwnerId: 'owner-2',
+            interestClass: 'npri' as const,
+            royaltyKind: 'floating' as const,
+            fraction: '0.5',
+            initialFraction: '0.5',
+            docNo: 'NPRI-1',
+            ...(ratificationStatus ? { ratificationStatus } : {}),
+          },
+        ],
+        owners: [
+          createBlankOwner('ws-1', { id: 'owner-1', name: 'Mineral Owner' }),
+          createBlankOwner('ws-1', { id: 'owner-2', name: 'NPRI Owner' }),
+        ],
+        leases: [
+          createBlankLease('ws-1', 'owner-1', {
+            id: 'lease-1',
+            leaseName: 'Base Lease',
+            lessee: 'Operator A',
+            royaltyRate: '1/8',
+            leasedInterest: '1',
+          }),
+        ],
+        leaseholdAssignments: [],
+        leaseholdOrris: [],
+      });
+
+    // Absent ratification reads as 'ratified' (legacy back-compat — the old
+    // engine implicitly ratified every NPRI, so existing data is not held).
+    const legacy = buildWith(undefined);
+    expect(legacy.npris.find((n) => n.id === 'npri-1')?.ratificationStatus).toBe('ratified');
+    expect(legacy.npriRatificationHoldCount).toBe(0);
+    expect(
+      buildLeaseholdTransferOrderHoldReasons(legacy).some((r) => r.includes('ratification'))
+    ).toBe(false);
+
+    // Explicit 'unknown' (a newly-created NPRI's default) holds the transfer order.
+    const unknown = buildWith('unknown');
+    expect(unknown.npriRatificationHoldCount).toBe(1);
+    expect(
+      buildLeaseholdTransferOrderHoldReasons(unknown).some((r) => r.includes('ratification'))
+    ).toBe(true);
+
+    // 'unratified' likewise holds.
+    expect(buildWith('unratified').npriRatificationHoldCount).toBe(1);
+
+    // The decimals are identical regardless of ratification — the unratified
+    // tract-basis payout math is deferred, so only the hold differs today.
+    expect(buildWith('ratified').totalNpriDecimal).toBe(unknown.totalNpriDecimal);
+  });
+
+  it('holds the transfer order with a counsel-sign-off reason when a fixed NPRI exceeds royalty (DA-H1, F4)', () => {
+    const reasons = buildLeaseholdTransferOrderHoldReasons({
+      unitAssignmentWarningCount: 0,
+      npriRatificationHoldCount: 0,
+      fixedNpriExceedsRoyaltyTractCount: 2,
+    });
+    expect(reasons.some((r) => r.includes('counsel sign-off'))).toBe(true);
+    expect(reasons.some((r) => r.includes('2 tracts') && r.includes('fixed NPRI'))).toBe(true);
+
+    // No flag -> no DA-H1 hold.
+    expect(
+      buildLeaseholdTransferOrderHoldReasons({
+        unitAssignmentWarningCount: 0,
+        npriRatificationHoldCount: 0,
+        fixedNpriExceedsRoyaltyTractCount: 0,
+      }).some((r) => r.includes('counsel sign-off'))
+    ).toBe(false);
+  });
+
   it('surfaces malformed lease royalty, ORRI burden, and WI assignment inputs as warnings', () => {
     const summary = buildLeaseholdUnitSummary({
       deskMaps: [
@@ -1610,14 +1846,20 @@ describe('leasehold-summary', () => {
     expect(summary.tracts[0]?.floatingNpriBurdenRate).toBe('0.0625');
     expect(summary.tracts[0]?.fixedNpriBurdenRate).toBe('0.0625');
     expect(summary.tracts[0]?.totalNpriBurdenRate).toBe('0.125');
-    expect(summary.tracts[0]?.npriAdjustedNriBeforeOrriRate).toBe('0.8125');
-    expect(summary.tracts[0]?.preWorkingInterestDecimal).toBe('0.8125');
+    // DA-H1: the 1/16 floating NPRI carves the 1/8 royalty to 1/16, then the
+    // 1/16 fixed NPRI is fully satisfied out of that remaining royalty (excess
+    // 0), so the lessor's net royalty drops to 0 and the WI's NRI is unburdened
+    // (0.875). The fixed NPRI does NOT exceed the royalty, so no warning.
+    expect(summary.tracts[0]?.npriAdjustedNriBeforeOrriRate).toBe('0.875');
+    expect(summary.tracts[0]?.preWorkingInterestDecimal).toBe('0.875');
+    expect(summary.tracts[0]?.fixedNpriExceedsRoyalty).toBe(false);
+    expect(summary.fixedNpriExceedsRoyaltyTractCount).toBe(0);
     expect(summary.tracts[0]?.owners[0]).toEqual(
       expect.objectContaining({
         ownerTractRoyalty: '0.125',
-        netOwnerTractRoyalty: '0.0625',
+        netOwnerTractRoyalty: '0',
         unitRoyaltyDecimal: '0.125',
-        netOwnerUnitRoyaltyDecimal: '0.0625',
+        netOwnerUnitRoyaltyDecimal: '0',
       })
     );
     expect(summary.npris).toEqual(
@@ -1640,13 +1882,11 @@ describe('leasehold-summary', () => {
       unitSummary: summary,
       focusedDeskMapId: 'dm-1',
     });
+    // DA-H1: the lessor royalty row is fully consumed (net 0) so it drops out;
+    // the NPRIs are still paid in full and the WI keeps the unburdened 0.875.
+    expect(rows.some((row) => row.category === 'royalty')).toBe(false);
     expect(rows).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({
-          category: 'royalty',
-          payee: 'Mineral Owner',
-          decimal: '0.0625',
-        }),
         expect.objectContaining({
           category: 'npri',
           payee: 'Fixed NPRI Owner',
@@ -1659,7 +1899,7 @@ describe('leasehold-summary', () => {
         }),
         expect.objectContaining({
           category: 'retained_wi',
-          decimal: '0.8125',
+          decimal: '0.875',
         }),
       ])
     );
@@ -1673,9 +1913,8 @@ describe('leasehold-summary', () => {
     expect(review.expectedDecimal).toBe('1');
     expect(review.varianceDecimal).toBe('0');
     expect(review.categorySummaries).toEqual([
-      { category: 'royalty', rowCount: 1, totalDecimal: '0.0625' },
       { category: 'npri', rowCount: 2, totalDecimal: '0.125' },
-      { category: 'retained_wi', rowCount: 1, totalDecimal: '0.8125' },
+      { category: 'retained_wi', rowCount: 1, totalDecimal: '0.875' },
     ]);
   });
 
@@ -1758,7 +1997,9 @@ describe('leasehold-summary', () => {
     expect(summary.totalRoyaltyDecimal).toBe('0.125');
     expect(summary.totalNpriDecimal).toBe('0.0625');
     expect(summary.tracts[0]?.fixedNpriBurdenRate).toBe('0.0625');
-    expect(summary.tracts[0]?.preWorkingInterestDecimal).toBe('0.8125');
+    // DA-H1: the branch fixed NPRI is covered out of the branch lessors' royalty
+    // (excess 0), so the WI keeps the unburdened 0.875.
+    expect(summary.tracts[0]?.preWorkingInterestDecimal).toBe('0.875');
 
     const npri = summary.npris.find((record) => record.id === 'npri-root');
     expect(npri?.unitDecimal).toBe('0.0625');
@@ -1775,10 +2016,13 @@ describe('leasehold-summary', () => {
       focusedDeskMapId: 'dm-1',
     }).filter((row) => row.category === 'royalty');
 
+    // DA-H1: the branch's 1/16 fixed NPRI is satisfied from the two branch
+    // lessors' royalties (0.03125 each), reducing each net royalty from 0.0625
+    // to 0.03125.
     expect(royaltyRows).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ payee: 'Root Owner', decimal: '0.0625' }),
-        expect.objectContaining({ payee: 'Child Owner', decimal: '0.0625' }),
+        expect.objectContaining({ payee: 'Root Owner', decimal: '0.03125' }),
+        expect.objectContaining({ payee: 'Child Owner', decimal: '0.03125' }),
       ])
     );
   });
@@ -1850,13 +2094,104 @@ describe('leasehold-summary', () => {
       ],
     });
 
+    // DA-H1: with no floating NPRI, the 1/16 fixed NPRI is fully covered by the
+    // 1/8 royalty (excess 0), so the WI's NRI base stays 0.875 and the 1/10
+    // NRI-basis ORRI now carves from 0.875 (= 0.0875), leaving pre-WI 0.7875.
+    // The lessor's net royalty falls from 0.125 to 0.0625.
     expect(summary.tracts[0]?.nriBeforeOrriRate).toBe('0.875');
     expect(summary.tracts[0]?.fixedNpriBurdenRate).toBe('0.0625');
-    expect(summary.tracts[0]?.npriAdjustedNriBeforeOrriRate).toBe('0.8125');
-    expect(summary.tracts[0]?.netRevenueInterestBaseRate).toBe('0.8125');
-    expect(summary.tracts[0]?.netRevenueInterestOrriBurdenRate).toBe('0.08125');
-    expect(summary.tracts[0]?.preWorkingInterestDecimal).toBe('0.73125');
-    expect(summary.orris[0]?.unitDecimal).toBe('0.08125');
+    expect(summary.tracts[0]?.npriAdjustedNriBeforeOrriRate).toBe('0.875');
+    expect(summary.tracts[0]?.netRevenueInterestBaseRate).toBe('0.875');
+    expect(summary.tracts[0]?.netRevenueInterestOrriBurdenRate).toBe('0.0875');
+    expect(summary.tracts[0]?.preWorkingInterestDecimal).toBe('0.7875');
+    expect(summary.tracts[0]?.fixedNpriExceedsRoyalty).toBe(false);
+    expect(summary.orris[0]?.unitDecimal).toBe('0.0875');
+  });
+
+  it('DA-H1: charges fixed-NPRI excess over the lessor royalty to the working interest and flags it', () => {
+    // 100% minerals, 1/8 lease royalty, a 1/4 fixed NPRI, no floating. The fixed
+    // NPRI (0.25) exhausts the lessor's 1/8 royalty (covered 0.125) and the
+    // remaining 0.125 excess burdens the WI. Division-order result: lessor 0,
+    // NPRI 1/4, WI 3/4, with the fixedNpriExceedsRoyalty warning set.
+    const summary = buildLeaseholdUnitSummary({
+      deskMaps: [
+        {
+          id: 'dm-1',
+          name: 'Tract 1',
+          code: 'T1',
+          tractId: 'T1',
+          grossAcres: '100',
+          pooledAcres: '100',
+          description: '',
+          nodeIds: ['n1', 'l1', 'npri-fixed'],
+        },
+      ],
+      nodes: [
+        {
+          ...createBlankNode('n1', null),
+          grantee: 'A Owner',
+          linkedOwnerId: 'owner-1',
+          fraction: '1',
+          initialFraction: '1',
+        },
+        {
+          ...createBlankNode('l1', 'n1'),
+          type: 'related' as const,
+          relatedKind: 'lease' as const,
+        },
+        {
+          ...createBlankNode('npri-fixed', 'n1'),
+          grantee: 'Fixed NPRI Owner',
+          linkedOwnerId: 'owner-2',
+          interestClass: 'npri' as const,
+          royaltyKind: 'fixed' as const,
+          fraction: '0.25',
+          initialFraction: '0.25',
+        },
+      ],
+      owners: [
+        createBlankOwner('ws-1', { id: 'owner-1', name: 'A Owner' }),
+        createBlankOwner('ws-1', { id: 'owner-2', name: 'Fixed NPRI Owner' }),
+      ],
+      leases: [
+        createBlankLease('ws-1', 'owner-1', {
+          id: 'lease-1',
+          leaseName: 'Base Lease',
+          lessee: 'Operator A',
+          royaltyRate: '1/8',
+          leasedInterest: '1',
+        }),
+      ],
+      leaseholdAssignments: [],
+      leaseholdOrris: [],
+    });
+
+    expect(summary.tracts[0]?.fixedNpriBurdenRate).toBe('0.25');
+    expect(summary.tracts[0]?.npriAdjustedNriBeforeOrriRate).toBe('0.75');
+    expect(summary.tracts[0]?.preWorkingInterestDecimal).toBe('0.75');
+    expect(summary.tracts[0]?.fixedNpriExceedsRoyalty).toBe(true);
+    expect(summary.fixedNpriExceedsRoyaltyTractCount).toBe(1);
+    expect(summary.tracts[0]?.owners[0]?.netOwnerTractRoyalty).toBe('0');
+    const fixedNpri = summary.npris.find((record) => record.id === 'npri-fixed');
+    expect(fixedNpri?.unitDecimal).toBe('0.25');
+
+    const review = buildLeaseholdTransferOrderReview({
+      unit: {
+        name: 'Audit Unit',
+        description: '',
+        operator: 'Operator A',
+        effectiveDate: '2024-01-01',
+        jurisdiction: 'tx_fee',
+      },
+      unitSummary: summary,
+      focusedDeskMapId: 'dm-1',
+    });
+    expect(review.totalDecimal).toBe('1');
+    expect(review.varianceDecimal).toBe('0');
+    expect(review.categorySummaries).toEqual([
+      { category: 'npri', rowCount: 1, totalDecimal: '0.25' },
+      { category: 'retained_wi', rowCount: 1, totalDecimal: '0.75' },
+    ]);
   });
 
   it('distinguishes fixed NPRIs entered as burdened-branch shares versus whole-tract shares', () => {

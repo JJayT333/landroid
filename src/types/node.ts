@@ -43,6 +43,49 @@ export type FixedRoyaltyBasis = 'burdened_branch' | 'whole_tract' | null;
 export type RoyaltyKind = 'fixed' | 'floating' | null;
 
 /**
+ * NPRI ratification of pooling (DA-M5; deep-audit decision of record).
+ *
+ * Today's leasehold math silently assumes every NPRI ratified the pooling, so it
+ * shares unit production weighted by tract participation. This tri-state makes
+ * that assumption explicit:
+ * - `'ratified'`   — owner ratified the unit; unit-weighted payout (today's math).
+ * - `'unknown'`    — ratification unconfirmed; computed unit-weighted but held on
+ *                    the transfer-order sheet until confirmed. The default when
+ *                    absent, so the engine no longer silently assumes ratification.
+ * - `'unratified'` — owner did NOT ratify; entitled to a tract-basis payout. The
+ *                    tract-basis math is deferred pending counsel confirmation as
+ *                    to specific instruments (deep-audit), so it is currently held
+ *                    rather than silently recomputed.
+ *
+ * Absent on non-NPRI nodes and on legacy data (treated as `'unknown'`).
+ */
+export type RatificationStatus = 'ratified' | 'unratified' | 'unknown';
+
+/** Which reading of an antique double fraction the human selected. */
+export type DoubleFractionBasis = 'presumption' | 'arithmetic';
+
+/**
+ * Van Dyke v. Navigator (Tex. 2023) double-fraction capture (TXM-002).
+ *
+ * An antique double fraction such as "an undivided 1/2 of the 1/8 royalty" must
+ * NEVER be auto-multiplied: the "1/8" is historically a synonym for "the
+ * royalty," so the clause is presumptively 1/2 OF THE ESTATE (≈ 1/2), not 1/16.
+ * LANDroid captures the verbatim clause, computes BOTH readings, and stores the
+ * human's chosen basis — it never silently resolves the ambiguity. `calculateShare`
+ * applies the chosen reading as a single resolved fraction (one ratio × one base).
+ */
+export interface DoubleFractionClause {
+  /** Verbatim deed language, e.g. "an undivided 1/2 of the 1/8 royalty". */
+  clauseText: string;
+  /** Resolved fraction under the Van Dyke presumption reading (outer fraction of the estate). */
+  presumptionReading: string;
+  /** Resolved fraction under the literal arithmetic reading (outer × inner). */
+  arithmeticReading: string;
+  /** The reading the human selected; the engine applies only this one. */
+  chosenBasis: DoubleFractionBasis;
+}
+
+/**
  * Denormalized cache of every document currently attached to a node
  * (Phase 5 / ADR 0004). The source of truth is the Dexie
  * `document_attachments` + `documents` pair — this array exists so Desk
@@ -82,6 +125,13 @@ export interface OwnershipNode {
   // Ownership fractions — stored as Decimal-serialized strings for precision
   fraction: string;
   initialFraction: string;
+  /**
+   * DA-M1: when a conveyance recites more than the grantor's remainder, the node
+   * is BOOKED at the remainder (`initialFraction`) but the deed's stated amount
+   * is captured here verbatim so the stated-vs-booked divergence round-trips and
+   * surfaces as a title issue. Absent unless an over-conveyance was recorded.
+   */
+  statedFraction?: string;
 
   // Tree structure
   parentId: string | null;
@@ -124,6 +174,19 @@ export interface OwnershipNode {
    * - `null` means not applicable (mineral nodes and floating NPRIs)
    */
   fixedRoyaltyBasis: FixedRoyaltyBasis;
+  /**
+   * NPRI pooling ratification. See {@link RatificationStatus}. Optional and
+   * absent by default (treated as `'unknown'`); only meaningful on NPRI nodes.
+   */
+  ratificationStatus?: RatificationStatus;
+
+  /**
+   * Van Dyke double-fraction capture. See {@link DoubleFractionClause}. Optional
+   * and absent by default; present only on conveyances entered from an antique
+   * double-fraction clause. The engine reads `chosenBasis` and never
+   * auto-multiplies the two fractions.
+   */
+  doubleFractionClause?: DoubleFractionClause;
 
   /**
    * Depth-range discriminator. See {@link DepthRange}. Defaults to
@@ -249,6 +312,70 @@ function normalizeFixedRoyaltyBasis(value: unknown): FixedRoyaltyBasis {
     return value;
   }
   return null;
+}
+
+/**
+ * Normalize the optional NPRI ratification flag. Returns the explicit status, or
+ * `undefined` for any other value so the field stays absent (= `'unknown'`) on
+ * non-NPRI nodes and legacy data, keeping it round-trip-safe.
+ */
+function normalizeRatificationStatus(value: unknown): RatificationStatus | undefined {
+  if (value === 'ratified' || value === 'unratified' || value === 'unknown') {
+    return value;
+  }
+  return undefined;
+}
+
+/**
+ * Normalize the optional Van Dyke double-fraction clause. Returns a fully-formed
+ * clause or `undefined` if the shape is incomplete, so the field stays absent on
+ * ordinary conveyances and round-trips verbatim when present.
+ */
+/**
+ * Non-throwing check that a string parses as a finite, non-negative Decimal.
+ * Used to gate the OPTIONAL fraction-bearing fields (statedFraction, double-
+ * fraction readings) so malformed imported data is DROPPED rather than preserved
+ * verbatim and silently coerced to 0 by a downstream `d()` (the required fields
+ * fraction/initialFraction throw instead; these are optional so we drop).
+ */
+function isFiniteNonNegativeDecimalString(value: string): boolean {
+  const trimmed = value.trim();
+  if (trimmed.length === 0) return false;
+  try {
+    const parsed = new Decimal(trimmed);
+    return parsed.isFinite() && !parsed.isNegative();
+  } catch {
+    return false;
+  }
+}
+
+function normalizeDoubleFractionClause(value: unknown): DoubleFractionClause | undefined {
+  if (!value || typeof value !== 'object') {
+    return undefined;
+  }
+  const candidate = value as Partial<DoubleFractionClause>;
+  const chosenBasis =
+    candidate.chosenBasis === 'arithmetic' || candidate.chosenBasis === 'presumption'
+      ? candidate.chosenBasis
+      : undefined;
+  if (
+    typeof candidate.presumptionReading !== 'string'
+    || typeof candidate.arithmeticReading !== 'string'
+    || !chosenBasis
+    // Drop the whole clause if either reading is not a valid fraction: a garbage
+    // reading would otherwise resolve to 0 in calculateShare with no warning,
+    // masking corrupt data on the exact feature meant to prevent silent errors.
+    || !isFiniteNonNegativeDecimalString(candidate.presumptionReading)
+    || !isFiniteNonNegativeDecimalString(candidate.arithmeticReading)
+  ) {
+    return undefined;
+  }
+  return {
+    clauseText: normalizeText(candidate.clauseText),
+    presumptionReading: candidate.presumptionReading,
+    arithmeticReading: candidate.arithmeticReading,
+    chosenBasis,
+  };
 }
 
 function normalizeAttachmentSummary(value: unknown): NodeAttachmentSummary | null {
@@ -466,6 +593,25 @@ export function normalizeOwnershipNode(
     fixedRoyaltyBasis,
     depthRange: normalizeDepthRange(node.depthRange),
     isCollapsed: node.isCollapsed === true,
+    // DA-M1: an over-conveyance records the deed's STATED fraction verbatim
+    // alongside the booked fraction. Optional and absent by default; preserved
+    // only when it is a valid fraction so a malformed import is dropped rather
+    // than round-tripped as garbage (it is display/title-issue only, but the
+    // doc contract calls it a fraction).
+    ...(typeof node.statedFraction === 'string'
+      && isFiniteNonNegativeDecimalString(node.statedFraction)
+      ? { statedFraction: node.statedFraction }
+      : {}),
+    // DA-M5: NPRI ratification flag, only on NPRI nodes. Absent (= 'unknown') by
+    // default so legacy data and non-NPRI nodes round-trip unchanged.
+    ...(interestClass === 'npri' && normalizeRatificationStatus(node.ratificationStatus)
+      ? { ratificationStatus: normalizeRatificationStatus(node.ratificationStatus) }
+      : {}),
+    // Van Dyke: preserve a captured double-fraction clause verbatim. Absent on
+    // ordinary conveyances, so existing data round-trips unchanged.
+    ...(normalizeDoubleFractionClause(node.doubleFractionClause)
+      ? { doubleFractionClause: normalizeDoubleFractionClause(node.doubleFractionClause) }
+      : {}),
   };
 }
 

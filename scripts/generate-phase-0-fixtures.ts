@@ -54,11 +54,15 @@ function installDeterministicRuntime() {
     return randomSeed / 0x100000000;
   };
 
-  const currentCrypto = globalThis.crypto ?? {};
+  // Preserve subtle / getRandomValues explicitly: they are non-enumerable on the
+  // global crypto, so a `{ ...currentCrypto }` spread drops them and the document
+  // SHA-256 export later fails with "Cannot read properties of undefined (digest)".
+  const currentCrypto = globalThis.crypto ?? ({} as Crypto);
   Object.defineProperty(globalThis, 'crypto', {
     configurable: true,
     value: {
-      ...currentCrypto,
+      subtle: currentCrypto.subtle,
+      getRandomValues: currentCrypto.getRandomValues?.bind(currentCrypto),
       randomUUID: () =>
         uuids[uuidIndex++]
         ?? `00000000-0000-4000-8000-${String(uuidIndex).padStart(12, '0')}`,

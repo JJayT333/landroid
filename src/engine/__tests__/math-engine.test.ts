@@ -137,7 +137,9 @@ describe('calculateShare', () => {
     });
     // 3/4 of initial 1.0 = 0.75; the parent only has 0.5 remaining. The old
     // engine silently clamped this to 0.5; now it returns the raw 0.75 so the
-    // caller can warn, and executeConveyance rejects it loudly (see below).
+    // caller can warn, and executeConveyance BOOKS the remainder (0.5) while
+    // capturing the stated 0.75 and returning an over_conveyance warning — it
+    // no longer rejects (DA-M1; see the over-conveyance booking tests below).
     expect(share.toFixed(9)).toBe('0.750000000');
   });
 
@@ -152,6 +154,46 @@ describe('calculateShare', () => {
       parentInitialFraction: '1.0',
     });
     expect(share.toFixed(9)).toBe('0.000000000');
+  });
+
+  it('double fraction (Van Dyke): applies the chosen reading and never auto-multiplies', () => {
+    // "1/2 of 1/8" — presumption reading is 1/2 of the estate (0.5), NOT 1/16.
+    const base = {
+      conveyanceMode: 'fraction' as const,
+      splitBasis: 'whole' as const,
+      numerator: '1',
+      denominator: '1',
+      manualAmount: '0',
+      parentFraction: '1.0',
+      parentInitialFraction: '1.0',
+    };
+    const presumption = calculateShare({
+      ...base,
+      doubleFractionClause: {
+        clauseText: 'an undivided 1/2 of the 1/8 royalty',
+        presumptionReading: '0.5',
+        arithmeticReading: '0.0625',
+        chosenBasis: 'presumption',
+      },
+    });
+    expect(presumption.toFixed(9)).toBe('0.500000000');
+
+    // The arithmetic reading is available but only applied when explicitly chosen.
+    const arithmetic = calculateShare({
+      ...base,
+      doubleFractionClause: {
+        clauseText: 'an undivided 1/2 of the 1/8 royalty',
+        presumptionReading: '0.5',
+        arithmeticReading: '0.0625',
+        chosenBasis: 'arithmetic',
+      },
+    });
+    expect(arithmetic.toFixed(9)).toBe('0.062500000');
+
+    // The clause takes precedence over the mode/basis math, so the engine can
+    // never silently collapse the two fractions into 1/16 on its own.
+    expect(presumption.equals(d('0.5'))).toBe(true);
+    expect(arithmetic.equals(d('0.0625'))).toBe(true);
   });
 });
 
@@ -185,18 +227,29 @@ describe('executeConveyance', () => {
     expect(result.audit.affectedCount).toBe(2);
   });
 
-  it('rejects share exceeding parent fraction', () => {
-    const root = makeNode('root', null, '1.000000000', '0.300000000');
+  it('books an over-conveyance at the grantor remainder and captures the stated amount (DA-M1)', () => {
+    // Grantor holds 0.5; a deed reciting 0.75 is BOOKED at 0.5 (the remainder)
+    // with the stated 0.75 captured, and a non-blocking warning is returned.
+    const root = makeNode('root', null, '0.500000000', '0.500000000');
     const result = executeConveyance({
       allNodes: [root],
       parentId: 'root',
       newNodeId: 'child1',
-      share: '0.5',
+      share: '0.75',
       form: createBlankNode('child1', 'root'),
     });
-    expect(result.ok).toBe(false);
-    if (result.ok) return;
-    expect(result.error.code).toBe('invalid_input');
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const child = findNode(result.data, 'child1');
+    expect(child.fraction).toBe('0.500000000');
+    expect(child.initialFraction).toBe('0.500000000');
+    expect(child.statedFraction).toBe('0.750000000');
+    expect(findNode(result.data, 'root').fraction).toBe('0.000000000');
+    expect(result.warning?.code).toBe('over_conveyance');
+    expect(result.warning?.details).toMatchObject({
+      statedShare: '0.750000000',
+      bookedShare: '0.500000000',
+    });
   });
 
   it('rejects duplicate newNodeId', () => {
@@ -250,21 +303,27 @@ describe('executeConveyance', () => {
     expect(invalidShare.ok).toBe(false);
   });
 
-  it('rejects an over-conveyance instead of silently capping (DA-M1)', () => {
-    // Parent holds 0.5 remaining; calculateShare now returns the raw 0.75 for
-    // "3/4 of the whole", and the engine must reject it rather than clamp.
-    const root = makeNode('root', null, '1.000000000', '0.500000000');
+  it('books an over-conveyance alongside an existing sibling without disturbing it (DA-M1)', () => {
+    // Root: initial 1.0, remaining 0.4, with a sibling child already holding 0.6
+    // (balanced). A deed reciting 0.75 from root books at the 0.4 remainder; the
+    // graph stays valid and the existing sibling is untouched.
+    const root = makeNode('root', null, '1.000000000', '0.400000000');
+    const existing = makeNode('existing', 'root', '0.600000000', '0.600000000');
     const result = executeConveyance({
-      allNodes: [root],
+      allNodes: [root, existing],
       parentId: 'root',
       newNodeId: 'child-over',
       share: '0.750000000',
       form: createBlankNode('child-over', 'root'),
     });
-    expect(result.ok).toBe(false);
-    if (result.ok) return;
-    expect(result.error.code).toBe('invalid_input');
-    expect(result.error.message).toBe('share exceeds parent remaining fraction');
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(findNode(result.data, 'root').fraction).toBe('0.000000000');
+    expect(findNode(result.data, 'existing').initialFraction).toBe('0.600000000');
+    const child = findNode(result.data, 'child-over');
+    expect(child.initialFraction).toBe('0.400000000');
+    expect(child.statedFraction).toBe('0.750000000');
+    expect(result.warning?.code).toBe('over_conveyance');
   });
 });
 

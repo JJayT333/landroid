@@ -3076,6 +3076,8 @@ function formatDecimalCategoryLabel(category: LeaseholdDecimalRow['category']) {
       return 'Retained WI';
     case 'assigned_wi':
       return 'Assigned WI';
+    case 'unleased':
+      return 'Unleased';
     default:
       return 'Decimal';
   }
@@ -3093,6 +3095,8 @@ function decimalCategoryClasses(category: LeaseholdDecimalRow['category']) {
       return 'border-ledger-line bg-parchment-dark text-ink';
     case 'assigned_wi':
       return 'border-leather/30 bg-leather/10 text-leather';
+    case 'unleased':
+      return 'border-slate-300 bg-slate-100 text-slate-700';
     default:
       return 'border-ledger-line bg-parchment text-ink';
   }
@@ -3135,6 +3139,13 @@ function transferOrderRowStatus(row: LeaseholdDecimalRow) {
     return {
       label: 'Derived remainder',
       classes: 'border-ledger-line bg-parchment-dark/80 text-ink',
+    };
+  }
+
+  if (row.category === 'unleased') {
+    return {
+      label: 'Unleased mineral',
+      classes: 'border-slate-300 bg-slate-100/80 text-slate-700',
     };
   }
 

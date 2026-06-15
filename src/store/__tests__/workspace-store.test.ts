@@ -13,6 +13,8 @@ const mocks = vi.hoisted(() => ({
   unlinkCurativeNode: vi.fn(),
   removeOwner: vi.fn(async () => undefined),
   removeLease: vi.fn(async () => undefined),
+  addCurativeIssue: vi.fn(async () => undefined),
+  curativeTitleIssues: [] as Array<{ issueType: string; affectedNodeId: string | null }>,
   ownerState: {
     leases: [] as Array<{ id: string; ownerId: string }>,
   },
@@ -78,6 +80,10 @@ vi.mock('../curative-store', () => ({
       unlinkDeskMap: vi.fn(),
       unlinkOwner: vi.fn(),
       unlinkLease: vi.fn(),
+      // DA-M1: convey() reads titleIssues (idempotency guard) and calls addIssue.
+      workspaceId: 'ws-test',
+      titleIssues: mocks.curativeTitleIssues,
+      addIssue: mocks.addCurativeIssue,
     }),
   },
 }));
@@ -98,6 +104,7 @@ describe('workspace-store', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.ownerState.leases = [];
+    mocks.curativeTitleIssues.length = 0;
     useWorkspaceStore.setState({
       workspaceId: 'ws-test',
       projectName: 'Workspace Store Test',
@@ -116,6 +123,125 @@ describe('workspace-store', () => {
       lastError: null,
       startupWarning: null,
     });
+  });
+
+  it('books an over-conveyance and raises an Over-conveyance title issue (DA-M1)', async () => {
+    const root = {
+      ...createBlankNode('root', null),
+      grantee: 'Root Owner',
+      initialFraction: '0.500000000',
+      fraction: '0.500000000',
+    };
+    useWorkspaceStore.setState({
+      nodes: [root],
+      deskMaps: [
+        {
+          id: 'dm-1',
+          name: 'Tract 1',
+          code: 'T1',
+          tractId: null,
+          grossAcres: '100',
+          pooledAcres: '100',
+          description: '',
+          nodeIds: ['root'],
+        },
+      ],
+      activeDeskMapId: 'dm-1',
+    });
+
+    // Recite 0.75 from a grantor holding only 0.5 -> over-conveyance: the engine
+    // books the 0.5 remainder, captures the stated 0.75, and the store flags it.
+    const ok = useWorkspaceStore
+      .getState()
+      .convey('root', 'child-over', '0.75', { grantee: 'Over Grantee', docNo: '2026-OC-1' });
+    expect(ok).toBe(true);
+
+    const child = useWorkspaceStore.getState().nodes.find((n) => n.id === 'child-over');
+    expect(child?.fraction).toBe('0.500000000');
+    expect(child?.statedFraction).toBe('0.750000000');
+
+    expect(mocks.addCurativeIssue).toHaveBeenCalledTimes(1);
+    expect(mocks.addCurativeIssue).toHaveBeenCalledWith(
+      expect.objectContaining({
+        issueType: 'Over-conveyance',
+        affectedNodeId: 'child-over',
+        affectedDeskMapId: 'dm-1',
+        sourceDocNo: '2026-OC-1',
+        priority: 'High',
+      })
+    );
+  });
+
+  it('surfaces lastError (never silently) if the over-conveyance title issue fails to persist (F1)', async () => {
+    // warn-don't-cap: the over-conveyance is BOOKED, so a failed title-issue
+    // write must not leave the capped number with no surfaced warning.
+    mocks.addCurativeIssue.mockRejectedValueOnce(new Error('quota exceeded'));
+    const root = {
+      ...createBlankNode('root', null),
+      grantee: 'Root Owner',
+      initialFraction: '0.500000000',
+      fraction: '0.500000000',
+    };
+    useWorkspaceStore.setState({
+      nodes: [root],
+      deskMaps: [
+        {
+          id: 'dm-1',
+          name: 'Tract 1',
+          code: 'T1',
+          tractId: null,
+          grossAcres: '100',
+          pooledAcres: '100',
+          description: '',
+          nodeIds: ['root'],
+        },
+      ],
+      activeDeskMapId: 'dm-1',
+    });
+
+    const ok = useWorkspaceStore
+      .getState()
+      .convey('root', 'child-over', '0.75', { grantee: 'Over Grantee' });
+    expect(ok).toBe(true);
+    // The booking itself is still correct.
+    expect(useWorkspaceStore.getState().nodes.find((n) => n.id === 'child-over')?.fraction).toBe(
+      '0.500000000'
+    );
+    // The warning is NOT lost: the persistence failure surfaces via lastError.
+    await vi.waitFor(() => {
+      expect(useWorkspaceStore.getState().lastError).toMatch(/Over-conveyance booked/);
+    });
+  });
+
+  it('does not raise an Over-conveyance issue for a within-remainder conveyance', async () => {
+    const root = {
+      ...createBlankNode('root', null),
+      grantee: 'Root Owner',
+      initialFraction: '1.000000000',
+      fraction: '1.000000000',
+    };
+    useWorkspaceStore.setState({
+      nodes: [root],
+      deskMaps: [
+        {
+          id: 'dm-1',
+          name: 'Tract 1',
+          code: 'T1',
+          tractId: null,
+          grossAcres: '100',
+          pooledAcres: '100',
+          description: '',
+          nodeIds: ['root'],
+        },
+      ],
+      activeDeskMapId: 'dm-1',
+    });
+
+    const ok = useWorkspaceStore
+      .getState()
+      .convey('root', 'child-ok', '0.25', { grantee: 'Normal Grantee' });
+    expect(ok).toBe(true);
+    expect(mocks.addCurativeIssue).not.toHaveBeenCalled();
   });
 
   it('repairs an invalid active desk map id while loading a workspace', () => {

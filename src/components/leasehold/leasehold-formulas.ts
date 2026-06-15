@@ -976,6 +976,7 @@ export function transferOrderRowFormula(
     orri: 'ORRI burden — override royalty',
     retained_wi: 'Retained working interest (operator/lessee)',
     assigned_wi: 'Assigned working interest',
+    unleased: 'Unleased mineral interest — cost-bearing',
   };
   return {
     title: `Transfer-order Decimal — ${row.category.toUpperCase()}`,

@@ -1,16 +1,30 @@
-// Depth severance is not yet modeled; this allocator assumes
-// `depthRange: 'all_depths'` on every node and lease. See
-// `src/types/depth-range.ts` for the Phase 8 attachment point.
-import type Decimal from 'decimal.js';
-import { d } from '../../engine/decimal';
+// Compatibility shim + UI helpers.
+//
+// The lease-coverage math (the lease-scope index, owner-node lease resolution,
+// first-effective-wins allocation, and the per-tract coverage summary) now lives
+// in the unified title-math engine; it is re-exported here so existing consumers
+// keep their import path. Implementation: src/title-math/calculators/coverage.ts.
+// The view-only helpers below (primary-lease selection / formatting and the
+// lease-eligibility predicate) are not title math and remain here.
+import { getActiveLeases } from '../../title-math/calculators/coverage';
 import { isNpriNode, type OwnershipNode } from '../../types/node';
-import {
-  isInactiveLeaseStatus,
-  isTexasMathLease,
-  type Lease,
-} from '../../types/owner';
-import { parseStrictInterestString } from '../../utils/interest-string';
-import { isLeaseNode } from './deskmap-lease-node';
+import type { Lease } from '../../types/owner';
+
+export {
+  allocateLeaseCoverage,
+  buildLeaseScopeIndex,
+  calculateDeskMapCoverageSummary,
+  getActiveLeases,
+  getLeasesForOwnerNode,
+  isLeaseActive,
+} from '../../title-math/calculators/coverage';
+export type {
+  DeskMapCoverageSummary,
+  LeaseCoverageAllocation,
+  LeaseCoverageOverlap,
+  LeaseCoverageResult,
+  LeaseScopeIndex,
+} from '../../title-math/calculators/coverage';
 
 export interface DeskMapPrimaryLeaseSummary {
   id: string;
@@ -25,80 +39,16 @@ export interface DeskMapPrimaryLeaseSummary {
   notes: string;
 }
 
-export interface DeskMapCoverageSummary {
-  currentOwnership: string;
-  linkedOwnership: string;
-  leasedOwnership: string;
-  missingOwnership: string;
-  unlinkedOwnership: string;
-  unleasedOwnership: string;
-  currentOwnerCount: number;
-  linkedOwnerCount: number;
-  leasedOwnerCount: number;
-  currentOwnershipContributors: Array<{
-    nodeId: string;
-    grantee: string;
-    fraction: string;
-  }>;
-  /**
-   * Audit M5: surfaced lease overlap warnings so the Desk Map coverage card
-   * can call out top-lease or duplicated-lease scenarios. Populated per
-   * owner node; one entry per clipped lease. Empty array means no overlaps.
-   */
-  leaseOverlaps: Array<{
-    ownerNodeId: string;
-    ownerGrantee: string;
-    overlap: LeaseCoverageOverlap;
-  }>;
-}
-
-export interface LeaseCoverageAllocation {
-  lease: Lease;
-  allocatedFraction: string;
-}
-
-/**
- * Warning-only signal emitted when two or more active leases for the same owner
- * try to claim more of the owner's interest than the owner holds. The later
- * lease (in effective-date order) is silently clipped by `allocateLeaseCoverage`
- * today, which is why a separate warning is surfaced here rather than a
- * blocking error — the user may have a chain-of-title issue or a top-lease
- * scenario that LANDroid should flag for human review, not quietly resolve.
- * Matches the existing warning-only over-assignment convention.
- */
-export interface LeaseCoverageOverlap {
-  leaseId: string;
-  leaseName: string;
-  lessee: string;
-  requestedFraction: string;
-  allocatedFraction: string;
-  clippedFraction: string;
-}
-
-export interface LeaseCoverageResult {
-  allocations: LeaseCoverageAllocation[];
-  overlaps: LeaseCoverageOverlap[];
-}
-
-export interface LeaseScopeIndex {
-  linkedLeaseIds: Set<string>;
-  linkedLeaseIdsByParentNodeId: Map<string, Set<string>>;
-}
-
 function asLeaseText(value: string | null | undefined): string {
   return typeof value === 'string' ? value : '';
-}
-
-export function isLeaseActive(lease: Lease) {
-  return !isInactiveLeaseStatus(lease.status) && isTexasMathLease(lease);
 }
 
 /**
  * Mineral-only lease gate: Texas leasehold math only consumes leases attached
  * under a mineral-class owner node. NPRI royalty streams and any future
- * non-mineral interest class (e.g. federal-scope work) are never lessors. This
- * predicate is the single source of truth shared by the AttachLeaseModal and
- * by DeskMapView's per-node lease summary builder.
+ * non-mineral interest class are never lessors. This predicate is the single
+ * source of truth shared by the AttachLeaseModal and by DeskMapView's per-node
+ * lease summary builder.
  */
 export function canOwnerNodeHoldLease<
   T extends Pick<OwnershipNode, 'type' | 'interestClass' | 'linkedOwnerId'>,
@@ -107,139 +57,6 @@ export function canOwnerNodeHoldLease<
   if (!node.linkedOwnerId) return false;
   if (isNpriNode(node)) return false;
   return node.interestClass === 'mineral';
-}
-
-function compareLeaseAllocationOrder(left: Lease, right: Lease) {
-  return (
-    `${asLeaseText(left.effectiveDate) || '9999-12-31'}|${left.createdAt}|${left.updatedAt}|${left.id}`
-  ).localeCompare(
-    `${asLeaseText(right.effectiveDate) || '9999-12-31'}|${right.createdAt}|${right.updatedAt}|${right.id}`
-  );
-}
-
-export function getActiveLeases(leases: Lease[]) {
-  return leases.filter(isLeaseActive);
-}
-
-export function buildLeaseScopeIndex(nodes: OwnershipNode[]): LeaseScopeIndex {
-  const linkedLeaseIds = new Set<string>();
-  const linkedLeaseIdsByParentNodeId = new Map<string, Set<string>>();
-
-  for (const node of nodes) {
-    if (!isLeaseNode(node) || !node.parentId || !node.linkedLeaseId) {
-      continue;
-    }
-
-    linkedLeaseIds.add(node.linkedLeaseId);
-    const branchLeaseIds = linkedLeaseIdsByParentNodeId.get(node.parentId) ?? new Set<string>();
-    branchLeaseIds.add(node.linkedLeaseId);
-    linkedLeaseIdsByParentNodeId.set(node.parentId, branchLeaseIds);
-  }
-
-  return { linkedLeaseIds, linkedLeaseIdsByParentNodeId };
-}
-
-export function getLeasesForOwnerNode(
-  ownerLeases: Lease[],
-  ownerNode: Pick<OwnershipNode, 'id'>,
-  leaseScopeIndex: LeaseScopeIndex
-): Lease[] {
-  const branchLinkedLeaseIds =
-    leaseScopeIndex.linkedLeaseIdsByParentNodeId.get(ownerNode.id) ?? new Set<string>();
-  const unscopedOwnerLeases = ownerLeases.filter(
-    (lease) => !leaseScopeIndex.linkedLeaseIds.has(lease.id)
-  );
-  const branchLeases = ownerLeases.filter((lease) => branchLinkedLeaseIds.has(lease.id));
-
-  return [...unscopedOwnerLeases, ...branchLeases];
-}
-
-export function allocateLeaseCoverage(
-  leases: Lease[],
-  ownerFractionInput: string
-): LeaseCoverageResult {
-  const ownerFraction = d(ownerFractionInput);
-  if (!ownerFraction.greaterThan(0)) {
-    return { allocations: [], overlaps: [] };
-  }
-
-  const activeLeases = [...getActiveLeases(leases)].sort(compareLeaseAllocationOrder);
-  const allocations: LeaseCoverageAllocation[] = [];
-  const overlaps: LeaseCoverageOverlap[] = [];
-  let remainingFraction = ownerFraction;
-
-  for (const lease of activeLeases) {
-    const leasedInterestText = asLeaseText(lease.leasedInterest).trim();
-    let requestedFraction: Decimal;
-    if (leasedInterestText.length > 0) {
-      // Strict parse: malformed leased-interest values must surface a coverage
-      // warning rather than silently coerce to zero (audit M-2). The lenient
-      // parser belongs on display paths only.
-      const parsed = parseStrictInterestString(leasedInterestText);
-      if (parsed === null) {
-        overlaps.push({
-          leaseId: lease.id,
-          leaseName: asLeaseText(lease.leaseName),
-          lessee: asLeaseText(lease.lessee),
-          requestedFraction: leasedInterestText,
-          allocatedFraction: '0',
-          clippedFraction: 'malformed',
-        });
-        continue;
-      }
-      requestedFraction = parsed;
-    } else {
-      requestedFraction = ownerFraction;
-    }
-
-    // If earlier leases already exhausted the owner's share, any subsequent
-    // lease is fully clipped: requested > 0, allocated = 0, clipped = requested.
-    if (!remainingFraction.greaterThan(0)) {
-      if (requestedFraction.greaterThan(0)) {
-        overlaps.push({
-          leaseId: lease.id,
-          leaseName: asLeaseText(lease.leaseName),
-          lessee: asLeaseText(lease.lessee),
-          requestedFraction: requestedFraction.toString(),
-          allocatedFraction: '0',
-          clippedFraction: requestedFraction.toString(),
-        });
-      }
-      continue;
-    }
-
-    const allocatedFraction = requestedFraction.greaterThan(remainingFraction)
-      ? remainingFraction
-      : requestedFraction;
-
-    // Partial clip: the lease wanted more than the owner had remaining.
-    // Record the clipped amount as an overlap warning before writing the
-    // allocation. A lease that requests exactly the remaining fraction is NOT
-    // an overlap.
-    if (requestedFraction.greaterThan(remainingFraction)) {
-      const clipped = requestedFraction.minus(remainingFraction);
-      overlaps.push({
-        leaseId: lease.id,
-        leaseName: asLeaseText(lease.leaseName),
-        lessee: asLeaseText(lease.lessee),
-        requestedFraction: requestedFraction.toString(),
-        allocatedFraction: allocatedFraction.toString(),
-        clippedFraction: clipped.toString(),
-      });
-    }
-
-    if (!allocatedFraction.greaterThan(0)) {
-      continue;
-    }
-
-    allocations.push({
-      lease,
-      allocatedFraction: allocatedFraction.toString(),
-    });
-    remainingFraction = remainingFraction.minus(allocatedFraction);
-  }
-
-  return { allocations, overlaps };
 }
 
 export function pickPrimaryLease(leases: Lease[]): Lease | null {
@@ -268,89 +85,5 @@ export function toDeskMapPrimaryLeaseSummary(
     status: asLeaseText(lease.status),
     docNo: asLeaseText(lease.docNo),
     notes: asLeaseText(lease.notes),
-  };
-}
-
-export function calculateDeskMapCoverageSummary(
-  nodes: OwnershipNode[],
-  activeLeasesByOwnerId: Map<string, Lease[]>,
-  leaseScopeNodes: OwnershipNode[] = nodes
-): DeskMapCoverageSummary {
-  const leaseScopeIndex = buildLeaseScopeIndex(leaseScopeNodes);
-  let currentOwnership = d(0);
-  let linkedOwnership = d(0);
-  let leasedOwnership = d(0);
-  let currentOwnerCount = 0;
-  let linkedOwnerCount = 0;
-  let leasedOwnerCount = 0;
-  const leaseOverlaps: DeskMapCoverageSummary['leaseOverlaps'] = [];
-
-  nodes.forEach((node) => {
-    if (node.type === 'related' || isNpriNode(node)) return;
-    const remaining = d(node.fraction);
-    if (!remaining.greaterThan(0)) return;
-
-      currentOwnerCount += 1;
-      currentOwnership = currentOwnership.plus(remaining);
-
-    if (node.linkedOwnerId) {
-      linkedOwnerCount += 1;
-      linkedOwnership = linkedOwnership.plus(remaining);
-
-      const ownerLeases = getLeasesForOwnerNode(
-        activeLeasesByOwnerId.get(node.linkedOwnerId) ?? [],
-        node,
-        leaseScopeIndex
-      );
-      // Audit M5: overlap warnings used to be discarded here. We now keep
-      // them alongside allocations so the Desk Map coverage card can flag
-      // top-lease / duplicate-lease situations that need human review.
-      const { allocations, overlaps } = allocateLeaseCoverage(ownerLeases, remaining.toString());
-      for (const overlap of overlaps) {
-        leaseOverlaps.push({
-          ownerNodeId: node.id,
-          ownerGrantee: node.grantee || 'Unknown',
-          overlap,
-        });
-      }
-
-      if (allocations.length > 0) {
-        leasedOwnerCount += 1;
-        leasedOwnership = leasedOwnership.plus(
-          allocations.reduce(
-            (sum, allocation) => sum.plus(d(allocation.allocatedFraction)),
-            d(0)
-          )
-        );
-      }
-    }
-  });
-
-  const whole = d(1);
-  const missingOwnership = whole.minus(currentOwnership);
-  const unlinkedOwnership = whole.minus(linkedOwnership);
-  const unleasedOwnership = whole.minus(leasedOwnership);
-
-  return {
-    currentOwnership: currentOwnership.toString(),
-    linkedOwnership: linkedOwnership.toString(),
-    leasedOwnership: leasedOwnership.toString(),
-    missingOwnership: missingOwnership.toString(),
-    unlinkedOwnership: unlinkedOwnership.toString(),
-    unleasedOwnership: unleasedOwnership.toString(),
-    currentOwnerCount,
-    linkedOwnerCount,
-    leasedOwnerCount,
-    currentOwnershipContributors: nodes
-      .filter((node) => {
-        if (node.type === 'related' || isNpriNode(node)) return false;
-        return d(node.fraction).greaterThan(0);
-      })
-      .map((node) => ({
-        nodeId: node.id,
-        grantee: node.grantee || 'Unknown',
-        fraction: node.fraction,
-      })),
-    leaseOverlaps,
   };
 }

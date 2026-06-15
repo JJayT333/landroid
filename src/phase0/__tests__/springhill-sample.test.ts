@@ -3,7 +3,11 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { calculateDeskMapCoverageSummary } from '../../components/deskmap/deskmap-coverage';
-import { buildLeaseholdUnitSummary } from '../../components/leasehold/leasehold-summary';
+import {
+  buildLeaseholdTransferOrderHoldReasons,
+  buildLeaseholdUnitSummary,
+} from '../../components/leasehold/leasehold-summary';
+import { d } from '../../engine/decimal';
 import {
   exportLandroidFile,
   importLandroidFile,
@@ -126,5 +130,72 @@ describe('Springhill Dr. Elmore public sample', () => {
           node.docNo === LCT_OGML
       )
     ).toBe(true);
+  });
+
+  // HAND-VERIFIED ANCHORS (non-refreezable). These literals are the review's
+  // own hand-recomputes on the real Springhill oracle. Unlike the frozen
+  // baselines (which are re-captured from the engine and so cannot fail for a
+  // uniform regression), changing one of these requires editing this test -- a
+  // visible, reviewed change -- so they defend the interest stack against a
+  // silently-refrozen regression. See scripts/title-math-baseline.ts for why the
+  // baseline alone is not a correctness proof.
+  it('pins the DA-H1 fixed-NPRI-from-royalty interest stack on Tract 2', () => {
+    const sample = readSample();
+    const unitSummary = buildLeaseholdUnitSummary({
+      deskMaps: sample.deskMaps,
+      nodes: sample.nodes,
+      owners: sample.ownerData!.owners,
+      leases: sample.ownerData!.leases,
+      leaseholdAssignments: sample.leaseholdAssignments ?? [],
+      leaseholdOrris: sample.leaseholdOrris ?? [],
+    });
+    const tr2 = unitSummary.tracts.find((tract) => tract.code === 'TR2');
+    expect(tr2).toBeDefined();
+
+    // The royalty / NRI / fixed-NPRI stack up to the WI (the numbers that must
+    // stay clear), hand-verified.
+    expect(tr2).toMatchObject({
+      weightedRoyaltyRate: '0.154745133',
+      nriBeforeOrriRate: '0.633175025',
+      fixedNpriBurdenRate: '0.012311252',
+      // DA-H1: the WI's NRI is reduced only by the fixed-NPRI EXCESS over the
+      // lessor royalty, not the full fixed burden.
+      npriAdjustedNriBeforeOrriRate: '0.633041075',
+      fixedNpriExceedsRoyalty: true,
+    });
+
+    // The excess charged to the WI = nriBeforeOrri - npriAdjusted, hand-checked
+    // to 0.000133950 (= the two zero-royalty slices' fixed NPRI, per the review).
+    const excess = d(tr2!.nriBeforeOrriRate).minus(d(tr2!.npriAdjustedNriBeforeOrriRate));
+    expect(excess.toFixed(9)).toBe('0.000133950');
+
+    // The DA-H1 counsel-sign-off warning fires on the real oracle (TR2) and is
+    // surfaced as a transfer-order hold reason (F4).
+    expect(unitSummary.fixedNpriExceedsRoyaltyTractCount).toBe(1);
+    expect(
+      buildLeaseholdTransferOrderHoldReasons(unitSummary).some((reason) =>
+        reason.includes('counsel sign-off')
+      )
+    ).toBe(true);
+  });
+
+  it('pins the ratification mixed-demo state on the real oracle', () => {
+    const sample = readSample();
+    const unitSummary = buildLeaseholdUnitSummary({
+      deskMaps: sample.deskMaps,
+      nodes: sample.nodes,
+      owners: sample.ownerData!.owners,
+      leases: sample.ownerData!.leases,
+      leaseholdAssignments: sample.leaseholdAssignments ?? [],
+      leaseholdOrris: sample.leaseholdOrris ?? [],
+    });
+    // 6 NPRI owners who also hold minerals are 'ratified'; the 118 NPRI-only
+    // nodes are 'unratified' and held. Ratification changes no decimal (the math
+    // is deferred), so this guards only the flags / hold count.
+    const ratified = unitSummary.npris.filter((npri) => npri.ratificationStatus === 'ratified');
+    const unratified = unitSummary.npris.filter((npri) => npri.ratificationStatus === 'unratified');
+    expect(ratified).toHaveLength(6);
+    expect(unratified).toHaveLength(118);
+    expect(unitSummary.npriRatificationHoldCount).toBe(118);
   });
 });
