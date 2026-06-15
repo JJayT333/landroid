@@ -174,7 +174,7 @@ describe('Springhill Dr. Elmore public sample', () => {
     expect(unitSummary.fixedNpriExceedsRoyaltyTractCount).toBe(1);
     expect(
       buildLeaseholdTransferOrderHoldReasons(unitSummary).some((reason) =>
-        reason.includes('counsel sign-off')
+        reason.includes('counsel-approved')
       )
     ).toBe(true);
   });
