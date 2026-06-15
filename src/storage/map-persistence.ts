@@ -1,4 +1,5 @@
 import db from './db';
+import { sha256HexOfBlob } from './blob-hash';
 import {
   activeStorageScopedId,
   activeWorkspaceScope,
@@ -179,10 +180,18 @@ export async function replaceMapWorkspaceData(
 
 export async function saveMapAsset(asset: MapAsset) {
   await ensureWorkspaceWriteFence(asset.workspaceId);
+  // DA2-M2: stamp content hash + byte length on save so every stored map asset
+  // carries integrity metadata (same SHA-256 digest as the document/canvas-asset
+  // stores) for round-trip tamper-evidence and future dedup-on-ingest.
+  const withFixity: MapAsset = {
+    ...asset,
+    contentHash: await sha256HexOfBlob(asset.blob),
+    byteLength: asset.blob.size,
+  };
   return db.transaction('rw', db.workspaceWriteLeases, db.mapAssets, async () => {
     await assertWorkspaceWriteFence(asset.workspaceId);
     return db.mapAssets.put(
-      stampActiveDbKeyWithStorageId(normalizeMapAsset(asset), 'id')
+      stampActiveDbKeyWithStorageId(normalizeMapAsset(withFixity), 'id')
     );
   });
 }

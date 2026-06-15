@@ -55,6 +55,15 @@ export interface MapAsset {
   blob: Blob;
   createdAt: string;
   updatedAt: string;
+  /**
+   * DA2-M2: content hash + byte length of the stored blob, for round-trip
+   * integrity / tamper-evidence and as the join key for future dedup-on-ingest
+   * (mirrors the document vault + canvas-asset stores). Computed on save
+   * (`saveMapAsset`); optional so legacy/in-memory assets without a saved blob
+   * round-trip unchanged until their next save.
+   */
+  contentHash?: string;
+  byteLength?: number;
 }
 
 /**

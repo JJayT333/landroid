@@ -51,6 +51,13 @@ function makeTable<Row extends Record<string, unknown>>(rows: Row[], pk: keyof R
   });
   return {
     get: vi.fn(async (id: string) => byId.get(id)),
+    put: vi.fn(async (row: Row) => {
+      byId.set(String(row[pk]), row);
+      const existing = rows.findIndex((r) => String(r[pk]) === String(row[pk]));
+      if (existing >= 0) rows[existing] = row;
+      else rows.push(row);
+      return row[pk];
+    }),
     where: vi.fn((field: string) => ({
       equals: (value: unknown) => collection((row) => {
         if (field === '[dbKey+workspaceId]' && Array.isArray(value)) {
@@ -146,6 +153,21 @@ describe('map-asset lazy-load contract', () => {
     const assets = await mapPersistence.loadMapAssetsWithBlobs('ws-1');
     expect(assets).toHaveLength(1);
     expect(assets[0].blob).toBeInstanceOf(Blob);
+  });
+
+  it('saveMapAsset stamps content hash + byte length on the stored blob (DA2-M2)', async () => {
+    const { mapPersistence } = await loadStore([]);
+    const asset = fakeAsset('map-hash', {
+      blob: new Blob(['hello map asset bytes'], { type: 'application/geo+json' }),
+    });
+    delete (asset as Partial<MapAsset>).contentHash;
+    delete (asset as Partial<MapAsset>).byteLength;
+
+    await mapPersistence.saveMapAsset(asset as MapAsset);
+
+    const [stored] = await mapPersistence.loadMapAssetsWithBlobs('ws-1');
+    expect(stored.contentHash).toMatch(/^[0-9a-f]{64}$/);
+    expect(stored.byteLength).toBe(stored.blob.size);
   });
 
   it('never exposes a Blob through the metadata project-open reader', async () => {
