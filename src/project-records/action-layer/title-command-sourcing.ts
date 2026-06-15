@@ -110,9 +110,10 @@ export const AI_TOOL_NAME_BY_TITLE_MUTATION: Record<TitleMutation, string> = {
   // Baseline is system/user-origin only. If it is ever mislabeled as AI-origin,
   // this non-gated placeholder makes the gate fail closed.
   baseline: 'titleBaseline',
-  // No AI tool performs a generic field update through this path, so an
-  // ai-origin 'update' maps to a non-gated name and is correctly rejected by
-  // assertTitleCommandRoutesThroughGate. Field edits are user-origin.
+  // Fallback only for an UNNAMED ai-origin 'update' — which maps to this
+  // non-gated placeholder and correctly fails closed. A NAMED ai-origin 'update'
+  // is validated against its own tool instead (e.g. the gated `createDeskMap`
+  // journals 'update' when it seeds a tract). Direct field edits are user-origin.
   update: 'updateNode',
 };
 
@@ -138,13 +139,15 @@ export function assertTitleCommandRoutesThroughGate(
     }
     return;
   }
-  const expected = AI_TOOL_NAME_BY_TITLE_MUTATION[mutation];
-  if (aiToolName && aiToolName !== expected) {
-    throw new Error(
-      `AI title mutation "${mutation}" names tool "${aiToolName}", expected "${expected}".`
-    );
-  }
-  const tool = aiToolName ?? expected;
+  // The invariant is that the AI tool that produced this mutation is one the
+  // hosted read-only gate blocks — nothing may bypass approval. A single gated
+  // tool can legitimately produce a non-headline mutation (e.g. `createDeskMap`
+  // seeds a tract and journals an `'update'`), so when the caller names the tool
+  // we validate THAT tool is gated rather than requiring it to equal the
+  // mutation's canonical tool. The mutation→tool map is only the fallback for an
+  // unnamed AI mutation, where an `'update'` resolves to the ungated
+  // `'updateNode'` placeholder and correctly fails closed.
+  const tool = aiToolName ?? AI_TOOL_NAME_BY_TITLE_MUTATION[mutation];
   if (!gate.has(tool)) {
     throw new Error(
       `AI title mutation "${mutation}" tool "${tool}" is not gated by ` +

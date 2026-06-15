@@ -78,7 +78,7 @@ vi.mock('../../project-records/action-layer/title-command-sourcing', async (impo
   };
 });
 
-import { useWorkspaceStore } from '../workspace-store';
+import { useWorkspaceStore, withMutationOrigin } from '../workspace-store';
 import { useOwnerStore } from '../owner-store';
 import {
   ensureTitleBaseline,
@@ -302,6 +302,44 @@ describe('Phase 4 LIVE title journal (real store auto-records)', () => {
     // the store is still canonical and correct
     expect(useWorkspaceStore.getState().nodes.some((n) => n.id === 'npri')).toBe(false);
     expect(useWorkspaceStore.getState().nodes.some((n) => n.id === 'leasenode-1')).toBe(true);
+  });
+
+  it('threads real mutation origin into the audit chain (DA-M3)', async () => {
+    const store = () => useWorkspaceStore.getState();
+    // user-origin (direct UI edit): no origin scope.
+    store().createRootNode('root', '1', {
+      grantee: 'Root',
+      interestClass: 'mineral',
+      linkedOwnerId: 'owner-1',
+    });
+    // ai-origin: the approval executor wraps the synchronous store call. The
+    // journal hook fires inline, so it reads 'ai' off the active scope.
+    withMutationOrigin(
+      'ai',
+      () => store().convey('root', 'child', '0.5', { grantee: 'Child' }),
+      'convey'
+    );
+    // import-origin: the staged-import apply path (no aiToolName).
+    withMutationOrigin('import', () =>
+      store().createRootNode('imp', '0.5', { grantee: 'Imported' })
+    );
+    await settleTitleActionLog();
+
+    const events = useTitleActionLog.getState().auditEvents;
+    expect(events).toHaveLength(3);
+    // direct edit stays user-origin
+    expect(events[0]?.actorKind).toBe('user');
+    // AI edit is tagged 'ai' with the tool as actorId (the AI-gate now sees it)
+    const conveyEvent = events.find(
+      (event) => (event.details as { mutation?: string }).mutation === 'convey'
+    );
+    expect(conveyEvent?.actorKind).toBe('ai');
+    expect(conveyEvent?.actorId).toBe('convey');
+    // staged import is tagged 'import'
+    expect(events.at(-1)?.actorKind).toBe('import');
+    // provenance does not perturb the hash chain
+    expect((await verifyAuditChain(events)).valid).toBe(true);
+    expect(useTitleActionLog.getState().lastError).toBeNull();
   });
 
   it('surfaces a parity divergence without rolling back the canonical store', async () => {

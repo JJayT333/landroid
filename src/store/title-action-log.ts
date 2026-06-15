@@ -576,7 +576,7 @@ export function ensureTitleBaseline(
   return recordingChain;
 }
 
-setTitleJournalHook((mutation, beforeWorkspace, afterWorkspace) => {
+setTitleJournalHook((mutation, beforeWorkspace, afterWorkspace, context) => {
   const state = useTitleActionLog.getState();
   if (!state.enabled) return { rolledBack: false };
 
@@ -597,7 +597,7 @@ setTitleJournalHook((mutation, beforeWorkspace, afterWorkspace) => {
     try {
       parityClean = checkTitleInlineParity({
         mutation,
-        origin: 'user',
+        origin: context.origin,
         beforeWorkspace,
         afterWorkspace,
         ownerData: readOwnerData(),
@@ -640,6 +640,14 @@ setTitleJournalHook((mutation, beforeWorkspace, afterWorkspace) => {
       beforeWorkspace,
       afterWorkspace,
       ownerData,
+      // DA-M3: provenance from the active mutation-origin context. Direct UI
+      // edits stay 'user'; AI/import callers wrap their synchronous store call
+      // in `withMutationOrigin`, so the hook sees the real origin here. The
+      // origin flows to the audit event's `actorKind` (which carries 'ai' /
+      // 'import'); `approvedBy` stays 'user' because a human approved the AI
+      // action through the approval gate (the contract only allows user|system).
+      origin: context.origin,
+      aiToolName: context.aiToolName,
     });
   });
   track(recordingChain);
