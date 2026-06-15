@@ -1,14 +1,19 @@
 // Leasehold / transfer-order derivation for the unified title-math engine.
 //
-// Faithful transcription of components/leasehold/leasehold-summary.ts: the
-// arithmetic and operation ORDER are preserved field-by-field so the raw
-// Decimal.toString() residue stays byte-identical (Springhill is the oracle).
-// The one genuine change is the lease-coverage dependency, which now points at
-// the unified engine's own coverage calculator (./coverage) rather than the
-// view-layer module. DA-H1 (fixed NPRI deducted from NRI, not lessor royalty)
-// is reproduced as-is pending attorney sign-off; the historical string
-// round-trips at the unit-summary fold are reproduced deliberately. See the
-// FIDELITY and DA-H1 markers below.
+// Originally a faithful transcription of
+// components/leasehold/leasehold-summary.ts (operation ORDER preserved
+// field-by-field so the raw residue stayed byte-identical to the old engine).
+// Since then it has diverged deliberately, each change guarded by the
+// differential harness (Springhill is the oracle):
+//   - DA-H1: a fixed NPRI is now satisfied from the lessor royalty first, with
+//     only the excess charged to the WI (decision of record; see
+//     `calculateOrriBasisRates` + the `fixedNpriExceedsRoyalty` flag).
+//   - Stage B: FINAL display rates / unit totals / transfer-order terminals are
+//     quantized to 9dp via `emitRate`; re-read intermediates stay full precision
+//     (the per-tract string re-reads below are LOSSLESS — `d()` round-trips them
+//     exactly, so they pin operation order, not value).
+//   - DA-M5 ratification flag + unleased rows (additive).
+// The lease-coverage dependency points at this engine's own ./coverage.
 //
 // Depth severance is not yet modeled; this module assumes
 // `depthRange: 'all_depths'` on every node, lease, ORRI, and WI assignment.
@@ -1349,11 +1354,12 @@ export function buildLeaseholdUnitSummary({
     };
   });
   const tractSummaryById = new Map(tracts.map((tract) => [tract.deskMapId, tract]));
-  // FIDELITY: reproduces the historical string round-trip. Each tract's
-  // preWorkingInterestDecimal was already serialized to a string upstream; the
-  // v2 code re-parses it here with d(...), discarding sub-display precision
-  // before summing. Preserved verbatim so Springhill stays byte-identical. The
-  // same round-trip appears below for the unit/tract WI folds.
+  // Each tract's preWorkingInterestDecimal was serialized to a string upstream
+  // and is re-parsed here. `d(...)` at precision 40 round-trips every such string
+  // LOSSLESSLY, so this re-read preserves the value exactly (it is the per-tract
+  // operation order it pins, not any sub-display precision). The Stage-B 9dp
+  // quantization is applied once to the SUM (the returned final), not to these
+  // re-read intermediates. The same re-read pattern recurs in the WI folds below.
   const totalPreWorkingInterestDecimal = tracts.reduce(
     (sum, tract) => sum.plus(d(tract.preWorkingInterestDecimal)),
     d(0)
