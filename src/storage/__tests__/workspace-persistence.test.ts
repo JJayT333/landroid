@@ -707,6 +707,126 @@ describe('workspace-persistence', () => {
     expect(await imported.mapData?.mapAssets[0]?.blob.text()).toContain('FeatureCollection');
   });
 
+  it('strips unknown keys from imported owner docs / map assets / regions / research imports (DA-L8 pt2)', async () => {
+    const payload = {
+      version: LANDROID_FILE_VERSION,
+      workspaceId: 'ws-junk',
+      projectName: 'Junk Keys',
+      nodes: [createBlankNode('node-junk')],
+      deskMaps: [],
+      activeDeskMapId: null,
+      instrumentTypes: [],
+      ownerData: {
+        owners: [],
+        leases: [],
+        contacts: [],
+        docs: [
+          {
+            id: 'odoc-junk',
+            // workspaceId omitted → should fall back to the file workspaceId.
+            ownerId: 'owner-junk',
+            fileName: 'notes.txt',
+            mimeType: 'text/plain',
+            category: 'Title',
+            notes: 'kept',
+            blob: { base64: btoa('owner-doc-body'), mimeType: 'text/plain' },
+            createdAt: '2026-06-01T00:00:00.000Z',
+            updatedAt: '2026-06-01T00:00:00.000Z',
+            __evil: { polluted: true },
+            bogus: 'drop-me',
+          },
+        ],
+      },
+      mapData: {
+        mapAssets: [
+          {
+            id: 'asset-junk',
+            workspaceId: 'ws-explicit',
+            title: 'Tract',
+            kind: 'GeoJSON',
+            fileName: 'tract.geojson',
+            mimeType: 'application/geo+json',
+            isFeatured: true,
+            blob: { base64: btoa('{"type":"FeatureCollection"}'), mimeType: 'application/geo+json' },
+            createdAt: '2026-06-01T00:00:00.000Z',
+            updatedAt: '2026-06-01T00:00:00.000Z',
+            bogus: 'drop-me',
+          },
+        ],
+        mapRegions: [
+          {
+            id: 'region-junk',
+            assetId: 'asset-junk',
+            title: 'North',
+            status: 'Active',
+            rect: { x: 0.1, y: 0.2, width: 0.3, height: 0.4, page: 1 },
+            linkedOwnerId: 'owner-junk',
+            createdAt: '2026-06-01T00:00:00.000Z',
+            updatedAt: '2026-06-01T00:00:00.000Z',
+            bogus: 'drop-me',
+          },
+        ],
+        mapReferences: [],
+      },
+      researchData: {
+        imports: [
+          {
+            id: 'rimp-junk',
+            datasetId: 'ds-1',
+            title: 'Prod',
+            fileName: 'prod.csv',
+            mimeType: 'text/csv',
+            detectedFormat: 'CSV',
+            blob: { base64: btoa('a,b'), mimeType: 'text/csv' },
+            createdAt: '2026-06-01T00:00:00.000Z',
+            updatedAt: '2026-06-01T00:00:00.000Z',
+            bogus: 'drop-me',
+          },
+        ],
+        sources: [],
+        formulas: [],
+        projectRecords: [],
+        questions: [],
+      },
+    };
+    const file = new File([JSON.stringify(payload)], 'junk.landroid', {
+      type: 'application/json',
+    });
+
+    const imported = await importLandroidFile(file);
+
+    const doc = imported.ownerData?.docs[0];
+    const asset = imported.mapData?.mapAssets[0];
+    const region = imported.mapData?.mapRegions[0];
+    const research = imported.researchData?.imports[0];
+
+    // Unknown keys are dropped from every previously raw-spread store.
+    for (const record of [doc, asset, region, research]) {
+      expect(record).toBeDefined();
+      expect(record).not.toHaveProperty('bogus');
+    }
+    expect(doc).not.toHaveProperty('__evil');
+
+    // Valid fields survive; blobs round-trip.
+    expect(doc?.workspaceId).toBe('ws-junk'); // missing → file workspaceId fallback
+    expect(doc?.category).toBe('Title');
+    expect(doc?.notes).toBe('kept');
+    expect(await doc?.blob.text()).toBe('owner-doc-body');
+
+    expect(asset?.workspaceId).toBe('ws-explicit'); // present → preserved
+    expect(asset?.kind).toBe('GeoJSON');
+    expect(asset?.isFeatured).toBe(true);
+    expect(await asset?.blob.text()).toContain('FeatureCollection');
+
+    expect(region?.status).toBe('Active');
+    expect(region?.linkedOwnerId).toBe('owner-junk');
+    expect(region?.rect).toEqual({ x: 0.1, y: 0.2, width: 0.3, height: 0.4, page: 1 });
+
+    expect(research?.detectedFormat).toBe('CSV');
+    expect(research?.datasetId).toBe('ds-1');
+    expect(await research?.blob.text()).toBe('a,b');
+  });
+
   it('round-trips canvas image assets (bytes + content hash) through export/import', async () => {
     const imageBytes = new Blob([new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8])], {
       type: 'image/png',
