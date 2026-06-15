@@ -19,7 +19,7 @@ import type {
   OwnershipNode,
   SplitBasis,
 } from '../../types/node';
-import type { Audit, Result } from '../../types/result';
+import type { Audit, Result, ResultWarning } from '../../types/result';
 import {
   allocatesAgainstParent,
   deriveDefaultRoyaltyMeta,
@@ -47,8 +47,17 @@ import { emitNodeFraction, emitScaleFactor } from '../precision/emit';
 
 // ── Result constructors ─────────────────────────────────────
 
-function ok(nodes: CalcNode[], audit: Audit): Result<OwnershipNode[]> {
-  return { ok: true, data: nodes.map(fromCalc), audit };
+function ok(
+  nodes: CalcNode[],
+  audit: Audit,
+  warning?: ResultWarning
+): Result<OwnershipNode[]> {
+  return {
+    ok: true,
+    data: nodes.map(fromCalc),
+    audit,
+    ...(warning ? { warning } : {}),
+  };
 }
 
 function err(code: string, message: string, details?: unknown): Result<OwnershipNode[]> {
@@ -176,17 +185,17 @@ export function executeConveyance(params: ConveyanceParams): Result<OwnershipNod
     return err('invalid_input', 'share must be greater than zero');
   }
   const shareAmt = parsedShare;
-  if (shareAmt.greaterThan(clamp(parent.fraction).plus(EPSILON))) {
-    return err('invalid_input', 'share exceeds parent remaining fraction', {
-      parentId,
-      parentFraction: emitNodeFraction(parent.fraction),
-      requestedShare: emitNodeFraction(shareAmt),
-    });
-  }
+  // DA-M1: an over-conveyance (a deed reciting more than the grantor holds) is
+  // NOT rejected. Book the grantor's remainder and capture the deed's stated
+  // amount verbatim; the divergence is surfaced as a warning + title issue. The
+  // structural invariants (negative/cycle/non-finite, checked below) still block.
+  const grantorRemaining = clamp(parent.fraction);
+  const overConveys = shareAmt.greaterThan(grantorRemaining.plus(EPSILON));
+  const bookedShare = overConveys ? grantorRemaining : shareAmt;
 
   const updatedNodes = nodes.map((n) => {
     if (n.id !== parentId) return n;
-    return { ...n, fraction: clamp(n.fraction.minus(shareAmt)) };
+    return { ...n, fraction: clamp(n.fraction.minus(bookedShare)) };
   });
   const royaltyKind =
     childInterestClass === 'npri'
@@ -208,13 +217,14 @@ export function executeConveyance(params: ConveyanceParams): Result<OwnershipNod
     id: newNodeId,
     type: 'conveyance',
     parentId,
-    fraction: shareAmt,
-    initialFraction: shareAmt,
+    fraction: bookedShare,
+    initialFraction: bookedShare,
     rest: {
       ...(form ?? {}),
       interestClass: childInterestClass,
       royaltyKind,
       fixedRoyaltyBasis,
+      ...(overConveys ? { statedFraction: emitNodeFraction(shareAmt) } : {}),
     },
   });
 
@@ -223,7 +233,25 @@ export function executeConveyance(params: ConveyanceParams): Result<OwnershipNod
   const validation = validateCalcGraph(updatedNodes);
   if (!validation.valid) return err('invalid_graph', 'Conveyance would produce invalid ownership graph', validation.issues);
 
-  return ok(updatedNodes, { action: 'convey', affectedCount: 2 });
+  return ok(
+    updatedNodes,
+    { action: 'convey', affectedCount: 2 },
+    overConveys
+      ? {
+          code: 'over_conveyance',
+          message:
+            `Deed recites ${emitNodeFraction(shareAmt)} but the grantor holds ` +
+            `${emitNodeFraction(grantorRemaining)}; booked at ${emitNodeFraction(bookedShare)}, ` +
+            'stated amount captured for review.',
+          details: {
+            parentId,
+            statedShare: emitNodeFraction(shareAmt),
+            bookedShare: emitNodeFraction(bookedShare),
+            grantorRemaining: emitNodeFraction(grantorRemaining),
+          },
+        }
+      : undefined
+  );
 }
 
 // ── Operation: Create NPRI ──────────────────────────────────

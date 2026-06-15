@@ -82,6 +82,13 @@ export interface OwnershipNode {
   // Ownership fractions — stored as Decimal-serialized strings for precision
   fraction: string;
   initialFraction: string;
+  /**
+   * DA-M1: when a conveyance recites more than the grantor's remainder, the node
+   * is BOOKED at the remainder (`initialFraction`) but the deed's stated amount
+   * is captured here verbatim so the stated-vs-booked divergence round-trips and
+   * surfaces as a title issue. Absent unless an over-conveyance was recorded.
+   */
+  statedFraction?: string;
 
   // Tree structure
   parentId: string | null;

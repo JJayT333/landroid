@@ -135,9 +135,11 @@ describe('AI approval previews', () => {
   });
 
   it('blocks approval when the previewed title move would fail', async () => {
+    // A zero share is a structural invariant that still hard-blocks (unlike an
+    // over-conveyance, which DA-M1 now books-with-warning rather than rejecting).
     const queued = await runTool(landroidTools.convey, {
       parentNodeId: 'root',
-      share: '2',
+      share: '0',
       form: { grantee: 'Impossible Child' },
     });
 
@@ -151,7 +153,7 @@ describe('AI approval previews', () => {
       canApprove: false,
       validation: {
         status: 'blocked',
-        message: expect.stringContaining('share exceeds parent remaining fraction'),
+        message: expect.stringContaining('share must be greater than zero'),
       },
     });
 
