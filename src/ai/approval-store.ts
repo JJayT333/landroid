@@ -26,6 +26,14 @@ interface AIApprovalState {
   enqueue: (proposal: Omit<AIApprovalProposal, 'id' | 'createdAt'>) => AIApprovalProposal;
   remove: (id: string) => void;
   clear: () => void;
+  /**
+   * Recompute every queued proposal's preview from the CURRENT workspace state.
+   * Previews are computed once at enqueue time, so a card can drift stale if the
+   * user edits the graph before approving — the displayed before/after numbers
+   * and the `canApprove` gate would still reflect enqueue-time state (DA-M12).
+   * The panel calls this on relevant store changes to keep cards live.
+   */
+  refreshPreviews: () => void;
 }
 
 type MutationExecutor = (input: unknown) => Promise<unknown>;
@@ -46,6 +54,13 @@ export const useAIApprovalStore = create<AIApprovalState>()((set, get) => ({
   remove: (id) =>
     set({ proposals: get().proposals.filter((proposal) => proposal.id !== id) }),
   clear: () => set({ proposals: [] }),
+  refreshPreviews: () =>
+    set({
+      proposals: get().proposals.map((proposal) => ({
+        ...proposal,
+        preview: buildAIApprovalPreview(proposal.toolName, proposal.input),
+      })),
+    }),
 }));
 
 export function registerAIMutationExecutor(
@@ -109,8 +124,13 @@ export async function approveAIProposal(id: string): Promise<unknown> {
   }
 
   const undoLabel = `Approved AI: ${proposal.summary}`;
-  assertAIApprovalPreviewCanApply(proposal.id, proposal.toolName, proposal.input);
+  // Capture the rollback point first, then re-assert applicability against the
+  // exact state we are about to mutate, so the recheck and the executed
+  // mutation see the same workspace rather than a snapshot taken in between
+  // (DA-M12). A wasted snapshot on a rare abort is cheaper than executing a
+  // mutation validated against different state.
   const snapshot = await captureSnapshot(undoLabel);
+  assertAIApprovalPreviewCanApply(proposal.id, proposal.toolName, proposal.input);
   const result = await executor(proposal.input);
   useAIApprovalStore.getState().remove(id);
   recordAIActionResult({

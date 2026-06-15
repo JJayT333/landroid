@@ -707,6 +707,126 @@ describe('workspace-persistence', () => {
     expect(await imported.mapData?.mapAssets[0]?.blob.text()).toContain('FeatureCollection');
   });
 
+  it('strips unknown keys from imported owner docs / map assets / regions / research imports (DA-L8 pt2)', async () => {
+    const payload = {
+      version: LANDROID_FILE_VERSION,
+      workspaceId: 'ws-junk',
+      projectName: 'Junk Keys',
+      nodes: [createBlankNode('node-junk')],
+      deskMaps: [],
+      activeDeskMapId: null,
+      instrumentTypes: [],
+      ownerData: {
+        owners: [],
+        leases: [],
+        contacts: [],
+        docs: [
+          {
+            id: 'odoc-junk',
+            // workspaceId omitted → should fall back to the file workspaceId.
+            ownerId: 'owner-junk',
+            fileName: 'notes.txt',
+            mimeType: 'text/plain',
+            category: 'Title',
+            notes: 'kept',
+            blob: { base64: btoa('owner-doc-body'), mimeType: 'text/plain' },
+            createdAt: '2026-06-01T00:00:00.000Z',
+            updatedAt: '2026-06-01T00:00:00.000Z',
+            __evil: { polluted: true },
+            bogus: 'drop-me',
+          },
+        ],
+      },
+      mapData: {
+        mapAssets: [
+          {
+            id: 'asset-junk',
+            workspaceId: 'ws-explicit',
+            title: 'Tract',
+            kind: 'GeoJSON',
+            fileName: 'tract.geojson',
+            mimeType: 'application/geo+json',
+            isFeatured: true,
+            blob: { base64: btoa('{"type":"FeatureCollection"}'), mimeType: 'application/geo+json' },
+            createdAt: '2026-06-01T00:00:00.000Z',
+            updatedAt: '2026-06-01T00:00:00.000Z',
+            bogus: 'drop-me',
+          },
+        ],
+        mapRegions: [
+          {
+            id: 'region-junk',
+            assetId: 'asset-junk',
+            title: 'North',
+            status: 'Active',
+            rect: { x: 0.1, y: 0.2, width: 0.3, height: 0.4, page: 1 },
+            linkedOwnerId: 'owner-junk',
+            createdAt: '2026-06-01T00:00:00.000Z',
+            updatedAt: '2026-06-01T00:00:00.000Z',
+            bogus: 'drop-me',
+          },
+        ],
+        mapReferences: [],
+      },
+      researchData: {
+        imports: [
+          {
+            id: 'rimp-junk',
+            datasetId: 'ds-1',
+            title: 'Prod',
+            fileName: 'prod.csv',
+            mimeType: 'text/csv',
+            detectedFormat: 'CSV',
+            blob: { base64: btoa('a,b'), mimeType: 'text/csv' },
+            createdAt: '2026-06-01T00:00:00.000Z',
+            updatedAt: '2026-06-01T00:00:00.000Z',
+            bogus: 'drop-me',
+          },
+        ],
+        sources: [],
+        formulas: [],
+        projectRecords: [],
+        questions: [],
+      },
+    };
+    const file = new File([JSON.stringify(payload)], 'junk.landroid', {
+      type: 'application/json',
+    });
+
+    const imported = await importLandroidFile(file);
+
+    const doc = imported.ownerData?.docs[0];
+    const asset = imported.mapData?.mapAssets[0];
+    const region = imported.mapData?.mapRegions[0];
+    const research = imported.researchData?.imports[0];
+
+    // Unknown keys are dropped from every previously raw-spread store.
+    for (const record of [doc, asset, region, research]) {
+      expect(record).toBeDefined();
+      expect(record).not.toHaveProperty('bogus');
+    }
+    expect(doc).not.toHaveProperty('__evil');
+
+    // Valid fields survive; blobs round-trip.
+    expect(doc?.workspaceId).toBe('ws-junk'); // missing → file workspaceId fallback
+    expect(doc?.category).toBe('Title');
+    expect(doc?.notes).toBe('kept');
+    expect(await doc?.blob.text()).toBe('owner-doc-body');
+
+    expect(asset?.workspaceId).toBe('ws-explicit'); // present → preserved
+    expect(asset?.kind).toBe('GeoJSON');
+    expect(asset?.isFeatured).toBe(true);
+    expect(await asset?.blob.text()).toContain('FeatureCollection');
+
+    expect(region?.status).toBe('Active');
+    expect(region?.linkedOwnerId).toBe('owner-junk');
+    expect(region?.rect).toEqual({ x: 0.1, y: 0.2, width: 0.3, height: 0.4, page: 1 });
+
+    expect(research?.detectedFormat).toBe('CSV');
+    expect(research?.datasetId).toBe('ds-1');
+    expect(await research?.blob.text()).toBe('a,b');
+  });
+
   it('round-trips canvas image assets (bytes + content hash) through export/import', async () => {
     const imageBytes = new Blob([new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8])], {
       type: 'image/png',
@@ -1137,6 +1257,58 @@ describe('workspace-persistence', () => {
     await expect(importLandroidFile(file)).rejects.toThrow(
       `Unsupported .landroid file version ${LANDROID_FILE_VERSION + 1}`
     );
+  });
+
+  it('rejects a non-numeric version that carries v8+ document data (DA-L8 bypass)', async () => {
+    const payload = {
+      version: '99',
+      workspaceId: 'ws-bypass',
+      projectName: 'Bypass',
+      nodes: [createBlankNode('node-a')],
+      deskMaps: [],
+      activeDeskMapId: null,
+      instrumentTypes: [],
+      documentData: { documents: [], attachments: [] },
+    };
+    const file = new File([JSON.stringify(payload)], 'bypass.landroid', {
+      type: 'application/json',
+    });
+
+    await expect(importLandroidFile(file)).rejects.toThrow(/numeric version/);
+  });
+
+  it('rejects a missing version that carries an action ledger (DA-L8 bypass)', async () => {
+    const payload = {
+      workspaceId: 'ws-bypass-2',
+      projectName: 'Bypass 2',
+      nodes: [createBlankNode('node-a')],
+      deskMaps: [],
+      activeDeskMapId: null,
+      instrumentTypes: [],
+      actionLedger: { records: [], auditEvents: [] },
+    };
+    const file = new File([JSON.stringify(payload)], 'bypass-2.landroid', {
+      type: 'application/json',
+    });
+
+    await expect(importLandroidFile(file)).rejects.toThrow(/numeric version/);
+  });
+
+  it('still imports a genuine version-less legacy file with no v8+ markers (DA-L8)', async () => {
+    const payload = {
+      workspaceId: 'ws-legacy-noversion',
+      projectName: 'Legacy No Version',
+      nodes: [createBlankNode('node-legacy')],
+      deskMaps: [],
+      activeDeskMapId: null,
+      instrumentTypes: [],
+    };
+    const file = new File([JSON.stringify(payload)], 'legacy-noversion.landroid', {
+      type: 'application/json',
+    });
+
+    const imported = await importLandroidFile(file);
+    expect(imported.workspaceId).toBe('ws-legacy-noversion');
   });
 
   it('normalizes legacy imported leases that predate royalty and leased-interest fields', async () => {

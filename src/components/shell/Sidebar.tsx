@@ -100,6 +100,7 @@ export default function Sidebar({ onOpenProjectPicker }: SidebarProps) {
   const lastSavedAt = useStorageHealthStore((s) => s.lastSavedAt);
   const persistentStorage = useStorageHealthStore((s) => s.persistentStorage);
   const rollingAutoExport = useStorageHealthStore((s) => s.rollingAutoExport);
+  const lastPersistenceError = useStorageHealthStore((s) => s.lastPersistenceError);
 
   const [collapsed, setCollapsed] = useState(
     () => localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === '1'
@@ -363,9 +364,11 @@ export default function Sidebar({ onOpenProjectPicker }: SidebarProps) {
       ? `Auto-export ${rollingAutoExport.directoryName ?? 'on'}`
       : 'Backup manual'
   }`;
-  const statusDotClass = lastSavedAt
-    ? 'bg-[#3f7d4e]'
-    : 'bg-gold';
+  const statusDotClass = lastPersistenceError
+    ? 'bg-seal'
+    : lastSavedAt
+      ? 'bg-[#3f7d4e]'
+      : 'bg-gold';
 
   const navButton = (
     item: { id: ViewMode; label: string; icon: ShellIconName },
@@ -580,9 +583,18 @@ export default function Sidebar({ onOpenProjectPicker }: SidebarProps) {
           </button>
         </div>
         <div className="mt-1 flex items-center justify-between gap-2">
-          <div className="truncate text-[10px] text-ink-light" title={statusLine}>
-            {statusLine}
-          </div>
+          {lastPersistenceError ? (
+            <div
+              className="truncate text-[10px] font-semibold text-seal"
+              title={lastPersistenceError.message}
+            >
+              Storage full — back up now
+            </div>
+          ) : (
+            <div className="truncate text-[10px] text-ink-light" title={statusLine}>
+              {statusLine}
+            </div>
+          )}
           <div className="flex shrink-0 items-center gap-1.5">
             <StorageHealthChip />
             <LedgerStatusChip />

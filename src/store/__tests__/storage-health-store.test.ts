@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { useStorageHealthStore } from '../storage-health-store';
+import {
+  useStorageHealthStore,
+  withQuotaErrorReporting,
+} from '../storage-health-store';
 
 describe('storage health store', () => {
   beforeEach(() => {
@@ -115,5 +118,49 @@ describe('storage health store', () => {
       warning:
         'Auto-export folder permission is unavailable. Use Backup Now or choose the folder again.',
     });
+  });
+});
+
+describe('storage-quota surfacing (DA-M11)', () => {
+  beforeEach(() => {
+    useStorageHealthStore.getState().clearPersistenceError();
+  });
+
+  const quotaError = () =>
+    new DOMException('The quota has been exceeded.', 'QuotaExceededError');
+
+  it('records a quota failure on the health store and rethrows', async () => {
+    await expect(
+      withQuotaErrorReporting('Workspace save', async () => {
+        throw quotaError();
+      })
+    ).rejects.toBeInstanceOf(DOMException);
+
+    expect(
+      useStorageHealthStore.getState().lastPersistenceError?.message
+    ).toMatch(/storage is full/i);
+  });
+
+  it('does not record non-quota errors but still rethrows', async () => {
+    await expect(
+      withQuotaErrorReporting('Workspace save', async () => {
+        throw new Error('unrelated failure');
+      })
+    ).rejects.toThrow('unrelated failure');
+
+    expect(useStorageHealthStore.getState().lastPersistenceError).toBeNull();
+  });
+
+  it('returns the value on success', async () => {
+    const value = await withQuotaErrorReporting('Workspace save', async () => 42);
+    expect(value).toBe(42);
+  });
+
+  it('clears the quota warning on the next successful workspace save', () => {
+    useStorageHealthStore.getState().recordPersistenceError('full');
+    expect(useStorageHealthStore.getState().lastPersistenceError).not.toBeNull();
+
+    useStorageHealthStore.getState().recordWorkspaceSaved();
+    expect(useStorageHealthStore.getState().lastPersistenceError).toBeNull();
   });
 });

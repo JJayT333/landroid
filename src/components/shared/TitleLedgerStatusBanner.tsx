@@ -82,7 +82,9 @@ export default function TitleLedgerStatusBanner() {
 export function TitleLedgerStatusPanel({ onHide }: { onHide?: () => void } = {}) {
   const lastDivergence = useTitleActionLog((state) => state.lastDivergence);
   const lastError = useTitleActionLog((state) => state.lastError);
-  const recordedMutationCount = useTitleActionLog((state) => state.recordedMutationCount);
+  // Cutover readiness counts only parities recorded THIS session; a hydrated
+  // ledger's historical count must not auto-satisfy the threshold (DA-U2).
+  const sessionParityCount = useTitleActionLog((state) => state.sessionParityCount);
   const actionRecords = useTitleActionLog((state) => state.actionRecords);
   const auditEvents = useTitleActionLog((state) => state.auditEvents);
   const readPathMode = useTitleActionLog((state) => state.readPathMode);
@@ -95,7 +97,7 @@ export function TitleLedgerStatusPanel({ onHide }: { onHide?: () => void } = {})
   // is skipped and both read NOT clean.
   const [parityGates, setParityGates] = useState<TitleParityGates>(NOT_CLEAN_GATES);
   useEffect(() => {
-    if (recordedMutationCount < MIN_PASSED_TITLE_PARITIES) {
+    if (sessionParityCount < MIN_PASSED_TITLE_PARITIES) {
       setParityGates(NOT_CLEAN_GATES);
       return;
     }
@@ -112,12 +114,12 @@ export function TitleLedgerStatusPanel({ onHide }: { onHide?: () => void } = {})
     return () => {
       cancelled = true;
     };
-  }, [actionRecords, auditEvents, recordedMutationCount]);
+  }, [actionRecords, auditEvents, sessionParityCount]);
 
   const readiness = useMemo(
     () =>
       deriveTitleCutoverReadiness({
-        recordedMutationCount,
+        recordedMutationCount: sessionParityCount,
         mathParityClean: parityGates.mathParityClean,
         landroidRoundTripClean: parityGates.landroidRoundTripClean,
         runtimeDivergenceMessage: lastDivergence
@@ -125,7 +127,7 @@ export function TitleLedgerStatusPanel({ onHide }: { onHide?: () => void } = {})
           : null,
         runtimeErrorMessage: lastError,
       }),
-    [lastDivergence, lastError, recordedMutationCount, parityGates]
+    [lastDivergence, lastError, sessionParityCount, parityGates]
   );
 
   const [flipError, setFlipError] = useState<string | null>(null);
