@@ -893,6 +893,142 @@ describe('leasehold-summary', () => {
     expect(Number.isFinite(Number(summary.tracts[0]?.preWorkingInterestDecimal))).toBe(true);
   });
 
+  it('adds a cost-bearing unleased mineral row so the sheet balances to full ownership', () => {
+    // Owner holds 1.0 minerals but leases only 0.5 — the remaining 0.5 is an
+    // unleased mineral interest that must appear on the transfer-order sheet so
+    // it accounts for 100% of the tract (deep-audit §4 row 11).
+    const summary = buildLeaseholdUnitSummary({
+      deskMaps: [
+        {
+          id: 'dm-1',
+          name: 'Tract 1',
+          code: 'T1',
+          tractId: 'T1',
+          grossAcres: '100',
+          pooledAcres: '100',
+          description: '',
+          nodeIds: ['n1', 'l1'],
+        },
+      ],
+      nodes: [
+        {
+          ...createBlankNode('n1', null),
+          grantee: 'A Owner',
+          linkedOwnerId: 'owner-1',
+          fraction: '1',
+          initialFraction: '1',
+        },
+        {
+          ...createBlankNode('l1', 'n1'),
+          type: 'related' as const,
+          relatedKind: 'lease' as const,
+        },
+      ],
+      owners: [createBlankOwner('ws-1', { id: 'owner-1', name: 'A Owner' })],
+      leases: [
+        createBlankLease('ws-1', 'owner-1', {
+          id: 'lease-1',
+          leaseName: 'Half Lease',
+          lessee: 'Operator A',
+          royaltyRate: '0.2',
+          leasedInterest: '0.5',
+        }),
+      ],
+      leaseholdAssignments: [],
+      leaseholdOrris: [],
+    });
+
+    expect(summary.tracts[0]?.leasedOwnership).toBe('0.5');
+    expect(summary.tracts[0]?.currentOwnership).toBe('1');
+
+    const unit = {
+      name: 'Half Unit',
+      description: '',
+      operator: 'Operator A',
+      effectiveDate: '2024-01-01',
+      jurisdiction: 'tx_fee' as const,
+    };
+    const review = buildLeaseholdTransferOrderReview({
+      unit,
+      unitSummary: summary,
+      focusedDeskMapId: null,
+    });
+
+    const unleasedRows = review.rows.filter((row) => row.category === 'unleased');
+    expect(unleasedRows).toHaveLength(1);
+    expect(unleasedRows[0]?.payee).toBe('A Owner');
+    expect(unleasedRows[0]?.decimal).toBe('0.5');
+    // royalty 0.1 + retained WI 0.4 + unleased 0.5 = 1.0, balanced against 100%.
+    expect(review.expectedDecimal).toBe('1');
+    expect(review.totalDecimal).toBe('1');
+    expect(review.varianceDecimal).toBe('0');
+    // Unleased rows are derived (no source instrument) and excluded from the
+    // source-completeness review counts.
+    expect(unleasedRows[0]?.sourceDocNo).toBe('');
+    expect(review.reviewableRowCount).toBe(
+      review.rows.filter((row) => row.category !== 'retained_wi' && row.category !== 'unleased').length
+    );
+  });
+
+  it('emits no unleased row when the owner is fully leased', () => {
+    const summary = buildLeaseholdUnitSummary({
+      deskMaps: [
+        {
+          id: 'dm-1',
+          name: 'Tract 1',
+          code: 'T1',
+          tractId: 'T1',
+          grossAcres: '100',
+          pooledAcres: '100',
+          description: '',
+          nodeIds: ['n1', 'l1'],
+        },
+      ],
+      nodes: [
+        {
+          ...createBlankNode('n1', null),
+          grantee: 'A Owner',
+          linkedOwnerId: 'owner-1',
+          fraction: '1',
+          initialFraction: '1',
+        },
+        {
+          ...createBlankNode('l1', 'n1'),
+          type: 'related' as const,
+          relatedKind: 'lease' as const,
+        },
+      ],
+      owners: [createBlankOwner('ws-1', { id: 'owner-1', name: 'A Owner' })],
+      leases: [
+        createBlankLease('ws-1', 'owner-1', {
+          id: 'lease-1',
+          leaseName: 'Full Lease',
+          lessee: 'Operator A',
+          royaltyRate: '0.25',
+          leasedInterest: '1',
+        }),
+      ],
+      leaseholdAssignments: [],
+      leaseholdOrris: [],
+    });
+
+    const review = buildLeaseholdTransferOrderReview({
+      unit: {
+        name: 'Full Unit',
+        description: '',
+        operator: 'Operator A',
+        effectiveDate: '2024-01-01',
+        jurisdiction: 'tx_fee' as const,
+      },
+      unitSummary: summary,
+      focusedDeskMapId: null,
+    });
+
+    expect(review.rows.some((row) => row.category === 'unleased')).toBe(false);
+    expect(review.expectedDecimal).toBe('1');
+    expect(review.varianceDecimal).toBe('0');
+  });
+
   it('surfaces malformed lease royalty, ORRI burden, and WI assignment inputs as warnings', () => {
     const summary = buildLeaseholdUnitSummary({
       deskMaps: [

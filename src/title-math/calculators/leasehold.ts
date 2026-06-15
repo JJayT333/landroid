@@ -325,7 +325,11 @@ export type LeaseholdDecimalRowKind =
   | 'npri'
   | 'orri'
   | 'retained_wi'
-  | 'assigned_wi';
+  | 'assigned_wi'
+  // A mineral owner's interest that is not under any active lease. Cost-bearing,
+  // surfaced so the transfer-order sheet accounts for 100% of the tract (the
+  // owner still holds an unleased mineral interest, not just the leased share).
+  | 'unleased';
 
 export interface LeaseholdDecimalRow {
   id: string;
@@ -364,6 +368,7 @@ export const LEASEHOLD_DECIMAL_CATEGORY_ORDER: Record<LeaseholdDecimalRowKind, n
   orri: 2,
   retained_wi: 3,
   assigned_wi: 4,
+  unleased: 5,
 };
 
 function nameOwner(node: OwnershipNode, ownerById: Map<string, Owner>): string {
@@ -1661,6 +1666,24 @@ export function buildLeaseholdDecimalRows({
           decimal,
         });
       });
+
+    // Unleased mineral interest: the owner's mineral fraction not covered by any
+    // active lease. Cost-bearing, so the focused sheet accounts for 100% of the
+    // tract rather than only the leased portion.
+    focusedTract.owners.forEach((owner) => {
+      const unleasedFraction = d(owner.fraction).minus(d(owner.leasedFraction));
+      pushRow({
+        id: `unleased-${focusedTract.deskMapId}-${owner.nodeId}`,
+        category: 'unleased',
+        payee: owner.ownerName,
+        tractName: focusedTract.name,
+        tractCode: focusedTract.code,
+        sourceLabel: `${focusedTract.code} unleased mineral`,
+        effectiveDate: '',
+        sourceDocNo: '',
+        decimal: d(focusedTract.unitParticipation).times(unleasedFraction).toString(),
+      });
+    });
   } else {
     unitSummary.tracts.forEach((tract) => {
       tract.owners.forEach((owner) => {
@@ -1757,6 +1780,24 @@ export function buildLeaseholdDecimalRows({
           decimal: assignment.unitDecimal,
         });
       });
+
+    // Unleased mineral interest across every tract (see the focused path).
+    unitSummary.tracts.forEach((tract) => {
+      tract.owners.forEach((owner) => {
+        const unleasedFraction = d(owner.fraction).minus(d(owner.leasedFraction));
+        pushRow({
+          id: `unleased-${tract.deskMapId}-${owner.nodeId}`,
+          category: 'unleased',
+          payee: owner.ownerName,
+          tractName: tract.name,
+          tractCode: tract.code,
+          sourceLabel: `${tract.code} unleased mineral`,
+          effectiveDate: '',
+          sourceDocNo: '',
+          decimal: d(tract.unitParticipation).times(unleasedFraction).toString(),
+        });
+      });
+    });
   }
 
   return rows.sort((left, right) => {
@@ -1788,8 +1829,11 @@ export function buildLeaseholdTransferOrderHoldReasons(
     : [];
 }
 
-function leaseholdCoverageDecimal(tract: Pick<LeaseholdTractSummary, 'unitParticipation' | 'leasedOwnership'>) {
-  return d(tract.unitParticipation).times(d(tract.leasedOwnership));
+function leaseholdCoverageDecimal(tract: Pick<LeaseholdTractSummary, 'unitParticipation' | 'currentOwnership'>) {
+  // Balance against the FULL current mineral ownership, not just the leased
+  // portion: unleased mineral owners now appear as cost-bearing rows, so the
+  // expected unit decimal must cover 100% of the tract for the variance to close.
+  return d(tract.unitParticipation).times(d(tract.currentOwnership));
 }
 
 export function buildLeaseholdTransferOrderReview({
@@ -1845,7 +1889,11 @@ export function buildLeaseholdTransferOrderReview({
       };
     })
     .filter((summary) => summary.rowCount > 0);
-  const reviewableRows = rows.filter((row) => row.category !== 'retained_wi');
+  // retained_wi and unleased are derived (no source instrument), so they are
+  // excluded from the source-completeness review counts.
+  const reviewableRows = rows.filter(
+    (row) => row.category !== 'retained_wi' && row.category !== 'unleased'
+  );
 
   return {
     rows,

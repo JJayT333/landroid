@@ -584,6 +584,28 @@
         "sourceLabel": "Vulcan Mesa Petroleum, LLC assignment",
         "tractCode": "VM2",
         "tractName": "VM2 — Widow's Aegis"
+      },
+      {
+        "category": "unleased",
+        "decimal": "0.06666666666666666666666666666666666666666",
+        "effectiveDate": "",
+        "id": "unleased-dm-vulcan-mesa-2-1779555600000-vm-12",
+        "payee": "Pinhead \"Doublecount\" Crumley",
+        "sourceDocNo": "",
+        "sourceLabel": "VM2 unleased mineral",
+        "tractCode": "VM2",
+        "tractName": "VM2 — Widow's Aegis"
+      },
+      {
+        "category": "unleased",
+        "decimal": "0.06666666666666666666666666666666666666666",
+        "effectiveDate": "",
+        "id": "unleased-dm-vulcan-mesa-2-1779555600000-vm-13",
+        "payee": "Pinhead \"Doublecount\" Crumley",
+        "sourceDocNo": "",
+        "sourceLabel": "VM2 unleased mineral",
+        "tractCode": "VM2",
+        "tractName": "VM2 — Widow's Aegis"
       }
     ],
     "VM3": [
@@ -650,6 +672,17 @@
         "payee": "Minerva Draw Production Co.",
         "sourceDocNo": "VM-ASG-2",
         "sourceLabel": "Vulcan Mesa Petroleum, LLC assignment",
+        "tractCode": "VM3",
+        "tractName": "VM3 — Mercury Cutoff"
+      },
+      {
+        "category": "unleased",
+        "decimal": "0.009259259259259259259259259259259259259259",
+        "effectiveDate": "",
+        "id": "unleased-dm-vulcan-mesa-3-1779555600000-vm-21",
+        "payee": "Beauregard Plumstead",
+        "sourceDocNo": "",
+        "sourceLabel": "VM3 unleased mineral",
         "tractCode": "VM3",
         "tractName": "VM3 — Mercury Cutoff"
       }
@@ -4345,9 +4378,14 @@
         "category": "assigned_wi",
         "rowCount": 3,
         "totalDecimal": "0.391865318"
+      },
+      {
+        "category": "unleased",
+        "rowCount": 3,
+        "totalDecimal": "0.142592593"
       }
     ],
-    "expectedDecimal": "0.990740741",
+    "expectedDecimal": "1.133333333",
     "reviewableRowCount": 36,
     "rows": [
       {
@@ -4756,13 +4794,46 @@
         "sourceLabel": "Vulcan Mesa Petroleum, LLC assignment",
         "tractCode": "TRACT",
         "tractName": "VM10 — Roughneck Olympus"
+      },
+      {
+        "category": "unleased",
+        "decimal": "0.06666666666666666666666666666666666666666",
+        "effectiveDate": "",
+        "id": "unleased-dm-vulcan-mesa-2-1779555600000-vm-12",
+        "payee": "Pinhead \"Doublecount\" Crumley",
+        "sourceDocNo": "",
+        "sourceLabel": "VM2 unleased mineral",
+        "tractCode": "VM2",
+        "tractName": "VM2 — Widow's Aegis"
+      },
+      {
+        "category": "unleased",
+        "decimal": "0.06666666666666666666666666666666666666666",
+        "effectiveDate": "",
+        "id": "unleased-dm-vulcan-mesa-2-1779555600000-vm-13",
+        "payee": "Pinhead \"Doublecount\" Crumley",
+        "sourceDocNo": "",
+        "sourceLabel": "VM2 unleased mineral",
+        "tractCode": "VM2",
+        "tractName": "VM2 — Widow's Aegis"
+      },
+      {
+        "category": "unleased",
+        "decimal": "0.009259259259259259259259259259259259259259",
+        "effectiveDate": "",
+        "id": "unleased-dm-vulcan-mesa-3-1779555600000-vm-21",
+        "payee": "Beauregard Plumstead",
+        "sourceDocNo": "",
+        "sourceLabel": "VM3 unleased mineral",
+        "tractCode": "VM3",
+        "tractName": "VM3 — Mercury Cutoff"
       }
     ],
     "rowsMissingEffectiveDate": 0,
     "rowsMissingSourceDocNo": 0,
     "rowsWithCompleteSource": 36,
     "rowsWithSourceGap": 0,
-    "totalDecimal": "1.023920495",
+    "totalDecimal": "1.166513088",
     "varianceDecimal": "0.033179754"
   },
   "unitRows": [
@@ -5172,6 +5243,39 @@
       "sourceLabel": "Vulcan Mesa Petroleum, LLC assignment",
       "tractCode": "TRACT",
       "tractName": "VM10 — Roughneck Olympus"
+    },
+    {
+      "category": "unleased",
+      "decimal": "0.06666666666666666666666666666666666666666",
+      "effectiveDate": "",
+      "id": "unleased-dm-vulcan-mesa-2-1779555600000-vm-12",
+      "payee": "Pinhead \"Doublecount\" Crumley",
+      "sourceDocNo": "",
+      "sourceLabel": "VM2 unleased mineral",
+      "tractCode": "VM2",
+      "tractName": "VM2 — Widow's Aegis"
+    },
+    {
+      "category": "unleased",
+      "decimal": "0.06666666666666666666666666666666666666666",
+      "effectiveDate": "",
+      "id": "unleased-dm-vulcan-mesa-2-1779555600000-vm-13",
+      "payee": "Pinhead \"Doublecount\" Crumley",
+      "sourceDocNo": "",
+      "sourceLabel": "VM2 unleased mineral",
+      "tractCode": "VM2",
+      "tractName": "VM2 — Widow's Aegis"
+    },
+    {
+      "category": "unleased",
+      "decimal": "0.009259259259259259259259259259259259259259",
+      "effectiveDate": "",
+      "id": "unleased-dm-vulcan-mesa-3-1779555600000-vm-21",
+      "payee": "Beauregard Plumstead",
+      "sourceDocNo": "",
+      "sourceLabel": "VM3 unleased mineral",
+      "tractCode": "VM3",
+      "tractName": "VM3 — Mercury Cutoff"
     }
   ],
   "validation": {
