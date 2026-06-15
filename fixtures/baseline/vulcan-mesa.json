@@ -1262,14 +1262,14 @@
     "overAssignedTractCount": 5,
     "overBurdenedTractCount": 0,
     "overFloatingNpriBurdenedTractCount": 0,
-    "preWorkingInterestDecimal": "0.7045840010683760683760683760683760683759",
+    "preWorkingInterestDecimal": "0.704584001",
     "retainedWorkingInterestDecimal": "0.3458984375",
-    "totalAssignedWorkingInterestDecimal": "0.3918653178418803418803418803418803418802",
+    "totalAssignedWorkingInterestDecimal": "0.391865318",
     "totalGrossAcres": "2160",
-    "totalNpriDecimal": "0.04861111111111111111111111111111111111112",
-    "totalOrriDecimal": "0.02310474537037037037037037037037037037038",
+    "totalNpriDecimal": "0.048611111",
+    "totalOrriDecimal": "0.023104745",
     "totalPooledAcres": "2160",
-    "totalRoyaltyDecimal": "0.2306445868945868945868945868945868945869",
+    "totalRoyaltyDecimal": "0.230644587",
     "trackedAssignmentCount": 3,
     "trackedNpriCount": 2,
     "trackedOrriCount": 4,
@@ -1952,10 +1952,10 @@
         "leaseOverlaps": [],
         "leasedOwnership": "1",
         "name": "VM4 — Vulcan Gulch",
-        "netRevenueInterestBaseRate": "0.7427884615384615384615384615384615384615",
+        "netRevenueInterestBaseRate": "0.742788462",
         "netRevenueInterestOrriBurdenRate": "0",
-        "npriAdjustedNriBeforeOrriRate": "0.7740384615384615384615384615384615384615",
-        "nriBeforeOrriRate": "0.7740384615384615384615384615384615384615",
+        "npriAdjustedNriBeforeOrriRate": "0.774038462",
+        "nriBeforeOrriRate": "0.774038462",
         "overAssigned": true,
         "overBurdened": false,
         "overFloatingNpriBurdened": false,
@@ -2117,7 +2117,7 @@
         "unitOrriDecimal": "0.002893518518518518518518518518518518518518",
         "unitParticipation": "0.09259259259259259259259259259259259259259",
         "unitRoyaltyDecimal": "0.02092236467236467236467236467236467236467",
-        "weightedRoyaltyRate": "0.2259615384615384615384615384615384615385",
+        "weightedRoyaltyRate": "0.225961538",
         "workingInterestOrriBurdenRate": "0"
       },
       {
@@ -3110,7 +3110,7 @@
         "leasedOwnership": "1",
         "name": "VM10 — Roughneck Olympus",
         "netRevenueInterestBaseRate": "0.7375",
-        "netRevenueInterestOrriBurdenRate": "0.0115234375",
+        "netRevenueInterestOrriBurdenRate": "0.011523438",
         "npriAdjustedNriBeforeOrriRate": "0.75",
         "nriBeforeOrriRate": "0.75",
         "overAssigned": false,
@@ -3306,7 +3306,7 @@
         "preWorkingInterestDecimal": "0.1075520833333333333333333333333333333333",
         "retainedWorkingInterestDecimal": "0.08066406249999999999999999999999999999997",
         "totalNpriBurdenRate": "0",
-        "totalOrriBurdenRate": "0.0240234375",
+        "totalOrriBurdenRate": "0.024023438",
         "trackedAssignmentCount": 1,
         "trackedNpriCount": 0,
         "trackedOrriCount": 2,
@@ -4324,30 +4324,30 @@
       {
         "category": "royalty",
         "rowCount": 28,
-        "totalDecimal": "0.214440883190883190883190883190883190883"
+        "totalDecimal": "0.214440883"
       },
       {
         "category": "npri",
         "rowCount": 2,
-        "totalDecimal": "0.04861111111111111111111111111111111111112"
+        "totalDecimal": "0.048611111"
       },
       {
         "category": "orri",
         "rowCount": 3,
-        "totalDecimal": "0.02310474537037037037037037037037037037037"
+        "totalDecimal": "0.023104745"
       },
       {
         "category": "retained_wi",
         "rowCount": 1,
-        "totalDecimal": "0.3458984375"
+        "totalDecimal": "0.345898438"
       },
       {
         "category": "assigned_wi",
         "rowCount": 3,
-        "totalDecimal": "0.3918653178418803418803418803418803418802"
+        "totalDecimal": "0.391865318"
       }
     ],
-    "expectedDecimal": "0.9907407407407407407407407407407407407407",
+    "expectedDecimal": "0.990740741",
     "reviewableRowCount": 36,
     "rows": [
       {
@@ -4762,8 +4762,8 @@
     "rowsMissingSourceDocNo": 0,
     "rowsWithCompleteSource": 36,
     "rowsWithSourceGap": 0,
-    "totalDecimal": "1.023920495014245014245014245014245014245",
-    "varianceDecimal": "0.0331797542735042735042735042735042735043"
+    "totalDecimal": "1.023920495",
+    "varianceDecimal": "0.033179754"
   },
   "unitRows": [
     {

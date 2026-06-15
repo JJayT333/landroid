@@ -14,6 +14,7 @@
 // `depthRange: 'all_depths'` on every node, lease, ORRI, and WI assignment.
 // See `src/types/depth-range.ts` for the Phase 8 attachment point.
 import { d, type Decimal } from '../../engine/decimal';
+import { emitRate } from '../precision/emit';
 import {
   isNpriNode,
   type DeskMap,
@@ -1277,22 +1278,26 @@ export function buildLeaseholdUnitSummary({
       currentOwnership: currentOwnership.toString(),
       leasedOwnership: leasedOwnership.toString(),
       unitParticipation: unitParticipation.toString(),
-      weightedRoyaltyRate: weightedRoyaltyRate.toString(),
-      nriBeforeOrriRate: nriBeforeOrriRate.toString(),
-      floatingNpriBurdenRate: floatingNpriBurdenRate.toString(),
-      fixedNpriBurdenRate: fixedNpriBurdenRate.toString(),
-      totalNpriBurdenRate: totalNpriBurdenRate.toString(),
-      npriAdjustedNriBeforeOrriRate: npriAdjustedNriBeforeOrriRate.toString(),
-      grossOrriBurdenRate: grossOrriBurdenRate.toString(),
-      workingInterestOrriBurdenRate: workingInterestOrriBurdenRate.toString(),
-      netRevenueInterestBaseRate: netRevenueInterestBaseRate.toString(),
-      netRevenueInterestOrriBurdenRate: netRevenueInterestOrriBurdenRate.toString(),
-      totalOrriBurdenRate: totalOrriBurdenRate.toString(),
+      // Stage B: these tract-level display rates are final outputs (not re-read
+      // and multiplied downstream), so they quantize to 9dp.
+      weightedRoyaltyRate: emitRate(weightedRoyaltyRate),
+      nriBeforeOrriRate: emitRate(nriBeforeOrriRate),
+      floatingNpriBurdenRate: emitRate(floatingNpriBurdenRate),
+      fixedNpriBurdenRate: emitRate(fixedNpriBurdenRate),
+      totalNpriBurdenRate: emitRate(totalNpriBurdenRate),
+      npriAdjustedNriBeforeOrriRate: emitRate(npriAdjustedNriBeforeOrriRate),
+      grossOrriBurdenRate: emitRate(grossOrriBurdenRate),
+      workingInterestOrriBurdenRate: emitRate(workingInterestOrriBurdenRate),
+      netRevenueInterestBaseRate: emitRate(netRevenueInterestBaseRate),
+      netRevenueInterestOrriBurdenRate: emitRate(netRevenueInterestOrriBurdenRate),
+      totalOrriBurdenRate: emitRate(totalOrriBurdenRate),
+      // unitRoyaltyDecimal / unitNpriDecimal / unitOrriDecimal / preWorkingInterestDecimal
+      // stay raw -- the unit-total folds below re-read and re-sum them.
       unitRoyaltyDecimal: unitRoyaltyDecimal.toString(),
       unitNpriDecimal: unitNpriDecimal.toString(),
       unitOrriDecimal: unitOrriDecimal.toString(),
       preWorkingInterestDecimal: preWorkingInterestDecimal.toString(),
-      assignmentShare: assignmentShare.toString(),
+      assignmentShare: emitRate(assignmentShare),
       assignedWorkingInterestDecimal: assignedWorkingInterestDecimal.toString(),
       retainedWorkingInterestDecimal: retainedWorkingInterestDecimal.greaterThan(0)
         ? retainedWorkingInterestDecimal.toString()
@@ -1453,23 +1458,31 @@ export function buildLeaseholdUnitSummary({
     tractCount: tracts.length,
     totalGrossAcres: totalGrossAcres.toString(),
     totalPooledAcres: totalPooledAcres.toString(),
-    totalRoyaltyDecimal: tracts.reduce(
+    // Stage B: unit decimal totals are final outputs. They quantize to 9dp;
+    // the per-tract decimals they sum stay raw, and an additive re-sum of raw
+    // values rounded once at the end stays byte-class (agrees at 9dp).
+    totalRoyaltyDecimal: emitRate(tracts.reduce(
       (sum, tract) => sum.plus(d(tract.unitRoyaltyDecimal)),
       d(0)
-    ).toString(),
-    totalNpriDecimal: tracts.reduce(
+    )),
+    totalNpriDecimal: emitRate(tracts.reduce(
       (sum, tract) => sum.plus(d(tract.unitNpriDecimal)),
       d(0)
-    ).toString(),
-    totalOrriDecimal: tracts.reduce(
+    )),
+    totalOrriDecimal: emitRate(tracts.reduce(
       (sum, tract) => sum.plus(d(tract.unitOrriDecimal)),
       d(0)
-    ).toString(),
-    preWorkingInterestDecimal: totalPreWorkingInterestDecimal.toString(),
-    totalAssignedWorkingInterestDecimal: tracts.reduce(
+    )),
+    preWorkingInterestDecimal: emitRate(totalPreWorkingInterestDecimal),
+    totalAssignedWorkingInterestDecimal: emitRate(tracts.reduce(
       (sum, tract) => sum.plus(d(tract.assignedWorkingInterestDecimal)),
       d(0)
-    ).toString(),
+    )),
+    // NOT quantized: this unit total is re-read as the unit-level retained-WI
+    // transfer-order row decimal (`buildLeaseholdDecimalRows`), which is then
+    // re-summed into the transfer-order total. Rows stay raw so the grand total
+    // is `round(sum(raw))` (a true final), not `round(sum(round(...)))` -- the
+    // latter accumulates rounding and shifts the total past 9dp.
     retainedWorkingInterestDecimal: tracts.reduce(
       (sum, tract) => sum.plus(d(tract.retainedWorkingInterestDecimal)),
       d(0)
@@ -1827,7 +1840,8 @@ export function buildLeaseholdTransferOrderReview({
       return {
         category,
         rowCount: rollup?.rowCount ?? 0,
-        totalDecimal: rollup?.totalDecimal.toString() ?? '0',
+        // Stage B: category total is a final output -> 9dp.
+        totalDecimal: rollup ? emitRate(rollup.totalDecimal) : '0',
       };
     })
     .filter((summary) => summary.rowCount > 0);
@@ -1835,9 +1849,12 @@ export function buildLeaseholdTransferOrderReview({
 
   return {
     rows,
-    totalDecimal: totalDecimal.toString(),
-    expectedDecimal: expectedDecimal.toString(),
-    varianceDecimal: totalDecimal.minus(expectedDecimal).abs().toString(),
+    // Stage B: transfer-order terminals are final outputs -> 9dp. Quantizing the
+    // variance collapses sub-9dp arithmetic residue to a clean 0 when the sheet
+    // balances.
+    totalDecimal: emitRate(totalDecimal),
+    expectedDecimal: emitRate(expectedDecimal),
+    varianceDecimal: emitRate(totalDecimal.minus(expectedDecimal).abs()),
     categorySummaries,
     reviewableRowCount: reviewableRows.length,
     rowsWithCompleteSource: reviewableRows.filter(

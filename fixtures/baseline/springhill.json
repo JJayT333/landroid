@@ -5016,14 +5016,14 @@
     "overAssignedTractCount": 0,
     "overBurdenedTractCount": 0,
     "overFloatingNpriBurdenedTractCount": 0,
-    "preWorkingInterestDecimal": "0.6434311974812239954546595895914457012176",
+    "preWorkingInterestDecimal": "0.643431197",
     "retainedWorkingInterestDecimal": "0.6434311974812239954546595895914457012176",
     "totalAssignedWorkingInterestDecimal": "0",
     "totalGrossAcres": "276.1216",
-    "totalNpriDecimal": "0.01334475539265184704854672723901353606527",
+    "totalNpriDecimal": "0.013344755",
     "totalOrriDecimal": "0",
     "totalPooledAcres": "276.1216",
-    "totalRoyaltyDecimal": "0.1646348478094349705588648865813709129118",
+    "totalRoyaltyDecimal": "0.164634848",
     "trackedAssignmentCount": 0,
     "trackedNpriCount": 124,
     "trackedOrriCount": 0,
@@ -5225,7 +5225,7 @@
         "currentOwnership": "1",
         "description": "Dr. Elmore #1 Unit, Tract 2. Present-day mineral ownership (90 owners); totals 100%. San Jacinto County, TX.",
         "deskMapId": "dm-tr2",
-        "fixedNpriBurdenRate": "0.01231125246875",
+        "fixedNpriBurdenRate": "0.012311252",
         "fixedNpriExceedsRoyalty": true,
         "floatingNpriBurdenRate": "0",
         "grossAcres": "106.19",
@@ -5237,10 +5237,10 @@
         "leaseOverlaps": [],
         "leasedOwnership": "0.787920158",
         "name": "Tract 2 — 106.19 ac. (DOTO Unit Tr. 1)",
-        "netRevenueInterestBaseRate": "0.6330410748489583333333333333333333333333",
+        "netRevenueInterestBaseRate": "0.633041075",
         "netRevenueInterestOrriBurdenRate": "0",
-        "npriAdjustedNriBeforeOrriRate": "0.6330410748489583333333333333333333333333",
-        "nriBeforeOrriRate": "0.6331750248333333333333333333333333333333",
+        "npriAdjustedNriBeforeOrriRate": "0.633041075",
+        "nriBeforeOrriRate": "0.633175025",
         "overAssigned": false,
         "overBurdened": false,
         "overFloatingNpriBurdened": false,
@@ -6360,7 +6360,7 @@
         "pooledAcres": "106.19",
         "preWorkingInterestDecimal": "0.2434529994691139172620565238889919030842",
         "retainedWorkingInterestDecimal": "0.2434529994691139172620565238889919030842",
-        "totalNpriBurdenRate": "0.01231125246875",
+        "totalNpriBurdenRate": "0.012311252",
         "totalOrriBurdenRate": "0",
         "trackedAssignmentCount": 0,
         "trackedNpriCount": 26,
@@ -6375,7 +6375,7 @@
         "unitOrriDecimal": "0",
         "unitParticipation": "0.3845769400148340441312812905618394214723",
         "unitRoyaltyDecimal": "0.05951140979542467280116200012361703442737",
-        "weightedRoyaltyRate": "0.1547451331666666666666666666666666666667",
+        "weightedRoyaltyRate": "0.154745133",
         "workingInterestOrriBurdenRate": "0"
       },
       {
@@ -6386,7 +6386,7 @@
         "currentOwnership": "1",
         "description": "Dr. Elmore #1 Unit, Tract 3. Present-day mineral ownership (85 owners); totals 100%. San Jacinto County, TX.",
         "deskMapId": "dm-tr3",
-        "fixedNpriBurdenRate": "0.011389413875",
+        "fixedNpriBurdenRate": "0.011389414",
         "fixedNpriExceedsRoyalty": false,
         "floatingNpriBurdenRate": "0",
         "grossAcres": "28.223",
@@ -6398,10 +6398,10 @@
         "leaseOverlaps": [],
         "leasedOwnership": "0.728922488",
         "name": "Tract 3 — 28.223 ac. (DOTO Unit Tr. 5)",
-        "netRevenueInterestBaseRate": "0.5865389560458333333333333333333333333333",
+        "netRevenueInterestBaseRate": "0.586538956",
         "netRevenueInterestOrriBurdenRate": "0",
-        "npriAdjustedNriBeforeOrriRate": "0.5865389560458333333333333333333333333333",
-        "nriBeforeOrriRate": "0.5865389560458333333333333333333333333333",
+        "npriAdjustedNriBeforeOrriRate": "0.586538956",
+        "nriBeforeOrriRate": "0.586538956",
         "overAssigned": false,
         "overBurdened": false,
         "overFloatingNpriBurdened": false,
@@ -7404,7 +7404,7 @@
         "pooledAcres": "28.223",
         "preWorkingInterestDecimal": "0.05995144514765072405297762531676865072007",
         "retainedWorkingInterestDecimal": "0.05995144514765072405297762531676865072007",
-        "totalNpriBurdenRate": "0.011389413875",
+        "totalNpriBurdenRate": "0.011389414",
         "totalOrriBurdenRate": "0",
         "trackedAssignmentCount": 0,
         "trackedNpriCount": 26,
@@ -7419,7 +7419,7 @@
         "unitOrriDecimal": "0",
         "unitParticipation": "0.1022122137493046541813461895049137771185",
         "unitRoyaltyDecimal": "0.01455333600248023274286884232647258792261",
-        "weightedRoyaltyRate": "0.1423835319541666666666666666666666666667",
+        "weightedRoyaltyRate": "0.142383532",
         "workingInterestOrriBurdenRate": "0"
       },
       {
@@ -7551,7 +7551,7 @@
         "currentOwnership": "1",
         "description": "Dr. Elmore #1 Unit, Tract 5. Present-day mineral ownership (71 owners); totals 100%. San Jacinto County, TX.",
         "deskMapId": "dm-tr5",
-        "fixedNpriBurdenRate": "0.00981471146875",
+        "fixedNpriBurdenRate": "0.009814711",
         "fixedNpriExceedsRoyalty": false,
         "floatingNpriBurdenRate": "0",
         "grossAcres": "8.44",
@@ -7563,10 +7563,10 @@
         "leaseOverlaps": [],
         "leasedOwnership": "0.628141534",
         "name": "Tract 5 — 8.44 ac. (DOTO Unit Tr. 4)",
-        "netRevenueInterestBaseRate": "0.5056216928333333333333333333333333333333",
+        "netRevenueInterestBaseRate": "0.505621693",
         "netRevenueInterestOrriBurdenRate": "0",
-        "npriAdjustedNriBeforeOrriRate": "0.5056216928333333333333333333333333333333",
-        "nriBeforeOrriRate": "0.5056216928333333333333333333333333333333",
+        "npriAdjustedNriBeforeOrriRate": "0.505621693",
+        "nriBeforeOrriRate": "0.505621693",
         "overAssigned": false,
         "overBurdened": false,
         "overFloatingNpriBurdened": false,
@@ -8452,7 +8452,7 @@
         "pooledAcres": "8.44",
         "preWorkingInterestDecimal": "0.01545495566994155232090982137338525248779",
         "retainedWorkingInterestDecimal": "0.01545495566994155232090982137338525248779",
-        "totalNpriBurdenRate": "0.00981471146875",
+        "totalNpriBurdenRate": "0.009814711",
         "totalOrriBurdenRate": "0",
         "trackedAssignmentCount": 0,
         "trackedNpriCount": 26,
@@ -8467,7 +8467,7 @@
         "unitOrriDecimal": "0",
         "unitParticipation": "0.03056624327832375301316521416651214537363",
         "unitRoyaltyDecimal": "0.003744971271521918845416898448606217936832",
-        "weightedRoyaltyRate": "0.1225198411666666666666666666666666666667",
+        "weightedRoyaltyRate": "0.122519841",
         "workingInterestOrriBurdenRate": "0"
       },
       {
@@ -8478,7 +8478,7 @@
         "currentOwnership": "1",
         "description": "Dr. Elmore #1 Unit, Tract 6. Present-day mineral ownership (73 owners); totals 100%. San Jacinto County, TX.",
         "deskMapId": "dm-tr6",
-        "fixedNpriBurdenRate": "0.01297691384375",
+        "fixedNpriBurdenRate": "0.012976914",
         "fixedNpriExceedsRoyalty": false,
         "floatingNpriBurdenRate": "0",
         "grossAcres": "42.581",
@@ -8490,10 +8490,10 @@
         "leaseOverlaps": [],
         "leasedOwnership": "0.830522486",
         "name": "Tract 6 — 42.581 ac. (DOTO Unit Tr. 2)",
-        "netRevenueInterestBaseRate": "0.6675264544333333333333333333333333333333",
+        "netRevenueInterestBaseRate": "0.667526454",
         "netRevenueInterestOrriBurdenRate": "0",
-        "npriAdjustedNriBeforeOrriRate": "0.6675264544333333333333333333333333333333",
-        "nriBeforeOrriRate": "0.6675264544333333333333333333333333333333",
+        "npriAdjustedNriBeforeOrriRate": "0.667526454",
+        "nriBeforeOrriRate": "0.667526454",
         "overAssigned": false,
         "overBurdened": false,
         "overFloatingNpriBurdened": false,
@@ -9325,7 +9325,7 @@
         "pooledAcres": "42.581",
         "preWorkingInterestDecimal": "0.1029399509354783061762160825761789974658",
         "retainedWorkingInterestDecimal": "0.1029399509354783061762160825761789974658",
-        "totalNpriBurdenRate": "0.01297691384375",
+        "totalNpriBurdenRate": "0.012976914",
         "totalOrriBurdenRate": "0",
         "trackedAssignmentCount": 0,
         "trackedNpriCount": 26,
@@ -9340,7 +9340,7 @@
         "unitOrriDecimal": "0",
         "unitParticipation": "0.1542110432505099202670127943630632301131",
         "unitRoyaltyDecimal": "0.02513578807358871357160516719203906298287",
-        "weightedRoyaltyRate": "0.1629960315666666666666666666666666666667",
+        "weightedRoyaltyRate": "0.162996032",
         "workingInterestOrriBurdenRate": "0"
       },
       {
@@ -13788,20 +13788,20 @@
       {
         "category": "royalty",
         "rowCount": 58,
-        "totalDecimal": "0.1513416064918890958427977625316768650721"
+        "totalDecimal": "0.151341606"
       },
       {
         "category": "npri",
         "rowCount": 124,
-        "totalDecimal": "0.01334475539265184704854672723901353606522"
+        "totalDecimal": "0.013344755"
       },
       {
         "category": "retained_wi",
         "rowCount": 1,
-        "totalDecimal": "0.6434311974812239954546595895914457012176"
+        "totalDecimal": "0.643431197"
       }
     ],
-    "expectedDecimal": "0.8081175593657649383460040793621361023549",
+    "expectedDecimal": "0.808117559",
     "reviewableRowCount": 182,
     "rows": [
       {
@@ -15821,8 +15821,8 @@
     "rowsMissingSourceDocNo": 0,
     "rowsWithCompleteSource": 182,
     "rowsWithSourceGap": 0,
-    "totalDecimal": "0.8081175593657649383460040793621361023545",
-    "varianceDecimal": "4e-40"
+    "totalDecimal": "0.808117559",
+    "varianceDecimal": "0"
   },
   "unitRows": [
     {

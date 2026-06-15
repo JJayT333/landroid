@@ -7,9 +7,12 @@
  * the per-tract coverage summary. UI-only helpers (pickPrimaryLease,
  * toDeskMapPrimaryLeaseSummary, canOwnerNodeHoldLease) stay in the component.
  *
- * Emission goes through `emitRate` (= Decimal.toString()), preserving the raw
- * full-precision residue the desk-map layer has always produced; string and
- * literal pass-throughs ('0', 'malformed', node.fraction) are preserved verbatim.
+ * Emission goes through `emitRate` (now 9dp-quantized, Stage B) for the display
+ * coverage totals, but the cross-module `allocatedFraction` that leasehold
+ * re-parses and multiplies through its burden stack stays full precision via
+ * `emitRawRate` -- quantizing it would compound rounding into a real divergence.
+ * String and literal pass-throughs ('0', 'malformed', node.fraction) are
+ * preserved verbatim.
  *
  * Depth severance is not modeled; this allocator assumes depthRange 'all_depths'
  * on every node and lease (the Phase 8 attachment point).
@@ -22,7 +25,7 @@ import type { OwnershipNode } from '../../types/node';
 import { isInactiveLeaseStatus, isTexasMathLease, type Lease } from '../../types/owner';
 import { parseStrictInterestString } from '../../utils/interest-string';
 import { isTitleCountedNode } from '../model/node-predicates';
-import { emitRate } from '../precision/emit';
+import { emitRate, emitRawRate } from '../precision/emit';
 
 export interface DeskMapCoverageSummary {
   currentOwnership: string;
@@ -194,7 +197,9 @@ export function allocateLeaseCoverage(
 
     allocations.push({
       lease,
-      allocatedFraction: emitRate(allocatedFraction),
+      // B0 firewall: leasehold re-parses this and multiplies it through the
+      // whole royalty/NPRI/WI stack, so it must keep full precision.
+      allocatedFraction: emitRawRate(allocatedFraction),
     });
     remainingFraction = remainingFraction.minus(allocatedFraction);
   }

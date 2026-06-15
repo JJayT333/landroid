@@ -1523,34 +1523,34 @@
         "decimal": "0.02688802083333333333333333333333333333333"
       }
     ],
-    "totalDecimal": "1.023920495014245014245014245014245014245",
-    "expectedDecimal": "0.9907407407407407407407407407407407407407",
-    "varianceDecimal": "0.0331797542735042735042735042735042735043",
+    "totalDecimal": "1.023920495",
+    "expectedDecimal": "0.990740741",
+    "varianceDecimal": "0.033179754",
     "categorySummaries": [
       {
         "category": "royalty",
         "rowCount": 28,
-        "totalDecimal": "0.214440883190883190883190883190883190883"
+        "totalDecimal": "0.214440883"
       },
       {
         "category": "npri",
         "rowCount": 2,
-        "totalDecimal": "0.04861111111111111111111111111111111111112"
+        "totalDecimal": "0.048611111"
       },
       {
         "category": "orri",
         "rowCount": 3,
-        "totalDecimal": "0.02310474537037037037037037037037037037037"
+        "totalDecimal": "0.023104745"
       },
       {
         "category": "retained_wi",
         "rowCount": 1,
-        "totalDecimal": "0.3458984375"
+        "totalDecimal": "0.345898438"
       },
       {
         "category": "assigned_wi",
         "rowCount": 3,
-        "totalDecimal": "0.3918653178418803418803418803418803418802"
+        "totalDecimal": "0.391865318"
       }
     ],
     "reviewableRowCount": 36,
