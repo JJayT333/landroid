@@ -397,6 +397,8 @@ describe('Phase 4 LIVE title journal (real store auto-records)', () => {
     const actionRecords = [...seeded.actionRecords];
     const auditEvents = [...seeded.auditEvents];
     expect(actionRecords.length).toBeGreaterThan(0);
+    // Recorded this session, so the session parity counter tracks the total.
+    expect(seeded.sessionParityCount).toBe(seeded.recordedMutationCount);
 
     // loadWorkspace wipes the live ledger (ACT-H04); a v9 import then hydrates it.
     useTitleActionLog.getState().reset();
@@ -409,6 +411,9 @@ describe('Phase 4 LIVE title journal (real store auto-records)', () => {
     expect(after.auditEvents).toEqual(auditEvents);
     expect(after.headHash).toBe(auditEvents.at(-1)?.eventHash);
     expect(after.recordedMutationCount).toBe(actionRecords.length);
+    // DA-U2: hydrated history is not a parity recorded this session, so it must
+    // not count toward the cutover readiness threshold.
+    expect(after.sessionParityCount).toBe(0);
     expect((await verifyAuditChain(after.auditEvents)).valid).toBe(true);
   });
 
