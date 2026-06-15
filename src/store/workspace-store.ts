@@ -68,7 +68,8 @@ import {
   executeAttachConveyance,
   executeDeleteBranch,
 } from '../engine/math-engine';
-import type { Audit } from '../types/result';
+import type { Audit, ResultWarning } from '../types/result';
+import { createBlankTitleIssue } from '../types/title-issue';
 import {
   captureCascadeBundle,
   captureCascadeReapply,
@@ -323,6 +324,43 @@ interface WorkspaceState {
 function findParentId(nodes: OwnershipNode[], nodeId: string): string | null {
   const node = nodes.find((n) => n.id === nodeId);
   return node?.parentId ?? null;
+}
+
+/**
+ * DA-M1: a conveyance that recites more than the grantor holds is booked at the
+ * grantor's remainder (the engine captures the stated amount on the node), and
+ * the divergence is surfaced as a tracked title issue rather than rejected.
+ * Raising it here covers both the Convey modal and the AI conveyance path, and
+ * is idempotent per node so re-deriving the same mutation does not duplicate it.
+ */
+function raiseOverConveyanceIssue(
+  newNodeId: string,
+  deskMapId: string | null,
+  form: Partial<OwnershipNode>,
+  warning: ResultWarning
+): void {
+  const curative = useCurativeStore.getState();
+  const alreadyFlagged = curative.titleIssues.some(
+    (issue) =>
+      issue.issueType === 'Over-conveyance' && issue.affectedNodeId === newNodeId
+  );
+  if (alreadyFlagged) return;
+
+  const granteeLabel = (form.grantee ?? '').trim() || 'grantee';
+  const issue = createBlankTitleIssue(curative.workspaceId ?? '', {
+    id: `over-conveyance-${newNodeId}`,
+    title: `Over-conveyance to ${granteeLabel}`,
+    issueType: 'Over-conveyance',
+    priority: 'High',
+    affectedNodeId: newNodeId,
+    affectedDeskMapId: deskMapId,
+    sourceDocNo: (form.docNo ?? '').trim(),
+    requiredCurativeAction:
+      'Confirm the deed language and reconcile the over-stated grant; the engine '
+      + 'booked the grantor remainder and captured the stated amount for review.',
+    notes: warning.message,
+  });
+  void curative.addIssue(issue).catch(() => {});
 }
 
 function resolveActiveDeskMapId(
@@ -1037,6 +1075,10 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
         ...dmUpdate,
       });
       if (journalTitleMutation('convey', state, get()).rolledBack) return false;
+      // DA-M1: surface a booked over-conveyance as a tracked title issue.
+      if (result.warning?.code === 'over_conveyance') {
+        raiseOverConveyanceIssue(newNodeId, targetDeskMapId ?? null, form, result.warning);
+      }
       return true;
     }
     set({ lastError: result.error.message });

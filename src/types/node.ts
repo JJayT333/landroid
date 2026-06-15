@@ -473,6 +473,12 @@ export function normalizeOwnershipNode(
     fixedRoyaltyBasis,
     depthRange: normalizeDepthRange(node.depthRange),
     isCollapsed: node.isCollapsed === true,
+    // DA-M1: an over-conveyance records the deed's STATED fraction verbatim
+    // alongside the booked fraction. Optional and absent by default; preserved
+    // verbatim so full-node snapshots round-trip the captured value.
+    ...(typeof node.statedFraction === 'string' && node.statedFraction.trim().length > 0
+      ? { statedFraction: node.statedFraction }
+      : {}),
   };
 }
 

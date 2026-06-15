@@ -103,14 +103,9 @@ export default function ConveyModal({ parentNode, onClose }: ConveyModalProps) {
       return;
     }
 
-    if (overConveys) {
-      setError(
-        `Requested ${previewFrac} exceeds ${parentRemainingLabel.toLowerCase()} of ${parentRemaining}. ` +
-          'Reduce the amount or use "Convey remainder instead".'
-      );
-      return;
-    }
-
+    // DA-M1: an over-conveyance is NOT blocked. The engine books the grantor's
+    // remainder, captures the deed's stated amount verbatim on the new node, and
+    // the store raises an Over-conveyance title issue. Saving proceeds.
     const share = serialize(previewShare);
     const newNodeId = `node-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
 
@@ -268,12 +263,18 @@ export default function ConveyModal({ parentNode, onClose }: ConveyModalProps) {
               {parentRemainingLabel.toLowerCase()} of{' '}
               <span className="font-mono font-semibold">{parentRemaining}</span>.
             </p>
+            <p className="mt-1 text-xs">
+              Saving will book the remainder (
+              <span className="font-mono font-semibold">{parentRemaining}</span>), record the
+              stated <span className="font-mono font-semibold">{previewFrac}</span> on the deed, and
+              flag an over-conveyance title issue for review.
+            </p>
             <button
               type="button"
               onClick={handleConveyRemainder}
               className="mt-2 rounded border border-tint-amber-line bg-white/60 px-2 py-1 text-xs font-semibold hover:bg-white"
             >
-              Convey remainder ({parentRemaining}) instead
+              Convey remainder ({parentRemaining}) exactly instead
             </button>
           </div>
         )}
