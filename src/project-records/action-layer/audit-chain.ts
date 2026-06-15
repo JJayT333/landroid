@@ -175,17 +175,22 @@ export async function verifyAuditChain(
  * by id. So an edit to `result.recordEffects` (in Dexie, or in a `.landroid`
  * `actionLedger` before import) passes `verifyAuditChain` untouched.
  *
- * The fix commits `actionHash = sha256(canonicalJson(actionRecord))` into each
- * `action_record.applied` event's `details` at materialization. Because the
- * event hash covers `details`, the payload becomes transitively bound to the
- * chain: tampering with the ActionRecord breaks this comparison; stripping the
- * committed `actionHash` to forge a "legacy" event breaks the event hash. So a
- * genuinely legacy (pre-DA-H5) event — one with no committed hash whose own
- * `eventHash` is still valid — is the only authentic unhashed case, accepted
- * with a count the caller surfaces as a one-time warning.
+ * The fix commits `actionHash = sha256(canonicalJson(actionRecord.result))` into
+ * each `action_record.applied` event's `details` at materialization. The hash
+ * covers the `result` payload specifically — `recordEffects` (what replay
+ * applies) and `titleNodeSnapshots` (the math node set), i.e. exactly the data a
+ * tamper would target — and deliberately NOT the lifecycle envelope (`status`,
+ * `revision`, `lastModified`), which the DA-H2 undo legitimately rewrites in
+ * place when it marks a record `undone`. Because the event hash covers
+ * `details`, the payload becomes transitively bound to the chain: tampering with
+ * the result breaks this comparison; stripping the committed `actionHash` to
+ * forge a "legacy" event breaks the event hash. So a genuinely legacy (pre-DA-H5)
+ * event — one with no committed hash whose own `eventHash` is still valid — is
+ * the only authentic unhashed case, accepted with a count the caller surfaces as
+ * a one-time warning.
  */
 export async function computeActionRecordHash(record: ActionRecord): Promise<string> {
-  return sha256HexOfText(canonicalJson(record));
+  return sha256HexOfText(canonicalJson(record.result));
 }
 
 export interface ActionPayloadVerification {

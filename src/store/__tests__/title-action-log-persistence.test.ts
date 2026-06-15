@@ -45,7 +45,15 @@ const ledgerPersistenceMocks = vi.hoisted(() => {
     replaceTitleLedgerWorkspaceRows: vi.fn(async (workspaceId: string, rows: Rows) => {
       rowsByWorkspace.set(workspaceId, clone(rows));
     }),
-    quarantineTitleLedgerRows: vi.fn(async () => undefined),
+    quarantineTitleLedgerRows: vi.fn(
+      async (_input: {
+        workspaceId: string;
+        rows: Rows;
+        reason: string;
+        source: 'storage' | 'file';
+        quarantinedAt: string;
+      }) => undefined
+    ),
   };
 });
 
@@ -297,10 +305,7 @@ describe('title action log runtime persistence lifecycle', () => {
       ledgerPersistenceMocks.quarantineTitleLedgerRows
     ).toHaveBeenCalledTimes(1);
     const quarantineCall =
-      ledgerPersistenceMocks.quarantineTitleLedgerRows.mock.calls[0][0] as {
-        source: string;
-        rows: TitleLedgerWorkspaceRows;
-      };
+      ledgerPersistenceMocks.quarantineTitleLedgerRows.mock.calls[0][0];
     expect(quarantineCall.source).toBe('storage');
     expect(quarantineCall.rows.auditEvents).toHaveLength(
       corrupted.auditEvents.length

@@ -255,6 +255,23 @@ describe('DA-H5 action payload hashing', () => {
     expect(verdict.reason).toMatch(/payload was altered/);
   });
 
+  it('keeps verifying after a record is marked undone in place (DA-H2 interaction)', async () => {
+    const { actionRecords, auditEvents } = await hashedRows();
+    // DA-H2 undo rewrites status/revision/lastModified in place but never the
+    // `result` payload — so the committed hash (over `result`) must still match.
+    const undone = actionRecords.map((record) =>
+      record.recordId === 'action-record-1'
+        ? ActionRecordSchema.parse({
+            ...record,
+            status: 'undone',
+            revision: record.revision + 1,
+            lastModified: '2026-06-02T00:00:00.000Z',
+          })
+        : record
+    );
+    expect((await verifyActionPayloadHashes(undone, auditEvents)).valid).toBe(true);
+  });
+
   it('accepts a legacy chain (no committed actionHash) and counts it', async () => {
     const r1 = actionRecord('action-record-1', 'one');
     const legacyEvents = await buildAuditChain({
