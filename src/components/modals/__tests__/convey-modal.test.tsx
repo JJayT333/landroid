@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { calculateShare } from '../../../engine/math-engine';
+import { calculateShare } from '../../../title-math';
 import { isOverConveyance } from '../ConveyModal';
 
 // DA-M1: the modal must flag an over-conveyance now that `calculateShare`

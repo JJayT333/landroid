@@ -56,8 +56,8 @@ import {
   type LeaseholdTransferOrderReview,
   type LeaseholdUnitAssignmentWarning,
   type LeaseholdUnitSummary,
-} from '../components/leasehold/leasehold-summary';
-import type { LeaseCoverageOverlap } from '../components/deskmap/deskmap-coverage';
+} from '../title-math';
+import type { LeaseCoverageOverlap } from '../title-math';
 import UnitFocusSelector from '../components/shared/UnitFocusSelector';
 import {
   filterDeskMapsByUnitCode,

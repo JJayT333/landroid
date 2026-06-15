@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createBlankNode } from '../../types/node';
 import { createBlankLease, createBlankOwner } from '../../types/owner';
 import { createBlankTitleIssue } from '../../types/title-issue';
-import { buildLeaseholdUnitSummary } from '../../components/leasehold/leasehold-summary';
+import { buildLeaseholdUnitSummary } from '../../title-math';
 import {
   buildOwnerListRows,
   sortAndFilterOwnerListRows,

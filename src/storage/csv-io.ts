@@ -16,7 +16,7 @@ import {
   type LeaseholdUnit,
 } from '../types/leasehold';
 import { createWorkspaceId } from '../utils/workspace-id';
-import { validateOwnershipGraph } from '../engine/math-engine';
+import { validateOwnershipGraph } from '../title-math';
 import { parseStrictInterestString } from '../utils/interest-string';
 
 // ── CSV column names ────────────────────────────────────────

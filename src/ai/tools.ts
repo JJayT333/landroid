@@ -22,7 +22,7 @@ import {
   registerAIMutationExecutor,
 } from './approval-store';
 import type { OwnershipNode } from '../types/node';
-import { validateOwnershipGraph } from '../engine/math-engine';
+import { validateOwnershipGraph } from '../title-math';
 import {
   createBlankLease,
   createBlankOwner,

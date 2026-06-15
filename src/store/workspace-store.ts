@@ -67,7 +67,7 @@ import {
   executePredecessorInsert,
   executeAttachConveyance,
   executeDeleteBranch,
-} from '../engine/math-engine';
+} from '../title-math';
 import type { Audit, ResultWarning } from '../types/result';
 import { createBlankTitleIssue } from '../types/title-issue';
 import {

@@ -5,12 +5,12 @@ import {
   calculateDeskMapCoverageSummary,
   getActiveLeases,
   getLeasesForOwnerNode,
-} from '../components/deskmap/deskmap-coverage';
+} from '../title-math';
 import { isLeaseNode } from '../components/deskmap/deskmap-lease-node';
 import {
   buildLeaseholdUnitSummary,
   type LeaseholdUnitSummary,
-} from '../components/leasehold/leasehold-summary';
+} from '../title-math';
 import { useOwnerStore } from '../store/owner-store';
 import { useUIStore, type ViewMode } from '../store/ui-store';
 import { useWorkspaceStore } from '../store/workspace-store';

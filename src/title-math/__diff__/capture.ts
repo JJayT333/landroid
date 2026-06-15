@@ -23,16 +23,16 @@
  *
  * Test/diagnostic-only; never imported by app code.
  */
-import type { DeskMapCoverageSummary } from '../../components/deskmap/deskmap-coverage';
+import type { DeskMapCoverageSummary } from '../index';
 import type {
   LeaseholdDecimalRow,
   LeaseholdTransferOrderReview,
   LeaseholdUnitSummary,
-} from '../../components/leasehold/leasehold-summary';
+} from '../index';
 import type {
   NpriBranchDiscrepancy,
   ValidationResult,
-} from '../../engine/math-engine';
+} from '../index';
 import type { LiveOwnershipFractions } from '../../engine/tree-layout';
 import type { WorkspaceData } from '../../storage/workspace-persistence';
 import { createBlankLeaseholdUnit } from '../../types/leasehold';

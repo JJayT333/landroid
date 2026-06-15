@@ -17,7 +17,7 @@ import type {
   LeaseholdOwnerSummary,
   LeaseholdTractSummary,
   LeaseholdUnitSummary,
-} from './leasehold-summary';
+} from '../../title-math';
 
 // ── Number formatting ───────────────────────────────────
 

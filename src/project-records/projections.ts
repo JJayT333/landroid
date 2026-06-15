@@ -5,7 +5,7 @@ import {
   type LeaseholdDecimalRow,
   type LeaseholdTransferOrderReview,
   type LeaseholdUnitSummary,
-} from '../components/leasehold/leasehold-summary';
+} from '../title-math';
 import { dualDisplay, formatAsFraction } from '../engine/fraction-display';
 import type {
   BackendSpineCoreRecord,

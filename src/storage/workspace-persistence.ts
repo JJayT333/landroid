@@ -29,7 +29,7 @@ import { Decimal } from '../engine/decimal';
 import {
   validateOwnershipGraph,
   type ValidationIssue,
-} from '../engine/math-engine';
+} from '../title-math';
 import { createWorkspaceId } from '../utils/workspace-id';
 import { assertFileSize, FILE_SIZE_LIMITS } from '../utils/file-validation';
 import {

@@ -4,11 +4,13 @@ import { createBlankLease, type Lease } from '../../../types/owner';
 import {
   allocateLeaseCoverage,
   calculateDeskMapCoverageSummary,
-  canOwnerNodeHoldLease,
   isLeaseActive,
+} from '../../../title-math';
+import {
+  canOwnerNodeHoldLease,
   pickPrimaryLease,
   toDeskMapPrimaryLeaseSummary,
-} from '../deskmap-coverage';
+} from '../lease-helpers';
 
 describe('deskmap-coverage', () => {
   it('calculates current, linked, and leased coverage separately', () => {

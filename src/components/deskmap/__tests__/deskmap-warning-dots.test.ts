@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createBlankNode } from '../../../types/node';
 import type { DeskMap } from '../../../types/node';
-import type { DeskMapCoverageSummary } from '../deskmap-coverage';
+import type { DeskMapCoverageSummary } from '../../../title-math';
 import { buildDeskMapWarningDotState, hasDeskMapWarningDot } from '../deskmap-warning-dots';
 
 function deskMap(nodeIds: string[], fields: Partial<DeskMap> = {}): DeskMap {

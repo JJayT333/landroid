@@ -3,9 +3,11 @@ import {
   buildLeaseScopeIndex,
   getActiveLeases,
   getLeasesForOwnerNode,
+} from '../../title-math';
+import {
   pickPrimaryLease,
   toDeskMapPrimaryLeaseSummary,
-} from '../deskmap/deskmap-coverage';
+} from '../deskmap/lease-helpers';
 import { deriveCounty } from '../../utils/land';
 import { useUIStore } from '../../store/ui-store';
 import { useOwnerStore } from '../../store/owner-store';
