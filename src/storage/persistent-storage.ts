@@ -37,6 +37,18 @@ export interface PersistentStorageEnv {
   storage?: StorageManagerLike;
 }
 
+/**
+ * Detect an IndexedDB storage-quota failure (DA-M11). Browsers throw a
+ * `DOMException` named `'QuotaExceededError'` (legacy code 22) when a write
+ * would exceed the origin's storage budget.
+ */
+export function isQuotaExceededError(error: unknown): boolean {
+  return (
+    error instanceof DOMException
+    && (error.name === 'QuotaExceededError' || error.code === 22)
+  );
+}
+
 function resolveStorage(env?: PersistentStorageEnv): StorageManagerLike | undefined {
   if (env) return env.storage;
   if (typeof navigator !== 'undefined') {

@@ -5,6 +5,7 @@
  * persistence authority or affect autosave/export behavior.
  */
 import { create } from 'zustand';
+import { isQuotaExceededError } from '../storage/persistent-storage';
 import type {
   BrowserStorageEstimateResult,
   PersistentStorageResult,
@@ -46,6 +47,12 @@ interface StorageHealthState {
   browserStorageEstimate: BrowserStorageEstimateResult | null;
   lastExportedAt: string | null;
   lastSavedAt: string | null;
+  /**
+   * Last storage-quota write failure (DA-M11). A denied blob/shard write was
+   * previously invisible; this surfaces it so the Sidebar can warn the user to
+   * export. Cleared by the next successful workspace save.
+   */
+  lastPersistenceError: { message: string; at: string } | null;
   persistentStorage: PersistentStorageResult | null;
   rollingAutoExport: RollingAutoExportState;
   clearRollingAutoExportDirectory: () => void;
@@ -68,6 +75,8 @@ interface StorageHealthState {
   recordRollingAutoExportWarning: (message: string) => void;
   recordWorkspaceSaved: (savedAt?: string) => void;
   recordWorkspaceExported: (exportedAt?: string) => void;
+  recordPersistenceError: (message: string) => void;
+  clearPersistenceError: () => void;
   setBrowserStorageEstimate: (estimate: BrowserStorageEstimateResult) => void;
   setPersistentStorageResult: (result: PersistentStorageResult) => void;
   setRollingAutoExportSupported: () => void;
@@ -78,6 +87,7 @@ export const useStorageHealthStore = create<StorageHealthState>((set) => ({
   browserStorageEstimate: null,
   lastExportedAt: null,
   lastSavedAt: null,
+  lastPersistenceError: null,
   persistentStorage: null,
   rollingAutoExport: initialRollingAutoExportState,
   clearRollingAutoExportDirectory: () => {
@@ -162,10 +172,18 @@ export const useStorageHealthStore = create<StorageHealthState>((set) => ({
     }));
   },
   recordWorkspaceSaved: (savedAt = new Date().toISOString()) => {
-    set({ lastSavedAt: savedAt });
+    // A successful save means storage accepted the write — clear any stale
+    // quota warning.
+    set({ lastSavedAt: savedAt, lastPersistenceError: null });
   },
   recordWorkspaceExported: (exportedAt = new Date().toISOString()) => {
     set({ lastExportedAt: exportedAt });
+  },
+  recordPersistenceError: (message) => {
+    set({ lastPersistenceError: { message, at: new Date().toISOString() } });
+  },
+  clearPersistenceError: () => {
+    set({ lastPersistenceError: null });
   },
   setBrowserStorageEstimate: (estimate) => {
     set({ browserStorageEstimate: estimate });
@@ -195,3 +213,26 @@ export const useStorageHealthStore = create<StorageHealthState>((set) => ({
     });
   },
 }));
+
+/**
+ * Run a storage write; on an IndexedDB quota failure, record it on the
+ * storage-health store (so the Sidebar can warn the user to export) before
+ * rethrowing so existing callers still see the failure (DA-M11).
+ */
+export async function withQuotaErrorReporting<T>(
+  operationLabel: string,
+  run: () => Promise<T>
+): Promise<T> {
+  try {
+    return await run();
+  } catch (error) {
+    if (isQuotaExceededError(error)) {
+      useStorageHealthStore
+        .getState()
+        .recordPersistenceError(
+          `${operationLabel} failed: browser storage is full. Export a .landroid backup to free space.`
+        );
+    }
+    throw error;
+  }
+}

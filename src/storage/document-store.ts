@@ -16,6 +16,7 @@
 import db from './db';
 import Dexie from 'dexie';
 import { sha256HexOfBlob } from './blob-hash';
+import { withQuotaErrorReporting } from '../store/storage-health-store';
 import {
   activeStorageScopedId,
   activeWorkspaceScope,
@@ -279,7 +280,7 @@ export async function saveDoc(
   };
 
   await ensureWorkspaceWriteFence(input.workspaceId);
-  return db.transaction(
+  return withQuotaErrorReporting('Document save', () => db.transaction(
     'rw',
     db.workspaceWriteLeases,
     db.documents,
@@ -305,7 +306,7 @@ export async function saveDoc(
       );
       return { document, attachment };
     }
-  );
+  ));
 }
 
 /**

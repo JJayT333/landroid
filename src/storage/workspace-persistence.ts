@@ -39,6 +39,7 @@ import {
   type DeskMap,
 } from '../types/node';
 import type { CanvasSaveData } from '../store/canvas-store';
+import { withQuotaErrorReporting } from '../store/storage-health-store';
 import type { PageSizeId } from '../types/flowchart';
 import {
   normalizeLeaseholdAssignments,
@@ -1019,7 +1020,7 @@ export async function saveWorkspaceShardsToDb(
   // workspace (a fresh install, or an import/CSV that swapped the workspace).
   const shouldAnchorMonolith = anchoredMonolithWorkspaceId !== workspaceId;
 
-  await db.transaction(
+  await withQuotaErrorReporting('Workspace save', () => db.transaction(
     'rw',
     [
       db.workspaces,
@@ -1074,7 +1075,7 @@ export async function saveWorkspaceShardsToDb(
         });
       }
     }
-  );
+  ));
 
   if (shouldAnchorMonolith) {
     anchoredMonolithWorkspaceId = workspaceId;
