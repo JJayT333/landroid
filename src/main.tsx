@@ -205,7 +205,14 @@ useWorkspaceStore.subscribe((state) => {
     void (async () => {
       const result = await saveWorkspaceShardsToDb(payload);
       if (result.status !== 'written') return;
-      if (saveGeneration !== workspaceSaveGeneration) return;
+      // DA-H4(a): flush the ledger in the SAME save unit as the shards it
+      // accompanies — never skip it because a newer edit arrived between the
+      // shard write and here. The generation guard previously sat in front of
+      // the flush, so a perpetual-typing session could persist shards
+      // repeatedly while skipping the ledger; a tab-kill in that window left
+      // the store permanently ahead of a valid-looking but stale ledger.
+      // `flushTitleActionLogToStorage` keeps its own ledger-generation guard to
+      // drop a genuinely stale in-memory chain.
       await flushTitleActionLogToStorage(payload.workspaceId);
       if (saveGeneration !== workspaceSaveGeneration) return;
       useStorageHealthStore.getState().recordWorkspaceSaved();

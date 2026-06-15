@@ -54,6 +54,7 @@ import {
 import type { ProjectRecordBundle } from '../project-records/record-validation';
 import {
   listTitleLedgerWorkspaceRows,
+  quarantineTitleLedgerRows,
   replaceTitleLedgerWorkspaceRows,
 } from '../storage/title-ledger-persistence';
 import type { TitleLedgerWorkspaceRows } from '../storage/title-ledger-stores';
@@ -81,6 +82,21 @@ export interface TitleLedgerDivergence {
   at: string;
 }
 
+/**
+ * DA-H4: a notice that a stored or imported ledger chain failed verification and
+ * was QUARANTINED (preserved in `titleLedgerQuarantine`) rather than erased,
+ * before a fresh baseline replaced it. Surfaced in the ledger status banner so
+ * the corruption/tamper event is visible, not silent.
+ */
+export interface TitleLedgerQuarantineNotice {
+  workspaceId: string;
+  source: 'storage' | 'file';
+  reason: string;
+  at: string;
+  actionRecordCount: number;
+  auditEventCount: number;
+}
+
 interface TitleActionLogState {
   /** When false, the journal hook is a no-op (reversible kill switch). */
   enabled: boolean;
@@ -101,6 +117,8 @@ interface TitleActionLogState {
   lastDivergence: TitleLedgerDivergence | null;
   /** Last non-divergence recording error (e.g. a malformed mutation). */
   lastError: string | null;
+  /** Last invalid chain quarantined-not-erased on hydrate (DA-H4). */
+  lastQuarantine: TitleLedgerQuarantineNotice | null;
   /**
    * Live read-path mode for title records. Default `'shadow'` (store-canonical).
    * `'cutover'` sources title records from the durable ledger. Reversible.
@@ -205,6 +223,7 @@ export const useTitleActionLog = create<TitleActionLogState>()((set, get) => ({
   sessionParityCount: 0,
   lastDivergence: null,
   lastError: null,
+  lastQuarantine: null,
   readPathMode: 'shadow',
 
   setEnabled: (enabled) => set({ enabled }),
@@ -221,6 +240,7 @@ export const useTitleActionLog = create<TitleActionLogState>()((set, get) => ({
       sessionParityCount: 0,
       lastDivergence: null,
       lastError: null,
+      lastQuarantine: null,
       readPathMode: 'shadow',
     });
   },
@@ -238,6 +258,7 @@ export const useTitleActionLog = create<TitleActionLogState>()((set, get) => ({
       sessionParityCount: 0,
       lastDivergence: null,
       lastError: null,
+      lastQuarantine: null,
       readPathMode: 'shadow',
     });
   },
@@ -498,6 +519,64 @@ async function baselineAndFlushTitleLedger(
   };
 }
 
+/**
+ * DA-H4: preserve an invalid chain (quarantine, best-effort) instead of letting
+ * the subsequent re-baseline erase the only tamper/corruption evidence, then
+ * return a notice the banner surfaces. Called BEFORE `baselineAndFlushTitleLedger`
+ * (whose reset clears `lastQuarantine`), so the caller sets the notice AFTER the
+ * baseline completes.
+ */
+async function quarantineInvalidLedger(
+  workspaceId: string,
+  rows: TitleLedgerWorkspaceRows,
+  source: 'storage' | 'file'
+): Promise<TitleLedgerQuarantineNotice> {
+  const reason =
+    `${rows.actionRecords.length} action record(s) / ${rows.auditEvents.length} `
+    + 'audit event(s) failed ledger verification on hydrate';
+  const quarantinedAt = new Date().toISOString();
+  try {
+    await quarantineTitleLedgerRows({
+      workspaceId,
+      rows,
+      reason,
+      source,
+      quarantinedAt,
+    });
+  } catch (err) {
+    console.warn(
+      '[title-action-log] failed to durably quarantine the invalid ledger; '
+        + 'surfacing the in-session notice only:',
+      err
+    );
+  }
+  console.warn(
+    `[title-action-log] Quarantined an invalid ${source} ledger for workspace `
+      + `${workspaceId} (not erased): ${reason}.`
+  );
+  return {
+    workspaceId,
+    source,
+    reason,
+    at: quarantinedAt,
+    actionRecordCount: rows.actionRecords.length,
+    auditEventCount: rows.auditEvents.length,
+  };
+}
+
+async function baselineAfterQuarantine(
+  workspace: WorkspaceData,
+  rows: TitleLedgerWorkspaceRows,
+  source: 'storage' | 'file',
+  ownerData?: OwnerSlice
+): Promise<TitleLedgerLifecycleResult> {
+  const notice = await quarantineInvalidLedger(workspace.workspaceId, rows, source);
+  const result = await baselineAndFlushTitleLedger(workspace, ownerData);
+  // Set AFTER the baseline — baselineAndFlushTitleLedger's reset clears it.
+  useTitleActionLog.setState({ lastQuarantine: notice });
+  return result;
+}
+
 export async function flushTitleActionLogToStorage(
   workspaceId: string
 ): Promise<void> {
@@ -550,6 +629,9 @@ export async function hydrateTitleActionLogFromStorageOrBaseline(
         auditEventCount: rows.auditEvents.length,
       };
     }
+    // DA-H4: the stored chain is non-empty but invalid — preserve it before the
+    // baseline overwrites it, instead of the old warn-and-erase.
+    return baselineAfterQuarantine(workspace, storedRows, 'storage', ownerData);
   }
   return baselineAndFlushTitleLedger(workspace, ownerData);
 }
@@ -569,6 +651,12 @@ export async function hydrateTitleActionLogFromImportedLedger(
         actionRecordCount: rows.actionRecords.length,
         auditEventCount: rows.auditEvents.length,
       };
+    }
+    // DA-H4: an imported file's chain failed verification — quarantine the
+    // rejected bundle (evidence of a tampered/corrupt `.landroid`) before
+    // baselining, rather than dropping it silently.
+    if (rows.actionRecords.length > 0 || rows.auditEvents.length > 0) {
+      return baselineAfterQuarantine(workspace, rows, 'file', ownerData);
     }
   }
   return baselineAndFlushTitleLedger(workspace, ownerData);

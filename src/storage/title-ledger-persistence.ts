@@ -13,6 +13,7 @@ import {
 import type {
   StoredTitleActionRecord,
   StoredTitleAuditEvent,
+  StoredTitleLedgerQuarantine,
   TitleLedgerWorkspaceRows,
 } from './title-ledger-stores';
 
@@ -177,5 +178,53 @@ export async function clearTitleLedgerRowsForActiveKey(): Promise<void> {
       await db.titleActionRecords.where('dbKey').equals(dbKey).delete();
       await db.titleAuditEvents.where('dbKey').equals(dbKey).delete();
     }
+  );
+}
+
+/**
+ * DA-H4: preserve a rejected ledger chain before a fresh baseline overwrites it.
+ * Append-only and deliberately NOT lease-fenced — evidence preservation must not
+ * be blocked by a read-only tab, and each capture gets a unique id (the head
+ * hash + timestamp), so concurrent captures coexist rather than clobber.
+ */
+export async function quarantineTitleLedgerRows(input: {
+  workspaceId: string;
+  rows: TitleLedgerWorkspaceRows;
+  reason: string;
+  source: 'storage' | 'file';
+  quarantinedAt: string;
+}): Promise<StoredTitleLedgerQuarantine> {
+  const dbKey = activeDbKey();
+  const headMarker =
+    input.rows.auditEvents.at(-1)?.eventHash
+    ?? `n${input.rows.actionRecords.length}`;
+  const record: StoredTitleLedgerQuarantine = {
+    id: titleLedgerStorageId(
+      `${input.workspaceId}::quarantine::${input.quarantinedAt}::${headMarker}`,
+      dbKey
+    ),
+    dbKey,
+    workspaceId: input.workspaceId,
+    quarantinedAt: input.quarantinedAt,
+    source: input.source,
+    reason: input.reason,
+    actionRecords: input.rows.actionRecords,
+    auditEvents: input.rows.auditEvents,
+  };
+  await db.titleLedgerQuarantine.put(record);
+  return record;
+}
+
+export async function listTitleLedgerQuarantine(
+  workspaceId: string
+): Promise<StoredTitleLedgerQuarantine[]> {
+  const dbKey = activeDbKey();
+  const scope = titleLedgerScope(dbKey, workspaceId);
+  const rows = await db.titleLedgerQuarantine
+    .where('[dbKey+workspaceId]')
+    .equals(scope)
+    .toArray();
+  return rows.sort((first, second) =>
+    first.quarantinedAt < second.quarantinedAt ? -1 : 1
   );
 }

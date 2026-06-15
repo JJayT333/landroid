@@ -41,8 +41,12 @@ import type {
 import type {
   StoredTitleActionRecord,
   StoredTitleAuditEvent,
+  StoredTitleLedgerQuarantine,
 } from './title-ledger-stores';
-import { TITLE_LEDGER_STORE_DEFINITIONS } from './title-ledger-stores';
+import {
+  TITLE_LEDGER_QUARANTINE_STORE_DEFINITION,
+  TITLE_LEDGER_STORE_DEFINITIONS,
+} from './title-ledger-stores';
 import type { TitleIssue } from '../types/title-issue';
 import { LANDROID_FILE_VERSION } from './landroid-file-version';
 import {
@@ -140,6 +144,7 @@ const db = new Dexie('landroid-v2') as Dexie & {
   workspaceUiStateShards: EntityTable<WorkspaceUiStateShard, 'id'>;
   titleActionRecords: EntityTable<StoredTitleActionRecord, 'id'>;
   titleAuditEvents: EntityTable<StoredTitleAuditEvent, 'id'>;
+  titleLedgerQuarantine: EntityTable<StoredTitleLedgerQuarantine, 'id'>;
   workspaceWriteLeases: EntityTable<WorkspaceWriteLease, 'workspaceId'>;
   savedProjects: EntityTable<SavedProjectRecord, 'id'>;
 };
@@ -569,6 +574,18 @@ db.version(14).stores({
 db.version(15).stores({
   canvasAssets:
     'id, dbKey, workspaceId, contentHash, [dbKey+workspaceId], [dbKey+workspaceId+contentHash]',
+});
+
+/**
+ * v16 (DA-H4 title-ledger quarantine).
+ *
+ * Adds `titleLedgerQuarantine` — a preserved copy of a title ledger chain that
+ * failed verification on hydrate, captured before a fresh baseline replaces the
+ * bad rows so the tamper/corruption evidence is not erased. Additive and
+ * non-destructive: a new empty table, no data migration.
+ */
+db.version(16).stores({
+  ...TITLE_LEDGER_QUARANTINE_STORE_DEFINITION,
 });
 
 

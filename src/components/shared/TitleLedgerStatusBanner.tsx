@@ -15,6 +15,7 @@ import {
   isTitleCutoverArmed,
   useTitleActionLog,
   type TitleLedgerDivergence,
+  type TitleLedgerQuarantineNotice,
 } from '../../store/title-action-log';
 import { useOwnerStore } from '../../store/owner-store';
 import { readCurrentWorkspaceData } from '../../store/workspace-store';
@@ -70,9 +71,10 @@ export function setLedgerBannerHidden(hidden: boolean): void {
 export default function TitleLedgerStatusBanner() {
   const lastDivergence = useTitleActionLog((state) => state.lastDivergence);
   const lastError = useTitleActionLog((state) => state.lastError);
+  const lastQuarantine = useTitleActionLog((state) => state.lastQuarantine);
   const readPathMode = useTitleActionLog((state) => state.readPathMode);
   const manuallyHidden = useLedgerBannerPref((state) => state.hidden);
-  const trouble = Boolean(lastDivergence || lastError);
+  const trouble = Boolean(lastDivergence || lastError || lastQuarantine);
   const healthy = readPathMode === 'cutover' && !trouble;
   if (healthy || (manuallyHidden && !trouble)) return null;
   return <TitleLedgerStatusPanel onHide={() => setLedgerBannerHidden(true)} />;
@@ -82,6 +84,7 @@ export default function TitleLedgerStatusBanner() {
 export function TitleLedgerStatusPanel({ onHide }: { onHide?: () => void } = {}) {
   const lastDivergence = useTitleActionLog((state) => state.lastDivergence);
   const lastError = useTitleActionLog((state) => state.lastError);
+  const lastQuarantine = useTitleActionLog((state) => state.lastQuarantine);
   // Cutover readiness counts only parities recorded THIS session; a hydrated
   // ledger's historical count must not auto-satisfy the threshold (DA-U2).
   const sessionParityCount = useTitleActionLog((state) => state.sessionParityCount);
@@ -133,27 +136,56 @@ export function TitleLedgerStatusPanel({ onHide }: { onHide?: () => void } = {})
   const [flipError, setFlipError] = useState<string | null>(null);
 
   return (
-    <TitleLedgerStatusBannerContent
-      lastDivergence={lastDivergence}
-      lastError={lastError}
-      readiness={readiness}
-      readMode={readPathMode}
-      flipError={flipError}
-      onHide={onHide}
-      armed={isTitleCutoverArmed()}
-      onFlip={() => {
-        try {
-          flipToCutover({ reviewerApprovalToken: MANUAL_FLIP_TOKEN, ready: readiness.ready });
+    <>
+      <QuarantineNotice notice={lastQuarantine} />
+      <TitleLedgerStatusBannerContent
+        lastDivergence={lastDivergence}
+        lastError={lastError}
+        readiness={readiness}
+        readMode={readPathMode}
+        flipError={flipError}
+        onHide={onHide}
+        armed={isTitleCutoverArmed()}
+        onFlip={() => {
+          try {
+            flipToCutover({ reviewerApprovalToken: MANUAL_FLIP_TOKEN, ready: readiness.ready });
+            setFlipError(null);
+          } catch (err) {
+            setFlipError(err instanceof Error ? `${err.name}: ${err.message}` : String(err));
+          }
+        }}
+        onRevert={() => {
+          revertReadPathToShadow();
           setFlipError(null);
-        } catch (err) {
-          setFlipError(err instanceof Error ? `${err.name}: ${err.message}` : String(err));
-        }
-      }}
-      onRevert={() => {
-        revertReadPathToShadow();
-        setFlipError(null);
-      }}
-    />
+        }}
+      />
+    </>
+  );
+}
+
+/**
+ * DA-H4: a self-contained notice that an invalid ledger chain was preserved
+ * (quarantined), not erased. Kept separate from the readiness panel's tone logic
+ * so it never perturbs the divergence/error styling.
+ */
+function QuarantineNotice({ notice }: { notice: TitleLedgerQuarantineNotice | null }) {
+  if (!notice) return null;
+  const sourceLabel = notice.source === 'file' ? 'imported file' : 'stored';
+  return (
+    <div className="border-b border-amber-300 bg-amber-50 px-4 py-3 text-amber-950">
+      <p className="text-[12px] font-semibold">
+        Title ledger quarantined (preserved, not erased)
+      </p>
+      <p className="mt-1 text-[11px] leading-snug">
+        A {sourceLabel} title audit chain failed verification on load and was set
+        aside intact ({notice.actionRecordCount} action record
+        {notice.actionRecordCount === 1 ? '' : 's'},{' '}
+        {notice.auditEventCount} audit event
+        {notice.auditEventCount === 1 ? '' : 's'}). The workspace re-baselined a
+        fresh chain; the rejected one is retained for review rather than
+        discarded. {notice.reason}.
+      </p>
+    </div>
   );
 }
 
@@ -165,6 +197,7 @@ export function TitleLedgerStatusPanel({ onHide }: { onHide?: () => void } = {})
 export function LedgerStatusChip() {
   const lastDivergence = useTitleActionLog((state) => state.lastDivergence);
   const lastError = useTitleActionLog((state) => state.lastError);
+  const lastQuarantine = useTitleActionLog((state) => state.lastQuarantine);
   const readPathMode = useTitleActionLog((state) => state.readPathMode);
   const bannerHidden = useLedgerBannerPref((state) => state.hidden);
   const [open, setOpen] = useState(false);
@@ -181,11 +214,13 @@ export function LedgerStatusChip() {
     return () => document.removeEventListener('mousedown', onDocClick);
   }, [open]);
 
-  const trouble = Boolean(lastDivergence || lastError);
+  const trouble = Boolean(lastDivergence || lastError || lastQuarantine);
   const label = trouble
     ? lastDivergence
       ? 'Divergence'
-      : 'Ledger error'
+      : lastError
+        ? 'Ledger error'
+        : 'Quarantined'
     : readPathMode === 'cutover'
       ? 'Cutover'
       : 'Shadow';

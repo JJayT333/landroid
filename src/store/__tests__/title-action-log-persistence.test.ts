@@ -45,6 +45,7 @@ const ledgerPersistenceMocks = vi.hoisted(() => {
     replaceTitleLedgerWorkspaceRows: vi.fn(async (workspaceId: string, rows: Rows) => {
       rowsByWorkspace.set(workspaceId, clone(rows));
     }),
+    quarantineTitleLedgerRows: vi.fn(async () => undefined),
   };
 });
 
@@ -72,6 +73,8 @@ vi.mock('../../storage/title-ledger-persistence', () => ({
     ledgerPersistenceMocks.listTitleLedgerWorkspaceRows,
   replaceTitleLedgerWorkspaceRows:
     ledgerPersistenceMocks.replaceTitleLedgerWorkspaceRows,
+  quarantineTitleLedgerRows:
+    ledgerPersistenceMocks.quarantineTitleLedgerRows,
 }));
 vi.mock('../../storage/workspace-write-lease', () => leaseMocks);
 
@@ -261,6 +264,51 @@ describe('title action log runtime persistence lifecycle', () => {
       beforeRefresh.auditEvents.at(-1)?.eventHash
     );
     expect((await verifyAuditChain(useTitleActionLog.getState().auditEvents)).valid).toBe(true);
+  });
+
+  it('quarantines an invalid stored chain instead of erasing it (DA-H4)', async () => {
+    const workspace = makeWorkspace('ws-runtime', 'root-runtime', 'DOC-1');
+    loadWorkspaceIntoStores(workspace);
+
+    // Build a valid baseline chain, then corrupt an event hash so the stored
+    // chain fails verification on hydrate (a tamper/corruption stand-in).
+    const valid = await buildBaselineRows(workspace);
+    const corrupted: TitleLedgerWorkspaceRows = {
+      actionRecords: valid.actionRecords,
+      auditEvents: valid.auditEvents.map((event, index) =>
+        index === 0 ? { ...event, eventHash: 'f'.repeat(64) } : event
+      ),
+    };
+    ledgerPersistenceMocks.rowsByWorkspace.set(workspace.workspaceId, corrupted);
+    useTitleActionLog.getState().reset();
+
+    const result = await hydrateTitleActionLogFromStorageOrBaseline(
+      workspace,
+      ownerDataFor(workspace.workspaceId)
+    );
+
+    // Re-baselined fresh rather than hydrating the corrupt chain…
+    expect(result.source).toBe('baseline');
+    expect(
+      (await verifyAuditChain(useTitleActionLog.getState().auditEvents)).valid
+    ).toBe(true);
+    // …but the rejected rows were PRESERVED (quarantined), not silently erased.
+    expect(
+      ledgerPersistenceMocks.quarantineTitleLedgerRows
+    ).toHaveBeenCalledTimes(1);
+    const quarantineCall =
+      ledgerPersistenceMocks.quarantineTitleLedgerRows.mock.calls[0][0] as {
+        source: string;
+        rows: TitleLedgerWorkspaceRows;
+      };
+    expect(quarantineCall.source).toBe('storage');
+    expect(quarantineCall.rows.auditEvents).toHaveLength(
+      corrupted.auditEvents.length
+    );
+    // …and a notice is surfaced for the banner.
+    const notice = useTitleActionLog.getState().lastQuarantine;
+    expect(notice?.source).toBe('storage');
+    expect(notice?.auditEventCount).toBe(corrupted.auditEvents.length);
   });
 
   it('continues the audit chain from the persisted head after hydrate', async () => {

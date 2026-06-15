@@ -35,6 +35,10 @@ function makeLedgerTable<Row extends LedgerRow>(initial: Row[] = []) {
     bulkPut: vi.fn(async (newRows: Row[]) => {
       for (const row of newRows) rows.set(row.id, row);
     }),
+    put: vi.fn(async (row: Row) => {
+      rows.set(row.id, row);
+      return row.id;
+    }),
     where: vi.fn((field: string) => ({
       equals: vi.fn((value: unknown) =>
         collection((row) => {
@@ -133,6 +137,7 @@ async function loadTitleLedgerPersistence({
   const db = {
     titleActionRecords: makeLedgerTable(actionRows),
     titleAuditEvents: makeLedgerTable(auditRows),
+    titleLedgerQuarantine: makeLedgerTable(),
     transaction: vi.fn(async (_mode: string, ...args: unknown[]) => {
       const callback = args.at(-1);
       if (typeof callback !== 'function') {
@@ -336,5 +341,40 @@ describe('title ledger persistence', () => {
     expect([...db.titleAuditEvents.rows.values()]).toEqual([
       expect.objectContaining({ dbKey: 'user-bob', recordId: 'ev-b1' }),
     ]);
+  });
+
+  it('quarantines a rejected chain and reads it back scoped to the workspace (DA-H4)', async () => {
+    const { persistence, db } = await loadTitleLedgerPersistence({
+      workspaceKey: 'user-alice',
+    });
+
+    const rows = {
+      actionRecords: [fakeActionRecord({ recordId: 'bad-action' })],
+      auditEvents: [fakeAuditEventRecord({ recordId: 'bad-event' })],
+    };
+    const stored = await persistence.quarantineTitleLedgerRows({
+      workspaceId: 'ws-1',
+      rows,
+      reason: 'audit chain failed at index 0',
+      source: 'storage',
+      quarantinedAt: NOW,
+    });
+
+    // persisted under the active db key, scoped to the workspace, evidence intact
+    expect(stored.dbKey).toBe('user-alice');
+    expect([...db.titleLedgerQuarantine.rows.values()]).toHaveLength(1);
+
+    const read = await persistence.listTitleLedgerQuarantine('ws-1');
+    expect(read).toHaveLength(1);
+    expect(read[0]).toMatchObject({
+      workspaceId: 'ws-1',
+      source: 'storage',
+      reason: 'audit chain failed at index 0',
+    });
+    expect(read[0].actionRecords).toHaveLength(1);
+    expect(read[0].auditEvents).toHaveLength(1);
+
+    // a different workspace sees none of it
+    expect(await persistence.listTitleLedgerQuarantine('ws-2')).toHaveLength(0);
   });
 });
