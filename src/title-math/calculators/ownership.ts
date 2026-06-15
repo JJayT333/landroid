@@ -15,6 +15,7 @@ import { Decimal } from 'decimal.js';
 import { clamp, d } from '../../engine/decimal';
 import type {
   ConveyanceMode,
+  DoubleFractionClause,
   InterestClass,
   OwnershipNode,
   SplitBasis,
@@ -96,9 +97,24 @@ export interface ShareParams {
   manualAmount: string;
   parentFraction: string;
   parentInitialFraction: string;
+  /**
+   * Van Dyke: when a conveyance was entered from an antique double fraction, the
+   * resolved share IS the human-chosen reading. The engine never auto-multiplies
+   * the two fractions; it just applies the reading the human selected.
+   */
+  doubleFractionClause?: DoubleFractionClause;
 }
 
 export function calculateShare(params: ShareParams): Decimal {
+  // Van Dyke double fraction: resolve to the human-chosen reading verbatim. This
+  // takes precedence over the mode/basis math precisely so the engine cannot
+  // silently auto-multiply "1/2 of 1/8" into 1/16.
+  if (params.doubleFractionClause) {
+    const { chosenBasis, presumptionReading, arithmeticReading } = params.doubleFractionClause;
+    const chosen = chosenBasis === 'arithmetic' ? arithmeticReading : presumptionReading;
+    return clamp(d(chosen));
+  }
+
   const parentFrac = d(params.parentFraction);
   const parentInitial = d(params.parentInitialFraction);
 

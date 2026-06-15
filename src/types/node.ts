@@ -61,6 +61,30 @@ export type RoyaltyKind = 'fixed' | 'floating' | null;
  */
 export type RatificationStatus = 'ratified' | 'unratified' | 'unknown';
 
+/** Which reading of an antique double fraction the human selected. */
+export type DoubleFractionBasis = 'presumption' | 'arithmetic';
+
+/**
+ * Van Dyke v. Navigator (Tex. 2023) double-fraction capture (TXM-002).
+ *
+ * An antique double fraction such as "an undivided 1/2 of the 1/8 royalty" must
+ * NEVER be auto-multiplied: the "1/8" is historically a synonym for "the
+ * royalty," so the clause is presumptively 1/2 OF THE ESTATE (≈ 1/2), not 1/16.
+ * LANDroid captures the verbatim clause, computes BOTH readings, and stores the
+ * human's chosen basis — it never silently resolves the ambiguity. `calculateShare`
+ * applies the chosen reading as a single resolved fraction (one ratio × one base).
+ */
+export interface DoubleFractionClause {
+  /** Verbatim deed language, e.g. "an undivided 1/2 of the 1/8 royalty". */
+  clauseText: string;
+  /** Resolved fraction under the Van Dyke presumption reading (outer fraction of the estate). */
+  presumptionReading: string;
+  /** Resolved fraction under the literal arithmetic reading (outer × inner). */
+  arithmeticReading: string;
+  /** The reading the human selected; the engine applies only this one. */
+  chosenBasis: DoubleFractionBasis;
+}
+
 /**
  * Denormalized cache of every document currently attached to a node
  * (Phase 5 / ADR 0004). The source of truth is the Dexie
@@ -155,6 +179,14 @@ export interface OwnershipNode {
    * absent by default (treated as `'unknown'`); only meaningful on NPRI nodes.
    */
   ratificationStatus?: RatificationStatus;
+
+  /**
+   * Van Dyke double-fraction capture. See {@link DoubleFractionClause}. Optional
+   * and absent by default; present only on conveyances entered from an antique
+   * double-fraction clause. The engine reads `chosenBasis` and never
+   * auto-multiplies the two fractions.
+   */
+  doubleFractionClause?: DoubleFractionClause;
 
   /**
    * Depth-range discriminator. See {@link DepthRange}. Defaults to
@@ -292,6 +324,35 @@ function normalizeRatificationStatus(value: unknown): RatificationStatus | undef
     return value;
   }
   return undefined;
+}
+
+/**
+ * Normalize the optional Van Dyke double-fraction clause. Returns a fully-formed
+ * clause or `undefined` if the shape is incomplete, so the field stays absent on
+ * ordinary conveyances and round-trips verbatim when present.
+ */
+function normalizeDoubleFractionClause(value: unknown): DoubleFractionClause | undefined {
+  if (!value || typeof value !== 'object') {
+    return undefined;
+  }
+  const candidate = value as Partial<DoubleFractionClause>;
+  const chosenBasis =
+    candidate.chosenBasis === 'arithmetic' || candidate.chosenBasis === 'presumption'
+      ? candidate.chosenBasis
+      : undefined;
+  if (
+    typeof candidate.presumptionReading !== 'string'
+    || typeof candidate.arithmeticReading !== 'string'
+    || !chosenBasis
+  ) {
+    return undefined;
+  }
+  return {
+    clauseText: normalizeText(candidate.clauseText),
+    presumptionReading: candidate.presumptionReading,
+    arithmeticReading: candidate.arithmeticReading,
+    chosenBasis,
+  };
 }
 
 function normalizeAttachmentSummary(value: unknown): NodeAttachmentSummary | null {
@@ -519,6 +580,11 @@ export function normalizeOwnershipNode(
     // default so legacy data and non-NPRI nodes round-trip unchanged.
     ...(interestClass === 'npri' && normalizeRatificationStatus(node.ratificationStatus)
       ? { ratificationStatus: normalizeRatificationStatus(node.ratificationStatus) }
+      : {}),
+    // Van Dyke: preserve a captured double-fraction clause verbatim. Absent on
+    // ordinary conveyances, so existing data round-trips unchanged.
+    ...(normalizeDoubleFractionClause(node.doubleFractionClause)
+      ? { doubleFractionClause: normalizeDoubleFractionClause(node.doubleFractionClause) }
       : {}),
   };
 }

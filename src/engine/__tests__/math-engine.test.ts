@@ -153,6 +153,46 @@ describe('calculateShare', () => {
     });
     expect(share.toFixed(9)).toBe('0.000000000');
   });
+
+  it('double fraction (Van Dyke): applies the chosen reading and never auto-multiplies', () => {
+    // "1/2 of 1/8" — presumption reading is 1/2 of the estate (0.5), NOT 1/16.
+    const base = {
+      conveyanceMode: 'fraction' as const,
+      splitBasis: 'whole' as const,
+      numerator: '1',
+      denominator: '1',
+      manualAmount: '0',
+      parentFraction: '1.0',
+      parentInitialFraction: '1.0',
+    };
+    const presumption = calculateShare({
+      ...base,
+      doubleFractionClause: {
+        clauseText: 'an undivided 1/2 of the 1/8 royalty',
+        presumptionReading: '0.5',
+        arithmeticReading: '0.0625',
+        chosenBasis: 'presumption',
+      },
+    });
+    expect(presumption.toFixed(9)).toBe('0.500000000');
+
+    // The arithmetic reading is available but only applied when explicitly chosen.
+    const arithmetic = calculateShare({
+      ...base,
+      doubleFractionClause: {
+        clauseText: 'an undivided 1/2 of the 1/8 royalty',
+        presumptionReading: '0.5',
+        arithmeticReading: '0.0625',
+        chosenBasis: 'arithmetic',
+      },
+    });
+    expect(arithmetic.toFixed(9)).toBe('0.062500000');
+
+    // The clause takes precedence over the mode/basis math, so the engine can
+    // never silently collapse the two fractions into 1/16 on its own.
+    expect(presumption.equals(d('0.5'))).toBe(true);
+    expect(arithmetic.equals(d('0.0625'))).toBe(true);
+  });
 });
 
 // ---------------------------------------------------------------------------

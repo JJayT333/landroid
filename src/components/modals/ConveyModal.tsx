@@ -15,6 +15,8 @@ import { formatAsFraction } from '../../engine/fraction-display';
 import { d, serialize, Decimal } from '../../engine/decimal';
 import {
   getInterestClass,
+  type DoubleFractionBasis,
+  type DoubleFractionClause,
   type OwnershipNode,
   type ConveyanceMode,
   type SplitBasis,
@@ -57,12 +59,42 @@ export default function ConveyModal({ parentNode, onClose }: ConveyModalProps) {
     numerator: '1',
     denominator: '2',
     manualAmount: '0',
+    // Van Dyke double-fraction capture (off by default).
+    isDoubleFraction: false,
+    dfClauseText: '',
+    dfOuterNum: '1',
+    dfOuterDenom: '2',
+    dfInnerNum: '1',
+    dfInnerDenom: '8',
+    dfBasis: 'presumption' as DoubleFractionBasis,
   });
 
   const [error, setError] = useState<string | null>(null);
 
-  const set = (field: string, value: string) =>
+  const set = (field: string, value: string | boolean) =>
     setForm((f) => ({ ...f, [field]: value }));
+
+  // Van Dyke: build the double-fraction clause from the entered outer/inner
+  // fractions. The presumption reading is the OUTER fraction (of the estate);
+  // the arithmetic reading is outer x inner. The engine never auto-multiplies —
+  // it applies only the reading the operator selects below.
+  const doubleFractionOuter = (() => {
+    const denom = d(form.dfOuterDenom);
+    return denom.isZero() || !denom.isFinite() ? null : d(form.dfOuterNum).div(denom);
+  })();
+  const doubleFractionInner = (() => {
+    const denom = d(form.dfInnerDenom);
+    return denom.isZero() || !denom.isFinite() ? null : d(form.dfInnerNum).div(denom);
+  })();
+  const doubleFractionClause: DoubleFractionClause | undefined =
+    form.isDoubleFraction && doubleFractionOuter && doubleFractionInner
+      ? {
+          clauseText: form.dfClauseText,
+          presumptionReading: serialize(doubleFractionOuter),
+          arithmeticReading: serialize(doubleFractionOuter.times(doubleFractionInner)),
+          chosenBasis: form.dfBasis,
+        }
+      : undefined;
 
   const previewShare = calculateShare({
     conveyanceMode: form.conveyanceMode,
@@ -72,6 +104,7 @@ export default function ConveyModal({ parentNode, onClose }: ConveyModalProps) {
     manualAmount: form.manualAmount,
     parentFraction: parentNode.fraction,
     parentInitialFraction: parentNode.initialFraction,
+    doubleFractionClause,
   });
   const previewFrac = formatAsFraction(previewShare);
   const parentRemaining = formatAsFraction(d(parentNode.fraction));
@@ -125,6 +158,7 @@ export default function ConveyModal({ parentNode, onClose }: ConveyModalProps) {
       numerator: form.numerator,
       denominator: form.denominator,
       manualAmount: form.manualAmount,
+      ...(doubleFractionClause ? { doubleFractionClause } : {}),
     });
 
     if (!success) {
@@ -172,42 +206,31 @@ export default function ConveyModal({ parentNode, onClose }: ConveyModalProps) {
             Conveyance Amount
           </legend>
 
-          <div className="flex gap-2">
-            {([
-              ['fraction', 'Fraction'],
-              ['fixed', 'Fixed Amount'],
-              ['all', 'All Remaining'],
-            ] as const).map(([mode, label]) => (
-              <button
-                key={mode}
-                onClick={() => set('conveyanceMode', mode)}
-                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                  form.conveyanceMode === mode
-                    ? 'bg-leather text-parchment'
-                    : 'text-ink-light hover:bg-parchment-dark border border-ledger-line'
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+          <label className="flex items-center gap-2 text-xs text-ink cursor-pointer">
+            <input
+              type="checkbox"
+              checked={form.isDoubleFraction}
+              onChange={(e) => set('isDoubleFraction', e.target.checked)}
+              className="accent-leather"
+            />
+            Antique double fraction (e.g. &ldquo;1/2 of 1/8&rdquo;)
+          </label>
 
-          {form.conveyanceMode === 'fraction' && (
+          {!form.isDoubleFraction && (
             <>
-              <div className="flex gap-2 items-center">
-                <span className="text-[10px] text-ink-light uppercase tracking-wider">Of:</span>
+              <div className="flex gap-2">
                 {([
-                  ['initial', "Grantor's Full Interest"],
-                  ['remaining', "Grantor's Remaining"],
-                  ['whole', 'Whole Tract'],
-                ] as const).map(([basis, label]) => (
+                  ['fraction', 'Fraction'],
+                  ['fixed', 'Fixed Amount'],
+                  ['all', 'All Remaining'],
+                ] as const).map(([mode, label]) => (
                   <button
-                    key={basis}
-                    onClick={() => set('splitBasis', basis)}
-                    className={`px-2 py-1 rounded text-[10px] font-medium transition-colors ${
-                      form.splitBasis === basis
-                        ? 'bg-leather/20 text-leather font-semibold'
-                        : 'text-ink-light hover:bg-parchment-dark'
+                    key={mode}
+                    onClick={() => set('conveyanceMode', mode)}
+                    className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                      form.conveyanceMode === mode
+                        ? 'bg-leather text-parchment'
+                        : 'text-ink-light hover:bg-parchment-dark border border-ledger-line'
                     }`}
                   >
                     {label}
@@ -215,26 +238,111 @@ export default function ConveyModal({ parentNode, onClose }: ConveyModalProps) {
                 ))}
               </div>
 
-              <div className="flex items-center gap-2">
-                <input
-                  type="text"
-                  value={form.numerator}
-                  onChange={(e) => set('numerator', e.target.value)}
-                  className="w-20 px-3 py-1.5 rounded-md border border-ledger-line bg-parchment text-ink font-mono text-sm text-center focus:ring-2 focus:ring-leather outline-none"
-                />
-                <span className="text-ink-light text-lg">/</span>
-                <input
-                  type="text"
-                  value={form.denominator}
-                  onChange={(e) => set('denominator', e.target.value)}
-                  className="w-20 px-3 py-1.5 rounded-md border border-ledger-line bg-parchment text-ink font-mono text-sm text-center focus:ring-2 focus:ring-leather outline-none"
-                />
-              </div>
+              {form.conveyanceMode === 'fraction' && (
+                <>
+                  <div className="flex gap-2 items-center">
+                    <span className="text-[10px] text-ink-light uppercase tracking-wider">Of:</span>
+                    {([
+                      ['initial', "Grantor's Full Interest"],
+                      ['remaining', "Grantor's Remaining"],
+                      ['whole', 'Whole Tract'],
+                    ] as const).map(([basis, label]) => (
+                      <button
+                        key={basis}
+                        onClick={() => set('splitBasis', basis)}
+                        className={`px-2 py-1 rounded text-[10px] font-medium transition-colors ${
+                          form.splitBasis === basis
+                            ? 'bg-leather/20 text-leather font-semibold'
+                            : 'text-ink-light hover:bg-parchment-dark'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={form.numerator}
+                      onChange={(e) => set('numerator', e.target.value)}
+                      className="w-20 px-3 py-1.5 rounded-md border border-ledger-line bg-parchment text-ink font-mono text-sm text-center focus:ring-2 focus:ring-leather outline-none"
+                    />
+                    <span className="text-ink-light text-lg">/</span>
+                    <input
+                      type="text"
+                      value={form.denominator}
+                      onChange={(e) => set('denominator', e.target.value)}
+                      className="w-20 px-3 py-1.5 rounded-md border border-ledger-line bg-parchment text-ink font-mono text-sm text-center focus:ring-2 focus:ring-leather outline-none"
+                    />
+                  </div>
+                </>
+              )}
+
+              {form.conveyanceMode === 'fixed' && (
+                <FormField label="Fixed Amount (decimal)" value={form.manualAmount} onChange={(v) => set('manualAmount', v)} />
+              )}
             </>
           )}
 
-          {form.conveyanceMode === 'fixed' && (
-            <FormField label="Fixed Amount (decimal)" value={form.manualAmount} onChange={(v) => set('manualAmount', v)} />
+          {form.isDoubleFraction && (
+            <div className="space-y-2 rounded-md border border-amber-200 bg-amber-50/60 p-3">
+              <FormField
+                label="Verbatim clause (e.g. an undivided 1/2 of the 1/8 royalty)"
+                value={form.dfClauseText}
+                onChange={(v) => set('dfClauseText', v)}
+              />
+              <div className="flex items-end gap-2 text-xs">
+                <div>
+                  <span className="text-[10px] text-ink-light uppercase tracking-wider block mb-1">Outer</span>
+                  <div className="flex items-center gap-1">
+                    <input type="text" value={form.dfOuterNum} onChange={(e) => set('dfOuterNum', e.target.value)}
+                      className="w-14 px-2 py-1 rounded border border-ledger-line bg-parchment font-mono text-center" />
+                    <span className="text-ink-light">/</span>
+                    <input type="text" value={form.dfOuterDenom} onChange={(e) => set('dfOuterDenom', e.target.value)}
+                      className="w-14 px-2 py-1 rounded border border-ledger-line bg-parchment font-mono text-center" />
+                  </div>
+                </div>
+                <span className="pb-1.5 text-ink-light">of</span>
+                <div>
+                  <span className="text-[10px] text-ink-light uppercase tracking-wider block mb-1">Inner</span>
+                  <div className="flex items-center gap-1">
+                    <input type="text" value={form.dfInnerNum} onChange={(e) => set('dfInnerNum', e.target.value)}
+                      className="w-14 px-2 py-1 rounded border border-ledger-line bg-parchment font-mono text-center" />
+                    <span className="text-ink-light">/</span>
+                    <input type="text" value={form.dfInnerDenom} onChange={(e) => set('dfInnerDenom', e.target.value)}
+                      className="w-14 px-2 py-1 rounded border border-ledger-line bg-parchment font-mono text-center" />
+                  </div>
+                </div>
+              </div>
+              <p className="text-[10px] text-ink-light">
+                Van Dyke v. Navigator (Tex. 2023): an antique &ldquo;1/8&rdquo; is presumptively the
+                royalty itself, so the clause is read as the OUTER fraction of the estate, not the
+                product. LANDroid never auto-multiplies — choose the reading of record.
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                {([
+                  ['presumption', 'Presumption', doubleFractionOuter],
+                  ['arithmetic', 'Arithmetic', doubleFractionOuter && doubleFractionInner ? doubleFractionOuter.times(doubleFractionInner) : null],
+                ] as const).map(([basis, label, value]) => (
+                  <button
+                    key={basis}
+                    type="button"
+                    onClick={() => set('dfBasis', basis)}
+                    className={`rounded-md border px-3 py-2 text-left transition-colors ${
+                      form.dfBasis === basis
+                        ? 'border-leather bg-leather/10'
+                        : 'border-ledger-line hover:bg-parchment-dark'
+                    }`}
+                  >
+                    <span className="block text-[10px] uppercase tracking-wider text-ink-light">{label}</span>
+                    <span className="block font-mono text-sm font-semibold text-ink">
+                      {value ? formatAsFraction(value) : '—'}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
           )}
 
           <div className="bg-ledger rounded-md p-3">
