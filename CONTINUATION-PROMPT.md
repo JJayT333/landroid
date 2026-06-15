@@ -4,6 +4,43 @@ Use this file to resume the active workstream in a new chat. Read it with
 `AGENTS.md`, `PROJECT_CONTEXT.md`, and `docs/README.md` before touching code.
 Keep long history in `CHANGELOG.md`.
 
+## Active Handoff - 2026-06-15 (unified title-math merged; "do it all" program)
+
+The unified title-math engine is MERGED and LIVE on `main` (PR #180, `16cdd1e`).
+It re-architected all title math into one engine under `src/title-math/` — the
+four old modules (`engine/math-engine.ts`, `components/leasehold/leasehold-summary.ts`,
+`components/deskmap/deskmap-coverage.ts`, `engine/tree-layout.ts`) are now thin
+re-export SHIMS, so consumers are unchanged — and shipped the cleared +
+attorney-nuanced math: DA-H1 (fixed NPRI satisfied from the lessor royalty first,
+excess to WI, `fixedNpriExceedsRoyalty` counsel warning), DA-M1 (over-conveyance
+booked-with-warning + `Over-conveyance` title issue, never rejected), DA-M5 (NPRI
+ratification tri-state + transfer-order hold; legacy=ratified, new=unknown), Van
+Dyke double-fraction verbatim capture (engine never auto-multiplies), unleased-
+mineral payout rows, and Stage-B 9dp quantization of leasehold/coverage finals.
+An independent adversarial review confirmed the numbers (hand-recompute + a
+reconstructed pre-rewrite oracle); all findings are fixed (the one real bug: an
+over-conveyance warning could be lost on a failed DB write — now surfaces via
+`lastError`). Validation: 1235 tests green, `tsc` clean, `npm run build` clean,
+the differential clean.
+
+HARNESS CAVEAT (do not over-trust green): post-cutover the differential baseline
+is a self-consistency / reproducibility LOCK, not an old-vs-new differential (the
+two engine bundles resolve to the same code; baselines were re-frozen from this
+engine). A green `--check new` does NOT prove correctness — the port verification
+(done before cutover, against the real old engine), the unit suites, the hand-
+verified anchors in `springhill-sample.test.ts`, and the review do. See the
+labels in `scripts/title-math-baseline.ts`.
+
+The attorney has APPROVED the DA-H1 excess rule + the pending round-3/Van Dyke
+questions — the legal gate is cleared. NEXT: the "do it all" backlog program
+(5 waves, one PR per concern; plan in `~/.claude/plans/make-a-plan-to-glistening-lantern.md`):
+W1 hygiene + DA-H1 wording + Stage-G shim teardown + small defects (IN PROGRESS);
+W2 title-ledger trust lane (DA-H4/H5/M3/ACT-H01); W3 Documents pro-grade +
+Maps/3D-chooser (real WGS84 GeoJSON in hand) + Curative requirement model +
+Audit-sheet export; W4 research/intake; W5 Texas-math long-tail. Deferred per
+existing gates: federal/private math, hosted-AI hardening, RRC ingestion,
+OCR/AI-doc-QA.
+
 ## Active Handoff - 2026-06-13 (Step 2 + display-correctness merge session)
 
 All Step 2 hardening lanes and the display-correctness fixes are now MERGED to

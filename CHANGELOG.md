@@ -3,6 +3,58 @@
 This file records meaningful project changes so `CONTINUATION-PROMPT.md` can
 stay short.
 
+## 2026-06-15
+
+- **Unified title-math engine + cleared/attorney-nuanced math (#180).**
+  Re-architected all title math into one engine under `src/title-math/`; the
+  four old modules (`engine/math-engine.ts`, `components/leasehold/leasehold-summary.ts`,
+  `components/deskmap/deskmap-coverage.ts`, `engine/tree-layout.ts`) are now thin
+  re-export shims, so consumers are unchanged, and the port was verified
+  byte-identical against the pre-rewrite engine across Springhill (oracle),
+  Vulcan Mesa, and Raven Forest. Shipped on top: **DA-H1** (a fixed NPRI is
+  satisfied from the burdened lessor's royalty first, only the excess charged to
+  WI; per-tract `fixedNpriExceedsRoyalty` counsel warning), **DA-M1** (an
+  over-conveyance is booked at the grantor's remainder with the deed's stated
+  amount captured + an `Over-conveyance` title issue, never rejected), **DA-M5**
+  (NPRI pooling-ratification tri-state + transfer-order hold; legacy/absent reads
+  as `ratified`, new NPRIs default to explicit `unknown`; payout math unchanged),
+  **Van Dyke** double-fraction verbatim capture (the engine never auto-multiplies
+  the two fractions), **unleased-mineral payout rows** (the transfer-order sheet
+  now balances against full current ownership), and **Stage-B** 9dp quantization
+  of leasehold/coverage final outputs (re-read intermediates kept full precision
+  behind an `emitRawRate` firewall). An independent adversarial review confirmed
+  the numbers by hand-recompute and against a reconstructed pre-rewrite oracle;
+  all findings are fixed — notably an over-conveyance warning that could be lost
+  on a failed title-issue write (now surfaced via `lastError`). 1235 tests; `tsc`,
+  build, and the differential all clean.
+- NOTE on the safety net: post-cutover the differential baseline is a
+  self-consistency / reproducibility lock, not an old-vs-new differential — a
+  green `scripts/title-math-baseline.ts --check new` proves the engine reproduces
+  a frozen snapshot of itself, not that the math is correct. Correctness rests on
+  the (pre-cutover) port verification, the unit suites, and the hand-verified
+  anchors in `springhill-sample.test.ts`. The harness files are labeled
+  accordingly.
+
+## 2026-06-13 — Step 2 hardening wrap-up sprint (#161–#179)
+
+- #161 lean-professional aesthetics consolidation (DA-U1 §5).
+- #163 display-format precision migration + grep guard.
+- #164 quick-wins: hosted wizard, auth fallback, doc/comment drift.
+- #165 research optimistic-edit rollback on persist failure (DA2-R1).
+- #166 AI undo targets only the matching journal entry (DA-L6).
+- #167 over-conveyance warning + Add-Root validation (DA-M1/DA-M2 engine).
+- #168 collapse duplicate ORRI/WI derivation paths (DA-M7).
+- #169 flowchart: lease-card spillover + orphaned-node overlap.
+- #170 audit: normalizeInterestString save-guard + backlog reconcile.
+- #171 keep v7→v8 migration transaction alive + drop dangling attachments (DA-M10).
+- #172 AI approval-card previews stay live + re-check before execute (DA-M12).
+- #173 count only this session's parities toward cutover readiness (DA-U2).
+- #174/#178 reject version-bypass `.landroid` imports + field-pick imports (DA-L8).
+- #175 surface storage-quota write failures (DA-M11).
+- #176 chunk the base64 browser fallback encoder (DA-L7).
+- #177 browser storage-health Sidebar popover (DEF-STOR-01).
+- #179 render ownership node cards as visible, non-collapsing boxes.
+
 ## 2026-06-12
 
 - Added the DA-H7 legacy document content-hash backfill lane. Startup now runs
