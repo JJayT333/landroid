@@ -471,11 +471,15 @@ function effectiveFixedNpriBasis(
 }
 
 /**
- * DA-M5: an NPRI's pooling-ratification status. Absent (legacy / unset) is read
- * as `'unknown'`, so the engine no longer silently assumes ratification.
+ * DA-M5: an NPRI's pooling-ratification status. Absent is read as `'ratified'`
+ * -- LEGACY data predates ratification modeling and the old engine implicitly
+ * treated every NPRI as ratified, so absent preserves that (no retroactive hold
+ * on existing projects). NEWLY-created NPRIs are written explicit `'unknown'`
+ * (see executeCreateNpri), so the engine still does not silently assume
+ * ratification on new entry.
  */
 function effectiveNpriRatification(node: OwnershipNode): RatificationStatus {
-  return node.ratificationStatus ?? 'unknown';
+  return node.ratificationStatus ?? 'ratified';
 }
 
 function findBurdenedMineralAncestorId(

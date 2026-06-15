@@ -1086,27 +1086,28 @@ describe('leasehold-summary', () => {
         leaseholdOrris: [],
       });
 
-    // Absent ratification reads as 'unknown' (the engine no longer silently
-    // assumes ratification) and holds the transfer order.
-    const unknown = buildWith(undefined);
-    expect(unknown.npris.find((n) => n.id === 'npri-1')?.ratificationStatus).toBe('unknown');
+    // Absent ratification reads as 'ratified' (legacy back-compat — the old
+    // engine implicitly ratified every NPRI, so existing data is not held).
+    const legacy = buildWith(undefined);
+    expect(legacy.npris.find((n) => n.id === 'npri-1')?.ratificationStatus).toBe('ratified');
+    expect(legacy.npriRatificationHoldCount).toBe(0);
+    expect(
+      buildLeaseholdTransferOrderHoldReasons(legacy).some((r) => r.includes('ratification'))
+    ).toBe(false);
+
+    // Explicit 'unknown' (a newly-created NPRI's default) holds the transfer order.
+    const unknown = buildWith('unknown');
     expect(unknown.npriRatificationHoldCount).toBe(1);
     expect(
       buildLeaseholdTransferOrderHoldReasons(unknown).some((r) => r.includes('ratification'))
     ).toBe(true);
 
-    // A confirmed-ratified NPRI is payout-reliable: no hold.
-    const ratified = buildWith('ratified');
-    expect(ratified.npris.find((n) => n.id === 'npri-1')?.ratificationStatus).toBe('ratified');
-    expect(ratified.npriRatificationHoldCount).toBe(0);
-    expect(
-      buildLeaseholdTransferOrderHoldReasons(ratified).some((r) => r.includes('ratification'))
-    ).toBe(false);
+    // 'unratified' likewise holds.
+    expect(buildWith('unratified').npriRatificationHoldCount).toBe(1);
 
     // The decimals are identical regardless of ratification — the unratified
     // tract-basis payout math is deferred, so only the hold differs today.
-    expect(ratified.totalNpriDecimal).toBe(unknown.totalNpriDecimal);
-    expect(buildWith('unratified').npriRatificationHoldCount).toBe(1);
+    expect(buildWith('ratified').totalNpriDecimal).toBe(unknown.totalNpriDecimal);
   });
 
   it('holds the transfer order with a counsel-sign-off reason when a fixed NPRI exceeds royalty (DA-H1, F4)', () => {

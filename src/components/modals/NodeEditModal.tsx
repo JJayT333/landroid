@@ -65,7 +65,7 @@ export default function NodeEditModal({
     royaltyKind: node.royaltyKind,
     fixedRoyaltyBasis:
       node.fixedRoyaltyBasis ?? (node.royaltyKind === 'fixed' ? 'burdened_branch' : null),
-    ratificationStatus: node.ratificationStatus ?? 'unknown',
+    ratificationStatus: node.ratificationStatus ?? 'ratified',
     isDeceased: node.isDeceased,
     obituary: node.obituary,
     graveyardLink: node.graveyardLink,
@@ -130,7 +130,7 @@ export default function NodeEditModal({
             form.royaltyKind === 'fixed'
               ? (form.fixedRoyaltyBasis ?? 'burdened_branch')
               : null,
-          ratificationStatus: ratificationStatus ?? 'unknown',
+          ratificationStatus: ratificationStatus ?? 'ratified',
         }
       : {};
     if (initialChanged) {

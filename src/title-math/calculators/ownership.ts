@@ -318,6 +318,11 @@ export function executeCreateNpri(params: CreateNpriParams): Result<OwnershipNod
       interestClass: 'npri',
       royaltyKind,
       fixedRoyaltyBasis,
+      // DA-M5: a NEWLY-created NPRI defaults to 'unknown' ratification (held)
+      // unless the form states otherwise -- so the engine does not silently
+      // assume ratification on new entry. Legacy/absent NPRIs read as 'ratified'
+      // for back-compat (see effectiveNpriRatification).
+      ratificationStatus: form?.ratificationStatus ?? 'unknown',
     },
   });
 
