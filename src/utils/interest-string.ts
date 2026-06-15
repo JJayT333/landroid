@@ -95,6 +95,15 @@ export function parseStrictInterestString(
   return null;
 }
 
+/**
+ * Display-normalize an interest string using the LENIENT parser
+ * (`parseInterestString`), which coerces malformed input to `Decimal(0)`.
+ *
+ * ⚠ Never use this to gate or sanitize a value before SAVING it: garbage like
+ * "abc" or "1/2/3" silently becomes "0.000000000" here. For save paths use the
+ * STRICT parser (`parseStrictInterestString`), which returns `null` on
+ * malformed input so the caller can reject instead of persisting a silent zero.
+ */
 export function normalizeInterestString(value: string): string {
   const trimmed = value.trim();
   if (trimmed.length === 0) {

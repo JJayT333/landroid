@@ -31,4 +31,25 @@ describe('Chip', () => {
     expect(html).not.toContain('uppercase');
     expect(html).toContain('text-tint-green-ink');
   });
+
+  it('is single-line (nowrap) by default', () => {
+    const html = renderToStaticMarkup(<Chip>Active</Chip>);
+    expect(html).toContain('whitespace-nowrap');
+    expect(html).not.toContain('whitespace-normal');
+  });
+
+  it('wraps long free text and constrains width when wrap is set', () => {
+    const html = renderToStaticMarkup(
+      <Chip tone="green" uppercase={false} wrap title="full note">
+        Royalty pending — lease package not yet booked (NRI carried at 0).
+      </Chip>
+    );
+    // wrapping mode swaps nowrap for normal + break-words, capped to the parent
+    expect(html).toContain('whitespace-normal');
+    expect(html).toContain('break-words');
+    expect(html).toContain('max-w-full');
+    expect(html).not.toContain('whitespace-nowrap');
+    // exposes the full text as a tooltip
+    expect(html).toContain('title="full note"');
+  });
 });

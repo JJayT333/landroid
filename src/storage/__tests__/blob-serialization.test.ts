@@ -17,6 +17,34 @@ describe('blob-serialization (audit M3 per-blob cap)', () => {
     expect(restored.type).toBe('application/octet-stream');
   });
 
+  it('encodes via the chunked browser fallback identically to the Buffer path (DA-L7)', async () => {
+    // >64KB so the fallback spans multiple 0x8000 chunks.
+    const bytes = new Uint8Array(0x8000 * 2 + 123);
+    for (let index = 0; index < bytes.length; index += 1) {
+      bytes[index] = (index * 31 + 7) & 0xff;
+    }
+    const reference = Buffer.from(bytes).toString('base64');
+
+    const originalBuffer = (globalThis as { Buffer?: unknown }).Buffer;
+    try {
+      // Force the no-Buffer browser path.
+      (globalThis as { Buffer?: unknown }).Buffer = undefined;
+      const serialized = await serializeBlob(
+        new Blob([bytes], { type: 'application/octet-stream' })
+      );
+      expect(serialized.base64).toBe(reference);
+    } finally {
+      (globalThis as { Buffer?: unknown }).Buffer = originalBuffer;
+    }
+
+    const restored = deserializeBlob({
+      mimeType: 'application/octet-stream',
+      base64: reference,
+    });
+    const restoredBytes = new Uint8Array(await restored.arrayBuffer());
+    expect(Array.from(restoredBytes)).toEqual(Array.from(bytes));
+  });
+
   it('rejects a blob whose encoded size blows the cap', () => {
     // Base64 encodes 3 bytes -> 4 chars, so we need a little over
     // MAX_DESERIALIZED_BLOB_BYTES * 4 / 3 characters to trip the guard.

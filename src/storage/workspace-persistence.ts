@@ -39,6 +39,7 @@ import {
   type DeskMap,
 } from '../types/node';
 import type { CanvasSaveData } from '../store/canvas-store';
+import { withQuotaErrorReporting } from '../store/storage-health-store';
 import type { PageSizeId } from '../types/flowchart';
 import {
   normalizeLeaseholdAssignments,
@@ -52,6 +53,7 @@ import {
 } from '../types/leasehold';
 import {
   normalizeLease,
+  DOC_CATEGORY_OPTIONS,
   type ContactLog,
   type Owner,
   type OwnerDoc,
@@ -59,6 +61,8 @@ import {
 import { normalizeLeasePurchaseReport } from '../types/lease-purchase-report';
 import {
   normalizeMapExternalReference,
+  MAP_ASSET_KIND_OPTIONS,
+  MAP_REGION_STATUS_OPTIONS,
   type MapAsset,
   type MapExternalReference,
   type MapRegion,
@@ -69,6 +73,7 @@ import {
   normalizeResearchQuestion,
   normalizeResearchSource,
   sanitizeResearchLinks,
+  RESEARCH_IMPORT_FORMAT_OPTIONS,
   type ResearchFormula,
   type ResearchImport,
   type ResearchProjectRecord,
@@ -273,6 +278,135 @@ function normalizeContactRecord(
     subject: stringOr(raw.subject, ''),
     outcome: stringOr(raw.outcome, ''),
     notes: stringOr(raw.notes, ''),
+    createdAt: stringOr(raw.createdAt, nowIso),
+    updatedAt: stringOr(raw.updatedAt, nowIso),
+  };
+}
+
+function nullableStringOr(value: unknown): string | null {
+  return typeof value === 'string' ? value : null;
+}
+
+function optionOr<T extends readonly string[]>(
+  options: T,
+  value: unknown,
+  fallback: T[number]
+): T[number] {
+  return typeof value === 'string' && (options as readonly string[]).includes(value)
+    ? value
+    : fallback;
+}
+
+function finiteOr(value: unknown, fallback: number): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+}
+
+/**
+ * DA-L8 (pt 2): field-by-field normalizers for the blob-bearing side stores on
+ * .landroid import. These previously raw-spread (`{ ...raw, workspaceId, blob }`),
+ * so a hand-edited file could smuggle arbitrary extra keys into Dexie and back
+ * out on re-export. Like normalizeOwnerRecord above, each returns a fresh object
+ * with ONLY known fields (authoritative shape = the `createBlank*` factories in
+ * types/*.ts); unknown keys are dropped and the blob is deserialized here.
+ * Records missing a string `id` are filtered out by the callers.
+ */
+function normalizeImportedOwnerDoc(raw: unknown, workspaceId: string): OwnerDoc | null {
+  if (!isRecord(raw) || typeof raw.id !== 'string' || raw.id === '') return null;
+  const nowIso = new Date().toISOString();
+  return {
+    id: raw.id,
+    workspaceId: stringOr(raw.workspaceId, workspaceId),
+    ownerId: stringOr(raw.ownerId, ''),
+    leaseId: nullableStringOr(raw.leaseId),
+    fileName: stringOr(raw.fileName, ''),
+    mimeType: stringOr(raw.mimeType, 'application/octet-stream'),
+    category: optionOr(DOC_CATEGORY_OPTIONS, raw.category, 'Other'),
+    notes: stringOr(raw.notes, ''),
+    blob: deserializeSerializedBlob(raw.blob),
+    createdAt: stringOr(raw.createdAt, nowIso),
+    updatedAt: stringOr(raw.updatedAt, nowIso),
+  };
+}
+
+function normalizeImportedMapAsset(raw: unknown, workspaceId: string): MapAsset | null {
+  if (!isRecord(raw) || typeof raw.id !== 'string' || raw.id === '') return null;
+  const nowIso = new Date().toISOString();
+  return {
+    id: raw.id,
+    workspaceId: stringOr(raw.workspaceId, workspaceId),
+    title: stringOr(raw.title, ''),
+    kind: optionOr(MAP_ASSET_KIND_OPTIONS, raw.kind, 'Other'),
+    fileName: stringOr(raw.fileName, ''),
+    mimeType: stringOr(raw.mimeType, 'application/octet-stream'),
+    notes: stringOr(raw.notes, ''),
+    presentationSummary: stringOr(raw.presentationSummary, ''),
+    isFeatured: raw.isFeatured === true,
+    deskMapId: nullableStringOr(raw.deskMapId),
+    nodeId: nullableStringOr(raw.nodeId),
+    linkedOwnerId: nullableStringOr(raw.linkedOwnerId),
+    leaseId: nullableStringOr(raw.leaseId),
+    researchSourceId: nullableStringOr(raw.researchSourceId),
+    researchProjectRecordId: nullableStringOr(raw.researchProjectRecordId),
+    county: stringOr(raw.county, ''),
+    prospect: stringOr(raw.prospect, ''),
+    effectiveDate: stringOr(raw.effectiveDate, ''),
+    source: stringOr(raw.source, ''),
+    blob: deserializeSerializedBlob(raw.blob),
+    createdAt: stringOr(raw.createdAt, nowIso),
+    updatedAt: stringOr(raw.updatedAt, nowIso),
+  };
+}
+
+function normalizeImportedMapRegion(raw: unknown, workspaceId: string): MapRegion | null {
+  if (!isRecord(raw) || typeof raw.id !== 'string' || raw.id === '') return null;
+  const nowIso = new Date().toISOString();
+  const rawRect = isRecord(raw.rect) ? raw.rect : {};
+  return {
+    id: raw.id,
+    workspaceId: stringOr(raw.workspaceId, workspaceId),
+    assetId: stringOr(raw.assetId, ''),
+    title: stringOr(raw.title, ''),
+    shortLabel: stringOr(raw.shortLabel, ''),
+    status: optionOr(MAP_REGION_STATUS_OPTIONS, raw.status, 'Idea'),
+    summary: stringOr(raw.summary, ''),
+    notes: stringOr(raw.notes, ''),
+    acreage: stringOr(raw.acreage, ''),
+    color: stringOr(raw.color, '#9f6a2d'),
+    geometryKind: 'rect',
+    rect: {
+      x: finiteOr(rawRect.x, 0.2),
+      y: finiteOr(rawRect.y, 0.2),
+      width: finiteOr(rawRect.width, 0.2),
+      height: finiteOr(rawRect.height, 0.2),
+      page: finiteOr(rawRect.page, 0),
+    },
+    deskMapId: nullableStringOr(raw.deskMapId),
+    nodeId: nullableStringOr(raw.nodeId),
+    linkedOwnerId: nullableStringOr(raw.linkedOwnerId),
+    leaseId: nullableStringOr(raw.leaseId),
+    researchSourceId: nullableStringOr(raw.researchSourceId),
+    researchProjectRecordId: nullableStringOr(raw.researchProjectRecordId),
+    createdAt: stringOr(raw.createdAt, nowIso),
+    updatedAt: stringOr(raw.updatedAt, nowIso),
+  };
+}
+
+function normalizeImportedResearchImport(
+  raw: unknown,
+  workspaceId: string
+): ResearchImport | null {
+  if (!isRecord(raw) || typeof raw.id !== 'string' || raw.id === '') return null;
+  const nowIso = new Date().toISOString();
+  return {
+    id: raw.id,
+    workspaceId: stringOr(raw.workspaceId, workspaceId),
+    datasetId: nullableStringOr(raw.datasetId),
+    title: stringOr(raw.title, ''),
+    fileName: stringOr(raw.fileName, ''),
+    mimeType: stringOr(raw.mimeType, 'application/octet-stream'),
+    detectedFormat: optionOr(RESEARCH_IMPORT_FORMAT_OPTIONS, raw.detectedFormat, 'Other'),
+    notes: stringOr(raw.notes, ''),
+    blob: deserializeSerializedBlob(raw.blob),
     createdAt: stringOr(raw.createdAt, nowIso),
     updatedAt: stringOr(raw.updatedAt, nowIso),
   };
@@ -886,7 +1020,7 @@ export async function saveWorkspaceShardsToDb(
   // workspace (a fresh install, or an import/CSV that swapped the workspace).
   const shouldAnchorMonolith = anchoredMonolithWorkspaceId !== workspaceId;
 
-  await db.transaction(
+  await withQuotaErrorReporting('Workspace save', () => db.transaction(
     'rw',
     [
       db.workspaces,
@@ -941,7 +1075,7 @@ export async function saveWorkspaceShardsToDb(
         });
       }
     }
-  );
+  ));
 
   if (shouldAnchorMonolith) {
     anchoredMonolithWorkspaceId = workspaceId;
@@ -1728,13 +1862,27 @@ export async function importLandroidFile(file: File): Promise<LandroidFileData> 
     throw new Error('Invalid .landroid file: root payload must be an object');
   }
 
-  if (
-    typeof parsed.version === 'number'
-    && Number.isFinite(parsed.version)
-    && parsed.version > LANDROID_FILE_VERSION
-  ) {
+  const versionIsValidNumber =
+    typeof parsed.version === 'number' && Number.isFinite(parsed.version);
+
+  if (versionIsValidNumber && (parsed.version as number) > LANDROID_FILE_VERSION) {
     throw new Error(
       `Unsupported .landroid file version ${parsed.version}. This LANDroid build supports up to version ${LANDROID_FILE_VERSION}.`
+    );
+  }
+
+  // DA-L8: the future-version gate above only fires for numeric versions, so a
+  // crafted file could dodge it with a non-numeric version (e.g. `"99"`) or no
+  // version at all and fall through to the legacy v0/v7 path. A genuine pre-v8
+  // legacy file predates the version field — but it also predates the
+  // `documentData` (v8) and `actionLedger` (v9) structures. A file that carries
+  // either of those yet has no valid numeric version is malformed or a bypass
+  // attempt; reject it instead of silently importing it as legacy.
+  const hasV8PlusMarkers =
+    isRecord(parsed.documentData) || isRecord(parsed.actionLedger);
+  if (!versionIsValidNumber && hasV8PlusMarkers) {
+    throw new Error(
+      'Invalid .landroid file: document/ledger data requires a numeric version field.'
     );
   }
 
@@ -1803,12 +1951,8 @@ export async function importLandroidFile(file: File): Promise<LandroidFileData> 
                   (doc): doc is SerializedOwnerDoc =>
                     isRecord(doc) && typeof doc.id === 'string'
                 )
-                .map((doc) => ({
-                  ...doc,
-                  workspaceId:
-                    typeof doc.workspaceId === 'string' ? doc.workspaceId : workspaceId,
-                  blob: deserializeSerializedBlob(doc.blob),
-                }))
+                .map((doc) => normalizeImportedOwnerDoc(doc, workspaceId))
+                .filter((doc): doc is OwnerDoc => doc !== null)
             : [],
         }
       : { owners: [], leases: [], contacts: [], docs: [] };
@@ -1822,14 +1966,8 @@ export async function importLandroidFile(file: File): Promise<LandroidFileData> 
                   (asset): asset is SerializedMapAsset =>
                     isRecord(asset) && typeof asset.id === 'string'
                 )
-                .map((asset) => ({
-                  ...asset,
-                  workspaceId:
-                    typeof asset.workspaceId === 'string'
-                      ? asset.workspaceId
-                      : workspaceId,
-                  blob: deserializeSerializedBlob(asset.blob),
-                }))
+                .map((asset) => normalizeImportedMapAsset(asset, workspaceId))
+                .filter((asset): asset is MapAsset => asset !== null)
             : [],
           mapRegions: Array.isArray(parsed.mapData.mapRegions)
             ? parsed.mapData.mapRegions
@@ -1837,13 +1975,8 @@ export async function importLandroidFile(file: File): Promise<LandroidFileData> 
                   (region): region is SerializedMapRegion =>
                     isRecord(region) && typeof region.id === 'string'
                 )
-                .map((region) => ({
-                  ...region,
-                  workspaceId:
-                    typeof region.workspaceId === 'string'
-                      ? region.workspaceId
-                      : workspaceId,
-                }))
+                .map((region) => normalizeImportedMapRegion(region, workspaceId))
+                .filter((region): region is MapRegion => region !== null)
             : [],
           mapReferences: Array.isArray(parsed.mapData.mapReferences)
             ? parsed.mapData.mapReferences
@@ -1871,14 +2004,8 @@ export async function importLandroidFile(file: File): Promise<LandroidFileData> 
             (researchImport): researchImport is SerializedResearchImport =>
               isRecord(researchImport) && typeof researchImport.id === 'string'
           )
-          .map((researchImport) => ({
-            ...researchImport,
-            workspaceId:
-              typeof researchImport.workspaceId === 'string'
-                ? researchImport.workspaceId
-                : workspaceId,
-            blob: deserializeSerializedBlob(researchImport.blob),
-          }))
+          .map((researchImport) => normalizeImportedResearchImport(researchImport, workspaceId))
+          .filter((researchImport): researchImport is ResearchImport => researchImport !== null)
       : [];
   const researchSources =
     isRecord(parsed.researchData) && Array.isArray(parsed.researchData.sources)

@@ -124,7 +124,21 @@ function buildTree(nodes: OwnershipNode[]): TreeNode[] {
   // Also find "unlinked" nodes — they're separate roots
   const unlinked = nodes.filter(n => n.parentId === 'unlinked');
 
-  const trees = [...roots, ...unlinked].map(buildSubtree);
+  // Orphaned nodes: an ownership node whose parent was deleted after the chart
+  // was built (parentId set, but no matching node in this set). Without this
+  // they are unreachable from any root and get silently dropped from the
+  // layout — on the canvas they then retain stale positions / collapse toward
+  // the origin and overlap. Lay each out as its own root tree (with its own
+  // surviving subtree, if any), side by side with the real roots.
+  const orphaned = nodes.filter(
+    (n) =>
+      n.type !== 'related'
+      && n.parentId != null
+      && n.parentId !== 'unlinked'
+      && !byId.has(n.parentId)
+  );
+
+  const trees = [...roots, ...unlinked, ...orphaned].map(buildSubtree);
   return trees;
 }
 
@@ -332,7 +346,11 @@ export async function layoutOwnershipTreeWithElk(
       height: metrics.nodeHeight,
     })),
     edges: ownershipNodes
-      .filter((node) => node.parentId && node.parentId !== 'unlinked')
+      // Skip edges to a parent that is no longer in the set (deleted) — a
+      // dangling ELK edge to a missing source can break the layered layout and
+      // collapse the orphan to the origin. The orphan is still laid out as a
+      // disconnected node (and as a root by the centered fallback).
+      .filter((node) => node.parentId && node.parentId !== 'unlinked' && allNodes.has(node.parentId))
       .map<ElkExtendedEdge>((node) => ({
         id: `e-${node.parentId}-${node.id}`,
         sources: [node.parentId as string],
@@ -381,7 +399,7 @@ export async function layoutOwnershipTreeWithElk(
       ) as OwnershipNodeData & Record<string, unknown>,
     });
 
-    if (node.parentId && node.parentId !== 'unlinked') {
+    if (node.parentId && node.parentId !== 'unlinked' && allNodes.has(node.parentId)) {
       result.flowEdges.push({
         id: `e-${node.parentId}-${node.id}`,
         source: node.parentId,

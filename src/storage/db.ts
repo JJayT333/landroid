@@ -352,20 +352,7 @@ db.version(9)
       'attachmentId, workspaceId, docId, [workspaceId+entityKind+entityId], [entityKind+entityId], [docId+entityKind+entityId]',
   })
   .upgrade(async (tx) => {
-    const docs = await tx.table<DocumentRecord, 'docId'>('documents').toArray();
-    const workspaceByDocId = new Map(docs.map((doc) => [doc.docId, doc.workspaceId]));
-    const attachments = await tx
-      .table<DocumentAttachment, 'attachmentId'>('document_attachments')
-      .toArray();
-    await Promise.all(
-      attachments.map((attachment) => {
-        const workspaceId = workspaceByDocId.get(attachment.docId);
-        if (!workspaceId) return undefined;
-        return tx.table('document_attachments').update(attachment.attachmentId, {
-          workspaceId,
-        });
-      })
-    );
+    await runV9DocumentAttachmentBackfill(tx);
   });
 
 /**
@@ -793,11 +780,16 @@ async function runV7ToV8PdfMigration(tx: Transaction): Promise<void> {
     // would otherwise lose the blobs. Use a sentinel ID so the rows still
     // land in the new schema and the user can recover them manually.
     ?? '__orphaned_pre_v8__';
-  const result = await migratePdfsToDocuments(
-    pdfs,
-    nodeIndex,
-    fallbackWorkspaceId,
-    realMigrationDeps()
+  // The migration hashes each blob with WebCrypto (`sha256HexOfBlob`), a
+  // non-Dexie promise. Awaiting a foreign promise directly inside an `.upgrade`
+  // transaction can let IndexedDB auto-commit the version-change transaction
+  // before the follow-up `bulkAdd` runs, losing the migrated rows on large PDF
+  // sets. `Dexie.waitFor` keeps the transaction alive across the foreign work
+  // (DA-M10). `migratePdfsToDocuments` is pure (operates on the in-memory
+  // `pdfs` array via injected deps; it never touches `tx`), so wrapping its
+  // call is safe.
+  const result = await Dexie.waitFor(
+    migratePdfsToDocuments(pdfs, nodeIndex, fallbackWorkspaceId, realMigrationDeps())
   );
   if (result.documents.length > 0) {
     await tx.table<DocumentRecord, 'docId'>('documents').bulkAdd(result.documents);
@@ -817,6 +809,36 @@ async function runV7ToV8PdfMigration(tx: Transaction): Promise<void> {
       + `${result.orphans.slice(0, 10).join(', ')}`
       + (result.orphans.length > 10 ? ' …' : '')
     );
+  }
+}
+
+/**
+ * v9 upgrade body: stamp `workspaceId` onto every `document_attachments` row
+ * from its parent document so the `[workspaceId+…]` indexes resolve.
+ *
+ * DA-M10: an attachment whose `docId` has no matching document is dangling
+ * (its document was never migrated or was lost). The previous pass left such
+ * rows with no `workspaceId`, which hid them from every scoped query forever
+ * (dead, unreachable weight). They are now deleted in the same pass. Extracted
+ * and exported so it is unit-testable with a fake transaction.
+ */
+export async function runV9DocumentAttachmentBackfill(
+  tx: Transaction
+): Promise<void> {
+  const docs = await tx.table<DocumentRecord, 'docId'>('documents').toArray();
+  const workspaceByDocId = new Map(docs.map((doc) => [doc.docId, doc.workspaceId]));
+  const attachments = await tx
+    .table<DocumentAttachment, 'attachmentId'>('document_attachments')
+    .toArray();
+  for (const attachment of attachments) {
+    const workspaceId = workspaceByDocId.get(attachment.docId);
+    if (workspaceId) {
+      await tx
+        .table('document_attachments')
+        .update(attachment.attachmentId, { workspaceId });
+    } else {
+      await tx.table('document_attachments').delete(attachment.attachmentId);
+    }
   }
 }
 

@@ -87,6 +87,13 @@ interface TitleActionLogState {
   headHash: string | undefined;
   /** Count of mutations successfully recorded with clean inline parity. */
   recordedMutationCount: number;
+  /**
+   * Parities actually recorded THIS session (reset on hydrate/reset). Cutover
+   * readiness counts only these toward its threshold: a hydrated ledger's
+   * historical mutations were parity-checked in some past session, not this
+   * one, so they must not silently satisfy the "N clean parities" gate (DA-U2).
+   */
+  sessionParityCount: number;
   /** Last parity divergence surfaced (a bug to resolve; never silently dropped). */
   lastDivergence: TitleLedgerDivergence | null;
   /** Last non-divergence recording error (e.g. a malformed mutation). */
@@ -192,6 +199,7 @@ export const useTitleActionLog = create<TitleActionLogState>()((set, get) => ({
   auditEvents: [],
   headHash: undefined,
   recordedMutationCount: 0,
+  sessionParityCount: 0,
   lastDivergence: null,
   lastError: null,
   readPathMode: 'shadow',
@@ -207,6 +215,7 @@ export const useTitleActionLog = create<TitleActionLogState>()((set, get) => ({
       auditEvents: [],
       headHash: undefined,
       recordedMutationCount: 0,
+      sessionParityCount: 0,
       lastDivergence: null,
       lastError: null,
       readPathMode: 'shadow',
@@ -222,6 +231,8 @@ export const useTitleActionLog = create<TitleActionLogState>()((set, get) => ({
       auditEvents: [...auditEvents],
       headHash: auditEvents.at(-1)?.eventHash,
       recordedMutationCount: actionRecords.length,
+      // Hydrated history was parity-checked in a past session, not this one.
+      sessionParityCount: 0,
       lastDivergence: null,
       lastError: null,
       readPathMode: 'shadow',
@@ -292,6 +303,7 @@ export const useTitleActionLog = create<TitleActionLogState>()((set, get) => ({
         auditEvents: [...state.auditEvents, result.auditEvent],
         headHash: result.auditHeadHash,
         recordedMutationCount: state.recordedMutationCount + 1,
+        sessionParityCount: state.sessionParityCount + 1,
         lastError: null,
       }));
     } catch (err) {
