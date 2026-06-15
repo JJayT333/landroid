@@ -137,7 +137,9 @@ describe('calculateShare', () => {
     });
     // 3/4 of initial 1.0 = 0.75; the parent only has 0.5 remaining. The old
     // engine silently clamped this to 0.5; now it returns the raw 0.75 so the
-    // caller can warn, and executeConveyance rejects it loudly (see below).
+    // caller can warn, and executeConveyance BOOKS the remainder (0.5) while
+    // capturing the stated 0.75 and returning an over_conveyance warning — it
+    // no longer rejects (DA-M1; see the over-conveyance booking tests below).
     expect(share.toFixed(9)).toBe('0.750000000');
   });
 

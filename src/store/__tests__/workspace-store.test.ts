@@ -172,6 +172,47 @@ describe('workspace-store', () => {
     );
   });
 
+  it('surfaces lastError (never silently) if the over-conveyance title issue fails to persist (F1)', async () => {
+    // warn-don't-cap: the over-conveyance is BOOKED, so a failed title-issue
+    // write must not leave the capped number with no surfaced warning.
+    mocks.addCurativeIssue.mockRejectedValueOnce(new Error('quota exceeded'));
+    const root = {
+      ...createBlankNode('root', null),
+      grantee: 'Root Owner',
+      initialFraction: '0.500000000',
+      fraction: '0.500000000',
+    };
+    useWorkspaceStore.setState({
+      nodes: [root],
+      deskMaps: [
+        {
+          id: 'dm-1',
+          name: 'Tract 1',
+          code: 'T1',
+          tractId: null,
+          grossAcres: '100',
+          pooledAcres: '100',
+          description: '',
+          nodeIds: ['root'],
+        },
+      ],
+      activeDeskMapId: 'dm-1',
+    });
+
+    const ok = useWorkspaceStore
+      .getState()
+      .convey('root', 'child-over', '0.75', { grantee: 'Over Grantee' });
+    expect(ok).toBe(true);
+    // The booking itself is still correct.
+    expect(useWorkspaceStore.getState().nodes.find((n) => n.id === 'child-over')?.fraction).toBe(
+      '0.500000000'
+    );
+    // The warning is NOT lost: the persistence failure surfaces via lastError.
+    await vi.waitFor(() => {
+      expect(useWorkspaceStore.getState().lastError).toMatch(/Over-conveyance booked/);
+    });
+  });
+
   it('does not raise an Over-conveyance issue for a within-remainder conveyance', async () => {
     const root = {
       ...createBlankNode('root', null),

@@ -331,6 +331,24 @@ function normalizeRatificationStatus(value: unknown): RatificationStatus | undef
  * clause or `undefined` if the shape is incomplete, so the field stays absent on
  * ordinary conveyances and round-trips verbatim when present.
  */
+/**
+ * Non-throwing check that a string parses as a finite, non-negative Decimal.
+ * Used to gate the OPTIONAL fraction-bearing fields (statedFraction, double-
+ * fraction readings) so malformed imported data is DROPPED rather than preserved
+ * verbatim and silently coerced to 0 by a downstream `d()` (the required fields
+ * fraction/initialFraction throw instead; these are optional so we drop).
+ */
+function isFiniteNonNegativeDecimalString(value: string): boolean {
+  const trimmed = value.trim();
+  if (trimmed.length === 0) return false;
+  try {
+    const parsed = new Decimal(trimmed);
+    return parsed.isFinite() && !parsed.isNegative();
+  } catch {
+    return false;
+  }
+}
+
 function normalizeDoubleFractionClause(value: unknown): DoubleFractionClause | undefined {
   if (!value || typeof value !== 'object') {
     return undefined;
@@ -344,6 +362,11 @@ function normalizeDoubleFractionClause(value: unknown): DoubleFractionClause | u
     typeof candidate.presumptionReading !== 'string'
     || typeof candidate.arithmeticReading !== 'string'
     || !chosenBasis
+    // Drop the whole clause if either reading is not a valid fraction: a garbage
+    // reading would otherwise resolve to 0 in calculateShare with no warning,
+    // masking corrupt data on the exact feature meant to prevent silent errors.
+    || !isFiniteNonNegativeDecimalString(candidate.presumptionReading)
+    || !isFiniteNonNegativeDecimalString(candidate.arithmeticReading)
   ) {
     return undefined;
   }
@@ -572,8 +595,11 @@ export function normalizeOwnershipNode(
     isCollapsed: node.isCollapsed === true,
     // DA-M1: an over-conveyance records the deed's STATED fraction verbatim
     // alongside the booked fraction. Optional and absent by default; preserved
-    // verbatim so full-node snapshots round-trip the captured value.
-    ...(typeof node.statedFraction === 'string' && node.statedFraction.trim().length > 0
+    // only when it is a valid fraction so a malformed import is dropped rather
+    // than round-tripped as garbage (it is display/title-issue only, but the
+    // doc contract calls it a fraction).
+    ...(typeof node.statedFraction === 'string'
+      && isFiniteNonNegativeDecimalString(node.statedFraction)
       ? { statedFraction: node.statedFraction }
       : {}),
     // DA-M5: NPRI ratification flag, only on NPRI nodes. Absent (= 'unknown') by

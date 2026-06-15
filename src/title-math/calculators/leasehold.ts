@@ -1851,10 +1851,24 @@ export function buildLeaseholdDecimalRows({
 export function buildLeaseholdTransferOrderHoldReasons(
   unitSummary: Pick<
     LeaseholdUnitSummary,
-    'unitAssignmentWarningCount' | 'npriRatificationHoldCount'
+    | 'unitAssignmentWarningCount'
+    | 'npriRatificationHoldCount'
+    | 'fixedNpriExceedsRoyaltyTractCount'
   >
 ): string[] {
   const reasons: string[] = [];
+  // DA-H1 decision of record: where a fixed NPRI exceeds the burdened lessor's
+  // royalty, the excess is charged to the WI on treatise consensus (not on-point
+  // SCOTX authority), so the sheet must recommend counsel sign-off before payout
+  // reliance. The flag is computed per tract; surface it here so it is visible.
+  if (unitSummary.fixedNpriExceedsRoyaltyTractCount > 0) {
+    reasons.push(
+      `${unitSummary.fixedNpriExceedsRoyaltyTractCount} tract${
+        unitSummary.fixedNpriExceedsRoyaltyTractCount === 1 ? '' : 's'
+      } where a fixed NPRI exceeds the lessor royalty (excess charged to WI) — `
+      + `recommend counsel sign-off before payout reliance.`
+    );
+  }
   // Deliberate readiness gate: a null-unit ORRI/WI record is not transfer-order
   // reliable until it is assigned to the coded unit it affects.
   if (unitSummary.unitAssignmentWarningCount > 0) {

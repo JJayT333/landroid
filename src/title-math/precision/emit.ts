@@ -13,18 +13,28 @@
  * auditable, and makes an eventual deliberate quantization of the rate path a
  * one-line change here rather than a scatter edit across 85 call sites.
  *
- * Stage B (deliberate quantization): `emitRate` now rounds to 9 decimal places
- * -- the same display precision the ownership-graph `serialize` firewall already
- * applied -- so leasehold/coverage rates no longer leak the full 40-digit
- * arithmetic residue into the UI and the transfer-order sheet. This is applied
- * ONLY to value-safe FINAL outputs (display rates, summed unit totals,
- * transfer-order terminals). Intermediates that are re-read and then MULTIPLIED
- * or DIVIDED downstream (chiefly the cross-module `allocatedFraction` that
- * leasehold re-parses and multiplies through the royalty/NPRI/WI stack) must
- * stay full precision -- they route through `emitRawRate` instead. Quantizing a
- * re-read-and-multiplied intermediate would compound the rounding and shift the
- * final result past 9dp (a real `value` divergence), so the choke point exposes
- * both disciplines explicitly.
+ * Stage B (deliberate quantization): `emitRate` rounds to 9 decimal places --
+ * the same display precision the ownership-graph `serialize` firewall already
+ * applied. It is applied to value-safe FINAL outputs: the per-tract display
+ * rates and the SUMMED unit totals / transfer-order terminals (totalDecimal,
+ * expectedDecimal, varianceDecimal, category totals).
+ *
+ * Two things deliberately stay full precision (raw `.toString()`, NOT emitRate),
+ * so do not "fix" them to 9dp:
+ *   1. Re-read intermediates that are then MULTIPLIED or DIVIDED downstream --
+ *      chiefly the cross-module `allocatedFraction` (leasehold re-parses and
+ *      multiplies it through the whole royalty/NPRI/WI stack) and the unit
+ *      `retainedWorkingInterestDecimal` (re-read as a transfer-order row).
+ *      Quantizing these would compound the rounding and shift a final result
+ *      past 9dp -- a real `value` divergence.
+ *   2. The individual transfer-order ROW decimals (per-payee), incl. the new
+ *      'unleased' rows. Rows stay exact so the unit total is `round(sum(raw))`,
+ *      not `round(sum(round(...)))`; the latter accumulates per-row rounding and
+ *      the sheet may not foot. Every row is re-quantized to 9dp at DISPLAY time,
+ *      so the raw digits never reach a rendered field or a payout total -- they
+ *      are an internal-precision artifact, not a leak.
+ * These route through `emitRawRate` (or plain `.toString()`); the choke point
+ * exposes both disciplines explicitly.
  */
 import type { Decimal } from 'decimal.js';
 

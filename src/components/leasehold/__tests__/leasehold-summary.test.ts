@@ -1109,6 +1109,25 @@ describe('leasehold-summary', () => {
     expect(buildWith('unratified').npriRatificationHoldCount).toBe(1);
   });
 
+  it('holds the transfer order with a counsel-sign-off reason when a fixed NPRI exceeds royalty (DA-H1, F4)', () => {
+    const reasons = buildLeaseholdTransferOrderHoldReasons({
+      unitAssignmentWarningCount: 0,
+      npriRatificationHoldCount: 0,
+      fixedNpriExceedsRoyaltyTractCount: 2,
+    });
+    expect(reasons.some((r) => r.includes('counsel sign-off'))).toBe(true);
+    expect(reasons.some((r) => r.includes('2 tracts') && r.includes('fixed NPRI'))).toBe(true);
+
+    // No flag -> no DA-H1 hold.
+    expect(
+      buildLeaseholdTransferOrderHoldReasons({
+        unitAssignmentWarningCount: 0,
+        npriRatificationHoldCount: 0,
+        fixedNpriExceedsRoyaltyTractCount: 0,
+      }).some((r) => r.includes('counsel sign-off'))
+    ).toBe(false);
+  });
+
   it('surfaces malformed lease royalty, ORRI burden, and WI assignment inputs as warnings', () => {
     const summary = buildLeaseholdUnitSummary({
       deskMaps: [

@@ -360,7 +360,20 @@ function raiseOverConveyanceIssue(
       + 'booked the grantor remainder and captured the stated amount for review.',
     notes: warning.message,
   });
-  void curative.addIssue(issue).catch(() => {});
+  // Do NOT swallow a persistence failure: the over-conveyance was BOOKED (a
+  // capped number), so losing its warning silently would be the exact "silent
+  // cap" the warn-don't-cap rule forbids. If the title-issue write fails, the
+  // booking still stands -- surface it as lastError (the store's idiom) so the
+  // operator can re-flag it instead of relying on an unmarked transfer order.
+  void curative.addIssue(issue).catch((err: unknown) => {
+    const message = err instanceof Error ? err.message : String(err);
+    useWorkspaceStore.setState({
+      lastError:
+        `Over-conveyance booked for "${granteeLabel}" but its title issue could not be saved `
+        + `(${message}). The booking stands; re-flag the over-conveyance before relying on the `
+        + `transfer order.`,
+    });
+  });
 }
 
 function resolveActiveDeskMapId(
