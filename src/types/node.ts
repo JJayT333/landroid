@@ -43,6 +43,25 @@ export type FixedRoyaltyBasis = 'burdened_branch' | 'whole_tract' | null;
 export type RoyaltyKind = 'fixed' | 'floating' | null;
 
 /**
+ * NPRI ratification of pooling (DA-M5; deep-audit decision of record).
+ *
+ * Today's leasehold math silently assumes every NPRI ratified the pooling, so it
+ * shares unit production weighted by tract participation. This tri-state makes
+ * that assumption explicit:
+ * - `'ratified'`   — owner ratified the unit; unit-weighted payout (today's math).
+ * - `'unknown'`    — ratification unconfirmed; computed unit-weighted but held on
+ *                    the transfer-order sheet until confirmed. The default when
+ *                    absent, so the engine no longer silently assumes ratification.
+ * - `'unratified'` — owner did NOT ratify; entitled to a tract-basis payout. The
+ *                    tract-basis math is deferred pending counsel confirmation as
+ *                    to specific instruments (deep-audit), so it is currently held
+ *                    rather than silently recomputed.
+ *
+ * Absent on non-NPRI nodes and on legacy data (treated as `'unknown'`).
+ */
+export type RatificationStatus = 'ratified' | 'unratified' | 'unknown';
+
+/**
  * Denormalized cache of every document currently attached to a node
  * (Phase 5 / ADR 0004). The source of truth is the Dexie
  * `document_attachments` + `documents` pair — this array exists so Desk
@@ -131,6 +150,11 @@ export interface OwnershipNode {
    * - `null` means not applicable (mineral nodes and floating NPRIs)
    */
   fixedRoyaltyBasis: FixedRoyaltyBasis;
+  /**
+   * NPRI pooling ratification. See {@link RatificationStatus}. Optional and
+   * absent by default (treated as `'unknown'`); only meaningful on NPRI nodes.
+   */
+  ratificationStatus?: RatificationStatus;
 
   /**
    * Depth-range discriminator. See {@link DepthRange}. Defaults to
@@ -256,6 +280,18 @@ function normalizeFixedRoyaltyBasis(value: unknown): FixedRoyaltyBasis {
     return value;
   }
   return null;
+}
+
+/**
+ * Normalize the optional NPRI ratification flag. Returns the explicit status, or
+ * `undefined` for any other value so the field stays absent (= `'unknown'`) on
+ * non-NPRI nodes and legacy data, keeping it round-trip-safe.
+ */
+function normalizeRatificationStatus(value: unknown): RatificationStatus | undefined {
+  if (value === 'ratified' || value === 'unratified' || value === 'unknown') {
+    return value;
+  }
+  return undefined;
 }
 
 function normalizeAttachmentSummary(value: unknown): NodeAttachmentSummary | null {
@@ -478,6 +514,11 @@ export function normalizeOwnershipNode(
     // verbatim so full-node snapshots round-trip the captured value.
     ...(typeof node.statedFraction === 'string' && node.statedFraction.trim().length > 0
       ? { statedFraction: node.statedFraction }
+      : {}),
+    // DA-M5: NPRI ratification flag, only on NPRI nodes. Absent (= 'unknown') by
+    // default so legacy data and non-NPRI nodes round-trip unchanged.
+    ...(interestClass === 'npri' && normalizeRatificationStatus(node.ratificationStatus)
+      ? { ratificationStatus: normalizeRatificationStatus(node.ratificationStatus) }
       : {}),
   };
 }

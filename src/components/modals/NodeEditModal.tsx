@@ -65,6 +65,7 @@ export default function NodeEditModal({
     royaltyKind: node.royaltyKind,
     fixedRoyaltyBasis:
       node.fixedRoyaltyBasis ?? (node.royaltyKind === 'fixed' ? 'burdened_branch' : null),
+    ratificationStatus: node.ratificationStatus ?? 'unknown',
     isDeceased: node.isDeceased,
     obituary: node.obituary,
     graveyardLink: node.graveyardLink,
@@ -119,6 +120,9 @@ export default function NodeEditModal({
   const handleSave = () => {
     setError(null);
 
+    // Keep ratificationStatus out of the base spread: it is NPRI-only, so it is
+    // re-added (defaulted explicit) for NPRI nodes and dropped for minerals.
+    const { ratificationStatus, ...baseForm } = form;
     const normalizedNpriFields = interestClass === 'npri'
       ? {
           royaltyKind: form.royaltyKind,
@@ -126,10 +130,11 @@ export default function NodeEditModal({
             form.royaltyKind === 'fixed'
               ? (form.fixedRoyaltyBasis ?? 'burdened_branch')
               : null,
+          ratificationStatus: ratificationStatus ?? 'unknown',
         }
       : {};
     if (initialChanged) {
-      const { initialFraction, ...otherFields } = form;
+      const { initialFraction, ...otherFields } = baseForm;
       const success = rebalance(node.id, initialFraction, {
         ...otherFields,
         ...normalizedNpriFields,
@@ -140,7 +145,7 @@ export default function NodeEditModal({
       }
     } else {
       updateNode(node.id, {
-        ...form,
+        ...baseForm,
         ...normalizedNpriFields,
       });
     }
@@ -269,6 +274,37 @@ export default function NodeEditModal({
                     </div>
                   </div>
                 )}
+
+                <div className="space-y-1.5">
+                  <div className="text-[10px] text-ink-light uppercase tracking-wider">
+                    Pooling Ratification
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {([
+                      ['ratified', 'Ratified'],
+                      ['unratified', 'Unratified'],
+                      ['unknown', 'Unknown'],
+                    ] as const).map(([status, label]) => (
+                      <button
+                        key={status}
+                        type="button"
+                        onClick={() => set('ratificationStatus', status)}
+                        className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                          form.ratificationStatus === status
+                            ? 'bg-leather text-parchment'
+                            : 'text-ink hover:bg-parchment-dark border border-ledger-line'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="text-[10px] text-ink-light">
+                    Only a ratified NPRI is transfer-order payout-reliable.
+                    Unknown (the default) and unratified are computed
+                    unit-weighted but held until confirmed.
+                  </div>
+                </div>
               </>
             )}
 

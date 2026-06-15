@@ -1154,6 +1154,7 @@
     ],
     "leaseOverlapTractCount": 2,
     "leaseOverlapWarningCount": 2,
+    "npriRatificationHoldCount": 2,
     "npris": [
       {
         "burdenFraction": "0.500000000",
@@ -1166,6 +1167,7 @@
         "includedInMath": true,
         "notes": "PLANTED ERROR: VM3 — Mercury Cutoff fixed NPRI of 1/2 of the whole tract — stacks above the lease royalty to trigger the Over-burdened warning.",
         "payee": "Annie Boggs",
+        "ratificationStatus": "unknown",
         "royaltyKind": "fixed",
         "sourceDocNo": "VM3-NPRI-001",
         "tractBurdenRate": "0.4375",
@@ -1184,6 +1186,7 @@
         "includedInMath": true,
         "notes": "PLANTED ERROR: VM3 — Mercury Cutoff fixed NPRI of 1/4 of the whole tract — stacks above the lease royalty to trigger the Over-burdened warning.",
         "payee": "Hermes Royalty Holdings, LP",
+        "ratificationStatus": "unknown",
         "royaltyKind": "fixed",
         "sourceDocNo": "VM3-NPRI-002",
         "tractBurdenRate": "0.21875",

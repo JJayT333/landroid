@@ -20,6 +20,7 @@ import {
   type DeskMap,
   type FixedRoyaltyBasis,
   type OwnershipNode,
+  type RatificationStatus,
   type RoyaltyKind,
 } from '../../types/node';
 import type { Lease, Owner } from '../../types/owner';
@@ -220,6 +221,13 @@ export interface LeaseholdNpriSummary {
   payee: string;
   royaltyKind: Exclude<RoyaltyKind, null>;
   fixedRoyaltyBasis: Exclude<FixedRoyaltyBasis, null> | null;
+  /**
+   * DA-M5: pooling ratification. `'unknown'` (the default) and `'unratified'`
+   * are computed unit-weighted but held on the transfer-order sheet until the
+   * status is confirmed; only `'ratified'` is payout-reliable today. The
+   * `'unratified'` tract-basis payout math is deferred pending counsel review.
+   */
+  ratificationStatus: RatificationStatus;
   deskMapId: string;
   tractName: string;
   tractCode: string;
@@ -281,6 +289,12 @@ export interface LeaseholdUnitSummary {
   overFloatingNpriBurdenedTractCount: number;
   /** DA-H1: number of tracts whose fixed NPRI exceeds the lessor royalty. */
   fixedNpriExceedsRoyaltyTractCount: number;
+  /**
+   * DA-M5: number of included NPRIs whose pooling ratification is not confirmed
+   * (`'unknown'` or `'unratified'`). They are computed unit-weighted but should
+   * be held on the transfer-order sheet until the status is confirmed.
+   */
+  npriRatificationHoldCount: number;
   /**
    * Number of tracts that have at least one lease-overlap warning. Warning-only;
    * affected tracts still roll up their clipped allocations and the leasehold
@@ -449,6 +463,14 @@ function effectiveFixedNpriBasis(
     return null;
   }
   return node.fixedRoyaltyBasis === 'whole_tract' ? 'whole_tract' : 'burdened_branch';
+}
+
+/**
+ * DA-M5: an NPRI's pooling-ratification status. Absent (legacy / unset) is read
+ * as `'unknown'`, so the engine no longer silently assumes ratification.
+ */
+function effectiveNpriRatification(node: OwnershipNode): RatificationStatus {
+  return node.ratificationStatus ?? 'unknown';
 }
 
 function findBurdenedMineralAncestorId(
@@ -987,6 +1009,7 @@ export function buildLeaseholdUnitSummary({
     const nprisForTract = presentNpriHolders.map((node) => {
       const royaltyKind = effectiveNpriRoyaltyKind(node);
       const fixedRoyaltyBasis = effectiveFixedNpriBasis(node);
+      const ratificationStatus = effectiveNpriRatification(node);
       const burdenedMineralAncestorId = findBurdenedMineralAncestorId(node, nodeById);
       const burdenedBranchOwner =
         burdenedMineralAncestorId && nodeById.get(burdenedMineralAncestorId)
@@ -1060,6 +1083,7 @@ export function buildLeaseholdUnitSummary({
         payee: nameOwner(node, ownerById),
         royaltyKind,
         fixedRoyaltyBasis,
+        ratificationStatus,
         deskMapId: deskMap.id,
         tractName: deskMap.name,
         tractCode: deskMap.code,
@@ -1512,6 +1536,9 @@ export function buildLeaseholdUnitSummary({
     fixedNpriExceedsRoyaltyTractCount: tracts.filter(
       (tract) => tract.fixedNpriExceedsRoyalty
     ).length,
+    npriRatificationHoldCount: npris.filter(
+      (npri) => npri.includedInMath && npri.ratificationStatus !== 'ratified'
+    ).length,
     leaseOverlapTractCount: tracts.filter((tract) => tract.leaseOverlaps.length > 0).length,
     leaseOverlapWarningCount: tracts.reduce(
       (sum, tract) => sum + tract.leaseOverlaps.length,
@@ -1816,17 +1843,32 @@ export function buildLeaseholdDecimalRows({
 }
 
 export function buildLeaseholdTransferOrderHoldReasons(
-  unitSummary: Pick<LeaseholdUnitSummary, 'unitAssignmentWarningCount'>
+  unitSummary: Pick<
+    LeaseholdUnitSummary,
+    'unitAssignmentWarningCount' | 'npriRatificationHoldCount'
+  >
 ): string[] {
+  const reasons: string[] = [];
   // Deliberate readiness gate: a null-unit ORRI/WI record is not transfer-order
   // reliable until it is assigned to the coded unit it affects.
-  return unitSummary.unitAssignmentWarningCount > 0
-    ? [
-        `${unitSummary.unitAssignmentWarningCount} unit-scoped ORRI/WI record${
-          unitSummary.unitAssignmentWarningCount === 1 ? '' : 's'
-        } excluded - needs unit assignment.`,
-      ]
-    : [];
+  if (unitSummary.unitAssignmentWarningCount > 0) {
+    reasons.push(
+      `${unitSummary.unitAssignmentWarningCount} unit-scoped ORRI/WI record${
+        unitSummary.unitAssignmentWarningCount === 1 ? '' : 's'
+      } excluded - needs unit assignment.`
+    );
+  }
+  // DA-M5: NPRIs whose pooling ratification is unconfirmed are computed
+  // unit-weighted but are not payout-reliable until ratification is confirmed
+  // (the unratified tract-basis payout is deferred pending counsel review).
+  if (unitSummary.npriRatificationHoldCount > 0) {
+    reasons.push(
+      `${unitSummary.npriRatificationHoldCount} NPRI${
+        unitSummary.npriRatificationHoldCount === 1 ? '' : 's'
+      } need ratification confirmation before transfer-order payout.`
+    );
+  }
+  return reasons;
 }
 
 function leaseholdCoverageDecimal(tract: Pick<LeaseholdTractSummary, 'unitParticipation' | 'currentOwnership'>) {

@@ -1029,6 +1029,86 @@ describe('leasehold-summary', () => {
     expect(review.varianceDecimal).toBe('0');
   });
 
+  it('flags NPRIs with unconfirmed ratification and holds the transfer order (DA-M5)', () => {
+    const buildWith = (ratificationStatus?: 'ratified' | 'unratified' | 'unknown') =>
+      buildLeaseholdUnitSummary({
+        deskMaps: [
+          {
+            id: 'dm-1',
+            name: 'Tract 1',
+            code: 'T1',
+            tractId: 'T1',
+            grossAcres: '100',
+            pooledAcres: '100',
+            description: '',
+            nodeIds: ['n1', 'l1', 'npri-1'],
+          },
+        ],
+        nodes: [
+          {
+            ...createBlankNode('n1', null),
+            grantee: 'Mineral Owner',
+            linkedOwnerId: 'owner-1',
+            fraction: '1',
+            initialFraction: '1',
+          },
+          {
+            ...createBlankNode('l1', 'n1'),
+            type: 'related' as const,
+            relatedKind: 'lease' as const,
+          },
+          {
+            ...createBlankNode('npri-1', 'n1'),
+            grantee: 'NPRI Owner',
+            linkedOwnerId: 'owner-2',
+            interestClass: 'npri' as const,
+            royaltyKind: 'floating' as const,
+            fraction: '0.5',
+            initialFraction: '0.5',
+            docNo: 'NPRI-1',
+            ...(ratificationStatus ? { ratificationStatus } : {}),
+          },
+        ],
+        owners: [
+          createBlankOwner('ws-1', { id: 'owner-1', name: 'Mineral Owner' }),
+          createBlankOwner('ws-1', { id: 'owner-2', name: 'NPRI Owner' }),
+        ],
+        leases: [
+          createBlankLease('ws-1', 'owner-1', {
+            id: 'lease-1',
+            leaseName: 'Base Lease',
+            lessee: 'Operator A',
+            royaltyRate: '1/8',
+            leasedInterest: '1',
+          }),
+        ],
+        leaseholdAssignments: [],
+        leaseholdOrris: [],
+      });
+
+    // Absent ratification reads as 'unknown' (the engine no longer silently
+    // assumes ratification) and holds the transfer order.
+    const unknown = buildWith(undefined);
+    expect(unknown.npris.find((n) => n.id === 'npri-1')?.ratificationStatus).toBe('unknown');
+    expect(unknown.npriRatificationHoldCount).toBe(1);
+    expect(
+      buildLeaseholdTransferOrderHoldReasons(unknown).some((r) => r.includes('ratification'))
+    ).toBe(true);
+
+    // A confirmed-ratified NPRI is payout-reliable: no hold.
+    const ratified = buildWith('ratified');
+    expect(ratified.npris.find((n) => n.id === 'npri-1')?.ratificationStatus).toBe('ratified');
+    expect(ratified.npriRatificationHoldCount).toBe(0);
+    expect(
+      buildLeaseholdTransferOrderHoldReasons(ratified).some((r) => r.includes('ratification'))
+    ).toBe(false);
+
+    // The decimals are identical regardless of ratification — the unratified
+    // tract-basis payout math is deferred, so only the hold differs today.
+    expect(ratified.totalNpriDecimal).toBe(unknown.totalNpriDecimal);
+    expect(buildWith('unratified').npriRatificationHoldCount).toBe(1);
+  });
+
   it('surfaces malformed lease royalty, ORRI burden, and WI assignment inputs as warnings', () => {
     const summary = buildLeaseholdUnitSummary({
       deskMaps: [
