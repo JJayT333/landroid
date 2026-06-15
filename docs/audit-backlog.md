@@ -1,8 +1,16 @@
 # LANDroid Audit Backlog
 
-Last updated: 2026-06-13 (Step 2 hardening lanes all landed: DA-H7 #155,
-DA-H10 #156, DA-M16 #157; plus DA-H9 #158 and the Flowchart Miro-class rebuild
-#159 — incl. DA-H8. DA-H6 closed via #152, DA-H7 parts 1–2 via #153.)
+Last updated: 2026-06-15. The Step-2 wrap-up sprint (#161–#179) + the unified
+title-math rewrite (#180) landed: among the rows below, NOW FIXED are **DA-H1**
+(#180, attorney-approved excess-to-WI), **DA-M1/DA-M2** (#167 engine + #180
+surfacing), **DA-M5** (#180 ratification), **Van Dyke double-fraction** and
+**unleased rows** (#180), **DA-M7** (#168), **DA-M10/M11/M12** (#171/#175/#172),
+**DA-L6/L7/L8** (#166/#176/#174+#178), **DA-U1/U2** (#161/#173), **DA2-R1**
+(#165). STILL OPEN (the "do it all" program, by wave): DA-H4/H5 + DA-M3/ACT-M01 +
+ACT-H01 (W2 title-ledger trust); DA-M6, LLA-L02, DA2-M2 (W1 small defects);
+DA2-C*, DA2-M3/M4, DA2-R2/R3/R4 (W3/W4); the federal/RRC/hosted-AI lanes remain
+gated. (Prior: DA-H7 #155, DA-H10 #156, DA-M16 #157, DA-H9 #158, Flowchart
+rebuild #159 incl. DA-H8; DA-H6 #152; DA-H7 pts 1–2 #153.)
 
 ## 2026-06-10 Deep Audit (Claude) — new findings, not yet reconciled row-by-row
 
@@ -15,9 +23,12 @@ explicitly accepted, treat that report as part of this backlog. Summary:
   the permanent CI invariant, and after the operator's 2026-06-10 Springhill
   soak the flip governance is armed at boot (manual click + green gates still
   required to actually flip).
-- DA-H1: fixed NPRI deducted from lessee NRI instead of burdened lessor royalty
-  (attorney sign-off + golden update required before change; decision of
-  record in CONTINUATION-PROMPT.md — gate cleared, implement after Step 1).
+- DA-H1: FIXED (#180; attorney-approved 2026-06-15) — a fixed NPRI is now
+  satisfied from the burdened lessor's royalty first, with only the excess
+  charged to the WI; a per-tract `fixedNpriExceedsRoyalty` warning surfaces on
+  the transfer-order sheet (the excess rule rests on treatise consensus, now
+  counsel-approved). Springhill TR2 is a real excess case; TR1 0.225/0.775
+  unchanged.
 - DA-H2: FIXED (feat/scope-b-hardening) — AI undo hydrates-then-appends via
   `undoTitleActionRecord` (now live-called); `importAndOpenWorkspace` owns
   import ledger hydration.
