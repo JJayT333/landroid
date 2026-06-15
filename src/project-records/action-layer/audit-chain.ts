@@ -15,6 +15,7 @@
  */
 import {
   AuditEventRecordSchema,
+  type ActionRecord,
   type AuditEventRecord,
 } from '../../backend-spine/contracts';
 import {
@@ -166,4 +167,77 @@ export async function verifyAuditChain(
     reason: null,
     headHash: events.length > 0 ? expectedPrev : (options.priorHeadHash ?? genesis),
   };
+}
+
+/**
+ * DA-H5: the hash chain above covers each AuditEvent *body*, but replay consumes
+ * the referenced ActionRecord's `result` payload, which the event only points at
+ * by id. So an edit to `result.recordEffects` (in Dexie, or in a `.landroid`
+ * `actionLedger` before import) passes `verifyAuditChain` untouched.
+ *
+ * The fix commits `actionHash = sha256(canonicalJson(actionRecord))` into each
+ * `action_record.applied` event's `details` at materialization. Because the
+ * event hash covers `details`, the payload becomes transitively bound to the
+ * chain: tampering with the ActionRecord breaks this comparison; stripping the
+ * committed `actionHash` to forge a "legacy" event breaks the event hash. So a
+ * genuinely legacy (pre-DA-H5) event — one with no committed hash whose own
+ * `eventHash` is still valid — is the only authentic unhashed case, accepted
+ * with a count the caller surfaces as a one-time warning.
+ */
+export async function computeActionRecordHash(record: ActionRecord): Promise<string> {
+  return sha256HexOfText(canonicalJson(record));
+}
+
+export interface ActionPayloadVerification {
+  valid: boolean;
+  /** recordId of the first action whose payload hash mismatched, or null. */
+  brokenRecordId: string | null;
+  reason: string | null;
+  /** Count of applied events carrying no committed actionHash (legacy chains). */
+  legacyCount: number;
+}
+
+/**
+ * Recompute and compare each `action_record.applied` event's committed
+ * `actionHash` against its referenced ActionRecord. Run AFTER `verifyAuditChain`
+ * confirms the event bodies are intact — only then is a committed `actionHash`
+ * itself trustworthy. `subjectRecordIds[0]` is the action record's id by
+ * construction (see `recordTitleMutation`).
+ */
+export async function verifyActionPayloadHashes(
+  actionRecords: readonly ActionRecord[],
+  auditEvents: readonly AuditEventRecord[]
+): Promise<ActionPayloadVerification> {
+  const recordById = new Map(actionRecords.map((record) => [record.recordId, record]));
+  let legacyCount = 0;
+  for (const event of auditEvents) {
+    if (event.eventKind !== 'action_record.applied') continue;
+    const committed = (event.details as { actionHash?: unknown }).actionHash;
+    if (typeof committed !== 'string') {
+      legacyCount += 1;
+      continue;
+    }
+    const actionRecordId = event.subjectRecordIds[0];
+    const record = actionRecordId ? recordById.get(actionRecordId) : undefined;
+    if (!record) {
+      return {
+        valid: false,
+        brokenRecordId: actionRecordId ?? null,
+        reason: 'applied audit event references a missing action record',
+        legacyCount,
+      };
+    }
+    const recomputed = await computeActionRecordHash(record);
+    if (recomputed !== committed) {
+      return {
+        valid: false,
+        brokenRecordId: record.recordId,
+        reason:
+          'action record payload does not match the hash committed in the audit '
+          + 'chain (the payload was altered)',
+        legacyCount,
+      };
+    }
+  }
+  return { valid: true, brokenRecordId: null, reason: null, legacyCount };
 }

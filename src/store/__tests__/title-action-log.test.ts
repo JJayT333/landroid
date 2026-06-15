@@ -87,7 +87,11 @@ import {
   useTitleActionLog,
 } from '../title-action-log';
 import { clearTitleUndoStack, useTitleUndoStack } from '../title-undo-stack';
-import { AUDIT_GENESIS_HASH, verifyAuditChain } from '../../project-records/action-layer/audit-chain';
+import {
+  AUDIT_GENESIS_HASH,
+  verifyActionPayloadHashes,
+  verifyAuditChain,
+} from '../../project-records/action-layer/audit-chain';
 import { ParityDivergenceError } from '../../project-records/action-layer/parity';
 import { titleRecordsFromWorkspace } from '../../project-records/action-layer/title-projection';
 import { replayTitleProjection } from '../../project-records/action-layer/title-replay';
@@ -340,6 +344,39 @@ describe('Phase 4 LIVE title journal (real store auto-records)', () => {
     // provenance does not perturb the hash chain
     expect((await verifyAuditChain(events)).valid).toBe(true);
     expect(useTitleActionLog.getState().lastError).toBeNull();
+  });
+
+  it('commits an action payload hash and rejects payload tampering (DA-H5)', async () => {
+    driveSevenMutations();
+    await settleTitleActionLog();
+    const log = useTitleActionLog.getState();
+
+    // every applied event now carries a committed actionHash
+    const applied = log.auditEvents.filter(
+      (event) => event.eventKind === 'action_record.applied'
+    );
+    expect(applied.length).toBe(7);
+    expect(
+      applied.every(
+        (event) => typeof (event.details as { actionHash?: unknown }).actionHash === 'string'
+      )
+    ).toBe(true);
+
+    // the live chain's payloads verify clean, no legacy events
+    expect(
+      await verifyActionPayloadHashes(log.actionRecords, log.auditEvents)
+    ).toMatchObject({ valid: true, legacyCount: 0 });
+
+    // tamper a stored ActionRecord's replay payload; the event chain is intact
+    const tamperedRecords = log.actionRecords.map((record, index) =>
+      index === 0
+        ? { ...record, result: { ...record.result, summary: 'forged' } }
+        : record
+    );
+    expect((await verifyAuditChain(log.auditEvents)).valid).toBe(true);
+    const verdict = await verifyActionPayloadHashes(tamperedRecords, log.auditEvents);
+    expect(verdict.valid).toBe(false);
+    expect(verdict.brokenRecordId).toBe(log.actionRecords[0]?.recordId);
   });
 
   it('surfaces a parity divergence without rolling back the canonical store', async () => {

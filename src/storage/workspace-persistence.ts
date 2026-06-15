@@ -105,7 +105,10 @@ import {
   appendActionLayerToRecordBundle,
   assertActionLayerExportAllowed,
 } from '../project-records/action-layer/persistence';
-import { verifyAuditChain } from '../project-records/action-layer/audit-chain';
+import {
+  verifyActionPayloadHashes,
+  verifyAuditChain,
+} from '../project-records/action-layer/audit-chain';
 import {
   buildProjectRecordBundle,
   ProjectRecordBundleSchema,
@@ -1576,12 +1579,27 @@ async function validateImportedActionLedger(
   const auditEvents = parsed.data.records.filter(
     (record): record is AuditEventRecord => record.recordType === 'audit_event'
   );
+  const actionRecords = parsed.data.records.filter(
+    (record): record is ActionRecord => record.recordType === 'action_record'
+  );
   try {
     const verification = await verifyAuditChain(auditEvents);
     if (!verification.valid) {
       console.warn(
         `[landroid] Dropping invalid actionLedger: audit chain failed at index ` +
           `${verification.brokenAtIndex} (${verification.reason}).`
+      );
+      return undefined;
+    }
+    // DA-H5: with the event chain proven intact, reject a file whose ActionRecord
+    // payloads were edited out from under the committed hashes (the forgery the
+    // event-body chain alone misses). Pre-DA-H5 files carry no committed hashes;
+    // they verify clean and are accepted as legacy.
+    const payload = await verifyActionPayloadHashes(actionRecords, auditEvents);
+    if (!payload.valid) {
+      console.warn(
+        `[landroid] Dropping invalid actionLedger: action payload hash mismatch for ` +
+          `record ${payload.brokenRecordId} (${payload.reason}).`
       );
       return undefined;
     }

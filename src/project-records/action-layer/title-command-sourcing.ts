@@ -40,7 +40,11 @@ import {
   stableRecordId,
   type RecordBuildContext,
 } from '../record-helpers';
-import { AUDIT_GENESIS_HASH, buildAuditChain } from './audit-chain';
+import {
+  AUDIT_GENESIS_HASH,
+  buildAuditChain,
+  computeActionRecordHash,
+} from './audit-chain';
 import {
   parseActionCommand,
   RecordEffectSchema,
@@ -271,6 +275,11 @@ export async function materializeTitleCommand(input: {
     result: TitleActionResultSchema.parse(result),
   });
 
+  // DA-H5: bind the ActionRecord payload (what replay consumes) to the audit
+  // chain by committing its hash into the event details, which the event hash
+  // then covers. `subjectRecordIds[0]` is this record's id, the pairing the
+  // payload verifier relies on.
+  const actionHash = await computeActionRecordHash(actionRecord);
   const [auditEvent] = await buildAuditChain({
     context: input.context,
     priorHeadHash: input.priorHeadHash,
@@ -296,6 +305,7 @@ export async function materializeTitleCommand(input: {
           mutation: input.mutation,
           surface: 'title_tree',
           summary: command.summary,
+          actionHash,
         },
       },
     ],

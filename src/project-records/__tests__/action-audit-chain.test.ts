@@ -1,17 +1,23 @@
 import { describe, expect, it } from 'vitest';
-import type { AuditEventRecord } from '../../backend-spine/contracts';
+import {
+  ActionRecordSchema,
+  type ActionRecord,
+  type AuditEventRecord,
+} from '../../backend-spine/contracts';
 import {
   AUDIT_GENESIS_HASH,
   appendAuditEvent,
   auditChainHead,
   buildAuditChain,
+  computeActionRecordHash,
   computeAuditEventHash,
   computeAuditGenesisHash,
+  verifyActionPayloadHashes,
   verifyAuditChain,
   type AuditEventDraft,
 } from '../action-layer';
 import type { RecordBuildContext } from '../record-helpers';
-import { NOW } from './action-layer-fixtures';
+import { envelope, HASH, NOW } from './action-layer-fixtures';
 
 const context: RecordBuildContext = {
   workspaceId: 'ws-1',
@@ -170,5 +176,104 @@ describe('Phase 4 audit hash chain', () => {
       },
     });
     expect((await verifyAuditChain([...events, next])).valid).toBe(true);
+  });
+});
+
+function actionRecord(id: string, summary: string): ActionRecord {
+  return ActionRecordSchema.parse({
+    ...envelope('action_record', id),
+    actionKind: 'title.convey',
+    status: 'applied',
+    approvedBy: 'user',
+    appliedAt: NOW,
+    result: { commandId: `cmd-${id}`, surface: 'title_tree', mutation: 'convey', summary },
+  });
+}
+
+async function appliedEvent(
+  recordId: string,
+  actionRecordId: string,
+  details: Record<string, unknown>
+): Promise<AuditEventDraft> {
+  return {
+    recordId,
+    eventKind: 'action_record.applied',
+    actorKind: 'user',
+    occurredAt: NOW,
+    subjectRecordIds: [actionRecordId],
+    details,
+  };
+}
+
+describe('DA-H5 action payload hashing', () => {
+  async function hashedRows(): Promise<{
+    actionRecords: ActionRecord[];
+    auditEvents: AuditEventRecord[];
+  }> {
+    const r1 = actionRecord('action-record-1', 'one');
+    const r2 = actionRecord('action-record-2', 'two');
+    const auditEvents = await buildAuditChain({
+      context,
+      drafts: [
+        await appliedEvent('audit-1', r1.recordId, {
+          actionHash: await computeActionRecordHash(r1),
+        }),
+        await appliedEvent('audit-2', r2.recordId, {
+          actionHash: await computeActionRecordHash(r2),
+        }),
+      ],
+    });
+    return { actionRecords: [r1, r2], auditEvents };
+  }
+
+  it('verifies clean payloads with no legacy events', async () => {
+    const { actionRecords, auditEvents } = await hashedRows();
+    expect(await verifyActionPayloadHashes(actionRecords, auditEvents)).toEqual({
+      valid: true,
+      brokenRecordId: null,
+      reason: null,
+      legacyCount: 0,
+    });
+  });
+
+  it('rejects a tampered ActionRecord payload the event-body chain alone misses', async () => {
+    const { actionRecords, auditEvents } = await hashedRows();
+    // Edit the payload that replay consumes; leave the (already-valid) event
+    // chain untouched, exactly as a Dexie/`.landroid` edit would.
+    const tampered = actionRecords.map((record) =>
+      record.recordId === 'action-record-1'
+        ? { ...record, result: { ...record.result, summary: 'forged' } }
+        : record
+    );
+
+    // The event-body chain still verifies — this is the gap DA-H5 closes.
+    expect((await verifyAuditChain(auditEvents)).valid).toBe(true);
+
+    const verdict = await verifyActionPayloadHashes(tampered, auditEvents);
+    expect(verdict.valid).toBe(false);
+    expect(verdict.brokenRecordId).toBe('action-record-1');
+    expect(verdict.reason).toMatch(/payload was altered/);
+  });
+
+  it('accepts a legacy chain (no committed actionHash) and counts it', async () => {
+    const r1 = actionRecord('action-record-1', 'one');
+    const legacyEvents = await buildAuditChain({
+      context,
+      drafts: [await appliedEvent('audit-1', r1.recordId, { commandKind: 'title.convey' })],
+    });
+    const verdict = await verifyActionPayloadHashes([r1], legacyEvents);
+    expect(verdict.valid).toBe(true);
+    expect(verdict.legacyCount).toBe(1);
+  });
+
+  it('flags an applied event that references a missing action record', async () => {
+    const events = await buildAuditChain({
+      context,
+      drafts: [await appliedEvent('audit-1', 'action-record-missing', { actionHash: HASH })],
+    });
+    const verdict = await verifyActionPayloadHashes([], events);
+    expect(verdict.valid).toBe(false);
+    expect(verdict.brokenRecordId).toBe('action-record-missing');
+    expect(verdict.reason).toMatch(/missing action record/);
   });
 });

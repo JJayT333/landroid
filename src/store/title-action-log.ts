@@ -36,7 +36,10 @@ import type {
 import type { OwnerWorkspaceData } from '../storage/owner-persistence';
 import type { WorkspaceData } from '../storage/workspace-persistence';
 import { ParityDivergenceError } from '../project-records/action-layer/parity';
-import { verifyAuditChain } from '../project-records/action-layer/audit-chain';
+import {
+  verifyActionPayloadHashes,
+  verifyAuditChain,
+} from '../project-records/action-layer/audit-chain';
 import { setTitleCutoverRuntimeStateReader } from '../project-records/action-layer/title-cutover-gate';
 import {
   checkTitleInlineParity,
@@ -456,6 +459,26 @@ async function verifyTitleLedgerRows(
         `(${verification.reason}).`
     );
     return false;
+  }
+  // DA-H5: the event chain is intact, so the committed actionHashes are now
+  // trustworthy — confirm each ActionRecord payload still matches the hash bound
+  // into the chain. This catches a tampered/corrupt `result` payload that the
+  // event-body chain alone cannot see.
+  const payload = await verifyActionPayloadHashes(rows.actionRecords, rows.auditEvents);
+  if (!payload.valid) {
+    console.warn(
+      `[title-action-log] Ignoring ${label} ledger for workspace ${workspaceId}: ` +
+        `action payload hash mismatch for record ${payload.brokenRecordId} ` +
+        `(${payload.reason}).`
+    );
+    return false;
+  }
+  if (payload.legacyCount > 0) {
+    console.warn(
+      `[title-action-log] ${label} ledger for workspace ${workspaceId} carries ` +
+        `${payload.legacyCount} legacy unhashed action event(s) (pre-DA-H5). The ` +
+        'chain is accepted; mutations recorded from now on are payload-hashed.'
+    );
   }
   return true;
 }
