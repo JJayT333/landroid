@@ -7,6 +7,7 @@ import {
   projectLonLat,
   type GeoBBox,
 } from '../../maps/geojson-ingest';
+import { TRACT_PALETTE } from '../../maps/tract-palette';
 import type { GeoRing, MapTractFeature } from '../../types/map-tract-feature';
 
 /**
@@ -41,21 +42,6 @@ function ringCentroid(ring: GeoRing): [number, number] {
   }
   return [lon / ring.length, lat / ring.length];
 }
-
-// Muted, professional tract palette (a colored unit plat, not neon). Assigned by
-// position so the coloring is stable across renders.
-export const TRACT_PALETTE = [
-  '#9caf88', // sage
-  '#c0926a', // clay
-  '#8fa3b8', // slate blue
-  '#c4a55c', // ochre
-  '#b08f99', // dusty rose
-  '#a8a36a', // olive
-  '#8aa9a3', // teal gray
-  '#a88fa8', // mauve
-  '#cbb487', // sand
-  '#9aabb5', // stone blue
-];
 
 export default function TractMapCanvas() {
   const tractFeatures = useMapStore((state) => state.tractFeatures);

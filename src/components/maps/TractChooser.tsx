@@ -8,7 +8,7 @@ import {
   featureToSvgPath,
 } from '../../maps/geojson-ingest';
 import { buildTractExportRows, type TractExportRow } from '../../maps/tract-export';
-import { TRACT_PALETTE } from './TractMapCanvas';
+import { TRACT_PALETTE } from '../../maps/tract-palette';
 import type { MapTractFeature } from '../../types/map-tract-feature';
 
 /**
