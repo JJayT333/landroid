@@ -30,11 +30,17 @@ import {
   deleteMapTractFeaturesForAsset,
   loadMapTractFeatures,
   saveMapTractFeatures,
+  updateMapTractFeatureFields,
 } from '../storage/map-tract-feature-persistence';
 import {
   buildMapTractFeatures,
   parseTractFeatures,
 } from '../maps/geojson-ingest';
+import {
+  buildArcgisExternalRef,
+  removeExternalRef,
+  upsertExternalRef,
+} from '../maps/feature-tract-matcher';
 import type { MapTractFeature } from '../types/map-tract-feature';
 
 export interface GeoJsonIngestResult {
@@ -73,6 +79,15 @@ interface MapState {
     fileName: string;
     text: string;
   }) => Promise<GeoJsonIngestResult>;
+  /**
+   * Link (or unlink, with `null`) a tract feature to a DeskMap. Persists the
+   * feature's match and writes/moves the ArcGIS `ExternalRef` onto the
+   * DeskMap(s) via the workspace store.
+   */
+  setFeatureTractMatch: (
+    featureId: string,
+    deskMapId: string | null
+  ) => Promise<void>;
   replaceWorkspaceData: (
     workspaceId: string,
     data: MapWorkspaceData
@@ -198,6 +213,46 @@ export const useMapStore = create<MapState>()((set, get) => ({
       featureCount: features.length,
       warnings: collection.warnings,
     };
+  },
+
+  setFeatureTractMatch: async (featureId, deskMapId) => {
+    const feature = get().tractFeatures.find((f) => f.id === featureId);
+    if (!feature || feature.matchedDeskMapId === deskMapId) return;
+    const previousDeskMapId = feature.matchedDeskMapId;
+    const ref = buildArcgisExternalRef(feature);
+
+    // 1. persist + reflect the feature's match link
+    const updatedAt = new Date().toISOString();
+    await updateMapTractFeatureFields(featureId, { matchedDeskMapId: deskMapId, updatedAt });
+    set((state) => ({
+      tractFeatures: state.tractFeatures.map((f) =>
+        f.id === featureId ? { ...f, matchedDeskMapId: deskMapId, updatedAt } : f
+      ),
+    }));
+
+    // 2. move the ArcGIS ref between desk maps. Dynamic import: workspace-store
+    // statically imports this module, so a static back-import would deepen the
+    // cycle. updateDeskMapDetails persists via the shard autosave (not journaled
+    // — externalRefs is a GIS link, not a title-math field).
+    if (!ref) return;
+    const { useWorkspaceStore } = await import('./workspace-store');
+    const ws = useWorkspaceStore.getState();
+    if (previousDeskMapId && previousDeskMapId !== deskMapId) {
+      const old = ws.deskMaps.find((dm) => dm.id === previousDeskMapId);
+      if (old) {
+        ws.updateDeskMapDetails(previousDeskMapId, {
+          externalRefs: removeExternalRef(old.externalRefs ?? [], ref),
+        });
+      }
+    }
+    if (deskMapId) {
+      const next = useWorkspaceStore.getState().deskMaps.find((dm) => dm.id === deskMapId);
+      if (next) {
+        ws.updateDeskMapDetails(deskMapId, {
+          externalRefs: upsertExternalRef(next.externalRefs ?? [], ref),
+        });
+      }
+    }
   },
 
   replaceWorkspaceData: async (workspaceId, data) => {

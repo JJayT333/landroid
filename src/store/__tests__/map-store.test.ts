@@ -4,6 +4,7 @@ import {
   createBlankMapExternalReference,
   createBlankMapRegion,
 } from '../../types/map';
+import { normalizeMapTractFeature } from '../../types/map-tract-feature';
 
 const mocks = vi.hoisted(() => ({
   loadMapWorkspaceMetadata: vi.fn(),
@@ -32,6 +33,28 @@ const tractMocks = vi.hoisted(() => ({
 
 vi.mock('../../storage/map-tract-feature-persistence', () => tractMocks);
 
+// The matcher's cross-store write dynamically imports workspace-store; stub it
+// with a controllable desk-map list + an updateDeskMapDetails spy.
+const wsMocks = vi.hoisted(() => {
+  const state = {
+    deskMaps: [] as Array<{ id: string; code: string; externalRefs?: unknown[] }>,
+  };
+  const updateDeskMapDetails = vi.fn((id: string, fields: Record<string, unknown>) => {
+    const dm = state.deskMaps.find((d) => d.id === id);
+    if (dm) Object.assign(dm, fields);
+  });
+  return { state, updateDeskMapDetails };
+});
+
+vi.mock('../workspace-store', () => ({
+  useWorkspaceStore: {
+    getState: () => ({
+      deskMaps: wsMocks.state.deskMaps,
+      updateDeskMapDetails: wsMocks.updateDeskMapDetails,
+    }),
+  },
+}));
+
 vi.mock('../../storage/map-persistence', () => ({
   loadMapWorkspaceMetadata: mocks.loadMapWorkspaceMetadata,
   loadMapAssetsWithBlobs: mocks.loadMapAssetsWithBlobs,
@@ -56,6 +79,7 @@ describe('map-store', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     tractMocks.loadMapTractFeatures.mockResolvedValue([]);
+    wsMocks.state.deskMaps = [];
     useMapStore.setState({
       workspaceId: null,
       mapAssets: [],
@@ -343,5 +367,68 @@ describe('map-store', () => {
     await expect(
       useMapStore.getState().ingestGeoJsonTractFeatures({ fileName: 'x.geojson', text: '{}' })
     ).rejects.toThrow(/workspace/);
+  });
+
+  it('setFeatureTractMatch links the feature and writes the ArcGIS ref onto the DeskMap', async () => {
+    wsMocks.state.deskMaps = [{ id: 'dm-1', code: '18-203', externalRefs: [] }];
+    useMapStore.setState({
+      workspaceId: 'ws-a',
+      tractFeatures: [
+        normalizeMapTractFeature({
+          id: 'feat-1',
+          workspaceId: 'ws-a',
+          assetId: 'asset-1',
+          tractKey: '18-203',
+          objectId: 1,
+          polygons: [{ outer: [[0, 0], [1, 0], [1, 1]], holes: [] }],
+          bbox: [0, 0, 1, 1],
+          matchedDeskMapId: null,
+        }),
+      ],
+    });
+
+    await useMapStore.getState().setFeatureTractMatch('feat-1', 'dm-1');
+
+    // feature match persisted + reflected
+    expect(tractMocks.updateMapTractFeatureFields).toHaveBeenCalledWith(
+      'feat-1',
+      expect.objectContaining({ matchedDeskMapId: 'dm-1' })
+    );
+    expect(useMapStore.getState().tractFeatures[0].matchedDeskMapId).toBe('dm-1');
+    // ArcGIS ref written onto the DeskMap
+    expect(wsMocks.updateDeskMapDetails).toHaveBeenCalledWith(
+      'dm-1',
+      expect.objectContaining({ externalRefs: expect.any(Array) })
+    );
+    const refs = wsMocks.state.deskMaps[0].externalRefs as Array<{ system: string; objectId?: number }>;
+    expect(refs).toHaveLength(1);
+    expect(refs[0]).toMatchObject({ system: 'arcgis', objectId: 1 });
+  });
+
+  it('re-matching a feature moves the ref from the old DeskMap to the new', async () => {
+    wsMocks.state.deskMaps = [
+      { id: 'dm-1', code: '18-203', externalRefs: [{ system: 'arcgis', objectId: 5, externalId: '18-203' }] },
+      { id: 'dm-2', code: '18-201', externalRefs: [] },
+    ];
+    useMapStore.setState({
+      workspaceId: 'ws-a',
+      tractFeatures: [
+        normalizeMapTractFeature({
+          id: 'feat-1',
+          workspaceId: 'ws-a',
+          assetId: 'asset-1',
+          tractKey: '18-203',
+          objectId: 5,
+          polygons: [{ outer: [[0, 0], [1, 0], [1, 1]], holes: [] }],
+          bbox: [0, 0, 1, 1],
+          matchedDeskMapId: 'dm-1',
+        }),
+      ],
+    });
+
+    await useMapStore.getState().setFeatureTractMatch('feat-1', 'dm-2');
+
+    expect(wsMocks.state.deskMaps[0].externalRefs).toHaveLength(0); // removed from old
+    expect(wsMocks.state.deskMaps[1].externalRefs).toHaveLength(1); // added to new
   });
 });
