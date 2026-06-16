@@ -574,19 +574,18 @@ db.version(15).stores({
 });
 
 /**
- * v17 (DA2-M GeoJSON tract features).
+ * v16 (DA2-M GeoJSON tract features).
  *
  * Adds `mapTractFeatures` — parsed WGS84 tract polygons ingested from an ArcGIS
  * GeoJSON export, each with a nullable link to a LANDroid `DeskMap`. Additive
  * and non-destructive: a new empty table, no data migration.
  *
- * NOTE: v16 is intentionally reserved for the in-review title-ledger PR (#185,
- * `titleLedgerQuarantine`). If that PR merges after this one, it must rebase its
- * table from v16 to v18; if it merges first, this can be renumbered to v17 with
- * no gap. Dexie tolerates the v15→v17 gap (upgrades run for versions above the
- * stored one), so either order is safe.
+ * NOTE: the in-review title-ledger PR (#185) also adds a v16 table
+ * (`titleLedgerQuarantine`). These two open branches both off `main` claim v16;
+ * whichever merges SECOND hits a git conflict in this block and must renumber to
+ * v17 (kept contiguous — no version gap, so no Dexie VersionError either way).
  */
-db.version(17).stores({
+db.version(16).stores({
   mapTractFeatures:
     'id, dbKey, workspaceId, assetId, tractKey, matchedDeskMapId, [dbKey+workspaceId], [dbKey+workspaceId+assetId]',
 });
