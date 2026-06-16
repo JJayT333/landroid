@@ -1,7 +1,13 @@
 import { useMemo, useRef, useState } from 'react';
 import { useMapStore } from '../../store/map-store';
 import { useWorkspaceStore } from '../../store/workspace-store';
+import { useOwnerStore } from '../../store/owner-store';
 import { suggestTractMatches } from '../../maps/feature-tract-matcher';
+import {
+  downloadTractCsv,
+  downloadTractGeoJson,
+  type TractExportInput,
+} from '../../maps/tract-export';
 
 /**
  * DA2-M PR M2 — import an ArcGIS tract GeoJSON and tie each polygon to a
@@ -14,6 +20,12 @@ export default function TractMatcherPanel({ readOnly = false }: { readOnly?: boo
   const ingestGeoJsonTractFeatures = useMapStore((state) => state.ingestGeoJsonTractFeatures);
   const setFeatureTractMatch = useMapStore((state) => state.setFeatureTractMatch);
   const deskMaps = useWorkspaceStore((state) => state.deskMaps);
+  const nodes = useWorkspaceStore((state) => state.nodes);
+  const projectName = useWorkspaceStore((state) => state.projectName);
+  const leaseholdAssignments = useWorkspaceStore((state) => state.leaseholdAssignments);
+  const leaseholdOrris = useWorkspaceStore((state) => state.leaseholdOrris);
+  const owners = useOwnerStore((state) => state.owners);
+  const leases = useOwnerStore((state) => state.leases);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const [status, setStatus] = useState<string | null>(null);
@@ -29,6 +41,16 @@ export default function TractMatcherPanel({ readOnly = false }: { readOnly?: boo
   );
 
   const matchedCount = tractFeatures.filter((f) => f.matchedDeskMapId).length;
+
+  const exportInput: TractExportInput = {
+    tractFeatures,
+    deskMaps,
+    nodes,
+    owners,
+    leases,
+    leaseholdAssignments,
+    leaseholdOrris,
+  };
 
   async function onFile(file: File) {
     setBusy(true);
@@ -60,6 +82,26 @@ export default function TractMatcherPanel({ readOnly = false }: { readOnly?: boo
             <span className="rounded-full border border-ledger-line bg-parchment px-2 py-0.5 text-[11px] font-semibold text-ink-light">
               {matchedCount}/{tractFeatures.length} matched
             </span>
+          )}
+          {matchedCount > 0 && (
+            <>
+              <button
+                type="button"
+                onClick={() => downloadTractCsv(exportInput, projectName)}
+                title="Export matched tracts to CSV keyed LAND_TRACT_ID"
+                className="rounded-md border border-ledger-line bg-parchment px-3 py-1.5 text-xs font-semibold text-ink transition-colors hover:bg-parchment-dark"
+              >
+                Export CSV
+              </button>
+              <button
+                type="button"
+                onClick={() => downloadTractGeoJson(exportInput, projectName)}
+                title="Export matched tracts to GeoJSON with LANDroid attributes"
+                className="rounded-md border border-ledger-line bg-parchment px-3 py-1.5 text-xs font-semibold text-ink transition-colors hover:bg-parchment-dark"
+              >
+                Export GeoJSON
+              </button>
+            </>
           )}
           {!readOnly && (
             <button
