@@ -17,6 +17,7 @@ import {
   type RegistryDocument,
 } from '../documents/document-registry';
 import { downloadWorkspacePacket } from '../documents/packet-export';
+import { normalizeBatesPrefix } from '../documents/bates-stamp';
 import {
   listDocumentRegistryData,
   updateDocMetadata,
@@ -393,15 +394,31 @@ export default function DocumentsView() {
   }, [packetRows]);
 
   const [exportingPacket, setExportingPacket] = useState(false);
+  // Bates production set: off by default (it produces stamped COPIES; originals
+  // stay hash-verified). The prefix seeds from the project name.
+  const [batesEnabled, setBatesEnabled] = useState(false);
+  const [batesPrefix, setBatesPrefix] = useState('');
+  const [batesStart, setBatesStart] = useState('1');
   const downloadPacketZip = useCallback(async () => {
     setExportingPacket(true);
     setStatusMessage('Building attorney packet…');
     try {
       const packetDocIds = new Set(packetRows.map((row) => row.document.docId));
-      const result = await downloadWorkspacePacket({ packetDocIds, projectName });
+      const bates = batesEnabled
+        ? {
+            prefix: normalizeBatesPrefix(batesPrefix || projectName),
+            startNumber: Math.max(1, Math.trunc(Number(batesStart)) || 1),
+            padWidth: 6,
+          }
+        : undefined;
+      const result = await downloadWorkspacePacket({ packetDocIds, projectName, bates });
       const fileCount = result.entryPaths.filter((path) => path.startsWith('files/')).length;
+      const batesNote =
+        result.batesPageCount > 0
+          ? ` + ${result.batesPageCount} Bates-numbered page${result.batesPageCount === 1 ? '' : 's'}`
+          : '';
       setStatusMessage(
-        `Attorney packet downloaded — ${fileCount} document${fileCount === 1 ? '' : 's'}, hash-verified.`
+        `Attorney packet downloaded — ${fileCount} document${fileCount === 1 ? '' : 's'}, hash-verified${batesNote}.`
       );
     } catch (error) {
       setStatusMessage(
@@ -412,7 +429,7 @@ export default function DocumentsView() {
     } finally {
       setExportingPacket(false);
     }
-  }, [packetRows, projectName]);
+  }, [packetRows, projectName, batesEnabled, batesPrefix, batesStart]);
 
   const tractOptions = useMemo(
     () =>
@@ -953,6 +970,54 @@ export default function DocumentsView() {
                   Manifest JSON
                 </button>
               </div>
+            </div>
+
+            <div className="mt-3 rounded-md border border-ledger-line bg-parchment px-3 py-2">
+              <label className="flex items-center gap-2 text-xs font-semibold text-ink">
+                <input
+                  type="checkbox"
+                  checked={batesEnabled}
+                  onChange={(event) => setBatesEnabled(event.target.checked)}
+                />
+                Bates-number a production set
+              </label>
+              <p className="mt-1 text-[11px] leading-4 text-ink-light">
+                Adds a <span className="font-mono">production/</span> folder of sequentially
+                stamped copies. Originals stay untouched and hash-verified.
+              </p>
+              {batesEnabled && (
+                <div className="mt-2 flex flex-wrap items-end gap-2">
+                  <label className="flex flex-col gap-1">
+                    <span className="text-[10px] uppercase tracking-wider text-ink-light">
+                      Prefix
+                    </span>
+                    <input
+                      type="text"
+                      value={batesPrefix}
+                      onChange={(event) => setBatesPrefix(event.target.value)}
+                      placeholder={normalizeBatesPrefix(projectName)}
+                      className="w-36 rounded border border-ledger-line bg-parchment-light px-2 py-1 font-mono text-xs text-ink focus:border-leather focus:outline-none"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1">
+                    <span className="text-[10px] uppercase tracking-wider text-ink-light">
+                      Start #
+                    </span>
+                    <input
+                      type="number"
+                      min={1}
+                      value={batesStart}
+                      onChange={(event) => setBatesStart(event.target.value)}
+                      className="w-20 rounded border border-ledger-line bg-parchment-light px-2 py-1 font-mono text-xs text-ink focus:border-leather focus:outline-none"
+                    />
+                  </label>
+                  <span className="pb-1 font-mono text-[11px] text-ink-light">
+                    e.g.{' '}
+                    {normalizeBatesPrefix(batesPrefix || projectName)}
+                    {String(Math.max(1, Math.trunc(Number(batesStart)) || 1)).padStart(6, '0')}
+                  </span>
+                </div>
+              )}
             </div>
             <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
               <div className="rounded-md border border-ledger-line bg-parchment px-3 py-2">

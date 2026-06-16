@@ -19,6 +19,8 @@
  *   corrupt packet.
  */
 import { sha256HexOfBytes } from '../storage/blob-hash';
+import { hasPdfMagicBytes } from '../utils/pdf-validation';
+import { stampBatesPdf } from '../documents/bates-stamp';
 import type {
   AttorneyPacketExport,
   AttorneyPacketManifestItem,
@@ -42,6 +44,27 @@ export type NativeBytesLoader = (
   item: AttorneyPacketManifestItem
 ) => Promise<Uint8Array | ArrayBuffer | Blob> | Uint8Array | ArrayBuffer | Blob;
 
+/** Bates numbering for a packet production set (see {@link stampBatesPdf}). */
+export interface BatesPacketOptions {
+  /** Leading label, e.g. "LANDROID". */
+  prefix: string;
+  /** First number in the running sequence. */
+  startNumber: number;
+  /** Zero-pad width, e.g. 6 → 000001. */
+  padWidth: number;
+}
+
+/** One row of the production set's Bates index. */
+export interface BatesIndexEntry {
+  packetOrder: number;
+  documentId: string;
+  nativeFileName: string;
+  /** Null when the file is not a PDF and was carried through unstamped. */
+  firstBates: string | null;
+  lastBates: string | null;
+  pageCount: number;
+}
+
 export interface PacketArchiveResult {
   /** The packaged ZIP archive bytes. */
   bytes: Uint8Array;
@@ -49,9 +72,12 @@ export interface PacketArchiveResult {
   entryPaths: string[];
   /** The packet manifest hash this archive was built from. */
   manifestHash: string;
+  /** Total pages Bates-stamped across the production set (0 when not requested). */
+  batesPageCount: number;
 }
 
 const FILES_DIR = 'files/';
+const PRODUCTION_DIR = 'production/';
 const textEncoder = new TextEncoder();
 
 async function toBytes(
@@ -75,13 +101,26 @@ export async function buildAttorneyPacketArchive(input: {
   packetExport: AttorneyPacketExport;
   loadNativeBytes: NativeBytesLoader;
   hashBytes?: (bytes: Uint8Array) => Promise<string>;
+  /**
+   * When set, also emit a Bates-numbered production set under `production/`.
+   * Originals in `files/` are left byte-identical (and hash-verified) — the
+   * stamped copies are a derived artifact, so evidence integrity is preserved.
+   */
+  bates?: BatesPacketOptions;
 }): Promise<PacketArchiveResult> {
   const { packetExport } = input;
   const hashBytes = input.hashBytes ?? sha256HexOfBytes;
 
   // Verify + collect native files in deterministic manifest order first, so a
-  // hash mismatch aborts before any archive bytes are produced.
+  // hash mismatch aborts before any archive bytes are produced. When a Bates
+  // production set is requested, stamp each verified file in the same pass so
+  // the numbering runs continuously across the set.
   const fileEntries: Array<{ path: string; data: Uint8Array }> = [];
+  const productionEntries: Array<{ path: string; data: Uint8Array }> = [];
+  const batesIndex: BatesIndexEntry[] = [];
+  let batesCounter = input.bates?.startNumber ?? 1;
+  let batesPageCount = 0;
+
   for (const item of packetExport.manifest.items) {
     const bytes = await toBytes(await input.loadNativeBytes(item));
     const actualHash = await hashBytes(bytes);
@@ -89,6 +128,45 @@ export async function buildAttorneyPacketArchive(input: {
       throw new PacketArchiveHashMismatchError(item, actualHash);
     }
     fileEntries.push({ path: `${FILES_DIR}${item.nativeFileName}`, data: bytes });
+
+    if (input.bates) {
+      if (hasPdfMagicBytes(bytes)) {
+        const stamp = await stampBatesPdf(bytes, {
+          prefix: input.bates.prefix,
+          startNumber: batesCounter,
+          padWidth: input.bates.padWidth,
+        });
+        productionEntries.push({
+          path: `${PRODUCTION_DIR}${item.nativeFileName}`,
+          data: stamp.bytes,
+        });
+        batesIndex.push({
+          packetOrder: item.packetOrder,
+          documentId: item.documentId,
+          nativeFileName: item.nativeFileName,
+          firstBates: stamp.firstLabel,
+          lastBates: stamp.lastLabel,
+          pageCount: stamp.pageCount,
+        });
+        batesCounter = stamp.nextNumber;
+        batesPageCount += stamp.pageCount;
+      } else {
+        // Not a PDF (no such documents today): carry the original through so
+        // the production set is still complete, recorded with no Bates range.
+        productionEntries.push({
+          path: `${PRODUCTION_DIR}${item.nativeFileName}`,
+          data: bytes,
+        });
+        batesIndex.push({
+          packetOrder: item.packetOrder,
+          documentId: item.documentId,
+          nativeFileName: item.nativeFileName,
+          firstBates: null,
+          lastBates: null,
+          pageCount: 0,
+        });
+      }
+    }
   }
 
   const checksumLines = [
@@ -118,11 +196,25 @@ export async function buildAttorneyPacketArchive(input: {
       data: jsonEntry(packetExport.eDiscoverySidecars),
     });
   }
+  if (input.bates && productionEntries.length > 0) {
+    entries.push(...productionEntries);
+    entries.push({
+      path: `${PRODUCTION_DIR}bates-index.json`,
+      data: jsonEntry({
+        prefix: input.bates.prefix,
+        startNumber: input.bates.startNumber,
+        padWidth: input.bates.padWidth,
+        totalPages: batesPageCount,
+        items: batesIndex,
+      }),
+    });
+  }
 
   return {
     bytes: encodeStoredZip(entries),
     entryPaths: entries.map((entry) => entry.path),
     manifestHash: packetExport.manifestHash,
+    batesPageCount,
   };
 }
 

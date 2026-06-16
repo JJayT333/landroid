@@ -29,6 +29,7 @@ import {
 } from '../project-records/evidence-vault';
 import {
   buildAttorneyPacketArchive,
+  type BatesPacketOptions,
   type NativeBytesLoader,
   type PacketArchiveResult,
 } from '../project-records/packet-archive';
@@ -52,6 +53,8 @@ export interface PacketArchiveDataInput {
   title: string;
   generatedAt: string;
   packetId?: string;
+  /** When set, also emit a Bates-numbered production set under `production/`. */
+  bates?: BatesPacketOptions;
   /** Injectable for tests; defaults to the doc blob store. */
   loadNativeBytes?: NativeBytesLoader;
 }
@@ -76,6 +79,7 @@ export async function buildPacketArchiveFromData(
   return buildAttorneyPacketArchive({
     packetExport,
     loadNativeBytes: input.loadNativeBytes ?? loadDocumentNativeBytes,
+    bates: input.bates,
   });
 }
 
@@ -83,6 +87,7 @@ export async function buildPacketArchiveFromData(
 export async function buildWorkspacePacketArchive(input: {
   packetDocIds: ReadonlySet<string>;
   title: string;
+  bates?: BatesPacketOptions;
 }): Promise<PacketArchiveResult> {
   const workspace = readCurrentWorkspaceData();
   const [documentData, curativeData] = await Promise.all([
@@ -99,6 +104,7 @@ export async function buildWorkspacePacketArchive(input: {
     curativeData,
     title: input.title,
     generatedAt: new Date().toISOString(),
+    bates: input.bates,
   });
 }
 
@@ -110,10 +116,12 @@ function sanitizeFileNamePart(value: string): string {
 export async function downloadWorkspacePacket(input: {
   packetDocIds: ReadonlySet<string>;
   projectName: string;
+  bates?: BatesPacketOptions;
 }): Promise<PacketArchiveResult> {
   const result = await buildWorkspacePacketArchive({
     packetDocIds: input.packetDocIds,
     title: `${input.projectName || 'LANDroid'} — Attorney Packet`,
+    bates: input.bates,
   });
   const blob = new Blob([new Uint8Array(result.bytes)], { type: 'application/zip' });
   const url = URL.createObjectURL(blob);
