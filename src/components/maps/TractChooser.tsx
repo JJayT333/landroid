@@ -8,6 +8,7 @@ import {
   featureToSvgPath,
 } from '../../maps/geojson-ingest';
 import { buildTractExportRows, type TractExportRow } from '../../maps/tract-export';
+import { TRACT_PALETTE } from './TractMapCanvas';
 import type { MapTractFeature } from '../../types/map-tract-feature';
 
 /**
@@ -16,7 +17,7 @@ import type { MapTractFeature } from '../../types/map-tract-feature';
  * reveal that tract's LANDroid numbers. Click a matched card to open its tract
  * in the Desk Map.
  */
-function MiniTract({ feature }: { feature: MapTractFeature }) {
+function MiniTract({ feature, color }: { feature: MapTractFeature; color: string }) {
   const { d, width, height } = useMemo(() => {
     const proj = computeTractProjection(feature.bbox, { size: 200, padding: 10 });
     return { d: featureToSvgPath(feature.polygons, proj), width: proj.width, height: proj.height };
@@ -26,8 +27,9 @@ function MiniTract({ feature }: { feature: MapTractFeature }) {
       <path
         d={d}
         fillRule="evenodd"
-        fill="rgba(124,92,47,0.10)"
-        stroke="#5b4a32"
+        fill={color}
+        fillOpacity={0.5}
+        stroke="#4a3c28"
         strokeWidth={1}
         vectorEffect="non-scaling-stroke"
       />
@@ -72,9 +74,10 @@ export default function TractChooser() {
 
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-      {tractFeatures.map((feature) => {
+      {tractFeatures.map((feature, index) => {
         const flipped = flippedId === feature.id;
         const row = rowByFeatureId.get(feature.id);
+        const color = TRACT_PALETTE[index % TRACT_PALETTE.length];
         const deskMap = feature.matchedDeskMapId ? deskMapById.get(feature.matchedDeskMapId) : null;
         return (
           <div
@@ -112,7 +115,7 @@ export default function TractChooser() {
                   />
                 </div>
                 <div className="flex-1">
-                  <MiniTract feature={feature} />
+                  <MiniTract feature={feature} color={color} />
                 </div>
                 <div className="text-[11px] text-ink-light">
                   {feature.acres != null ? `${feature.acres} ac` : 'acres —'}
