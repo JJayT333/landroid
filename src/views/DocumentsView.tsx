@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import PdfViewerModal from '../components/modals/PdfViewerModal';
 import Button from '../components/shared/Button';
-import Pill from '../components/shared/Pill';
 import Skeleton from '../components/shared/Skeleton';
 import UndoRedoControls from '../components/shell/UndoRedoControls';
 import {
@@ -12,6 +11,7 @@ import {
   buildPacketManifest,
   buildPacketPreview,
   filterDocumentRegistryRows,
+  rowMatchesView,
   type DocumentRegistryRow,
   type DocumentRegistryViewId,
   type RegistryDocument,
@@ -290,6 +290,16 @@ export default function DocumentsView() {
     [dateFrom, dateTo, kindFilter, linkedState, rows, searchQuery, tractFilter, viewFilter]
   );
 
+  const viewCounts = useMemo(() => {
+    const counts = new Map<DocumentRegistryViewId, number>();
+    for (const view of DOCUMENT_REGISTRY_VIEWS) {
+      counts.set(view.id, rows.filter((row) => rowMatchesView(row, view.id)).length);
+    }
+    return counts;
+  }, [rows]);
+  const activeViewLabel =
+    DOCUMENT_REGISTRY_VIEWS.find((view) => view.id === viewFilter)?.label ?? 'Documents';
+
   const selectedDocIdSet = useMemo(() => new Set(selectedDocIds), [selectedDocIds]);
   const activeRow = useMemo(
     () => rows.find((row) => row.document.docId === activeDocId) ?? null,
@@ -414,11 +424,43 @@ export default function DocumentsView() {
 
   return (
     <div className="flex h-full min-h-0 bg-parchment text-ink">
+      <aside className="flex w-56 shrink-0 flex-col border-r border-ledger-line bg-parchment-light">
+        <div className="border-b border-ledger-line px-4 py-3">
+          <h2 className="font-display text-[19px] font-bold leading-tight text-ink">Documents</h2>
+          <div className="mt-px truncate text-[11px] text-ink-light">{projectName}</div>
+        </div>
+        <nav className="scrollbar-hidden flex-1 space-y-0.5 overflow-y-auto p-2">
+          {DOCUMENT_REGISTRY_VIEWS.map((view) => {
+            const count = viewCounts.get(view.id) ?? 0;
+            const active = viewFilter === view.id;
+            return (
+              <button
+                key={view.id}
+                type="button"
+                onClick={() => setViewFilter(view.id)}
+                aria-pressed={active}
+                className={`flex w-full items-center justify-between gap-2 rounded-md px-3 py-1.5 text-left text-xs transition-colors ${
+                  active
+                    ? 'bg-leather font-semibold text-parchment'
+                    : 'text-ink hover:bg-parchment-dark/40'
+                }`}
+              >
+                <span className="truncate">{view.label}</span>
+                <span
+                  className={`shrink-0 font-mono text-[10.5px] ${active ? 'text-parchment/80' : 'text-ink-light'}`}
+                >
+                  {count}
+                </span>
+              </button>
+            );
+          })}
+        </nav>
+      </aside>
       <section className="flex min-w-0 flex-1 flex-col">
         <header className="border-b border-ledger-line bg-parchment-light px-5 py-3">
           <div className="flex flex-wrap items-center gap-3">
             <div className="min-w-0">
-              <h2 className="font-display text-[19px] font-bold leading-tight text-ink">Documents</h2>
+              <h2 className="font-display text-[19px] font-bold leading-tight text-ink">{activeViewLabel}</h2>
               <div className="mt-px truncate text-[11px] text-ink-light">
                 {projectName} ·{' '}
                 <span className="font-mono text-[10.5px]">
@@ -454,19 +496,7 @@ export default function DocumentsView() {
         </header>
 
         <div className="border-b border-ledger-line bg-parchment-light px-5 pb-3 pt-2.5">
-          <div className="scrollbar-hidden flex gap-1.5 overflow-x-auto">
-            {DOCUMENT_REGISTRY_VIEWS.map((view) => (
-              <Pill
-                key={view.id}
-                active={viewFilter === view.id}
-                onClick={() => setViewFilter(view.id)}
-              >
-                {view.label}
-              </Pill>
-            ))}
-          </div>
-
-          <div className="mt-2.5 grid gap-2 md:grid-cols-[minmax(12rem,1fr)_9rem_11rem_10rem_9rem_9rem]">
+          <div className="grid gap-2 md:grid-cols-[minmax(12rem,1fr)_9rem_11rem_10rem_9rem_9rem]">
             <label className="block">
               <span className="sr-only">Search documents</span>
               <input
