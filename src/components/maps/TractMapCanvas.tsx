@@ -120,8 +120,11 @@ export default function TractMapCanvas() {
               textAnchor="middle"
               dominantBaseline="central"
               fontSize={11}
-              fontWeight={600}
+              fontWeight={700}
               fill="#2d2114"
+              stroke="#f4eee2"
+              strokeWidth={3}
+              paintOrder="stroke"
               pointerEvents="none"
               style={{ userSelect: 'none' }}
             >

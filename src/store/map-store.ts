@@ -27,6 +27,7 @@ import {
   type MapRegion,
 } from '../types/map';
 import {
+  deleteMapTractFeature,
   deleteMapTractFeaturesForAsset,
   loadMapTractFeatures,
   saveMapTractFeatures,
@@ -88,6 +89,8 @@ interface MapState {
     featureId: string,
     deskMapId: string | null
   ) => Promise<void>;
+  /** Remove a tract feature entirely (and its ArcGIS ref from any matched DeskMap). */
+  removeTractFeature: (featureId: string) => Promise<void>;
   replaceWorkspaceData: (
     workspaceId: string,
     data: MapWorkspaceData
@@ -253,6 +256,30 @@ export const useMapStore = create<MapState>()((set, get) => ({
         });
       }
     }
+  },
+
+  removeTractFeature: async (featureId) => {
+    const feature = get().tractFeatures.find((f) => f.id === featureId);
+    if (!feature) return;
+    // Clear the ArcGIS ref off any matched DeskMap before dropping the feature.
+    if (feature.matchedDeskMapId) {
+      const ref = buildArcgisExternalRef(feature);
+      if (ref) {
+        const { useWorkspaceStore } = await import('./workspace-store');
+        const deskMap = useWorkspaceStore
+          .getState()
+          .deskMaps.find((dm) => dm.id === feature.matchedDeskMapId);
+        if (deskMap) {
+          useWorkspaceStore.getState().updateDeskMapDetails(feature.matchedDeskMapId, {
+            externalRefs: removeExternalRef(deskMap.externalRefs ?? [], ref),
+          });
+        }
+      }
+    }
+    await deleteMapTractFeature(featureId);
+    set((state) => ({
+      tractFeatures: state.tractFeatures.filter((f) => f.id !== featureId),
+    }));
   },
 
   replaceWorkspaceData: async (workspaceId, data) => {
