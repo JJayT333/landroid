@@ -74,25 +74,17 @@ export default function TractMapCanvas() {
   }
 
   return (
-    <div className="rounded-md border border-ledger-line bg-ledger p-4 space-y-3">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <div className="text-sm font-semibold text-ink">Tract map</div>
-          <div className="text-xs text-ink-light">
-            {tractFeatures.length} tract{tractFeatures.length === 1 ? '' : 's'} • click a
-            polygon to select it.
-          </div>
-        </div>
-        <div className="flex items-center gap-3 text-[11px] text-ink-light">
-          <span className="flex items-center gap-1">
-            <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: 'rgba(63,125,78,0.45)' }} />
-            matched
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: 'rgba(180,130,45,0.4)' }} />
-            unmatched
-          </span>
-        </div>
+    <div className="space-y-3">
+      <div className="flex items-center justify-end gap-3 text-[11px] text-ink-light">
+        <span className="text-ink-light">click a polygon to select it</span>
+        <span className="flex items-center gap-1">
+          <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: 'rgba(63,125,78,0.45)' }} />
+          matched
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: 'rgba(180,130,45,0.4)' }} />
+          unmatched
+        </span>
       </div>
 
       <div className="rounded-md border border-ledger-line bg-parchment overflow-hidden">
