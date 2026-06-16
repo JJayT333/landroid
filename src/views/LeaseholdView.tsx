@@ -68,6 +68,7 @@ import {
   FormulaTooltip,
   type FormulaContent,
 } from '../components/leasehold/FormulaTooltip';
+import AuditSheetModal from '../components/leasehold/AuditSheetModal';
 import {
   assignedWorkingInterestFormula,
   assignmentUnitDecimalFormula,
@@ -4204,8 +4205,10 @@ export default function LeaseholdView() {
     (state) => state.setPendingNodeEditorRoute
   );
   const setActiveDeskMap = useWorkspaceStore((state) => state.setActiveDeskMap);
+  const projectName = useWorkspaceStore((state) => state.projectName);
   const [mode, setMode] = useState<LeaseholdMode>('overview');
   const [addLeaseOpen, setAddLeaseOpen] = useState(false);
+  const [auditSheetOpen, setAuditSheetOpen] = useState(false);
 
   const updateLeaseholdUnit = (...args: Parameters<typeof updateLeaseholdUnitToStore>) => {
     if (!readOnly) updateLeaseholdUnitToStore(...args);
@@ -4364,6 +4367,15 @@ export default function LeaseholdView() {
         </div>
         <div className="ml-auto flex shrink-0 items-center gap-2">
           <UndoRedoControls variant="secondary" />
+          <button
+            type="button"
+            onClick={() => setAuditSheetOpen(true)}
+            disabled={summary.tractCount === 0}
+            title="Open a printable per-tract derivation sheet (Print / Save as PDF)"
+            className="rounded-md border border-ledger-line px-3 py-1.5 text-xs font-semibold text-leather hover:bg-leather/10 disabled:opacity-50"
+          >
+            Audit Sheet
+          </button>
           {addLeaseButton}
         </div>
       </div>
@@ -4468,6 +4480,16 @@ export default function LeaseholdView() {
               </div>
             )}
           </>
+        )}
+
+        {auditSheetOpen && (
+          <AuditSheetModal
+            summary={summary}
+            projectName={projectName}
+            unitLabel={activeUnit ? activeUnit.unitName : 'All tracts'}
+            generatedAt={new Date().toLocaleString()}
+            onClose={() => setAuditSheetOpen(false)}
+          />
         )}
 
         {addLeaseOpen && (
