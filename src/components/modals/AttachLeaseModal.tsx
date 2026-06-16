@@ -45,7 +45,13 @@ import { parseStrictInterestString } from '../../utils/interest-string';
 import { serialize } from '../../engine/decimal';
 import { formatAcres } from '../../engine/display-format';
 import { assertFileSize, FILE_SIZE_LIMITS } from '../../utils/file-validation';
+import {
+  hasDuplicates,
+  inspectFileForDuplicates,
+  type DuplicateInspection,
+} from '../../documents/duplicate-guard';
 import Button from '../shared/Button';
+import DuplicateWarningPanel from '../shared/DuplicateWarningPanel';
 import FormField from '../shared/FormField';
 import Modal from '../shared/Modal';
 import {
@@ -411,6 +417,8 @@ export default function AttachLeaseModal({
   const [saveError, setSaveError] = useState<string | null>(null);
   const [selectedOwnerId, setSelectedOwnerId] = useState('');
   const [selectedPdfFile, setSelectedPdfFile] = useState<File | null>(null);
+  /** Set when the chosen lease PDF already exists byte-for-byte; user decides. */
+  const [duplicate, setDuplicate] = useState<DuplicateInspection | null>(null);
   const isEditingExistingLease = Boolean(existingLeaseNode || existingLease);
 
   const setTract = (
@@ -466,7 +474,8 @@ export default function AttachLeaseModal({
     )
   );
 
-  const handleSave = async () => {
+  // `force` skips the duplicate check (the user chose "attach a copy anyway").
+  const handleSave = async (force = false) => {
     if (!isParentMineral) {
       // Belt-and-suspenders: the modal body already renders a mineral-only
       // error state in this case, but guard the save path directly so a stale
@@ -521,6 +530,17 @@ export default function AttachLeaseModal({
         }
       }
     }
+
+    // Warn-and-choose: if the lease PDF is already in the workspace byte-for-byte,
+    // stop and let the user decide before any owner/lease/tract records are written.
+    if (selectedPdfFile && !force) {
+      const inspection = await inspectFileForDuplicates(workspaceId, selectedPdfFile);
+      if (hasDuplicates(inspection)) {
+        setDuplicate(inspection);
+        return;
+      }
+    }
+    setDuplicate(null);
 
     setSaveError(null);
     setSaving(true);
@@ -1083,6 +1103,7 @@ export default function AttachLeaseModal({
                   return;
                 }
               }
+              setDuplicate(null);
               setSelectedPdfFile(file);
               event.target.value = '';
             }}
@@ -1117,7 +1138,10 @@ export default function AttachLeaseModal({
               <button
                 type="button"
                 disabled={saving}
-                onClick={() => setSelectedPdfFile(null)}
+                onClick={() => {
+                  setDuplicate(null);
+                  setSelectedPdfFile(null);
+                }}
                 className="px-3 py-1.5 rounded-md text-xs text-seal hover:bg-seal/10 transition-colors disabled:opacity-60"
               >
                 Clear Selected PDF
@@ -1135,6 +1159,17 @@ export default function AttachLeaseModal({
           </div>
         )}
 
+        {duplicate && (
+          <DuplicateWarningPanel
+            candidateName={selectedPdfFile?.name ?? 'This lease PDF'}
+            matches={duplicate.matches}
+            confirmLabel="Save with a copy anyway"
+            onConfirm={() => handleSave(true)}
+            onCancel={() => setDuplicate(null)}
+            disabled={saving}
+          />
+        )}
+
         <div className="flex justify-end gap-2 pt-2 border-t border-ledger-line">
           <button
             type="button"
@@ -1146,7 +1181,7 @@ export default function AttachLeaseModal({
           <button
             type="button"
             disabled={saving}
-            onClick={handleSave}
+            onClick={() => handleSave()}
             className="px-4 py-2 rounded-md text-sm font-semibold bg-emerald-700 text-white hover:bg-emerald-600 transition-colors disabled:opacity-60"
           >
             {saving

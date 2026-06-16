@@ -30,6 +30,7 @@ import {
   inspectFileForDuplicates,
   type DuplicateInspection,
 } from '../../documents/duplicate-guard';
+import DuplicateWarningPanel from './DuplicateWarningPanel';
 import type { NodeAttachmentSummary, OwnershipNode } from '../../types/node';
 
 export interface AttachmentsSectionProps {
@@ -287,41 +288,13 @@ export default function AttachmentsSection({
       )}
 
       {pendingDuplicate && (
-        <div className="space-y-2 rounded-md border border-gold/40 bg-gold/10 px-3 py-2 text-xs text-ink">
-          <p className="font-semibold">This exact file is already in this project.</p>
-          <p className="text-ink-light">
-            “{pendingDuplicate.file.name}” is byte-for-byte identical to{' '}
-            {pendingDuplicate.inspection.matches.length === 1
-              ? `“${pendingDuplicate.inspection.matches[0].fileName}”`
-              : `${pendingDuplicate.inspection.matches.length} documents already on file`}
-            . Attach another copy anyway, or cancel and keep the one already here.
-          </p>
-          {pendingDuplicate.inspection.matches.length > 1 && (
-            <ul className="list-disc pl-4 font-mono text-ink-light">
-              {pendingDuplicate.inspection.matches.map((match) => (
-                <li key={match.docId}>{match.fileName}</li>
-              ))}
-            </ul>
-          )}
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={confirmPendingAttach}
-              disabled={pending}
-              className="rounded border border-leather/40 bg-parchment px-2 py-1 text-[11px] font-semibold text-leather hover:bg-leather/10 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              Attach a copy anyway
-            </button>
-            <button
-              type="button"
-              onClick={cancelPendingAttach}
-              disabled={pending}
-              className="rounded px-2 py-1 text-[11px] font-semibold text-ink-light hover:bg-leather/5 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
+        <DuplicateWarningPanel
+          candidateName={pendingDuplicate.file.name}
+          matches={pendingDuplicate.inspection.matches}
+          onConfirm={confirmPendingAttach}
+          onCancel={cancelPendingAttach}
+          disabled={pending}
+        />
       )}
 
       <label className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-ledger-line bg-parchment px-2 py-1 text-xs font-semibold text-leather hover:bg-leather/5">

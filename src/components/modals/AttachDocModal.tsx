@@ -12,6 +12,12 @@ import InstrumentSelect from '../shared/InstrumentSelect';
 import { useWorkspaceStore } from '../../store/workspace-store';
 import { assertFileSize, FILE_SIZE_LIMITS } from '../../utils/file-validation';
 import { normalizePdfBlob } from '../../utils/pdf-validation';
+import {
+  hasDuplicates,
+  inspectFileForDuplicates,
+  type DuplicateInspection,
+} from '../../documents/duplicate-guard';
+import DuplicateWarningPanel from '../shared/DuplicateWarningPanel';
 import { createBlankNode } from '../../types/node';
 
 interface AttachDocModalProps {
@@ -20,6 +26,7 @@ interface AttachDocModalProps {
 }
 
 export default function AttachDocModal({ parentNodeId, onClose }: AttachDocModalProps) {
+  const workspaceId = useWorkspaceStore((s) => s.workspaceId);
   const addNode = useWorkspaceStore((s) => s.addNode);
   const addNodeToActiveDeskMap = useWorkspaceStore((s) => s.addNodeToActiveDeskMap);
   const attachDocToNode = useWorkspaceStore((s) => s.attachDocToNode);
@@ -37,11 +44,14 @@ export default function AttachDocModal({ parentNodeId, onClose }: AttachDocModal
   const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  /** Set when the picked file already exists byte-for-byte; the user decides. */
+  const [duplicate, setDuplicate] = useState<DuplicateInspection | null>(null);
 
   const set = (field: string, value: string) =>
     setForm((f) => ({ ...f, [field]: value }));
 
-  const handleSave = async () => {
+  // `force` skips the duplicate check (the user chose "attach a copy anyway").
+  const handleSave = async (force = false) => {
     setError(null);
     setPending(true);
     const id = `node-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
@@ -64,7 +74,18 @@ export default function AttachDocModal({ parentNodeId, onClose }: AttachDocModal
       if (file) {
         assertFileSize(file, FILE_SIZE_LIMITS.PDF, 'PDF');
         await normalizePdfBlob(file, file.name);
+        // Warn-and-choose: stop before creating anything if this file is
+        // already in the workspace, unless the user already chose to proceed.
+        if (!force) {
+          const inspection = await inspectFileForDuplicates(workspaceId, file);
+          if (hasDuplicates(inspection)) {
+            setDuplicate(inspection);
+            setPending(false);
+            return;
+          }
+        }
       }
+      setDuplicate(null);
       addNode(node);
       addNodeToActiveDeskMap(id);
       nodeAdded = true;
@@ -148,6 +169,7 @@ export default function AttachDocModal({ parentNodeId, onClose }: AttachDocModal
                 }
                 try {
                   assertFileSize(selected, FILE_SIZE_LIMITS.PDF, 'PDF');
+                  setDuplicate(null);
                   setFile(selected);
                 } catch (uploadError) {
                   setFile(null);
@@ -177,11 +199,21 @@ export default function AttachDocModal({ parentNodeId, onClose }: AttachDocModal
           )}
         </fieldset>
 
+        {duplicate && (
+          <DuplicateWarningPanel
+            candidateName={file?.name ?? 'This file'}
+            matches={duplicate.matches}
+            onConfirm={() => handleSave(true)}
+            onCancel={() => setDuplicate(null)}
+            disabled={pending}
+          />
+        )}
+
         <div className="flex justify-end gap-2 pt-2 border-t border-ledger-line">
           <Button variant="ghost" onClick={onClose}>
             Cancel
           </Button>
-          <Button onClick={handleSave} disabled={pending}>
+          <Button onClick={() => handleSave()} disabled={pending}>
             {pending ? 'Attaching...' : 'Attach'}
           </Button>
         </div>
