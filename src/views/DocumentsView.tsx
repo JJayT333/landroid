@@ -16,6 +16,7 @@ import {
   type DocumentRegistryViewId,
   type RegistryDocument,
 } from '../documents/document-registry';
+import { downloadWorkspacePacket } from '../documents/packet-export';
 import {
   listDocumentRegistryData,
   updateDocMetadata,
@@ -380,6 +381,28 @@ export default function DocumentsView() {
     anchor.click();
     URL.revokeObjectURL(url);
   }, [packetRows]);
+
+  const [exportingPacket, setExportingPacket] = useState(false);
+  const downloadPacketZip = useCallback(async () => {
+    setExportingPacket(true);
+    setStatusMessage('Building attorney packet…');
+    try {
+      const packetDocIds = new Set(packetRows.map((row) => row.document.docId));
+      const result = await downloadWorkspacePacket({ packetDocIds, projectName });
+      const fileCount = result.entryPaths.filter((path) => path.startsWith('files/')).length;
+      setStatusMessage(
+        `Attorney packet downloaded — ${fileCount} document${fileCount === 1 ? '' : 's'}, hash-verified.`
+      );
+    } catch (error) {
+      setStatusMessage(
+        error instanceof Error
+          ? `Packet build failed: ${error.message}`
+          : 'Packet build failed.'
+      );
+    } finally {
+      setExportingPacket(false);
+    }
+  }, [packetRows, projectName]);
 
   const tractOptions = useMemo(
     () =>
@@ -881,14 +904,25 @@ export default function DocumentsView() {
           <section className="py-4">
             <div className="flex items-center justify-between gap-3">
               <h4 className="text-sm font-bold text-ink">Packet Preview</h4>
-              <button
-                type="button"
-                onClick={downloadManifest}
-                disabled={packetPreview.rows.length === 0}
-                className="rounded-md border border-ledger-line px-3 py-1.5 text-xs font-semibold text-leather hover:bg-leather/10 disabled:opacity-50"
-              >
-                Manifest JSON
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => void downloadPacketZip()}
+                  disabled={exportingPacket || packetPreview.rows.length === 0}
+                  title="Download a hash-verified attorney packet (ZIP: native files + manifest + checksums)"
+                  className="rounded-md border border-leather bg-leather px-3 py-1.5 text-xs font-semibold text-parchment hover:bg-leather/90 disabled:opacity-50"
+                >
+                  {exportingPacket ? 'Building…' : 'Download packet (ZIP)'}
+                </button>
+                <button
+                  type="button"
+                  onClick={downloadManifest}
+                  disabled={packetPreview.rows.length === 0}
+                  className="rounded-md border border-ledger-line px-3 py-1.5 text-xs font-semibold text-leather hover:bg-leather/10 disabled:opacity-50"
+                >
+                  Manifest JSON
+                </button>
+              </div>
             </div>
             <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
               <div className="rounded-md border border-ledger-line bg-parchment px-3 py-2">
