@@ -23,6 +23,15 @@ const mocks = vi.hoisted(() => ({
   clearLeaseLink: vi.fn(),
 }));
 
+const tractMocks = vi.hoisted(() => ({
+  loadMapTractFeatures: vi.fn(async () => []),
+  saveMapTractFeatures: vi.fn(async () => undefined),
+  deleteMapTractFeaturesForAsset: vi.fn(async () => undefined),
+  updateMapTractFeatureFields: vi.fn(async () => undefined),
+}));
+
+vi.mock('../../storage/map-tract-feature-persistence', () => tractMocks);
+
 vi.mock('../../storage/map-persistence', () => ({
   loadMapWorkspaceMetadata: mocks.loadMapWorkspaceMetadata,
   loadMapAssetsWithBlobs: mocks.loadMapAssetsWithBlobs,
@@ -46,11 +55,13 @@ import { useMapStore } from '../map-store';
 describe('map-store', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    tractMocks.loadMapTractFeatures.mockResolvedValue([]);
     useMapStore.setState({
       workspaceId: null,
       mapAssets: [],
       mapRegions: [],
       mapReferences: [],
+      tractFeatures: [],
       _hydrated: false,
     });
   });
@@ -288,5 +299,49 @@ describe('map-store', () => {
     });
 
     expect(useMapStore.getState().mapReferences[0]?.url).toBe('');
+  });
+
+  it('ingestGeoJsonTractFeatures stores the raw asset + parses features into state', async () => {
+    useMapStore.setState({ workspaceId: 'ws-a', _hydrated: true });
+    const geojson = JSON.stringify({
+      type: 'FeatureCollection',
+      features: [
+        {
+          type: 'Feature',
+          properties: { Tract: 'T-1', Acres: '40 ac', OBJECTID: 1 },
+          geometry: { type: 'Polygon', coordinates: [[[0, 0], [1, 0], [1, 1], [0, 0]]] },
+        },
+        {
+          type: 'Feature',
+          properties: { Tract: 'T-2' },
+          geometry: { type: 'Point', coordinates: [0, 0] }, // non-polygon → skipped
+        },
+      ],
+    });
+
+    const result = await useMapStore
+      .getState()
+      .ingestGeoJsonTractFeatures({ fileName: 'tracts.geojson', text: geojson });
+
+    expect(result.featureCount).toBe(1);
+    expect(result.warnings).toHaveLength(1);
+    // raw GeoJSON saved as a map asset
+    expect(mocks.saveMapAsset).toHaveBeenCalledTimes(1);
+    // idempotent persistence: clear this asset's features, then write the batch
+    expect(tractMocks.deleteMapTractFeaturesForAsset).toHaveBeenCalledWith('ws-a', result.assetId);
+    expect(tractMocks.saveMapTractFeatures).toHaveBeenCalledTimes(1);
+
+    const state = useMapStore.getState();
+    expect(state.tractFeatures).toHaveLength(1);
+    expect(state.tractFeatures[0].tractKey).toBe('T-1');
+    expect(state.tractFeatures[0].assetId).toBe(result.assetId);
+    expect(state.tractFeatures[0].matchedDeskMapId).toBeNull();
+  });
+
+  it('ingest throws before a workspace is set', async () => {
+    useMapStore.setState({ workspaceId: null });
+    await expect(
+      useMapStore.getState().ingestGeoJsonTractFeatures({ fileName: 'x.geojson', text: '{}' })
+    ).rejects.toThrow(/workspace/);
   });
 });
