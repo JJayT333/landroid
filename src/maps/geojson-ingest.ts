@@ -254,6 +254,36 @@ export interface TractProjection {
 
 const DEG2RAD = Math.PI / 180;
 
+/** Merge the bounding boxes of a set of parsed/stored features. */
+export function mergeFeatureBBoxes(
+  features: ReadonlyArray<{ bbox: GeoBBox }>
+): GeoBBox | null {
+  let bbox: GeoBBox | null = null;
+  for (const feature of features) {
+    bbox = bbox
+      ? [
+          Math.min(bbox[0], feature.bbox[0]),
+          Math.min(bbox[1], feature.bbox[1]),
+          Math.max(bbox[2], feature.bbox[2]),
+          Math.max(bbox[3], feature.bbox[3]),
+        ]
+      : [...feature.bbox];
+  }
+  return bbox;
+}
+
+/** Vertex-average centroid of a ring (good enough for a label anchor). */
+export function ringCentroid(ring: GeoRing): [number, number] {
+  if (ring.length === 0) return [0, 0];
+  let lon = 0;
+  let lat = 0;
+  for (const [x, y] of ring) {
+    lon += x;
+    lat += y;
+  }
+  return [lon / ring.length, lat / ring.length];
+}
+
 export function computeTractProjection(
   bbox: GeoBBox,
   options: { size?: number; padding?: number } = {}
