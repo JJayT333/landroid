@@ -28,6 +28,7 @@ const tractMocks = vi.hoisted(() => ({
   loadMapTractFeatures: vi.fn(async () => []),
   saveMapTractFeatures: vi.fn(async () => undefined),
   deleteMapTractFeaturesForAsset: vi.fn(async () => undefined),
+  deleteMapTractFeature: vi.fn(async () => undefined),
   updateMapTractFeatureFields: vi.fn(async () => undefined),
 }));
 
@@ -403,6 +404,42 @@ describe('map-store', () => {
     const refs = wsMocks.state.deskMaps[0].externalRefs as Array<{ system: string; objectId?: number }>;
     expect(refs).toHaveLength(1);
     expect(refs[0]).toMatchObject({ system: 'arcgis', objectId: 1 });
+  });
+
+  it('removeTractFeature drops the feature and clears its ref from the matched DeskMap', async () => {
+    wsMocks.state.deskMaps = [
+      { id: 'dm-1', code: '18-203', externalRefs: [{ system: 'arcgis', objectId: 1, externalId: '18-203' }] },
+    ];
+    useMapStore.setState({
+      workspaceId: 'ws-a',
+      tractFeatures: [
+        normalizeMapTractFeature({
+          id: 'feat-1',
+          workspaceId: 'ws-a',
+          assetId: 'asset-1',
+          tractKey: '18-203',
+          objectId: 1,
+          polygons: [{ outer: [[0, 0], [1, 0], [1, 1]], holes: [] }],
+          bbox: [0, 0, 1, 1],
+          matchedDeskMapId: 'dm-1',
+        }),
+        normalizeMapTractFeature({
+          id: 'feat-2',
+          workspaceId: 'ws-a',
+          assetId: 'asset-1',
+          tractKey: '1',
+          polygons: [{ outer: [[0, 0], [1, 0], [1, 1]], holes: [] }],
+          bbox: [0, 0, 1, 1],
+          matchedDeskMapId: null,
+        }),
+      ],
+    });
+
+    await useMapStore.getState().removeTractFeature('feat-1');
+
+    expect(tractMocks.deleteMapTractFeature).toHaveBeenCalledWith('feat-1');
+    expect(useMapStore.getState().tractFeatures.map((f) => f.id)).toEqual(['feat-2']);
+    expect(wsMocks.state.deskMaps[0].externalRefs).toHaveLength(0);
   });
 
   it('re-matching a feature moves the ref from the old DeskMap to the new', async () => {

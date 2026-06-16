@@ -19,6 +19,7 @@ export default function TractMatcherPanel({ readOnly = false }: { readOnly?: boo
   const tractFeatures = useMapStore((state) => state.tractFeatures);
   const ingestGeoJsonTractFeatures = useMapStore((state) => state.ingestGeoJsonTractFeatures);
   const setFeatureTractMatch = useMapStore((state) => state.setFeatureTractMatch);
+  const removeTractFeature = useMapStore((state) => state.removeTractFeature);
   const deskMaps = useWorkspaceStore((state) => state.deskMaps);
   const nodes = useWorkspaceStore((state) => state.nodes);
   const projectName = useWorkspaceStore((state) => state.projectName);
@@ -34,10 +35,6 @@ export default function TractMatcherPanel({ readOnly = false }: { readOnly?: boo
   const suggestions = useMemo(
     () => new Map(suggestTractMatches(tractFeatures, deskMaps).map((s) => [s.featureId, s])),
     [tractFeatures, deskMaps]
-  );
-  const deskMapById = useMemo(
-    () => new Map(deskMaps.map((dm) => [dm.id, dm])),
-    [deskMaps]
   );
 
   const matchedCount = tractFeatures.filter((f) => f.matchedDeskMapId).length;
@@ -133,68 +130,80 @@ export default function TractMatcherPanel({ readOnly = false }: { readOnly?: boo
           No tract geometry yet. Import a GeoJSON export to begin.
         </div>
       ) : (
-        <div className="space-y-2">
-          {tractFeatures.map((feature) => {
-            const suggestion = suggestions.get(feature.id);
-            const currentId = feature.matchedDeskMapId;
-            const suggestedId = !currentId ? suggestion?.deskMapId ?? null : null;
-            const selectValue = currentId ?? suggestedId ?? '';
-            return (
-              <div
-                key={feature.id}
-                className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-ledger-line bg-parchment px-3 py-2"
-              >
-                <div className="min-w-0">
-                  <div className="text-sm font-semibold text-ink truncate">
-                    Tract {feature.tractKey}
-                  </div>
-                  <div className="text-[11px] text-ink-light">
-                    {feature.acres != null ? `${feature.acres} ac` : 'acres —'}
-                    {currentId
-                      ? ` • linked to ${deskMapById.get(currentId)?.code ?? '—'}`
-                      : suggestedId
-                        ? ` • suggested: ${deskMapById.get(suggestedId)?.code ?? '—'}`
-                        : ' • no match'}
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <select
-                    disabled={readOnly}
-                    value={selectValue}
-                    onChange={(event) =>
-                      void setFeatureTractMatch(feature.id, event.target.value || null)
-                    }
-                    className="rounded-md border border-ledger-line bg-ledger px-2 py-1 text-xs text-ink disabled:opacity-50"
-                  >
-                    <option value="">— unmatched —</option>
-                    {deskMaps.map((dm) => (
-                      <option key={dm.id} value={dm.id}>
-                        {dm.code || dm.name || dm.id}
-                      </option>
-                    ))}
-                  </select>
-                  {!readOnly && suggestedId && (
-                    <button
-                      type="button"
-                      onClick={() => void setFeatureTractMatch(feature.id, suggestedId)}
-                      className="rounded-md border border-emerald-300 bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-800 transition-colors hover:bg-emerald-100"
-                    >
-                      Accept
-                    </button>
-                  )}
-                  {!readOnly && currentId && (
-                    <button
-                      type="button"
-                      onClick={() => void setFeatureTractMatch(feature.id, null)}
-                      className="rounded-md border border-ledger-line bg-ledger px-2 py-1 text-[11px] font-semibold text-ink-light transition-colors hover:bg-parchment-dark"
-                    >
-                      Clear
-                    </button>
-                  )}
-                </div>
-              </div>
-            );
-          })}
+        <div className="overflow-hidden rounded-md border border-ledger-line">
+          <table className="w-full border-collapse text-xs">
+            <thead>
+              <tr className="border-b border-ledger-line bg-parchment-dark/40 text-left text-[10px] uppercase tracking-wide text-ink-light">
+                <th className="px-3 py-1.5 font-semibold">Tract</th>
+                <th className="px-3 py-1.5 font-semibold">Acres</th>
+                <th className="px-3 py-1.5 font-semibold">Linked tract</th>
+                <th className="px-3 py-1.5" />
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-ledger-line">
+              {tractFeatures.map((feature) => {
+                const suggestion = suggestions.get(feature.id);
+                const currentId = feature.matchedDeskMapId;
+                const suggestedId = !currentId ? suggestion?.deskMapId ?? null : null;
+                const selectValue = currentId ?? suggestedId ?? '';
+                return (
+                  <tr key={feature.id} className="bg-parchment hover:bg-parchment-dark/30">
+                    <td className="px-3 py-1.5 font-mono font-semibold text-ink whitespace-nowrap">
+                      <span
+                        className={`mr-1.5 inline-block h-1.5 w-1.5 rounded-full align-middle ${currentId ? 'bg-[#3f7d4e]' : 'bg-[#b4822d]'}`}
+                      />
+                      {feature.tractKey}
+                    </td>
+                    <td className="px-3 py-1.5 text-ink-light whitespace-nowrap">
+                      {feature.acres != null ? `${feature.acres} ac` : '—'}
+                    </td>
+                    <td className="px-3 py-1.5">
+                      <div className="flex items-center gap-1.5">
+                        <select
+                          disabled={readOnly}
+                          value={selectValue}
+                          onChange={(event) =>
+                            void setFeatureTractMatch(feature.id, event.target.value || null)
+                          }
+                          className={`rounded border border-ledger-line bg-ledger px-1.5 py-0.5 text-xs disabled:opacity-50 ${currentId ? 'text-ink' : 'text-ink-light'}`}
+                        >
+                          <option value="">— unmatched —</option>
+                          {deskMaps.map((dm) => (
+                            <option key={dm.id} value={dm.id}>
+                              {dm.code || dm.name || dm.id}
+                            </option>
+                          ))}
+                        </select>
+                        {!readOnly && suggestedId && (
+                          <button
+                            type="button"
+                            title="Accept the suggested match"
+                            onClick={() => void setFeatureTractMatch(feature.id, suggestedId)}
+                            className="rounded border border-emerald-300 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-800 transition-colors hover:bg-emerald-100"
+                          >
+                            Accept
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-3 py-1.5 text-right whitespace-nowrap">
+                      {!readOnly && (
+                        <button
+                          type="button"
+                          title="Remove this tract"
+                          aria-label={`Remove tract ${feature.tractKey}`}
+                          onClick={() => void removeTractFeature(feature.id)}
+                          className="rounded px-1.5 py-0.5 text-sm leading-none text-ink-light transition-colors hover:bg-seal/10 hover:text-seal"
+                        >
+                          ×
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       )}
     </div>

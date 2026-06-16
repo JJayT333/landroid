@@ -42,6 +42,21 @@ function ringCentroid(ring: GeoRing): [number, number] {
   return [lon / ring.length, lat / ring.length];
 }
 
+// Muted, professional tract palette (a colored unit plat, not neon). Assigned by
+// position so the coloring is stable across renders.
+export const TRACT_PALETTE = [
+  '#9caf88', // sage
+  '#c0926a', // clay
+  '#8fa3b8', // slate blue
+  '#c4a55c', // ochre
+  '#b08f99', // dusty rose
+  '#a8a36a', // olive
+  '#8aa9a3', // teal gray
+  '#a88fa8', // mauve
+  '#cbb487', // sand
+  '#9aabb5', // stone blue
+];
+
 export default function TractMapCanvas() {
   const tractFeatures = useMapStore((state) => state.tractFeatures);
   const deskMaps = useWorkspaceStore((state) => state.deskMaps);
@@ -52,10 +67,11 @@ export default function TractMapCanvas() {
     const bbox = mergeBBoxes(tractFeatures);
     if (!bbox) return null;
     const proj = computeTractProjection(bbox, { size: 900, padding: 28 });
-    const shapes = tractFeatures.map((feature) => ({
+    const shapes = tractFeatures.map((feature, index) => ({
       id: feature.id,
       tractKey: feature.tractKey,
       matched: Boolean(feature.matchedDeskMapId),
+      color: TRACT_PALETTE[index % TRACT_PALETTE.length],
       d: featureToSvgPath(feature.polygons, proj),
       label: projectLonLat(ringCentroid(feature.polygons[0]?.outer ?? [[0, 0]]), proj),
     }));
@@ -67,27 +83,29 @@ export default function TractMapCanvas() {
   const deskMapById = new Map(deskMaps.map((dm) => [dm.id, dm]));
   const selected = tractFeatures.find((feature) => feature.id === selectedId) ?? null;
 
-  function fillFor(id: string, matched: boolean): string {
-    if (id === selectedId) return 'rgba(124, 92, 47, 0.45)'; // leather
-    if (id === hoveredId) return matched ? 'rgba(63, 125, 78, 0.4)' : 'rgba(180, 130, 45, 0.35)';
-    return matched ? 'rgba(63, 125, 78, 0.22)' : 'rgba(180, 130, 45, 0.16)';
+  // Colored unit plat: each tract carries its muted palette color; selection and
+  // hover deepen it, unlinked tracts sit a touch lighter than linked.
+  function fillOpacityFor(id: string, matched: boolean): number {
+    if (id === selectedId) return 0.82;
+    if (id === hoveredId) return 0.64;
+    return matched ? 0.52 : 0.34;
   }
 
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-end gap-3 text-[11px] text-ink-light">
-        <span className="text-ink-light">click a polygon to select it</span>
-        <span className="flex items-center gap-1">
-          <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: 'rgba(63,125,78,0.45)' }} />
-          matched
+        <span>click a tract to select it</span>
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block h-2.5 w-2.5 rounded-[2px] bg-[#8aa9a3]" style={{ opacity: 0.52 }} />
+          linked
         </span>
-        <span className="flex items-center gap-1">
-          <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: 'rgba(180,130,45,0.4)' }} />
-          unmatched
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block h-2.5 w-2.5 rounded-[2px] bg-[#8aa9a3]" style={{ opacity: 0.3 }} />
+          unlinked
         </span>
       </div>
 
-      <div className="rounded-md border border-ledger-line bg-parchment overflow-hidden">
+      <div className="rounded-md border border-ledger-line bg-gradient-to-b from-parchment to-parchment-dark/40 overflow-hidden shadow-sm">
         <svg
           viewBox={`0 0 ${render.proj.width} ${render.proj.height}`}
           className="w-full"
@@ -95,15 +113,22 @@ export default function TractMapCanvas() {
           role="group"
           aria-label="Tract polygons"
         >
+          <defs>
+            <filter id="tractDepth" x="-20%" y="-20%" width="140%" height="140%">
+              <feDropShadow dx="0" dy="1.4" stdDeviation="1.6" floodColor="#2d2114" floodOpacity="0.3" />
+            </filter>
+          </defs>
           {render.shapes.map((shape) => (
             <path
               key={shape.id}
               d={shape.d}
               fillRule="evenodd"
-              fill={fillFor(shape.id, shape.matched)}
-              stroke={shape.id === selectedId ? '#7c5c2f' : '#6b5535'}
-              strokeWidth={shape.id === selectedId ? 2 : 1}
+              fill={shape.color}
+              fillOpacity={fillOpacityFor(shape.id, shape.matched)}
+              stroke={shape.id === selectedId ? '#2d2114' : '#4a3c28'}
+              strokeWidth={shape.id === selectedId ? 2 : 1.1}
               vectorEffect="non-scaling-stroke"
+              filter="url(#tractDepth)"
               style={{ cursor: 'pointer' }}
               onClick={() => setSelectedId(shape.id)}
               onMouseEnter={() => setHoveredId(shape.id)}
@@ -120,8 +145,11 @@ export default function TractMapCanvas() {
               textAnchor="middle"
               dominantBaseline="central"
               fontSize={11}
-              fontWeight={600}
+              fontWeight={700}
               fill="#2d2114"
+              stroke="#f4eee2"
+              strokeWidth={3}
+              paintOrder="stroke"
               pointerEvents="none"
               style={{ userSelect: 'none' }}
             >

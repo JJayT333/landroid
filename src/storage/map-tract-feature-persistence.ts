@@ -72,6 +72,17 @@ export async function updateMapTractFeatureFields(
   });
 }
 
+/** Delete a single tract feature by id (the operator curating their unit). */
+export async function deleteMapTractFeature(id: string): Promise<void> {
+  const row = await getMapTractFeatureRow(id);
+  if (!row || row.dbKey !== activeWorkspaceScope(row.workspaceId)[0]) return;
+  await ensureWorkspaceWriteFence(row.workspaceId);
+  await db.transaction('rw', db.workspaceWriteLeases, db.mapTractFeatures, async () => {
+    await assertWorkspaceWriteFence(row.workspaceId);
+    await db.mapTractFeatures.delete(row.id);
+  });
+}
+
 /** Drop every feature ingested from one GeoJSON asset (re-ingest / asset delete). */
 export async function deleteMapTractFeaturesForAsset(
   workspaceId: string,
