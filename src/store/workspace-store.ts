@@ -194,7 +194,15 @@ interface WorkspaceState {
     fields: Partial<
       Pick<
         DeskMap,
-        'grossAcres' | 'pooledAcres' | 'description' | 'unitName' | 'unitCode'
+        | 'grossAcres'
+        | 'pooledAcres'
+        | 'description'
+        | 'unitName'
+        | 'unitCode'
+        // DA2-M: the GeoJSON feature→tract matcher writes the ArcGIS link here
+        // (and may confirm the tract id). Not a title-math field; not journaled.
+        | 'tractId'
+        | 'externalRefs'
       >
     >
   ) => void;
