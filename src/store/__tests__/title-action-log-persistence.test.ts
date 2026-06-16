@@ -310,10 +310,70 @@ describe('title action log runtime persistence lifecycle', () => {
     expect(quarantineCall.rows.auditEvents).toHaveLength(
       corrupted.auditEvents.length
     );
-    // …and a notice is surfaced for the banner.
+    // …and a notice is surfaced for the banner, flagged durably persisted.
     const notice = useTitleActionLog.getState().lastQuarantine;
     expect(notice?.source).toBe('storage');
     expect(notice?.auditEventCount).toBe(corrupted.auditEvents.length);
+    expect(notice?.durablyPersisted).toBe(true);
+  });
+
+  it('flags the quarantine notice when the durable copy fails (DA-H4/F2)', async () => {
+    const workspace = makeWorkspace('ws-runtime', 'root-runtime', 'DOC-1');
+    loadWorkspaceIntoStores(workspace);
+    const valid = await buildBaselineRows(workspace);
+    const corrupted: TitleLedgerWorkspaceRows = {
+      actionRecords: valid.actionRecords,
+      auditEvents: valid.auditEvents.map((event, index) =>
+        index === 0 ? { ...event, eventHash: 'f'.repeat(64) } : event
+      ),
+    };
+    ledgerPersistenceMocks.rowsByWorkspace.set(workspace.workspaceId, corrupted);
+    // The durable quarantine put fails (e.g. quota) — must NOT be reported as
+    // "retained", since the live rows are about to be re-baselined away.
+    ledgerPersistenceMocks.quarantineTitleLedgerRows.mockRejectedValueOnce(
+      new Error('QuotaExceededError')
+    );
+    useTitleActionLog.getState().reset();
+
+    const result = await hydrateTitleActionLogFromStorageOrBaseline(
+      workspace,
+      ownerDataFor(workspace.workspaceId)
+    );
+
+    expect(result.source).toBe('baseline');
+    const notice = useTitleActionLog.getState().lastQuarantine;
+    expect(notice).not.toBeNull();
+    expect(notice?.durablyPersisted).toBe(false);
+  });
+
+  it('quarantines an invalid IMPORTED file ledger, source file (DA-H4/F3)', async () => {
+    const workspace = makeWorkspace('ws-runtime-file', 'root-file', 'FILE-1');
+    loadWorkspaceIntoStores(workspace);
+    const fileRows = await buildBaselineRows(workspace);
+    // Corrupt the file bundle's chain so it fails verification on import.
+    const corruptedAudit = fileRows.auditEvents.map((event, index) =>
+      index === 0 ? { ...event, eventHash: 'f'.repeat(64) } : event
+    );
+    const fileLedger = buildProjectRecordBundle({
+      workspaceId: workspace.workspaceId,
+      projectId: workspace.workspaceId,
+      generatedAt: '2026-06-04T12:00:00.000Z',
+      records: [...fileRows.actionRecords, ...corruptedAudit],
+    });
+
+    useTitleActionLog.getState().reset();
+    const result = await hydrateTitleActionLogFromImportedLedger(
+      workspace,
+      fileLedger,
+      ownerDataFor(workspace.workspaceId)
+    );
+
+    expect(result.source).toBe('baseline');
+    expect(ledgerPersistenceMocks.quarantineTitleLedgerRows).toHaveBeenCalledTimes(1);
+    expect(
+      ledgerPersistenceMocks.quarantineTitleLedgerRows.mock.calls[0][0].source
+    ).toBe('file');
+    expect(useTitleActionLog.getState().lastQuarantine?.source).toBe('file');
   });
 
   it('continues the audit chain from the persisted head after hydrate', async () => {

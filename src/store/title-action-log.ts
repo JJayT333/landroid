@@ -95,6 +95,13 @@ export interface TitleLedgerQuarantineNotice {
   at: string;
   actionRecordCount: number;
   auditEventCount: number;
+  /**
+   * Whether the rejected chain was durably written to `titleLedgerQuarantine`.
+   * False when the copy failed (e.g. quota): for a `'storage'` source the live
+   * rows are about to be re-baselined away, so the evidence then lives only in
+   * this session — the banner must say so, not claim it was retained.
+   */
+  durablyPersisted: boolean;
 }
 
 interface TitleActionLogState {
@@ -535,6 +542,7 @@ async function quarantineInvalidLedger(
     `${rows.actionRecords.length} action record(s) / ${rows.auditEvents.length} `
     + 'audit event(s) failed ledger verification on hydrate';
   const quarantinedAt = new Date().toISOString();
+  let durablyPersisted = false;
   try {
     await quarantineTitleLedgerRows({
       workspaceId,
@@ -543,16 +551,17 @@ async function quarantineInvalidLedger(
       source,
       quarantinedAt,
     });
+    durablyPersisted = true;
   } catch (err) {
     console.warn(
-      '[title-action-log] failed to durably quarantine the invalid ledger; '
-        + 'surfacing the in-session notice only:',
+      '[title-action-log] failed to durably quarantine the invalid ledger; the '
+        + 'rejected chain will survive only in this session notice:',
       err
     );
   }
   console.warn(
     `[title-action-log] Quarantined an invalid ${source} ledger for workspace `
-      + `${workspaceId} (not erased): ${reason}.`
+      + `${workspaceId} (not erased; durablyPersisted=${durablyPersisted}): ${reason}.`
   );
   return {
     workspaceId,
@@ -561,6 +570,7 @@ async function quarantineInvalidLedger(
     at: quarantinedAt,
     actionRecordCount: rows.actionRecords.length,
     auditEventCount: rows.auditEvents.length,
+    durablyPersisted,
   };
 }
 

@@ -171,19 +171,31 @@ export function TitleLedgerStatusPanel({ onHide }: { onHide?: () => void } = {})
 function QuarantineNotice({ notice }: { notice: TitleLedgerQuarantineNotice | null }) {
   if (!notice) return null;
   const sourceLabel = notice.source === 'file' ? 'imported file' : 'stored';
+  const counts =
+    `${notice.actionRecordCount} action record${notice.actionRecordCount === 1 ? '' : 's'}, `
+    + `${notice.auditEventCount} audit event${notice.auditEventCount === 1 ? '' : 's'}`;
+  // Honest about whether the evidence actually survived the re-baseline. A failed
+  // durable copy must NOT be reported as "retained" — that would suppress the
+  // prompt to export before the rebaselined rows overwrite the original.
+  const tone = notice.durablyPersisted
+    ? 'border-amber-300 bg-amber-50 text-amber-950'
+    : 'border-red-300 bg-red-50 text-red-950';
   return (
-    <div className="border-b border-amber-300 bg-amber-50 px-4 py-3 text-amber-950">
+    <div className={`border-b px-4 py-3 ${tone}`}>
       <p className="text-[12px] font-semibold">
-        Title ledger quarantined (preserved, not erased)
+        {notice.durablyPersisted
+          ? 'Title ledger quarantined (preserved, not erased)'
+          : 'Title ledger rejected — durable preservation FAILED'}
       </p>
       <p className="mt-1 text-[11px] leading-snug">
-        A {sourceLabel} title audit chain failed verification on load and was set
-        aside intact ({notice.actionRecordCount} action record
-        {notice.actionRecordCount === 1 ? '' : 's'},{' '}
-        {notice.auditEventCount} audit event
-        {notice.auditEventCount === 1 ? '' : 's'}). The workspace re-baselined a
-        fresh chain; the rejected one is retained for review rather than
-        discarded. {notice.reason}.
+        A {sourceLabel} title audit chain failed verification on load ({counts}).
+        The workspace re-baselined a fresh chain.{' '}
+        {notice.durablyPersisted
+          ? 'The rejected chain was set aside intact for review rather than discarded.'
+          : 'The rejected chain could NOT be written to durable quarantine and now '
+            + 'exists only in this session — export/download this workspace now if you '
+            + 'need the original audit trail.'}{' '}
+        {notice.reason}.
       </p>
     </div>
   );

@@ -216,14 +216,48 @@ describe('DA-H5 action payload hashing', () => {
       context,
       drafts: [
         await appliedEvent('audit-1', r1.recordId, {
+          commandKind: r1.actionKind,
           actionHash: await computeActionRecordHash(r1),
         }),
         await appliedEvent('audit-2', r2.recordId, {
+          commandKind: r2.actionKind,
           actionHash: await computeActionRecordHash(r2),
         }),
       ],
     });
     return { actionRecords: [r1, r2], auditEvents };
+  }
+
+  // Append an `action_record.undone` event (as the DA-H2 undo write path does)
+  // that reverts `recordId`, chained off the existing head.
+  async function withUndoEvent(
+    recordId: string,
+    auditEvents: AuditEventRecord[]
+  ): Promise<AuditEventRecord[]> {
+    const [undone] = await buildAuditChain({
+      context,
+      priorHeadHash: auditEvents.at(-1)?.eventHash,
+      drafts: [
+        {
+          recordId: `audit-undone-${recordId}`,
+          eventKind: 'action_record.undone',
+          actorKind: 'user',
+          occurredAt: NOW,
+          subjectRecordIds: [recordId],
+          details: { reverts: recordId, actionKind: 'title.convey' },
+        },
+      ],
+    });
+    return [...auditEvents, undone];
+  }
+
+  function markUndone(record: ActionRecord): ActionRecord {
+    return ActionRecordSchema.parse({
+      ...record,
+      status: 'undone',
+      revision: record.revision + 1,
+      lastModified: '2026-06-02T00:00:00.000Z',
+    });
   }
 
   it('verifies clean payloads with no legacy events', async () => {
@@ -255,21 +289,57 @@ describe('DA-H5 action payload hashing', () => {
     expect(verdict.reason).toMatch(/payload was altered/);
   });
 
-  it('keeps verifying after a record is marked undone in place (DA-H2 interaction)', async () => {
+  it('keeps verifying a record undone in place WITH its backing undo event (DA-H2)', async () => {
     const { actionRecords, auditEvents } = await hashedRows();
-    // DA-H2 undo rewrites status/revision/lastModified in place but never the
-    // `result` payload — so the committed hash (over `result`) must still match.
-    const undone = actionRecords.map((record) =>
+    // A legitimate DA-H2 undo: status/revision rewritten in place (result intact)
+    // AND a matching action_record.undone event appended.
+    const records = actionRecords.map((record) =>
+      record.recordId === 'action-record-1' ? markUndone(record) : record
+    );
+    const events = await withUndoEvent('action-record-1', auditEvents);
+    expect((await verifyActionPayloadHashes(records, events)).valid).toBe(true);
+  });
+
+  it('rejects a bare status flip with no backing undo event (DA-H5/F1 drop forgery)', async () => {
+    const { actionRecords, auditEvents } = await hashedRows();
+    // The attack the result-only hash misses: flip status to `undone` so replay
+    // silently DROPS the mutation, without adding any undo event. `result` is
+    // untouched, so the payload hash and the event chain both still verify.
+    const forged = actionRecords.map((record) =>
+      record.recordId === 'action-record-1' ? markUndone(record) : record
+    );
+    expect((await verifyAuditChain(auditEvents)).valid).toBe(true);
+    const verdict = await verifyActionPayloadHashes(forged, auditEvents);
+    expect(verdict.valid).toBe(false);
+    expect(verdict.brokenRecordId).toBe('action-record-1');
+    expect(verdict.reason).toMatch(/marked undone but no matching undo event/);
+  });
+
+  it('rejects an undo event with no matching undone record (DA-H5/F1 un-drop forgery)', async () => {
+    const { actionRecords, auditEvents } = await hashedRows();
+    // The inverse: an undo event reverts action-record-1 but the record is left
+    // `applied`, re-introducing a mutation that should have been dropped.
+    const events = await withUndoEvent('action-record-1', auditEvents);
+    const verdict = await verifyActionPayloadHashes(actionRecords, events);
+    expect(verdict.valid).toBe(false);
+    expect(verdict.brokenRecordId).toBe('action-record-1');
+    expect(verdict.reason).toMatch(/has a matching undo event but is not marked undone/);
+  });
+
+  it('rejects an actionKind relabel the result hash misses (DA-H5/F1)', async () => {
+    const { actionRecords, auditEvents } = await hashedRows();
+    // Replay feeds actionKind as the command kind; relabel it while leaving
+    // `result` (and so the committed actionHash) untouched.
+    const relabeled = actionRecords.map((record) =>
       record.recordId === 'action-record-1'
-        ? ActionRecordSchema.parse({
-            ...record,
-            status: 'undone',
-            revision: record.revision + 1,
-            lastModified: '2026-06-02T00:00:00.000Z',
-          })
+        ? ActionRecordSchema.parse({ ...record, actionKind: 'title.precede' })
         : record
     );
-    expect((await verifyActionPayloadHashes(undone, auditEvents)).valid).toBe(true);
+    expect((await verifyAuditChain(auditEvents)).valid).toBe(true);
+    const verdict = await verifyActionPayloadHashes(relabeled, auditEvents);
+    expect(verdict.valid).toBe(false);
+    expect(verdict.brokenRecordId).toBe('action-record-1');
+    expect(verdict.reason).toMatch(/actionKind .* does not match the commandKind/);
   });
 
   it('accepts a legacy chain (no committed actionHash) and counts it', async () => {
@@ -281,6 +351,25 @@ describe('DA-H5 action payload hashing', () => {
     const verdict = await verifyActionPayloadHashes([r1], legacyEvents);
     expect(verdict.valid).toBe(true);
     expect(verdict.legacyCount).toBe(1);
+  });
+
+  it('actionHash is stable across a JSON export/import round-trip (no false-positive quarantine)', async () => {
+    // The inverse of the tamper risk: a legitimate `.landroid` export→import must
+    // not perturb canonicalJson(result) and wrongly reject a valid chain. Uses a
+    // 24-sig-digit decimal fraction string, as recordEffects carry.
+    const record = ActionRecordSchema.parse({
+      ...actionRecord('action-record-rt', 'rt'),
+      result: {
+        commandId: 'cmd-rt',
+        surface: 'title_tree',
+        mutation: 'convey',
+        summary: 'rt',
+        recordEffects: [{ kind: 'upsert', fraction: '0.333333333333333333333333' }],
+      },
+    });
+    const before = await computeActionRecordHash(record);
+    const roundTripped = ActionRecordSchema.parse(JSON.parse(JSON.stringify(record)));
+    expect(await computeActionRecordHash(roundTripped)).toBe(before);
   });
 
   it('flags an applied event that references a missing action record', async () => {

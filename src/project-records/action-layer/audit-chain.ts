@@ -203,25 +203,46 @@ export interface ActionPayloadVerification {
 }
 
 /**
- * Recompute and compare each `action_record.applied` event's committed
- * `actionHash` against its referenced ActionRecord. Run AFTER `verifyAuditChain`
- * confirms the event bodies are intact — only then is a committed `actionHash`
- * itself trustworthy. `subjectRecordIds[0]` is the action record's id by
- * construction (see `recordTitleMutation`).
+ * Verify that each ActionRecord still matches what the (already chain-verified)
+ * audit events committed about it. Run AFTER `verifyAuditChain` confirms the
+ * event bodies are intact — only then are the committed values trustworthy.
+ * `subjectRecordIds[0]` is the action record's id by construction (see
+ * `recordTitleMutation` and `undoActionRecord`). Three bindings, because replay
+ * consumes BOTH the `result` payload AND two envelope fields the result hash
+ * deliberately excludes (so undo can rewrite them in place):
+ *
+ *  1. `result` payload  — recompute `actionHash` and compare (the recordEffects /
+ *     titleNodeSnapshots replay applies).
+ *  2. `actionKind`      — must equal the `commandKind` committed in the paired
+ *     applied event's `details` (replay feeds `actionKind` as the command kind,
+ *     `title-replay.ts`). Catches a relabel that the result hash misses.
+ *  3. `status`          — a record is `'undone'` IFF an `action_record.undone`
+ *     event reverts it. Replay drops `undone` records, so a bare `applied`↔`undone`
+ *     flip (no matching undo event) would silently drop or re-introduce a title
+ *     mutation; the result hash misses it because `result` is untouched.
+ *
+ * (1) only applies to events carrying a committed `actionHash`; legacy (pre-DA-H5)
+ * events are counted and accepted. (2) and (3) use fields present on every chain,
+ * so they harden legacy chains too.
  */
 export async function verifyActionPayloadHashes(
   actionRecords: readonly ActionRecord[],
   auditEvents: readonly AuditEventRecord[]
 ): Promise<ActionPayloadVerification> {
   const recordById = new Map(actionRecords.map((record) => [record.recordId, record]));
+  // recordIds an `action_record.undone` event reverts — envelope-bound by the
+  // event hash, so this set cannot be forged without breaking `verifyAuditChain`.
+  const undoneByEvent = new Set<string>();
+  for (const event of auditEvents) {
+    if (event.eventKind !== 'action_record.undone') continue;
+    const reverted =
+      (event.details as { reverts?: unknown }).reverts ?? event.subjectRecordIds[0];
+    if (typeof reverted === 'string') undoneByEvent.add(reverted);
+  }
+
   let legacyCount = 0;
   for (const event of auditEvents) {
     if (event.eventKind !== 'action_record.applied') continue;
-    const committed = (event.details as { actionHash?: unknown }).actionHash;
-    if (typeof committed !== 'string') {
-      legacyCount += 1;
-      continue;
-    }
     const actionRecordId = event.subjectRecordIds[0];
     const record = actionRecordId ? recordById.get(actionRecordId) : undefined;
     if (!record) {
@@ -231,6 +252,24 @@ export async function verifyActionPayloadHashes(
         reason: 'applied audit event references a missing action record',
         legacyCount,
       };
+    }
+    // (2) actionKind binding — the field replay feeds as the command kind.
+    const committedKind = (event.details as { commandKind?: unknown }).commandKind;
+    if (typeof committedKind === 'string' && record.actionKind !== committedKind) {
+      return {
+        valid: false,
+        brokenRecordId: record.recordId,
+        reason:
+          `action record actionKind "${record.actionKind}" does not match the `
+          + `commandKind "${committedKind}" committed in the audit chain`,
+        legacyCount,
+      };
+    }
+    // (1) result payload binding.
+    const committed = (event.details as { actionHash?: unknown }).actionHash;
+    if (typeof committed !== 'string') {
+      legacyCount += 1;
+      continue;
     }
     const recomputed = await computeActionRecordHash(record);
     if (recomputed !== committed) {
@@ -244,5 +283,22 @@ export async function verifyActionPayloadHashes(
       };
     }
   }
+
+  // (3) status binding — undone IFF an undo event reverts it. Catches a bare
+  // status flip (drop/un-drop forgery) the count check cannot see per-record.
+  for (const record of actionRecords) {
+    if ((record.status === 'undone') !== undoneByEvent.has(record.recordId)) {
+      return {
+        valid: false,
+        brokenRecordId: record.recordId,
+        reason:
+          record.status === 'undone'
+            ? 'action record is marked undone but no matching undo event backs it'
+            : 'action record has a matching undo event but is not marked undone',
+        legacyCount,
+      };
+    }
+  }
+
   return { valid: true, brokenRecordId: null, reason: null, legacyCount };
 }
