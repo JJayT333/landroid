@@ -7,6 +7,7 @@ import { useConfirmation } from '../components/shared/ConfirmationProvider';
 import { prepareMapAssetUploadFile } from '../maps/map-asset-upload';
 import { parseGeoJsonSummary, type GeoJsonSummary } from '../maps/geojson-summary';
 import TractMatcherPanel from '../components/maps/TractMatcherPanel';
+import TractMapCanvas from '../components/maps/TractMapCanvas';
 import { MAP_ASSET_ACCEPT } from '../utils/file-validation';
 import { useMapStore } from '../store/map-store';
 import { useOwnerStore } from '../store/owner-store';
@@ -599,6 +600,7 @@ export default function MapsView() {
       />
 
       <TractMatcherPanel readOnly={readOnly} />
+      <TractMapCanvas />
 
       {mapAssets.length === 0 ? (
         <div className="flex-1 rounded-md border border-dashed border-ledger-line bg-parchment shadow-sm flex items-center justify-center px-6">
