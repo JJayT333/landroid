@@ -67,23 +67,29 @@ export default function TractMapCanvas() {
   const deskMapById = new Map(deskMaps.map((dm) => [dm.id, dm]));
   const selected = tractFeatures.find((feature) => feature.id === selectedId) ?? null;
 
+  // Plat aesthetic: thin ink boundaries over parchment, one restrained leather
+  // accent. Linked tracts carry a faint warm tint; unlinked are nearly bare;
+  // selection/hover deepen the same accent rather than introducing new colors.
   function fillFor(id: string, matched: boolean): string {
-    if (id === selectedId) return 'rgba(124, 92, 47, 0.45)'; // leather
-    if (id === hoveredId) return matched ? 'rgba(63, 125, 78, 0.4)' : 'rgba(180, 130, 45, 0.35)';
-    return matched ? 'rgba(63, 125, 78, 0.22)' : 'rgba(180, 130, 45, 0.16)';
+    if (id === selectedId) return 'rgba(124, 92, 47, 0.30)';
+    if (id === hoveredId) return 'rgba(124, 92, 47, 0.16)';
+    return matched ? 'rgba(124, 92, 47, 0.10)' : 'rgba(45, 33, 20, 0.025)';
   }
 
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-end gap-3 text-[11px] text-ink-light">
-        <span className="text-ink-light">click a polygon to select it</span>
-        <span className="flex items-center gap-1">
-          <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: 'rgba(63,125,78,0.45)' }} />
-          matched
+        <span>click a tract to select it</span>
+        <span className="flex items-center gap-1.5">
+          <span
+            className="inline-block h-2.5 w-2.5 rounded-[2px] border border-[#6b5535]"
+            style={{ background: 'rgba(124,92,47,0.35)' }}
+          />
+          linked
         </span>
-        <span className="flex items-center gap-1">
-          <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: 'rgba(180,130,45,0.4)' }} />
-          unmatched
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block h-2.5 w-2.5 rounded-[2px] border border-[#6b5535]" />
+          unlinked
         </span>
       </div>
 
@@ -101,8 +107,8 @@ export default function TractMapCanvas() {
               d={shape.d}
               fillRule="evenodd"
               fill={fillFor(shape.id, shape.matched)}
-              stroke={shape.id === selectedId ? '#7c5c2f' : '#6b5535'}
-              strokeWidth={shape.id === selectedId ? 2 : 1}
+              stroke={shape.id === selectedId ? '#3d2f1c' : '#5b4a32'}
+              strokeWidth={shape.id === selectedId ? 1.75 : 1}
               vectorEffect="non-scaling-stroke"
               style={{ cursor: 'pointer' }}
               onClick={() => setSelectedId(shape.id)}

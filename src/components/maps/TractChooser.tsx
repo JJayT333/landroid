@@ -26,8 +26,8 @@ function MiniTract({ feature }: { feature: MapTractFeature }) {
       <path
         d={d}
         fillRule="evenodd"
-        fill="rgba(63,125,78,0.25)"
-        stroke="#6b5535"
+        fill="rgba(124,92,47,0.10)"
+        stroke="#5b4a32"
         strokeWidth={1}
         vectorEffect="non-scaling-stroke"
       />
