@@ -69,6 +69,8 @@ import {
   type FormulaContent,
 } from '../components/leasehold/FormulaTooltip';
 import AuditSheetModal from '../components/leasehold/AuditSheetModal';
+import { useCurativeStore } from '../store/curative-store';
+import { countOpenHighRiskCurativeIssuesForUnit } from '../components/deskmap/curative-deskmap-flags';
 import {
   assignedWorkingInterestFormula,
   assignmentUnitDecimalFormula,
@@ -3677,6 +3679,7 @@ function LeaseholdDeck({
   unit,
   activeUnitCode,
   unitSummary,
+  curativeIssueCount,
   unitUniqueLessees,
   assignments,
   assignmentSummaries,
@@ -3707,6 +3710,8 @@ function LeaseholdDeck({
   unit: LeaseholdUnit;
   activeUnitCode: string | null;
   unitSummary: ReturnType<typeof buildLeaseholdUnitSummary>;
+  /** Open Critical/High curative issues across the unit's tracts (hold count). */
+  curativeIssueCount: number;
   unitUniqueLessees: string[];
   assignments: LeaseholdAssignment[];
   assignmentSummaries: LeaseholdAssignmentSummary[];
@@ -3747,8 +3752,8 @@ function LeaseholdDeck({
     [focusedDeskMapId, unit, unitSummary]
   );
   const transferOrderHoldReasons = useMemo(
-    () => buildLeaseholdTransferOrderHoldReasons(unitSummary),
-    [unitSummary]
+    () => buildLeaseholdTransferOrderHoldReasons(unitSummary, curativeIssueCount),
+    [unitSummary, curativeIssueCount]
   );
 
   useEffect(() => {
@@ -4298,6 +4303,15 @@ export default function LeaseholdView() {
       }),
     [focusedDeskMaps, leaseholdAssignments, leaseholdOrris, leases, nodes, owners]
   );
+  // Distinct open Critical/High curative issues across this unit's tracts. Used
+  // only to raise a transfer-order hold reason (flag-and-hold, no decimal).
+  // Matches the Desk Map dot scoping (by affectedDeskMapId or affectedNodeId)
+  // so the hold and the dots agree. The curative store is workspace-scoped.
+  const titleIssues = useCurativeStore((state) => state.titleIssues);
+  const curativeIssueCount = useMemo(
+    () => countOpenHighRiskCurativeIssuesForUnit(focusedDeskMaps, titleIssues),
+    [focusedDeskMaps, titleIssues]
+  );
   const focusedNodeIds = useMemo(
     () => new Set(focusedDeskMaps.flatMap((deskMap) => deskMap.nodeIds)),
     [focusedDeskMaps]
@@ -4567,6 +4581,7 @@ export default function LeaseholdView() {
             unit={leaseholdUnit}
             activeUnitCode={effectiveUnitCode}
             unitSummary={summary}
+            curativeIssueCount={curativeIssueCount}
             unitUniqueLessees={summary.uniqueLessees}
             assignments={leaseholdAssignments.filter((assignment) =>
               assignment.scope === 'tract'

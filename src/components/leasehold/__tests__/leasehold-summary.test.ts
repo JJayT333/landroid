@@ -1129,6 +1129,34 @@ describe('leasehold-summary', () => {
     ).toBe(false);
   });
 
+  it('holds the transfer order when open Critical/High curative issues are passed (DA2-C)', () => {
+    const base = {
+      unitAssignmentWarningCount: 0,
+      npriRatificationHoldCount: 0,
+      fixedNpriExceedsRoyaltyTractCount: 0,
+    };
+
+    // Plural reason for 2 issues.
+    const two = buildLeaseholdTransferOrderHoldReasons(base, 2);
+    expect(two.some((r) => /open Critical\/High curative issues/.test(r))).toBe(true);
+    expect(two.some((r) => r.includes('2 open'))).toBe(true);
+
+    // Singular for 1.
+    const one = buildLeaseholdTransferOrderHoldReasons(base, 1);
+    expect(
+      one.some((r) => /1 open Critical\/High curative issue\b/.test(r) && !/issues/.test(r))
+    ).toBe(true);
+
+    // 0 / omitted -> no curative reason, and the default arg is byte-identical
+    // to the no-arg call (proves every existing caller is unchanged).
+    expect(
+      buildLeaseholdTransferOrderHoldReasons(base, 0).some((r) => /curative/.test(r))
+    ).toBe(false);
+    expect(buildLeaseholdTransferOrderHoldReasons(base)).toEqual(
+      buildLeaseholdTransferOrderHoldReasons(base, 0)
+    );
+  });
+
   it('surfaces malformed lease royalty, ORRI burden, and WI assignment inputs as warnings', () => {
     const summary = buildLeaseholdUnitSummary({
       deskMaps: [
