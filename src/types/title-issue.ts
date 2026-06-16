@@ -56,6 +56,29 @@ export interface TitleIssue {
   updatedAt: string;
 }
 
+/**
+ * A curative issue is "closed" once it is Resolved or Deferred; every other
+ * status is still open/active. Single source of truth for the curative store,
+ * the Curative view, and the leasehold/desk-map flag wiring.
+ */
+export function titleIssueIsClosed(issue: Pick<TitleIssue, 'status'>): boolean {
+  return issue.status === 'Resolved' || issue.status === 'Deferred';
+}
+
+/**
+ * An OPEN issue at Critical or High priority — the bar for raising a
+ * transfer-order hold and a Desk Map warning dot. (Medium/Low and closed
+ * issues never gate payout or light a dot.)
+ */
+export function isOpenHighRiskTitleIssue(
+  issue: Pick<TitleIssue, 'status' | 'priority'>
+): boolean {
+  return (
+    !titleIssueIsClosed(issue)
+    && (issue.priority === 'Critical' || issue.priority === 'High')
+  );
+}
+
 function nowIso() {
   return new Date().toISOString();
 }

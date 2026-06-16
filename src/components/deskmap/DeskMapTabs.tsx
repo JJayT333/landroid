@@ -24,6 +24,8 @@ import {
   getActiveLeases,
 } from '../../title-math';
 import { hasDeskMapWarningDot } from './deskmap-warning-dots';
+import { countOpenHighRiskCurativeIssuesForDeskMap } from './curative-deskmap-flags';
+import { useCurativeStore } from '../../store/curative-store';
 
 interface UnitGroup {
   unitCode: DeskMapUnitCode | null;
@@ -42,6 +44,7 @@ export default function DeskMapTabs() {
   const renameDeskMap = useWorkspaceStore((s) => s.renameDeskMap);
   const deleteDeskMap = useWorkspaceStore((s) => s.deleteDeskMap);
   const leases = useOwnerStore((s) => s.leases);
+  const titleIssues = useCurativeStore((s) => s.titleIssues);
   const { confirm: requestConfirmation } = useConfirmation();
 
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -97,11 +100,15 @@ export default function DeskMapTabs() {
             deskMap,
             nodes: deskMapNodes,
             coverageSummary,
+            curativeIssueCount: countOpenHighRiskCurativeIssuesForDeskMap(
+              deskMap,
+              titleIssues
+            ),
           }),
         ] as const;
       })
     );
-  }, [deskMaps, leases, nodes]);
+  }, [deskMaps, leases, nodes, titleIssues]);
 
   const handleCreate = () => {
     if (readOnly) return;
