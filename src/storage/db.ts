@@ -31,6 +31,7 @@ import { sha256HexOfBlob } from './blob-hash';
 import type { ContactLog, Lease, Owner, OwnerDoc } from '../types/owner';
 import type { LeasePurchaseReport } from '../types/lease-purchase-report';
 import type { MapAsset, MapExternalReference, MapRegion } from '../types/map';
+import type { MapTractFeature } from '../types/map-tract-feature';
 import type {
   ResearchFormula,
   ResearchImport,
@@ -127,6 +128,7 @@ const db = new Dexie('landroid-v2') as Dexie & {
   mapAssets: EntityTable<DbScoped<MapAsset>, 'id'>;
   mapRegions: EntityTable<DbScoped<MapRegion>, 'id'>;
   mapExternalReferences: EntityTable<DbScoped<MapExternalReference>, 'id'>;
+  mapTractFeatures: EntityTable<DbScoped<MapTractFeature>, 'id'>;
   researchImports: EntityTable<DbScoped<ResearchImport>, 'id'>;
   researchSources: EntityTable<DbScoped<ResearchSource>, 'id'>;
   researchFormulas: EntityTable<DbScoped<ResearchFormula>, 'id'>;
@@ -569,6 +571,24 @@ db.version(14).stores({
 db.version(15).stores({
   canvasAssets:
     'id, dbKey, workspaceId, contentHash, [dbKey+workspaceId], [dbKey+workspaceId+contentHash]',
+});
+
+/**
+ * v17 (DA2-M GeoJSON tract features).
+ *
+ * Adds `mapTractFeatures` — parsed WGS84 tract polygons ingested from an ArcGIS
+ * GeoJSON export, each with a nullable link to a LANDroid `DeskMap`. Additive
+ * and non-destructive: a new empty table, no data migration.
+ *
+ * NOTE: v16 is intentionally reserved for the in-review title-ledger PR (#185,
+ * `titleLedgerQuarantine`). If that PR merges after this one, it must rebase its
+ * table from v16 to v18; if it merges first, this can be renumbered to v17 with
+ * no gap. Dexie tolerates the v15→v17 gap (upgrades run for versions above the
+ * stored one), so either order is safe.
+ */
+db.version(17).stores({
+  mapTractFeatures:
+    'id, dbKey, workspaceId, assetId, tractKey, matchedDeskMapId, [dbKey+workspaceId], [dbKey+workspaceId+assetId]',
 });
 
 
