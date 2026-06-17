@@ -23,6 +23,14 @@ import {
 } from '../types/title-issue';
 import type { Lease, Owner } from '../types/owner';
 import type { DeskMap, OwnershipNode } from '../types/node';
+import {
+  describeDeskMap,
+  describeLease,
+  describeNode,
+  describeOwner,
+  findDeskMapIdForNode,
+} from '../curative/curative-labels';
+import CurativeRequirementReportModal from '../components/curative/CurativeRequirementReportModal';
 
 type StatusFilter = 'all' | 'active' | TitleIssueStatus;
 type PriorityFilter = 'all' | TitleIssuePriority;
@@ -55,49 +63,6 @@ const COMPANY_READINESS_BACKLOG = [
 
 function normalizeSearchText(value: string) {
   return value.trim().toLowerCase();
-}
-
-function describeOwner(owner: Owner | undefined) {
-  return owner?.name || 'Unlinked owner';
-}
-
-function describeLease(lease: Lease | undefined) {
-  if (!lease) {
-    return 'Unlinked lease';
-  }
-
-  return [lease.leaseName, lease.lessee, lease.docNo].filter(Boolean).join(' • ')
-    || 'Unnamed lease';
-}
-
-function describeDeskMap(deskMap: DeskMap | undefined) {
-  if (!deskMap) {
-    return 'Unlinked tract';
-  }
-
-  return [deskMap.code, deskMap.name].filter(Boolean).join(' • ')
-    || 'Unnamed tract';
-}
-
-function describeNode(node: OwnershipNode | undefined) {
-  if (!node) {
-    return 'Unlinked branch';
-  }
-
-  const label = node.grantee || node.grantor || node.docNo || node.id;
-  const classLabel = node.interestClass === 'npri' ? 'NPRI' : 'Mineral';
-  return `${label} (${classLabel})`;
-}
-
-export function findDeskMapIdForNode(
-  nodeId: string | null,
-  deskMaps: DeskMap[]
-): string | null {
-  if (!nodeId) {
-    return null;
-  }
-
-  return deskMaps.find((deskMap) => deskMap.nodeIds.includes(nodeId))?.id ?? null;
 }
 
 function issueToForm(issue: TitleIssue): TitleIssueForm {
@@ -326,6 +291,7 @@ export default function CurativeView() {
   const setActiveNode = useWorkspaceStore((state) => state.setActiveNode);
   const owners = useOwnerStore((state) => state.owners);
   const leases = useOwnerStore((state) => state.leases);
+  const projectName = useWorkspaceStore((state) => state.projectName);
   const setView = useUIStore((state) => state.setView);
   const { confirm: requestConfirmation } = useConfirmation();
 
@@ -334,6 +300,7 @@ export default function CurativeView() {
   const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>('all');
   const [form, setForm] = useState<TitleIssueForm | null>(null);
   const [saving, setSaving] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
 
   const visibleIssues = useMemo(
     () =>
@@ -347,6 +314,11 @@ export default function CurativeView() {
         leases,
       }),
     [deskMaps, leases, nodes, owners, priorityFilter, searchQuery, statusFilter, titleIssues]
+  );
+
+  const reportContext = useMemo(
+    () => ({ deskMaps, nodes, owners, leases }),
+    [deskMaps, nodes, owners, leases]
   );
 
   const selectedIssue = selectedIssueId
@@ -458,6 +430,14 @@ export default function CurativeView() {
                 {activeIssues.length} active title issue{activeIssues.length === 1 ? '' : 's'}
               </div>
             </div>
+            <button
+              type="button"
+              onClick={() => setReportOpen(true)}
+              title="Open a printable, numbered title requirement report (Print / Save as PDF)"
+              className="rounded-md border border-ledger-line px-3 py-2 text-xs font-semibold text-leather transition-colors hover:bg-leather/10"
+            >
+              Requirement Report
+            </button>
             <button
               type="button"
               disabled={readOnly || !workspaceId}
@@ -951,6 +931,16 @@ export default function CurativeView() {
           </div>
         )}
       </section>
+
+      {reportOpen && (
+        <CurativeRequirementReportModal
+          issues={visibleIssues}
+          context={reportContext}
+          projectName={projectName}
+          generatedAt={new Date().toLocaleString()}
+          onClose={() => setReportOpen(false)}
+        />
+      )}
     </div>
   );
 }

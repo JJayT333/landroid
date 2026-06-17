@@ -15,7 +15,8 @@ import {
   buildDeskMapOwnerSearchMatches,
   computeDeskMapFitViewport,
 } from '../DeskMapView';
-import { filterTitleIssues, findDeskMapIdForNode } from '../CurativeView';
+import { filterTitleIssues } from '../CurativeView';
+import { findDeskMapIdForNode } from '../../curative/curative-labels';
 
 describe('view helpers', () => {
   it('forces ready transfer-order rows into hold while payout hold is active', () => {
