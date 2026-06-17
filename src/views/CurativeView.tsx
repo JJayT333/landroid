@@ -15,6 +15,7 @@ import {
   TITLE_ISSUE_STATUS_OPTIONS,
   TITLE_ISSUE_TYPE_OPTIONS,
   createBlankTitleIssue,
+  titleIssueIsClosed,
   type TitleIssue,
   type TitleIssuePriority,
   type TitleIssueStatus,
@@ -51,9 +52,6 @@ const COMPANY_READINESS_BACKLOG = [
   'Enterprise audit trail and reviewer signoff',
 ];
 
-function titleIssueIsClosed(issue: Pick<TitleIssue, 'status'>) {
-  return issue.status === 'Resolved' || issue.status === 'Deferred';
-}
 
 function normalizeSearchText(value: string) {
   return value.trim().toLowerCase();

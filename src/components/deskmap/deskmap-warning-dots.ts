@@ -11,12 +11,15 @@ export interface DeskMapWarningDotState {
   graphIssues: ValidationIssue[];
   npriDiscrepancyCount: number;
   leaseOverlapCount: number;
+  curativeIssueCount: number;
 }
 
 export interface BuildDeskMapWarningDotStateInput {
   deskMap: Pick<DeskMap, 'nodeIds'>;
   nodes: readonly OwnershipNode[];
   coverageSummary?: Pick<DeskMapCoverageSummary, 'leaseOverlaps'>;
+  /** Open Critical/High curative issues affecting this desk map (default 0). */
+  curativeIssueCount?: number;
 }
 
 export function buildDeskMapWarningDotState(
@@ -27,15 +30,18 @@ export function buildDeskMapWarningDotState(
   const graphIssues = validateOwnershipGraph(deskMapNodes).issues;
   const npriDiscrepancyCount = findNpriBranchDiscrepancies(deskMapNodes).length;
   const leaseOverlapCount = input.coverageSummary?.leaseOverlaps.length ?? 0;
+  const curativeIssueCount = input.curativeIssueCount ?? 0;
 
   return {
     hasWarning:
       graphIssues.length > 0
       || npriDiscrepancyCount > 0
-      || leaseOverlapCount > 0,
+      || leaseOverlapCount > 0
+      || curativeIssueCount > 0,
     graphIssues,
     npriDiscrepancyCount,
     leaseOverlapCount,
+    curativeIssueCount,
   };
 }
 

@@ -11,6 +11,7 @@ import {
 } from './workspace-write-lease';
 import {
   normalizeTitleIssue,
+  titleIssueIsClosed,
   type TitleIssue,
 } from '../types/title-issue';
 
@@ -51,9 +52,6 @@ function sortTitleIssues(issues: TitleIssue[]) {
   });
 }
 
-function titleIssueIsClosed(issue: TitleIssue) {
-  return issue.status === 'Resolved' || issue.status === 'Deferred';
-}
 
 export async function loadCurativeWorkspaceData(
   workspaceId: string

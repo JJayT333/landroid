@@ -124,4 +124,42 @@ describe('deskmap warning dots', () => {
     expect(state.hasWarning).toBe(true);
     expect(state.leaseOverlapCount).toBe(1);
   });
+
+  it('flags an otherwise-clean tract when it carries open Critical/High curative issues', () => {
+    const owner = {
+      ...createBlankNode('owner-1'),
+      initialFraction: '1',
+      fraction: '1',
+    };
+    const state = buildDeskMapWarningDotState({
+      deskMap: deskMap(['owner-1']),
+      nodes: [owner],
+      curativeIssueCount: 2,
+    });
+
+    expect(state.hasWarning).toBe(true);
+    expect(state.curativeIssueCount).toBe(2);
+  });
+
+  it('does not flag a clean tract when curativeIssueCount is 0 / omitted', () => {
+    const owner = {
+      ...createBlankNode('owner-1'),
+      initialFraction: '1',
+      fraction: '1',
+    };
+
+    const omitted = buildDeskMapWarningDotState({
+      deskMap: deskMap(['owner-1']),
+      nodes: [owner],
+    });
+    expect(omitted.hasWarning).toBe(false);
+    expect(omitted.curativeIssueCount).toBe(0);
+
+    const zero = buildDeskMapWarningDotState({
+      deskMap: deskMap(['owner-1']),
+      nodes: [owner],
+      curativeIssueCount: 0,
+    });
+    expect(zero.hasWarning).toBe(false);
+  });
 });
