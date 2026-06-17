@@ -353,6 +353,58 @@ describe('DA-H5 action payload hashing', () => {
     expect(verdict.legacyCount).toBe(1);
   });
 
+  it('rejects a head event re-signed with its actionHash stripped to masquerade as legacy (mixed-chain downgrade)', async () => {
+    const { actionRecords, auditEvents } = await hashedRows();
+    const [r1, r2] = actionRecords;
+    // The attack the all-or-nothing rule closes: forge the HEAD record's result,
+    // then DROP the head event's committed actionHash so it reads as "legacy",
+    // and re-sign ONLY the head's own eventHash (the head has no successor to pin
+    // it). Both verifyAuditChain and the count check would otherwise pass.
+    const forgedRecords = [
+      r1,
+      { ...r2, result: { ...r2.result, summary: 'forged-head' } },
+    ];
+    const strippedHead: AuditEventRecord = {
+      ...auditEvents[1],
+      details: { commandKind: r2.actionKind }, // actionHash removed
+    };
+    const reSignedHead: AuditEventRecord = {
+      ...strippedHead,
+      eventHash: await computeAuditEventHash(strippedHead),
+    };
+    const events = [auditEvents[0], reSignedHead];
+
+    // The event-body chain is self-consistent — exactly the gap this closes.
+    expect((await verifyAuditChain(events)).valid).toBe(true);
+
+    const verdict = await verifyActionPayloadHashes(forgedRecords, events);
+    expect(verdict.valid).toBe(false);
+    expect(verdict.brokenRecordId).toBe('action-record-2');
+    expect(verdict.reason).toMatch(/mixed-chain downgrade/);
+  });
+
+  it('rejects a head event with its commandKind stripped while siblings still bind it (mixed-chain downgrade)', async () => {
+    const { actionRecords, auditEvents } = await hashedRows();
+    const [, r2] = actionRecords;
+    // Same downgrade aimed at the actionKind binding: drop the head's commandKind
+    // (keeping its actionHash) so the actionKind relabel guard would be skipped.
+    const strippedHead: AuditEventRecord = {
+      ...auditEvents[1],
+      details: { actionHash: await computeActionRecordHash(r2) }, // commandKind removed
+    };
+    const reSignedHead: AuditEventRecord = {
+      ...strippedHead,
+      eventHash: await computeAuditEventHash(strippedHead),
+    };
+    const events = [auditEvents[0], reSignedHead];
+    expect((await verifyAuditChain(events)).valid).toBe(true);
+
+    const verdict = await verifyActionPayloadHashes(actionRecords, events);
+    expect(verdict.valid).toBe(false);
+    expect(verdict.brokenRecordId).toBe('action-record-2');
+    expect(verdict.reason).toMatch(/commandKind binding.*mixed-chain downgrade/);
+  });
+
   it('actionHash is stable across a JSON export/import round-trip (no false-positive quarantine)', async () => {
     // The inverse of the tamper risk: a legitimate `.landroid` export→import must
     // not perturb canonicalJson(result) and wrongly reject a valid chain. Uses a

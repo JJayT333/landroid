@@ -195,12 +195,16 @@ export async function quarantineTitleLedgerRows(input: {
   quarantinedAt: string;
 }): Promise<StoredTitleLedgerQuarantine> {
   const dbKey = activeDbKey();
+  // Content-address the quarantine id on the chain's head hash (an append-only
+  // hash chain's head commits its whole history), NOT the wall-clock: a read-only
+  // tab that re-quarantines the SAME invalid chain on every reload then re-`put`s
+  // the same id (idempotent) instead of appending a duplicate row each time.
   const headMarker =
     input.rows.auditEvents.at(-1)?.eventHash
     ?? `n${input.rows.actionRecords.length}`;
   const record: StoredTitleLedgerQuarantine = {
     id: titleLedgerStorageId(
-      `${input.workspaceId}::quarantine::${input.quarantinedAt}::${headMarker}`,
+      `${input.workspaceId}::quarantine::${headMarker}`,
       dbKey
     ),
     dbKey,

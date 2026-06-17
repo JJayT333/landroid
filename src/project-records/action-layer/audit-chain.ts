@@ -221,9 +221,12 @@ export interface ActionPayloadVerification {
  *     flip (no matching undo event) would silently drop or re-introduce a title
  *     mutation; the result hash misses it because `result` is untouched.
  *
- * (1) only applies to events carrying a committed `actionHash`; legacy (pre-DA-H5)
- * events are counted and accepted. (2) and (3) use fields present on every chain,
- * so they harden legacy chains too.
+ * (1) and (2) are all-or-nothing across the chain: a fully-unhashed chain is
+ * accepted as genuinely legacy (pre-DA-H5) and counted; but once ANY applied
+ * event commits the binding, every applied event must carry it, so a single
+ * stripped-and-re-signed event (notably the head) is rejected rather than waved
+ * through as "legacy". (3) uses fields present on every chain, so it hardens
+ * legacy chains too.
  */
 export async function verifyActionPayloadHashes(
   actionRecords: readonly ActionRecord[],
@@ -240,9 +243,26 @@ export async function verifyActionPayloadHashes(
     if (typeof reverted === 'string') undoneByEvent.add(reverted);
   }
 
+  // A genuine legacy (pre-DA-H5) chain commits NO `actionHash` / `commandKind` on
+  // ANY applied event. A chain where SOME applied events carry the binding but
+  // others do not is a strip-and-re-sign downgrade — forge one record's `result`,
+  // drop that event's `actionHash` so it reads as "legacy", recompute only its
+  // own `eventHash` (the head has no successor pinning it). So the binding is
+  // all-or-nothing: once any applied event commits it, EVERY applied event must,
+  // or verification fails. (Truncating a hashed chain back to fully-legacy is the
+  // residual the deferred envelope head-hash pin, `lastFlushedHeadHash`, closes.)
+  const appliedEvents = auditEvents.filter(
+    (event) => event.eventKind === 'action_record.applied'
+  );
+  const chainCommitsHash = appliedEvents.some(
+    (event) => typeof (event.details as { actionHash?: unknown }).actionHash === 'string'
+  );
+  const chainCommitsKind = appliedEvents.some(
+    (event) => typeof (event.details as { commandKind?: unknown }).commandKind === 'string'
+  );
+
   let legacyCount = 0;
-  for (const event of auditEvents) {
-    if (event.eventKind !== 'action_record.applied') continue;
+  for (const event of appliedEvents) {
     const actionRecordId = event.subjectRecordIds[0];
     const record = actionRecordId ? recordById.get(actionRecordId) : undefined;
     if (!record) {
@@ -255,32 +275,52 @@ export async function verifyActionPayloadHashes(
     }
     // (2) actionKind binding — the field replay feeds as the command kind.
     const committedKind = (event.details as { commandKind?: unknown }).commandKind;
-    if (typeof committedKind === 'string' && record.actionKind !== committedKind) {
+    if (typeof committedKind === 'string') {
+      if (record.actionKind !== committedKind) {
+        return {
+          valid: false,
+          brokenRecordId: record.recordId,
+          reason:
+            `action record actionKind "${record.actionKind}" does not match the `
+            + `commandKind "${committedKind}" committed in the audit chain`,
+          legacyCount,
+        };
+      }
+    } else if (chainCommitsKind) {
       return {
         valid: false,
         brokenRecordId: record.recordId,
         reason:
-          `action record actionKind "${record.actionKind}" does not match the `
-          + `commandKind "${committedKind}" committed in the audit chain`,
+          'applied audit event is missing the commandKind binding present on other '
+          + 'events in this chain (mixed-chain downgrade)',
         legacyCount,
       };
     }
     // (1) result payload binding.
     const committed = (event.details as { actionHash?: unknown }).actionHash;
-    if (typeof committed !== 'string') {
-      legacyCount += 1;
-      continue;
-    }
-    const recomputed = await computeActionRecordHash(record);
-    if (recomputed !== committed) {
+    if (typeof committed === 'string') {
+      const recomputed = await computeActionRecordHash(record);
+      if (recomputed !== committed) {
+        return {
+          valid: false,
+          brokenRecordId: record.recordId,
+          reason:
+            'action record payload does not match the hash committed in the audit '
+            + 'chain (the payload was altered)',
+          legacyCount,
+        };
+      }
+    } else if (chainCommitsHash) {
       return {
         valid: false,
         brokenRecordId: record.recordId,
         reason:
-          'action record payload does not match the hash committed in the audit '
-          + 'chain (the payload was altered)',
+          'applied audit event is missing the payload hash committed by other '
+          + 'events in this chain (mixed-chain downgrade)',
         legacyCount,
       };
+    } else {
+      legacyCount += 1;
     }
   }
 

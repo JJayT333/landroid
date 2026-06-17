@@ -377,4 +377,37 @@ describe('title ledger persistence', () => {
     // a different workspace sees none of it
     expect(await persistence.listTitleLedgerQuarantine('ws-2')).toHaveLength(0);
   });
+
+  it('re-quarantining the same invalid chain is idempotent — no duplicate rows on reload (DA-H4 content-addressed id)', async () => {
+    const { persistence, db } = await loadTitleLedgerPersistence({
+      workspaceKey: 'user-alice',
+    });
+
+    // The same invalid chain, captured twice (e.g. a read-only tab re-quarantining
+    // it on each reload) with DIFFERENT wall-clock timestamps. The id is now
+    // content-addressed on the chain's head hash, not the timestamp, so the second
+    // capture overwrites the first instead of appending a duplicate row.
+    const rows = {
+      actionRecords: [fakeActionRecord({ recordId: 'bad-action' })],
+      auditEvents: [fakeAuditEventRecord({ recordId: 'bad-event' })],
+    };
+    const first = await persistence.quarantineTitleLedgerRows({
+      workspaceId: 'ws-1',
+      rows,
+      reason: 'audit chain failed at index 0',
+      source: 'storage',
+      quarantinedAt: '2026-06-04T12:00:00.000Z',
+    });
+    const second = await persistence.quarantineTitleLedgerRows({
+      workspaceId: 'ws-1',
+      rows,
+      reason: 'audit chain failed at index 0',
+      source: 'storage',
+      quarantinedAt: '2026-06-04T13:00:00.000Z',
+    });
+
+    expect(second.id).toBe(first.id);
+    expect([...db.titleLedgerQuarantine.rows.values()]).toHaveLength(1);
+    expect(await persistence.listTitleLedgerQuarantine('ws-1')).toHaveLength(1);
+  });
 });
