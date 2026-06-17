@@ -1858,7 +1858,12 @@ export function buildLeaseholdTransferOrderHoldReasons(
     | 'unitAssignmentWarningCount'
     | 'npriRatificationHoldCount'
     | 'fixedNpriExceedsRoyaltyTractCount'
-  >
+  >,
+  // Open Critical/High curative issues scoped to this unit's tracts. A plain
+  // count (not the issue objects) keeps this calculator free of any curative
+  // dependency. Default 0 ⇒ every existing caller is byte-identical. This only
+  // appends a hold-reason STRING; it never enters a decimal computation.
+  curativeIssueCount = 0
 ): string[] {
   const reasons: string[] = [];
   // DA-H1: where a fixed NPRI exceeds the burdened lessor's royalty, the excess
@@ -1892,6 +1897,15 @@ export function buildLeaseholdTransferOrderHoldReasons(
       `${unitSummary.npriRatificationHoldCount} NPRI${
         unitSummary.npriRatificationHoldCount === 1 ? '' : 's'
       } need ratification confirmation before transfer-order payout.`
+    );
+  }
+  // Open Critical/High curative issues on this unit's tracts must be resolved or
+  // deferred before payout. Flag-and-hold only — no decimal is affected.
+  if (curativeIssueCount > 0) {
+    reasons.push(
+      `${curativeIssueCount} open Critical/High curative issue${
+        curativeIssueCount === 1 ? '' : 's'
+      } on this unit's tracts — resolve or defer before transfer-order payout.`
     );
   }
   return reasons;

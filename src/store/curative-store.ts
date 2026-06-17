@@ -8,6 +8,7 @@ import {
 } from '../storage/curative-persistence';
 import {
   normalizeTitleIssue,
+  titleIssueIsClosed,
   type TitleIssue,
 } from '../types/title-issue';
 
@@ -16,10 +17,6 @@ function touch<T extends { updatedAt: string }>(record: T): T {
     ...record,
     updatedAt: new Date().toISOString(),
   };
-}
-
-function titleIssueIsClosed(issue: TitleIssue) {
-  return issue.status === 'Resolved' || issue.status === 'Deferred';
 }
 
 function sortTitleIssues(issues: TitleIssue[]) {

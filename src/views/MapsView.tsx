@@ -6,6 +6,8 @@ import MapRegionModal from '../components/modals/MapRegionModal';
 import { useConfirmation } from '../components/shared/ConfirmationProvider';
 import { prepareMapAssetUploadFile } from '../maps/map-asset-upload';
 import { parseGeoJsonSummary, type GeoJsonSummary } from '../maps/geojson-summary';
+import TractMatcherPanel from '../components/maps/TractMatcherPanel';
+import TractMapSection from '../components/maps/TractMapSection';
 import { MAP_ASSET_ACCEPT } from '../utils/file-validation';
 import { useMapStore } from '../store/map-store';
 import { useOwnerStore } from '../store/owner-store';
@@ -596,6 +598,9 @@ export default function MapsView() {
           event.target.value = '';
         }}
       />
+
+      <TractMatcherPanel readOnly={readOnly} />
+      <TractMapSection />
 
       {mapAssets.length === 0 ? (
         <div className="flex-1 rounded-md border border-dashed border-ledger-line bg-parchment shadow-sm flex items-center justify-center px-6">

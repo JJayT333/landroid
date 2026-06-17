@@ -469,6 +469,28 @@ export async function listDocumentRegistryData(
 }
 
 /**
+ * Find existing documents in this workspace whose bytes hash to `contentHash`.
+ * Backs the ingest dedup guard, which *warns* (never silently skips) before a
+ * byte-identical file is attached a second time. Returns blob-free metadata;
+ * the `contentHash` index keeps this to the (usually zero or one) matching rows
+ * rather than scanning the registry.
+ */
+export async function findDocsByContentHash(
+  workspaceId: string,
+  contentHash: string
+): Promise<Array<Omit<DocumentRecord, 'blob'>>> {
+  if (!contentHash) return [];
+  const [dbKey, scopedWorkspaceId] = activeWorkspaceScope(workspaceId);
+  const rows = await db.documents.where('contentHash').equals(contentHash).toArray();
+  return rows
+    .filter((doc) => doc.dbKey === dbKey && doc.workspaceId === scopedWorkspaceId)
+    .map((doc) => {
+      const { blob: _blob, ...meta } = stripStoredDocId(doc);
+      return meta;
+    });
+}
+
+/**
  * Delete a document and cascade-delete every attachment that references
  * it. Use this when the underlying file is wrong/unwanted everywhere, not
  * when one entity just wants to drop a reference.

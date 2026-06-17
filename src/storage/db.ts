@@ -31,6 +31,7 @@ import { sha256HexOfBlob } from './blob-hash';
 import type { ContactLog, Lease, Owner, OwnerDoc } from '../types/owner';
 import type { LeasePurchaseReport } from '../types/lease-purchase-report';
 import type { MapAsset, MapExternalReference, MapRegion } from '../types/map';
+import type { MapTractFeature } from '../types/map-tract-feature';
 import type {
   ResearchFormula,
   ResearchImport,
@@ -131,6 +132,7 @@ const db = new Dexie('landroid-v2') as Dexie & {
   mapAssets: EntityTable<DbScoped<MapAsset>, 'id'>;
   mapRegions: EntityTable<DbScoped<MapRegion>, 'id'>;
   mapExternalReferences: EntityTable<DbScoped<MapExternalReference>, 'id'>;
+  mapTractFeatures: EntityTable<DbScoped<MapTractFeature>, 'id'>;
   researchImports: EntityTable<DbScoped<ResearchImport>, 'id'>;
   researchSources: EntityTable<DbScoped<ResearchSource>, 'id'>;
   researchFormulas: EntityTable<DbScoped<ResearchFormula>, 'id'>;
@@ -577,14 +579,27 @@ db.version(15).stores({
 });
 
 /**
- * v16 (DA-H4 title-ledger quarantine).
+ * v16 (DA2-M GeoJSON tract features).
+ *
+ * Adds `mapTractFeatures` — parsed WGS84 tract polygons ingested from an ArcGIS
+ * GeoJSON export, each with a nullable link to a LANDroid `DeskMap`. Additive
+ * and non-destructive: a new empty table, no data migration.
+ */
+db.version(16).stores({
+  mapTractFeatures:
+    'id, dbKey, workspaceId, assetId, tractKey, matchedDeskMapId, [dbKey+workspaceId], [dbKey+workspaceId+assetId]',
+});
+
+/**
+ * v17 (DA-H4 title-ledger quarantine).
  *
  * Adds `titleLedgerQuarantine` — a preserved copy of a title ledger chain that
  * failed verification on hydrate, captured before a fresh baseline replaces the
  * bad rows so the tamper/corruption evidence is not erased. Additive and
- * non-destructive: a new empty table, no data migration.
+ * non-destructive: a new empty table, no data migration. Renumbered v16 → v17
+ * on the rebase onto main (the DA2-M Maps lane claimed v16 first).
  */
-db.version(16).stores({
+db.version(17).stores({
   ...TITLE_LEDGER_QUARANTINE_STORE_DEFINITION,
 });
 

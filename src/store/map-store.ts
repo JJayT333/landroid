@@ -17,6 +17,7 @@ import {
   type MapWorkspaceData,
 } from '../storage/map-persistence';
 import {
+  createBlankMapAsset,
   normalizeMapAsset,
   normalizeMapExternalReference,
   normalizeMapRegion,
@@ -25,6 +26,29 @@ import {
   type MapExternalReference,
   type MapRegion,
 } from '../types/map';
+import {
+  deleteMapTractFeature,
+  deleteMapTractFeaturesForAsset,
+  loadMapTractFeatures,
+  saveMapTractFeatures,
+  updateMapTractFeatureFields,
+} from '../storage/map-tract-feature-persistence';
+import {
+  buildMapTractFeatures,
+  parseTractFeatures,
+} from '../maps/geojson-ingest';
+import {
+  buildArcgisExternalRef,
+  removeExternalRef,
+  upsertExternalRef,
+} from '../maps/feature-tract-matcher';
+import type { MapTractFeature } from '../types/map-tract-feature';
+
+export interface GeoJsonIngestResult {
+  assetId: string;
+  featureCount: number;
+  warnings: string[];
+}
 
 function touch<T extends { updatedAt: string }>(record: T): T {
   return {
@@ -43,8 +67,30 @@ interface MapState {
   mapAssets: MapAssetMeta[];
   mapRegions: MapRegion[];
   mapReferences: MapExternalReference[];
+  /** DA2-M: parsed GeoJSON tract polygons (separate from rect `mapRegions`). */
+  tractFeatures: MapTractFeature[];
   _hydrated: boolean;
   setWorkspace: (workspaceId: string) => Promise<void>;
+  /**
+   * Ingest an ArcGIS GeoJSON export: store the raw file as a `GeoJSON` map
+   * asset, parse its polygons, and persist them as tract features keyed to that
+   * asset (idempotent — re-ingesting the same file replaces its features).
+   */
+  ingestGeoJsonTractFeatures: (input: {
+    fileName: string;
+    text: string;
+  }) => Promise<GeoJsonIngestResult>;
+  /**
+   * Link (or unlink, with `null`) a tract feature to a DeskMap. Persists the
+   * feature's match and writes/moves the ArcGIS `ExternalRef` onto the
+   * DeskMap(s) via the workspace store.
+   */
+  setFeatureTractMatch: (
+    featureId: string,
+    deskMapId: string | null
+  ) => Promise<void>;
+  /** Remove a tract feature entirely (and its ArcGIS ref from any matched DeskMap). */
+  removeTractFeature: (featureId: string) => Promise<void>;
   replaceWorkspaceData: (
     workspaceId: string,
     data: MapWorkspaceData
@@ -115,10 +161,14 @@ export const useMapStore = create<MapState>()((set, get) => ({
   mapAssets: [],
   mapRegions: [],
   mapReferences: [],
+  tractFeatures: [],
   _hydrated: false,
 
   setWorkspace: async (workspaceId) => {
-    const data = await loadMapWorkspaceMetadata(workspaceId);
+    const [data, tractFeatures] = await Promise.all([
+      loadMapWorkspaceMetadata(workspaceId),
+      loadMapTractFeatures(workspaceId),
+    ]);
     const featuredAssets = ensureFeaturedAsset(data.mapAssets);
     if (!sameFeaturedState(data.mapAssets, featuredAssets)) {
       await persistFeaturedFlags(featuredAssets);
@@ -128,8 +178,108 @@ export const useMapStore = create<MapState>()((set, get) => ({
       mapAssets: featuredAssets,
       mapRegions: data.mapRegions,
       mapReferences: data.mapReferences,
+      tractFeatures,
       _hydrated: true,
     });
+  },
+
+  ingestGeoJsonTractFeatures: async ({ fileName, text }) => {
+    const workspaceId = get().workspaceId;
+    if (!workspaceId) {
+      throw new Error('Cannot ingest GeoJSON before a workspace is set.');
+    }
+    const collection = parseTractFeatures(text);
+
+    // Store the raw GeoJSON as a map asset so the source file round-trips and
+    // the features carry a stable `assetId` back-reference.
+    const asset = createBlankMapAsset(
+      workspaceId,
+      new Blob([text], { type: 'application/geo+json' }),
+      { fileName, mimeType: 'application/geo+json' }
+    );
+    await get().addAsset(asset);
+
+    const now = new Date().toISOString();
+    const features = buildMapTractFeatures(workspaceId, asset.id, collection, now);
+    // Idempotent: clear any prior features for this asset, then write the batch.
+    await deleteMapTractFeaturesForAsset(workspaceId, asset.id);
+    await saveMapTractFeatures(workspaceId, features);
+    set((state) => ({
+      tractFeatures: [
+        ...state.tractFeatures.filter((feature) => feature.assetId !== asset.id),
+        ...features,
+      ],
+    }));
+
+    return {
+      assetId: asset.id,
+      featureCount: features.length,
+      warnings: collection.warnings,
+    };
+  },
+
+  setFeatureTractMatch: async (featureId, deskMapId) => {
+    const feature = get().tractFeatures.find((f) => f.id === featureId);
+    if (!feature || feature.matchedDeskMapId === deskMapId) return;
+    const previousDeskMapId = feature.matchedDeskMapId;
+    const ref = buildArcgisExternalRef(feature);
+
+    // 1. persist + reflect the feature's match link
+    const updatedAt = new Date().toISOString();
+    await updateMapTractFeatureFields(featureId, { matchedDeskMapId: deskMapId, updatedAt });
+    set((state) => ({
+      tractFeatures: state.tractFeatures.map((f) =>
+        f.id === featureId ? { ...f, matchedDeskMapId: deskMapId, updatedAt } : f
+      ),
+    }));
+
+    // 2. move the ArcGIS ref between desk maps. Dynamic import: workspace-store
+    // statically imports this module, so a static back-import would deepen the
+    // cycle. updateDeskMapDetails persists via the shard autosave (not journaled
+    // — externalRefs is a GIS link, not a title-math field).
+    if (!ref) return;
+    const { useWorkspaceStore } = await import('./workspace-store');
+    const ws = useWorkspaceStore.getState();
+    if (previousDeskMapId && previousDeskMapId !== deskMapId) {
+      const old = ws.deskMaps.find((dm) => dm.id === previousDeskMapId);
+      if (old) {
+        ws.updateDeskMapDetails(previousDeskMapId, {
+          externalRefs: removeExternalRef(old.externalRefs ?? [], ref),
+        });
+      }
+    }
+    if (deskMapId) {
+      const next = useWorkspaceStore.getState().deskMaps.find((dm) => dm.id === deskMapId);
+      if (next) {
+        ws.updateDeskMapDetails(deskMapId, {
+          externalRefs: upsertExternalRef(next.externalRefs ?? [], ref),
+        });
+      }
+    }
+  },
+
+  removeTractFeature: async (featureId) => {
+    const feature = get().tractFeatures.find((f) => f.id === featureId);
+    if (!feature) return;
+    // Clear the ArcGIS ref off any matched DeskMap before dropping the feature.
+    if (feature.matchedDeskMapId) {
+      const ref = buildArcgisExternalRef(feature);
+      if (ref) {
+        const { useWorkspaceStore } = await import('./workspace-store');
+        const deskMap = useWorkspaceStore
+          .getState()
+          .deskMaps.find((dm) => dm.id === feature.matchedDeskMapId);
+        if (deskMap) {
+          useWorkspaceStore.getState().updateDeskMapDetails(feature.matchedDeskMapId, {
+            externalRefs: removeExternalRef(deskMap.externalRefs ?? [], ref),
+          });
+        }
+      }
+    }
+    await deleteMapTractFeature(featureId);
+    set((state) => ({
+      tractFeatures: state.tractFeatures.filter((f) => f.id !== featureId),
+    }));
   },
 
   replaceWorkspaceData: async (workspaceId, data) => {
@@ -217,6 +367,10 @@ export const useMapStore = create<MapState>()((set, get) => ({
   removeAsset: async (id) => {
     await deleteMapAsset(id);
     const state = get();
+    // Drop tract features ingested from this (GeoJSON) asset, if any.
+    if (state.workspaceId && state.tractFeatures.some((feature) => feature.assetId === id)) {
+      await deleteMapTractFeaturesForAsset(state.workspaceId, id);
+    }
     const nextAssets = ensureFeaturedAsset(
       state.mapAssets.filter((asset) => asset.id !== id)
     );
@@ -225,6 +379,7 @@ export const useMapStore = create<MapState>()((set, get) => ({
       mapAssets: nextAssets,
       mapRegions: state.mapRegions.filter((region) => region.assetId !== id),
       mapReferences: state.mapReferences.filter((reference) => reference.assetId !== id),
+      tractFeatures: state.tractFeatures.filter((feature) => feature.assetId !== id),
     });
   },
 

@@ -327,7 +327,7 @@ export function buildDocumentRegistryRows(input: {
     .sort((a, b) => docDateValue(b.document).localeCompare(docDateValue(a.document)));
 }
 
-function rowMatchesView(row: DocumentRegistryRow, view: DocumentRegistryViewId) {
+export function rowMatchesView(row: DocumentRegistryRow, view: DocumentRegistryViewId) {
   if (view === 'all') return true;
   if (view === 'unlinked') return row.linkedEntities.length === 0;
   if (view === 'missing_metadata') return row.missingMetadata.length > 0;

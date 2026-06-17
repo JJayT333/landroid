@@ -25,6 +25,12 @@ import { useState } from 'react';
 import { ArrowDownIcon, ArrowUpIcon } from '../shell/icons';
 import { useWorkspaceStore } from '../../store/workspace-store';
 import { assertFileSize, FILE_SIZE_LIMITS } from '../../utils/file-validation';
+import {
+  hasDuplicates,
+  inspectFileForDuplicates,
+  type DuplicateInspection,
+} from '../../documents/duplicate-guard';
+import DuplicateWarningPanel from './DuplicateWarningPanel';
 import type { NodeAttachmentSummary, OwnershipNode } from '../../types/node';
 
 export interface AttachmentsSectionProps {
@@ -36,6 +42,7 @@ export default function AttachmentsSection({
   node,
   onViewDoc,
 }: AttachmentsSectionProps) {
+  const workspaceId = useWorkspaceStore((s) => s.workspaceId);
   const attachDocToNode = useWorkspaceStore((s) => s.attachDocToNode);
   const detachDocFromNode = useWorkspaceStore((s) => s.detachDocFromNode);
   const renameDocOnNode = useWorkspaceStore((s) => s.renameDocOnNode);
@@ -47,8 +54,17 @@ export default function AttachmentsSection({
   const [pending, setPending] = useState(false);
   /** Per-attachment in-flight rename input (keyed by attachmentId). */
   const [renameDraft, setRenameDraft] = useState<Record<string, string>>({});
+  /**
+   * A picked file whose bytes already exist in the workspace. We never attach
+   * (or skip) automatically — we hold the file here and let the user choose.
+   */
+  const [pendingDuplicate, setPendingDuplicate] = useState<{
+    file: File;
+    inspection: DuplicateInspection;
+  } | null>(null);
 
-  async function handleAdd(file: File): Promise<void> {
+  /** Attach a file straight away (already validated / duplicate-cleared). */
+  async function attachNow(file: File): Promise<void> {
     setError(null);
     setPending(true);
     try {
@@ -63,6 +79,44 @@ export default function AttachmentsSection({
     } finally {
       setPending(false);
     }
+  }
+
+  /**
+   * A file was picked: validate size, check for byte-identical duplicates, and
+   * either warn-and-wait (duplicate) or attach (clean). Nothing is automatic.
+   */
+  async function handleSelect(file: File): Promise<void> {
+    setError(null);
+    setPendingDuplicate(null);
+    setPending(true);
+    try {
+      assertFileSize(file, FILE_SIZE_LIMITS.PDF, 'PDF');
+      const inspection = await inspectFileForDuplicates(workspaceId, file);
+      if (hasDuplicates(inspection)) {
+        setPendingDuplicate({ file, inspection });
+        return;
+      }
+      await attachDocToNode(node.id, file);
+    } catch (uploadError) {
+      setError(
+        uploadError instanceof Error
+          ? uploadError.message
+          : 'PDF attachment failed. Please try again.'
+      );
+    } finally {
+      setPending(false);
+    }
+  }
+
+  async function confirmPendingAttach(): Promise<void> {
+    if (!pendingDuplicate) return;
+    const { file } = pendingDuplicate;
+    setPendingDuplicate(null);
+    await attachNow(file);
+  }
+
+  function cancelPendingAttach(): void {
+    setPendingDuplicate(null);
   }
 
   async function handleRename(
@@ -233,6 +287,16 @@ export default function AttachmentsSection({
         </ul>
       )}
 
+      {pendingDuplicate && (
+        <DuplicateWarningPanel
+          candidateName={pendingDuplicate.file.name}
+          matches={pendingDuplicate.inspection.matches}
+          onConfirm={confirmPendingAttach}
+          onCancel={cancelPendingAttach}
+          disabled={pending}
+        />
+      )}
+
       <label className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-ledger-line bg-parchment px-2 py-1 text-xs font-semibold text-leather hover:bg-leather/5">
         <input
           type="file"
@@ -242,11 +306,11 @@ export default function AttachmentsSection({
           onChange={async (event) => {
             const file = event.target.files?.[0];
             if (!file) return;
-            await handleAdd(file);
+            await handleSelect(file);
             event.target.value = '';
           }}
         />
-        {pending ? 'Attaching…' : '+ Attach PDF'}
+        {pending ? 'Checking…' : '+ Attach PDF'}
       </label>
     </div>
   );
