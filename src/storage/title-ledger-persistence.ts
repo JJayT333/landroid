@@ -6,6 +6,8 @@ import {
 } from '../backend-spine/contracts';
 import { activeDbKey, storageScopedId } from './db-key-scope';
 import db from './db';
+import { canonicalJson } from '../project-records/action-layer/canonical-json';
+import { sha256HexOfText } from '../project-records/record-helpers';
 import {
   assertWorkspaceWriteFence,
   ensureWorkspaceWritable,
@@ -195,16 +197,22 @@ export async function quarantineTitleLedgerRows(input: {
   quarantinedAt: string;
 }): Promise<StoredTitleLedgerQuarantine> {
   const dbKey = activeDbKey();
-  // Content-address the quarantine id on the chain's head hash (an append-only
-  // hash chain's head commits its whole history), NOT the wall-clock: a read-only
-  // tab that re-quarantines the SAME invalid chain on every reload then re-`put`s
-  // the same id (idempotent) instead of appending a duplicate row each time.
-  const headMarker =
-    input.rows.auditEvents.at(-1)?.eventHash
-    ?? `n${input.rows.actionRecords.length}`;
+  // Content-address the quarantine id on a hash of the FULL rejected row set + its
+  // source — NOT the wall-clock, and NOT the (untrusted, possibly-forged) head
+  // event hash. So the SAME invalid chain re-quarantined (e.g. a read-only tab on
+  // each reload) re-`put`s the same id (idempotent, no duplicate-row growth),
+  // while DISTINCT invalid chains get distinct ids and never overwrite each
+  // other's evidence — even when they share a head hash or carry no audit events.
+  const contentHash = await sha256HexOfText(
+    canonicalJson({
+      source: input.source,
+      actionRecords: input.rows.actionRecords,
+      auditEvents: input.rows.auditEvents,
+    })
+  );
   const record: StoredTitleLedgerQuarantine = {
     id: titleLedgerStorageId(
-      `${input.workspaceId}::quarantine::${headMarker}`,
+      `${input.workspaceId}::quarantine::${input.source}::${contentHash}`,
       dbKey
     ),
     dbKey,

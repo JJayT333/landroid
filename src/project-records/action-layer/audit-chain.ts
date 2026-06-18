@@ -207,10 +207,14 @@ export interface ActionPayloadVerification {
  * audit events committed about it. Run AFTER `verifyAuditChain` confirms the
  * event bodies are intact — only then are the committed values trustworthy.
  * `subjectRecordIds[0]` is the action record's id by construction (see
- * `recordTitleMutation` and `undoActionRecord`). Three bindings, because replay
- * consumes BOTH the `result` payload AND two envelope fields the result hash
- * deliberately excludes (so undo can rewrite them in place):
+ * `recordTitleMutation` and `undoActionRecord`). A record↔applied-event
+ * **bijection** (0) plus three payload bindings — because replay consumes EVERY
+ * action record AND two envelope fields the result hash deliberately excludes
+ * (so undo can rewrite them in place):
  *
+ *  0. bijection         — every applied event binds a DISTINCT action record and
+ *     every action record is bound by one; an unbound record would be replayed
+ *     verbatim with no committed hash to check it.
  *  1. `result` payload  — recompute `actionHash` and compare (the recordEffects /
  *     titleNodeSnapshots replay applies).
  *  2. `actionKind`      — must equal the `commandKind` committed in the paired
@@ -242,6 +246,21 @@ export async function verifyActionPayloadHashes(
       (event.details as { reverts?: unknown }).reverts ?? event.subjectRecordIds[0];
     if (typeof reverted === 'string') undoneByEvent.add(reverted);
   }
+  // A dangling undo — reverting a record that is not present — would let the (3)
+  // status check pass silently (it iterates only the records that ARE present).
+  // Every reverted id must resolve to a real action record.
+  for (const revertedId of undoneByEvent) {
+    if (!recordById.has(revertedId)) {
+      return {
+        valid: false,
+        brokenRecordId: revertedId,
+        reason:
+          'undo audit event reverts an action record that is not present '
+          + '(dangling undo reference)',
+        legacyCount: 0,
+      };
+    }
+  }
 
   // A genuine legacy (pre-DA-H5) chain commits NO `actionHash` / `commandKind` on
   // ANY applied event. A chain where SOME applied events carry the binding but
@@ -262,6 +281,12 @@ export async function verifyActionPayloadHashes(
   );
 
   let legacyCount = 0;
+  // (0) Bijection — every applied event binds a DISTINCT action record, and (after
+  // the loop) every action record is bound. Replay (`parseTitleActions`) consumes
+  // every action record regardless of its event binding, so without this an
+  // attacker can point two applied events at one record and smuggle a second,
+  // UNBOUND forged record past the hash checks (the count guard alone passes it).
+  const boundRecordIds = new Set<string>();
   for (const event of appliedEvents) {
     const actionRecordId = event.subjectRecordIds[0];
     const record = actionRecordId ? recordById.get(actionRecordId) : undefined;
@@ -273,6 +298,17 @@ export async function verifyActionPayloadHashes(
         legacyCount,
       };
     }
+    if (boundRecordIds.has(record.recordId)) {
+      return {
+        valid: false,
+        brokenRecordId: record.recordId,
+        reason:
+          'multiple applied audit events bind a single action record '
+          + '(non-bijective chain)',
+        legacyCount,
+      };
+    }
+    boundRecordIds.add(record.recordId);
     // (2) actionKind binding — the field replay feeds as the command kind.
     const committedKind = (event.details as { commandKind?: unknown }).commandKind;
     if (typeof committedKind === 'string') {
@@ -321,6 +357,22 @@ export async function verifyActionPayloadHashes(
       };
     } else {
       legacyCount += 1;
+    }
+  }
+
+  // (0, cont.) Every action record must have been bound by an applied event
+  // above. An unbound record (no applied event ⇒ no committed hash) would be
+  // replayed verbatim — the smuggled-forgery path.
+  for (const record of actionRecords) {
+    if (!boundRecordIds.has(record.recordId)) {
+      return {
+        valid: false,
+        brokenRecordId: record.recordId,
+        reason:
+          'action record has no applied audit event binding it '
+          + '(unbound record replay would consume)',
+        legacyCount,
+      };
     }
   }
 

@@ -963,12 +963,11 @@ describe('workspace-persistence', () => {
     expect(imported.nodes).toHaveLength(1);
     expect(imported.actionLedger).toBeUndefined();
     expect(warn).toHaveBeenCalledWith(
-      expect.stringContaining('Dropping invalid actionLedger')
+      expect.stringContaining('Dropping unparseable actionLedger')
     );
   });
 
-  it('drops a chain-broken v9 action ledger and still returns the snapshot', async () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+  it('RETAINS a chain-broken v9 action ledger for the hydrate layer to quarantine (DA-H4)', async () => {
     const ledger = await buildSyntheticTitleLedger();
     const blob = await exportLandroidFile(titleLandroidData(), ledger);
     const payload = JSON.parse(await blob.text());
@@ -985,10 +984,15 @@ describe('workspace-persistence', () => {
 
     const imported = await importLandroidFile(file);
 
+    // The snapshot still loads cleanly...
     expect(imported.projectName).toBe(titleImportSafeWorkspace().projectName);
     expect(imported.nodes).toEqual(titleImportSafeWorkspace().nodes);
-    expect(imported.actionLedger).toBeUndefined();
-    expect(warn).toHaveBeenCalledWith(expect.stringContaining('audit chain failed'));
+    // ...and the parseable-but-invalid ledger is now PRESERVED on import (not
+    // silently dropped), so the hydrate layer verifies + quarantines it as tamper
+    // evidence rather than baselining over it. Verification moved off the import
+    // path into `verifyTitleLedgerRows`.
+    expect(imported.actionLedger).toBeDefined();
+    expect(imported.actionLedger?.records.length).toBeGreaterThan(0);
   });
 
   it('keeps backward compatibility when older files omit canvas state', async () => {

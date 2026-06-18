@@ -410,4 +410,38 @@ describe('title ledger persistence', () => {
     expect([...db.titleLedgerQuarantine.rows.values()]).toHaveLength(1);
     expect(await persistence.listTitleLedgerQuarantine('ws-1')).toHaveLength(1);
   });
+
+  it('keeps DISTINCT invalid chains separate — different content yields different ids, no overwrite (DA-H4)', async () => {
+    const { persistence, db } = await loadTitleLedgerPersistence({
+      workspaceKey: 'user-alice',
+    });
+
+    // Two genuinely different rejected chains captured into the same workspace.
+    // The content-addressed id must not collapse them (which would overwrite and
+    // lose one chain's evidence).
+    const a = await persistence.quarantineTitleLedgerRows({
+      workspaceId: 'ws-1',
+      rows: {
+        actionRecords: [fakeActionRecord({ recordId: 'bad-a' })],
+        auditEvents: [fakeAuditEventRecord({ recordId: 'evt-a' })],
+      },
+      reason: 'chain A failed',
+      source: 'storage',
+      quarantinedAt: NOW,
+    });
+    const b = await persistence.quarantineTitleLedgerRows({
+      workspaceId: 'ws-1',
+      rows: {
+        actionRecords: [fakeActionRecord({ recordId: 'bad-b' })],
+        auditEvents: [fakeAuditEventRecord({ recordId: 'evt-b' })],
+      },
+      reason: 'chain B failed',
+      source: 'storage',
+      quarantinedAt: NOW,
+    });
+
+    expect(b.id).not.toBe(a.id);
+    expect([...db.titleLedgerQuarantine.rows.values()]).toHaveLength(2);
+    expect(await persistence.listTitleLedgerQuarantine('ws-1')).toHaveLength(2);
+  });
 });

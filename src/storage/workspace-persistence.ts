@@ -106,10 +106,6 @@ import {
   assertActionLayerExportAllowed,
 } from '../project-records/action-layer/persistence';
 import {
-  verifyActionPayloadHashes,
-  verifyAuditChain,
-} from '../project-records/action-layer/audit-chain';
-import {
   buildProjectRecordBundle,
   ProjectRecordBundleSchema,
   type ProjectRecordBundle,
@@ -1550,66 +1546,37 @@ async function serializeResearchData(
   };
 }
 
-function ledgerWarningReason(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
-
 async function validateImportedActionLedger(
   raw: unknown
 ): Promise<ProjectRecordBundle | undefined> {
   const parsed = ProjectRecordBundleSchema.safeParse(raw);
   if (!parsed.success) {
     console.warn(
-      `[landroid] Dropping invalid actionLedger: ${parsed.error.message}`
+      `[landroid] Dropping unparseable actionLedger: ${parsed.error.message}`
     );
     return undefined;
   }
 
   const nonLedgerRecord = parsed.data.records.find(
-    (record) => record.recordType !== 'action_record' && record.recordType !== 'audit_event'
+    (record) =>
+      record.recordType !== 'action_record' && record.recordType !== 'audit_event'
   );
   if (nonLedgerRecord) {
     console.warn(
-      `[landroid] Dropping invalid actionLedger: record ${nonLedgerRecord.recordId} ` +
-        `has non-ledger type ${nonLedgerRecord.recordType}.`
+      `[landroid] Dropping actionLedger with a non-ledger record `
+        + `${nonLedgerRecord.recordId} (type ${nonLedgerRecord.recordType}).`
     );
     return undefined;
   }
 
-  const auditEvents = parsed.data.records.filter(
-    (record): record is AuditEventRecord => record.recordType === 'audit_event'
-  );
-  const actionRecords = parsed.data.records.filter(
-    (record): record is ActionRecord => record.recordType === 'action_record'
-  );
-  try {
-    const verification = await verifyAuditChain(auditEvents);
-    if (!verification.valid) {
-      console.warn(
-        `[landroid] Dropping invalid actionLedger: audit chain failed at index ` +
-          `${verification.brokenAtIndex} (${verification.reason}).`
-      );
-      return undefined;
-    }
-    // DA-H5: with the event chain proven intact, reject a file whose ActionRecord
-    // payloads were edited out from under the committed hashes (the forgery the
-    // event-body chain alone misses). Pre-DA-H5 files carry no committed hashes;
-    // they verify clean and are accepted as legacy.
-    const payload = await verifyActionPayloadHashes(actionRecords, auditEvents);
-    if (!payload.valid) {
-      console.warn(
-        `[landroid] Dropping invalid actionLedger: action payload hash mismatch for ` +
-          `record ${payload.brokenRecordId} (${payload.reason}).`
-      );
-      return undefined;
-    }
-  } catch (error) {
-    console.warn(
-      `[landroid] Dropping invalid actionLedger: ${ledgerWarningReason(error)}`
-    );
-    return undefined;
-  }
-
+  // Structural validation ONLY. Integrity (audit chain + payload hashes +
+  // record↔event bijection) is verified by the hydrate layer
+  // (`verifyTitleLedgerRows` → `hydrateTitleActionLogFromImportedLedger`), which
+  // QUARANTINES a parseable-but-invalid ledger as tamper evidence (DA-H4).
+  // Verifying-and-dropping HERE would hand the hydrate layer `undefined`, so it
+  // would baseline fresh and ERASE exactly the evidence the import is meant to
+  // preserve. Return the parseable bundle intact and let hydrate decide
+  // apply-vs-quarantine.
   return parsed.data;
 }
 

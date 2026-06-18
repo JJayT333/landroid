@@ -405,6 +405,50 @@ describe('DA-H5 action payload hashing', () => {
     expect(verdict.reason).toMatch(/commandKind binding.*mixed-chain downgrade/);
   });
 
+  it('rejects a non-bijective chain: two applied events bind one record, smuggling an unbound forged record', async () => {
+    const r1 = actionRecord('action-record-1', 'one');
+    const r2 = actionRecord('action-record-2', 'two'); // smuggled, no event binds it
+    // Both applied events point at r1 (properly hashed for r1); r2 rides in with
+    // no applied event. Count is 2 records / 2 applied events / 0 undone — the
+    // count guard alone would pass this; the bijection guard must not.
+    const auditEvents = await buildAuditChain({
+      context,
+      drafts: [
+        await appliedEvent('audit-1', r1.recordId, {
+          commandKind: r1.actionKind,
+          actionHash: await computeActionRecordHash(r1),
+        }),
+        await appliedEvent('audit-2', r1.recordId, {
+          commandKind: r1.actionKind,
+          actionHash: await computeActionRecordHash(r1),
+        }),
+      ],
+    });
+    expect((await verifyAuditChain(auditEvents)).valid).toBe(true); // event chain self-consistent
+
+    const verdict = await verifyActionPayloadHashes([r1, r2], auditEvents);
+    expect(verdict.valid).toBe(false);
+    expect(verdict.reason).toMatch(/non-bijective chain/);
+  });
+
+  it('rejects an action record with no applied event binding it (unbound record)', async () => {
+    const { actionRecords, auditEvents } = await hashedRows(); // r1, r2 each bound
+    const unbound = actionRecord('action-record-3', 'three'); // no applied event
+    const verdict = await verifyActionPayloadHashes([...actionRecords, unbound], auditEvents);
+    expect(verdict.valid).toBe(false);
+    expect(verdict.brokenRecordId).toBe('action-record-3');
+    expect(verdict.reason).toMatch(/no applied audit event binding it/);
+  });
+
+  it('rejects a dangling undo event that reverts a record not present', async () => {
+    const { actionRecords, auditEvents } = await hashedRows();
+    const events = await withUndoEvent('action-record-ghost', auditEvents);
+    const verdict = await verifyActionPayloadHashes(actionRecords, events);
+    expect(verdict.valid).toBe(false);
+    expect(verdict.brokenRecordId).toBe('action-record-ghost');
+    expect(verdict.reason).toMatch(/dangling undo reference/);
+  });
+
   it('actionHash is stable across a JSON export/import round-trip (no false-positive quarantine)', async () => {
     // The inverse of the tamper risk: a legitimate `.landroid` export→import must
     // not perturb canonicalJson(result) and wrongly reject a valid chain. Uses a
