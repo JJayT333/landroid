@@ -42,7 +42,10 @@ import {
   removeExternalRef,
   upsertExternalRef,
 } from '../maps/feature-tract-matcher';
-import type { MapTractFeature } from '../types/map-tract-feature';
+import {
+  normalizeMapTractFeature,
+  type MapTractFeature,
+} from '../types/map-tract-feature';
 
 export interface GeoJsonIngestResult {
   assetId: string;
@@ -294,6 +297,10 @@ export const useMapStore = create<MapState>()((set, get) => ({
       mapReferences: data.mapReferences.map((reference) =>
         normalizeMapExternalReference({ ...reference, workspaceId })
       ),
+      // `?? []` tolerates pre-DA2-M `.landroid` files without tractFeatures.
+      tractFeatures: (data.tractFeatures ?? []).map((feature) =>
+        normalizeMapTractFeature({ ...feature, workspaceId })
+      ),
     };
     await replaceMapWorkspaceData(workspaceId, normalizedData);
     set({
@@ -301,19 +308,21 @@ export const useMapStore = create<MapState>()((set, get) => ({
       mapAssets: normalizedData.mapAssets.map(toMapAssetMeta),
       mapRegions: normalizedData.mapRegions,
       mapReferences: normalizedData.mapReferences,
+      tractFeatures: normalizedData.tractFeatures,
       _hydrated: true,
     });
   },
 
   exportWorkspaceData: async () => {
-    const { workspaceId, mapRegions, mapReferences } = get();
+    const { workspaceId, mapRegions, mapReferences, tractFeatures } = get();
     // Re-read blob-bearing assets from Dexie: the in-memory store holds
     // metadata only, but `.landroid` export and the AI undo snapshot must
-    // carry the file bytes.
+    // carry the file bytes. tractFeatures hold no blobs, so the in-memory copy
+    // is complete.
     const mapAssets = workspaceId
       ? await loadMapAssetsWithBlobs(workspaceId)
       : [];
-    return { mapAssets, mapRegions, mapReferences };
+    return { mapAssets, mapRegions, mapReferences, tractFeatures };
   },
 
   addAsset: async (asset) => {

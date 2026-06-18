@@ -20,11 +20,21 @@ import {
   type MapExternalReference,
   type MapRegion,
 } from '../types/map';
+import {
+  normalizeMapTractFeature,
+  type MapTractFeature,
+} from '../types/map-tract-feature';
 
 export interface MapWorkspaceData {
   mapAssets: MapAsset[];
   mapRegions: MapRegion[];
   mapReferences: MapExternalReference[];
+  /**
+   * DA2-M: parsed GeoJSON tract polygons + their DeskMap matches. Carried in the
+   * `.landroid` export so a round-trip preserves them. Optional on the wire for
+   * back-compat with pre-DA2-M files (read as []).
+   */
+  tractFeatures: MapTractFeature[];
 }
 
 /** Project-open shape: map assets carry metadata only, never the file blob. */
@@ -63,10 +73,11 @@ async function getMapReferenceRow(id: string) {
 export async function loadMapWorkspaceData(
   workspaceId: string
 ): Promise<MapWorkspaceData> {
-  const [mapAssets, mapRegions, mapReferences] = await Promise.all([
+  const [mapAssets, mapRegions, mapReferences, tractFeatures] = await Promise.all([
     db.mapAssets.where('[dbKey+workspaceId]').equals(activeWorkspaceScope(workspaceId)).toArray(),
     db.mapRegions.where('[dbKey+workspaceId]').equals(activeWorkspaceScope(workspaceId)).toArray(),
     db.mapExternalReferences.where('[dbKey+workspaceId]').equals(activeWorkspaceScope(workspaceId)).toArray(),
+    db.mapTractFeatures.where('[dbKey+workspaceId]').equals(activeWorkspaceScope(workspaceId)).toArray(),
   ]);
 
   return {
@@ -74,6 +85,9 @@ export async function loadMapWorkspaceData(
     mapRegions: mapRegions.map((region) => normalizeMapRegion(stripStoredId(region))),
     mapReferences: mapReferences.map((reference) =>
       normalizeMapExternalReference(stripStoredId(reference))
+    ),
+    tractFeatures: tractFeatures.map((feature) =>
+      normalizeMapTractFeature(stripStoredId(feature))
     ),
   };
 }
@@ -130,16 +144,20 @@ export async function replaceMapWorkspaceData(
   await ensureWorkspaceWriteFence(workspaceId);
   await db.transaction(
     'rw',
-    db.workspaceWriteLeases,
-    db.mapAssets,
-    db.mapRegions,
-    db.mapExternalReferences,
+    [
+      db.workspaceWriteLeases,
+      db.mapAssets,
+      db.mapRegions,
+      db.mapExternalReferences,
+      db.mapTractFeatures,
+    ],
     async () => {
       await assertWorkspaceWriteFence(workspaceId);
       await Promise.all([
         db.mapAssets.where('[dbKey+workspaceId]').equals(activeWorkspaceScope(workspaceId)).delete(),
         db.mapRegions.where('[dbKey+workspaceId]').equals(activeWorkspaceScope(workspaceId)).delete(),
         db.mapExternalReferences.where('[dbKey+workspaceId]').equals(activeWorkspaceScope(workspaceId)).delete(),
+        db.mapTractFeatures.where('[dbKey+workspaceId]').equals(activeWorkspaceScope(workspaceId)).delete(),
       ]);
 
       if (data.mapAssets.length > 0) {
@@ -169,6 +187,19 @@ export async function replaceMapWorkspaceData(
           data.mapReferences.map((reference) =>
             stampActiveDbKeyWithStorageId(
               normalizeMapExternalReference({ ...reference, workspaceId }),
+              'id'
+            )
+          )
+        );
+      }
+
+      // `?? []` tolerates pre-DA2-M `.landroid` files that carry no tractFeatures.
+      const tractFeatures = data.tractFeatures ?? [];
+      if (tractFeatures.length > 0) {
+        await db.mapTractFeatures.bulkPut(
+          tractFeatures.map((feature) =>
+            stampActiveDbKeyWithStorageId(
+              normalizeMapTractFeature({ ...feature, workspaceId }),
               'id'
             )
           )

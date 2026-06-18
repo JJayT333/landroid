@@ -192,6 +192,7 @@ async function fixtureInput() {
     mapAssets: [mapAsset],
     mapRegions: [],
     mapReferences: [],
+    tractFeatures: [],
   };
   const researchData: ResearchWorkspaceData = {
     imports: [researchImport],
