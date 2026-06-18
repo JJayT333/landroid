@@ -68,6 +68,10 @@ import {
   type MapRegion,
 } from '../types/map';
 import {
+  normalizeMapTractFeature,
+  type MapTractFeature,
+} from '../types/map-tract-feature';
+import {
   normalizeResearchFormula,
   normalizeResearchProjectRecord,
   normalizeResearchQuestion,
@@ -1425,6 +1429,7 @@ async function serializeMapData(
       mapAssets: SerializedMapAsset[];
       mapRegions: SerializedMapRegion[];
       mapReferences: SerializedMapExternalReference[];
+      tractFeatures: MapTractFeature[];
     }
 > {
   if (!mapData) return undefined;
@@ -1438,6 +1443,8 @@ async function serializeMapData(
     ),
     mapRegions: mapData.mapRegions,
     mapReferences: mapData.mapReferences,
+    // No blobs — the GeoJSON tract polygons round-trip as plain JSON.
+    tractFeatures: mapData.tractFeatures,
   };
 }
 
@@ -1994,8 +2001,28 @@ export async function importLandroidFile(file: File): Promise<LandroidFileData> 
                   })
                 )
             : [],
+          tractFeatures: Array.isArray(parsed.mapData.tractFeatures)
+            ? parsed.mapData.tractFeatures
+                .filter(
+                  (feature): feature is Record<string, unknown> & { id: string; assetId: string } =>
+                    isRecord(feature)
+                    && typeof feature.id === 'string'
+                    && typeof feature.assetId === 'string'
+                )
+                .map((feature) =>
+                  normalizeMapTractFeature({
+                    ...(feature as Partial<MapTractFeature>),
+                    id: feature.id,
+                    assetId: feature.assetId,
+                    workspaceId:
+                      typeof feature.workspaceId === 'string'
+                        ? feature.workspaceId
+                        : workspaceId,
+                  })
+                )
+            : [],
         }
-      : { mapAssets: [], mapRegions: [], mapReferences: [] };
+      : { mapAssets: [], mapRegions: [], mapReferences: [], tractFeatures: [] };
 
   const researchImports =
     isRecord(parsed.researchData) && Array.isArray(parsed.researchData.imports)

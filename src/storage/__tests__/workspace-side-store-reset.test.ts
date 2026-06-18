@@ -131,7 +131,7 @@ function emptyDocumentData() {
 }
 
 function emptyMapData() {
-  return { mapAssets: [], mapRegions: [], mapReferences: [] };
+  return { mapAssets: [], mapRegions: [], mapReferences: [], tractFeatures: [] };
 }
 
 function emptyResearchData() {

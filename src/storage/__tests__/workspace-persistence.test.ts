@@ -5,6 +5,7 @@ import {
   createBlankMapExternalReference,
   createBlankMapRegion,
 } from '../../types/map';
+import { normalizeMapTractFeature } from '../../types/map-tract-feature';
 import { createBlankLease, createBlankOwner, createBlankOwnerDoc } from '../../types/owner';
 import { createBlankLeasePurchaseReport } from '../../types/lease-purchase-report';
 import { createBlankNode } from '../../types/node';
@@ -112,6 +113,16 @@ function buildWorkspace(canvas: CanvasSaveData | null): LandroidFileData {
     regionId: mapRegion.id,
     label: 'RRC GIS',
     url: 'https://example.com/rrc',
+  });
+  const mapTractFeature = normalizeMapTractFeature({
+    id: 'feat-1',
+    workspaceId: 'ws-1',
+    assetId: mapAsset.id,
+    tractKey: 'T-1',
+    acres: 110,
+    matchedDeskMapId: 'dm-1',
+    polygons: [{ outer: [[-95, 30], [-94, 30], [-94, 31]], holes: [] }],
+    bbox: [-95, 30, -94, 31],
   });
   const researchImport = createBlankResearchImport(
     'ws-1',
@@ -377,6 +388,7 @@ function buildWorkspace(canvas: CanvasSaveData | null): LandroidFileData {
       mapAssets: [mapAsset],
       mapRegions: [mapRegion],
       mapReferences: [mapReference],
+      tractFeatures: [mapTractFeature],
     },
     researchData: {
       imports: [researchImport],
@@ -664,6 +676,16 @@ describe('workspace-persistence', () => {
     expect(imported.mapData?.mapRegions[0]?.title).toBe('North Tract');
     expect(imported.mapData?.mapRegions[0]?.linkedOwnerId).toBe('owner-1');
     expect(imported.mapData?.mapReferences[0]?.label).toBe('RRC GIS');
+    // DA2-M round-trip fix: parsed GeoJSON tract polygons + their DeskMap match
+    // survive .landroid export → import (previously dropped).
+    expect(imported.mapData?.tractFeatures).toHaveLength(1);
+    expect(imported.mapData?.tractFeatures[0]?.tractKey).toBe('T-1');
+    expect(imported.mapData?.tractFeatures[0]?.matchedDeskMapId).toBe('dm-1');
+    expect(imported.mapData?.tractFeatures[0]?.polygons[0]?.outer).toEqual([
+      [-95, 30],
+      [-94, 30],
+      [-94, 31],
+    ]);
     expect(imported.researchData?.imports[0]?.datasetId).toBe(
       'production-data-query-dump'
     );
@@ -1019,6 +1041,7 @@ describe('workspace-persistence', () => {
       mapAssets: [],
       mapRegions: [],
       mapReferences: [],
+      tractFeatures: [],
     });
     expect(imported.researchData).toEqual({
       imports: [],

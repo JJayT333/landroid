@@ -39,6 +39,7 @@ const EMPTY_MAP_DATA: MapWorkspaceData = {
   mapAssets: [],
   mapRegions: [],
   mapReferences: [],
+  tractFeatures: [],
 };
 
 const EMPTY_RESEARCH_DATA: ResearchWorkspaceData = {
