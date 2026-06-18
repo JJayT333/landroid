@@ -1,4 +1,5 @@
 import type { ActionPlanRecord } from '../../backend-spine/contracts';
+import { withMutationOrigin } from '../../store/workspace-store';
 import {
   approveImportSessionCandidates,
   type ImportApprovalDraft,
@@ -65,10 +66,16 @@ export async function applyApprovedStagedImportActionPlan(input: {
 
   const appliedRows: AppliedStagedImportRow[] = [];
   for (const mutation of mutations) {
-    const ok = input.actions.createRootNode(
-      mutation.nodeId,
-      mutation.fraction,
-      mutation.form
+    // DA-M3: staged-import applies are `import`-origin in the durable ledger.
+    // `createRootNode` runs the title journal hook synchronously, so the origin
+    // scope wraps exactly the recording call (no `aiToolName` — import is not an
+    // AI tool and must not engage the AI gate).
+    const ok = withMutationOrigin('import', () =>
+      input.actions.createRootNode(
+        mutation.nodeId,
+        mutation.fraction,
+        mutation.form
+      )
     );
     if (!ok) {
       throw new Error(

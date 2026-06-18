@@ -1,17 +1,23 @@
 import { describe, expect, it } from 'vitest';
-import type { AuditEventRecord } from '../../backend-spine/contracts';
+import {
+  ActionRecordSchema,
+  type ActionRecord,
+  type AuditEventRecord,
+} from '../../backend-spine/contracts';
 import {
   AUDIT_GENESIS_HASH,
   appendAuditEvent,
   auditChainHead,
   buildAuditChain,
+  computeActionRecordHash,
   computeAuditEventHash,
   computeAuditGenesisHash,
+  verifyActionPayloadHashes,
   verifyAuditChain,
   type AuditEventDraft,
 } from '../action-layer';
 import type { RecordBuildContext } from '../record-helpers';
-import { NOW } from './action-layer-fixtures';
+import { envelope, HASH, NOW } from './action-layer-fixtures';
 
 const context: RecordBuildContext = {
   workspaceId: 'ws-1',
@@ -170,5 +176,306 @@ describe('Phase 4 audit hash chain', () => {
       },
     });
     expect((await verifyAuditChain([...events, next])).valid).toBe(true);
+  });
+});
+
+function actionRecord(id: string, summary: string): ActionRecord {
+  return ActionRecordSchema.parse({
+    ...envelope('action_record', id),
+    actionKind: 'title.convey',
+    status: 'applied',
+    approvedBy: 'user',
+    appliedAt: NOW,
+    result: { commandId: `cmd-${id}`, surface: 'title_tree', mutation: 'convey', summary },
+  });
+}
+
+async function appliedEvent(
+  recordId: string,
+  actionRecordId: string,
+  details: Record<string, unknown>
+): Promise<AuditEventDraft> {
+  return {
+    recordId,
+    eventKind: 'action_record.applied',
+    actorKind: 'user',
+    occurredAt: NOW,
+    subjectRecordIds: [actionRecordId],
+    details,
+  };
+}
+
+describe('DA-H5 action payload hashing', () => {
+  async function hashedRows(): Promise<{
+    actionRecords: ActionRecord[];
+    auditEvents: AuditEventRecord[];
+  }> {
+    const r1 = actionRecord('action-record-1', 'one');
+    const r2 = actionRecord('action-record-2', 'two');
+    const auditEvents = await buildAuditChain({
+      context,
+      drafts: [
+        await appliedEvent('audit-1', r1.recordId, {
+          commandKind: r1.actionKind,
+          actionHash: await computeActionRecordHash(r1),
+        }),
+        await appliedEvent('audit-2', r2.recordId, {
+          commandKind: r2.actionKind,
+          actionHash: await computeActionRecordHash(r2),
+        }),
+      ],
+    });
+    return { actionRecords: [r1, r2], auditEvents };
+  }
+
+  // Append an `action_record.undone` event (as the DA-H2 undo write path does)
+  // that reverts `recordId`, chained off the existing head.
+  async function withUndoEvent(
+    recordId: string,
+    auditEvents: AuditEventRecord[]
+  ): Promise<AuditEventRecord[]> {
+    const [undone] = await buildAuditChain({
+      context,
+      priorHeadHash: auditEvents.at(-1)?.eventHash,
+      drafts: [
+        {
+          recordId: `audit-undone-${recordId}`,
+          eventKind: 'action_record.undone',
+          actorKind: 'user',
+          occurredAt: NOW,
+          subjectRecordIds: [recordId],
+          details: { reverts: recordId, actionKind: 'title.convey' },
+        },
+      ],
+    });
+    return [...auditEvents, undone];
+  }
+
+  function markUndone(record: ActionRecord): ActionRecord {
+    return ActionRecordSchema.parse({
+      ...record,
+      status: 'undone',
+      revision: record.revision + 1,
+      lastModified: '2026-06-02T00:00:00.000Z',
+    });
+  }
+
+  it('verifies clean payloads with no legacy events', async () => {
+    const { actionRecords, auditEvents } = await hashedRows();
+    expect(await verifyActionPayloadHashes(actionRecords, auditEvents)).toEqual({
+      valid: true,
+      brokenRecordId: null,
+      reason: null,
+      legacyCount: 0,
+    });
+  });
+
+  it('rejects a tampered ActionRecord payload the event-body chain alone misses', async () => {
+    const { actionRecords, auditEvents } = await hashedRows();
+    // Edit the payload that replay consumes; leave the (already-valid) event
+    // chain untouched, exactly as a Dexie/`.landroid` edit would.
+    const tampered = actionRecords.map((record) =>
+      record.recordId === 'action-record-1'
+        ? { ...record, result: { ...record.result, summary: 'forged' } }
+        : record
+    );
+
+    // The event-body chain still verifies — this is the gap DA-H5 closes.
+    expect((await verifyAuditChain(auditEvents)).valid).toBe(true);
+
+    const verdict = await verifyActionPayloadHashes(tampered, auditEvents);
+    expect(verdict.valid).toBe(false);
+    expect(verdict.brokenRecordId).toBe('action-record-1');
+    expect(verdict.reason).toMatch(/payload was altered/);
+  });
+
+  it('keeps verifying a record undone in place WITH its backing undo event (DA-H2)', async () => {
+    const { actionRecords, auditEvents } = await hashedRows();
+    // A legitimate DA-H2 undo: status/revision rewritten in place (result intact)
+    // AND a matching action_record.undone event appended.
+    const records = actionRecords.map((record) =>
+      record.recordId === 'action-record-1' ? markUndone(record) : record
+    );
+    const events = await withUndoEvent('action-record-1', auditEvents);
+    expect((await verifyActionPayloadHashes(records, events)).valid).toBe(true);
+  });
+
+  it('rejects a bare status flip with no backing undo event (DA-H5/F1 drop forgery)', async () => {
+    const { actionRecords, auditEvents } = await hashedRows();
+    // The attack the result-only hash misses: flip status to `undone` so replay
+    // silently DROPS the mutation, without adding any undo event. `result` is
+    // untouched, so the payload hash and the event chain both still verify.
+    const forged = actionRecords.map((record) =>
+      record.recordId === 'action-record-1' ? markUndone(record) : record
+    );
+    expect((await verifyAuditChain(auditEvents)).valid).toBe(true);
+    const verdict = await verifyActionPayloadHashes(forged, auditEvents);
+    expect(verdict.valid).toBe(false);
+    expect(verdict.brokenRecordId).toBe('action-record-1');
+    expect(verdict.reason).toMatch(/marked undone but no matching undo event/);
+  });
+
+  it('rejects an undo event with no matching undone record (DA-H5/F1 un-drop forgery)', async () => {
+    const { actionRecords, auditEvents } = await hashedRows();
+    // The inverse: an undo event reverts action-record-1 but the record is left
+    // `applied`, re-introducing a mutation that should have been dropped.
+    const events = await withUndoEvent('action-record-1', auditEvents);
+    const verdict = await verifyActionPayloadHashes(actionRecords, events);
+    expect(verdict.valid).toBe(false);
+    expect(verdict.brokenRecordId).toBe('action-record-1');
+    expect(verdict.reason).toMatch(/has a matching undo event but is not marked undone/);
+  });
+
+  it('rejects an actionKind relabel the result hash misses (DA-H5/F1)', async () => {
+    const { actionRecords, auditEvents } = await hashedRows();
+    // Replay feeds actionKind as the command kind; relabel it while leaving
+    // `result` (and so the committed actionHash) untouched.
+    const relabeled = actionRecords.map((record) =>
+      record.recordId === 'action-record-1'
+        ? ActionRecordSchema.parse({ ...record, actionKind: 'title.precede' })
+        : record
+    );
+    expect((await verifyAuditChain(auditEvents)).valid).toBe(true);
+    const verdict = await verifyActionPayloadHashes(relabeled, auditEvents);
+    expect(verdict.valid).toBe(false);
+    expect(verdict.brokenRecordId).toBe('action-record-1');
+    expect(verdict.reason).toMatch(/actionKind .* does not match the commandKind/);
+  });
+
+  it('accepts a legacy chain (no committed actionHash) and counts it', async () => {
+    const r1 = actionRecord('action-record-1', 'one');
+    const legacyEvents = await buildAuditChain({
+      context,
+      drafts: [await appliedEvent('audit-1', r1.recordId, { commandKind: 'title.convey' })],
+    });
+    const verdict = await verifyActionPayloadHashes([r1], legacyEvents);
+    expect(verdict.valid).toBe(true);
+    expect(verdict.legacyCount).toBe(1);
+  });
+
+  it('rejects a head event re-signed with its actionHash stripped to masquerade as legacy (mixed-chain downgrade)', async () => {
+    const { actionRecords, auditEvents } = await hashedRows();
+    const [r1, r2] = actionRecords;
+    // The attack the all-or-nothing rule closes: forge the HEAD record's result,
+    // then DROP the head event's committed actionHash so it reads as "legacy",
+    // and re-sign ONLY the head's own eventHash (the head has no successor to pin
+    // it). Both verifyAuditChain and the count check would otherwise pass.
+    const forgedRecords = [
+      r1,
+      { ...r2, result: { ...r2.result, summary: 'forged-head' } },
+    ];
+    const strippedHead: AuditEventRecord = {
+      ...auditEvents[1],
+      details: { commandKind: r2.actionKind }, // actionHash removed
+    };
+    const reSignedHead: AuditEventRecord = {
+      ...strippedHead,
+      eventHash: await computeAuditEventHash(strippedHead),
+    };
+    const events = [auditEvents[0], reSignedHead];
+
+    // The event-body chain is self-consistent — exactly the gap this closes.
+    expect((await verifyAuditChain(events)).valid).toBe(true);
+
+    const verdict = await verifyActionPayloadHashes(forgedRecords, events);
+    expect(verdict.valid).toBe(false);
+    expect(verdict.brokenRecordId).toBe('action-record-2');
+    expect(verdict.reason).toMatch(/mixed-chain downgrade/);
+  });
+
+  it('rejects a head event with its commandKind stripped while siblings still bind it (mixed-chain downgrade)', async () => {
+    const { actionRecords, auditEvents } = await hashedRows();
+    const [, r2] = actionRecords;
+    // Same downgrade aimed at the actionKind binding: drop the head's commandKind
+    // (keeping its actionHash) so the actionKind relabel guard would be skipped.
+    const strippedHead: AuditEventRecord = {
+      ...auditEvents[1],
+      details: { actionHash: await computeActionRecordHash(r2) }, // commandKind removed
+    };
+    const reSignedHead: AuditEventRecord = {
+      ...strippedHead,
+      eventHash: await computeAuditEventHash(strippedHead),
+    };
+    const events = [auditEvents[0], reSignedHead];
+    expect((await verifyAuditChain(events)).valid).toBe(true);
+
+    const verdict = await verifyActionPayloadHashes(actionRecords, events);
+    expect(verdict.valid).toBe(false);
+    expect(verdict.brokenRecordId).toBe('action-record-2');
+    expect(verdict.reason).toMatch(/commandKind binding.*mixed-chain downgrade/);
+  });
+
+  it('rejects a non-bijective chain: two applied events bind one record, smuggling an unbound forged record', async () => {
+    const r1 = actionRecord('action-record-1', 'one');
+    const r2 = actionRecord('action-record-2', 'two'); // smuggled, no event binds it
+    // Both applied events point at r1 (properly hashed for r1); r2 rides in with
+    // no applied event. Count is 2 records / 2 applied events / 0 undone — the
+    // count guard alone would pass this; the bijection guard must not.
+    const auditEvents = await buildAuditChain({
+      context,
+      drafts: [
+        await appliedEvent('audit-1', r1.recordId, {
+          commandKind: r1.actionKind,
+          actionHash: await computeActionRecordHash(r1),
+        }),
+        await appliedEvent('audit-2', r1.recordId, {
+          commandKind: r1.actionKind,
+          actionHash: await computeActionRecordHash(r1),
+        }),
+      ],
+    });
+    expect((await verifyAuditChain(auditEvents)).valid).toBe(true); // event chain self-consistent
+
+    const verdict = await verifyActionPayloadHashes([r1, r2], auditEvents);
+    expect(verdict.valid).toBe(false);
+    expect(verdict.reason).toMatch(/non-bijective chain/);
+  });
+
+  it('rejects an action record with no applied event binding it (unbound record)', async () => {
+    const { actionRecords, auditEvents } = await hashedRows(); // r1, r2 each bound
+    const unbound = actionRecord('action-record-3', 'three'); // no applied event
+    const verdict = await verifyActionPayloadHashes([...actionRecords, unbound], auditEvents);
+    expect(verdict.valid).toBe(false);
+    expect(verdict.brokenRecordId).toBe('action-record-3');
+    expect(verdict.reason).toMatch(/no applied audit event binding it/);
+  });
+
+  it('rejects a dangling undo event that reverts a record not present', async () => {
+    const { actionRecords, auditEvents } = await hashedRows();
+    const events = await withUndoEvent('action-record-ghost', auditEvents);
+    const verdict = await verifyActionPayloadHashes(actionRecords, events);
+    expect(verdict.valid).toBe(false);
+    expect(verdict.brokenRecordId).toBe('action-record-ghost');
+    expect(verdict.reason).toMatch(/dangling undo reference/);
+  });
+
+  it('actionHash is stable across a JSON export/import round-trip (no false-positive quarantine)', async () => {
+    // The inverse of the tamper risk: a legitimate `.landroid` export→import must
+    // not perturb canonicalJson(result) and wrongly reject a valid chain. Uses a
+    // 24-sig-digit decimal fraction string, as recordEffects carry.
+    const record = ActionRecordSchema.parse({
+      ...actionRecord('action-record-rt', 'rt'),
+      result: {
+        commandId: 'cmd-rt',
+        surface: 'title_tree',
+        mutation: 'convey',
+        summary: 'rt',
+        recordEffects: [{ kind: 'upsert', fraction: '0.333333333333333333333333' }],
+      },
+    });
+    const before = await computeActionRecordHash(record);
+    const roundTripped = ActionRecordSchema.parse(JSON.parse(JSON.stringify(record)));
+    expect(await computeActionRecordHash(roundTripped)).toBe(before);
+  });
+
+  it('flags an applied event that references a missing action record', async () => {
+    const events = await buildAuditChain({
+      context,
+      drafts: [await appliedEvent('audit-1', 'action-record-missing', { actionHash: HASH })],
+    });
+    const verdict = await verifyActionPayloadHashes([], events);
+    expect(verdict.valid).toBe(false);
+    expect(verdict.brokenRecordId).toBe('action-record-missing');
+    expect(verdict.reason).toMatch(/missing action record/);
   });
 });

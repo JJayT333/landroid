@@ -36,7 +36,10 @@ import type {
 import type { OwnerWorkspaceData } from '../storage/owner-persistence';
 import type { WorkspaceData } from '../storage/workspace-persistence';
 import { ParityDivergenceError } from '../project-records/action-layer/parity';
-import { verifyAuditChain } from '../project-records/action-layer/audit-chain';
+import {
+  verifyActionPayloadHashes,
+  verifyAuditChain,
+} from '../project-records/action-layer/audit-chain';
 import { setTitleCutoverRuntimeStateReader } from '../project-records/action-layer/title-cutover-gate';
 import {
   checkTitleInlineParity,
@@ -51,6 +54,7 @@ import {
 import type { ProjectRecordBundle } from '../project-records/record-validation';
 import {
   listTitleLedgerWorkspaceRows,
+  quarantineTitleLedgerRows,
   replaceTitleLedgerWorkspaceRows,
 } from '../storage/title-ledger-persistence';
 import type { TitleLedgerWorkspaceRows } from '../storage/title-ledger-stores';
@@ -78,6 +82,28 @@ export interface TitleLedgerDivergence {
   at: string;
 }
 
+/**
+ * DA-H4: a notice that a stored or imported ledger chain failed verification and
+ * was QUARANTINED (preserved in `titleLedgerQuarantine`) rather than erased,
+ * before a fresh baseline replaced it. Surfaced in the ledger status banner so
+ * the corruption/tamper event is visible, not silent.
+ */
+export interface TitleLedgerQuarantineNotice {
+  workspaceId: string;
+  source: 'storage' | 'file';
+  reason: string;
+  at: string;
+  actionRecordCount: number;
+  auditEventCount: number;
+  /**
+   * Whether the rejected chain was durably written to `titleLedgerQuarantine`.
+   * False when the copy failed (e.g. quota): for a `'storage'` source the live
+   * rows are about to be re-baselined away, so the evidence then lives only in
+   * this session — the banner must say so, not claim it was retained.
+   */
+  durablyPersisted: boolean;
+}
+
 interface TitleActionLogState {
   /** When false, the journal hook is a no-op (reversible kill switch). */
   enabled: boolean;
@@ -98,6 +124,8 @@ interface TitleActionLogState {
   lastDivergence: TitleLedgerDivergence | null;
   /** Last non-divergence recording error (e.g. a malformed mutation). */
   lastError: string | null;
+  /** Last invalid chain quarantined-not-erased on hydrate (DA-H4). */
+  lastQuarantine: TitleLedgerQuarantineNotice | null;
   /**
    * Live read-path mode for title records. Default `'shadow'` (store-canonical).
    * `'cutover'` sources title records from the durable ledger. Reversible.
@@ -202,6 +230,7 @@ export const useTitleActionLog = create<TitleActionLogState>()((set, get) => ({
   sessionParityCount: 0,
   lastDivergence: null,
   lastError: null,
+  lastQuarantine: null,
   readPathMode: 'shadow',
 
   setEnabled: (enabled) => set({ enabled }),
@@ -218,6 +247,7 @@ export const useTitleActionLog = create<TitleActionLogState>()((set, get) => ({
       sessionParityCount: 0,
       lastDivergence: null,
       lastError: null,
+      lastQuarantine: null,
       readPathMode: 'shadow',
     });
   },
@@ -235,6 +265,7 @@ export const useTitleActionLog = create<TitleActionLogState>()((set, get) => ({
       sessionParityCount: 0,
       lastDivergence: null,
       lastError: null,
+      lastQuarantine: null,
       readPathMode: 'shadow',
     });
   },
@@ -457,6 +488,26 @@ async function verifyTitleLedgerRows(
     );
     return false;
   }
+  // DA-H5: the event chain is intact, so the committed actionHashes are now
+  // trustworthy — confirm each ActionRecord payload still matches the hash bound
+  // into the chain. This catches a tampered/corrupt `result` payload that the
+  // event-body chain alone cannot see.
+  const payload = await verifyActionPayloadHashes(rows.actionRecords, rows.auditEvents);
+  if (!payload.valid) {
+    console.warn(
+      `[title-action-log] Ignoring ${label} ledger for workspace ${workspaceId}: ` +
+        `action payload hash mismatch for record ${payload.brokenRecordId} ` +
+        `(${payload.reason}).`
+    );
+    return false;
+  }
+  if (payload.legacyCount > 0) {
+    console.warn(
+      `[title-action-log] ${label} ledger for workspace ${workspaceId} carries ` +
+        `${payload.legacyCount} legacy unhashed action event(s) (pre-DA-H5). The ` +
+        'chain is accepted; mutations recorded from now on are payload-hashed.'
+    );
+  }
   return true;
 }
 
@@ -473,6 +524,67 @@ async function baselineAndFlushTitleLedger(
     actionRecordCount: state.actionRecords.length,
     auditEventCount: state.auditEvents.length,
   };
+}
+
+/**
+ * DA-H4: preserve an invalid chain (quarantine, best-effort) instead of letting
+ * the subsequent re-baseline erase the only tamper/corruption evidence, then
+ * return a notice the banner surfaces. Called BEFORE `baselineAndFlushTitleLedger`
+ * (whose reset clears `lastQuarantine`), so the caller sets the notice AFTER the
+ * baseline completes.
+ */
+async function quarantineInvalidLedger(
+  workspaceId: string,
+  rows: TitleLedgerWorkspaceRows,
+  source: 'storage' | 'file'
+): Promise<TitleLedgerQuarantineNotice> {
+  const reason =
+    `${rows.actionRecords.length} action record(s) / ${rows.auditEvents.length} `
+    + 'audit event(s) failed ledger verification on hydrate';
+  const quarantinedAt = new Date().toISOString();
+  let durablyPersisted = false;
+  try {
+    await quarantineTitleLedgerRows({
+      workspaceId,
+      rows,
+      reason,
+      source,
+      quarantinedAt,
+    });
+    durablyPersisted = true;
+  } catch (err) {
+    console.warn(
+      '[title-action-log] failed to durably quarantine the invalid ledger; the '
+        + 'rejected chain will survive only in this session notice:',
+      err
+    );
+  }
+  console.warn(
+    `[title-action-log] Quarantined an invalid ${source} ledger for workspace `
+      + `${workspaceId} (not erased; durablyPersisted=${durablyPersisted}): ${reason}.`
+  );
+  return {
+    workspaceId,
+    source,
+    reason,
+    at: quarantinedAt,
+    actionRecordCount: rows.actionRecords.length,
+    auditEventCount: rows.auditEvents.length,
+    durablyPersisted,
+  };
+}
+
+async function baselineAfterQuarantine(
+  workspace: WorkspaceData,
+  rows: TitleLedgerWorkspaceRows,
+  source: 'storage' | 'file',
+  ownerData?: OwnerSlice
+): Promise<TitleLedgerLifecycleResult> {
+  const notice = await quarantineInvalidLedger(workspace.workspaceId, rows, source);
+  const result = await baselineAndFlushTitleLedger(workspace, ownerData);
+  // Set AFTER the baseline — baselineAndFlushTitleLedger's reset clears it.
+  useTitleActionLog.setState({ lastQuarantine: notice });
+  return result;
 }
 
 export async function flushTitleActionLogToStorage(
@@ -527,6 +639,9 @@ export async function hydrateTitleActionLogFromStorageOrBaseline(
         auditEventCount: rows.auditEvents.length,
       };
     }
+    // DA-H4: the stored chain is non-empty but invalid — preserve it before the
+    // baseline overwrites it, instead of the old warn-and-erase.
+    return baselineAfterQuarantine(workspace, storedRows, 'storage', ownerData);
   }
   return baselineAndFlushTitleLedger(workspace, ownerData);
 }
@@ -546,6 +661,12 @@ export async function hydrateTitleActionLogFromImportedLedger(
         actionRecordCount: rows.actionRecords.length,
         auditEventCount: rows.auditEvents.length,
       };
+    }
+    // DA-H4: an imported file's chain failed verification — quarantine the
+    // rejected bundle (evidence of a tampered/corrupt `.landroid`) before
+    // baselining, rather than dropping it silently.
+    if (rows.actionRecords.length > 0 || rows.auditEvents.length > 0) {
+      return baselineAfterQuarantine(workspace, rows, 'file', ownerData);
     }
   }
   return baselineAndFlushTitleLedger(workspace, ownerData);
@@ -576,7 +697,7 @@ export function ensureTitleBaseline(
   return recordingChain;
 }
 
-setTitleJournalHook((mutation, beforeWorkspace, afterWorkspace) => {
+setTitleJournalHook((mutation, beforeWorkspace, afterWorkspace, context) => {
   const state = useTitleActionLog.getState();
   if (!state.enabled) return { rolledBack: false };
 
@@ -597,7 +718,7 @@ setTitleJournalHook((mutation, beforeWorkspace, afterWorkspace) => {
     try {
       parityClean = checkTitleInlineParity({
         mutation,
-        origin: 'user',
+        origin: context.origin,
         beforeWorkspace,
         afterWorkspace,
         ownerData: readOwnerData(),
@@ -640,6 +761,14 @@ setTitleJournalHook((mutation, beforeWorkspace, afterWorkspace) => {
       beforeWorkspace,
       afterWorkspace,
       ownerData,
+      // DA-M3: provenance from the active mutation-origin context. Direct UI
+      // edits stay 'user'; AI/import callers wrap their synchronous store call
+      // in `withMutationOrigin`, so the hook sees the real origin here. The
+      // origin flows to the audit event's `actorKind` (which carries 'ai' /
+      // 'import'); `approvedBy` stays 'user' because a human approved the AI
+      // action through the approval gate (the contract only allows user|system).
+      origin: context.origin,
+      aiToolName: context.aiToolName,
     });
   });
   track(recordingChain);

@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { withMutationOrigin } from '../store/workspace-store';
 import { captureSnapshot, useAIUndoStore } from './undo-store';
 import {
   buildAIApprovalDetails,
@@ -131,7 +132,15 @@ export async function approveAIProposal(id: string): Promise<unknown> {
   // mutation validated against different state.
   const snapshot = await captureSnapshot(undoLabel);
   assertAIApprovalPreviewCanApply(proposal.id, proposal.toolName, proposal.input);
-  const result = await executor(proposal.input);
+  // DA-M3: tag the durable ledger with the real provenance. The executor calls
+  // the store mutation synchronously, which fires the title journal hook inline,
+  // so this `withMutationOrigin` scope is the one the hook reads — the awaited
+  // promise resolves after the synchronous store call has already recorded.
+  const result = await withMutationOrigin(
+    'ai',
+    () => executor(proposal.input),
+    proposal.toolName
+  );
   useAIApprovalStore.getState().remove(id);
   recordAIActionResult({
     proposalId: proposal.id,

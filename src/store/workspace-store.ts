@@ -452,10 +452,56 @@ function collectAncestorIds(
  * `set()` — it can never change the store's result or state. See
  * docs/phase-4-title-cutover-notes.md.
  */
+/**
+ * Provenance of a title mutation (DA-M3 / ACT-M01). Direct UI edits are
+ * `'user'`; the AI approval executor tags `'ai'`, the staged-import apply path
+ * tags `'import'`, and the synthetic load-time baseline is `'system'`. Without
+ * this the durable audit chain recorded every mutation as `'user'`, so the
+ * AI-gate assertion never saw an AI origin at runtime.
+ */
+export type MutationOrigin = 'user' | 'ai' | 'import' | 'system';
+
+export interface MutationOriginContext {
+  origin: MutationOrigin;
+  /** AI tool / import session id, surfaced as the audit event `actorId`. */
+  aiToolName?: string;
+}
+
+const DEFAULT_MUTATION_ORIGIN: MutationOriginContext = { origin: 'user' };
+let currentMutationOriginContext: MutationOriginContext = DEFAULT_MUTATION_ORIGIN;
+
+/**
+ * Run `fn` with the active mutation origin set to `origin`. The store mutators
+ * fire the journal hook synchronously inside `set()`, and the AI/import callers
+ * invoke the store action synchronously within `fn`, so the hook reads the
+ * intended origin off this module-scoped context without any async leakage
+ * (the `finally` restores the prior context before `fn`'s returned promise
+ * resolves). Nesting is supported: the prior context is restored, not reset.
+ */
+export function withMutationOrigin<T>(
+  origin: MutationOrigin,
+  fn: () => T,
+  aiToolName?: string
+): T {
+  const previous = currentMutationOriginContext;
+  currentMutationOriginContext = { origin, aiToolName };
+  try {
+    return fn();
+  } finally {
+    currentMutationOriginContext = previous;
+  }
+}
+
+/** The origin context the next journaled mutation will be recorded under. */
+export function readMutationOriginContext(): MutationOriginContext {
+  return currentMutationOriginContext;
+}
+
 export type TitleJournalHook = (
   mutation: string,
   beforeWorkspace: WorkspaceData,
-  afterWorkspace: WorkspaceData
+  afterWorkspace: WorkspaceData,
+  context: MutationOriginContext
 ) => { rolledBack: boolean } | void;
 
 /** Surfaced as `lastError` when a cutover rollback vetoes a mutation (DA-H3). */
@@ -569,7 +615,8 @@ function journalTitleMutation(
       const verdict = titleJournalHook(
         mutation,
         beforeWorkspace,
-        snapshotWorkspaceData(afterState)
+        snapshotWorkspaceData(afterState),
+        readMutationOriginContext()
       ) ?? { rolledBack: false };
       rolledBack = verdict.rolledBack;
       if (rolledBack) {

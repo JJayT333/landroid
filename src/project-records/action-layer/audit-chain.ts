@@ -15,6 +15,7 @@
  */
 import {
   AuditEventRecordSchema,
+  type ActionRecord,
   type AuditEventRecord,
 } from '../../backend-spine/contracts';
 import {
@@ -166,4 +167,230 @@ export async function verifyAuditChain(
     reason: null,
     headHash: events.length > 0 ? expectedPrev : (options.priorHeadHash ?? genesis),
   };
+}
+
+/**
+ * DA-H5: the hash chain above covers each AuditEvent *body*, but replay consumes
+ * the referenced ActionRecord's `result` payload, which the event only points at
+ * by id. So an edit to `result.recordEffects` (in Dexie, or in a `.landroid`
+ * `actionLedger` before import) passes `verifyAuditChain` untouched.
+ *
+ * The fix commits `actionHash = sha256(canonicalJson(actionRecord.result))` into
+ * each `action_record.applied` event's `details` at materialization. The hash
+ * covers the `result` payload specifically — `recordEffects` (what replay
+ * applies) and `titleNodeSnapshots` (the math node set), i.e. exactly the data a
+ * tamper would target — and deliberately NOT the lifecycle envelope (`status`,
+ * `revision`, `lastModified`), which the DA-H2 undo legitimately rewrites in
+ * place when it marks a record `undone`. Because the event hash covers
+ * `details`, the payload becomes transitively bound to the chain: tampering with
+ * the result breaks this comparison; stripping the committed `actionHash` to
+ * forge a "legacy" event breaks the event hash. So a genuinely legacy (pre-DA-H5)
+ * event — one with no committed hash whose own `eventHash` is still valid — is
+ * the only authentic unhashed case, accepted with a count the caller surfaces as
+ * a one-time warning.
+ */
+export async function computeActionRecordHash(record: ActionRecord): Promise<string> {
+  return sha256HexOfText(canonicalJson(record.result));
+}
+
+export interface ActionPayloadVerification {
+  valid: boolean;
+  /** recordId of the first action whose payload hash mismatched, or null. */
+  brokenRecordId: string | null;
+  reason: string | null;
+  /** Count of applied events carrying no committed actionHash (legacy chains). */
+  legacyCount: number;
+}
+
+/**
+ * Verify that each ActionRecord still matches what the (already chain-verified)
+ * audit events committed about it. Run AFTER `verifyAuditChain` confirms the
+ * event bodies are intact — only then are the committed values trustworthy.
+ * `subjectRecordIds[0]` is the action record's id by construction (see
+ * `recordTitleMutation` and `undoActionRecord`). A record↔applied-event
+ * **bijection** (0) plus three payload bindings — because replay consumes EVERY
+ * action record AND two envelope fields the result hash deliberately excludes
+ * (so undo can rewrite them in place):
+ *
+ *  0. bijection         — every applied event binds a DISTINCT action record and
+ *     every action record is bound by one; an unbound record would be replayed
+ *     verbatim with no committed hash to check it.
+ *  1. `result` payload  — recompute `actionHash` and compare (the recordEffects /
+ *     titleNodeSnapshots replay applies).
+ *  2. `actionKind`      — must equal the `commandKind` committed in the paired
+ *     applied event's `details` (replay feeds `actionKind` as the command kind,
+ *     `title-replay.ts`). Catches a relabel that the result hash misses.
+ *  3. `status`          — a record is `'undone'` IFF an `action_record.undone`
+ *     event reverts it. Replay drops `undone` records, so a bare `applied`↔`undone`
+ *     flip (no matching undo event) would silently drop or re-introduce a title
+ *     mutation; the result hash misses it because `result` is untouched.
+ *
+ * (1) and (2) are all-or-nothing across the chain: a fully-unhashed chain is
+ * accepted as genuinely legacy (pre-DA-H5) and counted; but once ANY applied
+ * event commits the binding, every applied event must carry it, so a single
+ * stripped-and-re-signed event (notably the head) is rejected rather than waved
+ * through as "legacy". (3) uses fields present on every chain, so it hardens
+ * legacy chains too.
+ */
+export async function verifyActionPayloadHashes(
+  actionRecords: readonly ActionRecord[],
+  auditEvents: readonly AuditEventRecord[]
+): Promise<ActionPayloadVerification> {
+  const recordById = new Map(actionRecords.map((record) => [record.recordId, record]));
+  // recordIds an `action_record.undone` event reverts — envelope-bound by the
+  // event hash, so this set cannot be forged without breaking `verifyAuditChain`.
+  const undoneByEvent = new Set<string>();
+  for (const event of auditEvents) {
+    if (event.eventKind !== 'action_record.undone') continue;
+    const reverted =
+      (event.details as { reverts?: unknown }).reverts ?? event.subjectRecordIds[0];
+    if (typeof reverted === 'string') undoneByEvent.add(reverted);
+  }
+  // A dangling undo — reverting a record that is not present — would let the (3)
+  // status check pass silently (it iterates only the records that ARE present).
+  // Every reverted id must resolve to a real action record.
+  for (const revertedId of undoneByEvent) {
+    if (!recordById.has(revertedId)) {
+      return {
+        valid: false,
+        brokenRecordId: revertedId,
+        reason:
+          'undo audit event reverts an action record that is not present '
+          + '(dangling undo reference)',
+        legacyCount: 0,
+      };
+    }
+  }
+
+  // A genuine legacy (pre-DA-H5) chain commits NO `actionHash` / `commandKind` on
+  // ANY applied event. A chain where SOME applied events carry the binding but
+  // others do not is a strip-and-re-sign downgrade — forge one record's `result`,
+  // drop that event's `actionHash` so it reads as "legacy", recompute only its
+  // own `eventHash` (the head has no successor pinning it). So the binding is
+  // all-or-nothing: once any applied event commits it, EVERY applied event must,
+  // or verification fails. (Truncating a hashed chain back to fully-legacy is the
+  // residual the deferred envelope head-hash pin, `lastFlushedHeadHash`, closes.)
+  const appliedEvents = auditEvents.filter(
+    (event) => event.eventKind === 'action_record.applied'
+  );
+  const chainCommitsHash = appliedEvents.some(
+    (event) => typeof (event.details as { actionHash?: unknown }).actionHash === 'string'
+  );
+  const chainCommitsKind = appliedEvents.some(
+    (event) => typeof (event.details as { commandKind?: unknown }).commandKind === 'string'
+  );
+
+  let legacyCount = 0;
+  // (0) Bijection — every applied event binds a DISTINCT action record, and (after
+  // the loop) every action record is bound. Replay (`parseTitleActions`) consumes
+  // every action record regardless of its event binding, so without this an
+  // attacker can point two applied events at one record and smuggle a second,
+  // UNBOUND forged record past the hash checks (the count guard alone passes it).
+  const boundRecordIds = new Set<string>();
+  for (const event of appliedEvents) {
+    const actionRecordId = event.subjectRecordIds[0];
+    const record = actionRecordId ? recordById.get(actionRecordId) : undefined;
+    if (!record) {
+      return {
+        valid: false,
+        brokenRecordId: actionRecordId ?? null,
+        reason: 'applied audit event references a missing action record',
+        legacyCount,
+      };
+    }
+    if (boundRecordIds.has(record.recordId)) {
+      return {
+        valid: false,
+        brokenRecordId: record.recordId,
+        reason:
+          'multiple applied audit events bind a single action record '
+          + '(non-bijective chain)',
+        legacyCount,
+      };
+    }
+    boundRecordIds.add(record.recordId);
+    // (2) actionKind binding — the field replay feeds as the command kind.
+    const committedKind = (event.details as { commandKind?: unknown }).commandKind;
+    if (typeof committedKind === 'string') {
+      if (record.actionKind !== committedKind) {
+        return {
+          valid: false,
+          brokenRecordId: record.recordId,
+          reason:
+            `action record actionKind "${record.actionKind}" does not match the `
+            + `commandKind "${committedKind}" committed in the audit chain`,
+          legacyCount,
+        };
+      }
+    } else if (chainCommitsKind) {
+      return {
+        valid: false,
+        brokenRecordId: record.recordId,
+        reason:
+          'applied audit event is missing the commandKind binding present on other '
+          + 'events in this chain (mixed-chain downgrade)',
+        legacyCount,
+      };
+    }
+    // (1) result payload binding.
+    const committed = (event.details as { actionHash?: unknown }).actionHash;
+    if (typeof committed === 'string') {
+      const recomputed = await computeActionRecordHash(record);
+      if (recomputed !== committed) {
+        return {
+          valid: false,
+          brokenRecordId: record.recordId,
+          reason:
+            'action record payload does not match the hash committed in the audit '
+            + 'chain (the payload was altered)',
+          legacyCount,
+        };
+      }
+    } else if (chainCommitsHash) {
+      return {
+        valid: false,
+        brokenRecordId: record.recordId,
+        reason:
+          'applied audit event is missing the payload hash committed by other '
+          + 'events in this chain (mixed-chain downgrade)',
+        legacyCount,
+      };
+    } else {
+      legacyCount += 1;
+    }
+  }
+
+  // (0, cont.) Every action record must have been bound by an applied event
+  // above. An unbound record (no applied event ⇒ no committed hash) would be
+  // replayed verbatim — the smuggled-forgery path.
+  for (const record of actionRecords) {
+    if (!boundRecordIds.has(record.recordId)) {
+      return {
+        valid: false,
+        brokenRecordId: record.recordId,
+        reason:
+          'action record has no applied audit event binding it '
+          + '(unbound record replay would consume)',
+        legacyCount,
+      };
+    }
+  }
+
+  // (3) status binding — undone IFF an undo event reverts it. Catches a bare
+  // status flip (drop/un-drop forgery) the count check cannot see per-record.
+  for (const record of actionRecords) {
+    if ((record.status === 'undone') !== undoneByEvent.has(record.recordId)) {
+      return {
+        valid: false,
+        brokenRecordId: record.recordId,
+        reason:
+          record.status === 'undone'
+            ? 'action record is marked undone but no matching undo event backs it'
+            : 'action record has a matching undo event but is not marked undone',
+        legacyCount,
+      };
+    }
+  }
+
+  return { valid: true, brokenRecordId: null, reason: null, legacyCount };
 }

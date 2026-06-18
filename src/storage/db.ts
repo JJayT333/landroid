@@ -42,8 +42,12 @@ import type {
 import type {
   StoredTitleActionRecord,
   StoredTitleAuditEvent,
+  StoredTitleLedgerQuarantine,
 } from './title-ledger-stores';
-import { TITLE_LEDGER_STORE_DEFINITIONS } from './title-ledger-stores';
+import {
+  TITLE_LEDGER_QUARANTINE_STORE_DEFINITION,
+  TITLE_LEDGER_STORE_DEFINITIONS,
+} from './title-ledger-stores';
 import type { TitleIssue } from '../types/title-issue';
 import { LANDROID_FILE_VERSION } from './landroid-file-version';
 import {
@@ -142,6 +146,7 @@ const db = new Dexie('landroid-v2') as Dexie & {
   workspaceUiStateShards: EntityTable<WorkspaceUiStateShard, 'id'>;
   titleActionRecords: EntityTable<StoredTitleActionRecord, 'id'>;
   titleAuditEvents: EntityTable<StoredTitleAuditEvent, 'id'>;
+  titleLedgerQuarantine: EntityTable<StoredTitleLedgerQuarantine, 'id'>;
   workspaceWriteLeases: EntityTable<WorkspaceWriteLease, 'workspaceId'>;
   savedProjects: EntityTable<SavedProjectRecord, 'id'>;
 };
@@ -579,15 +584,23 @@ db.version(15).stores({
  * Adds `mapTractFeatures` — parsed WGS84 tract polygons ingested from an ArcGIS
  * GeoJSON export, each with a nullable link to a LANDroid `DeskMap`. Additive
  * and non-destructive: a new empty table, no data migration.
- *
- * NOTE: the in-review title-ledger PR (#185) also adds a v16 table
- * (`titleLedgerQuarantine`). These two open branches both off `main` claim v16;
- * whichever merges SECOND hits a git conflict in this block and must renumber to
- * v17 (kept contiguous — no version gap, so no Dexie VersionError either way).
  */
 db.version(16).stores({
   mapTractFeatures:
     'id, dbKey, workspaceId, assetId, tractKey, matchedDeskMapId, [dbKey+workspaceId], [dbKey+workspaceId+assetId]',
+});
+
+/**
+ * v17 (DA-H4 title-ledger quarantine).
+ *
+ * Adds `titleLedgerQuarantine` — a preserved copy of a title ledger chain that
+ * failed verification on hydrate, captured before a fresh baseline replaces the
+ * bad rows so the tamper/corruption evidence is not erased. Additive and
+ * non-destructive: a new empty table, no data migration. Renumbered v16 → v17
+ * on the rebase onto main (the DA2-M Maps lane claimed v16 first).
+ */
+db.version(17).stores({
+  ...TITLE_LEDGER_QUARANTINE_STORE_DEFINITION,
 });
 
 

@@ -6,6 +6,8 @@ import {
 } from '../backend-spine/contracts';
 import { activeDbKey, storageScopedId } from './db-key-scope';
 import db from './db';
+import { canonicalJson } from '../project-records/action-layer/canonical-json';
+import { sha256HexOfText } from '../project-records/record-helpers';
 import {
   assertWorkspaceWriteFence,
   ensureWorkspaceWritable,
@@ -13,6 +15,7 @@ import {
 import type {
   StoredTitleActionRecord,
   StoredTitleAuditEvent,
+  StoredTitleLedgerQuarantine,
   TitleLedgerWorkspaceRows,
 } from './title-ledger-stores';
 
@@ -177,5 +180,63 @@ export async function clearTitleLedgerRowsForActiveKey(): Promise<void> {
       await db.titleActionRecords.where('dbKey').equals(dbKey).delete();
       await db.titleAuditEvents.where('dbKey').equals(dbKey).delete();
     }
+  );
+}
+
+/**
+ * DA-H4: preserve a rejected ledger chain before a fresh baseline overwrites it.
+ * Append-only and deliberately NOT lease-fenced — evidence preservation must not
+ * be blocked by a read-only tab, and each capture gets a unique id (the head
+ * hash + timestamp), so concurrent captures coexist rather than clobber.
+ */
+export async function quarantineTitleLedgerRows(input: {
+  workspaceId: string;
+  rows: TitleLedgerWorkspaceRows;
+  reason: string;
+  source: 'storage' | 'file';
+  quarantinedAt: string;
+}): Promise<StoredTitleLedgerQuarantine> {
+  const dbKey = activeDbKey();
+  // Content-address the quarantine id on a hash of the FULL rejected row set + its
+  // source — NOT the wall-clock, and NOT the (untrusted, possibly-forged) head
+  // event hash. So the SAME invalid chain re-quarantined (e.g. a read-only tab on
+  // each reload) re-`put`s the same id (idempotent, no duplicate-row growth),
+  // while DISTINCT invalid chains get distinct ids and never overwrite each
+  // other's evidence — even when they share a head hash or carry no audit events.
+  const contentHash = await sha256HexOfText(
+    canonicalJson({
+      source: input.source,
+      actionRecords: input.rows.actionRecords,
+      auditEvents: input.rows.auditEvents,
+    })
+  );
+  const record: StoredTitleLedgerQuarantine = {
+    id: titleLedgerStorageId(
+      `${input.workspaceId}::quarantine::${input.source}::${contentHash}`,
+      dbKey
+    ),
+    dbKey,
+    workspaceId: input.workspaceId,
+    quarantinedAt: input.quarantinedAt,
+    source: input.source,
+    reason: input.reason,
+    actionRecords: input.rows.actionRecords,
+    auditEvents: input.rows.auditEvents,
+  };
+  await db.titleLedgerQuarantine.put(record);
+  return record;
+}
+
+export async function listTitleLedgerQuarantine(
+  workspaceId: string
+): Promise<StoredTitleLedgerQuarantine[]> {
+  const dbKey = activeDbKey();
+  const scope = titleLedgerScope(dbKey, workspaceId);
+  const rows = await db.titleLedgerQuarantine
+    .where('[dbKey+workspaceId]')
+    .equals(scope)
+    .toArray();
+  return rows.sort((first, second) =>
+    first.quarantinedAt < second.quarantinedAt ? -1 : 1
   );
 }

@@ -35,6 +35,10 @@ function makeLedgerTable<Row extends LedgerRow>(initial: Row[] = []) {
     bulkPut: vi.fn(async (newRows: Row[]) => {
       for (const row of newRows) rows.set(row.id, row);
     }),
+    put: vi.fn(async (row: Row) => {
+      rows.set(row.id, row);
+      return row.id;
+    }),
     where: vi.fn((field: string) => ({
       equals: vi.fn((value: unknown) =>
         collection((row) => {
@@ -133,6 +137,7 @@ async function loadTitleLedgerPersistence({
   const db = {
     titleActionRecords: makeLedgerTable(actionRows),
     titleAuditEvents: makeLedgerTable(auditRows),
+    titleLedgerQuarantine: makeLedgerTable(),
     transaction: vi.fn(async (_mode: string, ...args: unknown[]) => {
       const callback = args.at(-1);
       if (typeof callback !== 'function') {
@@ -336,5 +341,107 @@ describe('title ledger persistence', () => {
     expect([...db.titleAuditEvents.rows.values()]).toEqual([
       expect.objectContaining({ dbKey: 'user-bob', recordId: 'ev-b1' }),
     ]);
+  });
+
+  it('quarantines a rejected chain and reads it back scoped to the workspace (DA-H4)', async () => {
+    const { persistence, db } = await loadTitleLedgerPersistence({
+      workspaceKey: 'user-alice',
+    });
+
+    const rows = {
+      actionRecords: [fakeActionRecord({ recordId: 'bad-action' })],
+      auditEvents: [fakeAuditEventRecord({ recordId: 'bad-event' })],
+    };
+    const stored = await persistence.quarantineTitleLedgerRows({
+      workspaceId: 'ws-1',
+      rows,
+      reason: 'audit chain failed at index 0',
+      source: 'storage',
+      quarantinedAt: NOW,
+    });
+
+    // persisted under the active db key, scoped to the workspace, evidence intact
+    expect(stored.dbKey).toBe('user-alice');
+    expect([...db.titleLedgerQuarantine.rows.values()]).toHaveLength(1);
+
+    const read = await persistence.listTitleLedgerQuarantine('ws-1');
+    expect(read).toHaveLength(1);
+    expect(read[0]).toMatchObject({
+      workspaceId: 'ws-1',
+      source: 'storage',
+      reason: 'audit chain failed at index 0',
+    });
+    expect(read[0].actionRecords).toHaveLength(1);
+    expect(read[0].auditEvents).toHaveLength(1);
+
+    // a different workspace sees none of it
+    expect(await persistence.listTitleLedgerQuarantine('ws-2')).toHaveLength(0);
+  });
+
+  it('re-quarantining the same invalid chain is idempotent — no duplicate rows on reload (DA-H4 content-addressed id)', async () => {
+    const { persistence, db } = await loadTitleLedgerPersistence({
+      workspaceKey: 'user-alice',
+    });
+
+    // The same invalid chain, captured twice (e.g. a read-only tab re-quarantining
+    // it on each reload) with DIFFERENT wall-clock timestamps. The id is now
+    // content-addressed on the chain's head hash, not the timestamp, so the second
+    // capture overwrites the first instead of appending a duplicate row.
+    const rows = {
+      actionRecords: [fakeActionRecord({ recordId: 'bad-action' })],
+      auditEvents: [fakeAuditEventRecord({ recordId: 'bad-event' })],
+    };
+    const first = await persistence.quarantineTitleLedgerRows({
+      workspaceId: 'ws-1',
+      rows,
+      reason: 'audit chain failed at index 0',
+      source: 'storage',
+      quarantinedAt: '2026-06-04T12:00:00.000Z',
+    });
+    const second = await persistence.quarantineTitleLedgerRows({
+      workspaceId: 'ws-1',
+      rows,
+      reason: 'audit chain failed at index 0',
+      source: 'storage',
+      quarantinedAt: '2026-06-04T13:00:00.000Z',
+    });
+
+    expect(second.id).toBe(first.id);
+    expect([...db.titleLedgerQuarantine.rows.values()]).toHaveLength(1);
+    expect(await persistence.listTitleLedgerQuarantine('ws-1')).toHaveLength(1);
+  });
+
+  it('keeps DISTINCT invalid chains separate — different content yields different ids, no overwrite (DA-H4)', async () => {
+    const { persistence, db } = await loadTitleLedgerPersistence({
+      workspaceKey: 'user-alice',
+    });
+
+    // Two genuinely different rejected chains captured into the same workspace.
+    // The content-addressed id must not collapse them (which would overwrite and
+    // lose one chain's evidence).
+    const a = await persistence.quarantineTitleLedgerRows({
+      workspaceId: 'ws-1',
+      rows: {
+        actionRecords: [fakeActionRecord({ recordId: 'bad-a' })],
+        auditEvents: [fakeAuditEventRecord({ recordId: 'evt-a' })],
+      },
+      reason: 'chain A failed',
+      source: 'storage',
+      quarantinedAt: NOW,
+    });
+    const b = await persistence.quarantineTitleLedgerRows({
+      workspaceId: 'ws-1',
+      rows: {
+        actionRecords: [fakeActionRecord({ recordId: 'bad-b' })],
+        auditEvents: [fakeAuditEventRecord({ recordId: 'evt-b' })],
+      },
+      reason: 'chain B failed',
+      source: 'storage',
+      quarantinedAt: NOW,
+    });
+
+    expect(b.id).not.toBe(a.id);
+    expect([...db.titleLedgerQuarantine.rows.values()]).toHaveLength(2);
+    expect(await persistence.listTitleLedgerQuarantine('ws-1')).toHaveLength(2);
   });
 });

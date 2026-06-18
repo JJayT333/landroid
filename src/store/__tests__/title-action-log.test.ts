@@ -78,7 +78,7 @@ vi.mock('../../project-records/action-layer/title-command-sourcing', async (impo
   };
 });
 
-import { useWorkspaceStore } from '../workspace-store';
+import { useWorkspaceStore, withMutationOrigin } from '../workspace-store';
 import { useOwnerStore } from '../owner-store';
 import {
   ensureTitleBaseline,
@@ -87,7 +87,11 @@ import {
   useTitleActionLog,
 } from '../title-action-log';
 import { clearTitleUndoStack, useTitleUndoStack } from '../title-undo-stack';
-import { AUDIT_GENESIS_HASH, verifyAuditChain } from '../../project-records/action-layer/audit-chain';
+import {
+  AUDIT_GENESIS_HASH,
+  verifyActionPayloadHashes,
+  verifyAuditChain,
+} from '../../project-records/action-layer/audit-chain';
 import { ParityDivergenceError } from '../../project-records/action-layer/parity';
 import { titleRecordsFromWorkspace } from '../../project-records/action-layer/title-projection';
 import { replayTitleProjection } from '../../project-records/action-layer/title-replay';
@@ -302,6 +306,77 @@ describe('Phase 4 LIVE title journal (real store auto-records)', () => {
     // the store is still canonical and correct
     expect(useWorkspaceStore.getState().nodes.some((n) => n.id === 'npri')).toBe(false);
     expect(useWorkspaceStore.getState().nodes.some((n) => n.id === 'leasenode-1')).toBe(true);
+  });
+
+  it('threads real mutation origin into the audit chain (DA-M3)', async () => {
+    const store = () => useWorkspaceStore.getState();
+    // user-origin (direct UI edit): no origin scope.
+    store().createRootNode('root', '1', {
+      grantee: 'Root',
+      interestClass: 'mineral',
+      linkedOwnerId: 'owner-1',
+    });
+    // ai-origin: the approval executor wraps the synchronous store call. The
+    // journal hook fires inline, so it reads 'ai' off the active scope.
+    withMutationOrigin(
+      'ai',
+      () => store().convey('root', 'child', '0.5', { grantee: 'Child' }),
+      'convey'
+    );
+    // import-origin: the staged-import apply path (no aiToolName).
+    withMutationOrigin('import', () =>
+      store().createRootNode('imp', '0.5', { grantee: 'Imported' })
+    );
+    await settleTitleActionLog();
+
+    const events = useTitleActionLog.getState().auditEvents;
+    expect(events).toHaveLength(3);
+    // direct edit stays user-origin
+    expect(events[0]?.actorKind).toBe('user');
+    // AI edit is tagged 'ai' with the tool as actorId (the AI-gate now sees it)
+    const conveyEvent = events.find(
+      (event) => (event.details as { mutation?: string }).mutation === 'convey'
+    );
+    expect(conveyEvent?.actorKind).toBe('ai');
+    expect(conveyEvent?.actorId).toBe('convey');
+    // staged import is tagged 'import'
+    expect(events.at(-1)?.actorKind).toBe('import');
+    // provenance does not perturb the hash chain
+    expect((await verifyAuditChain(events)).valid).toBe(true);
+    expect(useTitleActionLog.getState().lastError).toBeNull();
+  });
+
+  it('commits an action payload hash and rejects payload tampering (DA-H5)', async () => {
+    driveSevenMutations();
+    await settleTitleActionLog();
+    const log = useTitleActionLog.getState();
+
+    // every applied event now carries a committed actionHash
+    const applied = log.auditEvents.filter(
+      (event) => event.eventKind === 'action_record.applied'
+    );
+    expect(applied.length).toBe(7);
+    expect(
+      applied.every(
+        (event) => typeof (event.details as { actionHash?: unknown }).actionHash === 'string'
+      )
+    ).toBe(true);
+
+    // the live chain's payloads verify clean, no legacy events
+    expect(
+      await verifyActionPayloadHashes(log.actionRecords, log.auditEvents)
+    ).toMatchObject({ valid: true, legacyCount: 0 });
+
+    // tamper a stored ActionRecord's replay payload; the event chain is intact
+    const tamperedRecords = log.actionRecords.map((record, index) =>
+      index === 0
+        ? { ...record, result: { ...record.result, summary: 'forged' } }
+        : record
+    );
+    expect((await verifyAuditChain(log.auditEvents)).valid).toBe(true);
+    const verdict = await verifyActionPayloadHashes(tamperedRecords, log.auditEvents);
+    expect(verdict.valid).toBe(false);
+    expect(verdict.brokenRecordId).toBe(log.actionRecords[0]?.recordId);
   });
 
   it('surfaces a parity divergence without rolling back the canonical store', async () => {
