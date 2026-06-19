@@ -45,6 +45,7 @@ async function loadLifecycleHarness(options: {
   initialActiveKey?: string | null;
   existingProjects?: SavedProjectSummary[];
   replaceSideStoresImpl?: () => Promise<void>;
+  loadedWorkspace?: WorkspaceData | null;
 } = {}) {
   vi.resetModules();
   const calls: string[] = [];
@@ -147,19 +148,44 @@ async function loadLifecycleHarness(options: {
     }),
     duplicateProjectStorage: vi.fn(),
     loadProjectCanvas: vi.fn(async () => null),
-    loadProjectWorkspace: vi.fn(async () => ({
-      status: 'missing',
-      data: null,
-      error: null,
-      warning: null,
-      source: null,
-    })),
+    loadProjectWorkspace: vi.fn(async () =>
+      options.loadedWorkspace
+        ? {
+            status: 'loaded',
+            data: options.loadedWorkspace,
+            error: null,
+            warning: null,
+            source: 'shards',
+          }
+        : {
+            status: 'missing',
+            data: null,
+            error: null,
+            warning: null,
+            source: null,
+          }
+    ),
     renameProjectInStorage: vi.fn(),
     saveProjectCanvas,
     saveProjectWorkspaceSnapshot,
   }));
   vi.doMock('../storage/workspace-side-store-reset', () => ({
     replaceWorkspaceSideStores,
+  }));
+  vi.doMock('../ai/approval-store', () => ({
+    useAIApprovalStore: {
+      getState: () => ({ clear: () => calls.push('clearAI:approval') }),
+    },
+  }));
+  vi.doMock('../ai/action-journal', () => ({
+    useAIActionJournalStore: {
+      getState: () => ({ clear: () => calls.push('clearAI:journal') }),
+    },
+  }));
+  vi.doMock('../ai/undo-store', () => ({
+    useAIUndoStore: {
+      getState: () => ({ clear: () => calls.push('clearAI:undo') }),
+    },
   }));
   vi.doMock('../storage/autosave-change-detection', () => ({
     buildCanvasAutosavePayload: vi.fn(() => ({ nodes: [], edges: [] })),
@@ -199,7 +225,10 @@ async function loadLifecycleHarness(options: {
     flushTitleActionLogToStorage: vi.fn(async () => {
       calls.push(`flushTitle:${activeWorkspaceKey}`);
     }),
-    hydrateTitleActionLogFromStorageOrBaseline: vi.fn(),
+    hydrateTitleActionLogFromStorageOrBaseline: vi.fn(async () => {
+      calls.push(`hydrateStorageOrBaseline:${activeWorkspaceKey}`);
+      return { source: 'storage' };
+    }),
     hydrateTitleActionLogFromImportedLedger: vi.fn(async () => {
       calls.push(`hydrateImportedLedger:${activeWorkspaceKey}`);
     }),
@@ -367,6 +396,33 @@ describe('project workspace lifecycle helpers', () => {
 
     expect(getActiveWorkspaceKey()).toBe('default::project::ws-active');
     expect(workspaceState.loadWorkspace).not.toHaveBeenCalled();
+  });
+
+  it('clears the AI approval/journal/undo stores when opening another saved project', async () => {
+    // Audit finding: the open-saved-project path hydrated the side stores but
+    // left the prior project's AI state behind — a stale approved proposal or
+    // undo snapshot from project A could then write A's data into B. The clear
+    // must happen, and must happen before the new workspace is loaded.
+    const opened = savedProject(
+      'ws-opened',
+      'default::project::ws-opened',
+      'Opened Project'
+    );
+    const { module, calls } = await loadLifecycleHarness({
+      existingProjects: [opened],
+      loadedWorkspace: workspaceData('ws-opened', 'Opened Project'),
+    });
+
+    await module.openSavedProject(opened);
+
+    expect(calls).toContain('clearAI:approval');
+    expect(calls).toContain('clearAI:journal');
+    expect(calls).toContain('clearAI:undo');
+    // The clear precedes loading the newly opened workspace, so no AI state
+    // captured against the old project survives into the new one.
+    expect(calls.indexOf('clearAI:undo')).toBeLessThan(
+      calls.indexOf('loadWorkspace:default::project::ws-opened:ws-opened')
+    );
   });
 
   it('re-engages the active workspace lease after renaming a background project', async () => {

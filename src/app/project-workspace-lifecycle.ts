@@ -38,6 +38,9 @@ import { useCurativeStore } from '../store/curative-store';
 import { useMapStore } from '../store/map-store';
 import { useOwnerStore } from '../store/owner-store';
 import { useResearchStore } from '../store/research-store';
+import { useAIApprovalStore } from '../ai/approval-store';
+import { useAIActionJournalStore } from '../ai/action-journal';
+import { useAIUndoStore } from '../ai/undo-store';
 import { initWorkspaceWriteLease } from '../storage/workspace-write-lease';
 import {
   flushTitleActionLogToStorage,
@@ -121,6 +124,22 @@ async function hydrateSideStores(workspaceId: string): Promise<void> {
   ]);
 }
 
+/**
+ * Drop the transient AI state (approval queue, pending undo snapshot, action
+ * journal) on every project switch. It belongs to the project being left, so
+ * carrying it into the newly opened project is a data-loss hazard: an
+ * approved-in-B stale proposal would write A's record into B, and restoring A's
+ * undo snapshot while B is active overwrites B with A's data. The import / demo
+ * / new-project path already clears these via
+ * `finalizeWorkspaceSideStoreReplacement`; the open-saved-project path hydrates
+ * the side stores directly, so it must clear them here too.
+ */
+function clearTransientAIState(): void {
+  useAIApprovalStore.getState().clear();
+  useAIActionJournalStore.getState().clear();
+  useAIUndoStore.getState().clear();
+}
+
 export async function flushActiveProject(): Promise<void> {
   const workspace = useWorkspaceStore.getState();
   if (!workspace._hydrated) return;
@@ -150,6 +169,7 @@ async function applyLoadedProject(
   const warnings: string[] = [];
   if (loadWarning) warnings.push(loadWarning);
 
+  clearTransientAIState();
   setActiveWorkspaceStorageKey(project.workspaceDbKey);
   useWorkspaceStore.getState().loadWorkspace(data);
   await hydrateSideStores(data.workspaceId);

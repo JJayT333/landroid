@@ -25,7 +25,7 @@ import {
   titleLedgerGeneration,
   useTitleActionLog,
 } from '../store/title-action-log';
-import { readCurrentWorkspaceData } from '../store/workspace-store';
+import { readCurrentWorkspaceData, useWorkspaceStore } from '../store/workspace-store';
 import { useOwnerStore } from '../store/owner-store';
 import { restoreSnapshot, type UndoSnapshot } from './undo-store';
 
@@ -128,6 +128,21 @@ export async function appendTitleUndoRecordsFromIndex(
  * hydrate-then-append instead of reset-and-erase (DA-H2).
  */
 export async function restoreSnapshotWithLedger(snapshot: UndoSnapshot): Promise<void> {
+  // Defense in depth: a snapshot is only valid for the workspace it was
+  // captured in. The project-switch lifecycle clears the AI undo store on every
+  // load (clearTransientAIState), so a cross-project snapshot should be
+  // unreachable — but if one ever survives, both the ledger flush below (keyed
+  // by snapshot.workspaceId) and restoreSnapshot (loadWorkspace with the other
+  // project's nodes, then the autosave loop persists it) would overwrite the
+  // ACTIVE project. Refuse rather than corrupt.
+  const activeWorkspaceId = useWorkspaceStore.getState().workspaceId;
+  if (snapshot.workspaceId !== activeWorkspaceId) {
+    console.warn(
+      '[ai-undo] snapshot workspace does not match the active workspace; undo ignored.'
+    );
+    return;
+  }
+
   // Persist the in-memory chain before loadWorkspace resets it, so the AI
   // turn's records are durable and can be marked undone below. Best effort:
   // an unflushable chain must not block the user's escape hatch.
