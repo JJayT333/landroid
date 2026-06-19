@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import Decimal from 'decimal.js';
 import { buildTractAuditFormulas, buildUnitAuditSheet } from '../audit-sheet';
 import {
   preWorkingInterestFormula,
@@ -100,5 +101,66 @@ describe('buildUnitAuditSheet', () => {
     expect(formulas[0]).toEqual(tractUnitRoyaltyFormula(tract));
     expect(formulas[3]).toEqual(preWorkingInterestFormula(tract));
     expect(formulas[5]).toEqual(retainedWorkingInterestFormula(tract));
+  });
+});
+
+describe('preWorkingInterestFormula reconciles to the engine (DA-H1 fixed-NPRI excess)', () => {
+  it('charges only the fixed-NPRI excess to WI and the printed steps reconcile to the result', () => {
+    // Synthesize a fixed-NPRI tract by overriding a real engine tract: the full
+    // fixed-NPRI burden is 10%, but only the 5% in excess of the lessor royalty
+    // is charged to the working interest (npriAdjusted = nriBeforeOrri − excess).
+    //   preWorkingInterestRate = npriAdjusted − totalOrri = 0.825 − 0.025 = 0.80
+    //   preWorkingInterestDecimal = unitParticipation × rate = 0.5 × 0.80 = 0.40
+    // The OLD builder subtracted the FULL fixed NPRI (and a hand-rolled
+    // leased−royalty base), printing a rate of ~0.75 → 0.375, contradicting the
+    // 0.40 result line on every fixed-NPRI tract.
+    const tract = {
+      ...unitSummary().tracts[0],
+      nriBeforeOrriRate: '0.875',
+      fixedNpriBurdenRate: '0.1',
+      npriAdjustedNriBeforeOrriRate: '0.825',
+      totalOrriBurdenRate: '0.025',
+      unitParticipation: '0.5',
+      preWorkingInterestDecimal: '0.4',
+      overBurdened: false,
+    };
+
+    const formula = preWorkingInterestFormula(tract);
+
+    // Only the excess over royalty (5%) is charged to WI — NOT the full 10%.
+    const excessInput = formula.inputs?.find((i) => /excess/i.test(i.label));
+    const fullInput = formula.inputs?.find((i) => /full/i.test(i.label));
+    expect(excessInput?.value).toBe('5.0000%');
+    expect(fullInput?.value).toBe('10.0000%');
+
+    // The printed derivation reconciles to the engine result (the bug was that
+    // it did not): rate = npriAdjusted − totalOrri, clamped, × unitParticipation.
+    const rate = new Decimal(tract.npriAdjustedNriBeforeOrriRate).minus(
+      tract.totalOrriBurdenRate
+    );
+    const recomputed = Decimal.max(rate, new Decimal(0)).times(tract.unitParticipation);
+    expect(recomputed.toFixed(7)).toBe(
+      new Decimal(tract.preWorkingInterestDecimal).toFixed(7)
+    );
+
+    // The final printed step shows the engine's pre-WI decimal.
+    expect(formula.steps.at(-1)?.value).toContain(new Decimal('0.4').toFixed(7));
+  });
+
+  it('reconciles on a real (no fixed-NPRI) engine tract too', () => {
+    const tract = unitSummary().tracts[0];
+    const formula = preWorkingInterestFormula(tract);
+
+    const rate = new Decimal(tract.npriAdjustedNriBeforeOrriRate).minus(
+      tract.totalOrriBurdenRate
+    );
+    const recomputed = Decimal.max(rate, new Decimal(0)).times(tract.unitParticipation);
+    expect(recomputed.toFixed(7)).toBe(
+      new Decimal(tract.preWorkingInterestDecimal).toFixed(7)
+    );
+    // The printed result line shows that same engine decimal.
+    expect(formula.result.value).toContain(
+      new Decimal(tract.preWorkingInterestDecimal).toFixed(7)
+    );
   });
 });

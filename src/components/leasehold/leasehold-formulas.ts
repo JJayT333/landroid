@@ -269,37 +269,54 @@ export function tractUnitOrriFormula(
 }
 
 // ── 7. Pre-Working-Interest Decimal (tract) ─────────────
-// preWorkingInterestRate = leasedOwnership − weightedRoyalty − fixedNpriBurden − totalOrriBurden
-// preWorkingInterestDecimal = unitParticipation × preWorkingInterestRate (clamped ≥ 0)
+// Mirrors the engine exactly (leasehold.ts:1255-1266):
+//   preWorkingInterestRate = npriAdjustedNriBeforeOrriRate − totalOrriBurdenRate
+//   preWorkingInterestDecimal = rate > 0 ? unitParticipation × rate : 0
+// where npriAdjustedNriBeforeOrriRate = nriBeforeOrriRate − fixedNpriExcess, and
+// fixedNpriExcess is ONLY the fixed-NPRI amount in EXCESS of the lessor royalty
+// (DA-H1, counsel-approved) — NOT the full fixed-NPRI burden. The prior version
+// of this derivation subtracted the full fixed-NPRI burden (and started from a
+// hand-rolled leased−royalty base), so its printed steps did not reconcile to
+// the result on any tract carrying a fixed NPRI.
 
 export function preWorkingInterestFormula(
   tract: LeaseholdTractSummary
 ): FormulaContent {
-  const leased = new Decimal(tract.leasedOwnership);
-  const royalty = new Decimal(tract.weightedRoyaltyRate);
-  const fixedNpri = new Decimal(tract.fixedNpriBurdenRate);
+  const nriBeforeOrri = new Decimal(tract.nriBeforeOrriRate);
+  const npriAdjusted = new Decimal(tract.npriAdjustedNriBeforeOrriRate);
+  // The fixed-NPRI amount actually charged to the working interest: only the
+  // excess over the lessor royalty (DA-H1). Equals the engine's fixedNpriExcess
+  // by construction (leasehold.ts:635), derived here from two summary fields so
+  // the printed sheet needs no new engine output.
+  const fixedNpriExcess = nriBeforeOrri.minus(npriAdjusted);
   const orri = new Decimal(tract.totalOrriBurdenRate);
-  const pre = leased.minus(royalty).minus(fixedNpri).minus(orri);
+  const rate = npriAdjusted.minus(orri);
+  const rateClamped = Decimal.max(rate, 0);
   return {
     title: 'Pre-Assignment Working Interest',
     description:
       'The working-interest decimal available for assignment, before any WI assignments are subtracted.',
     inputs: [
-      { label: 'Leased ownership', value: pct(tract.leasedOwnership) },
-      { label: 'Weighted royalty rate', value: pct(tract.weightedRoyaltyRate) },
-      { label: 'Fixed NPRI burden', value: pct(tract.fixedNpriBurdenRate) },
+      { label: 'NRI before ORRI (after royalty)', value: pct(tract.nriBeforeOrriRate) },
+      { label: 'Fixed NPRI burden (full)', value: pct(tract.fixedNpriBurdenRate) },
+      { label: 'Fixed NPRI charged to WI (excess over royalty)', value: pct(fixedNpriExcess) },
       { label: 'Total ORRI burden', value: pct(tract.totalOrriBurdenRate) },
       { label: 'Unit participation (TPF)', value: pct(tract.unitParticipation) },
     ],
     steps: [
       {
-        label: 'Pre-WI rate = Leased − Royalty − Fixed NPRI − ORRI',
-        expression: `${pct(leased)} − ${pct(royalty)} − ${pct(fixedNpri)} − ${pct(orri)}`,
-        value: `= ${pct(pre)}`,
+        label: 'NPRI-adjusted NRI = NRI before ORRI − Fixed NPRI excess',
+        expression: `${pct(nriBeforeOrri)} − ${pct(fixedNpriExcess)}`,
+        value: `= ${pct(npriAdjusted)}`,
+      },
+      {
+        label: 'Pre-WI rate = NPRI-adjusted NRI − Total ORRI',
+        expression: `${pct(npriAdjusted)} − ${pct(orri)}`,
+        value: `= ${pct(rate)}`,
       },
       {
         label: '× Unit participation',
-        expression: `${pct(pre)} × ${pct(tract.unitParticipation)}`,
+        expression: `${pct(rateClamped)} × ${pct(tract.unitParticipation)}`,
         value: `= ${decAndPct(tract.preWorkingInterestDecimal)}`,
       },
     ],
@@ -308,8 +325,8 @@ export function preWorkingInterestFormula(
       value: decAndPct(tract.preWorkingInterestDecimal),
     },
     note: tract.overBurdened
-      ? 'Over-burdened: fixed NPRIs + ORRIs exceed the available NRI. Pre-WI clamped to 0.'
-      : 'Clamped to 0 when negative (over-burdened tract).',
+      ? 'Over-burdened: the fixed-NPRI excess + ORRIs exceed the available NRI, so the pre-WI rate is negative and is clamped to 0.'
+      : 'Only the fixed-NPRI amount in excess of the lessor royalty is charged to the working interest (DA-H1); the full fixed-NPRI burden is shown for reference. Clamped to 0 when the rate is negative.',
   };
 }
 
