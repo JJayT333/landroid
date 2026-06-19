@@ -9,7 +9,7 @@ import { createBlankOwner } from '../../types/owner';
 import { createBlankLeaseholdUnit } from '../../types/leasehold';
 import { verifyAuditChain } from '../../project-records/action-layer/audit-chain';
 import { replayTitleProjection } from '../../project-records/action-layer/title-replay';
-import type { UndoSnapshot } from '../undo-store';
+import { restoreSnapshot, type UndoSnapshot } from '../undo-store';
 
 const docMocks = vi.hoisted(() => ({
   deleteDocsForAttachments: vi.fn(async () => {}),
@@ -277,6 +277,28 @@ describe('AI undo keeps the durable title ledger (DA-H2)', () => {
     const log = useTitleActionLog.getState();
     expect(log.actionRecords[0]?.status).toBe('applied');
     expect(log.auditEvents).toHaveLength(eventsBefore);
+  });
+
+  it('refuses to restore a snapshot captured against a different workspace (defense in depth)', async () => {
+    // Audit finding: a stale undo snapshot from project A, restored while
+    // project B is active, would loadWorkspace A's data and the autosave loop
+    // would then overwrite B on disk. The lifecycle clears the undo store on
+    // every switch, but the restore itself must also refuse a cross-workspace
+    // snapshot.
+    const foreign = snapshotOfCurrentWorkspace('foreign empty project');
+    foreign.workspaceId = 'ws-some-other-project';
+
+    // The ACTIVE workspace then gains a node the foreign (empty) snapshot lacks.
+    useWorkspaceStore.getState().createRootNode('root', '1', { grantee: 'Root' });
+    await settleTitleActionLog();
+    expect(useWorkspaceStore.getState().nodes).toHaveLength(1);
+
+    await restoreSnapshotWithLedger(foreign);
+
+    // Refused: restoreSnapshot (which would loadWorkspace the empty foreign
+    // snapshot and wipe the active node) never ran, and the node survives.
+    expect(restoreSnapshot).not.toHaveBeenCalled();
+    expect(useWorkspaceStore.getState().nodes).toHaveLength(1);
   });
 
   it('a fresh workspace with no persisted chain keeps pre-existing behavior (baseline)', async () => {
