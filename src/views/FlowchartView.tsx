@@ -99,6 +99,32 @@ function getNodeDimensions(node: Node) {
   };
 }
 
+/**
+ * Scale a non-ownership node's size by `factor`. ShapeNode / ImageNode /
+ * FrameNode (and the print path) render from the TOP-LEVEL `node.width/height`
+ * — the live size NodeResizer drives — falling back to `data.width/height`.
+ * The store always sets `node.width/height` on these nodes, so scaling only
+ * `data.*` (as Fit-to-Grid and the Resize overlay previously did) left every
+ * shape/image/frame visually unchanged. Scale the top-level dimensions the
+ * renderer actually reads, and keep `data.*` + `data.fontSize` consistent.
+ */
+export function scaleNonOwnershipNodeSize<T extends Node>(node: T, factor: number): T {
+  const data = node.data as Record<string, unknown>;
+  const mul = (value: unknown): unknown =>
+    typeof value === 'number' ? value * factor : value;
+  return {
+    ...node,
+    width: mul(node.width) as T['width'],
+    height: mul(node.height) as T['height'],
+    data: {
+      ...data,
+      width: mul(data.width),
+      height: mul(data.height),
+      fontSize: mul(data.fontSize),
+    },
+  };
+}
+
 function scaleNode(
   node: Node,
   factor: number,
@@ -121,16 +147,9 @@ function scaleNode(
     };
   }
 
-  const data = node.data as Record<string, unknown>;
   return {
-    ...node,
+    ...scaleNonOwnershipNodeSize(node, factor),
     position,
-    data: {
-      ...data,
-      width: typeof data.width === 'number' ? data.width * factor : data.width,
-      height: typeof data.height === 'number' ? data.height * factor : data.height,
-      fontSize: typeof data.fontSize === 'number' ? data.fontSize * factor : data.fontSize,
-    },
   };
 }
 
@@ -248,36 +267,22 @@ function ResizeOverlay({
     (newScale: number) => {
       setScale(newScale);
       setNodes(
-        originals.nodes.map((n) => ({
-          ...n,
-          position: {
+        originals.nodes.map((n) => {
+          const position = {
             x: (n.position.x - bbox.minX) * newScale + bbox.minX,
             y: (n.position.y - bbox.minY) * newScale + bbox.minY,
-          },
-          data:
-            n.type === 'ownership'
-              ? {
+          };
+          return n.type === 'ownership'
+            ? {
+                ...n,
+                position,
+                data: {
                   ...n.data,
-                  nodeScale: clampNodeScale(
-                    getOwnershipScale(n.data) * newScale
-                  ),
-                }
-              : {
-                  ...(n.data as Record<string, unknown>),
-                  width:
-                    typeof (n.data as Record<string, unknown>)?.width === 'number'
-                      ? ((n.data as Record<string, unknown>).width as number) * newScale
-                      : (n.data as Record<string, unknown>)?.width,
-                  height:
-                    typeof (n.data as Record<string, unknown>)?.height === 'number'
-                      ? ((n.data as Record<string, unknown>).height as number) * newScale
-                      : (n.data as Record<string, unknown>)?.height,
-                  fontSize:
-                    typeof (n.data as Record<string, unknown>)?.fontSize === 'number'
-                      ? ((n.data as Record<string, unknown>).fontSize as number) * newScale
-                      : (n.data as Record<string, unknown>)?.fontSize,
+                  nodeScale: clampNodeScale(getOwnershipScale(n.data) * newScale),
                 },
-        }))
+              }
+            : { ...scaleNonOwnershipNodeSize(n, newScale), position };
+        })
       );
       setEdges(
         originals.edges.map((e) => ({
