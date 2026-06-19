@@ -425,6 +425,10 @@ export async function duplicateProjectStorage(
   await copyWorkspaceRows(db.mapAssets, source, target.workspaceDbKey, target.workspaceId, 'id');
   await copyWorkspaceRows(db.mapRegions, source, target.workspaceDbKey, target.workspaceId, 'id');
   await copyWorkspaceRows(db.mapExternalReferences, source, target.workspaceDbKey, target.workspaceId, 'id');
+  // DA2-M GeoJSON tract polygons (v16). The `id` PK is storage-scoped (re-keyed
+  // by retargetRow); `assetId` is stored plain and resolves to the copied
+  // MapAsset's plain id, so the tract→asset link survives the copy.
+  await copyWorkspaceRows(db.mapTractFeatures, source, target.workspaceDbKey, target.workspaceId, 'id');
   await copyWorkspaceRows(db.researchImports, source, target.workspaceDbKey, target.workspaceId, 'id');
   await copyWorkspaceRows(db.researchSources, source, target.workspaceDbKey, target.workspaceId, 'id');
   await copyWorkspaceRows(db.researchFormulas, source, target.workspaceDbKey, target.workspaceId, 'id');
@@ -439,4 +443,21 @@ export async function duplicateProjectStorage(
     target.workspaceId,
     'attachmentId'
   );
+  // Canvas illustration images (v15). Flowchart nodes reference an asset by its
+  // plain `contentHash` (the node carries only the hash), which is preserved by
+  // the copy; only the storage-scoped `id` PK is re-keyed. Without this, a
+  // duplicated project's image nodes render broken.
+  await copyWorkspaceRows(db.canvasAssets, source, target.workspaceDbKey, target.workspaceId, 'id');
+
+  // Title ledger (titleActionRecords / titleAuditEvents) is DELIBERATELY NOT
+  // copied. Each audit event's hash covers the whole record envelope, including
+  // `workspaceId` (audit-chain.ts `auditHashBody` strips only `eventHash`), so
+  // re-keying the rows to the duplicate's workspaceId would invalidate every
+  // event hash — the copy would fail chain verification and be quarantined on
+  // load. Instead the duplicate gets a fresh ledger baseline on first open
+  // (hydrateTitleActionLogFromStorageOrBaseline baselines from the copied nodes
+  // when no chain exists): a duplicate is a new project whose audit trail begins
+  // at its initial, duplicated state. Carrying the source's recorded action
+  // history into a duplicate would require re-anchoring the chain under the new
+  // workspaceId — a separate feature, not a row copy.
 }
