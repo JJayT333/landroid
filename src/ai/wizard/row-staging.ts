@@ -450,6 +450,18 @@ function parseInterestExpression(raw: string): { ok: true; value: string } | { o
     return { ok: false };
   }
 
+  // Reject expressions that mix multiplicative (×) and additive (+/−) operators.
+  // This evaluator has no operator precedence and folds tokens left-to-right, so
+  // "a + b × c" would evaluate as "(a + b) × c" — silently staging a wrong
+  // fraction. Pure ×-chains and pure ±-chains are unambiguous under left-to-
+  // right; a mixed expression is ambiguous, so stop and ask rather than guess
+  // (never fabricate a fraction).
+  const hasMultiplicative = tokens.some((token) => /^[xX*]$/.test(token));
+  const hasAdditive = tokens.some((token) => /^[+\-]$/.test(token));
+  if (hasMultiplicative && hasAdditive) {
+    return { ok: false };
+  }
+
   let value: Decimal | null = null;
   let pendingOperator: 'mul' | 'add' | 'sub' | null = null;
   for (const token of tokens) {

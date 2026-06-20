@@ -243,6 +243,18 @@ describe('row staging', () => {
     });
   });
 
+  it('rejects expressions that mix × and +/− (no precedence → stop and ask, never guess)', () => {
+    // This evaluator folds left-to-right, so "1/2 + 1/4 × 1/2" would have
+    // computed (1/2 + 1/4) × 1/2 = 0.375 instead of the correct
+    // 1/2 + (1/4 × 1/2) = 0.625 — silently staging a wrong fraction. A mixed
+    // expression is ambiguous here, so it must fail rather than guess.
+    expect(parseImportFraction('1/2 + 1/4 x 1/2 MI').ok).toBe(false);
+    expect(parseImportFraction('1/2 x 1/4 + 1/8 MI').ok).toBe(false);
+    // Pure ×-chains and pure ±-chains stay valid (unambiguous left-to-right).
+    expect(parseImportFraction('1/2 x 1/2 x 1/2').ok).toBe(true);
+    expect(parseImportFraction('1/2 - 1/8 - 1/16').ok).toBe(true);
+  });
+
   it('marks ambiguous NPRI rows as needing a question instead of defaulting to fixed', () => {
     const [row] = buildStagedImportRows(
       workbook([

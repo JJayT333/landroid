@@ -18,9 +18,14 @@ export function buildModelMessagesWithActionJournal(
     ...(journalContext
       ? [{ role: 'system' as const, content: journalContext }]
       : []),
-    ...entries.map((entry) => ({
-      role: entry.role,
-      content: entry.text,
-    })),
+    // Drop empty/whitespace-only turns. An assistant entry with empty content
+    // (e.g. a tool-only or errored turn) is rejected by the provider and wedges
+    // the next request; empty user turns are equally unusable as context.
+    ...entries
+      .filter((entry) => entry.text.trim().length > 0)
+      .map((entry) => ({
+        role: entry.role,
+        content: entry.text,
+      })),
   ];
 }

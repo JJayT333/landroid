@@ -45,4 +45,23 @@ describe('AI chat model context', () => {
       )
     ).toEqual([{ role: 'user', content: 'hello' }]);
   });
+
+  it('drops empty/whitespace-only turns that would wedge the provider', () => {
+    // An assistant turn with empty content (tool-only or errored) is rejected by
+    // the provider and wedges the next request. These must not be sent.
+    expect(
+      buildModelMessagesWithActionJournal(
+        [
+          { role: 'user', text: 'first question' },
+          { role: 'assistant', text: '' },
+          { role: 'assistant', text: '   ' },
+          { role: 'user', text: 'second question' },
+        ],
+        []
+      )
+    ).toEqual([
+      { role: 'user', content: 'first question' },
+      { role: 'user', content: 'second question' },
+    ]);
+  });
 });
