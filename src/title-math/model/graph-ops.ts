@@ -222,17 +222,27 @@ function validateCycles(
  * within EPSILON; flags over- and under-allocated branches.
  */
 function validateBranchAllocation(nodes: CalcNode[], issues: ValidationIssue[]): void {
+  // Index children by parentId ONCE (O(n)) instead of re-scanning every node for
+  // every node (O(n²)). Built by iterating `nodes` in array order, so each
+  // parent's child list preserves the original iteration order — the Decimal
+  // accumulation below sums the same children in the same order, byte-identical
+  // to the prior nested scan. `related` and parent-less children were always
+  // skipped, so they are excluded from the index here.
+  const childrenByParent = new Map<string, CalcNode[]>();
+  for (const child of nodes) {
+    if (child.type === 'related' || !child.parentId) continue;
+    const siblings = childrenByParent.get(child.parentId);
+    if (siblings) siblings.push(child);
+    else childrenByParent.set(child.parentId, [child]);
+  }
+
   for (const node of nodes) {
     if (!node.id || node.type === 'related') continue;
     const initial = clamp(node.initialFraction);
     const remaining = clamp(node.fraction);
     let childInitialTotal = new Decimal(0);
-    for (const child of nodes) {
-      if (
-        child.type === 'related' ||
-        child.parentId !== node.id ||
-        !allocatesAgainstParent(node, child)
-      ) continue;
+    for (const child of childrenByParent.get(node.id) ?? []) {
+      if (!allocatesAgainstParent(node, child)) continue;
       childInitialTotal = childInitialTotal.plus(clamp(child.initialFraction));
     }
     const allocated = remaining.plus(childInitialTotal);
