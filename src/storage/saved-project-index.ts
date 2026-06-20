@@ -5,6 +5,7 @@ import {
   makeProjectWorkspaceDbKey,
 } from './active-workspace-key';
 import { storageScopedId } from './db-key-scope';
+import type { LedgerBaselineProvenance } from '../backend-spine/contracts';
 
 export interface SavedProjectSummary {
   workspaceId: string;
@@ -13,6 +14,8 @@ export interface SavedProjectSummary {
   createdAt: string;
   updatedAt: string;
   lastOpenedAt: string;
+  /** Lineage if this project was created via Duplicate; otherwise absent. */
+  derivedFrom?: LedgerBaselineProvenance;
 }
 
 interface SavedProjectUpsert {
@@ -47,6 +50,7 @@ function toSummary(record: SavedProjectRecord): SavedProjectSummary {
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
     lastOpenedAt: record.lastOpenedAt,
+    ...(record.derivedFrom ? { derivedFrom: record.derivedFrom } : {}),
   };
 }
 
@@ -81,7 +85,8 @@ export async function getMostRecentSavedProject(): Promise<SavedProjectSummary |
 export async function createSavedProjectIndexRecord(
   workspaceId: string,
   projectName: string,
-  timestamp = nowIso()
+  timestamp = nowIso(),
+  derivedFrom?: LedgerBaselineProvenance
 ): Promise<SavedProjectSummary> {
   const indexDbKey = getProjectIndexDbKey();
   const record: SavedProjectRecord = {
@@ -93,6 +98,7 @@ export async function createSavedProjectIndexRecord(
     createdAt: timestamp,
     updatedAt: timestamp,
     lastOpenedAt: timestamp,
+    ...(derivedFrom ? { derivedFrom } : {}),
   };
   await db.savedProjects.put(record);
   return toSummary(record);
@@ -121,6 +127,8 @@ export async function upsertSavedProjectFromWorkspace({
     createdAt: existing?.createdAt ?? updatedAt,
     updatedAt,
     lastOpenedAt: openedAt ?? existing?.lastOpenedAt ?? updatedAt,
+    // Lineage is durable: an open/rename/touch must not erase it.
+    ...(existing?.derivedFrom ? { derivedFrom: existing.derivedFrom } : {}),
   };
   await db.savedProjects.put(record);
   return toSummary(record);

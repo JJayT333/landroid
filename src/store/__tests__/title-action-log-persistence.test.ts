@@ -317,6 +317,47 @@ describe('title action log runtime persistence lifecycle', () => {
     expect(notice?.durablyPersisted).toBe(true);
   });
 
+  it('still seals duplicate provenance into the re-baseline after quarantining an invalid chain', async () => {
+    const workspace = makeWorkspace('ws-runtime', 'root-runtime', 'DOC-1');
+    loadWorkspaceIntoStores(workspace);
+
+    const valid = await buildBaselineRows(workspace);
+    const corrupted: TitleLedgerWorkspaceRows = {
+      actionRecords: valid.actionRecords,
+      auditEvents: valid.auditEvents.map((event, index) =>
+        index === 0 ? { ...event, eventHash: 'f'.repeat(64) } : event
+      ),
+    };
+    ledgerPersistenceMocks.rowsByWorkspace.set(workspace.workspaceId, corrupted);
+    useTitleActionLog.getState().reset();
+
+    const provenance = {
+      kind: 'duplicate' as const,
+      sourceWorkspaceId: 'ws-source',
+      sourceProjectName: 'Source',
+      duplicatedAt: '2026-06-20T00:00:00.000Z',
+      sourceNodeCount: 1,
+      sourceLedgerHeadHash: 'src-head',
+    };
+
+    const result = await hydrateTitleActionLogFromStorageOrBaseline(
+      workspace,
+      ownerDataFor(workspace.workspaceId),
+      provenance
+    );
+
+    // The corrupt chain is quarantined and a fresh baseline is recorded — and the
+    // duplicate's lineage rides through the quarantine path into that baseline.
+    expect(result.source).toBe('baseline');
+    const baseline = useTitleActionLog
+      .getState()
+      .actionRecords.find((record) => record.actionKind === 'title.baseline');
+    expect((baseline?.result as { provenance?: unknown }).provenance).toEqual(provenance);
+    expect(
+      (await verifyAuditChain(useTitleActionLog.getState().auditEvents)).valid
+    ).toBe(true);
+  });
+
   it('flags the quarantine notice when the durable copy fails (DA-H4/F2)', async () => {
     const workspace = makeWorkspace('ws-runtime', 'root-runtime', 'DOC-1');
     loadWorkspaceIntoStores(workspace);

@@ -47,8 +47,10 @@ import {
   hydrateTitleActionLogFromImportedLedger,
   hydrateTitleActionLogFromStorageOrBaseline,
 } from '../store/title-action-log';
+import { listTitleLedgerWorkspaceRows } from '../storage/title-ledger-persistence';
 import { readCurrentWorkspaceData, useWorkspaceStore } from '../store/workspace-store';
 import { createWorkspaceId } from '../utils/workspace-id';
+import type { LedgerBaselineProvenance } from '../backend-spine/contracts';
 
 export type ProjectOpenResult = {
   project: SavedProjectSummary;
@@ -182,7 +184,10 @@ async function applyLoadedProject(
   // attachments[0], which projects into instrument_record.documentId.
   await hydrateTitleActionLogFromStorageOrBaseline(
     readCurrentWorkspaceData(),
-    readTitleOwnerData()
+    readTitleOwnerData(),
+    // A duplicate's first open has no prior chain, so its genesis baseline is
+    // recorded here; pass the lineage so it is sealed into that first event.
+    project.derivedFrom
   ).catch((error) => {
     const message = error instanceof Error ? error.message : String(error);
     warnings.push(`Title ledger hydration failed: ${message}`);
@@ -380,9 +385,32 @@ export async function duplicateSavedProject(
     workspaceId: createWorkspaceId(),
     projectName: projectName.trim() || `${project.projectName} Copy`,
   };
+  // Chain-of-custody for the copy. The source ledger is identity-bound and is
+  // NOT copied (#204); this records "a true copy of X as of T", with X's ledger
+  // head as a reference pointer, to be sealed into the duplicate's genesis
+  // baseline on its first open. The source is generally NOT the active
+  // workspace, so the head MUST be read under the source's own dbKey (default
+  // activeDbKey would scope to the wrong project and silently return null).
+  // Best-effort — null if X genuinely has no chain.
+  const sourceLedgerHeadHash = await listTitleLedgerWorkspaceRows(
+    project.workspaceId,
+    project.workspaceDbKey
+  )
+    .then((rows) => rows.auditEvents.at(-1)?.eventHash ?? null)
+    .catch(() => null);
+  const derivedFrom: LedgerBaselineProvenance = {
+    kind: 'duplicate',
+    sourceWorkspaceId: project.workspaceId,
+    sourceProjectName: project.projectName,
+    duplicatedAt: new Date().toISOString(),
+    sourceNodeCount: workspaceResult.data.nodes.length,
+    sourceLedgerHeadHash,
+  };
   const target = await createSavedProjectIndexRecord(
     targetData.workspaceId,
-    targetData.projectName
+    targetData.projectName,
+    undefined,
+    derivedFrom
   );
   try {
     await duplicateProjectStorage(project, target, targetData, canvas);

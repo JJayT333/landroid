@@ -231,6 +231,32 @@ describe('title ledger persistence', () => {
     expect(listed.auditEvents[0]).not.toHaveProperty('dbKey');
   });
 
+  it('reads a non-active project ledger when given an explicit dbKey (duplicate source-head read)', async () => {
+    const action = fakeActionRecord({ recordId: 'src-action' });
+    const audit = fakeAuditEventRecord({
+      recordId: 'src-audit',
+      subjectRecordIds: ['src-action'],
+    });
+    // Source rows live under the SOURCE's own dbKey; the active project differs.
+    const { persistence } = await loadTitleLedgerPersistence({
+      workspaceKey: 'active-dbkey',
+      actionRows: [storedAction(action, 'source-dbkey', 0)],
+      auditRows: [storedAudit(audit, 'source-dbkey', 0)],
+    });
+
+    // Default (active) scope cannot see a background source's rows — this is the
+    // exact gap that silently nulled the duplicate's source-ledger head.
+    const underActive = await persistence.listTitleLedgerWorkspaceRows('ws-1');
+    expect(underActive.auditEvents).toHaveLength(0);
+    expect(underActive.actionRecords).toHaveLength(0);
+
+    // An explicit source dbKey reads them, so the duplicate path can capture the
+    // source ledger head even though the source is not the active workspace.
+    const underSource = await persistence.listTitleLedgerWorkspaceRows('ws-1', 'source-dbkey');
+    expect(underSource.auditEvents).toEqual([audit]);
+    expect(underSource.actionRecords).toEqual([action]);
+  });
+
   it('refuses to write ledger rows from a read-only tab (DA-M15)', async () => {
     const action = fakeActionRecord({ recordId: 'fenced-action' });
     const audit = fakeAuditEventRecord({

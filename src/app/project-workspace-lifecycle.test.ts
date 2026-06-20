@@ -2,6 +2,15 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { CanvasSaveData } from '../store/canvas-store';
 import type { WorkspaceData } from '../storage/workspace-persistence';
 
+type DerivedFrom = {
+  kind: 'duplicate';
+  sourceWorkspaceId: string;
+  sourceProjectName: string;
+  duplicatedAt: string;
+  sourceNodeCount: number;
+  sourceLedgerHeadHash: string | null;
+};
+
 type SavedProjectSummary = {
   workspaceId: string;
   workspaceDbKey: string;
@@ -9,6 +18,7 @@ type SavedProjectSummary = {
   createdAt: string;
   updatedAt: string;
   lastOpenedAt: string;
+  derivedFrom?: DerivedFrom;
 };
 
 function workspaceData(
@@ -105,12 +115,20 @@ async function loadLifecycleHarness(options: {
   }));
   vi.doMock('../storage/saved-project-index', () => ({
     createSavedProjectIndexRecord: vi.fn(
-      async (workspaceId: string, projectName: string) => {
-        const project = savedProject(
-          workspaceId,
-          `default::project::${workspaceId}`,
-          projectName
-        );
+      async (
+        workspaceId: string,
+        projectName: string,
+        _timestamp?: string,
+        derivedFrom?: DerivedFrom
+      ) => {
+        const project = {
+          ...savedProject(
+            workspaceId,
+            `default::project::${workspaceId}`,
+            projectName
+          ),
+          ...(derivedFrom ? { derivedFrom } : {}),
+        };
         projects.set(workspaceId, project);
         return project;
       }
@@ -225,10 +243,13 @@ async function loadLifecycleHarness(options: {
     flushTitleActionLogToStorage: vi.fn(async () => {
       calls.push(`flushTitle:${activeWorkspaceKey}`);
     }),
-    hydrateTitleActionLogFromStorageOrBaseline: vi.fn(async () => {
-      calls.push(`hydrateStorageOrBaseline:${activeWorkspaceKey}`);
-      return { source: 'storage' };
-    }),
+    hydrateTitleActionLogFromStorageOrBaseline: vi.fn(
+      async (_ws: unknown, _owner: unknown, provenance?: DerivedFrom) => {
+        calls.push(`hydrateStorageOrBaseline:${activeWorkspaceKey}`);
+        if (provenance) calls.push(`hydrateProvenance:${provenance.sourceWorkspaceId}`);
+        return { source: 'storage' };
+      }
+    ),
     hydrateTitleActionLogFromImportedLedger: vi.fn(async () => {
       calls.push(`hydrateImportedLedger:${activeWorkspaceKey}`);
     }),
@@ -238,6 +259,16 @@ async function loadLifecycleHarness(options: {
       calls.push(`reengageLease:${workspaceId}`);
       return true;
     }),
+  }));
+  vi.doMock('../storage/title-ledger-persistence', () => ({
+    listTitleLedgerWorkspaceRows: vi.fn(
+      async (workspaceId: string, dbKey?: string) => {
+        // Capture the scope so a test can prove the SOURCE's dbKey is used, not
+        // the active project's (else a background duplicate's head reads null).
+        calls.push(`listLedger:${dbKey ?? 'ACTIVE'}:${workspaceId}`);
+        return { actionRecords: [], auditEvents: [{ eventHash: 'src-head-hash' }] };
+      }
+    ),
   }));
   vi.doMock('../utils/workspace-id', () => ({
     createWorkspaceId: () => 'ws-new-project',
@@ -448,5 +479,59 @@ describe('project workspace lifecycle helpers', () => {
 
     expect(calls).toContain('deleteProjectStorage:default::project::ws-other');
     expect(calls).toContain('reengageLease:ws-active');
+  });
+
+  it('stamps duplicate chain-of-custody onto the new project (for its genesis baseline)', async () => {
+    const source = savedProject('ws-src', 'default::project::ws-src', 'Source Project');
+    const { module, projects, calls } = await loadLifecycleHarness({
+      existingProjects: [source],
+      loadedWorkspace: {
+        ...workspaceData('ws-src', 'Source Project'),
+        nodes: [{ id: 'n1' }, { id: 'n2' }] as unknown as WorkspaceData['nodes'],
+      },
+    });
+
+    const target = await module.duplicateSavedProject(source, 'Source Copy');
+
+    // The source head MUST be read under the SOURCE's own dbKey (the source is
+    // not the active workspace); a default-active scope would silently null it.
+    expect(calls).toContain('listLedger:default::project::ws-src:ws-src');
+
+    // The duplicate (createWorkspaceId mock → 'ws-new-project') records who it
+    // descends from, the source's node count, and the source ledger head — the
+    // pieces the genesis baseline seals on first open.
+    expect(projects.get('ws-new-project')?.derivedFrom).toEqual({
+      kind: 'duplicate',
+      sourceWorkspaceId: 'ws-src',
+      sourceProjectName: 'Source Project',
+      duplicatedAt: expect.any(String),
+      sourceNodeCount: 2,
+      sourceLedgerHeadHash: 'src-head-hash',
+    });
+    expect(target.derivedFrom?.sourceWorkspaceId).toBe('ws-src');
+  });
+
+  it("threads a duplicate's lineage into the genesis baseline on its first open", async () => {
+    const dup: SavedProjectSummary = {
+      ...savedProject('ws-dup', 'default::project::ws-dup', 'Duplicate'),
+      derivedFrom: {
+        kind: 'duplicate',
+        sourceWorkspaceId: 'ws-orig',
+        sourceProjectName: 'Original',
+        duplicatedAt: '2026-06-20T00:00:00.000Z',
+        sourceNodeCount: 2,
+        sourceLedgerHeadHash: 'orig-head',
+      },
+    };
+    const { module, calls } = await loadLifecycleHarness({
+      existingProjects: [dup],
+      loadedWorkspace: workspaceData('ws-dup', 'Duplicate'),
+    });
+
+    await module.openSavedProject(dup);
+
+    // The baseline hydrator received the lineage, so the genesis event will
+    // carry it; a non-duplicate open passes nothing (no hydrateProvenance call).
+    expect(calls).toContain('hydrateProvenance:ws-orig');
   });
 });
