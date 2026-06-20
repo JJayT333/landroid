@@ -23,9 +23,11 @@
 import { z } from 'zod';
 import {
   ActionRecordSchema,
+  LedgerBaselineProvenanceSchema,
   type ActionRecord,
   type AuditEventRecord,
   type BackendSpineCoreRecord,
+  type LedgerBaselineProvenance,
 } from '../../backend-spine/contracts';
 import { HOSTED_BLOCKED_TOOL_NAMES } from '../../ai/tools';
 import type { OwnershipNode } from '../../types/node';
@@ -184,6 +186,9 @@ export const TitleActionResultSchema = z
     tombstonedRecordIds: z.array(z.string()),
     sourceCitationIds: z.array(z.string()),
     aiToolName: z.string().optional(),
+    // Chain-of-custody, present ONLY on a duplicate's genesis baseline result.
+    // Sealed here so the audit-event hash covers it (tamper-evident provenance).
+    provenance: LedgerBaselineProvenanceSchema.optional(),
     mutationBoundary: z.literal(SHADOW_MUTATION_BOUNDARY),
     wouldMutateLiveStores: z.literal(false),
     wouldWriteLandroidV8: z.literal(false),
@@ -238,6 +243,8 @@ export async function materializeTitleCommand(input: {
   approvedBy: ActionRecord['approvedBy'];
   appliedAt: string;
   aiToolName?: string;
+  /** Chain-of-custody for a duplicate's genesis; ignored for any non-baseline. */
+  provenance?: LedgerBaselineProvenance;
   priorHeadHash?: string;
 }): Promise<TitleMaterialization> {
   const { command, delta } = input;
@@ -256,6 +263,11 @@ export async function materializeTitleCommand(input: {
     tombstonedRecordIds: delta.tombstonedRecordIds,
     sourceCitationIds: command.sourceCitationIds,
     aiToolName: input.aiToolName,
+    // Provenance belongs only on the genesis baseline; a non-baseline carrier
+    // would be a mislabeled record, so it is dropped for any other mutation.
+    ...(input.mutation === 'baseline' && input.provenance
+      ? { provenance: input.provenance }
+      : {}),
     mutationBoundary: SHADOW_MUTATION_BOUNDARY,
     wouldMutateLiveStores: false,
     wouldWriteLandroidV8: false,
@@ -454,6 +466,8 @@ export async function recordTitleMutation(input: {
   aiToolName?: string;
   sourceCitationIds?: string[];
   commandId?: string;
+  /** Chain-of-custody for a duplicate's genesis baseline; baseline-only. */
+  provenance?: LedgerBaselineProvenance;
   priorHeadHash?: string;
 }): Promise<TitleMutationRecordResult> {
   assertTitleCommandRoutesThroughGate(input.mutation, input.origin, input.aiToolName);
@@ -503,6 +517,7 @@ export async function recordTitleMutation(input: {
     approvedBy: input.approvedBy ?? 'user',
     appliedAt: input.appliedAt,
     aiToolName: input.aiToolName,
+    provenance: input.provenance,
     priorHeadHash: input.priorHeadHash,
   });
 

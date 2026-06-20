@@ -22,6 +22,7 @@ import type {
   DocumentAttachment,
   DocumentRecord,
 } from '../types/document';
+import type { LedgerBaselineProvenance } from '../backend-spine/contracts';
 import {
   buildNodeWorkspaceIndex,
   migratePdfsToDocuments,
@@ -112,6 +113,12 @@ export interface SavedProjectRecord {
   createdAt: string;
   updatedAt: string;
   lastOpenedAt: string;
+  /**
+   * Lineage for a project created via Duplicate. Local convenience metadata
+   * (not indexed, no migration) carried until the duplicate's first open seals
+   * it into the genesis ledger baseline. Absent for non-duplicated projects.
+   */
+  derivedFrom?: LedgerBaselineProvenance;
 }
 
 const SAVED_PROJECTS_STORE_DEFINITION =

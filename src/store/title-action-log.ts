@@ -32,6 +32,7 @@ import type {
   ActionRecord,
   AuditEventRecord,
   BackendSpineCoreRecord,
+  LedgerBaselineProvenance,
 } from '../backend-spine/contracts';
 import type { OwnerWorkspaceData } from '../storage/owner-persistence';
 import type { WorkspaceData } from '../storage/workspace-persistence';
@@ -152,6 +153,8 @@ interface TitleActionLogState {
     origin?: 'user' | 'ai' | 'import' | 'system';
     approvedBy?: ActionRecord['approvedBy'];
     aiToolName?: string;
+    /** Chain-of-custody for a duplicate's genesis; only set by the baseline path. */
+    provenance?: LedgerBaselineProvenance;
   }) => Promise<void>;
   /**
    * Flip the title record read path to cutover. Requires the readiness gates to
@@ -296,6 +299,7 @@ export const useTitleActionLog = create<TitleActionLogState>()((set, get) => ({
     origin = 'user',
     approvedBy = 'user',
     aiToolName,
+    provenance,
   }) => {
     const generationAtStart = ledgerGeneration;
     // Only mutations in the typed title catalog are representable as commands.
@@ -322,6 +326,7 @@ export const useTitleActionLog = create<TitleActionLogState>()((set, get) => ({
         afterWorkspace,
         ownerData,
         aiToolName,
+        provenance,
         priorHeadHash: get().headHash,
       });
       if (generationAtStart !== ledgerGeneration) return;
@@ -390,6 +395,7 @@ async function recordBaselineIfNeeded(input: {
   workspace: WorkspaceData;
   ownerData?: OwnerSlice;
   generationAtEnqueue: number;
+  provenance?: LedgerBaselineProvenance;
 }): Promise<void> {
   if (input.generationAtEnqueue !== ledgerGeneration) return;
   const state = useTitleActionLog.getState();
@@ -404,6 +410,8 @@ async function recordBaselineIfNeeded(input: {
     beforeWorkspace: emptyTitleBaselineWorkspace(afterWorkspace),
     afterWorkspace,
     ownerData: input.ownerData,
+    // Seal duplicate chain-of-custody into the genesis baseline (tamper-evident).
+    provenance: input.provenance,
   });
 }
 
@@ -513,10 +521,11 @@ async function verifyTitleLedgerRows(
 
 async function baselineAndFlushTitleLedger(
   workspace: WorkspaceData,
-  ownerData?: OwnerSlice
+  ownerData?: OwnerSlice,
+  provenance?: LedgerBaselineProvenance
 ): Promise<TitleLedgerLifecycleResult> {
   useTitleActionLog.getState().reset();
-  await ensureTitleBaseline(workspace, ownerData);
+  await ensureTitleBaseline(workspace, ownerData, provenance);
   await flushTitleActionLogToStorage(workspace.workspaceId);
   const state = useTitleActionLog.getState();
   return {
@@ -578,10 +587,11 @@ async function baselineAfterQuarantine(
   workspace: WorkspaceData,
   rows: TitleLedgerWorkspaceRows,
   source: 'storage' | 'file',
-  ownerData?: OwnerSlice
+  ownerData?: OwnerSlice,
+  provenance?: LedgerBaselineProvenance
 ): Promise<TitleLedgerLifecycleResult> {
   const notice = await quarantineInvalidLedger(workspace.workspaceId, rows, source);
-  const result = await baselineAndFlushTitleLedger(workspace, ownerData);
+  const result = await baselineAndFlushTitleLedger(workspace, ownerData, provenance);
   // Set AFTER the baseline — baselineAndFlushTitleLedger's reset clears it.
   useTitleActionLog.setState({ lastQuarantine: notice });
   return result;
@@ -621,7 +631,8 @@ export async function flushTitleActionLogToStorage(
 
 export async function hydrateTitleActionLogFromStorageOrBaseline(
   workspace: WorkspaceData,
-  ownerData?: OwnerSlice
+  ownerData?: OwnerSlice,
+  provenance?: LedgerBaselineProvenance
 ): Promise<TitleLedgerLifecycleResult> {
   const storedRows = await listTitleLedgerWorkspaceRows(workspace.workspaceId);
   if (
@@ -641,9 +652,11 @@ export async function hydrateTitleActionLogFromStorageOrBaseline(
     }
     // DA-H4: the stored chain is non-empty but invalid — preserve it before the
     // baseline overwrites it, instead of the old warn-and-erase.
-    return baselineAfterQuarantine(workspace, storedRows, 'storage', ownerData);
+    return baselineAfterQuarantine(workspace, storedRows, 'storage', ownerData, provenance);
   }
-  return baselineAndFlushTitleLedger(workspace, ownerData);
+  // No prior chain → this is the genesis baseline. A duplicate threads its
+  // chain-of-custody here so it is sealed into that first event.
+  return baselineAndFlushTitleLedger(workspace, ownerData, provenance);
 }
 
 export async function hydrateTitleActionLogFromImportedLedger(
@@ -681,7 +694,8 @@ export async function hydrateTitleActionLogFromImportedLedger(
  */
 export function ensureTitleBaseline(
   workspace: WorkspaceData,
-  ownerData?: OwnerSlice
+  ownerData?: OwnerSlice,
+  provenance?: LedgerBaselineProvenance
 ): Promise<void> {
   if (!useTitleActionLog.getState().enabled) return Promise.resolve();
   const generationAtEnqueue = ledgerGeneration;
@@ -691,6 +705,7 @@ export function ensureTitleBaseline(
       workspace: workspaceAtEnqueue,
       ownerData,
       generationAtEnqueue,
+      provenance,
     })
   );
   track(recordingChain);

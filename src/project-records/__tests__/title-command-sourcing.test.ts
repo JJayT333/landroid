@@ -44,6 +44,7 @@ import { verifyAuditChain } from '../action-layer/audit-chain';
 import {
   applyTitleMutation,
   COMMAND_KIND_BY_TITLE_MUTATION,
+  recordTitleMutation,
   type TitleMutation,
 } from '../action-layer/title-command-sourcing';
 import { replayTitleProjection, reconstructTitleNodes, orderNodesLike } from '../action-layer/title-replay';
@@ -256,6 +257,37 @@ describe('Phase 4 title command-sourcing wrapper (real store, 7 mutations)', () 
       finalWorkspace.nodes.map((n) => n.id)
     );
     expect(reconstructed.map((n) => n.id)).toEqual(finalWorkspace.nodes.map((n) => n.id));
+  });
+
+  it('drops chain-of-custody provenance from a non-baseline mutation (guard)', async () => {
+    resetStore();
+    const before = snapshot();
+    useWorkspaceStore.getState().createRootNode('solo', '1', { grantee: 'Solo' });
+    const after = snapshot();
+
+    const result = await recordTitleMutation({
+      mutation: 'createRootNode',
+      origin: 'user',
+      approvedBy: 'user',
+      context: context(),
+      appliedAt: NOW,
+      ownerData: OWNER_DATA,
+      beforeWorkspace: before,
+      afterWorkspace: after,
+      // Provenance only belongs on the genesis baseline; a non-baseline carrier
+      // must be dropped so it can never mislabel an ordinary edit.
+      provenance: {
+        kind: 'duplicate',
+        sourceWorkspaceId: 'ws-source',
+        sourceProjectName: 'Source',
+        duplicatedAt: NOW,
+        sourceNodeCount: 0,
+        sourceLedgerHeadHash: null,
+      },
+    });
+
+    expect(result.actionRecord.actionKind).toBe(COMMAND_KIND_BY_TITLE_MUTATION.createRootNode);
+    expect((result.actionRecord.result as { provenance?: unknown }).provenance).toBeUndefined();
   });
 
   it('deleteNode emits tombstone effects and a node snapshot for the removed node', async () => {

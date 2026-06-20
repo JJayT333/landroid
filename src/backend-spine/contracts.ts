@@ -535,6 +535,27 @@ export const ActionPlanRecordSchema = RecordEnvelopeSchema.extend({
 }).strict();
 export type ActionPlanRecord = z.infer<typeof ActionPlanRecordSchema>;
 
+/**
+ * Chain-of-custody for a project's genesis. A duplicated project gets a fresh
+ * ledger that begins at its copied state (the source ledger is identity-bound by
+ * hash and is NOT copied — see duplicateProjectStorage), so the only honest way
+ * to record "this file is a true copy of X as of T" is to seal it into the
+ * duplicate's genesis baseline `result`, where the audit-event hash covers it.
+ * It is recorded provenance, never the source's replayed history.
+ */
+export const LedgerBaselineProvenanceSchema = z
+  .object({
+    kind: z.literal('duplicate'),
+    sourceWorkspaceId: NonEmptyStringSchema,
+    sourceProjectName: z.string(),
+    duplicatedAt: IsoDateTimeSchema,
+    sourceNodeCount: z.number().int().nonnegative(),
+    /** The source ledger's head hash at duplicate time, or null if it had none. */
+    sourceLedgerHeadHash: z.string().nullable(),
+  })
+  .strict();
+export type LedgerBaselineProvenance = z.infer<typeof LedgerBaselineProvenanceSchema>;
+
 export const ActionRecordSchema = RecordEnvelopeSchema.extend({
   recordType: z.literal('action_record'),
   actionPlanId: IdSchema.optional(),

@@ -83,9 +83,13 @@ function byPositionThenRecordId<T extends { position: number; recordId: string }
 }
 
 export async function listTitleLedgerWorkspaceRows(
-  workspaceId: string
+  workspaceId: string,
+  // Defaults to the active project's dbKey. Pass an explicit dbKey to read a
+  // DIFFERENT (e.g. background, not-currently-open) project's ledger — the
+  // duplicate path reads the source's head this way, since the source is
+  // generally not the active workspace.
+  dbKey: string = activeDbKey()
 ): Promise<TitleLedgerWorkspaceRows> {
-  const dbKey = activeDbKey();
   const scope = titleLedgerScope(dbKey, workspaceId);
   const [actionRows, auditRows] = await Promise.all([
     db.titleActionRecords.where('[dbKey+workspaceId]').equals(scope).toArray(),

@@ -513,6 +513,46 @@ describe('Phase 4 LIVE title journal (real store auto-records)', () => {
     expect(useTitleActionLog.getState().actionRecords).toHaveLength(0);
   });
 
+  it('seals duplicate chain-of-custody into the genesis baseline and the chain still verifies', async () => {
+    seedPreExistingWorkspace();
+    const provenance = {
+      kind: 'duplicate' as const,
+      sourceWorkspaceId: 'ws-source-001',
+      sourceProjectName: 'Vulcan Mesa',
+      duplicatedAt: '2026-06-20T00:00:00.000Z',
+      sourceNodeCount: 3,
+      sourceLedgerHeadHash: 'source-head-hash-abc',
+    };
+
+    await ensureTitleBaseline(workspaceSnapshot(), ownerDataSnapshot(), provenance);
+    await settleTitleActionLog();
+
+    const log = useTitleActionLog.getState();
+    const baseline = log.actionRecords.find((record) => record.actionKind === 'title.baseline');
+    expect(baseline).toBeDefined();
+    // Provenance is sealed into the genesis result...
+    expect((baseline?.result as { provenance?: unknown }).provenance).toEqual(provenance);
+    // ...and the audit chain + the action-payload hash (DA-H5) still verify with it,
+    // so the chain-of-custody is tamper-evident, not free-floating metadata.
+    expect((await verifyAuditChain(log.auditEvents)).valid).toBe(true);
+    expect(
+      (await verifyActionPayloadHashes(log.actionRecords, log.auditEvents)).valid
+    ).toBe(true);
+  });
+
+  it('omits provenance from a baseline recorded without lineage (a non-duplicated project)', async () => {
+    seedPreExistingWorkspace();
+
+    await ensureTitleBaseline(workspaceSnapshot(), ownerDataSnapshot());
+    await settleTitleActionLog();
+
+    const baseline = useTitleActionLog
+      .getState()
+      .actionRecords.find((record) => record.actionKind === 'title.baseline');
+    expect(baseline).toBeDefined();
+    expect((baseline?.result as { provenance?: unknown }).provenance).toBeUndefined();
+  });
+
   it('uses loaded owner data for linkedOwnerId party ids in the baseline', async () => {
     seedPreExistingWorkspace();
 
