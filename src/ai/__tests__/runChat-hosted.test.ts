@@ -72,6 +72,12 @@ describe('runChatTurn hosted proxy path', () => {
     expect(body.messages?.[0]?.content).toContain(
       'Hosted read-only context counts as project context'
     );
+    // The proxy forwards no tools, so the hosted system prompt must be the
+    // advisory build — it must not promise tools or an approval flow the model
+    // cannot use on this path.
+    expect(body.messages?.[0]?.content).toContain('You have no editing tools on this path');
+    expect(body.messages?.[0]?.content).not.toContain('Mutating tools are approval-gated');
+    expect(body.messages?.[0]?.content).not.toContain("- 'convey'");
     expect(body.messages?.[1]?.content).toContain('Read-only LANDroid app context (minimal)');
     expect(body.messages?.at(-1)).toEqual({ role: 'user', content: 'hello' });
   });

@@ -7,7 +7,7 @@
  */
 import { streamText, stepCountIs, type ModelMessage } from 'ai';
 import { HOSTED_MODEL_ID, resolveModel } from './client';
-import { LANDROID_SYSTEM_PROMPT } from './system-prompt';
+import { LANDROID_ADVISORY_SYSTEM_PROMPT, LANDROID_SYSTEM_PROMPT } from './system-prompt';
 import { buildAIAppContext } from './app-context';
 import { landroidTools, UNDO_MUTATING_TOOL_NAMES } from './tools';
 import { useAISettingsStore } from './settings-store';
@@ -179,7 +179,10 @@ async function runHostedProxyChatTurn(
         model: HOSTED_MODEL_ID,
         stream: true,
         messages: [
-          { role: 'system', content: LANDROID_SYSTEM_PROMPT },
+          // The hosted proxy forwards no tools, so the model genuinely has no
+          // write path here. Send the advisory prompt so it never claims to
+          // create, queue, or approve a change it cannot make.
+          { role: 'system', content: LANDROID_ADVISORY_SYSTEM_PROMPT },
           { role: 'system', content: buildAIAppContext(settings.hostedContextMode) },
           ...input.messages.map(toOpenAIMessage),
         ],
