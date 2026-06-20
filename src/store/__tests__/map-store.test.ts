@@ -363,6 +363,41 @@ describe('map-store', () => {
     expect(state.tractFeatures[0].matchedDeskMapId).toBeNull();
   });
 
+  it('dedupes features that share an id so memory matches the persisted batch', async () => {
+    useMapStore.setState({ workspaceId: 'ws-a', _hydrated: true });
+    // Two polygons for the SAME tract with no GlobalID/ObjectID → both resolve
+    // to the `tract:{tractKey}` fallback id. Dexie put would store one row; the
+    // in-memory spread must not keep both (which renders the tract twice).
+    const geojson = JSON.stringify({
+      type: 'FeatureCollection',
+      features: [
+        {
+          type: 'Feature',
+          properties: { Tract: 'T-9' },
+          geometry: { type: 'Polygon', coordinates: [[[0, 0], [1, 0], [1, 1], [0, 0]]] },
+        },
+        {
+          type: 'Feature',
+          properties: { Tract: 'T-9' },
+          geometry: { type: 'Polygon', coordinates: [[[2, 2], [3, 2], [3, 3], [2, 2]]] },
+        },
+      ],
+    });
+
+    const result = await useMapStore
+      .getState()
+      .ingestGeoJsonTractFeatures({ fileName: 'dup.geojson', text: geojson });
+
+    const ids = useMapStore.getState().tractFeatures.map((feature) => feature.id);
+    expect(new Set(ids).size).toBe(ids.length); // no duplicate-id rows in memory
+    expect(useMapStore.getState().tractFeatures).toHaveLength(result.featureCount);
+    const lastCall = tractMocks.saveMapTractFeatures.mock.calls.at(-1) as
+      | unknown[]
+      | undefined;
+    const savedBatch = (lastCall?.[1] as unknown[] | undefined) ?? [];
+    expect(savedBatch).toHaveLength(result.featureCount);
+  });
+
   it('ingest throws before a workspace is set', async () => {
     useMapStore.setState({ workspaceId: null });
     await expect(

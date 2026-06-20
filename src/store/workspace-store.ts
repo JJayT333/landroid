@@ -1584,6 +1584,15 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
     set((state) => {
       const targetDeskMapId = resolveActiveDeskMapId(state.deskMaps, state.activeDeskMapId);
       if (!targetDeskMapId) return {};
+      // Membership guard (mirrors addNodeToDeskMap): a re-add of a node already
+      // on the target desk map must not append a duplicate nodeId, which would
+      // render the same card twice.
+      const target = state.deskMaps.find((dm) => dm.id === targetDeskMapId);
+      if (target?.nodeIds.includes(nodeId)) {
+        return state.activeDeskMapId === targetDeskMapId
+          ? {}
+          : { activeDeskMapId: targetDeskMapId };
+      }
       return {
         activeDeskMapId: targetDeskMapId,
         deskMaps: state.deskMaps.map((dm) =>

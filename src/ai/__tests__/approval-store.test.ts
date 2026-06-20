@@ -86,6 +86,73 @@ describe('AI approval store — live preview refresh (DA-M12)', () => {
   });
 });
 
+describe('AI approval store — duplicate proposal collapse', () => {
+  beforeEach(() => {
+    useAIApprovalStore.getState().clear();
+    seedWorkspaceWithRoot();
+  });
+
+  it('collapses an identical still-pending proposal instead of queuing a second card', () => {
+    const first = queueAIApprovalProposal('deleteNode', { nodeId: 'root' }, 'Delete leaf root');
+    const second = queueAIApprovalProposal('deleteNode', { nodeId: 'root' }, 'Delete leaf root');
+
+    expect(second.proposalId).toBe(first.proposalId);
+    expect(useAIApprovalStore.getState().proposals).toHaveLength(1);
+  });
+
+  it('keeps genuinely different proposals as separate cards', () => {
+    useWorkspaceStore.setState({
+      nodes: [
+        rootNode(),
+        {
+          ...createBlankNode('leaf'),
+          parentId: 'root',
+          fraction: '0',
+          initialFraction: '0',
+        },
+      ],
+      deskMaps: [deskMap({ nodeIds: ['root', 'leaf'] })],
+    });
+
+    queueAIApprovalProposal('deleteNode', { nodeId: 'root' }, 'Delete root');
+    queueAIApprovalProposal('deleteNode', { nodeId: 'leaf' }, 'Delete leaf');
+
+    expect(useAIApprovalStore.getState().proposals).toHaveLength(2);
+  });
+});
+
+describe('AI approval store — concurrent approve is idempotent', () => {
+  beforeEach(() => {
+    useAIApprovalStore.getState().clear();
+    seedWorkspaceWithRoot();
+  });
+
+  it('runs the executor once when the same proposal is approved twice concurrently', async () => {
+    let releaseExecutor: (value: unknown) => void = () => {};
+    const gate = new Promise<unknown>((resolve) => {
+      releaseExecutor = resolve;
+    });
+    const executor = vi.fn(async () => {
+      await gate;
+      return { ok: true };
+    });
+    registerAIMutationExecutor('deleteNode', executor);
+
+    const queued = queueAIApprovalProposal('deleteNode', { nodeId: 'root' }, 'Delete leaf root');
+
+    // Two approvals fire before the first resolves (e.g. a fast double-click /
+    // double tool round-trip). The mutation must apply exactly once.
+    const first = approveAIProposal(queued.proposalId);
+    const second = approveAIProposal(queued.proposalId);
+    releaseExecutor({ ok: true });
+    const [r1, r2] = await Promise.all([first, second]);
+
+    expect(executor).toHaveBeenCalledTimes(1);
+    expect(r1).toEqual(r2);
+    expect(useAIApprovalStore.getState().proposals).toHaveLength(0);
+  });
+});
+
 describe('AI approval store — re-assert before execute (DA-M12)', () => {
   beforeEach(() => {
     useAIApprovalStore.getState().clear();

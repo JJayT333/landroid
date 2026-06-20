@@ -125,6 +125,32 @@ describe('workspace-store', () => {
     });
   });
 
+  it('addNodeToActiveDeskMap is idempotent — a re-add does not duplicate the nodeId', () => {
+    const node = { ...createBlankNode('n1', null), grantee: 'A' };
+    useWorkspaceStore.setState({
+      nodes: [node],
+      deskMaps: [
+        {
+          id: 'dm-1',
+          name: 'Tract 1',
+          code: 'T1',
+          tractId: null,
+          grossAcres: '100',
+          pooledAcres: '100',
+          description: '',
+          nodeIds: [],
+        },
+      ],
+      activeDeskMapId: 'dm-1',
+    });
+
+    useWorkspaceStore.getState().addNodeToActiveDeskMap('n1');
+    useWorkspaceStore.getState().addNodeToActiveDeskMap('n1');
+
+    const dm = useWorkspaceStore.getState().deskMaps.find((d) => d.id === 'dm-1');
+    expect(dm?.nodeIds).toEqual(['n1']);
+  });
+
   it('books an over-conveyance and raises an Over-conveyance title issue (DA-M1)', async () => {
     const root = {
       ...createBlankNode('root', null),
