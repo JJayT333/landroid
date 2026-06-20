@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { createBlankOwner, type Lease } from '../../types/owner';
+import { createBlankLease, createBlankOwner, type Lease } from '../../types/owner';
 
 const mocks = vi.hoisted(() => ({
   loadOwnerWorkspaceMetadata: vi.fn(),
@@ -72,6 +72,21 @@ describe('owner-store', () => {
       selectedOwnerTab: 'info',
       _hydrated: false,
     });
+  });
+
+  it('addLease upserts by id so a re-add replaces instead of duplicating', async () => {
+    useOwnerStore.setState({ workspaceId: 'ws-a' });
+    const lease = createBlankLease('ws-a', 'owner-1', {
+      id: 'lease-1',
+      leaseName: 'Original',
+    });
+
+    await useOwnerStore.getState().addLease(lease);
+    await useOwnerStore.getState().addLease({ ...lease, leaseName: 'Updated' });
+
+    const leases = useOwnerStore.getState().leases;
+    expect(leases).toHaveLength(1);
+    expect(leases[0]?.leaseName).toBe('Updated');
   });
 
   it('clears selected owner state when switching workspaces', async () => {

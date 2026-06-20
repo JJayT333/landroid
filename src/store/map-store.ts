@@ -204,19 +204,27 @@ export const useMapStore = create<MapState>()((set, get) => ({
 
     const now = new Date().toISOString();
     const features = buildMapTractFeatures(workspaceId, asset.id, collection, now);
+    // Dedupe by feature id (last wins) so the in-memory set matches what Dexie
+    // persists: saveMapTractFeatures puts by id, so two features sharing an id
+    // (e.g. the `tract:{tractKey}` fallback when GeoJSON lacks globalId/objectId)
+    // collapse to one stored row — but the spread below would otherwise keep
+    // both in memory and render the tract twice.
+    const dedupedFeatures = Array.from(
+      new Map(features.map((feature) => [feature.id, feature])).values()
+    );
     // Idempotent: clear any prior features for this asset, then write the batch.
     await deleteMapTractFeaturesForAsset(workspaceId, asset.id);
-    await saveMapTractFeatures(workspaceId, features);
+    await saveMapTractFeatures(workspaceId, dedupedFeatures);
     set((state) => ({
       tractFeatures: [
         ...state.tractFeatures.filter((feature) => feature.assetId !== asset.id),
-        ...features,
+        ...dedupedFeatures,
       ],
     }));
 
     return {
       assetId: asset.id,
-      featureCount: features.length,
+      featureCount: dedupedFeatures.length,
       warnings: collection.warnings,
     };
   },

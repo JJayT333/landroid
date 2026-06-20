@@ -221,7 +221,14 @@ export const useOwnerStore = create<OwnerState>()((set, get) => ({
       ownerId: lease.ownerId,
     });
     await saveLease(next);
-    set((state) => ({ leases: [...state.leases, next] }));
+    // Upsert by id: re-adding an existing lease id replaces in place rather than
+    // appending a second record (which would render as a duplicate lease under
+    // the owner). saveLease already overwrites the stored row by id.
+    set((state) => ({
+      leases: state.leases.some((existing) => existing.id === next.id)
+        ? state.leases.map((existing) => (existing.id === next.id ? next : existing))
+        : [...state.leases, next],
+    }));
   },
 
   updateLease: async (id, fields) => {

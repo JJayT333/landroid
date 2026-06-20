@@ -41,9 +41,36 @@ type MutationExecutor = (input: unknown) => Promise<unknown>;
 
 const mutationExecutors = new Map<string, MutationExecutor>();
 
+/**
+ * Order-stable serialization of a proposal's input so two structurally-equal
+ * inputs compare equal regardless of key order. Used to collapse duplicate
+ * pending proposals at enqueue time.
+ */
+function stableInputKey(input: unknown): string {
+  return JSON.stringify(input, (_key, value) => {
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      return Object.fromEntries(
+        Object.entries(value as Record<string, unknown>).sort(([a], [b]) =>
+          a.localeCompare(b)
+        )
+      );
+    }
+    return value;
+  });
+}
+
 export const useAIApprovalStore = create<AIApprovalState>()((set, get) => ({
   proposals: [],
   enqueue: (proposal) => {
+    // Collapse an identical still-pending proposal (same tool + same input)
+    // instead of queuing a second visually-identical approval card — e.g. when
+    // the model proposes the same change twice within one tool loop.
+    const duplicate = get().proposals.find(
+      (existing) =>
+        existing.toolName === proposal.toolName
+        && stableInputKey(existing.input) === stableInputKey(proposal.input)
+    );
+    if (duplicate) return duplicate;
     const queued: AIApprovalProposal = {
       ...proposal,
       id: `ai-proposal-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -111,7 +138,21 @@ export function queueAIApprovalProposal(
   };
 }
 
-export async function approveAIProposal(id: string): Promise<unknown> {
+// Approvals in flight by proposal id. A second approve() for the same id while
+// the first is still awaiting its executor returns the SAME promise instead of
+// running the mutation twice (the proposal is only removed after the executor
+// resolves, so a fast double-trigger would otherwise both find it and apply).
+const inFlightApprovals = new Map<string, Promise<unknown>>();
+
+export function approveAIProposal(id: string): Promise<unknown> {
+  const existing = inFlightApprovals.get(id);
+  if (existing) return existing;
+  const run = runApproval(id);
+  inFlightApprovals.set(id, run);
+  return run.finally(() => inFlightApprovals.delete(id));
+}
+
+async function runApproval(id: string): Promise<unknown> {
   const proposal = useAIApprovalStore
     .getState()
     .proposals.find((item) => item.id === id);
