@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import OwnerDetailPanel from '../components/owners/OwnerDetailPanel';
 import { getOwnerLeaseDeskMapTargets } from '../components/owners/owner-lease-deskmap';
+import {
+  countActiveLeaseInstruments,
+  groupLeasesByInstrument,
+} from '../components/owners/owner-lease-grouping';
 import Button from '../components/shared/Button';
 import Pill from '../components/shared/Pill';
 import UndoRedoControls from '../components/shell/UndoRedoControls';
@@ -90,13 +94,16 @@ export function buildOwnerListRows(owners: Owner[], leases: Lease[]): OwnerListR
 
   return owners.map((owner) => {
     const ownerLeases = leasesByOwnerId.get(owner.id) ?? [];
-    const activeLeaseCount = ownerLeases.filter(
-      (lease) => !isInactiveLeaseStatus(lease.status)
-    ).length;
+    // Count distinct lease INSTRUMENTS, not per-tract records, so the list-rail
+    // badge matches the collapsed cards in the detail panel.
+    const activeLeaseCount = countActiveLeaseInstruments(
+      ownerLeases,
+      isInactiveLeaseStatus
+    );
 
     return {
       owner,
-      leaseCount: ownerLeases.length,
+      leaseCount: groupLeasesByInstrument(ownerLeases).length,
       activeLeaseCount,
       searchText: normalizeOwnerListText(
         [
