@@ -11,6 +11,7 @@ import OwnerDocsTab from './OwnerDocsTab';
 import OwnerInfoTab from './OwnerInfoTab';
 import OwnerLeasesTab from './OwnerLeasesTab';
 import type { OwnerLeaseDeskMapTarget } from './owner-lease-deskmap';
+import { groupLeasesByInstrument } from './owner-lease-grouping';
 
 const tabs: { id: OwnerPanelTab; label: string }[] = [
   { id: 'info', label: 'Info' },
@@ -81,9 +82,12 @@ export default function OwnerDetailPanel({
     if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
     return (words[0][0] + words[words.length - 1][0]).toUpperCase();
   })();
+  // Count distinct lease INSTRUMENTS, not records: one instrument spanning N
+  // tracts is stored as N per-tract records but shows as one collapsed card.
+  const leaseInstrumentCount = groupLeasesByInstrument(leases).length;
   const stats: { label: string; value: number }[] = [
     ...(typeof tractCount === 'number' ? [{ label: 'Tracts', value: tractCount }] : []),
-    { label: 'Lease Records', value: leases.length },
+    { label: 'Leases', value: leaseInstrumentCount },
     { label: 'Contacts', value: contacts.length },
     { label: 'Documents', value: docs.length },
   ];

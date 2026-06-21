@@ -20,6 +20,49 @@ import {
   parseStrictInterestString,
 } from '../../utils/interest-string';
 import type { OwnerLeaseDeskMapTarget } from './owner-lease-deskmap';
+import {
+  groupLeasesByInstrument,
+  type LeaseInstrumentGroup,
+} from './owner-lease-grouping';
+
+/** Instrument fields carried across every record of a collapsed lease group. */
+const LEASE_INSTRUMENT_FIELDS = [
+  'leaseName',
+  'lessee',
+  'royaltyRate',
+  'leasedInterest',
+  'effectiveDate',
+  'expirationDate',
+  'status',
+  'docNo',
+  'notes',
+] as const;
+
+/**
+ * Union the desk-map attach targets across every record in a collapsed group,
+ * keyed by the owner mineral node, preferring an already-attached target and
+ * remembering which record owns it (so the button acts on the right record).
+ */
+function unionGroupDeskMapTargets(
+  group: LeaseInstrumentGroup,
+  getDeskMapTargetsForLease: (leaseId: string) => OwnerLeaseDeskMapTarget[]
+): Array<OwnerLeaseDeskMapTarget & { leaseId: string }> {
+  const byNode = new Map<string, OwnerLeaseDeskMapTarget & { leaseId: string }>();
+  for (const record of group.records) {
+    for (const target of getDeskMapTargetsForLease(record.id)) {
+      const existing = byNode.get(target.parentNodeId);
+      if (!existing || (!existing.leaseNodeId && target.leaseNodeId)) {
+        byNode.set(target.parentNodeId, { ...target, leaseId: record.id });
+      }
+    }
+  }
+  return [...byNode.values()].sort((left, right) => {
+    if (left.leaseNodeId && !right.leaseNodeId) return -1;
+    if (!left.leaseNodeId && right.leaseNodeId) return 1;
+    const byName = left.deskMapName.localeCompare(right.deskMapName);
+    return byName !== 0 ? byName : left.parentNodeLabel.localeCompare(right.parentNodeLabel);
+  });
+}
 
 interface OwnerLeasesTabProps {
   workspaceId: string;
@@ -49,8 +92,13 @@ export default function OwnerLeasesTab({
 }: OwnerLeasesTabProps) {
   const { confirm: requestConfirmation } = useConfirmation();
   const [draft, setDraft] = useState<Lease | null>(null);
+  // When editing a collapsed group of duplicate records, the instrument fields
+  // are applied to ALL of them on save so they stay collapsed (null = single).
+  const [editingGroupIds, setEditingGroupIds] = useState<string[] | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+
+  const leaseGroups = useMemo(() => groupLeasesByInstrument(leases), [leases]);
   // Suggest lessees from every lease in the project, not just this owner's
   // (the `leases` prop is owner-filtered).
   const allLeases = useOwnerStore((state) => state.leases);
@@ -62,13 +110,16 @@ export default function OwnerLeasesTab({
   const beginAdd = () => {
     if (readOnly) return;
     setSaveError(null);
+    setEditingGroupIds(null);
     setDraft(createBlankLease(workspaceId, ownerId));
   };
 
-  const beginEdit = (lease: Lease) => {
+  const beginEditGroup = (group: LeaseInstrumentGroup) => {
     if (readOnly) return;
     setSaveError(null);
-    setDraft(normalizeLease(lease, { workspaceId, ownerId }));
+    // Edit applies to every record in a collapsed group so they stay one card.
+    setEditingGroupIds(group.records.length > 1 ? group.records.map((record) => record.id) : null);
+    setDraft(normalizeLease(group.primary, { workspaceId, ownerId }));
   };
 
   const set = (field: keyof Lease, value: string) => {
@@ -184,6 +235,7 @@ export default function OwnerLeasesTab({
               variant="ghost"
               onClick={() => {
                 setSaveError(null);
+                setEditingGroupIds(null);
                 setDraft(null);
               }}
             >
@@ -225,12 +277,23 @@ export default function OwnerLeasesTab({
                     ? ''
                     : serialize(parsedLeasedInterest),
                 };
-                if (leases.some((lease) => lease.id === draft.id)) {
+                if (editingGroupIds && editingGroupIds.length > 1) {
+                  // Apply the instrument fields to every collapsed record so the
+                  // group stays a single card (ids/owner/workspace untouched).
+                  const instrumentFields: Partial<Lease> = {};
+                  for (const field of LEASE_INSTRUMENT_FIELDS) {
+                    instrumentFields[field] = normalizedDraft[field];
+                  }
+                  await Promise.all(
+                    editingGroupIds.map((id) => onUpdate(id, instrumentFields))
+                  );
+                } else if (leases.some((lease) => lease.id === draft.id)) {
                   await onUpdate(draft.id, normalizedDraft);
                 } else {
                   await onAdd(normalizedDraft);
                 }
                 setSaving(false);
+                setEditingGroupIds(null);
                 setDraft(null);
               }}
               title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
@@ -258,20 +321,26 @@ export default function OwnerLeasesTab({
           </div>
         )}
 
-        {leases.map((lease) => (
-          <div
-            key={lease.id}
-            className="rounded-md border border-ledger-line bg-parchment px-4 py-3"
-          >
-            {(() => {
-              const deskMapTargets = getDeskMapTargetsForLease(lease.id);
-
-              return (
-                <>
+        {leaseGroups.map((group) => {
+          const lease = group.primary;
+          const recordCount = group.records.length;
+          const deskMapTargets = unionGroupDeskMapTargets(group, getDeskMapTargetsForLease);
+          return (
+            <div
+              key={group.key}
+              className="rounded-md border border-ledger-line bg-parchment px-4 py-3"
+            >
             <div className="flex items-start justify-between gap-3">
               <div className="space-y-1">
-                <div className="text-sm font-semibold text-ink">
-                  {lease.leaseName || lease.lessee || 'Untitled Lease'}
+                <div className="flex items-center gap-2">
+                  <div className="text-sm font-semibold text-ink">
+                    {lease.leaseName || lease.lessee || 'Untitled Lease'}
+                  </div>
+                  {recordCount > 1 && (
+                    <span className="px-2 py-0.5 rounded-full bg-leather/10 text-[10px] font-semibold text-leather">
+                      {recordCount} tracts
+                    </span>
+                  )}
                 </div>
                 <div className="text-xs text-ink-light">
                   {lease.lessee ? `Lessee: ${lease.lessee}` : 'Lessee not recorded'}
@@ -307,7 +376,7 @@ export default function OwnerLeasesTab({
                 <button
                   type="button"
                   disabled={readOnly}
-                  onClick={() => beginEdit(lease)}
+                  onClick={() => beginEditGroup(group)}
                   title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
                   className="px-3 py-1.5 rounded-md text-xs font-semibold text-leather hover:bg-leather/10 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                 >
@@ -320,12 +389,17 @@ export default function OwnerLeasesTab({
                     if (readOnly) return;
                     const confirmed = await requestConfirmation({
                       title: 'Delete Lease?',
-                      message: 'Delete this lease? Linked map/doc references will be cleared.',
+                      message:
+                        recordCount > 1
+                          ? `Delete this lease across ${recordCount} tracts? Linked map/doc references will be cleared.`
+                          : 'Delete this lease? Linked map/doc references will be cleared.',
                       confirmLabel: 'Delete Lease',
                       tone: 'danger',
                     });
                     if (!confirmed) return;
-                    await onRemove(lease.id);
+                    for (const record of group.records) {
+                      await onRemove(record.id);
+                    }
                   }}
                   title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
                   className="px-3 py-1.5 rounded-md text-xs font-semibold text-seal hover:bg-seal/10 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
@@ -334,44 +408,46 @@ export default function OwnerLeasesTab({
                 </button>
               </div>
             </div>
-                  <div className="mt-3 pt-3 border-t border-ledger-line/70">
-                    <div className="text-[10px] font-semibold uppercase tracking-wider text-ink-light">
-                      Desk Map Lease Node
-                    </div>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {deskMapTargets.length > 0 ? (
-                        deskMapTargets.map((target) => (
-                          <button
-                            key={`${lease.id}-${target.parentNodeId}`}
-                            type="button"
-                            disabled={readOnly && !target.leaseNodeId}
-                            onClick={() => onOpenDeskMapLeaseTarget(lease, target)}
-                            title={
-                              readOnly && !target.leaseNodeId
-                                ? READ_ONLY_WORKSPACE_EDIT_TITLE
-                                : undefined
-                            }
-                            className="px-3 py-1.5 rounded-md text-xs font-semibold text-emerald-900 hover:bg-emerald-100 border border-emerald-300 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-                          >
-                            {target.leaseNodeId ? 'Open' : 'Create'} {target.deskMapName}
-                          </button>
-                        ))
-                      ) : (
-                        <button
-                          type="button"
-                          disabled
-                          className="px-3 py-1.5 rounded-md text-xs font-semibold text-ink-light border border-ledger-line opacity-70 cursor-not-allowed"
-                        >
-                          Link Owner In Desk Map First
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </>
-              );
-            })()}
-          </div>
-        ))}
+            <div className="mt-3 pt-3 border-t border-ledger-line/70">
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-ink-light">
+                Desk Map Lease Node
+              </div>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {deskMapTargets.length > 0 ? (
+                  deskMapTargets.map((target) => {
+                    const owningLease =
+                      group.records.find((record) => record.id === target.leaseId) ?? lease;
+                    return (
+                      <button
+                        key={`${group.key}-${target.parentNodeId}`}
+                        type="button"
+                        disabled={readOnly && !target.leaseNodeId}
+                        onClick={() => onOpenDeskMapLeaseTarget(owningLease, target)}
+                        title={
+                          readOnly && !target.leaseNodeId
+                            ? READ_ONLY_WORKSPACE_EDIT_TITLE
+                            : undefined
+                        }
+                        className="px-3 py-1.5 rounded-md text-xs font-semibold text-emerald-900 hover:bg-emerald-100 border border-emerald-300 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {target.leaseNodeId ? 'Open' : 'Create'} {target.deskMapName}
+                      </button>
+                    );
+                  })
+                ) : (
+                  <button
+                    type="button"
+                    disabled
+                    className="px-3 py-1.5 rounded-md text-xs font-semibold text-ink-light border border-ledger-line opacity-70 cursor-not-allowed"
+                  >
+                    Link Owner In Desk Map First
+                  </button>
+                )}
+              </div>
+            </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
