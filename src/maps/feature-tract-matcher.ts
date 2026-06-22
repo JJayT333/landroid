@@ -13,8 +13,9 @@
 import type { MapTractFeature } from '../types/map-tract-feature';
 import type { DeskMap } from '../types/node';
 import { normalizeExternalRef, type ExternalRef } from '../types/external-ref';
+import { featureAcres } from './tract-area';
 
-export type TractMatchConfidence = 'exact' | 'normalized' | 'none';
+export type TractMatchConfidence = 'exact' | 'normalized' | 'acreage' | 'none';
 
 export interface TractMatchSuggestion {
   featureId: string;
@@ -27,6 +28,25 @@ export interface TractMatchSuggestion {
 /** Case/space/underscore-insensitive code key, e.g. "18 _201" → "18-201". */
 export function normalizeTractCode(value: string): string {
   return value.trim().toLowerCase().replace(/[\s_]+/g, '-');
+}
+
+/** First positive number in a free-text acreage string, e.g. "106.19 ac" → 106.19. */
+function parseAcreage(value: string | undefined): number | null {
+  if (!value) return null;
+  const match = value.match(/-?\d+(\.\d+)?/);
+  if (!match) return null;
+  const acres = parseFloat(match[0]);
+  return Number.isFinite(acres) && acres > 0 ? acres : null;
+}
+
+/**
+ * How far a feature's acreage may sit from a DeskMap's and still be a candidate.
+ * Generous on purpose — interior splits move acreage and the result is a human-
+ * confirmed SUGGESTION, never a silent link — with the greedy one-to-one
+ * assignment below preventing a near-sized neighbor from stealing a tract.
+ */
+function acreageTolerance(deskMapAcres: number): number {
+  return Math.max(3, 0.2 * deskMapAcres);
 }
 
 export function suggestTractMatches(
@@ -43,22 +63,76 @@ export function suggestTractMatches(
     if (!byNormalized.has(normalized)) byNormalized.set(normalized, deskMap.id);
   }
 
-  return features.map((feature) => {
+  // Pass 1 — code match (exact, then normalized). The DeskMaps these claim are
+  // off the table for the acreage pass so a fuzzy match can't override a code.
+  const results = new Map<string, TractMatchSuggestion>();
+  const usedDeskMapIds = new Set<string>();
+  for (const feature of features) {
     const exact = byCode.get(feature.tractKey.trim());
-    if (exact) {
-      return { featureId: feature.id, tractKey: feature.tractKey, deskMapId: exact, confidence: 'exact' };
+    const deskMapId = exact ?? byNormalized.get(normalizeTractCode(feature.tractKey)) ?? null;
+    const confidence: TractMatchConfidence = exact
+      ? 'exact'
+      : deskMapId
+        ? 'normalized'
+        : 'none';
+    if (deskMapId) usedDeskMapIds.add(deskMapId);
+    results.set(feature.id, {
+      featureId: feature.id,
+      tractKey: feature.tractKey,
+      deskMapId,
+      confidence,
+    });
+  }
+
+  // Pass 2 — acreage crosswalk for renumbered exports whose Tract keys don't
+  // equal the DeskMap codes. Greedy nearest-acreage, one feature to one DeskMap,
+  // smallest distance first, within tolerance. Greedy (not an optimal-assignment
+  // solver) is deliberate: the result is a human-confirmed suggestion, and on
+  // real exports it pairs the unit tracts and leaves near-sized neighbors out.
+  const availableDeskMaps = deskMaps
+    .filter((deskMap) => !usedDeskMapIds.has(deskMap.id))
+    .map((deskMap) => ({ id: deskMap.id, acres: parseAcreage(deskMap.grossAcres) }))
+    .filter((deskMap): deskMap is { id: string; acres: number } => deskMap.acres !== null);
+
+  if (availableDeskMaps.length > 0) {
+    const unmatched = features
+      .filter((feature) => results.get(feature.id)?.deskMapId == null)
+      .map((feature) => ({ id: feature.id, acres: featureAcres(feature) }))
+      .filter((feature): feature is { id: string; acres: number } => feature.acres !== null);
+
+    const pairs: Array<{ featureId: string; deskMapId: string; dist: number }> = [];
+    for (const feature of unmatched) {
+      for (const deskMap of availableDeskMaps) {
+        const dist = Math.abs(deskMap.acres - feature.acres);
+        if (dist <= acreageTolerance(deskMap.acres)) {
+          pairs.push({ featureId: feature.id, deskMapId: deskMap.id, dist });
+        }
+      }
     }
-    const normalized = byNormalized.get(normalizeTractCode(feature.tractKey));
-    if (normalized) {
-      return {
-        featureId: feature.id,
-        tractKey: feature.tractKey,
-        deskMapId: normalized,
-        confidence: 'normalized',
-      };
+    // Smallest distance first; explicit id tie-breakers make the assignment
+    // deterministic regardless of engine sort stability or input ordering.
+    pairs.sort(
+      (a, b) =>
+        a.dist - b.dist
+        || a.featureId.localeCompare(b.featureId)
+        || a.deskMapId.localeCompare(b.deskMapId)
+    );
+
+    const claimedFeatures = new Set<string>();
+    const claimedDeskMaps = new Set<string>(usedDeskMapIds);
+    for (const pair of pairs) {
+      if (claimedFeatures.has(pair.featureId) || claimedDeskMaps.has(pair.deskMapId)) continue;
+      claimedFeatures.add(pair.featureId);
+      claimedDeskMaps.add(pair.deskMapId);
+      const suggestion = results.get(pair.featureId);
+      if (suggestion) {
+        suggestion.deskMapId = pair.deskMapId;
+        suggestion.confidence = 'acreage';
+      }
     }
-    return { featureId: feature.id, tractKey: feature.tractKey, deskMapId: null, confidence: 'none' };
-  });
+  }
+
+  return features.map((feature) => results.get(feature.id) as TractMatchSuggestion);
 }
 
 /** The ArcGIS `ExternalRef` for a tract feature (or null if it carries no id). */

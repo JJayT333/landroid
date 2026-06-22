@@ -3,6 +3,8 @@ import { useMapStore } from '../../store/map-store';
 import { useWorkspaceStore } from '../../store/workspace-store';
 import { useOwnerStore } from '../../store/owner-store';
 import { suggestTractMatches } from '../../maps/feature-tract-matcher';
+import { featureAcres } from '../../maps/tract-area';
+import { formatAcres } from '../../engine/display-format';
 import {
   downloadTractCsv,
   downloadTractGeoJson,
@@ -155,7 +157,13 @@ export default function TractMatcherPanel({ readOnly = false }: { readOnly?: boo
                       {feature.tractKey}
                     </td>
                     <td className="px-3 py-1.5 text-ink-light whitespace-nowrap">
-                      {feature.acres != null ? `${feature.acres} ac` : '—'}
+                      {(() => {
+                        // Fall back to geodesic area when the export left Acres
+                        // blank, marking the derived figure with "~".
+                        if (feature.acres != null) return `${feature.acres} ac`;
+                        const derived = featureAcres(feature);
+                        return derived != null ? `~${formatAcres(derived)} ac` : '—';
+                      })()}
                     </td>
                     <td className="px-3 py-1.5">
                       <div className="flex items-center gap-1.5">
@@ -175,14 +183,24 @@ export default function TractMatcherPanel({ readOnly = false }: { readOnly?: boo
                           ))}
                         </select>
                         {!readOnly && suggestedId && (
-                          <button
-                            type="button"
-                            title="Accept the suggested match"
-                            onClick={() => void setFeatureTractMatch(feature.id, suggestedId)}
-                            className="rounded border border-emerald-300 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-800 transition-colors hover:bg-emerald-100"
-                          >
-                            Accept
-                          </button>
+                          <>
+                            {suggestion?.confidence === 'acreage' && (
+                              <span
+                                title="Suggested by matching acreage — the Tract key did not match a DeskMap code. Confirm before relying on it."
+                                className="rounded-full border border-[#b4822d]/40 bg-[#b4822d]/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-[#8a6320]"
+                              >
+                                ≈ acreage
+                              </span>
+                            )}
+                            <button
+                              type="button"
+                              title="Accept the suggested match"
+                              onClick={() => void setFeatureTractMatch(feature.id, suggestedId)}
+                              className="rounded border border-emerald-300 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-800 transition-colors hover:bg-emerald-100"
+                            >
+                              Accept
+                            </button>
+                          </>
                         )}
                       </div>
                     </td>
