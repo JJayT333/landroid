@@ -3294,9 +3294,12 @@ function LinkedSummary({
         <div className="text-sm text-ink-light">{emptyText}</div>
       ) : (
         <div className="grid gap-2 sm:grid-cols-2">
-          {items.map((item) => (
+          {items.map((item, index) => (
             <div
-              key={`${item.meta}-${item.label}`}
+              // Index-suffixed: two records sharing a label+meta (e.g. same-type,
+              // not-yet-renamed) would otherwise collide on key and one would be
+              // dropped from this display-only list.
+              key={`${item.meta}-${item.label}-${index}`}
               className="rounded-md border border-ledger-line bg-parchment px-3 py-2"
             >
               <div className="text-sm font-semibold text-ink truncate">{item.label}</div>
