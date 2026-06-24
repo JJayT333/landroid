@@ -7,15 +7,25 @@ import {
   projectLonLat,
   type GeoBBox,
 } from '../../maps/geojson-ingest';
-import { TRACT_PALETTE } from '../../maps/tract-palette';
+import { featureAcres } from '../../maps/tract-area';
+import { formatAcres } from '../../engine/display-format';
 import type { GeoRing, MapTractFeature } from '../../types/map-tract-feature';
 
 /**
- * DA2-M PR M4 — render the ingested tract polygons as SVG (the real map, not the
- * rect annotation boxes). WGS84 → planar projection is computed here from the
- * loaded feature set; click a polygon to select its tract. Matched tracts read
- * green, unmatched amber, the selected one is highlighted.
+ * DA2-M — render ingested tract polygons as a land-plat exhibit: flat parchment
+ * paper inside a survey frame, thin ink tract boundaries, a restrained warm wash
+ * on the matched (unit) tracts so they read against the white neighbors, and
+ * small seal-red survey tract numbers. Click a polygon to select its tract.
  */
+
+// Survey-plat ink + accents, drawn from the app theme tokens.
+const INK = '#3a2e1c';
+const INK_SELECTED = '#241a0e';
+const PAPER = '#fffcf6'; // --color-parchment-light
+const FRAME = '#cdbf9f';
+const UNIT_WASH = '#8a4b2d'; // --color-leather, used at low opacity
+const LABEL_RED = '#a4342c'; // --color-seal — the survey tract-number red
+const LABEL_HALO = '#fffcf6';
 
 function mergeBBoxes(features: readonly MapTractFeature[]): GeoBBox | null {
   let bbox: GeoBBox | null = null;
@@ -52,15 +62,18 @@ export default function TractMapCanvas() {
   const render = useMemo(() => {
     const bbox = mergeBBoxes(tractFeatures);
     if (!bbox) return null;
-    const proj = computeTractProjection(bbox, { size: 900, padding: 28 });
-    const shapes = tractFeatures.map((feature, index) => ({
-      id: feature.id,
-      tractKey: feature.tractKey,
-      matched: Boolean(feature.matchedDeskMapId),
-      color: TRACT_PALETTE[index % TRACT_PALETTE.length],
-      d: featureToSvgPath(feature.polygons, proj),
-      label: projectLonLat(ringCentroid(feature.polygons[0]?.outer ?? [[0, 0]]), proj),
-    }));
+    const proj = computeTractProjection(bbox, { size: 900, padding: 36 });
+    const shapes = tractFeatures.map((feature) => {
+      const acres = featureAcres(feature);
+      return {
+        id: feature.id,
+        tractKey: feature.tractKey,
+        matched: Boolean(feature.matchedDeskMapId),
+        acresLabel: acres != null ? formatAcres(acres) : null,
+        d: featureToSvgPath(feature.polygons, proj),
+        label: projectLonLat(ringCentroid(feature.polygons[0]?.outer ?? [[0, 0]]), proj),
+      };
+    });
     return { proj, shapes };
   }, [tractFeatures]);
 
@@ -68,13 +81,14 @@ export default function TractMapCanvas() {
 
   const deskMapById = new Map(deskMaps.map((dm) => [dm.id, dm]));
   const selected = tractFeatures.find((feature) => feature.id === selectedId) ?? null;
+  const { width, height } = render.proj;
 
-  // Colored unit plat: each tract carries its muted palette color; selection and
-  // hover deepen it, unlinked tracts sit a touch lighter than linked.
+  // Restrained warm wash on the matched (unit) tracts so they read against the
+  // white neighbor tracts — selection/hover deepen it; neighbors stay paper.
   function fillOpacityFor(id: string, matched: boolean): number {
-    if (id === selectedId) return 0.82;
-    if (id === hoveredId) return 0.64;
-    return matched ? 0.52 : 0.34;
+    if (id === selectedId) return 0.26;
+    if (id === hoveredId) return matched ? 0.2 : 0.08;
+    return matched ? 0.13 : 0;
   }
 
   return (
@@ -82,39 +96,59 @@ export default function TractMapCanvas() {
       <div className="flex items-center justify-end gap-3 text-[11px] text-ink-light">
         <span>click a tract to select it</span>
         <span className="flex items-center gap-1.5">
-          <span className="inline-block h-2.5 w-2.5 rounded-[2px] bg-[#8aa9a3]" style={{ opacity: 0.52 }} />
-          linked
+          <span
+            className="inline-block h-2.5 w-2.5 rounded-[1px] border border-[#3a2e1c]"
+            style={{ backgroundColor: UNIT_WASH, opacity: 0.13 }}
+          />
+          unit tract
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="inline-block h-2.5 w-2.5 rounded-[2px] bg-[#8aa9a3]" style={{ opacity: 0.3 }} />
-          unlinked
+          <span className="inline-block h-2.5 w-2.5 rounded-[1px] border border-[#3a2e1c] bg-[#fffcf6]" />
+          neighbor
         </span>
       </div>
 
-      <div className="rounded-md border border-ledger-line bg-gradient-to-b from-parchment to-parchment-dark/40 overflow-hidden shadow-sm">
+      <div className="overflow-hidden rounded-md border border-ledger-line">
         <svg
-          viewBox={`0 0 ${render.proj.width} ${render.proj.height}`}
+          viewBox={`0 0 ${width} ${height}`}
           className="w-full"
-          style={{ maxHeight: '60vh', display: 'block' }}
+          style={{ maxHeight: '62vh', display: 'block', backgroundColor: PAPER }}
           role="group"
-          aria-label="Tract polygons"
+          aria-label="Tract plat"
         >
-          <defs>
-            <filter id="tractDepth" x="-20%" y="-20%" width="140%" height="140%">
-              <feDropShadow dx="0" dy="1.4" stdDeviation="1.6" floodColor="#2d2114" floodOpacity="0.3" />
-            </filter>
-          </defs>
+          {/* Survey frame: a double rule just inside the paper edge. */}
+          <rect
+            x={8}
+            y={8}
+            width={width - 16}
+            height={height - 16}
+            fill="none"
+            stroke={FRAME}
+            strokeWidth={2}
+            vectorEffect="non-scaling-stroke"
+          />
+          <rect
+            x={12}
+            y={12}
+            width={width - 24}
+            height={height - 24}
+            fill="none"
+            stroke={FRAME}
+            strokeWidth={0.75}
+            vectorEffect="non-scaling-stroke"
+          />
+
           {render.shapes.map((shape) => (
             <path
               key={shape.id}
               d={shape.d}
               fillRule="evenodd"
-              fill={shape.color}
+              fill={UNIT_WASH}
               fillOpacity={fillOpacityFor(shape.id, shape.matched)}
-              stroke={shape.id === selectedId ? '#2d2114' : '#4a3c28'}
-              strokeWidth={shape.id === selectedId ? 2 : 1.1}
+              stroke={shape.id === selectedId ? INK_SELECTED : INK}
+              strokeWidth={shape.id === selectedId ? 1.9 : 0.85}
+              strokeLinejoin="round"
               vectorEffect="non-scaling-stroke"
-              filter="url(#tractDepth)"
               style={{ cursor: 'pointer' }}
               onClick={() => setSelectedId(shape.id)}
               onMouseEnter={() => setHoveredId(shape.id)}
@@ -123,24 +157,43 @@ export default function TractMapCanvas() {
               <title>Tract {shape.tractKey}</title>
             </path>
           ))}
+
           {render.shapes.map((shape) => (
-            <text
+            <g
               key={`${shape.id}-label`}
-              x={shape.label[0]}
-              y={shape.label[1]}
-              textAnchor="middle"
-              dominantBaseline="central"
-              fontSize={11}
-              fontWeight={700}
-              fill="#2d2114"
-              stroke="#f4eee2"
-              strokeWidth={3}
-              paintOrder="stroke"
               pointerEvents="none"
               style={{ userSelect: 'none' }}
+              transform={`translate(${shape.label[0]} ${shape.label[1]})`}
             >
-              {shape.tractKey}
-            </text>
+              <text
+                textAnchor="middle"
+                dominantBaseline="central"
+                fontSize={13}
+                fontWeight={700}
+                fontFamily="'Tahoma', 'Segoe UI', system-ui, sans-serif"
+                fill={LABEL_RED}
+                stroke={LABEL_HALO}
+                strokeWidth={2.6}
+                paintOrder="stroke"
+              >
+                {shape.tractKey}
+              </text>
+              {shape.acresLabel && (
+                <text
+                  y={11}
+                  textAnchor="middle"
+                  dominantBaseline="central"
+                  fontSize={7}
+                  fontFamily="'Tahoma', 'Segoe UI', system-ui, sans-serif"
+                  fill="#6b5b3e"
+                  stroke={LABEL_HALO}
+                  strokeWidth={1.8}
+                  paintOrder="stroke"
+                >
+                  {shape.acresLabel} ac
+                </text>
+              )}
+            </g>
           ))}
         </svg>
       </div>
@@ -149,7 +202,10 @@ export default function TractMapCanvas() {
         <div className="rounded-md border border-ledger-line bg-parchment px-3 py-2 text-xs text-ink">
           <span className="font-semibold">Tract {selected.tractKey}</span>
           {' • '}
-          {selected.acres != null ? `${selected.acres} ac` : 'acres —'}
+          {(() => {
+            const acres = featureAcres(selected);
+            return acres != null ? `${formatAcres(acres)} ac` : 'acres —';
+          })()}
           {' • '}
           {selected.matchedDeskMapId
             ? `linked to ${deskMapById.get(selected.matchedDeskMapId)?.code ?? '—'}`
