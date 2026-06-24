@@ -67,6 +67,38 @@ export default function TractMatcherPanel({ readOnly = false }: { readOnly?: boo
     }
   }
 
+  // Demo convenience: ingest the bundled sample tract export and auto-confirm
+  // every suggested match in one click, so the plat is populated on the spot.
+  async function onLoadSample() {
+    setBusy(true);
+    setStatus(null);
+    try {
+      const response = await fetch('/samples/dr-elmore-tracts.geojson');
+      if (!response.ok) throw new Error('sample tract file not found');
+      const text = await response.text();
+      const result = await ingestGeoJsonTractFeatures({
+        fileName: 'dr-elmore-tracts.geojson',
+        text,
+      });
+      const fresh = useMapStore.getState().tractFeatures;
+      let accepted = 0;
+      for (const suggestion of suggestTractMatches(fresh, deskMaps)) {
+        if (suggestion.deskMapId) {
+          await setFeatureTractMatch(suggestion.featureId, suggestion.deskMapId);
+          accepted += 1;
+        }
+      }
+      setStatus(
+        `Loaded ${result.featureCount} sample tract${result.featureCount === 1 ? '' : 's'}`
+          + ` (${accepted} matched).`
+      );
+    } catch (err) {
+      setStatus(`Load failed: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="rounded-md border border-ledger-line bg-ledger p-4 space-y-3">
       <div className="flex items-center justify-between gap-3">
@@ -128,8 +160,18 @@ export default function TractMatcherPanel({ readOnly = false }: { readOnly?: boo
       {status && <div className="text-xs text-ink-light">{status}</div>}
 
       {tractFeatures.length === 0 ? (
-        <div className="rounded-md border border-dashed border-ledger-line bg-parchment px-3 py-4 text-center text-xs text-ink-light">
-          No tract geometry yet. Import a GeoJSON export to begin.
+        <div className="rounded-md border border-dashed border-ledger-line bg-parchment px-3 py-5 text-center text-xs text-ink-light space-y-2">
+          <div>No tract geometry yet. Import a GeoJSON export to begin.</div>
+          {!readOnly && (
+            <button
+              type="button"
+              disabled={busy || !workspaceId}
+              onClick={() => void onLoadSample()}
+              className="rounded-md border border-leather/30 bg-parchment px-3 py-1.5 text-xs font-semibold text-leather transition-colors hover:bg-leather/10 disabled:opacity-50"
+            >
+              {busy ? 'Loading…' : 'Load sample tracts'}
+            </button>
+          )}
         </div>
       ) : (
         <div className="overflow-hidden rounded-md border border-ledger-line">
