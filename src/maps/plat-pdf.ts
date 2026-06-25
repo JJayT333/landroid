@@ -2,9 +2,11 @@
  * Unit-plat PDF exhibit (DA2-M PR M6).
  *
  * Draws the matched/ingested tracts as a VECTOR plat (pdf-lib `drawSvgPath`, no
- * rasterization) — colored tracts + numbers, a title block, and a legend table
- * keyed `LAND_TRACT_ID` — the kind of plat a landman distributes. Pure data in,
- * PDF bytes out (testable; the UI only wires the download).
+ * rasterization) inside a survey frame — thin ink tract boundaries, a restrained
+ * warm wash on the matched (unit) tracts so they read against the white
+ * neighbors, seal-red survey tract numbers with acreage, a title block, and a
+ * legend table keyed `LAND_TRACT_ID`. Matches the on-screen land-plat exhibit.
+ * Pure data in, PDF bytes out (testable; the UI only wires the download).
  */
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import {
@@ -14,7 +16,8 @@ import {
   projectLonLat,
   ringCentroid,
 } from './geojson-ingest';
-import { hexToRgb01, tractColorAt } from './tract-palette';
+import { featureAcres } from './tract-area';
+import { formatAcres } from '../engine/display-format';
 import type { MapTractFeature } from '../types/map-tract-feature';
 
 export interface PlatPdfInput {
@@ -29,6 +32,16 @@ export interface PlatPdfInput {
 const INK = rgb(0.18, 0.13, 0.08);
 const INK_SOFT = rgb(0.42, 0.36, 0.28);
 const BORDER = rgb(0.29, 0.24, 0.16);
+const TRACT_INK = rgb(0.227, 0.18, 0.11); // #3a2e1c — thin survey boundaries
+const UNIT_WASH = rgb(0.541, 0.294, 0.176); // #8a4b2d leather, faint on matched tracts
+const LABEL_RED = rgb(0.643, 0.204, 0.173); // #a4342c — survey tract-number red
+const ACRES_INK = rgb(0.42, 0.357, 0.243); // #6b5b3e
+const FRAME = rgb(0.804, 0.749, 0.624); // #cdbf9f — survey frame rule
+
+function acresText(feature: MapTractFeature): string | null {
+  const acres = featureAcres(feature);
+  return acres != null ? formatAcres(acres) : null;
+}
 
 export async function buildUnitPlatPdf(input: PlatPdfInput): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
@@ -64,17 +77,31 @@ export async function buildUnitPlatPdf(input: PlatPdfInput): Promise<Uint8Array>
   const availH = top - margin;
   const scale = Math.min(availW / proj.width, availH / proj.height);
   const left = margin;
+  const drawnW = proj.width * scale;
+  const drawnH = proj.height * scale;
 
-  features.forEach((feature, index) => {
-    const [r, g, b] = hexToRgb01(tractColorAt(index));
+  // Survey frame: a double rule just outside the drawn tracts.
+  const pad = 10;
+  for (const inset of [0, 4]) {
+    page.drawRectangle({
+      x: left - pad + inset,
+      y: top - drawnH - pad + inset,
+      width: drawnW + (pad - inset) * 2,
+      height: drawnH + (pad - inset) * 2,
+      borderColor: FRAME,
+      borderWidth: inset === 0 ? 1.4 : 0.6,
+    });
+  }
+
+  features.forEach((feature) => {
     page.drawSvgPath(featureToSvgPath(feature.polygons, proj), {
       x: left,
       y: top,
       scale,
-      color: rgb(r, g, b),
-      opacity: feature.matchedDeskMapId ? 0.5 : 0.34,
-      borderColor: BORDER,
-      borderWidth: 0.8,
+      color: UNIT_WASH,
+      opacity: feature.matchedDeskMapId ? 0.16 : 0,
+      borderColor: TRACT_INK,
+      borderWidth: 0.7,
     });
   });
 
@@ -82,8 +109,26 @@ export async function buildUnitPlatPdf(input: PlatPdfInput): Promise<Uint8Array>
     const [cx, cy] = projectLonLat(ringCentroid(feature.polygons[0].outer), proj);
     const x = left + cx * scale;
     const y = top - cy * scale;
-    const textWidth = bold.widthOfTextAtSize(feature.tractKey, 8);
-    page.drawText(feature.tractKey, { x: x - textWidth / 2, y: y - 4, size: 8, font: bold, color: INK });
+    const keyWidth = bold.widthOfTextAtSize(feature.tractKey, 9);
+    page.drawText(feature.tractKey, {
+      x: x - keyWidth / 2,
+      y: y - 2,
+      size: 9,
+      font: bold,
+      color: LABEL_RED,
+    });
+    const acres = acresText(feature);
+    if (acres) {
+      const label = `${acres} ac`;
+      const acWidth = font.widthOfTextAtSize(label, 5.5);
+      page.drawText(label, {
+        x: x - acWidth / 2,
+        y: y - 9,
+        size: 5.5,
+        font,
+        color: ACRES_INK,
+      });
+    }
   });
 
   // ── Legend table (right column) ──
@@ -94,12 +139,20 @@ export async function buildUnitPlatPdf(input: PlatPdfInput): Promise<Uint8Array>
   page.drawText('Acres', { x: lx + 70, y: ly, size: 9, font: bold, color: INK_SOFT });
   page.drawText('LAND_TRACT_ID', { x: lx + 116, y: ly, size: 9, font: bold, color: INK_SOFT });
   ly -= 15;
-  features.forEach((feature, index) => {
+  features.forEach((feature) => {
     if (ly < margin) return; // ran out of page; legend overflow is acceptable
-    const [r, g, b] = hexToRgb01(tractColorAt(index));
-    page.drawRectangle({ x: lx, y: ly - 1, width: 9, height: 9, color: rgb(r, g, b), opacity: 0.6, borderColor: BORDER, borderWidth: 0.5 });
+    page.drawRectangle({
+      x: lx,
+      y: ly - 1,
+      width: 9,
+      height: 9,
+      color: UNIT_WASH,
+      opacity: feature.matchedDeskMapId ? 0.16 : 0,
+      borderColor: TRACT_INK,
+      borderWidth: 0.6,
+    });
     page.drawText(feature.tractKey, { x: lx + 14, y: ly, size: 8, font, color: INK });
-    page.drawText(feature.acres != null ? `${feature.acres}` : '—', { x: lx + 70, y: ly, size: 8, font, color: INK });
+    page.drawText(acresText(feature) ?? '—', { x: lx + 70, y: ly, size: 8, font, color: INK });
     page.drawText(legendByKey.get(feature.tractKey)?.landTractId ?? '—', { x: lx + 116, y: ly, size: 8, font, color: INK });
     ly -= 13;
   });
