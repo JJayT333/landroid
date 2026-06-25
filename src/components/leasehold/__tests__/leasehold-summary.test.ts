@@ -2894,4 +2894,63 @@ describe('leasehold-summary', () => {
       'assignment-assignment-null-unit'
     );
   });
+
+  it('duplicate per-tract lease records yield the SAME math as one record on many nodes', () => {
+    // The Springhill generator (and the per-tract attach modal) record one
+    // instrument as N per-tract records. PR #212 collapses the DISPLAY; this
+    // locks the underlying guarantee that the leasehold math reads lease-NODES
+    // (not record count), so N identical records on N nodes == one record on N
+    // nodes — and a future data-model fix would be byte-identical here.
+    const deskMaps = [
+      { id: 'dm-1', name: 'Tract 1', code: 'T1', tractId: 'T1', grossAcres: '100', pooledAcres: '100', description: '', nodeIds: ['n1', 'l1'] },
+      { id: 'dm-2', name: 'Tract 2', code: 'T2', tractId: 'T2', grossAcres: '100', pooledAcres: '100', description: '', nodeIds: ['n2', 'l2'] },
+    ];
+    const owners = [createBlankOwner('ws-1', { id: 'owner-1', name: 'Multi-Tract Owner' })];
+    const minerals = (lease1: string, lease2: string): OwnershipNode[] => [
+      { ...createBlankNode('n1', null), grantee: 'Multi-Tract Owner', linkedOwnerId: 'owner-1', fraction: '1', initialFraction: '1' },
+      { ...createBlankNode('n2', null), grantee: 'Multi-Tract Owner', linkedOwnerId: 'owner-1', fraction: '1', initialFraction: '1' },
+      { ...createBlankNode('l1', 'n1'), type: 'related' as const, relatedKind: 'lease' as const, linkedLeaseId: lease1 },
+      { ...createBlankNode('l2', 'n2'), type: 'related' as const, relatedKind: 'lease' as const, linkedLeaseId: lease2 },
+    ];
+    const ogml = (id: string) =>
+      createBlankLease('ws-1', 'owner-1', {
+        id,
+        leaseName: 'OGML',
+        lessee: 'Operator',
+        royaltyRate: '1/8',
+        leasedInterest: '1',
+        effectiveDate: '2024-01-01',
+        docNo: 'OGML-1',
+      });
+    const common = { owners, leaseholdAssignments: [], leaseholdOrris: [] };
+
+    // N records, one lease-node each (today's duplicate model).
+    const duplicated = buildLeaseholdUnitSummary({
+      deskMaps,
+      nodes: minerals('lease-1', 'lease-2'),
+      leases: [ogml('lease-1'), ogml('lease-2')],
+      ...common,
+    });
+    // One record, two lease-nodes (the target model).
+    const consolidated = buildLeaseholdUnitSummary({
+      deskMaps,
+      nodes: minerals('lease-1', 'lease-1'),
+      leases: [ogml('lease-1')],
+      ...common,
+    });
+
+    const tractMath = (summary: typeof duplicated) =>
+      summary.tracts.map((tract) => ({
+        weightedRoyaltyRate: tract.weightedRoyaltyRate,
+        unitRoyaltyDecimal: tract.unitRoyaltyDecimal,
+        preWorkingInterestDecimal: tract.preWorkingInterestDecimal,
+        retainedWorkingInterestDecimal: tract.retainedWorkingInterestDecimal,
+        ownerRoyalties: tract.owners.map((owner) => owner.unitRoyaltyDecimal),
+      }));
+
+    expect(tractMath(duplicated)).toEqual(tractMath(consolidated));
+    expect(duplicated.totalRoyaltyDecimal).toBe(consolidated.totalRoyaltyDecimal);
+    expect(duplicated.preWorkingInterestDecimal).toBe(consolidated.preWorkingInterestDecimal);
+    expect(duplicated.retainedWorkingInterestDecimal).toBe(consolidated.retainedWorkingInterestDecimal);
+  });
 });
