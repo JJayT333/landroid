@@ -2,7 +2,10 @@ import { useMemo, useRef, useState } from 'react';
 import { useMapStore } from '../../store/map-store';
 import { useWorkspaceStore } from '../../store/workspace-store';
 import { useOwnerStore } from '../../store/owner-store';
+import { useConfirmation } from '../shared/ConfirmationProvider';
 import { suggestTractMatches } from '../../maps/feature-tract-matcher';
+import { parseTractFeatures } from '../../maps/geojson-ingest';
+import { detectTractReimport } from '../../maps/tract-reimport';
 import { featureAcres } from '../../maps/tract-area';
 import { formatAcres } from '../../engine/display-format';
 import {
@@ -22,6 +25,7 @@ export default function TractMatcherPanel({ readOnly = false }: { readOnly?: boo
   const ingestGeoJsonTractFeatures = useMapStore((state) => state.ingestGeoJsonTractFeatures);
   const setFeatureTractMatch = useMapStore((state) => state.setFeatureTractMatch);
   const removeTractFeature = useMapStore((state) => state.removeTractFeature);
+  const removeAsset = useMapStore((state) => state.removeAsset);
   const deskMaps = useWorkspaceStore((state) => state.deskMaps);
   const nodes = useWorkspaceStore((state) => state.nodes);
   const projectName = useWorkspaceStore((state) => state.projectName);
@@ -30,9 +34,33 @@ export default function TractMatcherPanel({ readOnly = false }: { readOnly?: boo
   const owners = useOwnerStore((state) => state.owners);
   const leases = useOwnerStore((state) => state.leases);
 
+  const { confirm: requestConfirmation } = useConfirmation();
   const inputRef = useRef<HTMLInputElement>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  // Warn-and-choose on a likely re-import: if the file repeats most of an
+  // earlier import's tracts, offer to replace that copy rather than silently
+  // stacking a second one. Returns ' (replaced an earlier import)' for the
+  // status line, or '' if nothing was replaced.
+  async function resolveReimport(text: string): Promise<string> {
+    const reimport = detectTractReimport(
+      parseTractFeatures(text).features.map((feature) => feature.tractKey),
+      tractFeatures
+    );
+    if (!reimport) return '';
+    const replace = await requestConfirmation({
+      title: 'Re-import detected',
+      message:
+        `${reimport.matched} of these tracts are already loaded from an earlier import. `
+        + 'Replace that earlier copy, or keep both layers?',
+      confirmLabel: 'Replace earlier',
+      cancelLabel: 'Keep both',
+    });
+    if (!replace) return '';
+    await removeAsset(reimport.assetId);
+    return ' (replaced an earlier import)';
+  }
 
   const suggestions = useMemo(
     () => new Map(suggestTractMatches(tractFeatures, deskMaps).map((s) => [s.featureId, s])),
@@ -56,9 +84,12 @@ export default function TractMatcherPanel({ readOnly = false }: { readOnly?: boo
     setStatus(null);
     try {
       const text = await file.text();
+      const replaced = await resolveReimport(text);
       const result = await ingestGeoJsonTractFeatures({ fileName: file.name, text });
       const warn = result.warnings.length ? ` (${result.warnings.length} skipped)` : '';
-      setStatus(`Imported ${result.featureCount} tract${result.featureCount === 1 ? '' : 's'}${warn}.`);
+      setStatus(
+        `Imported ${result.featureCount} tract${result.featureCount === 1 ? '' : 's'}${warn}${replaced}.`
+      );
     } catch (err) {
       setStatus(`Import failed: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
@@ -76,6 +107,7 @@ export default function TractMatcherPanel({ readOnly = false }: { readOnly?: boo
       const response = await fetch('/samples/dr-elmore-tracts.geojson');
       if (!response.ok) throw new Error('sample tract file not found');
       const text = await response.text();
+      await resolveReimport(text);
       const result = await ingestGeoJsonTractFeatures({
         fileName: 'dr-elmore-tracts.geojson',
         text,
