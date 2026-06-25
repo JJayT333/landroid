@@ -18,3 +18,12 @@ tests/fixtures/ai-wizard/**/*.tiff
 /local-gis-source/
 /*.ppkx
 /*.ppkx*.zip
+
+# Local worktrees + operator scratch artifacts (keep `git add -A` from sweeping
+# them in). Committed map sample lives at public/samples/, not the repo root.
+/.worktrees/
+/JSON.json
+/*.landroid
+/All Tract Numbers.pdf
+/All Tract Numbers.svg
+/docs/landroid-deep-audit-prompt.md
