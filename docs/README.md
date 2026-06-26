@@ -10,6 +10,7 @@ Use this map to decide which Markdown file to read or update.
 | `PROJECT_CONTEXT.md` | Domain, scope, and architecture invariants. | A long-lived product/domain boundary changes. |
 | `README.md` | Fast repo onboarding and validation entrypoint. | Setup, validation, or current surface list changes. |
 | `ARCHITECTURE.md` | Implementation map and module ownership. | Entrypoints, store ownership, data flow, or boundaries change. |
+| `docs/feature-interaction-map.md` | Audit companion: per-feature dependency edges (reads/read-by), the shared-contract → what-breaks → guard table, and a "if you change X, run guard Z" blast-radius cheat sheet. Built by code-tracing; refresh after large refactors. | Before a regression audit, or when a refactor changes feature dependencies or a new cross-cutting contract lands. |
 | `TESTING.md` | Validation command selection and known warnings. | Tests, fixtures, skipped e2e status, or validation policy changes. |
 | `SECURITY.md` | Security model, AI key policy, and import risk notes. | Provider, hosting, upload, or secret-handling posture changes. |
 | `DEPLOYMENT_GUIDE.md` | Step-by-step AWS POC deployment instructions. | Console steps, AWS resource names, hosted env vars, or smoke-test instructions change. |
