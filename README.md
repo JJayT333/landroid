@@ -75,6 +75,7 @@ persistence refactor, fixture retargeting, and document-registry smoke path.
 | `AGENTS.md` | Rules for AI coding agents working in this repo. |
 | `PROJECT_CONTEXT.md` | Domain, architecture, and scope invariants. |
 | `ARCHITECTURE.md` | Runtime stack, state ownership, module boundaries, and data flow. |
+| `docs/feature-interaction-map.md` | Audit companion: feature dependency edges, shared-contract → what-breaks → guard table, and a refactor blast-radius cheat sheet. |
 | `TESTING.md` | Validation commands, known warnings, and test policy. |
 | `SECURITY.md` | Local-first security model, AI/key handling, and upload risks. |
 | `DEPLOYMENT_GUIDE.md` | Step-by-step walkthrough for deploying to `landroid.abstractmapping.com` (Cognito + Amplify + Lambda AI proxy). |
