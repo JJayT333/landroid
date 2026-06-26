@@ -15,6 +15,7 @@ import { useOwnerStore } from '../../store/owner-store';
 import { useWorkspaceStore } from '../../store/workspace-store';
 import type { OwnershipNode } from '../../types/node';
 import {
+  DEFAULT_LEASE_STATUS,
   LEASE_STATUS_OPTIONS,
   computeNetAcres,
   createBlankLease,
@@ -125,96 +126,107 @@ export async function reconcileLeaseTractNodes({
     addNodeToDeskMap,
   } = actions;
   const plan = planTractReconcile(tractDrafts);
+  const checkedTracts = [...plan.create, ...plan.update];
+
+  // Lease-instrument model: the checked tracts are ONE lease instrument, so they
+  // share ONE Lease record. Its instrument-level fields come from leaseOverrides
+  // (the shared form); each tract's lessor interest + gross acres live on that
+  // tract's lease-node, so the record's own leasedInterest is left blank. Resolve
+  // (or mint) the canonical record once — preferring a record already linked
+  // under a checked tract, the originating tract first — so editing an existing
+  // lease consolidates rather than spawning a record per tract.
+  const originatingTract =
+    checkedTracts.find((tract) => tract.mineralNodeId === parentNode.id)
+    ?? checkedTracts[0]
+    ?? null;
+
+  let canonicalLeaseId: string | null = null;
+  let canonicalRecord: Lease | null = null;
+  if (originatingTract) {
+    const existingRecord = originatingTract.existingLeaseId
+      ? leases.find((lease) => lease.id === originatingTract.existingLeaseId) ?? null
+      : null;
+    canonicalRecord = {
+      ...(existingRecord ?? createBlankLease(resolvedWorkspaceId, ownerId)),
+      ...leaseOverrides,
+      workspaceId: resolvedWorkspaceId,
+      leasedInterest: '',
+    };
+    canonicalLeaseId = canonicalRecord.id;
+    if (existingRecord) {
+      await updateLease(canonicalLeaseId, canonicalRecord);
+    } else {
+      await addLease(canonicalRecord);
+    }
+  }
+
+  // Fan one lease-node per checked tract onto the canonical record, carrying that
+  // tract's lessor interest + gross acres on the node (the coverage math reads the
+  // per-tract leased interest off the node; a blank leaves the record's value).
   let originatingNodeId: string | null = null;
-  for (const tract of [...plan.create, ...plan.update, ...plan.remove]) {
+  for (const tract of checkedTracts) {
+    if (!canonicalLeaseId || !canonicalRecord) break;
     const isOriginating = tract.mineralNodeId === parentNode.id;
     const buildParentNode = isOriginating
       ? { ...parentNode, linkedOwnerId: ownerId }
       : nodes.find((node) => node.id === tract.mineralNodeId) ?? null;
+    if (!buildParentNode) continue;
 
-    if (tract.checked) {
-      if (!buildParentNode) continue;
-      const perTractFields = {
-        leaseName: tract.leaseName,
-        grossAcres: tract.grossAcres,
-        status: tract.status,
-        docNo: tract.docNo,
-        leasedInterest:
-          normalizedInterestByNode.get(tract.mineralNodeId) ?? '',
-      };
+    const tractLeasedInterest = normalizedInterestByNode.get(tract.mineralNodeId) ?? '';
+    const tractGrossAcres = tract.grossAcres;
 
-      if (tract.existingLeaseId) {
-        const existing = leases.find(
-          (lease) => lease.id === tract.existingLeaseId
-        );
-        const leaseRecord = {
-          ...(existing ?? createBlankLease(resolvedWorkspaceId, ownerId)),
-          ...perTractFields,
-          ...leaseOverrides,
-          id: tract.existingLeaseId,
-          workspaceId: resolvedWorkspaceId,
-        };
-        await updateLease(tract.existingLeaseId, leaseRecord);
-        if (tract.existingLeaseNodeId) {
-          const existingNode =
-            nodes.find((node) => node.id === tract.existingLeaseNodeId) ?? null;
-          updateNode(
-            tract.existingLeaseNodeId,
-            buildLeaseNode({
-              id: tract.existingLeaseNodeId,
-              parentNode: buildParentNode,
-              lease: leaseRecord,
-              existingNode,
-            })
-          );
-          if (isOriginating) originatingNodeId = tract.existingLeaseNodeId;
-        } else {
-          // Record created before node (e.g. via the Owners "Add Lease" form,
-          // then "Create Tract N" here): the slice exists but no lessee node
-          // does. Previously a silent no-op — create the missing node exactly
-          // like the create branch below.
-          const newNodeId = `node-${Date.now()}-${Math.random()
-            .toString(36)
-            .slice(2, 6)}-${tract.mineralNodeId.slice(-4)}`;
-          addNode(
-            buildLeaseNode({
-              id: newNodeId,
-              parentNode: buildParentNode,
-              lease: leaseRecord,
-            })
-          );
-          addNodeToDeskMap(newNodeId, tract.deskMapId);
-          if (isOriginating) originatingNodeId = newNodeId;
-        }
-      } else {
-        const leaseRecord = createBlankLease(resolvedWorkspaceId, ownerId, {
-          ...perTractFields,
-          ...leaseOverrides,
-        });
-        await addLease(leaseRecord);
-        const newNodeId = `node-${Date.now()}-${Math.random()
-          .toString(36)
-          .slice(2, 6)}-${tract.mineralNodeId.slice(-4)}`;
-        addNode(
-          buildLeaseNode({
-            id: newNodeId,
-            parentNode: buildParentNode,
-            lease: leaseRecord,
-          })
-        );
-        addNodeToDeskMap(newNodeId, tract.deskMapId);
-        if (isOriginating) originatingNodeId = newNodeId;
-      }
-    } else if (tract.existingLeaseId) {
-      // Unchecked but previously leased: remove exactly this tract's slice
-      // and lessee node. Remove the slice explicitly first so it is gone
-      // synchronously; removeNode's owner cleanup would also cascade it.
+    if (tract.existingLeaseNodeId) {
+      const existingNode =
+        nodes.find((node) => node.id === tract.existingLeaseNodeId) ?? null;
+      updateNode(
+        tract.existingLeaseNodeId,
+        buildLeaseNode({
+          id: tract.existingLeaseNodeId,
+          parentNode: buildParentNode,
+          lease: canonicalRecord,
+          existingNode,
+          tractLeasedInterest,
+          tractGrossAcres,
+        })
+      );
+      if (isOriginating) originatingNodeId = tract.existingLeaseNodeId;
+    } else {
+      const newNodeId = `node-${Date.now()}-${Math.random()
+        .toString(36)
+        .slice(2, 6)}-${tract.mineralNodeId.slice(-4)}`;
+      addNode(
+        buildLeaseNode({
+          id: newNodeId,
+          parentNode: buildParentNode,
+          lease: canonicalRecord,
+          tractLeasedInterest,
+          tractGrossAcres,
+        })
+      );
+      addNodeToDeskMap(newNodeId, tract.deskMapId);
+      if (isOriginating) originatingNodeId = newNodeId;
+    }
+
+    // Consolidate a legacy per-tract duplicate: a checked tract that still carried
+    // its OWN separate record now points at the canonical, so drop the old record.
+    // updateNode/addNode above already repointed this tract's node, so clearing
+    // the old record can never strand it.
+    if (tract.existingLeaseId && tract.existingLeaseId !== canonicalLeaseId) {
       await removeLease(tract.existingLeaseId);
-      if (tract.existingLeaseNodeId) {
-        removeNode(tract.existingLeaseNodeId);
-      }
     }
   }
+
+  // Unchecked but previously leased: remove this tract's lessee node, and its old
+  // separate record when it was not the canonical instrument.
+  for (const tract of plan.remove) {
+    if (tract.existingLeaseId && tract.existingLeaseId !== canonicalLeaseId) {
+      await removeLease(tract.existingLeaseId);
+    }
+    if (tract.existingLeaseNodeId) {
+      removeNode(tract.existingLeaseNodeId);
+    }
+  }
+
   return originatingNodeId;
 }
 
@@ -413,6 +425,22 @@ export default function AttachLeaseModal({
     })
   );
 
+  // Instrument-level descriptive fields, shared across every tract this one lease
+  // covers (one OGML = one name / status / recording). Per-tract figures (lessor
+  // interest, gross acres) stay on the tract rows. Seeded from the originating
+  // record so editing an existing lease carries them over.
+  const [sharedLeaseName, setSharedLeaseName] = useState<string>(
+    () =>
+      existingLease?.leaseName
+      ?? (parentNode.grantee ? `${parentNode.grantee} Lease` : '')
+  );
+  const [sharedStatus, setSharedStatus] = useState<string>(
+    () => existingLease?.status ?? DEFAULT_LEASE_STATUS
+  );
+  const [sharedDocNo, setSharedDocNo] = useState<string>(
+    () => existingLease?.docNo ?? ''
+  );
+
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [selectedOwnerId, setSelectedOwnerId] = useState('');
@@ -590,8 +618,13 @@ export default function AttachLeaseModal({
             ownerId,
           });
 
-      // Preserve the user's raw royalty text (1/8 stays 1/8, not 0.125).
+      // Preserve the user's raw royalty text (1/8 stays 1/8, not 0.125). These
+      // are the instrument-level fields shared across every tract; the per-tract
+      // lessor interest + gross acres are carried on the lease-nodes instead.
       const leaseOverrides = {
+        leaseName: sharedLeaseName,
+        status: sharedStatus,
+        docNo: sharedDocNo,
         lessee: lprDraft.lesseeName,
         royaltyRate: lprDraft.royalty.trim(),
         effectiveDate: lprDraft.effectiveDate,
@@ -818,12 +851,53 @@ export default function AttachLeaseModal({
           <legend className="text-xs font-semibold text-ink-light uppercase tracking-wider mb-2">
             Tracts
           </legend>
+          <div className="rounded-md border border-ledger-line bg-parchment/40 p-3 grid grid-cols-2 gap-2 mb-2">
+            <FormField
+              label="Lease Name"
+              value={sharedLeaseName}
+              onChange={(value) => {
+                setSaveError(null);
+                setSharedLeaseName(value);
+              }}
+            />
+            <FormField
+              label="Doc #"
+              value={sharedDocNo}
+              onChange={(value) => {
+                setSaveError(null);
+                setSharedDocNo(value);
+              }}
+            />
+            <div className="col-span-2">
+              <label className="text-[10px] text-ink-light uppercase tracking-wider block mb-1">
+                Status
+              </label>
+              <select
+                value={sharedStatus}
+                onChange={(event) => {
+                  setSaveError(null);
+                  setSharedStatus(event.target.value);
+                }}
+                className="w-full px-3 py-2 rounded-md border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-emerald-600 outline-none"
+              >
+                {(isLeaseStatusOption(sharedStatus)
+                  ? [...LEASE_STATUS_OPTIONS]
+                  : [sharedStatus, ...LEASE_STATUS_OPTIONS]
+                ).map((status) => (
+                  <option key={status} value={status}>
+                    {isLeaseStatusOption(status) ? status : `${status} (legacy)`}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <p className="col-span-2 text-[11px] leading-4 text-ink-light">
+              Lease name, status, and doc number apply to the whole lease across
+              every checked tract; lessor interest and acres are per tract below.
+            </p>
+          </div>
           <div className="space-y-2">
             {tractDrafts.map((tract) => {
               const netAcres = computeNetAcres(tract.grossAcres, tract.leasedInterest);
-              const statusOptions = isLeaseStatusOption(tract.status)
-                ? [...LEASE_STATUS_OPTIONS]
-                : [tract.status, ...LEASE_STATUS_OPTIONS];
               return (
                 <div
                   key={tract.mineralNodeId}
@@ -854,13 +928,6 @@ export default function AttachLeaseModal({
                   {tract.checked && (
                     <div className="grid grid-cols-2 gap-2">
                       <FormField
-                        label="Lease Name"
-                        value={tract.leaseName}
-                        onChange={(value) =>
-                          setTract(tract.mineralNodeId, { leaseName: value })
-                        }
-                      />
-                      <FormField
                         label="Lessor Interest"
                         value={tract.leasedInterest}
                         onChange={(value) =>
@@ -874,7 +941,7 @@ export default function AttachLeaseModal({
                           setTract(tract.mineralNodeId, { grossAcres: value })
                         }
                       />
-                      <div>
+                      <div className="col-span-2">
                         <label className="text-[10px] text-ink-light uppercase tracking-wider block mb-1">
                           Net Mineral Acres
                         </label>
@@ -882,35 +949,6 @@ export default function AttachLeaseModal({
                           {netAcres ? formatAcres(netAcres) : '—'}
                         </div>
                       </div>
-                      <div>
-                        <label className="text-[10px] text-ink-light uppercase tracking-wider block mb-1">
-                          Status
-                        </label>
-                        <select
-                          value={tract.status}
-                          onChange={(event) =>
-                            setTract(tract.mineralNodeId, {
-                              status: event.target.value,
-                            })
-                          }
-                          className="w-full px-3 py-2 rounded-md border border-ledger-line bg-parchment text-sm text-ink focus:ring-2 focus:ring-leather focus:border-emerald-600 outline-none"
-                        >
-                          {statusOptions.map((status) => (
-                            <option key={status} value={status}>
-                              {isLeaseStatusOption(status)
-                                ? status
-                                : `${status} (legacy)`}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <FormField
-                        label="Doc #"
-                        value={tract.docNo}
-                        onChange={(value) =>
-                          setTract(tract.mineralNodeId, { docNo: value })
-                        }
-                      />
                     </div>
                   )}
                 </div>
