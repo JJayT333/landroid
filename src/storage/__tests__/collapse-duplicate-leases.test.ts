@@ -101,6 +101,28 @@ describe('collapseDuplicateLeaseRecords', () => {
     expect(canonical?.leaseTractGrossAcres).toBeUndefined();
   });
 
+  it('moves a merged tract\'s leased interest onto its node when it differs (LPR-key)', () => {
+    const owner = 'owner-acme';
+    // Same LPR id => same instrument key regardless of leased interest, so these
+    // merge even though their per-tract fractions differ.
+    const r1 = rec('lease-1', owner, { leasePurchaseReportId: 'lpr-1', leasedInterest: '0.5' });
+    const r2 = rec('lease-2', owner, { leasePurchaseReportId: 'lpr-1', leasedInterest: '0.25' });
+    const t1 = ownerMineralNode('m1');
+    const t2 = ownerMineralNode('m2');
+    const ln1 = leaseNodeFor('ln1', t1, r1);
+    const ln2 = leaseNodeFor('ln2', t2, r2);
+
+    const result = collapseDuplicateLeaseRecords([r1, r2], [t1, t2, ln1, ln2]);
+
+    expect(result.leases.map((l) => l.id)).toEqual(['lease-1']);
+    const repointed = result.nodes.find((n) => n.id === 'ln2');
+    expect(repointed?.linkedLeaseId).toBe('lease-1');
+    expect(repointed?.leaseTractLeasedInterest).toBe('0.25');
+    // the canonical node keeps the canonical record's leased interest; no override.
+    const canonical = result.nodes.find((n) => n.id === 'ln1');
+    expect(canonical?.leaseTractLeasedInterest).toBeUndefined();
+  });
+
   it('is a no-op when there are no duplicates', () => {
     const r1 = rec('lease-1', 'owner-a');
     const result = collapseDuplicateLeaseRecords([r1], []);
