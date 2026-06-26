@@ -25,15 +25,37 @@ export function buildLeaseNode({
   parentNode,
   lease,
   existingNode,
+  tractLeasedInterest,
+  tractGrossAcres,
 }: {
   id: string;
   parentNode: OwnershipNode;
   lease: Lease;
   existingNode?: OwnershipNode | null;
+  /**
+   * Per-tract leased interest for this lease-node when one instrument fans across
+   * tracts. `undefined` leaves any existing node value untouched (the re-sync
+   * path); a provided string sets it authoritatively (`''` clears the override).
+   */
+  tractLeasedInterest?: string;
+  /** Per-tract gross acres for this lease-node; same `undefined`/clear semantics. */
+  tractGrossAcres?: string;
 }): OwnershipNode {
   const base = existingNode
     ? { ...existingNode }
     : createBlankNode(id, parentNode.id);
+
+  // Resolve per-tract fields: a provided param wins (even ''); otherwise keep the
+  // existing node's value. Drop the stale copies off `base` so an explicit clear
+  // isn't re-introduced by the spread, then re-add below only when non-empty.
+  const resolvedLeasedInterest = (
+    tractLeasedInterest !== undefined ? tractLeasedInterest : base.leaseTractLeasedInterest ?? ''
+  ).trim();
+  const resolvedGrossAcres = (
+    tractGrossAcres !== undefined ? tractGrossAcres : base.leaseTractGrossAcres ?? ''
+  ).trim();
+  delete base.leaseTractLeasedInterest;
+  delete base.leaseTractGrossAcres;
 
   return {
     ...base,
@@ -53,5 +75,7 @@ export function buildLeaseNode({
     initialFraction: '0',
     linkedOwnerId: parentNode.linkedOwnerId ?? lease.ownerId,
     linkedLeaseId: lease.id,
+    ...(resolvedLeasedInterest ? { leaseTractLeasedInterest: resolvedLeasedInterest } : {}),
+    ...(resolvedGrossAcres ? { leaseTractGrossAcres: resolvedGrossAcres } : {}),
   };
 }

@@ -194,6 +194,25 @@ export interface OwnershipNode {
    */
   depthRange: DepthRange;
 
+  /**
+   * Per-tract leased-interest override for a lease-node. One lease *instrument*
+   * fans out to N lease-nodes (one per tract it covers); a lessor may lease a
+   * different fraction of their interest on each tract, so that per-tract figure
+   * lives on the node rather than forcing a duplicate Lease record per tract.
+   * When non-empty the coverage math reads this in place of the linked Lease
+   * record's `leasedInterest` for this tract's owner branch; absent/empty means
+   * "use the record's value" (the universal case), so legacy single-tract leases
+   * and all non-lease nodes round-trip unchanged. Lease-nodes only.
+   */
+  leaseTractLeasedInterest?: string;
+  /**
+   * Per-tract gross mineral acres for a lease-node. Display/abstract only — the
+   * title-math never reads it (acreage is not a coverage input). Lets one
+   * instrument carry each tract's acreage without a duplicate Lease record.
+   * Absent by default. Lease-nodes only.
+   */
+  leaseTractGrossAcres?: string;
+
   // UI state
   isCollapsed: boolean;
 }
@@ -611,6 +630,24 @@ export function normalizeOwnershipNode(
     // ordinary conveyances, so existing data round-trips unchanged.
     ...(normalizeDoubleFractionClause(node.doubleFractionClause)
       ? { doubleFractionClause: normalizeDoubleFractionClause(node.doubleFractionClause) }
+      : {}),
+    // Lease-instrument model: per-tract leased-interest / gross-acres carried on
+    // a lease-node so one instrument can fan to N tracts without duplicate Lease
+    // records. Only on lease-nodes (the SAME shape `isLeaseNode` requires — both
+    // type 'related' AND relatedKind 'lease' — so the two predicates can't drift),
+    // only when non-empty, so every other node and all legacy data round-trip
+    // unchanged (the byte-identity oracle stays clean).
+    ...(normalizeNodeType(node.type) === 'related'
+      && normalizeRelatedKind(node.relatedKind) === 'lease'
+      && typeof node.leaseTractLeasedInterest === 'string'
+      && node.leaseTractLeasedInterest.trim().length > 0
+      ? { leaseTractLeasedInterest: node.leaseTractLeasedInterest.trim() }
+      : {}),
+    ...(normalizeNodeType(node.type) === 'related'
+      && normalizeRelatedKind(node.relatedKind) === 'lease'
+      && typeof node.leaseTractGrossAcres === 'string'
+      && node.leaseTractGrossAcres.trim().length > 0
+      ? { leaseTractGrossAcres: node.leaseTractGrossAcres.trim() }
       : {}),
   };
 }

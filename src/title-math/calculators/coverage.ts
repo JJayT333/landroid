@@ -71,6 +71,14 @@ export interface LeaseCoverageResult {
 export interface LeaseScopeIndex {
   linkedLeaseIds: Set<string>;
   linkedLeaseIdsByParentNodeId: Map<string, Set<string>>;
+  /**
+   * Per parent owner-node, the per-tract leased-interest override carried on each
+   * linked lease-node (keyed by lease id). Populated only when a lease-node sets
+   * a non-empty `leaseTractLeasedInterest`; a missing entry falls back to the
+   * Lease record's own `leasedInterest`, so legacy single-tract data — and the
+   * byte-identity oracle — are unaffected.
+   */
+  tractLeasedInterestByParentNodeId: Map<string, Map<string, string>>;
 }
 
 function asLeaseText(value: string | null | undefined): string {
@@ -96,6 +104,7 @@ export function getActiveLeases(leases: Lease[]): Lease[] {
 export function buildLeaseScopeIndex(nodes: OwnershipNode[]): LeaseScopeIndex {
   const linkedLeaseIds = new Set<string>();
   const linkedLeaseIdsByParentNodeId = new Map<string, Set<string>>();
+  const tractLeasedInterestByParentNodeId = new Map<string, Map<string, string>>();
 
   for (const node of nodes) {
     if (!isLeaseNode(node) || !node.parentId || !node.linkedLeaseId) {
@@ -106,9 +115,17 @@ export function buildLeaseScopeIndex(nodes: OwnershipNode[]): LeaseScopeIndex {
     const branchLeaseIds = linkedLeaseIdsByParentNodeId.get(node.parentId) ?? new Set<string>();
     branchLeaseIds.add(node.linkedLeaseId);
     linkedLeaseIdsByParentNodeId.set(node.parentId, branchLeaseIds);
+
+    const tractLeasedInterest = asLeaseText(node.leaseTractLeasedInterest).trim();
+    if (tractLeasedInterest.length > 0) {
+      const byLease =
+        tractLeasedInterestByParentNodeId.get(node.parentId) ?? new Map<string, string>();
+      byLease.set(node.linkedLeaseId, tractLeasedInterest);
+      tractLeasedInterestByParentNodeId.set(node.parentId, byLease);
+    }
   }
 
-  return { linkedLeaseIds, linkedLeaseIdsByParentNodeId };
+  return { linkedLeaseIds, linkedLeaseIdsByParentNodeId, tractLeasedInterestByParentNodeId };
 }
 
 export function getLeasesForOwnerNode(
@@ -121,7 +138,17 @@ export function getLeasesForOwnerNode(
   const unscopedOwnerLeases = ownerLeases.filter(
     (lease) => !leaseScopeIndex.linkedLeaseIds.has(lease.id)
   );
-  const branchLeases = ownerLeases.filter((lease) => branchLinkedLeaseIds.has(lease.id));
+  // A lease record fanned across tracts carries this tract's leased interest on
+  // its lease-node; apply that per-tract override so one instrument can lease a
+  // different fraction on each tract. No override → the record's own value, so
+  // single-tract and legacy leases are untouched.
+  const tractOverrides = leaseScopeIndex.tractLeasedInterestByParentNodeId.get(ownerNode.id);
+  const branchLeases = ownerLeases
+    .filter((lease) => branchLinkedLeaseIds.has(lease.id))
+    .map((lease) => {
+      const override = tractOverrides?.get(lease.id);
+      return override ? { ...lease, leasedInterest: override } : lease;
+    });
 
   return [...unscopedOwnerLeases, ...branchLeases];
 }

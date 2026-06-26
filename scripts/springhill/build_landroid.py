@@ -387,7 +387,7 @@ def owner_id(name,row=None):
         owners[k]['mailingAddress']=addr_of(row)
     return owners[k]['id']
 
-nodes=[]; deskMaps=[]; attachments=[]; need={DOTO}; lease_recs=[]; reconciliation=[]; nidc=0
+nodes=[]; deskMaps=[]; attachments=[]; need={DOTO}; lease_recs=[]; lease_by_key={}; reconciliation=[]; nidc=0
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Tract 2 — full DOTO→present chain of title (multi-generation).
@@ -723,14 +723,25 @@ def build_chain(t, parent_id, node_ids):
                 L=None
             generated_lid=''; generated_lnid=''
             if L:
-                need.add(L['instr']); lid=f'lease-{len(lease_recs)+1}'; rem=L['rem']; roy=aroy
+                need.add(L['instr']); rem=L['rem']; roy=aroy
                 if L['instr'] in LEASE_SOURCE_OVERRIDES:
                     rem=LEASE_SOURCE_OVERRIDES[L['instr']].get('notes',rem)
                 if not roy: rem=(rem+' | Royalty pending — lease package not yet booked (NRI carried at 0).').strip(' |')
-                lease_recs.append(dict(id=lid,workspaceId=WS,ownerId=o,leaseName=f'OGML — {L["lessor"][:40]}',
-                    lessee='Magnolia Petroleum Company, LLC',royaltyRate=roy,leasedInterest='',effectiveDate=L['date'],
-                    expirationDate='',status='Active',docNo=L['instr'],notes=rem,jurisdiction='tx_fee',
-                    depthRange='all_depths',createdAt=NOW,updatedAt=NOW))
+                # Lease-instrument model: one OGML that a single lessor carries
+                # across multiple tracts is ONE lease record, fanned to a lease-node
+                # per tract — not a duplicate record per tract (the four-identical-
+                # cards bug). Mint the record once per (owner, instrument); later
+                # tracts reuse its id and only add their own lease-node.
+                lease_key=(o,L['instr'])
+                if lease_key in lease_by_key:
+                    lid=lease_by_key[lease_key]
+                else:
+                    lid=f'lease-{len(lease_recs)+1}'
+                    lease_recs.append(dict(id=lid,workspaceId=WS,ownerId=o,leaseName=f'OGML — {L["lessor"][:40]}',
+                        lessee='Magnolia Petroleum Company, LLC',royaltyRate=roy,leasedInterest='',effectiveDate=L['date'],
+                        expirationDate='',status='Active',docNo=L['instr'],notes=rem,jurisdiction='tx_fee',
+                        depthRange='all_depths',createdAt=NOW,updatedAt=NOW))
+                    lease_by_key[lease_key]=lid
                 IDC[0]+=1; lnid=f'tr{t}c-{IDC[0]}'; laid=f'att-tr{t}c-{IDC[0]}-0'
                 nodes.append(dict(id=lnid,type='related',relatedKind='lease',instrument='Oil & Gas Lease',vol='',page='',
                     docNo=L['instr'],fileDate=L['date'],date=L['date'],grantor=spec['name'],grantee='Magnolia Petroleum Company, LLC',
