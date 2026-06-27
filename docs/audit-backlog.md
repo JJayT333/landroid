@@ -34,8 +34,14 @@ explicitly accepted, treat that report as part of this backlog. Summary:
   import ledger hydration.
 - DA-H3: FIXED (feat/scope-b-hardening) — journal verdict, rollback-aware
   mutators, cascades skipped on veto, hook exceptions surfaced.
-- DA-H4/H5: ledger flush ordering/stale-chain hydration; hash chain does not
-  cover ActionRecord payloads. (Open — Step 2+.)
+- DA-H4/H5: payload hashing (DA-H5) and invalid-chain quarantine (DA-H4) shipped
+  in #185 (`verifyActionPayloadHashes`, `quarantineInvalidLedger`; hydrate now
+  preserves a stale/invalid chain instead of rewriting it). The action result-hash
+  deliberately covers the ActionRecord `result` (the tamper target) and excludes
+  lifecycle envelope fields by design (`audit-chain.ts:178-182`). The one residual
+  is the deferred `lastFlushedHeadHash` envelope head-hash pin closing the
+  truncate-a-hashed-chain-back-to-fully-legacy vector (`audit-chain.ts:272`).
+  (Open — narrow, author-deferred.)
 - DA-H6: FIXED (#152) — `exportDocumentWorkspaceData` is workspace-scoped:
   every document + attachment of any entityKind exports (zero-node safe), so
   export scope matches the restore side's delete scope. Round-trip survival
@@ -86,6 +92,22 @@ explicitly accepted, treat that report as part of this backlog. Summary:
   shadow); ACT-M01 = Open (confirmed live); LLA-H02 = Fixed
   (feat/scope-b-hardening closed the ledger + heartbeat remnants); LLA-H03 =
   Open (confirmed: DeskMapView Add Root uses raw `addNode`).
+- 2026-06-26 reconciliation (HIGH-severity re-verification against current code):
+  re-confirmed live in code — **DA-H2** (`AIPanel.tsx` undo → `restoreSnapshotWithLedger`),
+  **DA-H3** (`removeNode` gates cascades on the rollback verdict, `workspace-store.ts:1464`),
+  **DA-H4/H5** (#185 payload hashing + quarantine; result-hash scope by design),
+  **LLA-H04** (`createNpri` tool calls `missingNpriCharacterizationMessage`,
+  `tools.ts:529`), and **DA-M14** (idle-writer heartbeat, `workspace-write-lease.ts:184`)
+  are all shipped. The federal-lease `stipulations` field and the DA-M1
+  over-conveyance warning also already exist. Genuinely OPEN from the HIGH list:
+  **DA-M2/LLA-H03** (raw `addNode`/`updateNode` skip `validateCalcGraph`), the
+  **`lastFlushedHeadHash`** ledger pin (DA-H4/H5 residual above), **DEF-AI-01**
+  (`CitationVerifier` exists but is wired nowhere in `runChat`/`AIPanel`),
+  **federal-lease-term persistence** (terms live in an in-memory `Map`,
+  `federal-lease-seed.ts:254`, no Dexie table), and the DA-M1 generic-`calculateShare`-clamp
+  residual. A broader cross-source snapshot lives in
+  `docs/deferred-and-planned-ledger.md`, but its per-item *status* over-states
+  openness — THIS file is the status source of truth.
 
 This is the active master list for open, deferred, superseded, and newly found
 review items. It consolidates:
