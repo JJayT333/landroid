@@ -67,6 +67,7 @@ import {
   executePredecessorInsert,
   executeAttachConveyance,
   executeDeleteBranch,
+  validateOwnershipGraph,
 } from '../title-math';
 import type { Audit, ResultWarning } from '../types/result';
 import { createBlankTitleIssue } from '../types/title-issue';
@@ -382,6 +383,50 @@ function raiseOverConveyanceIssue(
         + `transfer order.`,
     });
   });
+}
+
+/**
+ * DA-M2 / LLA-H03: raw `addNode`/`updateNode` (e.g. DeskMap "Add Root") bypass the
+ * structured ops' `validateCalcGraph` gate, so a negative / non-finite / malformed
+ * fraction, a duplicate id, or a cycle could land silently. After a raw write,
+ * surface each such defect as a curative title issue — warn-don't-cap: the entry
+ * STANDS, the downstream math gates it. Idempotent per (code, node) so re-edits
+ * don't pile up. Over-100% / multi-root is NOT a `validateCalcGraph` defect (it is
+ * an allowed Title Theory, already warned on the coverage card), so it never lands
+ * here — only genuine structural invalids do.
+ */
+function flagRawWriteStructuralDefects(state: WorkspaceState): void {
+  const validation = validateOwnershipGraph(state.nodes);
+  if (validation.valid) return;
+  const curative = useCurativeStore.getState();
+  for (const issue of validation.issues) {
+    if (!issue.nodeId) continue;
+    const issueId = `structural-${issue.code}-${issue.nodeId}`;
+    if (curative.titleIssues.some((ti) => ti.id === issueId)) continue;
+    const node = state.nodes.find((n) => n.id === issue.nodeId) ?? null;
+    const deskMapId =
+      state.deskMaps.find((dm) => dm.nodeIds.includes(issue.nodeId as string))?.id ?? null;
+    const titleIssue = createBlankTitleIssue(curative.workspaceId ?? '', {
+      id: issueId,
+      title: `Invalid node entry: ${(node?.grantee ?? '').trim() || issue.nodeId}`,
+      issueType: 'Other',
+      priority: 'High',
+      affectedNodeId: issue.nodeId,
+      affectedDeskMapId: deskMapId,
+      requiredCurativeAction:
+        'A title card was entered directly with a structurally invalid value; fix it so the '
+        + `ownership math is reliable. ${issue.message}`,
+      notes: issue.message,
+    });
+    void curative.addIssue(titleIssue).catch((err: unknown) => {
+      const message = err instanceof Error ? err.message : String(err);
+      useWorkspaceStore.setState({
+        lastError:
+          `A node was entered with an invalid value (${issue.message}) but its title issue could `
+          + `not be saved (${message}). The entry stands; re-flag it before relying on the math.`,
+      });
+    });
+  }
 }
 
 function resolveActiveDeskMapId(
@@ -1426,6 +1471,7 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
     const before = get();
     set((state) => ({ nodes: [...state.nodes, node] }));
     journalTitleMutation('update', before, get());
+    flagRawWriteStructuralDefects(get());
   },
 
   updateNode: (id, fields) => {
@@ -1434,6 +1480,7 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
       nodes: state.nodes.map((n) => (n.id === id ? { ...n, ...fields } : n)),
     }));
     journalTitleMutation('update', before, get());
+    flagRawWriteStructuralDefects(get());
   },
 
   removeNode: (id) => {
