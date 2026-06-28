@@ -125,6 +125,28 @@ describe('workspace-store', () => {
     });
   });
 
+  it('DA-M2: a raw addNode with a negative fraction is flagged but still lands (warn-dont-cap)', () => {
+    const bad = { ...createBlankNode('bad', null), fraction: '-0.500000000', grantee: 'Bad Node' };
+    useWorkspaceStore.getState().addNode(bad);
+
+    // warn-don't-cap: the entry STANDS
+    expect(useWorkspaceStore.getState().nodes.some((n) => n.id === 'bad')).toBe(true);
+    // and is surfaced as a curative title issue on that node
+    expect(mocks.addCurativeIssue).toHaveBeenCalledWith(
+      expect.objectContaining({
+        issueType: 'Other',
+        affectedNodeId: 'bad',
+        id: 'structural-negative_fraction-bad',
+      })
+    );
+  });
+
+  it('DA-M2: a valid raw addNode raises no structural issue', () => {
+    useWorkspaceStore.getState().addNode({ ...createBlankNode('good', null), grantee: 'Good' });
+    expect(useWorkspaceStore.getState().nodes.some((n) => n.id === 'good')).toBe(true);
+    expect(mocks.addCurativeIssue).not.toHaveBeenCalled();
+  });
+
   it('addNodeToActiveDeskMap is idempotent — a re-add does not duplicate the nodeId', () => {
     const node = { ...createBlankNode('n1', null), grantee: 'A' };
     useWorkspaceStore.setState({
