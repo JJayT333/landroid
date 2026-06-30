@@ -55,6 +55,9 @@ import Button from '../shared/Button';
 import DuplicateWarningPanel from '../shared/DuplicateWarningPanel';
 import FormField from '../shared/FormField';
 import Modal from '../shared/Modal';
+import LeaseAbstractReportModal, {
+  type LeaseAbstractReportSlice,
+} from '../leasehold/LeaseAbstractReportModal';
 import {
   buildOwnerLinkOptions,
   resolveExistingOwnerSelection,
@@ -261,6 +264,7 @@ export default function AttachLeaseModal({
   onSaved,
 }: AttachLeaseModalProps) {
   const workspaceId = useWorkspaceStore((state) => state.workspaceId);
+  const projectName = useWorkspaceStore((state) => state.projectName);
   const activeDeskMaps = useWorkspaceStore((state) => state.deskMaps);
   const activeDeskMapId = useWorkspaceStore((state) => state.activeDeskMapId);
   const nodes = useWorkspaceStore((state) => state.nodes);
@@ -443,6 +447,7 @@ export default function AttachLeaseModal({
 
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [reportOpen, setReportOpen] = useState(false);
   const [selectedOwnerId, setSelectedOwnerId] = useState('');
   const [selectedPdfFile, setSelectedPdfFile] = useState<File | null>(null);
   /** Set when the chosen lease PDF already exists byte-for-byte; user decides. */
@@ -501,6 +506,16 @@ export default function AttachLeaseModal({
       computeNetAcres(tract.grossAcres, tract.leasedInterest)
     )
   );
+
+  // Lease Abstract Report (Phase 3) data, derived from the current draft.
+  const reportLessorName =
+    owners.find((owner) => owner.id === lprDraft.ownerId)?.name ?? '';
+  const reportSlices: LeaseAbstractReportSlice[] = checkedTracts.map((tract) => ({
+    tractName: tract.deskMapName,
+    lessorInterest: tract.leasedInterest,
+    grossAcres: tract.grossAcres,
+    netAcres: formatAcres(computeNetAcres(tract.grossAcres, tract.leasedInterest)),
+  }));
 
   // `force` skips the duplicate check (the user chose "attach a copy anyway").
   const handleSave = async (force = false) => {
@@ -1208,28 +1223,48 @@ export default function AttachLeaseModal({
           />
         )}
 
-        <div className="flex justify-end gap-2 pt-2 border-t border-ledger-line">
+        <div className="flex items-center justify-between gap-2 pt-2 border-t border-ledger-line">
           <button
             type="button"
-            onClick={onClose}
-            className="px-4 py-2 rounded-md text-sm text-ink-light hover:bg-parchment-dark transition-colors"
+            onClick={() => setReportOpen(true)}
+            className="px-3 py-2 rounded-md text-sm font-semibold text-leather border border-ledger-line hover:bg-leather/10 transition-colors"
           >
-            Cancel
+            Lease Abstract Report
           </button>
-          <button
-            type="button"
-            disabled={saving}
-            onClick={() => handleSave()}
-            className="px-4 py-2 rounded-md text-sm font-semibold bg-emerald-700 text-white hover:bg-emerald-600 transition-colors disabled:opacity-60"
-          >
-            {saving
-              ? 'Saving...'
-              : isEditingExistingLease
-                ? 'Save Lease'
-                : 'Create Lease'}
-          </button>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 rounded-md text-sm text-ink-light hover:bg-parchment-dark transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={saving}
+              onClick={() => handleSave()}
+              className="px-4 py-2 rounded-md text-sm font-semibold bg-emerald-700 text-white hover:bg-emerald-600 transition-colors disabled:opacity-60"
+            >
+              {saving
+                ? 'Saving...'
+                : isEditingExistingLease
+                  ? 'Save Lease'
+                  : 'Create Lease'}
+            </button>
+          </div>
         </div>
       </div>
+      {reportOpen && (
+        <LeaseAbstractReportModal
+          lpr={lprDraft}
+          lessorName={reportLessorName}
+          slices={reportSlices}
+          economicsTotals={economicsTotals}
+          projectName={projectName}
+          generatedAt={new Date().toLocaleString()}
+          onClose={() => setReportOpen(false)}
+        />
+      )}
     </Modal>
   );
 }
