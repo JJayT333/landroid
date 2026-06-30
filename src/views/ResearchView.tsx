@@ -1876,6 +1876,8 @@ export default function ResearchView() {
                         .map((formula) => ({
                           label: labelForFormula(formula),
                           meta: `Formula • ${formula.category}`,
+                          entityId: formula.id,
+                          type: 'Formula' as const,
                         })),
                       ...projectRecords
                         .filter((record) =>
@@ -1884,6 +1886,8 @@ export default function ResearchView() {
                         .map((record) => ({
                           label: labelForProjectRecord(record),
                           meta: `Project Record • ${record.recordType}`,
+                          entityId: record.id,
+                          type: 'ProjectRecord' as const,
                         })),
                       ...questions
                         .filter((question) =>
@@ -1892,6 +1896,8 @@ export default function ResearchView() {
                         .map((question) => ({
                           label: labelForQuestion(question),
                           meta: `Question • ${question.status}`,
+                          entityId: question.id,
+                          type: 'Question' as const,
                         })),
                     ]}
                   />
@@ -2061,6 +2067,8 @@ export default function ResearchView() {
                       .map((question) => ({
                         label: labelForQuestion(question),
                         meta: `Question • ${question.status}`,
+                        entityId: question.id,
+                        type: 'Question' as const,
                       }))}
                   />
                 </div>
@@ -3283,7 +3291,12 @@ function LinkedSummary({
 }: {
   title: string;
   emptyText: string;
-  items: Array<{ label: string; meta: string }>;
+  items: Array<{
+    label: string;
+    meta: string;
+    entityId: string;
+    type: 'Formula' | 'ProjectRecord' | 'Question';
+  }>;
 }) {
   return (
     <div className="rounded-md border border-ledger-line bg-ledger px-3 py-3 space-y-2">
@@ -3294,12 +3307,12 @@ function LinkedSummary({
         <div className="text-sm text-ink-light">{emptyText}</div>
       ) : (
         <div className="grid gap-2 sm:grid-cols-2">
-          {items.map((item, index) => (
+          {items.map((item) => (
             <div
-              // Index-suffixed: two records sharing a label+meta (e.g. same-type,
-              // not-yet-renamed) would otherwise collide on key and one would be
-              // dropped from this display-only list.
-              key={`${item.meta}-${item.label}-${index}`}
+              // Keyed by entity id + type: two records sharing a label+meta (e.g.
+              // same-type, not-yet-renamed) are distinct entities and must each
+              // render, rather than collide on a label key and silently drop one.
+              key={`${item.type}-${item.entityId}`}
               className="rounded-md border border-ledger-line bg-parchment px-3 py-2"
             >
               <div className="text-sm font-semibold text-ink truncate">{item.label}</div>
