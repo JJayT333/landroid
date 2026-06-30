@@ -108,6 +108,21 @@ explicitly accepted, treat that report as part of this backlog. Summary:
   residual. A broader cross-source snapshot lives in
   `docs/deferred-and-planned-ledger.md`, but its per-item *status* over-states
   openness — THIS file is the status source of truth.
+- 2026-06-30 reconciliation (auto-executable plan, `humming-hatching-swan`): the
+  open HIGH items that needed no product input are now **shipped** —
+  **dbKey caller-discipline lint guard** (#225, source-grep regression test),
+  **DA-M2/LLA-H03** structural-validity warning on raw `addNode`/`updateNode`
+  (#226, warn-don't-cap), **federal-lease-term persistence** (#227, Dexie v18
+  `federalLeaseDocuments` side-store, reference-only, byte-safe), and the
+  **`lastFlushedHeadHash`** truncate-to-legacy pin (#228, Dexie v19
+  `titleLedgerHeadMarkers`, atomic with each flush, cleared a 3-lens adversarial
+  review). **DA-M1** was re-verified a **non-issue** (the `calculateShare` clamp
+  only floors negatives; rebalance/predecessor over-allocation is *blocked* by
+  `validateCalcGraph`, not silently capped) — closed, do not re-open. Remaining
+  genuinely OPEN from the HIGH list: **DEF-AI-01** only (citation-verifier UI
+  wiring — needs a reject-vs-warn + hosted-vs-Lambda product decision). The dbKey
+  *legacy-migration trigger UX* (where the operator-gated prompt appears) also
+  still needs input; the lint-guard half shipped in #225.
 
 This is the active master list for open, deferred, superseded, and newly found
 review items. It consolidates:
