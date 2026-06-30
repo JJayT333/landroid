@@ -356,6 +356,51 @@ function buildWorkspace(canvas: CanvasSaveData | null): LandroidFileData {
           createdAt: '2026-04-03T00:00:00.000Z',
           updatedAt: '2026-04-03T00:00:00.000Z',
         },
+        {
+          docId: 'doc-lease-attached',
+          workspaceId: 'ws-1',
+          fileName: 'lease-terms.pdf',
+          mimeType: 'application/pdf',
+          byteLength: TEST_PDF_BODY.length,
+          contentHash: 'fixture-lease-hash',
+          blob: new Blob([`${TEST_PDF_BODY}lease attachment\n`], {
+            type: 'application/pdf',
+          }),
+          kind: 'other',
+          displayTitle: 'Lease Terms',
+          createdAt: '2026-04-04T00:00:00.000Z',
+          updatedAt: '2026-04-04T00:00:00.000Z',
+        },
+        {
+          docId: 'doc-curative-attached',
+          workspaceId: 'ws-1',
+          fileName: 'title-defect.pdf',
+          mimeType: 'application/pdf',
+          byteLength: TEST_PDF_BODY.length,
+          contentHash: 'fixture-curative-hash',
+          blob: new Blob([`${TEST_PDF_BODY}curative attachment\n`], {
+            type: 'application/pdf',
+          }),
+          kind: 'other',
+          displayTitle: 'Title Defect Resolution',
+          createdAt: '2026-04-05T00:00:00.000Z',
+          updatedAt: '2026-04-05T00:00:00.000Z',
+        },
+        {
+          docId: 'doc-research-attached',
+          workspaceId: 'ws-1',
+          fileName: 'research-findings.pdf',
+          mimeType: 'application/pdf',
+          byteLength: TEST_PDF_BODY.length,
+          contentHash: 'fixture-research-hash',
+          blob: new Blob([`${TEST_PDF_BODY}research attachment\n`], {
+            type: 'application/pdf',
+          }),
+          kind: 'other',
+          displayTitle: 'Research Findings',
+          createdAt: '2026-04-06T00:00:00.000Z',
+          updatedAt: '2026-04-06T00:00:00.000Z',
+        },
       ],
       attachments: [
         {
@@ -375,6 +420,33 @@ function buildWorkspace(canvas: CanvasSaveData | null): LandroidFileData {
           entityId: 'owner-1',
           position: 0,
           createdAt: '2026-04-02T00:00:00.000Z',
+        },
+        {
+          attachmentId: 'att-lease-fixture',
+          workspaceId: 'ws-1',
+          docId: 'doc-lease-attached',
+          entityKind: 'lease',
+          entityId: 'lease-1',
+          position: 0,
+          createdAt: '2026-04-04T00:00:00.000Z',
+        },
+        {
+          attachmentId: 'att-curative-fixture',
+          workspaceId: 'ws-1',
+          docId: 'doc-curative-attached',
+          entityKind: 'curative',
+          entityId: 'issue-1',
+          position: 0,
+          createdAt: '2026-04-05T00:00:00.000Z',
+        },
+        {
+          attachmentId: 'att-research-fixture',
+          workspaceId: 'ws-1',
+          docId: 'doc-research-attached',
+          entityKind: 'research',
+          entityId: 'source-1',
+          position: 0,
+          createdAt: '2026-04-06T00:00:00.000Z',
         },
       ],
     },
@@ -625,8 +697,11 @@ describe('workspace-persistence', () => {
     );
     const importedAttachments = imported.documentData?.attachments ?? [];
     expect([...importedDocumentsById.keys()].sort()).toEqual([
+      'doc-curative-attached',
       'doc-fixture-1',
+      'doc-lease-attached',
       'doc-owner-attached',
+      'doc-research-attached',
       'doc-unattached',
     ]);
     expect(importedDocumentsById.get('doc-fixture-1')?.fileName).toBe('20260001.pdf');
@@ -664,6 +739,25 @@ describe('workspace-persistence', () => {
       entityKind: 'owner',
       entityId: 'owner-1',
       position: 0,
+    }));
+    // B6: every entity kind's attachments round-trip, not just node/owner.
+    expect(importedAttachments).toContainEqual(expect.objectContaining({
+      attachmentId: 'att-lease-fixture',
+      docId: 'doc-lease-attached',
+      entityKind: 'lease',
+      entityId: 'lease-1',
+    }));
+    expect(importedAttachments).toContainEqual(expect.objectContaining({
+      attachmentId: 'att-curative-fixture',
+      docId: 'doc-curative-attached',
+      entityKind: 'curative',
+      entityId: 'issue-1',
+    }));
+    expect(importedAttachments).toContainEqual(expect.objectContaining({
+      attachmentId: 'att-research-fixture',
+      docId: 'doc-research-attached',
+      entityKind: 'research',
+      entityId: 'source-1',
     }));
     expect(
       importedAttachments.filter((attachment) => attachment.docId === 'doc-unattached')
