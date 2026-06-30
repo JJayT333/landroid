@@ -299,6 +299,9 @@ export default function CurativeView() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('active');
   const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>('all');
   const [form, setForm] = useState<TitleIssueForm | null>(null);
+  // Snapshot of the form as last loaded/saved; the dirty check compares against
+  // it so EVERY edit path (setFormField and the direct setForm calls) is covered.
+  const [lastSavedForm, setLastSavedForm] = useState<TitleIssueForm | null>(null);
   const [saving, setSaving] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
 
@@ -397,7 +400,9 @@ export default function CurativeView() {
   }, [selectIssue, selectedIssueId, visibleIssues]);
 
   useEffect(() => {
-    setForm(issueForPanel ? issueToForm(issueForPanel) : null);
+    const loaded = issueForPanel ? issueToForm(issueForPanel) : null;
+    setForm(loaded);
+    setLastSavedForm(loaded);
   }, [issueForPanel?.id]);
 
   const setFormField = <K extends keyof TitleIssueForm>(
@@ -408,10 +413,29 @@ export default function CurativeView() {
     setForm((current) => (current ? { ...current, [field]: value } : current));
   };
 
-  const openLinkedDeskMap = () => {
+  const isFormDirty =
+    !!form
+    && !!lastSavedForm
+    && JSON.stringify(form) !== JSON.stringify(lastSavedForm);
+
+  // Confirm before an action that would discard unsaved edits — switching issues
+  // reloads the form, and leaving the view unmounts it. Returns true to proceed.
+  const confirmDiscardIfDirty = async (): Promise<boolean> => {
+    if (!isFormDirty) return true;
+    return requestConfirmation({
+      title: 'Discard unsaved changes?',
+      message: 'This curative issue has unsaved edits. Discard them?',
+      confirmLabel: 'Discard',
+      cancelLabel: 'Keep Editing',
+      tone: 'danger',
+    });
+  };
+
+  const openLinkedDeskMap = async () => {
     if (!issueForPanel?.affectedDeskMapId) {
       return;
     }
+    if (!(await confirmDiscardIfDirty())) return;
     setActiveDeskMap(issueForPanel.affectedDeskMapId);
     setActiveNode(issueForPanel.affectedNodeId);
     setView('chart');
@@ -555,7 +579,15 @@ export default function CurativeView() {
               <button
                 key={issue.id}
                 type="button"
-                onClick={() => selectIssue(issue.id)}
+                onClick={async () => {
+                  if (
+                    issue.id !== issueForPanel?.id
+                    && !(await confirmDiscardIfDirty())
+                  ) {
+                    return;
+                  }
+                  selectIssue(issue.id);
+                }}
                 className={`w-full border-b border-ledger-line px-4 py-3 text-left transition-colors ${
                   issueForPanel?.id === issue.id ? 'bg-leather/10' : 'hover:bg-ledger'
                 }`}
@@ -907,6 +939,7 @@ export default function CurativeView() {
                   if (readOnly) return;
                   setSaving(true);
                   await updateIssue(issueForPanel.id, form);
+                  setLastSavedForm(form);
                   setSaving(false);
                 }}
                 title={readOnly ? READ_ONLY_WORKSPACE_EDIT_TITLE : undefined}
