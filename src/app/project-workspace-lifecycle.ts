@@ -42,6 +42,8 @@ import { useAIApprovalStore } from '../ai/approval-store';
 import { useAIActionJournalStore } from '../ai/action-journal';
 import { useAIUndoStore } from '../ai/undo-store';
 import { initWorkspaceWriteLease } from '../storage/workspace-write-lease';
+import { loadFederalLeaseDocuments } from '../storage/federal-lease-persistence';
+import { hydrateFederalLeaseDocumentCache } from '../storage/federal-lease-seed';
 import {
   flushTitleActionLogToStorage,
   hydrateTitleActionLogFromImportedLedger,
@@ -123,6 +125,9 @@ async function hydrateSideStores(workspaceId: string): Promise<void> {
     useMapStore.getState().setWorkspace(workspaceId),
     useResearchStore.getState().setWorkspace(workspaceId),
     useCurativeStore.getState().setWorkspace(workspaceId),
+    // FED1/FED2: rebuild the in-memory federal lease-document read cache from the
+    // workspace-scoped side-store so "View Lease Document" survives a reload.
+    loadFederalLeaseDocuments(workspaceId).then(hydrateFederalLeaseDocumentCache),
   ]);
 }
 

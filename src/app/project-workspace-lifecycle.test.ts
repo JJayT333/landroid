@@ -260,6 +260,9 @@ async function loadLifecycleHarness(options: {
       return true;
     }),
   }));
+  vi.doMock('../storage/federal-lease-persistence', () => ({
+    loadFederalLeaseDocuments: vi.fn(async () => []),
+  }));
   vi.doMock('../storage/title-ledger-persistence', () => ({
     listTitleLedgerWorkspaceRows: vi.fn(
       async (workspaceId: string, dbKey?: string) => {

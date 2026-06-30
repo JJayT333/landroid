@@ -33,6 +33,7 @@ import type { ContactLog, Lease, Owner, OwnerDoc } from '../types/owner';
 import type { LeasePurchaseReport } from '../types/lease-purchase-report';
 import type { MapAsset, MapExternalReference, MapRegion } from '../types/map';
 import type { MapTractFeature } from '../types/map-tract-feature';
+import type { FederalLeaseDocument } from './federal-lease-seed';
 import type {
   ResearchFormula,
   ResearchImport,
@@ -140,6 +141,10 @@ const db = new Dexie('landroid-v2') as Dexie & {
   mapRegions: EntityTable<DbScoped<MapRegion>, 'id'>;
   mapExternalReferences: EntityTable<DbScoped<MapExternalReference>, 'id'>;
   mapTractFeatures: EntityTable<DbScoped<MapTractFeature>, 'id'>;
+  federalLeaseDocuments: EntityTable<
+    DbScoped<FederalLeaseDocument & { id: string; workspaceId: string }>,
+    'id'
+  >;
   researchImports: EntityTable<DbScoped<ResearchImport>, 'id'>;
   researchSources: EntityTable<DbScoped<ResearchSource>, 'id'>;
   researchFormulas: EntityTable<DbScoped<ResearchFormula>, 'id'>;
@@ -608,6 +613,19 @@ db.version(16).stores({
  */
 db.version(17).stores({
   ...TITLE_LEDGER_QUARANTINE_STORE_DEFINITION,
+});
+
+/**
+ * v18 (FED1/FED2 federal lease-document persistence).
+ *
+ * Adds `federalLeaseDocuments` — the reference-only BLM Form 3100-11 detail
+ * records for federal leases. They previously lived in an in-memory `Map` that
+ * died on reload; persisting them workspace-scoped lets "View Lease Document"
+ * survive a refresh. Additive and non-destructive: a new empty table, no data
+ * migration. Federal records remain reference-only and never feed Texas math.
+ */
+db.version(18).stores({
+  federalLeaseDocuments: 'id, dbKey, workspaceId, [dbKey+workspaceId]',
 });
 
 
