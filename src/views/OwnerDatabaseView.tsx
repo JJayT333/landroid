@@ -542,6 +542,7 @@ export default function OwnerDatabaseView() {
             onUpdateDoc={updateDoc}
             onRemoveDoc={removeDoc}
             tractCount={tractCountByOwnerId.get(selectedOwner.id)?.size ?? 0}
+            unitScoped={Boolean(effectiveUnitCode)}
             readOnly={readOnly}
           />
         ) : unitOwners.length > 0 && visibleOwnerRows.length === 0 ? (

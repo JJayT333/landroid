@@ -46,6 +46,12 @@ interface OwnerDetailPanelProps {
   onRemoveDoc: (id: string) => Promise<void>;
   /** Distinct focused tracts whose cards link to this owner (quick stat). */
   tractCount?: number;
+  /**
+   * True when `leases` is filtered to the active unit. Labels the lease quick
+   * stat "Unit Leases" so a count that drops under unit focus reads correctly,
+   * rather than the ambiguous "Leases".
+   */
+  unitScoped?: boolean;
   readOnly?: boolean;
 }
 
@@ -71,6 +77,7 @@ export default function OwnerDetailPanel({
   onUpdateDoc,
   onRemoveDoc,
   tractCount,
+  unitScoped = false,
   readOnly = false,
 }: OwnerDetailPanelProps) {
   const tabBaseId = `owner-${owner.id}`;
@@ -87,7 +94,7 @@ export default function OwnerDetailPanel({
   const leaseInstrumentCount = groupLeasesByInstrument(leases).length;
   const stats: { label: string; value: number }[] = [
     ...(typeof tractCount === 'number' ? [{ label: 'Tracts', value: tractCount }] : []),
-    { label: 'Leases', value: leaseInstrumentCount },
+    { label: unitScoped ? 'Unit Leases' : 'Leases', value: leaseInstrumentCount },
     { label: 'Contacts', value: contacts.length },
     { label: 'Documents', value: docs.length },
   ];

@@ -430,7 +430,7 @@ export default function OwnerLeasesTab({
                         }
                         className="px-3 py-1.5 rounded-md text-xs font-semibold text-emerald-900 hover:bg-emerald-100 border border-emerald-300 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                       >
-                        {target.leaseNodeId ? 'Open' : 'Create'} {target.deskMapName}
+                        {target.leaseNodeId ? 'Open' : 'Create'} {target.parentNodeLabel} — {target.deskMapName}
                       </button>
                     );
                   })
