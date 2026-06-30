@@ -15,6 +15,7 @@ import {
 import type {
   StoredTitleActionRecord,
   StoredTitleAuditEvent,
+  StoredTitleLedgerHeadMarker,
   StoredTitleLedgerQuarantine,
   TitleLedgerWorkspaceRows,
 } from './title-ledger-stores';
@@ -133,11 +134,17 @@ export async function replaceTitleLedgerWorkspaceRows(
   if (!writable) {
     throw new Error('Workspace is read-only because another tab holds the write lease.');
   }
+  // DA-H4 residual: the chain head pinned by the head-hash marker. auditRows are
+  // built in chain order (position = index), so the last one is the head. Written
+  // in the SAME transaction as the rows so the marker can never drift from the
+  // chain it certifies — a partial flush rolls back both together.
+  const headHash = auditRows.at(-1)?.eventHash ?? null;
   await db.transaction(
     'rw',
     db.workspaceWriteLeases,
     db.titleActionRecords,
     db.titleAuditEvents,
+    db.titleLedgerHeadMarkers,
     async () => {
       await assertWorkspaceWriteFence(workspaceId);
       await db.titleActionRecords.where('[dbKey+workspaceId]').equals(scope).delete();
@@ -148,6 +155,13 @@ export async function replaceTitleLedgerWorkspaceRows(
       if (auditRows.length > 0) {
         await db.titleAuditEvents.bulkPut(auditRows);
       }
+      await db.titleLedgerHeadMarkers.put({
+        id: titleLedgerStorageId(workspaceId, dbKey),
+        dbKey,
+        workspaceId,
+        flushedHeadHash: headHash,
+        flushedAt: new Date().toISOString(),
+      });
     }
   );
 }
@@ -166,10 +180,12 @@ export async function clearTitleLedgerWorkspaceRows(
     db.workspaceWriteLeases,
     db.titleActionRecords,
     db.titleAuditEvents,
+    db.titleLedgerHeadMarkers,
     async () => {
       await assertWorkspaceWriteFence(workspaceId);
       await db.titleActionRecords.where('[dbKey+workspaceId]').equals(scope).delete();
       await db.titleAuditEvents.where('[dbKey+workspaceId]').equals(scope).delete();
+      await db.titleLedgerHeadMarkers.where('[dbKey+workspaceId]').equals(scope).delete();
     }
   );
 }
@@ -180,11 +196,33 @@ export async function clearTitleLedgerRowsForActiveKey(): Promise<void> {
     'rw',
     db.titleActionRecords,
     db.titleAuditEvents,
+    db.titleLedgerHeadMarkers,
     async () => {
       await db.titleActionRecords.where('dbKey').equals(dbKey).delete();
       await db.titleAuditEvents.where('dbKey').equals(dbKey).delete();
+      await db.titleLedgerHeadMarkers.where('dbKey').equals(dbKey).delete();
     }
   );
+}
+
+/**
+ * Read the last-flushed head-hash marker for a workspace (null if none yet — a
+ * legacy/pre-pin chain, a fresh genesis, a duplicate, or an imported chain not
+ * yet re-flushed). Defaults to the active dbKey; pass an explicit dbKey to read a
+ * background project's marker, mirroring `listTitleLedgerWorkspaceRows`.
+ */
+export async function readTitleLedgerHeadMarker(
+  workspaceId: string,
+  dbKey: string = activeDbKey()
+): Promise<StoredTitleLedgerHeadMarker | null> {
+  const scope = titleLedgerScope(dbKey, workspaceId);
+  // One marker row per (dbKey, workspaceId); `toArray()[0]` keeps this working
+  // against the hand-rolled Dexie mock as well as the real collection.
+  const markers = await db.titleLedgerHeadMarkers
+    .where('[dbKey+workspaceId]')
+    .equals(scope)
+    .toArray();
+  return markers[0] ?? null;
 }
 
 /**
