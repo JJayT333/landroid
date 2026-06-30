@@ -29,6 +29,7 @@ import {
   clearFederalLeaseDocuments,
   registerFederalLeaseDocuments,
 } from './federal-lease-seed';
+import { replaceFederalLeaseDocuments } from './federal-lease-persistence';
 import { replaceWorkspaceSideStores } from './workspace-side-store-reset';
 
 // ── Node factory ────────────────────────────────────────
@@ -2315,6 +2316,9 @@ export async function seedCombinatorialData(): Promise<{
   clearFederalLeaseDocuments();
   const federal = buildRavenForestFederalLeases(workspace.workspaceId);
   registerFederalLeaseDocuments(federal.documents);
+  // FED1/FED2: persist the BLM 3100-11 detail records so they survive a reload
+  // (the in-memory cache above is rebuilt from this on workspace open).
+  await replaceFederalLeaseDocuments(workspace.workspaceId, federal.documents);
   for (const record of federal.records) {
     await useResearchStore.getState().addProjectRecord(record);
   }

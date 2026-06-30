@@ -268,3 +268,20 @@ export function getFederalLeaseDocument(
 export function clearFederalLeaseDocuments(): void {
   leaseDocumentRegistry.clear();
 }
+
+/** All cached documents — the source for `.landroid` export of federal data. */
+export function getAllFederalLeaseDocuments(): FederalLeaseDocument[] {
+  return [...leaseDocumentRegistry.values()];
+}
+
+/**
+ * FED1/FED2: replace the in-memory read cache from a persisted/imported set.
+ * Called on workspace open (after loading the Dexie side-store) so the sync
+ * render-path `getFederalLeaseDocument` reflects the current workspace.
+ */
+export function hydrateFederalLeaseDocumentCache(docs: FederalLeaseDocument[]): void {
+  leaseDocumentRegistry.clear();
+  for (const doc of docs) {
+    leaseDocumentRegistry.set(doc.recordId, doc);
+  }
+}
