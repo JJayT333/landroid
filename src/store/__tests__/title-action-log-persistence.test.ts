@@ -33,18 +33,34 @@ const leaseMocks = vi.hoisted(() => ({
 const ledgerPersistenceMocks = vi.hoisted(() => {
   type Rows = { actionRecords: unknown[]; auditEvents: unknown[] };
   const rowsByWorkspace = new Map<string, Rows>();
+  const markerByWorkspace = new Map<string, string | null>();
   const clone = (rows: Rows): Rows => ({
     actionRecords: [...rows.actionRecords],
     auditEvents: [...rows.auditEvents],
   });
+  const headOf = (rows: Rows): string | null =>
+    (rows.auditEvents.at(-1) as { eventHash?: string } | undefined)?.eventHash ?? null;
   return {
     rowsByWorkspace,
+    markerByWorkspace,
     listTitleLedgerWorkspaceRows: vi.fn(async (workspaceId: string) =>
       clone(rowsByWorkspace.get(workspaceId) ?? { actionRecords: [], auditEvents: [] })
     ),
     replaceTitleLedgerWorkspaceRows: vi.fn(async (workspaceId: string, rows: Rows) => {
       rowsByWorkspace.set(workspaceId, clone(rows));
+      // Mirror the real flush: the head-hash marker is written atomically.
+      markerByWorkspace.set(workspaceId, headOf(rows));
     }),
+    readTitleLedgerHeadMarker: vi.fn(async (workspaceId: string) =>
+      markerByWorkspace.has(workspaceId)
+        ? {
+            id: workspaceId,
+            workspaceId,
+            flushedHeadHash: markerByWorkspace.get(workspaceId) ?? null,
+            flushedAt: '2020-01-01T00:00:00.000Z',
+          }
+        : null
+    ),
     quarantineTitleLedgerRows: vi.fn(
       async (_input: {
         workspaceId: string;
@@ -81,6 +97,8 @@ vi.mock('../../storage/title-ledger-persistence', () => ({
     ledgerPersistenceMocks.listTitleLedgerWorkspaceRows,
   replaceTitleLedgerWorkspaceRows:
     ledgerPersistenceMocks.replaceTitleLedgerWorkspaceRows,
+  readTitleLedgerHeadMarker:
+    ledgerPersistenceMocks.readTitleLedgerHeadMarker,
   quarantineTitleLedgerRows:
     ledgerPersistenceMocks.quarantineTitleLedgerRows,
 }));
@@ -199,6 +217,7 @@ describe('title action log runtime persistence lifecycle', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     ledgerPersistenceMocks.rowsByWorkspace.clear();
+    ledgerPersistenceMocks.markerByWorkspace.clear();
     const workspace = makeWorkspace('ws-runtime', 'root-runtime', 'DOC-1');
     loadWorkspaceIntoStores(workspace);
     useTitleActionLog.getState().reset();
@@ -315,6 +334,64 @@ describe('title action log runtime persistence lifecycle', () => {
     expect(notice?.source).toBe('storage');
     expect(notice?.auditEventCount).toBe(corrupted.auditEvents.length);
     expect(notice?.durablyPersisted).toBe(true);
+  });
+
+  it('quarantines an internally-valid chain whose head contradicts the flushed marker (DA-H4 truncate-to-legacy)', async () => {
+    const workspace = makeWorkspace('ws-runtime', 'root-runtime', 'DOC-1');
+    loadWorkspaceIntoStores(workspace);
+
+    // The stored chain is internally VALID (passes verifyAuditChain), but the
+    // head-hash marker pins a DIFFERENT head — the stand-in for a hashed chain
+    // truncated/replaced with a re-hashed legacy chain that still self-verifies.
+    const persisted = await buildBaselineRows(workspace);
+    ledgerPersistenceMocks.rowsByWorkspace.set(workspace.workspaceId, persisted);
+    ledgerPersistenceMocks.markerByWorkspace.set(
+      workspace.workspaceId,
+      'a'.repeat(64) // != the stored head ⇒ the chain was replaced
+    );
+    useTitleActionLog.getState().reset();
+
+    const result = await hydrateTitleActionLogFromStorageOrBaseline(
+      workspace,
+      ownerDataFor(workspace.workspaceId)
+    );
+
+    // Re-baselined fresh rather than hydrating the replaced chain…
+    expect(result.source).toBe('baseline');
+    expect(
+      (await verifyAuditChain(useTitleActionLog.getState().auditEvents)).valid
+    ).toBe(true);
+    // …and the rejected chain was quarantined with the head-marker reason.
+    expect(ledgerPersistenceMocks.quarantineTitleLedgerRows).toHaveBeenCalledTimes(1);
+    const quarantineCall =
+      ledgerPersistenceMocks.quarantineTitleLedgerRows.mock.calls[0][0];
+    expect(quarantineCall.source).toBe('storage');
+    expect(quarantineCall.reason).toMatch(/head-hash marker/);
+    expect(useTitleActionLog.getState().lastQuarantine?.reason).toMatch(
+      /head-hash marker/
+    );
+  });
+
+  it('hydrates a valid chain whose head MATCHES the flushed marker (no false positive)', async () => {
+    const workspace = makeWorkspace('ws-runtime', 'root-runtime', 'DOC-1');
+    loadWorkspaceIntoStores(workspace);
+
+    const persisted = await buildBaselineRows(workspace);
+    ledgerPersistenceMocks.rowsByWorkspace.set(workspace.workspaceId, persisted);
+    // Marker agrees with the stored head — the normal post-flush reload.
+    ledgerPersistenceMocks.markerByWorkspace.set(
+      workspace.workspaceId,
+      persisted.auditEvents.at(-1)?.eventHash ?? null
+    );
+    useTitleActionLog.getState().reset();
+
+    const result = await hydrateTitleActionLogFromStorageOrBaseline(
+      workspace,
+      ownerDataFor(workspace.workspaceId)
+    );
+
+    expect(result.source).toBe('storage');
+    expect(ledgerPersistenceMocks.quarantineTitleLedgerRows).not.toHaveBeenCalled();
   });
 
   it('still seals duplicate provenance into the re-baseline after quarantining an invalid chain', async () => {

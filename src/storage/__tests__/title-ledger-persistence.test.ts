@@ -138,6 +138,7 @@ async function loadTitleLedgerPersistence({
     titleActionRecords: makeLedgerTable(actionRows),
     titleAuditEvents: makeLedgerTable(auditRows),
     titleLedgerQuarantine: makeLedgerTable(),
+    titleLedgerHeadMarkers: makeLedgerTable(),
     transaction: vi.fn(async (_mode: string, ...args: unknown[]) => {
       const callback = args.at(-1);
       if (typeof callback !== 'function') {
@@ -178,6 +179,42 @@ describe('title ledger persistence', () => {
       titleAuditEvents:
         'id, dbKey, workspaceId, projectId, recordId, eventKind, occurredAt, eventHash, previousHash, position, [dbKey+workspaceId], [dbKey+workspaceId+recordId], [dbKey+workspaceId+position], [workspaceId+recordId]',
     });
+  });
+
+  it('writes, reads, and clears a head-hash marker pinning the flushed chain head', async () => {
+    const action = fakeActionRecord({ recordId: 'a1' });
+    const audit = fakeAuditEventRecord({
+      recordId: 'e1',
+      subjectRecordIds: ['a1'],
+      eventHash: 'b'.repeat(64),
+    });
+    const { persistence, db } = await loadTitleLedgerPersistence({
+      workspaceKey: 'user-alice',
+    });
+
+    await persistence.replaceTitleLedgerWorkspaceRows('ws-1', {
+      actionRecords: [action],
+      auditEvents: [audit],
+    });
+
+    // The marker row pins the head event's hash, scoped to the active dbKey.
+    const markerRows = [...db.titleLedgerHeadMarkers.rows.values()];
+    expect(markerRows).toHaveLength(1);
+    expect(markerRows[0]).toEqual(
+      expect.objectContaining({
+        id: 'user-alice::ws-1',
+        dbKey: 'user-alice',
+        workspaceId: 'ws-1',
+        flushedHeadHash: audit.eventHash,
+      })
+    );
+    const marker = await persistence.readTitleLedgerHeadMarker('ws-1');
+    expect(marker?.flushedHeadHash).toBe(audit.eventHash);
+
+    // Clearing the workspace rows drops the marker too (no stale pin left behind).
+    await persistence.clearTitleLedgerWorkspaceRows('ws-1');
+    expect([...db.titleLedgerHeadMarkers.rows.values()]).toHaveLength(0);
+    expect(await persistence.readTitleLedgerHeadMarker('ws-1')).toBeNull();
   });
 
   it('writes and reads only the active dbKey workspace rows without rewriting record ids', async () => {

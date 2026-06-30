@@ -23,18 +23,33 @@ const otherMocks = vi.hoisted(() => ({ unlinkNode: vi.fn(), unlinkDeskMap: vi.fn
 const ledgerPersistenceMocks = vi.hoisted(() => {
   type Rows = { actionRecords: unknown[]; auditEvents: unknown[] };
   const rowsByWorkspace = new Map<string, Rows>();
+  const markerByWorkspace = new Map<string, string | null>();
   const clone = (rows: Rows): Rows => ({
     actionRecords: [...rows.actionRecords],
     auditEvents: [...rows.auditEvents],
   });
+  const headOf = (rows: Rows): string | null =>
+    (rows.auditEvents.at(-1) as { eventHash?: string } | undefined)?.eventHash ?? null;
   return {
     rowsByWorkspace,
+    markerByWorkspace,
     listTitleLedgerWorkspaceRows: vi.fn(async (workspaceId: string) =>
       clone(rowsByWorkspace.get(workspaceId) ?? { actionRecords: [], auditEvents: [] })
     ),
     replaceTitleLedgerWorkspaceRows: vi.fn(async (workspaceId: string, rows: Rows) => {
       rowsByWorkspace.set(workspaceId, clone(rows));
+      markerByWorkspace.set(workspaceId, headOf(rows));
     }),
+    readTitleLedgerHeadMarker: vi.fn(async (workspaceId: string) =>
+      markerByWorkspace.has(workspaceId)
+        ? {
+            id: workspaceId,
+            workspaceId,
+            flushedHeadHash: markerByWorkspace.get(workspaceId) ?? null,
+            flushedAt: '2020-01-01T00:00:00.000Z',
+          }
+        : null
+    ),
   };
 });
 
@@ -57,6 +72,7 @@ vi.mock('../../store/curative-store', () => ({
 vi.mock('../../storage/title-ledger-persistence', () => ({
   listTitleLedgerWorkspaceRows: ledgerPersistenceMocks.listTitleLedgerWorkspaceRows,
   replaceTitleLedgerWorkspaceRows: ledgerPersistenceMocks.replaceTitleLedgerWorkspaceRows,
+  readTitleLedgerHeadMarker: ledgerPersistenceMocks.readTitleLedgerHeadMarker,
 }));
 // DA-M15: the flush path is writer-gated; this single-tab test is the writer.
 vi.mock('../../storage/workspace-write-lease', () => ({
@@ -174,6 +190,7 @@ describe('AI undo keeps the durable title ledger (DA-H2)', () => {
     vi.clearAllMocks();
     undoHook.before = null;
     ledgerPersistenceMocks.rowsByWorkspace.clear();
+    ledgerPersistenceMocks.markerByWorkspace.clear();
     seedEmptyWorkspace();
   });
 

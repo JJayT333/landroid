@@ -56,6 +56,7 @@ import type { ProjectRecordBundle } from '../project-records/record-validation';
 import {
   listTitleLedgerWorkspaceRows,
   quarantineTitleLedgerRows,
+  readTitleLedgerHeadMarker,
   replaceTitleLedgerWorkspaceRows,
 } from '../storage/title-ledger-persistence';
 import type { TitleLedgerWorkspaceRows } from '../storage/title-ledger-stores';
@@ -545,11 +546,13 @@ async function baselineAndFlushTitleLedger(
 async function quarantineInvalidLedger(
   workspaceId: string,
   rows: TitleLedgerWorkspaceRows,
-  source: 'storage' | 'file'
+  source: 'storage' | 'file',
+  reasonOverride?: string
 ): Promise<TitleLedgerQuarantineNotice> {
   const reason =
-    `${rows.actionRecords.length} action record(s) / ${rows.auditEvents.length} `
-    + 'audit event(s) failed ledger verification on hydrate';
+    reasonOverride
+    ?? `${rows.actionRecords.length} action record(s) / ${rows.auditEvents.length} `
+      + 'audit event(s) failed ledger verification on hydrate';
   const quarantinedAt = new Date().toISOString();
   let durablyPersisted = false;
   try {
@@ -588,9 +591,15 @@ async function baselineAfterQuarantine(
   rows: TitleLedgerWorkspaceRows,
   source: 'storage' | 'file',
   ownerData?: OwnerSlice,
-  provenance?: LedgerBaselineProvenance
+  provenance?: LedgerBaselineProvenance,
+  reasonOverride?: string
 ): Promise<TitleLedgerLifecycleResult> {
-  const notice = await quarantineInvalidLedger(workspace.workspaceId, rows, source);
+  const notice = await quarantineInvalidLedger(
+    workspace.workspaceId,
+    rows,
+    source,
+    reasonOverride
+  );
   const result = await baselineAndFlushTitleLedger(workspace, ownerData, provenance);
   // Set AFTER the baseline — baselineAndFlushTitleLedger's reset clears it.
   useTitleActionLog.setState({ lastQuarantine: notice });
@@ -629,6 +638,25 @@ export async function flushTitleActionLogToStorage(
   await replaceTitleLedgerWorkspaceRows(workspaceId, rows);
 }
 
+/**
+ * DA-H4 residual: a hashed chain truncated back to a fully-legacy (re-hashed)
+ * chain still verifies internally, so `verifyTitleLedgerRows` cannot catch the
+ * replacement. The head-hash marker, written atomically with each flush, pins the
+ * expected head. Returns true when a marker exists and the stored head contradicts
+ * it (⇒ the chain was replaced). No marker ⇒ false — a legacy/pre-pin chain, a
+ * genesis baseline, a fresh duplicate, or an imported chain not yet re-flushed are
+ * all legitimately accepted; the pin arms forward from the first flush.
+ */
+async function storedLedgerHeadContradictsMarker(
+  storedRows: TitleLedgerWorkspaceRows,
+  workspaceId: string
+): Promise<boolean> {
+  const marker = await readTitleLedgerHeadMarker(workspaceId);
+  if (!marker) return false;
+  const storedHead = storedRows.auditEvents.at(-1)?.eventHash ?? null;
+  return marker.flushedHeadHash !== storedHead;
+}
+
 export async function hydrateTitleActionLogFromStorageOrBaseline(
   workspace: WorkspaceData,
   ownerData?: OwnerSlice,
@@ -642,6 +670,21 @@ export async function hydrateTitleActionLogFromStorageOrBaseline(
     if (
       await verifyTitleLedgerRows(storedRows, workspace.workspaceId, 'stored')
     ) {
+      if (
+        await storedLedgerHeadContradictsMarker(storedRows, workspace.workspaceId)
+      ) {
+        // Internally valid, but the head no longer matches the last flushed
+        // marker — a truncate-to-legacy replacement. Quarantine, don't hydrate.
+        return baselineAfterQuarantine(
+          workspace,
+          storedRows,
+          'storage',
+          ownerData,
+          provenance,
+          'The stored title-ledger head does not match the last flushed head-hash '
+            + 'marker — the chain may have been truncated or replaced.'
+        );
+      }
       const rows = cloneLedgerRows(storedRows);
       useTitleActionLog.getState().hydrate(rows);
       return {

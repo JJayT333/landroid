@@ -44,9 +44,11 @@ import type {
 import type {
   StoredTitleActionRecord,
   StoredTitleAuditEvent,
+  StoredTitleLedgerHeadMarker,
   StoredTitleLedgerQuarantine,
 } from './title-ledger-stores';
 import {
+  TITLE_LEDGER_HEAD_MARKER_STORE_DEFINITION,
   TITLE_LEDGER_QUARANTINE_STORE_DEFINITION,
   TITLE_LEDGER_STORE_DEFINITIONS,
 } from './title-ledger-stores';
@@ -159,6 +161,7 @@ const db = new Dexie('landroid-v2') as Dexie & {
   titleActionRecords: EntityTable<StoredTitleActionRecord, 'id'>;
   titleAuditEvents: EntityTable<StoredTitleAuditEvent, 'id'>;
   titleLedgerQuarantine: EntityTable<StoredTitleLedgerQuarantine, 'id'>;
+  titleLedgerHeadMarkers: EntityTable<StoredTitleLedgerHeadMarker, 'id'>;
   workspaceWriteLeases: EntityTable<WorkspaceWriteLease, 'workspaceId'>;
   savedProjects: EntityTable<SavedProjectRecord, 'id'>;
 };
@@ -626,6 +629,20 @@ db.version(17).stores({
  */
 db.version(18).stores({
   federalLeaseDocuments: 'id, dbKey, workspaceId, [dbKey+workspaceId]',
+});
+
+/**
+ * v19 (DA-H4 residual: title-ledger head-hash pin).
+ *
+ * Adds `titleLedgerHeadMarkers` — one row per workspace pinning the chain head's
+ * `eventHash` at the last flush. Lets hydrate detect a hashed chain truncated
+ * back to a legacy chain (which still verifies internally). Additive and
+ * non-destructive: a new empty table, no data migration. Existing chains have no
+ * marker until their next flush, so the pin arms forward — no rollout false
+ * positives.
+ */
+db.version(19).stores({
+  ...TITLE_LEDGER_HEAD_MARKER_STORE_DEFINITION,
 });
 
 
