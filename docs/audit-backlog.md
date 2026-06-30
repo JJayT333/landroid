@@ -123,6 +123,29 @@ explicitly accepted, treat that report as part of this backlog. Summary:
   wiring — needs a reject-vs-warn + hosted-vs-Lambda product decision). The dbKey
   *legacy-migration trigger UX* (where the operator-gated prompt appears) also
   still needs input; the lint-guard half shipped in #225.
+- 2026-06-30 reconciliation #2 (operator decision menu — display-polish batch):
+  shipped **owner panel B2/B4** (#230 — "Unit Leases" stat label under unit focus
+  + per-node desk-map button labels), **research "Used By" dedup** (#231 — key by
+  entityId+type so same-label records don't drop), **doc-link round-trip test
+  coverage** (#232 — all 5 entity kinds; prod already round-tripped them), and the
+  **curative dirty-form guard** (#233 — confirm before discarding unsaved edits).
+  Three menu items were re-verified **already-resolved or moot** and CLOSED, not
+  built (the recurring backlog-drift pattern — verify before building): **B5 /
+  LLA-M06** null-unit ORRI/WI surfacing is already shipped (`needsUnitAssignment`
+  + transfer-order hold + test `leasehold-summary.test.ts:2721`); **B7 / ACT-M01**
+  mutation-origin already threads via `withMutationOrigin` and the audit **event**
+  records it (`actorKind`), so the trail already distinguishes user/AI/import —
+  operator chose to **skip** the redundant ActionRecord mirror rather than touch
+  the hashed ledger; **dbKey legacy-migration (A2)** is already handled
+  **automatically** by the v11 `.upgrade()` backfill (`runV10ToV11DbKeyBackfill`,
+  `db.ts:471/1020`), so no operator-gated prompt is needed — CLOSED. **DEF-AI-01**
+  was **deferred** (not skipped): AI answers are prose with no structured citation
+  ids, so an existence-check has nothing to verify until the AI's answer format is
+  changed to emit `claim → record-id` citations; the verifier `verifyCitationSupport`
+  + contracts already exist (`projections.ts`) for when that lands. Remaining open
+  product lanes (operator-greenlit, bigger): **LPR Phase 2**, **map
+  multi-designation UI** (gated on #214 plat-look sign-off), **hosted-AI hardening**
+  (schema/context/rate-limit — gated on a hosted beta).
 
 This is the active master list for open, deferred, superseded, and newly found
 review items. It consolidates:
