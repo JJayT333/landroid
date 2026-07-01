@@ -8,7 +8,7 @@ import {
 import { normalizeMapTractFeature } from '../../types/map-tract-feature';
 import { createBlankLease, createBlankOwner, createBlankOwnerDoc } from '../../types/owner';
 import { createBlankLeasePurchaseReport } from '../../types/lease-purchase-report';
-import { createBlankNode } from '../../types/node';
+import { createBlankNode, normalizeOwnershipNode } from '../../types/node';
 import { sha256HexOfBlob } from '../blob-hash';
 import {
   createBlankResearchFormula,
@@ -236,6 +236,34 @@ function buildWorkspace(canvas: CanvasSaveData | null): LandroidFileData {
         linkedLeaseId: 'lease-1',
         relatedKind: 'lease',
       },
+      // Missing Link placeholders (LLA finding #7): exercise the placeholder
+      // markers through the real .landroid export/import round-trip so the
+      // `imported.nodes`==`original.nodes` assertion guards byte-identity on
+      // `provenance`/`placeholderMissing`/`placeholderPassthrough`. Normalized
+      // here so the fixture matches what import re-normalizes to. One
+      // indeterminate (passthrough key absent by default) and one explicit
+      // 'assume' + placeholderMissing.
+      normalizeOwnershipNode({
+        ...createBlankNode('placeholder-indeterminate', 'node-1'),
+        provenance: 'placeholder',
+        conveyanceMode: 'all',
+        grantor: '??? — missing link',
+        grantee: '??? — missing link',
+        initialFraction: '1',
+        fraction: '1',
+        placeholderMissing: 'person',
+      }),
+      normalizeOwnershipNode({
+        ...createBlankNode('placeholder-assume', 'node-1'),
+        provenance: 'placeholder',
+        conveyanceMode: 'all',
+        grantor: 'Estate of Pat Doe',
+        grantee: '??? — missing link',
+        initialFraction: '1',
+        fraction: '1',
+        placeholderPassthrough: 'assume',
+        placeholderMissing: 'both',
+      }),
     ],
     deskMaps: [
       {
@@ -246,7 +274,7 @@ function buildWorkspace(canvas: CanvasSaveData | null): LandroidFileData {
         grossAcres: '160',
         pooledAcres: '120',
         description: 'North half of Section 1',
-        nodeIds: ['node-1'],
+        nodeIds: ['node-1', 'placeholder-indeterminate', 'placeholder-assume'],
       },
     ],
     leaseholdUnit: {

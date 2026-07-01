@@ -18,9 +18,11 @@ import type {
 } from 'elkjs/lib/elk-api.js';
 import elkWorkerUrl from 'elkjs/lib/elk-worker.min.js?url';
 import type { OwnershipNode } from '../types/node';
+import { isPlaceholderNode, placeholderPassthroughOf } from '../types/node';
 import type { FlowEdgeData, OwnershipNodeData } from '../types/flowchart';
 import { getTreeLayoutMetrics } from './flowchart-metrics';
 import { computeRelativeShare } from '../title-math/calculators/tree-share';
+import { collectUnprovenIndeterminateNodeIds } from '../title-math/model/placeholder';
 
 // The live ownership-share math now lives in the unified title-math engine.
 // Re-exported here so canvas/flowchart consumers keep their existing import path.
@@ -170,11 +172,75 @@ function computeWidths(tree: TreeNode, metrics: ReturnType<typeof getTreeLayoutM
 
 // ── Position nodes ──────────────────────────────────────────
 
+/**
+ * Missing Link display/payout overlay, derived once per layout from all nodes.
+ *
+ * - `pendingIds` — nodes AT or BELOW an `'indeterminate'` placeholder
+ *   (`collectUnprovenIndeterminateNodeIds`). They render "—" + "pending".
+ * - `assumeFlaggedIds` — the `'assume'` placeholders and their descendants. Their
+ *   numbers compute and show, but the card carries "subject to unproven link".
+ *
+ * The two sets are disjoint: an `'assume'` placeholder is not a barrier, so it
+ * and its descendants are never in `pendingIds`.
+ */
+export interface PlaceholderOverlay {
+  pendingIds: ReadonlySet<string>;
+  assumeFlaggedIds: ReadonlySet<string>;
+}
+
+export function buildPlaceholderOverlay(
+  nodes: ReadonlyArray<OwnershipNode>
+): PlaceholderOverlay {
+  const pendingIds = collectUnprovenIndeterminateNodeIds(nodes);
+
+  const byId = new Map(nodes.map((n) => [n.id, n]));
+  const assumePlaceholderIds = new Set<string>();
+  for (const n of nodes) {
+    if (isPlaceholderNode(n) && placeholderPassthroughOf(n) === 'assume') {
+      assumePlaceholderIds.add(n.id);
+    }
+  }
+  const assumeFlaggedIds = new Set<string>();
+  if (assumePlaceholderIds.size > 0) {
+    const memo = new Map<string, boolean>();
+    const descendsFromAssume = (startId: string): boolean => {
+      const path: string[] = [];
+      let cursor: string | null = startId;
+      let answer = false;
+      while (cursor != null) {
+        const cached = memo.get(cursor);
+        if (cached !== undefined) {
+          answer = cached;
+          break;
+        }
+        if (assumePlaceholderIds.has(cursor)) {
+          answer = true;
+          break;
+        }
+        if (path.includes(cursor)) break; // defensive: malformed cycle
+        path.push(cursor);
+        cursor = byId.get(cursor)?.parentId ?? null;
+      }
+      for (const id of path) memo.set(id, answer);
+      return answer;
+    };
+    for (const n of nodes) {
+      if (descendsFromAssume(n.id)) assumeFlaggedIds.add(n.id);
+    }
+  }
+
+  return { pendingIds, assumeFlaggedIds };
+}
+
 function createOwnershipNodeData(
   node: OwnershipNode,
   parentInitialFraction: string | null,
   nodeScale = 1,
+  overlay?: PlaceholderOverlay,
 ): OwnershipNodeData {
+  const isPlaceholder = isPlaceholderNode(node);
+  const unprovenPending = overlay?.pendingIds.has(node.id) ?? false;
+  const assumeFlagged = !unprovenPending && (overlay?.assumeFlaggedIds.has(node.id) ?? false);
   return {
     label: node.grantee || node.instrument || 'Document',
     grantee: node.grantee,
@@ -186,6 +252,12 @@ function createOwnershipNodeData(
     relativeShare: computeRelativeShare(node, parentInitialFraction),
     nodeId: node.id,
     nodeScale,
+    ...(isPlaceholder ? { isPlaceholder: true } : {}),
+    ...(isPlaceholder && node.placeholderMissing
+      ? { placeholderMissing: node.placeholderMissing }
+      : {}),
+    ...(unprovenPending ? { unprovenPending: true } : {}),
+    ...(assumeFlagged ? { assumeFlagged: true } : {}),
   };
 }
 
@@ -197,13 +269,14 @@ function positionNodes(
   parentId: string | null,
   parentInitialFraction: string | null,
   metrics: ReturnType<typeof getTreeLayoutMetrics>,
+  overlay: PlaceholderOverlay,
 ): void {
   const { nodeWidth, nodeHeight, verticalGap, horizontalGap, relatedOffsetX } = metrics;
   const x = centerX - nodeWidth / 2;
 
   // Create flow node
   const node = tree.ownershipNode;
-  const data = createOwnershipNodeData(node, parentInitialFraction, metrics.nodeScale);
+  const data = createOwnershipNodeData(node, parentInitialFraction, metrics.nodeScale, overlay);
 
   result.flowNodes.push({
     id: node.id,
@@ -231,7 +304,7 @@ function positionNodes(
     const relNode = rel.ownershipNode;
     const relX = x + relatedOffsetX;
     const relY = y + i * (nodeHeight * 0.6);
-    const relData = createOwnershipNodeData(relNode, node.initialFraction, metrics.nodeScale);
+    const relData = createOwnershipNodeData(relNode, node.initialFraction, metrics.nodeScale, overlay);
 
     result.flowNodes.push({
       id: relNode.id,
@@ -263,7 +336,7 @@ function positionNodes(
 
   for (const child of tree.children) {
     const childCenter = childCenterX + child.subtreeWidth / 2;
-    positionNodes(child, childCenter, childY, result, node.id, node.initialFraction, metrics);
+    positionNodes(child, childCenter, childY, result, node.id, node.initialFraction, metrics, overlay);
     childCenterX += child.subtreeWidth + horizontalGap;
   }
 }
@@ -286,6 +359,7 @@ export function layoutOwnershipTree(nodes: OwnershipNode[], options: TreeLayoutO
   );
   const trees = buildTree(nodes);
   for (const tree of trees) computeWidths(tree, metrics);
+  const overlay = buildPlaceholderOverlay(nodes);
 
   const result: LayoutResult = { flowNodes: [], flowEdges: [] };
 
@@ -293,7 +367,7 @@ export function layoutOwnershipTree(nodes: OwnershipNode[], options: TreeLayoutO
   let offsetX = 0;
   for (const tree of trees) {
     const centerX = offsetX + tree.subtreeWidth / 2;
-    positionNodes(tree, centerX, 0, result, null, null, metrics);
+    positionNodes(tree, centerX, 0, result, null, null, metrics, overlay);
     offsetX += tree.subtreeWidth + metrics.rootGap;
   }
 
@@ -320,6 +394,7 @@ export async function layoutOwnershipTreeWithElk(
     options.nodeScale
   );
   const allNodes = new Map(nodes.map((node) => [node.id, node]));
+  const overlay = buildPlaceholderOverlay(nodes);
   const ownershipNodes = nodes.filter((node) => node.type !== 'related');
   const relatedByParent = new Map<string, OwnershipNode[]>();
 
@@ -396,6 +471,7 @@ export async function layoutOwnershipTreeWithElk(
           ? allNodes.get(node.parentId)?.initialFraction ?? null
           : null,
         metrics.nodeScale,
+        overlay,
       ) as OwnershipNodeData & Record<string, unknown>,
     });
 
@@ -427,7 +503,7 @@ export async function layoutOwnershipTreeWithElk(
           x: centeredPosition?.x ?? parentFlowNode.position.x + metrics.relatedOffsetX,
           y: centeredPosition?.y ?? parentFlowNode.position.y + index * (metrics.nodeHeight * 0.6),
         },
-        data: createOwnershipNodeData(relNode, parentSource.initialFraction, metrics.nodeScale) as OwnershipNodeData & Record<string, unknown>,
+        data: createOwnershipNodeData(relNode, parentSource.initialFraction, metrics.nodeScale, overlay) as OwnershipNodeData & Record<string, unknown>,
       });
 
       result.flowEdges.push({

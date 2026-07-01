@@ -34,6 +34,7 @@ export type {
   ShareParams,
 } from './calculators/ownership';
 export { findNpriBranchDiscrepancies } from './model/graph-ops';
+export { collectUnprovenIndeterminateNodeIds } from './model/placeholder';
 export type {
   NpriBranchDiscrepancy,
   NpriBranchDiscrepancyKind,

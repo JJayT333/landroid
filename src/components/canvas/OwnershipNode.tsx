@@ -99,6 +99,28 @@ export function OwnershipCard({
   const ofWholeFrac = formatAsFraction(absInterest);
   const remainingFrac = formatAsFraction(remaining);
 
+  // Missing Link overlay. A placeholder renders in a distinct dashed-amber state
+  // (modeled on the 'stale' badge pattern) so it can NEVER be mistaken for a
+  // recorded link. `unprovenPending` blanks the numbers to "—"; `assumeFlagged`
+  // shows the numbers with a "subject to unproven link" caption.
+  const isPlaceholder = data.isPlaceholder === true;
+  const unprovenPending = data.unprovenPending === true;
+  const assumeFlagged = data.assumeFlagged === true;
+  const missingLabel =
+    data.placeholderMissing === 'person'
+      ? 'Missing: the person / heir in the gap'
+      : data.placeholderMissing === 'instrument'
+        ? 'Missing: the recorded instrument'
+        : 'Missing: the person and the instrument';
+
+  const borderStateClass = selected
+    ? 'border-leather shadow-lg ring-2 ring-gold/50'
+    : isPlaceholder
+      ? 'border-dashed border-amber-500'
+      : data.stale
+        ? 'border-seal'
+        : 'border-line-strong';
+
   return (
     <div
       style={{
@@ -109,16 +131,27 @@ export function OwnershipCard({
         borderWidth,
       }}
       className={`
-        relative flex flex-col border-solid bg-parchment-light text-ink shadow-md transition-shadow
-        ${selected ? 'border-leather shadow-lg ring-2 ring-gold/50' : data.stale ? 'border-seal' : 'border-line-strong'}
+        relative flex flex-col border-solid text-ink shadow-md transition-shadow
+        ${isPlaceholder ? 'bg-amber-50' : 'bg-parchment-light'}
+        ${isPlaceholder && !selected ? '!border-dashed' : ''}
+        ${borderStateClass}
       `}
     >
-      {data.stale && (
+      {data.stale && !isPlaceholder && (
         <div
           className="absolute -top-2 left-2 z-10 rounded-sm bg-seal px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white shadow"
           title="This box no longer matches a record in the workspace — it was deleted after the chart was built. Re-import to refresh."
         >
           Stale
+        </div>
+      )}
+
+      {isPlaceholder && (
+        <div
+          className="absolute -top-2 left-2 z-10 rounded-sm bg-amber-500 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white shadow"
+          title={`Missing Link — an unproven gap in the chain of title. ${missingLabel}. The branch below it is held from payout until the link is proven.`}
+        >
+          ⚠ Missing Link
         </div>
       )}
 
@@ -166,9 +199,22 @@ export function OwnershipCard({
         </div>
       </div>
 
+      {/* What's-missing line — placeholder only. */}
+      {isPlaceholder && (
+        <div
+          className="border-t border-dashed border-amber-400 text-amber-800"
+          style={{
+            padding: `${footerPaddingY}px ${footerPaddingX}px`,
+            fontSize: fractionLabelSize,
+          }}
+        >
+          {missingLabel}
+        </div>
+      )}
+
       {/* Fractions */}
       <div
-        className="border-t border-line-strong bg-ledger space-y-0.5"
+        className={`border-t space-y-0.5 ${isPlaceholder ? 'border-dashed border-amber-400 bg-amber-100/40' : 'border-line-strong bg-ledger'}`}
         style={{
           padding: `${footerPaddingY}px ${footerPaddingX}px`,
           borderBottomLeftRadius: borderRadius,
@@ -183,8 +229,11 @@ export function OwnershipCard({
           >
             Granted
           </span>
-          <span className="font-mono font-semibold text-leather" style={{ fontSize: fractionValueSize }}>
-            {grantedFrac}
+          <span
+            className={`font-mono font-semibold ${unprovenPending ? 'text-amber-700' : 'text-leather'}`}
+            style={{ fontSize: fractionValueSize }}
+          >
+            {unprovenPending ? '—' : grantedFrac}
           </span>
         </div>
 
@@ -196,13 +245,28 @@ export function OwnershipCard({
           >
             Of Whole
           </span>
-          <span className="font-mono font-semibold text-ink" style={{ fontSize: fractionValueSize }}>
-            {ofWholeFrac}
+          <span
+            className={`font-mono font-semibold ${unprovenPending ? 'text-amber-700' : 'text-ink'}`}
+            style={{ fontSize: fractionValueSize }}
+          >
+            {unprovenPending ? '—' : ofWholeFrac}
           </span>
         </div>
 
+        {/* Pending / assume caption — the indeterminate-vs-assume overlay. */}
+        {unprovenPending && (
+          <div className="text-amber-700" style={{ fontSize: fractionLabelSize }}>
+            pending — unproven link
+          </div>
+        )}
+        {!unprovenPending && assumeFlagged && (
+          <div className="text-amber-700" style={{ fontSize: fractionLabelSize }}>
+            subject to unproven link
+          </div>
+        )}
+
         {/* Line 3: Remaining — only shown if grantee has conveyed some away */}
-        {hasConveyedSome && (
+        {!unprovenPending && hasConveyedSome && (
           <div className="flex items-center justify-between gap-2">
             <span
               className="text-ink-light uppercase shrink-0"

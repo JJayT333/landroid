@@ -215,6 +215,39 @@ const DRIVERS: Record<ActionName, ActionDriver> = {
     expectation: 'title',
     drive: (s) => s.insertPredecessor('child', 'pred', '0.25', { grantee: 'Predecessor' }),
   },
+  insertMissingLink: {
+    expectation: 'title',
+    drive: (s) => s.insertMissingLink('child', 'mlink', { grantee: 'Unknown Heir' }),
+  },
+  resolveMissingLink: {
+    expectation: 'title',
+    drive: (s) => {
+      // Set up a placeholder, then promote it with a real instrument. The
+      // instrument text/docNo project into the title records, so the resolve
+      // (not the insert) changes the slice; reset the spy to isolate resolve's
+      // OWN journal call.
+      s.insertMissingLink('child', 'mlink', { grantee: 'Unknown Heir' });
+      hookCalls.length = 0;
+      s.resolveMissingLink('mlink', { instrument: 'Affidavit of Heirship', docNo: 'AH-1' });
+    },
+  },
+  setPlaceholderPassthrough: {
+    // provenance / placeholderPassthrough are NOT projected into title records
+    // (display/triage only), so toggling cannot change the title slice.
+    expectation: 'non-title',
+    drive: (s) => {
+      // Mark an existing seed node as a placeholder WITHOUT changing the title
+      // slice (provenance is not projected), then toggle its passthrough.
+      useWorkspaceStore.setState((st) => ({
+        nodes: st.nodes.map((n) =>
+          n.id === 'orphan'
+            ? normalizeOwnershipNode({ ...n, provenance: 'placeholder' })
+            : n
+        ),
+      }));
+      s.setPlaceholderPassthrough('orphan', 'assume');
+    },
+  },
   attachConveyance: {
     expectation: 'title',
     drive: (s) => s.attachConveyance('orphan', 'root', '0.1', { grantee: 'Orphan Owner' }),
