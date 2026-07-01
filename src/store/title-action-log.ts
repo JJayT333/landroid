@@ -196,16 +196,19 @@ let ledgerGeneration = 0;
 let recordingChain: Promise<void> = Promise.resolve();
 const pending = new Set<Promise<unknown>>();
 
-// Governed read-path flip for the title_tree surface. DISARMED by default
-// (DA-C1): the journal-coverage exit gate must be green and the operator's
-// Springhill soak complete before re-arming, which is a deliberate one-line
-// change calling setTitleCutoverArmed(true) — never a runtime default. The
-// mode starts 'shadow'; reverting is available at any time regardless.
+// Governed read-path flip for the title_tree surface. This module's flag
+// CONSTRUCTS disarmed (DA-C1) — arming is never a runtime default here. The
+// Springhill soak completed 2026-06-10 and the operator armed the flip at boot
+// in src/main.tsx (#144, setTitleCutoverArmed(true)); disarm by deleting that
+// call. Arming only PERMITS the flip — it still requires the readiness gates
+// green plus the banner's explicit manual click. The mode starts 'shadow';
+// reverting is available at any time regardless.
 const titleReadPathFlag = new TitleReadPathFlag('shadow', { cutoverEnabled: false });
 
 /**
- * Arm or disarm the cutover flip governance. Exported for tests and for the
- * deliberate post-soak re-arm; nothing in production calls this with `true`.
+ * Arm or disarm the cutover flip governance. Exported for tests and called once
+ * at boot by src/main.tsx (#144, DA-C1 exit) with `true` to arm the flip after
+ * the completed Springhill soak; disarm by deleting that call.
  */
 export function setTitleCutoverArmed(enabled: boolean): void {
   titleReadPathFlag.setCutoverEnabled(enabled);
