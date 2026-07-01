@@ -64,9 +64,18 @@ npm run validate:backend
 ```
 
 `npm run test:e2e` uses Playwright Chromium and starts the local Vite server
-automatically. Current e2e status is tracked in `TESTING.md`; as of the current
-handoff, all 11 Playwright workflows are active after the document/PDF
-persistence refactor, fixture retargeting, and document-registry smoke path.
+automatically. Current e2e status is tracked in `TESTING.md`; the Playwright
+workflows in `tests/e2e/landroid-workflows.spec.ts` are active.
+
+## Code layout
+
+- `src/store/` — Zustand stores (workspace, owners, curative, `title-action-log`).
+- `src/title-math/` — the unified title-math engine (fractions, coverage, leasehold, NPRI/ORRI).
+- `src/storage/` — Dexie/IndexedDB persistence and `.landroid` export/import.
+- `src/components/`, `src/views/` — UI surfaces (Desk Map, Leasehold, Flowchart, Documents, Maps, …).
+
+For the full map — state ownership, module boundaries, and data flow — read
+`ARCHITECTURE.md`, then `docs/feature-interaction-map.md`.
 
 ## Key Docs
 

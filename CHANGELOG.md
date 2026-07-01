@@ -3,6 +3,54 @@
 This file records meaningful project changes so `CONTINUATION-PROMPT.md` can
 stay short.
 
+## 2026-06-30
+
+- **Missing Link placeholder node.** A `type:'conveyance'` node flagged
+  `provenance:'placeholder'` standing in for an unproven chain gap (an unestablished
+  heirship or a missing deed). It is a full pass-through the engine treats as a
+  computation barrier — it never fabricates a fraction below it (per-node
+  `indeterminate` default vs `assume` pass-through toggle) — and raises a High
+  `Missing link` curative issue that gates transfer-order payout via the existing
+  curative machinery. Additive and gated on `isPlaceholderNode`; recorded-node math
+  is byte-identical (baseline byte=0 on all three oracles). Adversarially reviewed;
+  undo/redo + delete curative-consistency fixed. See `src/title-math/model/placeholder.ts`.
+- **Docs accuracy sweep.** Corrected stale title-cutover wording (the flip is armed
+  at boot in `src/main.tsx` (#144) after the completed Springhill soak — not
+  "pending" it); marked shipped items done (Audit Sheet #198, Title UNDO #147);
+  refreshed the `CONTINUATION-PROMPT` handoff; caught this changelog up to `#235`;
+  and dropped pinned counts / "current handoff" phrasing from the onboarding docs.
+
+## 2026-06-16 – 2026-06-29 (rollup: #181–#235)
+
+Catch-up block bringing this changelog current with `main` after the unified-math
+engine (#180); grouped by lane — see the PRs / `git log` for detail.
+
+- **Maps** (#184, #186–#192, #202, #213–#218): GeoJSON tract side-store + ingest,
+  feature→tract matcher, real SVG tract polygons, a CSS-3D flip chooser, per-tract
+  CSV/GeoJSON export + unit-plat PDF exhibit, `.landroid` round-trip for map
+  features, the acreage crosswalk that auto-matches renumbered exports to Desk Maps,
+  the land-plat exhibit reskin, and re-import warn-and-choose.
+- **Documents → professional grade** (#193–#197): the three-pane Documents workflow,
+  warn-and-choose dedup on ingest and attach, the attorney-packet ZIP, and a
+  Bates-numbered production set.
+- **Curative + Audit Sheet** (#198, #200, #201, #205): the printable per-tract Audit
+  Sheet, open Critical/High issues raising transfer-order holds + Desk Map dots, the
+  printable Title Requirement Report, and the fixed-NPRI-excess pre-WI derivation.
+- **Ledger / storage trust** (#185, #204, #210, #225–#228): the DA-M3/H5/H4 ledger
+  trust lane, genesis-baseline sealing, duplicate-project copying the right assets,
+  the dbKey lint guard, raw-write structural-defect warnings (DA-M2), federal
+  lease-document persistence, and the last-flushed head-hash pin (DA-H4 residual).
+- **Lease-instrument model** (#220–#222): one lease record per instrument, fanning to
+  N tracts without inflating the math.
+- **Lease Purchase Report** (#235): the printable Lease Abstract Report (Phase 3).
+- **AI, perf, display** (#203, #206–#212, #215, #230–#234): a mode-accurate hosted
+  assistant prompt, ambiguous-fraction rejection, O(n) branch-allocation validation,
+  idempotent store mutations, duplicate-lease-card collapse, and the owner / research
+  / curative display-polish batch.
+- **Engine follow-ons + docs** (#181–#183, #223, #224, #229): tracking-doc sync, the
+  DA-H1 counsel-approval note, the compatibility-shim teardown, and the
+  feature-interaction / blast-radius map plus audit-backlog reconciles.
+
 ## 2026-06-15
 
 - **Unified title-math engine + cleared/attorney-nuanced math (#180).**

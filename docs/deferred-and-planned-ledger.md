@@ -364,7 +364,7 @@ This is the deduplicated, area-organized backlog mined from every memory file, R
 | DEF-ACT-01/02/03/05 cutover-decision set | phase-gate / product-decision | DEF-ACT-01/02/03/05 | First-workflow order (owner/curative low-risk vs title_tree high-value); full-effect persistence per surface; audit-chain scope (project-wide D3); maintain no-PII synthetic-fixture rule. |
 | DEF-IMP-01/02/03/04 import-session decisions | phase-gate | Phase 3/4 | ActionRecord-draft schema vs durable rows; source rows first-class vs sidecar; canonical runsheet identifiers; answered-question representation. |
 | DEF-ACT-04 v9 record-bearing package | phase-gate | DEF-ACT-04 | **SHIPPED** (v9 optional actionLedger, validates, drops bad with warning). Full projected-bundle/read-cutover stays deferred; read path stays shadow. |
-| Title UNDO PR pending operator review | held-PR | — | **Likely SHIPPED #147** (journaled inverse + Cmd+Z). Verify. |
+| Title UNDO | held-PR | — | **SHIPPED #147** (journaled inverse restores + cascade bundles + navbar button/Cmd+Z). |
 | PR #185 ledger-trust lane held-for-ultra | held-PR | #185, DA-M3/H5/H4 | **MERGED #185** (operator said merge, lifting hold). Conflicting earlier "held" note — treat as shipped. |
 | ADR 0007 action-layer/audit schema Proposed (staged) | product-decision | ADR-0007, Phase 1/3/4 | Phase 1 schema → Phase 3 imports → Phase 4 cutover after parity. AuditEvent "can support hash continuity". |
 | No observability / audit logging | deferred-finding **HG** | HG-4 | No structured logger/CloudWatch/Sentry; append-only audit events for auth/AI-mutation/upload/export/permission. |
