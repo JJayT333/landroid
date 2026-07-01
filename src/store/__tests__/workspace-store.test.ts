@@ -3,6 +3,16 @@ import { createBlankLeaseholdUnit } from '../../types/leasehold';
 import { createBlankNode } from '../../types/node';
 import { createBlankLease } from '../../types/owner';
 
+interface CurativeIssueRow {
+  id?: string;
+  issueType: string;
+  affectedNodeId: string | null;
+  affectedDeskMapId?: string | null;
+  status?: string;
+  priority?: string;
+  resolutionNotes?: string;
+}
+
 const mocks = vi.hoisted(() => ({
   unlinkDeskMap: vi.fn(),
   unlinkNode: vi.fn(),
@@ -13,8 +23,25 @@ const mocks = vi.hoisted(() => ({
   unlinkCurativeNode: vi.fn(),
   removeOwner: vi.fn(async () => undefined),
   removeLease: vi.fn(async () => undefined),
-  addCurativeIssue: vi.fn(async () => undefined),
-  curativeTitleIssues: [] as Array<{ issueType: string; affectedNodeId: string | null }>,
+  // Stateful curative mock so the raise -> resolve -> undo -> redo handoff is
+  // actually exercised (the real store persists + mutates titleIssues; the
+  // missing-link undo cascades read it back). addIssue de-dups by id (mirrors
+  // the store's same-id overwrite), updateIssue mutates in place, removeIssue
+  // drops by id.
+  addCurativeIssue: vi.fn(async (issue: CurativeIssueRow) => {
+    const idx = mocks.curativeTitleIssues.findIndex((i) => i.id === issue.id);
+    if (idx >= 0) mocks.curativeTitleIssues[idx] = { ...issue };
+    else mocks.curativeTitleIssues.unshift({ ...issue });
+  }),
+  updateCurativeIssue: vi.fn(async (id: string, fields: Partial<CurativeIssueRow>) => {
+    const target = mocks.curativeTitleIssues.find((i) => i.id === id);
+    if (target) Object.assign(target, fields);
+  }),
+  removeCurativeIssue: vi.fn(async (id: string) => {
+    const idx = mocks.curativeTitleIssues.findIndex((i) => i.id === id);
+    if (idx >= 0) mocks.curativeTitleIssues.splice(idx, 1);
+  }),
+  curativeTitleIssues: [] as CurativeIssueRow[],
   ownerState: {
     leases: [] as Array<{ id: string; ownerId: string }>,
   },
@@ -47,6 +74,10 @@ vi.mock('../../storage/document-store', () => ({
 vi.mock('../../storage/undo-cascade-bundle', () => ({
   captureCascadeBundle: vi.fn(async () => ({ kind: 'fake-bundle' })),
   restoreCascadeBundle: vi.fn(async () => ({})),
+  // Redo path for destructive mutations — stubbed so the missing-link delete
+  // undo/redo tests don't reach into Dexie.
+  captureCascadeReapply: vi.fn(async () => ({ kind: 'fake-reapply' })),
+  reapplyCascadeBundle: vi.fn(async () => ({})),
   planOwnerRecordCleanup: vi.fn(
     (
       removedNodes: Array<{ linkedOwnerId: string | null; linkedLeaseId: string | null }>,
@@ -84,6 +115,8 @@ vi.mock('../curative-store', () => ({
       workspaceId: 'ws-test',
       titleIssues: mocks.curativeTitleIssues,
       addIssue: mocks.addCurativeIssue,
+      updateIssue: mocks.updateCurativeIssue,
+      removeIssue: mocks.removeCurativeIssue,
     }),
   },
 }));
@@ -290,6 +323,318 @@ describe('workspace-store', () => {
       .convey('root', 'child-ok', '0.25', { grantee: 'Normal Grantee' });
     expect(ok).toBe(true);
     expect(mocks.addCurativeIssue).not.toHaveBeenCalled();
+  });
+
+  describe('Missing Link placeholder', () => {
+    function seedRootChild(): void {
+      // grandma (root) -> grandson (child); we bridge an unproven link between.
+      const root = {
+        ...createBlankNode('root', null),
+        grantee: 'Grandma',
+        initialFraction: '1.000000000',
+        fraction: '0.000000000',
+      };
+      const child = {
+        ...createBlankNode('child', 'root'),
+        grantee: 'Grandson',
+        conveyanceMode: 'all' as const,
+        initialFraction: '1.000000000',
+        fraction: '1.000000000',
+      };
+      useWorkspaceStore.setState({
+        nodes: [root, child],
+        deskMaps: [
+          {
+            id: 'dm-1',
+            name: 'Tract 1',
+            code: 'T1',
+            tractId: null,
+            grossAcres: '100',
+            pooledAcres: '100',
+            description: '',
+            nodeIds: ['root', 'child'],
+          },
+        ],
+        activeDeskMapId: 'dm-1',
+      });
+    }
+
+    it('insertMissingLink raises a High "Missing link" issue on the new node', async () => {
+      seedRootChild();
+      const ok = useWorkspaceStore
+        .getState()
+        .insertMissingLink('child', 'mlink', { placeholderMissing: 'both' });
+      expect(ok).toBe(true);
+
+      const nodes = useWorkspaceStore.getState().nodes;
+      const placeholder = nodes.find((n) => n.id === 'mlink');
+      // The placeholder is a full pass-through conveyance IN the main line.
+      expect(placeholder?.provenance).toBe('placeholder');
+      expect(placeholder?.conveyanceMode).toBe('all');
+      expect(placeholder?.type).toBe('conveyance');
+      expect(placeholder?.grantee).toBe('??? — missing link');
+      // child now hangs UNDER the placeholder, carrying its interest unchanged.
+      expect(nodes.find((n) => n.id === 'child')?.parentId).toBe('mlink');
+      // The placeholder takes 100% of the node's interest (no silent zero).
+      expect(placeholder?.initialFraction).toBe('1.000000000');
+      // It joined the same tract.
+      expect(
+        useWorkspaceStore
+          .getState()
+          .deskMaps.find((d) => d.id === 'dm-1')
+          ?.nodeIds
+      ).toContain('mlink');
+
+      expect(mocks.addCurativeIssue).toHaveBeenCalledTimes(1);
+      expect(mocks.addCurativeIssue).toHaveBeenCalledWith(
+        expect.objectContaining({
+          issueType: 'Missing link',
+          priority: 'High',
+          affectedNodeId: 'mlink',
+          affectedDeskMapId: 'dm-1',
+          id: 'missing-link-mlink',
+        })
+      );
+    });
+
+    it('insertMissingLink is NOT blocked by the placeholder (warn-dont-block save)', () => {
+      seedRootChild();
+      const ok = useWorkspaceStore.getState().insertMissingLink('child', 'mlink');
+      expect(ok).toBe(true);
+      expect(useWorkspaceStore.getState().lastError).toBeNull();
+      // A placeholder legitimately has no recorded instrument and is a full
+      // pass-through; the graph stays valid (no hard-error on save).
+      expect(
+        useWorkspaceStore.getState().nodes.find((n) => n.id === 'mlink')?.instrument
+      ).toBe('');
+    });
+
+    it('setPlaceholderPassthrough toggles indeterminate <-> assume', () => {
+      seedRootChild();
+      useWorkspaceStore.getState().insertMissingLink('child', 'mlink');
+      // Default is the absent 'indeterminate'.
+      expect(
+        useWorkspaceStore.getState().nodes.find((n) => n.id === 'mlink')
+          ?.placeholderPassthrough
+      ).toBeUndefined();
+
+      expect(
+        useWorkspaceStore.getState().setPlaceholderPassthrough('mlink', 'assume')
+      ).toBe(true);
+      expect(
+        useWorkspaceStore.getState().nodes.find((n) => n.id === 'mlink')
+          ?.placeholderPassthrough
+      ).toBe('assume');
+
+      expect(
+        useWorkspaceStore.getState().setPlaceholderPassthrough('mlink', 'indeterminate')
+      ).toBe(true);
+      // Back to the absent default (round-trip clean).
+      expect(
+        useWorkspaceStore.getState().nodes.find((n) => n.id === 'mlink')
+          ?.placeholderPassthrough
+      ).toBeUndefined();
+    });
+
+    it('setPlaceholderPassthrough is a no-op on a recorded (non-placeholder) node', () => {
+      seedRootChild();
+      expect(
+        useWorkspaceStore.getState().setPlaceholderPassthrough('child', 'assume')
+      ).toBe(false);
+    });
+
+    it('resolveMissingLink clears the placeholder, closes the issue, and math flows', async () => {
+      seedRootChild();
+      useWorkspaceStore.getState().insertMissingLink('child', 'mlink', {
+        placeholderMissing: 'instrument',
+        placeholderPassthrough: 'assume',
+      });
+      // The insert already raised the still-open issue (stateful curative mock),
+      // so the close path has a real target to find.
+      expect(
+        mocks.curativeTitleIssues.find((i) => i.id === 'missing-link-mlink')?.status
+      ).toBe('Open');
+
+      const ok = useWorkspaceStore.getState().resolveMissingLink('mlink', {
+        instrument: 'Affidavit of Heirship',
+        docNo: 'AH-2026-1',
+        grantor: 'Grandma Estate',
+        grantee: 'Proven Heir',
+      });
+      expect(ok).toBe(true);
+
+      const promoted = useWorkspaceStore.getState().nodes.find((n) => n.id === 'mlink');
+      // Placeholder markers cleared; promoted to an ordinary recorded node.
+      expect(promoted?.provenance).toBeUndefined();
+      expect(promoted?.placeholderPassthrough).toBeUndefined();
+      expect(promoted?.placeholderMissing).toBeUndefined();
+      // Real instrument + parties written.
+      expect(promoted?.instrument).toBe('Affidavit of Heirship');
+      expect(promoted?.grantee).toBe('Proven Heir');
+      // Structure intact: child still hangs under it, interest preserved.
+      expect(
+        useWorkspaceStore.getState().nodes.find((n) => n.id === 'child')?.parentId
+      ).toBe('mlink');
+      expect(promoted?.initialFraction).toBe('1.000000000');
+
+      // The linked Missing link issue was closed (Resolved).
+      expect(mocks.updateCurativeIssue).toHaveBeenCalledWith(
+        'missing-link-mlink',
+        expect.objectContaining({ status: 'Resolved' })
+      );
+    });
+
+    it('resolveMissingLink is a no-op on a recorded (non-placeholder) node', () => {
+      seedRootChild();
+      expect(useWorkspaceStore.getState().resolveMissingLink('child')).toBe(false);
+      expect(mocks.updateCurativeIssue).not.toHaveBeenCalled();
+    });
+
+    it('resolveMissingLink strips engine-structural fields from the promotion payload (#3)', () => {
+      seedRootChild();
+      useWorkspaceStore.getState().insertMissingLink('child', 'mlink');
+      const before = useWorkspaceStore.getState().nodes.find((n) => n.id === 'mlink');
+      // Engine-set values the promotion must not be able to overwrite.
+      const beforeInitialFraction = before?.initialFraction;
+      const beforeFraction = before?.fraction;
+      expect(beforeInitialFraction).toBe('1.000000000');
+      expect(before?.conveyanceMode).toBe('all');
+
+      // Attempt to re-fraction + re-mode the node out from under the engine on
+      // promotion; those structural keys must be ignored.
+      const ok = useWorkspaceStore.getState().resolveMissingLink('mlink', {
+        grantee: 'Proven Heir',
+        initialFraction: '0.250000000',
+        fraction: '0.250000000',
+        conveyanceMode: 'fraction',
+        statedFraction: '0.500000000',
+      });
+      expect(ok).toBe(true);
+
+      const promoted = useWorkspaceStore.getState().nodes.find((n) => n.id === 'mlink');
+      // Descriptive field landed...
+      expect(promoted?.grantee).toBe('Proven Heir');
+      // ...but the structural/fraction keys did NOT (full pass-through preserved).
+      expect(promoted?.initialFraction).toBe(beforeInitialFraction);
+      expect(promoted?.fraction).toBe(beforeFraction);
+      expect(promoted?.conveyanceMode).toBe('all');
+      expect(promoted?.statedFraction).toBeUndefined();
+    });
+
+    it('undo of insertMissingLink removes the raised issue; redo re-raises it (#1, #7)', async () => {
+      seedRootChild();
+      useWorkspaceStore.getState().insertMissingLink('child', 'mlink', {
+        placeholderMissing: 'both',
+      });
+      // The High issue was raised.
+      expect(
+        mocks.curativeTitleIssues.some((i) => i.id === 'missing-link-mlink')
+      ).toBe(true);
+
+      // Undo: the placeholder node is gone AND its orphaned issue is removed.
+      const undone = await useWorkspaceStore.getState().undoLastTitleMutation();
+      expect(undone).toBe(true);
+      expect(useWorkspaceStore.getState().nodes.some((n) => n.id === 'mlink')).toBe(false);
+      expect(
+        mocks.curativeTitleIssues.some((i) => i.id === 'missing-link-mlink')
+      ).toBe(false);
+
+      // Redo: the placeholder returns AND the issue is re-raised.
+      const redone = await useWorkspaceStore.getState().redoLastTitleMutation();
+      expect(redone).toBe(true);
+      expect(useWorkspaceStore.getState().nodes.some((n) => n.id === 'mlink')).toBe(true);
+      const reraised = mocks.curativeTitleIssues.find((i) => i.id === 'missing-link-mlink');
+      expect(reraised).toBeDefined();
+      expect(reraised?.issueType).toBe('Missing link');
+      expect(reraised?.priority).toBe('High');
+      expect(reraised?.affectedNodeId).toBe('mlink');
+    });
+
+    it('undo of resolveMissingLink reopens the issue; redo re-closes it (#2, #7)', async () => {
+      seedRootChild();
+      useWorkspaceStore.getState().insertMissingLink('child', 'mlink');
+      const ok = useWorkspaceStore.getState().resolveMissingLink('mlink', {
+        instrument: 'Affidavit of Heirship',
+        grantee: 'Proven Heir',
+      });
+      expect(ok).toBe(true);
+      // The link was closed (Resolved) and the node promoted.
+      expect(
+        mocks.curativeTitleIssues.find((i) => i.id === 'missing-link-mlink')?.status
+      ).toBe('Resolved');
+      expect(
+        useWorkspaceStore.getState().nodes.find((n) => n.id === 'mlink')?.provenance
+      ).toBeUndefined();
+
+      // Undo: the placeholder is reopened (provenance back) AND the issue reopens.
+      const undone = await useWorkspaceStore.getState().undoLastTitleMutation();
+      expect(undone).toBe(true);
+      expect(
+        useWorkspaceStore.getState().nodes.find((n) => n.id === 'mlink')?.provenance
+      ).toBe('placeholder');
+      expect(
+        mocks.curativeTitleIssues.find((i) => i.id === 'missing-link-mlink')?.status
+      ).toBe('Open');
+
+      // Redo: the promotion re-applies AND the issue re-closes.
+      const redone = await useWorkspaceStore.getState().redoLastTitleMutation();
+      expect(redone).toBe(true);
+      expect(
+        useWorkspaceStore.getState().nodes.find((n) => n.id === 'mlink')?.provenance
+      ).toBeUndefined();
+      expect(
+        mocks.curativeTitleIssues.find((i) => i.id === 'missing-link-mlink')?.status
+      ).toBe('Resolved');
+    });
+
+    it('deleting a placeholder closes its still-open Missing link issue; undo restores it (#4, #7)', async () => {
+      seedRootChild();
+      // Bridge the unproven link, then delete a leaf under it so the placeholder
+      // survives, then delete the placeholder itself.
+      useWorkspaceStore.getState().insertMissingLink('child', 'mlink', {
+        placeholderMissing: 'both',
+      });
+      expect(
+        mocks.curativeTitleIssues.find((i) => i.id === 'missing-link-mlink')?.status
+      ).toBe('Open');
+
+      // Delete the placeholder branch (mlink + its child).
+      useWorkspaceStore.getState().removeNode('mlink');
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      // The placeholder is gone and its High issue is auto-closed (no longer
+      // holding payout or lighting a dot for a node that no longer exists).
+      expect(useWorkspaceStore.getState().nodes.some((n) => n.id === 'mlink')).toBe(false);
+      const closed = mocks.curativeTitleIssues.find((i) => i.id === 'missing-link-mlink');
+      expect(closed?.status).toBe('Resolved');
+
+      // Undo of the delete reopens + relinks the issue to its restored placeholder.
+      const undone = await useWorkspaceStore.getState().undoLastTitleMutation();
+      expect(undone).toBe(true);
+      expect(useWorkspaceStore.getState().nodes.some((n) => n.id === 'mlink')).toBe(true);
+      const restored = mocks.curativeTitleIssues.find((i) => i.id === 'missing-link-mlink');
+      expect(restored?.status).toBe('Open');
+      expect(restored?.affectedNodeId).toBe('mlink');
+    });
+
+    it('raiseMissingLinkIssue de-dups by deterministic id under rapid double-insert (#6)', () => {
+      seedRootChild();
+      // First insert raises missing-link-mlink. Pre-seed the SAME id with a
+      // mismatched affectedNodeId to model the async addIssue lag: the guard must
+      // reject by id alone, not by node match.
+      mocks.curativeTitleIssues.push({
+        id: 'missing-link-mlink2',
+        issueType: 'Missing link',
+        affectedNodeId: null,
+        status: 'Open',
+      });
+      useWorkspaceStore.getState().insertMissingLink('child', 'mlink2');
+      // Only the pre-existing row remains — no duplicate raise for the same id.
+      expect(
+        mocks.curativeTitleIssues.filter((i) => i.id === 'missing-link-mlink2')
+      ).toHaveLength(1);
+      expect(mocks.addCurativeIssue).not.toHaveBeenCalled();
+    });
   });
 
   it('repairs an invalid active desk map id while loading a workspace', () => {

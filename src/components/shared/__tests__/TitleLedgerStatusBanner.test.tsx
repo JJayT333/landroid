@@ -68,7 +68,7 @@ describe('TitleLedgerStatusBanner', () => {
 
     expect(readiness.ready).toBe(true);
     expect(html).toContain('aria-disabled="true"');
-    expect(html).toContain('disarmed pending the Springhill');
+    expect(html).toContain('disarmed by deliberate governance');
     expect(html).toContain('Flip to cutover');
   });
 

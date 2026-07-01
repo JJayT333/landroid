@@ -77,5 +77,5 @@ explicitly says so.
   plan; superseded by the live deployment (`DEPLOYMENT_STATE.md` is current
   truth, `DEPLOYMENT_GUIDE.md` the how-to).
 - `docs/archive/prompts/audit-sheet-export-brief.md`: paste-ready feature brief
-  for the per-tract printable Audit Sheet export (not yet built; pointer lives
-  in `ROADMAP.md`).
+  for the per-tract printable Audit Sheet export (shipped #198; brief retained
+  for reference).

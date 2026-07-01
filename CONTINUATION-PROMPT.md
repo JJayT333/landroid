@@ -4,6 +4,45 @@ Use this file to resume the active workstream in a new chat. Read it with
 `AGENTS.md`, `PROJECT_CONTEXT.md`, and `docs/README.md` before touching code.
 Keep long history in `CHANGELOG.md`.
 
+## Active Handoff - 2026-06-30 (backlog cleared; Missing Link + staleness sweep)
+
+`main` is current through **#235** (LPR Phase 3). Everything in the sections below
+this one is dated history; this section is the authoritative current state.
+
+**Merged this session:** the **Missing Link** placeholder node — a `type:'conveyance'`
+node flagged `provenance:'placeholder'` standing in for an unproven chain gap (an
+unestablished heirship or a missing deed). It is a full pass-through the engine treats
+as a computation barrier — it never fabricates a fraction below it (per-node
+`indeterminate` default vs `assume` pass-through toggle), raises a High `Missing link`
+curative issue that gates transfer-order payout via the existing curative machinery,
+and is additive + gated on `isPlaceholderNode` so recorded-node math stays
+byte-identical (baseline byte=0 on all three oracles). Key files:
+`src/title-math/model/placeholder.ts`, `src/store/workspace-store.ts`
+(`insertMissingLink` / `resolveMissingLink` / `setPlaceholderPassthrough`),
+`src/components/modals/InsertMissingLinkModal.tsx`, and the dashed-amber card in
+`OwnershipNode.tsx` / `DeskMapCard.tsx`. Reviewed by a 4-lens adversarial pass; the
+undo/redo + delete curative-consistency findings were fixed.
+
+**Also this session — a staleness sweep** corrected stale title-cutover wording.
+**TRUE cutover state (verify from code, not comments):** governance is ARMED at boot
+(`src/main.tsx` calls `setTitleCutoverArmed(true)`, #144, after the Springhill soak
+completed 2026-06-10). The flip itself still requires the readiness gates green THIS
+session (`sessionParityCount` resets to 0 each load) PLUS a manual banner click;
+`readPathMode` starts `shadow` every session; revert is always available. A fresh load
+showing "shadow / not enough parities" is EXPECTED, not a disarmed flip.
+
+**Open lanes (both gated, neither urgent):** Map multi-designation UI (needs sign-off
+on the #214 plat look first); hosted-AI hardening (gated on a hosted beta — no hosted
+users yet). **Genuinely-open backlog, all correctly deferred:** DA-M5 unratified
+tract-basis payout math (pending counsel), ACT-H05 (make divergence a visible warning
+that blocks cutover candidacy), DA2-F3 (re-import wipes annotations once drawing tools
+are wired). No open blockers.
+
+**Verify:** `npm run lint` (tsc), `npm test`, `npm run baseline:check` (byte=0),
+`npm run build`. The three elkjs-`?url` test suites (`tree-layout`, `flowchart-scale`,
+`view-helpers`) only fail under a local sandbox asset guard; CI on GitHub is
+authoritative for them.
+
 ## Active Handoff - 2026-06-15 (unified title-math merged; "do it all" program)
 
 The unified title-math engine is MERGED and LIVE on `main` (PR #180, `16cdd1e`).

@@ -4,6 +4,7 @@ export const TITLE_ISSUE_TYPE_OPTIONS = [
   'Missing lease',
   'Missing ratification',
   'Probate / heirship',
+  'Missing link',
   'Bad legal description',
   'Name mismatch',
   'Unreleased lien',

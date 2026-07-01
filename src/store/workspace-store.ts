@@ -39,8 +39,18 @@ async function cascadeDeleteDocsForRemovedNodes(
   if (attachmentIds.size === 0) return;
   await deleteDocsForAttachments([...attachmentIds]);
 }
-import type { OwnershipNode, DeskMap, NodeAttachmentSummary } from '../types/node';
-import { normalizeDeskMap, normalizeOwnershipNode } from '../types/node';
+import type {
+  OwnershipNode,
+  DeskMap,
+  NodeAttachmentSummary,
+  PlaceholderMissing,
+  PlaceholderPassthrough,
+} from '../types/node';
+import {
+  isPlaceholderNode,
+  normalizeDeskMap,
+  normalizeOwnershipNode,
+} from '../types/node';
 import type { DocumentKind } from '../types/document';
 import {
   createBlankLeaseholdAssignment,
@@ -70,7 +80,7 @@ import {
   validateOwnershipGraph,
 } from '../title-math';
 import type { Audit, ResultWarning } from '../types/result';
-import { createBlankTitleIssue } from '../types/title-issue';
+import { createBlankTitleIssue, titleIssueIsClosed } from '../types/title-issue';
 import {
   captureCascadeBundle,
   captureCascadeReapply,
@@ -81,6 +91,7 @@ import {
   type CascadeReapplyBundle,
 } from '../storage/undo-cascade-bundle';
 import {
+  attachCurativeUndoCascade,
   clearTitleRedoStack,
   clearTitleUndoStack,
   popTitleRedoEntry,
@@ -88,6 +99,7 @@ import {
   pushTitleRedoEntry,
   pushTitleUndoEntry,
   titleUndoLabel,
+  type CurativeUndoCascade,
 } from './title-undo-stack';
 import {
   READ_ONLY_WORKSPACE_EDIT_TITLE,
@@ -217,6 +229,50 @@ interface WorkspaceState {
   createRootNode: (newNodeId: string, initialFraction: string, form: Partial<OwnershipNode>, deskMapId?: string) => boolean;
   rebalance: (nodeId: string, newInitialFraction: string, formFields?: Partial<OwnershipNode>) => boolean;
   insertPredecessor: (activeNodeId: string, newPredecessorId: string, newInitialFraction: string, form: Partial<OwnershipNode>) => boolean;
+  /**
+   * Missing Link — insert an UNPROVEN-gap placeholder as a bridge above
+   * `activeNodeId`, parenting it under a new `provenance: 'placeholder'`
+   * conveyance that takes 100% of the node's interest as a full pass-through
+   * (`conveyanceMode: 'all'`). Same plumbing as {@link insertPredecessor}; the
+   * fraction math runs structurally as a normal pass-through (no sentinel, no
+   * silent zero). On success it raises a High `'Missing link'` title issue on the
+   * new node, which auto-gates transfer-order payout and lights the Desk Map dot
+   * through the existing curative machinery. Returns false (and sets `lastError`)
+   * if the insert is rejected.
+   */
+  insertMissingLink: (
+    activeNodeId: string,
+    newNodeId: string,
+    opts?: MissingLinkOptions
+  ) => boolean;
+  /**
+   * Promote a Missing Link placeholder to a recorded node: clear `provenance` and
+   * the placeholder fields, write the real instrument + descriptive inputs from
+   * `recordedFields`, and close (status `'Resolved'`) the linked `'Missing link'`
+   * title issue. No-op (returns false) if `nodeId` is not a placeholder.
+   *
+   * Engine-bypass invariant: the structural + fraction keys
+   * (`id`/`type`/`parentId`/`provenance`/`placeholder*`/`initialFraction`/
+   * `fraction`/`conveyanceMode`/`statedFraction`) are STRIPPED from
+   * `recordedFields`, so a promotion can only set descriptive + non-structural
+   * fields — it can never re-parent or re-fraction the node out from under the
+   * engine. The node keeps the full pass-through it was inserted with. A genuine
+   * fraction change on promotion (rare) must route through the engine/rebalance,
+   * not a raw field write; that path is intentionally NOT wired here.
+   */
+  resolveMissingLink: (
+    nodeId: string,
+    recordedFields?: Partial<OwnershipNode>
+  ) => boolean;
+  /**
+   * Toggle a placeholder's passthrough between `'indeterminate'` (numbers below
+   * the link held pending) and `'assume'` (numbers compute + show, still flagged
+   * and still held). No-op (returns false) if `nodeId` is not a placeholder.
+   */
+  setPlaceholderPassthrough: (
+    nodeId: string,
+    mode: PlaceholderPassthrough
+  ) => boolean;
   attachConveyance: (activeNodeId: string, attachParentId: string, calcShare: string, form: Partial<OwnershipNode>) => boolean;
   /**
    * Atomic batch attach (audit M1).
@@ -333,6 +389,182 @@ interface WorkspaceState {
 function findParentId(nodes: OwnershipNode[], nodeId: string): string | null {
   const node = nodes.find((n) => n.id === nodeId);
   return node?.parentId ?? null;
+}
+
+/** Default grantor/grantee label for an unknown Missing Link party. */
+const MISSING_LINK_UNKNOWN_PARTY = '??? — missing link';
+
+/**
+ * Options for {@link WorkspaceState.insertMissingLink}. All optional — an
+ * unknown party defaults to the `'??? — missing link'` stand-in, and an absent
+ * passthrough defaults to `'indeterminate'` (numbers below the link held pending).
+ */
+export interface MissingLinkOptions {
+  /** Known grantor of the unproven link, if any; defaults to the stand-in. */
+  grantor?: string;
+  /** Known grantee of the unproven link, if any; defaults to the stand-in. */
+  grantee?: string;
+  /** What is missing — the person/heir, the instrument, or both. Triage only. */
+  placeholderMissing?: PlaceholderMissing;
+  /** `'indeterminate'` (default) or `'assume'`. */
+  placeholderPassthrough?: PlaceholderPassthrough;
+  /** Free-text remarks carried onto the placeholder node. */
+  remarks?: string;
+}
+
+/** Deterministic id of the 'Missing link' issue scoped to a placeholder node. */
+function missingLinkIssueId(placeholderNodeId: string): string {
+  return `missing-link-${placeholderNodeId}`;
+}
+
+/** Build the High 'Missing link' title issue for a placeholder node. */
+function buildMissingLinkIssue(
+  placeholderNodeId: string,
+  deskMapId: string | null,
+  opts: MissingLinkOptions
+) {
+  const curative = useCurativeStore.getState();
+  const granteeLabel = (opts.grantee ?? '').trim() || MISSING_LINK_UNKNOWN_PARTY;
+  return createBlankTitleIssue(curative.workspaceId ?? '', {
+    id: missingLinkIssueId(placeholderNodeId),
+    title: `Missing link to ${granteeLabel}`,
+    issueType: 'Missing link',
+    priority: 'High',
+    affectedNodeId: placeholderNodeId,
+    affectedDeskMapId: deskMapId,
+    requiredCurativeAction:
+      'Prove the unproven link in the chain of title (locate the heirship, deed, or '
+      + 'other instrument) and resolve the placeholder; the branch below it is held '
+      + 'from transfer-order payout until the link is established.',
+    notes:
+      `Unproven ${opts.placeholderMissing ?? 'both'} between `
+      + `${(opts.grantor ?? '').trim() || MISSING_LINK_UNKNOWN_PARTY} and ${granteeLabel}.`,
+  });
+}
+
+/**
+ * Missing Link: a placeholder bridge stands in for an UNPROVEN gap in the chain.
+ * On insert/save we raise a High `'Missing link'` title issue scoped to the
+ * placeholder node — exactly mirroring {@link raiseOverConveyanceIssue}. The
+ * High issue auto-gates transfer-order payout and lights the Desk Map warning dot
+ * through the EXISTING curative machinery (no new wiring).
+ *
+ * Idempotent by the DETERMINISTIC id (LLA finding #6): the synchronous
+ * `titleIssues` read can lag the async `addIssue`, so two rapid inserts for the
+ * same node would otherwise double-raise the same `missing-link-<nodeId>`. We
+ * reject when an issue with that exact id already exists, regardless of whether
+ * its affectedNodeId still matches.
+ *
+ * Returns the (raised or already-present) issue id so the caller can tie an undo
+ * cascade to it.
+ */
+function raiseMissingLinkIssue(
+  placeholderNodeId: string,
+  deskMapId: string | null,
+  opts: MissingLinkOptions
+): string {
+  const issueId = missingLinkIssueId(placeholderNodeId);
+  const curative = useCurativeStore.getState();
+  const alreadyFlagged = (curative.titleIssues ?? []).some(
+    (issue) => issue.id === issueId
+  );
+  if (alreadyFlagged) return issueId;
+
+  const granteeLabel = (opts.grantee ?? '').trim() || MISSING_LINK_UNKNOWN_PARTY;
+  const issue = buildMissingLinkIssue(placeholderNodeId, deskMapId, opts);
+  // Mirror raiseOverConveyanceIssue: do NOT swallow a persistence failure. The
+  // placeholder was inserted and the branch below it must be HELD from payout;
+  // losing the High issue silently would drop that hold. Surface it as lastError.
+  void Promise.resolve(curative.addIssue?.(issue)).catch((err: unknown) => {
+    const message = err instanceof Error ? err.message : String(err);
+    useWorkspaceStore.setState({
+      lastError:
+        `Missing-link placeholder inserted for "${granteeLabel}" but its title issue could not `
+        + `be saved (${message}). The placeholder stands; re-flag the missing link before `
+        + `relying on the transfer order.`,
+    });
+  });
+  return issueId;
+}
+
+/**
+ * LLA finding #4: when a placeholder is deleted, its still-OPEN High 'Missing
+ * link' issue must not keep holding transfer-order payout or lighting a Desk Map
+ * dot for a node that no longer exists. `removeNode` already nulls `affectedNodeId`
+ * via `unlinkNode`, but an unlinked-yet-Open High issue still gates. So close
+ * each affected 'Missing link' issue (status 'Resolved' with an auto-note).
+ *
+ * Returns a `CurativeUndoCascade` (or null when nothing was affected) so the
+ * delete is undo-consistent: undo reopens + relinks the issue to its restored
+ * placeholder, redo re-closes it. Synchronous capture from the live curative
+ * store; the close itself runs through `updateIssue` (Dexie-persisted).
+ */
+function closeMissingLinkIssuesForDeletedNodes(
+  removedIds: ReadonlyArray<string>
+): CurativeUndoCascade | null {
+  const removedSet = new Set(removedIds);
+  const curative = useCurativeStore.getState();
+  const affected = (curative.titleIssues ?? []).filter(
+    (issue) =>
+      issue.issueType === 'Missing link'
+      && issue.affectedNodeId !== null
+      && removedSet.has(issue.affectedNodeId)
+      && !titleIssueIsClosed(issue)
+  );
+  if (affected.length === 0) return null;
+
+  // Capture prior state for an exact undo (status, resolution notes, the node
+  // link `unlinkNode` is about to null).
+  const priors = affected.map((issue) => ({
+    id: issue.id,
+    status: issue.status,
+    resolutionNotes: issue.resolutionNotes,
+    affectedNodeId: issue.affectedNodeId,
+  }));
+  const closeNote = (existing: string) =>
+    (existing ? `${existing}\n` : '')
+    + 'Placeholder deleted; missing-link hold released (auto-closed).';
+
+  for (const prior of priors) {
+    void Promise.resolve(
+      curative.updateIssue?.(prior.id, {
+        status: 'Resolved',
+        resolutionNotes: closeNote(prior.resolutionNotes),
+      })
+    ).catch((err: unknown) => {
+      const message = err instanceof Error ? err.message : String(err);
+      useWorkspaceStore.setState({
+        lastError:
+          `Placeholder deleted but its 'Missing link' title issue could not be closed `
+          + `(${message}); clear it in Curative before relying on the transfer order.`,
+      });
+    });
+  }
+
+  return {
+    undo: async () => {
+      const store = useCurativeStore.getState();
+      for (const prior of priors) {
+        // Reopen to the prior status and relink to the restored placeholder so
+        // the High hold returns exactly as it was before the delete.
+        await store.updateIssue?.(prior.id, {
+          status: prior.status,
+          resolutionNotes: prior.resolutionNotes,
+          affectedNodeId: prior.affectedNodeId,
+        });
+      }
+    },
+    redo: async () => {
+      const store = useCurativeStore.getState();
+      for (const prior of priors) {
+        await store.updateIssue?.(prior.id, {
+          status: 'Resolved',
+          resolutionNotes: closeNote(prior.resolutionNotes),
+          affectedNodeId: null,
+        });
+      }
+    },
+  };
 }
 
 /**
@@ -1336,6 +1568,229 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
     return false;
   },
 
+  insertMissingLink: (activeNodeId, newNodeId, opts = {}) => {
+    const state = get();
+    const activeNode = state.nodes.find((n) => n.id === activeNodeId);
+    if (!activeNode) {
+      set({ lastError: `Cannot insert a missing link above missing node ${activeNodeId}` });
+      return false;
+    }
+    if (activeNode.type === 'related') {
+      set({
+        lastError:
+          'Cannot insert a missing link above a related document or lease node',
+      });
+      return false;
+    }
+    const parentId = findParentId(state.nodes, activeNodeId);
+
+    // LOCKED DESIGN: a Missing Link is a FULL pass-through conveyance — it takes
+    // 100% of the node's interest so the node hangs under it carrying the same
+    // interest. So newInitialFraction = the node's current initialFraction. We
+    // do NOT invent an indeterminate sentinel and do NOT zero anything; the
+    // fraction math runs structurally as an ordinary 'all' pass-through. The
+    // "indeterminate" semantics are a derived display/payout overlay
+    // (collectUnprovenIndeterminateNodeIds), never a stored-fraction change.
+    const passthroughInitial = activeNode.initialFraction;
+
+    const form: Partial<OwnershipNode> = {
+      provenance: 'placeholder',
+      conveyanceMode: 'all',
+      grantor: (opts.grantor ?? '').trim() || MISSING_LINK_UNKNOWN_PARTY,
+      grantee: (opts.grantee ?? '').trim() || MISSING_LINK_UNKNOWN_PARTY,
+      remarks: (opts.remarks ?? '').trim(),
+      ...(opts.placeholderMissing ? { placeholderMissing: opts.placeholderMissing } : {}),
+      // Default 'indeterminate' stays absent so recorded-node byte-identity is
+      // never perturbed; only an explicit 'assume' is written.
+      ...(opts.placeholderPassthrough === 'assume'
+        ? { placeholderPassthrough: 'assume' as PlaceholderPassthrough }
+        : {}),
+    };
+
+    const result = executePredecessorInsert({
+      allNodes: state.nodes,
+      activeNodeId,
+      activeNodeParentId: parentId,
+      newPredecessorId: newNodeId,
+      newInitialFraction: passthroughInitial,
+      form,
+    });
+    if (!result.ok) {
+      set({ lastError: result.error.message });
+      return false;
+    }
+
+    // The placeholder joins the same tract as the node it now parents.
+    const childDeskMap = state.deskMaps.find((dm) => dm.nodeIds.includes(activeNodeId));
+    const targetDeskMapId = childDeskMap?.id
+      ?? resolveActiveDeskMapId(state.deskMaps, state.activeDeskMapId);
+    const dmUpdate = targetDeskMapId
+      ? {
+          deskMaps: state.deskMaps.map((dm) =>
+            dm.id === targetDeskMapId
+              ? { ...dm, nodeIds: [...dm.nodeIds, newNodeId] }
+              : dm
+          ),
+          activeDeskMapId: targetDeskMapId,
+        }
+      : {};
+    set({
+      nodes: result.data.map((node) => normalizeOwnershipNode(node)),
+      lastAudit: result.audit,
+      lastError: null,
+      ...dmUpdate,
+    });
+    if (journalTitleMutation('insertMissingLink', state, get()).rolledBack) return false;
+    // Raise the High 'Missing link' issue AFTER the canonical set(), mirroring
+    // the over-conveyance path; the existing curative machinery turns this into a
+    // transfer-order hold and a Desk Map warning dot.
+    const issueId = raiseMissingLinkIssue(newNodeId, targetDeskMapId ?? null, opts);
+    // LLA finding #1: the raise lives in the SEPARATE curative store, outside
+    // the title-slice snapshot, so a plain undo would restore the workspace
+    // (placeholder gone) while leaving the High issue orphaned. Tie the issue
+    // lifecycle to the SAME undo entry as the node mutation, mirroring the
+    // delete-path cascade: undo removes the issue (its placeholder is gone),
+    // redo re-raises it from a rebuilt payload.
+    const dm = targetDeskMapId ?? null;
+    const curativeCascade: CurativeUndoCascade = {
+      undo: async () => {
+        await useCurativeStore.getState().removeIssue?.(issueId);
+      },
+      redo: async () => {
+        await useCurativeStore.getState().addIssue?.(
+          buildMissingLinkIssue(newNodeId, dm, opts)
+        );
+      },
+    };
+    attachCurativeUndoCascade(curativeCascade);
+    return true;
+  },
+
+  setPlaceholderPassthrough: (nodeId, mode) => {
+    const state = get();
+    const node = state.nodes.find((n) => n.id === nodeId);
+    if (!node || !isPlaceholderNode(node)) {
+      set({ lastError: `Cannot set passthrough on non-placeholder node ${nodeId}` });
+      return false;
+    }
+    // 'indeterminate' is the absent default, so toggling back to it drops the
+    // key entirely (round-trip-clean); 'assume' is written explicitly.
+    const nextNode =
+      mode === 'assume'
+        ? normalizeOwnershipNode({ ...node, placeholderPassthrough: 'assume' })
+        : normalizeOwnershipNode({
+            ...node,
+            placeholderPassthrough: undefined as unknown as PlaceholderPassthrough,
+          });
+    set({
+      nodes: state.nodes.map((n) => (n.id === nodeId ? nextNode : n)),
+      lastError: null,
+    });
+    if (journalTitleMutation('setPlaceholderPassthrough', state, get()).rolledBack) {
+      return false;
+    }
+    return true;
+  },
+
+  resolveMissingLink: (nodeId, recordedFields = {}) => {
+    const state = get();
+    const node = state.nodes.find((n) => n.id === nodeId);
+    if (!node || !isPlaceholderNode(node)) {
+      set({ lastError: `Cannot resolve non-placeholder node ${nodeId}` });
+      return false;
+    }
+    // Promote to a recorded node: clear the placeholder markers, then layer the
+    // operator's real instrument + conveyance inputs on top. Strip the structural
+    // keys from recordedFields so a promotion can never re-parent or re-fraction
+    // the node out from under the engine — only the descriptive + non-structural
+    // inputs flow through. normalizeOwnershipNode drops the now-absent placeholder
+    // keys, so the node round-trips as an ordinary recorded conveyance.
+    //
+    // LLA finding #3: besides id/type/parentId/provenance/placeholder*, also strip
+    // initialFraction, fraction, conveyanceMode, and statedFraction. A raw promotion
+    // payload must never re-fraction or change the pass-through mode of the node
+    // out from under the engine — the placeholder was inserted as a full pass-through
+    // and the branch below it carries that interest. A genuine fraction change on
+    // promotion (rare) must route through the engine/rebalance, NOT a raw field
+    // write; that path is intentionally left out here (see resolveMissingLink JSDoc).
+    const {
+      id: _id,
+      type: _type,
+      parentId: _parentId,
+      provenance: _prov,
+      placeholderPassthrough: _pp,
+      placeholderMissing: _pm,
+      initialFraction: _initialFraction,
+      fraction: _fraction,
+      conveyanceMode: _conveyanceMode,
+      statedFraction: _statedFraction,
+      ...safeRecordedFields
+    } = recordedFields;
+    const promoted = normalizeOwnershipNode({
+      ...node,
+      provenance: 'recorded',
+      placeholderPassthrough: undefined,
+      placeholderMissing: undefined,
+      ...safeRecordedFields,
+    });
+    set({
+      nodes: state.nodes.map((n) => (n.id === nodeId ? promoted : n)),
+      lastError: null,
+    });
+    if (journalTitleMutation('resolveMissingLink', state, get()).rolledBack) return false;
+    // Close the linked 'Missing link' issue (Resolved).
+    const curative = useCurativeStore.getState();
+    const linked = (curative.titleIssues ?? []).find(
+      (issue) =>
+        issue.issueType === 'Missing link'
+        && issue.affectedNodeId === nodeId
+        && !titleIssueIsClosed(issue)
+    );
+    if (linked) {
+      const priorStatus = linked.status;
+      const priorResolutionNotes = linked.resolutionNotes;
+      const closeNote =
+        (priorResolutionNotes ? `${priorResolutionNotes}\n` : '')
+        + 'Missing link proven and placeholder promoted to a recorded node.';
+      // LLA finding #5: mirror raiseMissingLinkIssue — do NOT swallow a close
+      // failure. The link is promoted but its High issue is still OPEN, so it
+      // still gates payout/lights a dot; surface it as lastError.
+      void Promise.resolve(
+        curative.updateIssue?.(linked.id, {
+          status: 'Resolved',
+          resolutionNotes: closeNote,
+        })
+      ).catch((err: unknown) => {
+        const message = err instanceof Error ? err.message : String(err);
+        useWorkspaceStore.setState({
+          lastError:
+            `Link promoted but its title issue could not be closed (${message}); clear it in `
+            + `Curative before relying on the transfer order.`,
+        });
+      });
+      // LLA finding #2: a plain undo reopens the placeholder node (provenance
+      // back to 'placeholder') but would leave the issue stale-Resolved. Tie the
+      // status transition to the SAME journaled entry: undo reopens it (back to
+      // its prior open status), redo re-closes it.
+      const curativeCascade: CurativeUndoCascade = {
+        undo: async () => {
+          await useCurativeStore.getState().updateIssue?.(linked.id, {
+            status: priorStatus,
+            resolutionNotes: priorResolutionNotes,
+          });
+        },
+        redo: async () => {
+          await useCurativeStore.getState().updateIssue?.(linked.id, {
+            status: 'Resolved',
+            resolutionNotes: closeNote,
+          });
+        },
+      };
+      attachCurativeUndoCascade(curativeCascade);
+    }
+    return true;
+  },
+
   attachConveyance: (activeNodeId, attachParentId, calcShare, form) => {
     const state = get();
     const result = executeAttachConveyance({ allNodes: state.nodes, activeNodeId, attachParentId, calcShare, form });
@@ -1514,6 +1969,13 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
       deferUndoCascade: true,
     });
     if (verdict.rolledBack) return;
+    // LLA finding #4: close any still-Open High 'Missing link' issue whose
+    // placeholder is being deleted (so it stops holding payout / lighting a dot),
+    // and tie that reversal to the SAME undo entry as the node delete. Done
+    // synchronously here so the cascade attaches to the entry just pushed by the
+    // journal (the async IIFE below could race a subsequent mutation's push).
+    const missingLinkCascade = closeMissingLinkIssuesForDeletedNodes(removedIds);
+    if (missingLinkCascade) attachCurativeUndoCascade(missingLinkCascade);
     void (async () => {
       // Undo capture FIRST: read the rows these cascades are about to destroy
       // so undoLastTitleMutation can put them back verbatim.
@@ -1732,6 +2194,20 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
         });
       }
     }
+    // Missing Link: reverse the curative issue side on the SAME entry as the
+    // node restore (the issue lives in the separate curative store, outside the
+    // title-slice snapshot). A failure surfaces through lastError, mirroring the
+    // raise/close paths; the title cards are already restored either way.
+    if (entry.curativeCascade) {
+      try {
+        await entry.curativeCascade.undo();
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        set({
+          lastError: `Undo restored the title cards, but the linked 'Missing link' title issue could not be updated: ${message}. Reconcile it in Curative before relying on the transfer order.`,
+        });
+      }
+    }
     pushTitleRedoEntry({
       mutation: entry.mutation,
       label: entry.label,
@@ -1740,6 +2216,7 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
       afterWorkspace: snapshotWorkspaceData(before),
       cascadeBundle: bundle,
       cascadeReapply,
+      curativeCascade: entry.curativeCascade,
     });
     return true;
   },
@@ -1773,6 +2250,18 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
         });
       }
     }
+    // Missing Link: re-apply the curative issue side (re-raise / re-close) on
+    // the SAME entry as the node restore. Mirrors the undo reverse above.
+    if (entry.curativeCascade) {
+      try {
+        await entry.curativeCascade.redo();
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        set({
+          lastError: `Redo restored the title cards, but the linked 'Missing link' title issue could not be updated: ${message}. Reconcile it in Curative before relying on the transfer order.`,
+        });
+      }
+    }
     // Hand the entry back to the undo stack so the redo can itself be undone;
     // the original bundle still restores the cascade-deleted rows verbatim.
     pushTitleUndoEntry({
@@ -1780,6 +2269,7 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
       label: entry.label,
       beforeWorkspace: snapshotWorkspaceData(before),
       cascade: Promise.resolve(entry.cascadeBundle),
+      curativeCascade: entry.curativeCascade,
     });
     return true;
   },

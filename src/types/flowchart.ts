@@ -34,6 +34,31 @@ export interface OwnershipNodeData {
    * in print instead of silently showing baked-in numbers.
    */
   stale?: boolean;
+  /**
+   * Missing Link overlay (placeholder provenance). When true the card renders in
+   * the distinct dashed-amber placeholder state with the "⚠ MISSING LINK" badge
+   * — it can NEVER be mistaken for a recorded link. Absent on ordinary recorded
+   * nodes so their card is byte-identical to today's.
+   */
+  isPlaceholder?: boolean;
+  /**
+   * Placeholder only: what is missing — `'person'`, `'instrument'`, or `'both'`.
+   * Drives the "what's-missing" line on the card. Triage/display only.
+   */
+  placeholderMissing?: 'person' | 'instrument' | 'both';
+  /**
+   * Display/payout overlay: this node sits AT or BELOW an `'indeterminate'`
+   * Missing Link, so its fraction lines render as "—" with a "pending — unproven
+   * link" hint instead of a computed number. Derived per render from
+   * `collectUnprovenIndeterminateNodeIds`; never a stored-fraction change.
+   */
+  unprovenPending?: boolean;
+  /**
+   * Display overlay: this node descends from an `'assume'` Missing Link, so the
+   * numbers DO compute and show, but the card carries a small "subject to
+   * unproven link" flag. Derived per render.
+   */
+  assumeFlagged?: boolean;
 }
 
 export interface ShapeNodeData {

@@ -334,7 +334,8 @@ export function TitleLedgerStatusBannerContent({
   const role = lastDivergence || lastError ? 'alert' : 'status';
 
   // The record-layer read path can flip to cutover only when readiness is green
-  // AND governance is armed (DA-C1: disarmed pending the Springhill soak), and
+  // AND governance is armed (DA-C1: disarmed by deliberate governance; the
+  // Springhill soak is complete — re-arming is a deliberate code change), and
   // can always revert. The live Desk Map / math stay store-canonical regardless.
   const canFlip = !isCutover && readiness.ready && armed;
   const buttonLabel = isCutover ? 'Revert to shadow' : 'Flip to cutover';
@@ -344,7 +345,7 @@ export function TitleLedgerStatusBannerContent({
     : canFlip
       ? 'Flip the title record read path to the durable ledger (cutover). Reversible.'
       : !armed && readiness.ready
-        ? 'Cutover is disarmed pending the Springhill soak; re-arming is a deliberate code change (DA-C1).'
+        ? 'Cutover is disarmed by deliberate governance (DA-C1); the Springhill soak is complete — re-arming is a deliberate code change.'
         : 'Disabled until the readiness gates are green.';
 
   return (
@@ -371,8 +372,8 @@ export function TitleLedgerStatusBannerContent({
           ) : null}
           {!isCutover && readiness.ready && !armed ? (
             <p className="text-xs leading-5 text-slate-700">
-              Readiness is green, but the flip stays disarmed pending the Springhill
-              soak. Re-arming is a deliberate code change.
+              Readiness is green, but the flip stays disarmed by deliberate
+              governance. The Springhill soak is complete; re-arming is a deliberate code change.
             </p>
           ) : null}
           <dl className="mt-2 grid gap-x-4 gap-y-1 text-xs sm:grid-cols-2 lg:grid-cols-4">

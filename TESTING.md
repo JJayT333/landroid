@@ -62,9 +62,7 @@ For hosted persistence-key changes, include
 
 ## E2E Status
 
-As of the current handoff:
-
-- 11 Playwright workflows are active.
+- The Playwright workflows in `tests/e2e/landroid-workflows.spec.ts` are active.
 - No Phase 5 Playwright workflows remain intentionally skipped.
 - Browser coverage includes multi-document Desk Map chips opening the correct
   PDF by `attachmentId`, v8 `.landroid` export/import document round-trip,

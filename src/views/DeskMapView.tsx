@@ -24,6 +24,7 @@ import {
   findNpriBranchDiscrepancies,
   type NpriBranchDiscrepancy,
 } from '../title-math';
+import { buildPlaceholderOverlay } from '../engine/tree-layout';
 import DeskMapCard from '../components/deskmap/DeskMapCard';
 import DeskMapLeaseCard from '../components/deskmap/DeskMapLeaseCard';
 import DeskMapNpriCard from '../components/deskmap/DeskMapNpriCard';
@@ -61,6 +62,7 @@ import {
 } from '../components/deskmap/lease-helpers';
 import ConveyModal from '../components/modals/ConveyModal';
 import PredecessorModal from '../components/modals/PredecessorModal';
+import InsertMissingLinkModal from '../components/modals/InsertMissingLinkModal';
 import { useConfirmation } from '../components/shared/ConfirmationProvider';
 import OwnershipNodeEditorModals from '../components/shared/OwnershipNodeEditorModals';
 import {
@@ -89,12 +91,16 @@ interface TreeBranchProps {
   npriDiscrepancyNodeIds: Set<string>;
   npriDiscrepancyByNpriNodeId: Map<string, NpriBranchDiscrepancy>;
   npriDiscrepancyCountByBranchNodeId: Map<string, number>;
+  unprovenPendingNodeIds: ReadonlySet<string>;
+  assumeFlaggedNodeIds: ReadonlySet<string>;
   onEdit: (id: string) => void;
   onConvey: (id: string) => void;
   onPrecede: (id: string) => void;
   onLease: (id: string) => void;
   onDelete: (id: string) => void;
   onViewDoc: (id: string) => void;
+  onInsertMissingLink: (id: string) => void;
+  onResolveMissingLink: (id: string) => void;
   readOnly: boolean;
 }
 
@@ -105,12 +111,16 @@ function TreeBranchComponent({
   npriDiscrepancyNodeIds,
   npriDiscrepancyByNpriNodeId,
   npriDiscrepancyCountByBranchNodeId,
+  unprovenPendingNodeIds,
+  assumeFlaggedNodeIds,
   onEdit,
   onConvey,
   onPrecede,
   onLease,
   onDelete,
   onViewDoc,
+  onInsertMissingLink,
+  onResolveMissingLink,
   readOnly,
 }: TreeBranchProps) {
   const leaseNode = isLeaseNode(tree.node);
@@ -146,12 +156,16 @@ function TreeBranchComponent({
           npriDiscrepancyCount={
             npriDiscrepancyCountByBranchNodeId.get(tree.node.id) ?? 0
           }
+          unprovenPending={unprovenPendingNodeIds.has(tree.node.id)}
+          assumeFlagged={assumeFlaggedNodeIds.has(tree.node.id)}
           onEdit={onEdit}
           onConvey={onConvey}
           onPrecede={onPrecede}
           onLease={onLease}
           onDelete={onDelete}
           onViewDoc={onViewDoc}
+          onInsertMissingLink={onInsertMissingLink}
+          onResolveMissingLink={onResolveMissingLink}
           readOnly={readOnly}
         />
       )}
@@ -167,12 +181,16 @@ function TreeBranchComponent({
               npriDiscrepancyNodeIds={npriDiscrepancyNodeIds}
               npriDiscrepancyByNpriNodeId={npriDiscrepancyByNpriNodeId}
               npriDiscrepancyCountByBranchNodeId={npriDiscrepancyCountByBranchNodeId}
+              unprovenPendingNodeIds={unprovenPendingNodeIds}
+              assumeFlaggedNodeIds={assumeFlaggedNodeIds}
               onEdit={onEdit}
               onConvey={onConvey}
               onPrecede={onPrecede}
               onLease={onLease}
               onDelete={onDelete}
               onViewDoc={onViewDoc}
+              onInsertMissingLink={onInsertMissingLink}
+              onResolveMissingLink={onResolveMissingLink}
               readOnly={readOnly}
             />
           ))}
@@ -194,12 +212,16 @@ function treeBranchPropsAreEqual(
     previous.npriDiscrepancyByNpriNodeId === next.npriDiscrepancyByNpriNodeId &&
     previous.npriDiscrepancyCountByBranchNodeId ===
       next.npriDiscrepancyCountByBranchNodeId &&
+    previous.unprovenPendingNodeIds === next.unprovenPendingNodeIds &&
+    previous.assumeFlaggedNodeIds === next.assumeFlaggedNodeIds &&
     previous.onEdit === next.onEdit &&
     previous.onConvey === next.onConvey &&
     previous.onPrecede === next.onPrecede &&
     previous.onLease === next.onLease &&
     previous.onDelete === next.onDelete &&
     previous.onViewDoc === next.onViewDoc &&
+    previous.onInsertMissingLink === next.onInsertMissingLink &&
+    previous.onResolveMissingLink === next.onResolveMissingLink &&
     previous.readOnly === next.readOnly
   );
 }
@@ -889,6 +911,11 @@ export default function DeskMapView() {
   const [editorRoute, setEditorRoute] = useState<NodeEditorRoute | null>(null);
   const [conveyParentId, setConveyParentId] = useState<string | null>(null);
   const [precedeNodeId, setPrecedeNodeId] = useState<string | null>(null);
+  // Missing Link modal: 'insert' targets the node the placeholder sits above;
+  // 'resolve' targets the placeholder being promoted to recorded.
+  const [missingLinkTarget, setMissingLinkTarget] = useState<
+    { nodeId: string; mode: 'insert' | 'resolve' } | null
+  >(null);
   const [npriParentId, setNpriParentId] = useState<string | null>(null);
   const [pdfViewDocId, setPdfViewDocId] = useState<string | null>(null);
   const [ownerSearchQuery, setOwnerSearchQuery] = useState('');
@@ -1050,6 +1077,13 @@ export default function DeskMapView() {
     () => buildNpriBranchDiscrepancyHighlightState(nodes),
     [nodes]
   );
+  // Missing Link display/payout overlay — which nodes render "pending" (below an
+  // indeterminate link) vs "subject to unproven link" (below an assume link).
+  // Derived from the unchanged stored fractions; never a stored-fraction change.
+  const placeholderOverlay = useMemo(
+    () => buildPlaceholderOverlay(nodes),
+    [nodes]
+  );
   const visibleNpriDiscrepancies = useMemo(() => {
     if (!activeDeskMap) {
       return [];
@@ -1084,6 +1118,9 @@ export default function DeskMapView() {
       : null;
   const conveyParent = conveyParentId ? nodeById.get(conveyParentId) ?? null : null;
   const precedeNode = precedeNodeId ? nodeById.get(precedeNodeId) ?? null : null;
+  const missingLinkNode = missingLinkTarget
+    ? nodeById.get(missingLinkTarget.nodeId) ?? null
+    : null;
 
   useEffect(() => {
     setOwnerSearchMatchIndex(0);
@@ -1135,6 +1172,16 @@ export default function DeskMapView() {
   const handlePrecede = useCallback((id: string) => {
     if (readOnly) return;
     setPrecedeNodeId(id);
+  }, [readOnly]);
+
+  const handleInsertMissingLink = useCallback((id: string) => {
+    if (readOnly) return;
+    setMissingLinkTarget({ nodeId: id, mode: 'insert' });
+  }, [readOnly]);
+
+  const handleResolveMissingLink = useCallback((id: string) => {
+    if (readOnly) return;
+    setMissingLinkTarget({ nodeId: id, mode: 'resolve' });
   }, [readOnly]);
 
   const handleLease = useCallback((id: string) => {
@@ -1611,12 +1658,16 @@ export default function DeskMapView() {
                   npriDiscrepancyCountByBranchNodeId={
                     npriDiscrepancyState.discrepancyCountByBranchNodeId
                   }
+                  unprovenPendingNodeIds={placeholderOverlay.pendingIds}
+                  assumeFlaggedNodeIds={placeholderOverlay.assumeFlaggedIds}
                   onEdit={handleEdit}
                   onConvey={handleConvey}
                   onPrecede={handlePrecede}
                   onLease={handleLease}
                   onDelete={handleDelete}
                   onViewDoc={handleViewDoc}
+                  onInsertMissingLink={handleInsertMissingLink}
+                  onResolveMissingLink={handleResolveMissingLink}
                   readOnly={readOnly}
                 />
               ))}
@@ -1665,6 +1716,16 @@ export default function DeskMapView() {
           <PredecessorModal
             node={precedeNode}
             onClose={() => setPrecedeNodeId(null)}
+          />
+        )}
+
+        {/* Missing Link modal — insert (above a recorded node) or resolve
+            (promote a placeholder to recorded). */}
+        {missingLinkNode && missingLinkTarget && (
+          <InsertMissingLinkModal
+            node={missingLinkNode}
+            mode={missingLinkTarget.mode}
+            onClose={() => setMissingLinkTarget(null)}
           />
         )}
 

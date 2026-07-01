@@ -19,6 +19,39 @@ export type ConveyanceMode = 'fraction' | 'fixed' | 'all';
 export type SplitBasis = 'initial' | 'remaining' | 'whole';
 export type NodeType = 'conveyance' | 'related';
 export type RelatedNodeKind = 'document' | 'lease';
+
+/**
+ * Node provenance — recorded vs. an unproven "Missing Link" placeholder.
+ *
+ * `'recorded'` (default, ABSENT on the node) — an ordinary node backed by a
+ * recorded instrument; today's behavior, participates in title math normally.
+ *
+ * `'placeholder'` — a **Missing Link**: a stand-in for an unproven gap in the
+ * chain (e.g. "grandma → ??? → grandson", an heirship or deed we cannot yet
+ * establish). A placeholder is still a `type: 'conveyance'` node so it sits
+ * structurally IN the chain and can parent the next owner, but the engine treats
+ * it as a COMPUTATION BARRIER: it never fabricates a fraction below itself. The
+ * record still saves and renders (warn-don't-block, like an over-conveyance);
+ * it just refuses to pass a computed interest through an unproven link.
+ */
+export type NodeProvenance = 'recorded' | 'placeholder';
+
+/**
+ * For a Missing Link placeholder only: what the interest BELOW the unproven link
+ * does.
+ *
+ * `'indeterminate'` (default, ABSENT) — nothing is computed past the link; the
+ * branch below renders as "pending" and is held from payout. Honors the
+ * never-fabricate rule.
+ *
+ * `'assume'` — assume the grantor's whole interest carried down to the grantee
+ * and keep computing, but every figure below is flagged "subject to unproven
+ * link." The explicit working-estimate override.
+ */
+export type PlaceholderPassthrough = 'indeterminate' | 'assume';
+
+/** For a Missing Link placeholder only: what is missing. Display/triage only. */
+export type PlaceholderMissing = 'person' | 'instrument' | 'both';
 export type InterestClass = 'mineral' | 'npri';
 export type FixedRoyaltyBasis = 'burdened_branch' | 'whole_tract' | null;
 /**
@@ -212,6 +245,27 @@ export interface OwnershipNode {
    * Absent by default. Lease-nodes only.
    */
   leaseTractGrossAcres?: string;
+
+  /**
+   * Missing Link placeholder marker. Absent on ordinary recorded nodes
+   * (= `'recorded'`); set to `'placeholder'` to mark an UNPROVEN link between two
+   * known owners. The engine then treats this node as a computation barrier and
+   * never fabricates a fraction below it. See {@link isPlaceholderNode}. Optional
+   * and absent by default so recorded nodes and legacy data round-trip
+   * byte-identically.
+   */
+  provenance?: NodeProvenance;
+  /**
+   * Placeholder only: whether interest below the unproven link is left
+   * `'indeterminate'` (default, absent) or `'assume'`d to pass through in full
+   * (flagged). See {@link placeholderPassthroughOf}.
+   */
+  placeholderPassthrough?: PlaceholderPassthrough;
+  /**
+   * Placeholder only: what is missing — the person/heir, the instrument, or both.
+   * Display/triage only; never read by the math.
+   */
+  placeholderMissing?: PlaceholderMissing;
 
   // UI state
   isCollapsed: boolean;
@@ -554,6 +608,59 @@ export function createBlankNode(id: string, parentId: string | null = null): Own
   };
 }
 
+const NODE_PROVENANCE_VALUES: readonly NodeProvenance[] = ['recorded', 'placeholder'];
+const PLACEHOLDER_PASSTHROUGH_VALUES: readonly PlaceholderPassthrough[] = [
+  'indeterminate',
+  'assume',
+];
+const PLACEHOLDER_MISSING_VALUES: readonly PlaceholderMissing[] = [
+  'person',
+  'instrument',
+  'both',
+];
+
+function normalizeProvenance(value: unknown): NodeProvenance | null {
+  return typeof value === 'string'
+    && (NODE_PROVENANCE_VALUES as readonly string[]).includes(value)
+    ? (value as NodeProvenance)
+    : null;
+}
+
+function normalizePlaceholderPassthrough(value: unknown): PlaceholderPassthrough | null {
+  return typeof value === 'string'
+    && (PLACEHOLDER_PASSTHROUGH_VALUES as readonly string[]).includes(value)
+    ? (value as PlaceholderPassthrough)
+    : null;
+}
+
+function normalizePlaceholderMissing(value: unknown): PlaceholderMissing | null {
+  return typeof value === 'string'
+    && (PLACEHOLDER_MISSING_VALUES as readonly string[]).includes(value)
+    ? (value as PlaceholderMissing)
+    : null;
+}
+
+/**
+ * A Missing Link placeholder — a node marking an unproven gap in the chain. The
+ * single predicate the engine, store, and UI all read.
+ */
+export function isPlaceholderNode(node: Pick<OwnershipNode, 'provenance'>): boolean {
+  return node.provenance === 'placeholder';
+}
+
+/**
+ * The passthrough mode of a placeholder: `'indeterminate'` by default (the key is
+ * absent unless explicitly `'assume'`). Returns `null` for non-placeholder nodes.
+ */
+export function placeholderPassthroughOf(
+  node: Pick<OwnershipNode, 'provenance' | 'placeholderPassthrough'>
+): PlaceholderPassthrough | null {
+  if (node.provenance !== 'placeholder') {
+    return null;
+  }
+  return node.placeholderPassthrough ?? 'indeterminate';
+}
+
 export function normalizeOwnershipNode(
   node: Pick<OwnershipNode, 'id'> & Partial<OwnershipNode>
 ): OwnershipNode {
@@ -565,6 +672,9 @@ export function normalizeOwnershipNode(
     interestClass === 'npri' && royaltyKind === 'fixed'
       ? explicitFixedRoyaltyBasis ?? (splitBasis === 'whole' ? 'whole_tract' : 'burdened_branch')
       : null;
+  const provenance = normalizeProvenance(node.provenance);
+  const placeholderMissing =
+    provenance === 'placeholder' ? normalizePlaceholderMissing(node.placeholderMissing) : null;
 
   return {
     ...createBlankNode(node.id, node.parentId ?? null),
@@ -649,6 +759,18 @@ export function normalizeOwnershipNode(
       && node.leaseTractGrossAcres.trim().length > 0
       ? { leaseTractGrossAcres: node.leaseTractGrossAcres.trim() }
       : {}),
+    // Missing Link placeholder (unproven gap in the chain). All three keys are
+    // ABSENT by default — only a placeholder carries `provenance`, only an
+    // explicit working-estimate override carries `placeholderPassthrough: 'assume'`
+    // (default 'indeterminate' stays absent), and `placeholderMissing` is present
+    // only when set on a placeholder — so recorded nodes and legacy data
+    // round-trip byte-identically (the byte-identity oracle stays clean).
+    ...(provenance === 'placeholder' ? { provenance } : {}),
+    ...(provenance === 'placeholder'
+      && normalizePlaceholderPassthrough(node.placeholderPassthrough) === 'assume'
+      ? { placeholderPassthrough: 'assume' as PlaceholderPassthrough }
+      : {}),
+    ...(placeholderMissing ? { placeholderMissing } : {}),
   };
 }
 
